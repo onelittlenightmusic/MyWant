@@ -140,11 +140,10 @@ func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	migratedCount := 0
 	for _, runtimeWant := range cb.wants {
 		if runtimeWant.want != nil {
-			if runtimeWant.want.State != nil {
-				if _, exists := runtimeWant.want.State["agent_history"]; exists {
-					runtimeWant.want.migrateAgentHistoryFromState()
-					migratedCount++
-				}
+			if _, exists := runtimeWant.want.GetState("agent_history"); exists {
+				// Remove legacy agent_history from state
+				runtimeWant.want.StoreState("agent_history", nil)
+				migratedCount++
 			}
 		}
 	}

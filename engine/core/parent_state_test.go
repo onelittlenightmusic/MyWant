@@ -11,7 +11,6 @@ import (
 func TestGetParentState_NoParent(t *testing.T) {
 	child := &Want{
 		Metadata: Metadata{Name: "child", Type: "test"},
-		State:    make(map[string]any),
 	}
 
 	val, ok := child.GetParentState("budget")
@@ -30,7 +29,6 @@ func TestGetParentWant_NoControllerOwner(t *testing.T) {
 				{Kind: "Want", ID: "parent-id", Controller: false},
 			},
 		},
-		State: make(map[string]any),
 	}
 
 	parent := child.GetParentWant()
@@ -48,8 +46,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 			ID:   "travel-coord-id",
 			Type: "coordinator",
 		},
-		Spec:  WantSpec{Params: make(map[string]any)},
-		State: make(map[string]any),
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	// Set initial budget on parent
 	parentWant.StoreState("budget", 5000.0)
@@ -72,8 +69,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 					{Kind: "Want", ID: "travel-coord-id", Controller: true},
 				},
 			},
-			Spec:  WantSpec{Params: make(map[string]any)},
-			State: make(map[string]any),
+			Spec: WantSpec{Params: make(map[string]any)},
 		}
 	}
 
@@ -142,8 +138,7 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 			ID:   "parent-id",
 			Type: "coordinator",
 		},
-		Spec:  WantSpec{Params: make(map[string]any)},
-		State: make(map[string]any),
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	parentWant.StoreState("costs", map[string]any{})
 
@@ -169,8 +164,8 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 						{Kind: "Want", ID: "parent-id", Controller: true},
 					},
 				},
-				State: make(map[string]any),
-			}
+				}
+
 			child.MergeParentState(map[string]any{
 				"costs": map[string]any{
 					fmt.Sprintf("item-%d", idx): float64(idx * 100),
@@ -214,8 +209,7 @@ func TestParentStateAccess_Cache(t *testing.T) {
 			ID:   "parent-id",
 			Type: "coordinator",
 		},
-		Spec:  WantSpec{Params: make(map[string]any)},
-		State: make(map[string]any),
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	parentWant.StoreState("value", "original")
 
@@ -233,7 +227,6 @@ func TestParentStateAccess_Cache(t *testing.T) {
 				{Kind: "Want", ID: "parent-id", Controller: true},
 			},
 		},
-		State: make(map[string]any),
 	}
 
 	// First access populates cache
@@ -268,8 +261,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 			ID:   "coord-e2e-id",
 			Type: "coordinator",
 		},
-		Spec:  WantSpec{Params: make(map[string]any)},
-		State: make(map[string]any),
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	coordinator.StoreState("budget", 5000.0)
 	coordinator.StoreState("costs", map[string]any{})
@@ -457,8 +449,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 			ID:   "concurrent-coord-id",
 			Type: "coordinator",
 		},
-		Spec:  WantSpec{Params: make(map[string]any)},
-		State: make(map[string]any),
+		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	coordinator.StoreState("costs", map[string]any{})
 
@@ -549,7 +540,6 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 func TestStoreParentState_NoParentWarning(t *testing.T) {
 	child := &Want{
 		Metadata: Metadata{Name: "orphan", Type: "test"},
-		State:    make(map[string]any),
 	}
 
 	// Should not panic, just log a warning

@@ -31,7 +31,6 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 		Metadata: metadata,
 		Spec:     spec,
 		Status:   WantStatusIdle,
-		State:    make(map[string]any),
 	}
 
 	baseWant := NewBaseNotifiableWant(want, 200) // Larger buffer for monitor

@@ -1,4 +1,4 @@
-module mywant/engine
+module mywant
 
 go 1.25.0
 

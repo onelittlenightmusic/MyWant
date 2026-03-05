@@ -12,9 +12,16 @@ func init() {
 	RegisterThinkAgent(budgetThinkerAgentName, budgetThinkerThink)
 }
 
-// budgetThinkerThink runs in two phases on each tick:
 func budgetThinkerThink(ctx context.Context, want *Want) error {
-	budget, _ := want.GetStateFloat64("budget", 5000.0)
+	// ── Phase 0: Initialize Goal ──────────────────────────────────────────
+	budget, ok := want.GetGoal("budget_limit")
+	if !ok || budget == nil {
+		legacyBudget, _ := want.GetStateFloat64("budget", 5000.0)
+		want.SetGoal("budget_limit", legacyBudget)
+		budget = legacyBudget
+	}
+	budgetVal := toFloat64(budget)
+
 	cb := GetGlobalChainBuilder()
 	if cb == nil { return nil }
 
@@ -23,19 +30,17 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	if hasItinerary {
 		itinerary, ok := itineraryRaw.(map[string]any)
 		if ok && len(itinerary) > 0 {
-			// Filter to only include active (non-cancelled) wants
 			activeItems := make(map[string]any)
 			for wantName, entry := range itinerary {
-				// Find the actual want to check its status
 				w, found := cb.FindWantByName(wantName)
 				if found && (w.Status == WantStatusCancelled || w.Status == WantStatusFailed) {
-					continue // Skip inactive wants
+					continue
 				}
 				activeItems[wantName] = entry
 			}
 
 			if len(activeItems) > 0 {
-				perWant := budget / float64(len(activeItems))
+				perWant := budgetVal / float64(len(activeItems))
 				targetBudgets := make(map[string]any, len(activeItems))
 				for wantName, entry := range activeItems {
 					wantType := ""
@@ -49,18 +54,15 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 					}
 				}
 				want.MergeParentState(map[string]any{"target_budgets": targetBudgets})
-				want.StoreLog("[BudgetThinker] Allocated %.2f per want across %d active itinerary items (out of %d total)", 
-					perWant, len(activeItems), len(itinerary))
 			}
 		}
 	}
 
-	// ── Phase 2: Aggregate reported costs ───────────────────────────────────
+	// ── Phase 2: Aggregate reported costs (Current State) ──────────────────
 	costsRaw, hasCosts := want.GetParentState("costs")
 	costs := map[string]any{}
 	if hasCosts {
 		if m, ok := costsRaw.(map[string]any); ok {
-			// Filter costs: skip entries from cancelled wants
 			for wantName, cost := range m {
 				w, found := cb.FindWantByName(wantName)
 				if found && (w.Status == WantStatusCancelled || w.Status == WantStatusFailed) {
@@ -79,17 +81,18 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 		totalCost += toFloat64(v)
 	}
 
-	remaining := budget - totalCost
-	exceeded := totalCost > budget
+	remaining := budgetVal - totalCost
+	exceeded := totalCost > budgetVal
 
-	want.StoreStateMulti(Dict{
-		"costs":            costs,
-		"total_cost":       totalCost,
-		"remaining_budget": remaining,
-		"budget_exceeded":  exceeded,
-		"budget_summary": fmt.Sprintf("Budget: %.2f, Spent: %.2f, Remaining: %.2f (%d costs reported)",
-			budget, totalCost, remaining, len(costs)),
-	})
-	want.StoreLog("[BudgetThinker] Updated: total=%.2f, remaining=%.2f, %d costs", totalCost, remaining, len(costs))
+	// Update GCP Current State (Domain-specific facts)
+	want.SetCurrent("total_spent", totalCost)
+	want.SetCurrent("remaining_budget", remaining)
+	want.SetCurrent("budget_exceeded", exceeded)
+	
+	summary := fmt.Sprintf("Budget: %.2f, Spent: %.2f, Remaining: %.2f (%d costs reported)",
+		budgetVal, totalCost, remaining, len(costs))
+	want.SetCurrent("budget_summary", summary)
+	want.SetCurrent("costs", costs)
+
 	return nil
 }

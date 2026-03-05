@@ -49,7 +49,6 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			Metadata:             metadata,
 			Spec:                 spec,
 			Status:               WantStatusIdle,
-			State:                make(map[string]any),
 			PreservePendingState: true, // Target aggregates MergeParentState writes across iterations
 		},
 		MaxDisplay:   1000,
@@ -530,13 +529,13 @@ drained:
 				approvalStatus = "failed"
 			}
 			var finalResultDescription string
-			if res, ok := t.State["result"].(string); ok {
+			if res, ok := t.GetStateString("result", ""); ok && res != "" {
 				finalResultDescription = res
 			} else {
 				finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
 			}
 			var evidenceMap map[string]any
-			if ev, ok := t.State["final_itinerary"]; ok {
+			if ev, ok := t.GetState("final_itinerary"); ok {
 				if bytes, err := json.Marshal(ev); err == nil {
 					json.Unmarshal(bytes, &evidenceMap)
 				}
@@ -948,25 +947,23 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 	}
 
 	if strings.HasPrefix(fieldName, ".") {
-		return t.extractValueByPath(want.State, fieldName)
+		return t.extractValueByPath(want.GetAllState(), fieldName)
 	}
 
 	// Try to get the specified stat from the want's State map
-	if want.State != nil {
-		if value, ok := want.State[fieldName]; ok {
+	if value, ok := want.GetState(fieldName); ok {
+		return value
+	}
+	if value, ok := want.GetState(strings.ToLower(fieldName)); ok {
+		return value
+	}
+	if fieldName == "TotalProcessed" {
+		if value, ok := want.GetStateInt("total_processed", 0); ok {
 			return value
-		}
-		if value, ok := want.State[strings.ToLower(fieldName)]; ok {
-			return value
-		}
-		if fieldName == "TotalProcessed" {
-			if value, ok := want.GetStateInt("total_processed", 0); ok {
-				return value
-			}
 		}
 	}
 
-	t.StoreLog("[TARGET] ⚠️  Target %s: Field '%s' not found in want '%s' (available: %v)\n", t.Metadata.Name, fieldName, spec.WantName, want.State)
+	t.StoreLog("[TARGET] ⚠️  Target %s: Field '%s' not found in want '%s'\n", t.Metadata.Name, fieldName, spec.WantName)
 	return 0
 }
 
@@ -1059,16 +1056,11 @@ func (t *Target) computeFallbackResult() {
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
 	for _, child := range childWants {
-		if child.State != nil {
-			if processed, ok := child.GetStateInt("total_processed", 0); ok {
-				totalProcessed += processed
-			} else if processed, ok := child.GetStateInt("TotalProcessed", 0); ok {
-				totalProcessed += processed
-			}
+		if processed, ok := child.GetStateInt("total_processed", 0); ok {
+			totalProcessed += processed
+		} else if processed, ok := child.GetStateInt("TotalProcessed", 0); ok {
+			totalProcessed += processed
 		}
-	}
-	if t.State == nil {
-		t.State = make(map[string]any)
 	}
 	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)

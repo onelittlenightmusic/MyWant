@@ -199,7 +199,6 @@ func TestGlobalState_WantMethods(t *testing.T) {
 
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
-		State:    make(map[string]any),
 	}
 
 	want.StoreGlobalState("wkey", "wvalue")
@@ -223,7 +222,6 @@ func TestGlobalState_ParentStateFallback(t *testing.T) {
 	// Want with no parent
 	orphan := &Want{
 		Metadata: Metadata{Name: "orphan", Type: "test"},
-		State:    make(map[string]any),
 	}
 
 	// StoreParentState should fall back to globalState

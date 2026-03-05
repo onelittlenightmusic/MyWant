@@ -9,7 +9,6 @@ func TestWantStateManagement(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
 		Spec:     WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 	}
 
 	// Test storing state
@@ -64,7 +63,6 @@ func TestWantExecCycle(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test-want", Type: "test"},
 		Spec:     WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 	}
 
 	// Test exec cycle batching

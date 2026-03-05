@@ -235,13 +235,14 @@ func NewWantWithLocals(
 
 // Want represents a processing unit in the chain
 type Want struct {
-	Metadata    Metadata       `json:"metadata" yaml:"metadata"`
-	Spec        WantSpec       `json:"spec" yaml:"spec"`
-	Status      WantStatus     `json:"status,omitempty" yaml:"status,omitempty"`
-	State       map[string]any `json:"state,omitempty" yaml:"state,omitempty"`
-	HiddenState map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
-	History     WantHistory    `json:"history" yaml:"-"`
-	Hash        string         `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
+	Metadata    Metadata                `json:"metadata" yaml:"metadata"`
+	Spec        WantSpec                `json:"spec" yaml:"spec"`
+	Status      WantStatus              `json:"status,omitempty" yaml:"status,omitempty"`
+	State       sync.Map                `json:"-" yaml:"-"`
+	StateLabels map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
+	HiddenState map[string]any          `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
+	History     WantHistory             `json:"history" yaml:"-"`
+	Hash        string                  `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// History ring buffers - private, lock-free concurrent stores (populated at runtime, not serialized)
 	stateHistoryRing     *ringBuffer[StateHistoryEntry] `json:"-" yaml:"-"`
@@ -257,11 +258,11 @@ type Want struct {
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
-	pendingStateChanges     map[string]any `json:"-" yaml:"-"`
-	pendingParameterChanges map[string]any `json:"-" yaml:"-"`
-	execCycleCount          int            `json:"-" yaml:"-"`
-	inExecCycle             bool           `json:"-" yaml:"-"`
-	pendingLogs             []string       `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
+	pendingStateChanges     sync.Map `json:"-" yaml:"-"`
+	pendingParameterChanges sync.Map `json:"-" yaml:"-"`
+	execCycleCount          int      `json:"-" yaml:"-"`
+	inExecCycle             bool     `json:"-" yaml:"-"`
+	pendingLogs             []string `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
@@ -276,11 +277,11 @@ type Want struct {
 	// Unified subscription event system
 	subscriptionSystem *UnifiedSubscriptionSystem `json:"-" yaml:"-"`
 
-	// State synchronization
-	stateMutex sync.RWMutex `json:"-" yaml:"-"`
-
 	// Hook called after MergeState completes (used by Target to signal stateNotify)
 	onMergeState func() `json:"-" yaml:"-"`
+
+	// Granular locking for non-comparable state types (e.g. nested maps)
+	keyMutexes sync.Map `json:"-" yaml:"-"`
 
 	// Remote execution mode (for external agent execution via webhook/grpc)
 	remoteMode  bool   `json:"-" yaml:"-"` // True when executing in external agent service
@@ -329,6 +330,41 @@ type Want struct {
 	// Retry mechanism for failed phases
 	PhaseRetryCount map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
+}
+
+// MarshalJSON handles custom JSON marshalling for the Want struct.
+func (n *Want) MarshalJSON() ([]byte, error) {
+	type Alias Want
+	stateMap := make(map[string]any)
+	n.State.Range(func(key, value any) bool {
+		stateMap[key.(string)] = value
+		return true
+	})
+	return json.Marshal(&struct {
+		State map[string]any `json:"state,omitempty"`
+		*Alias
+	}{
+		State: stateMap,
+		Alias: (*Alias)(n),
+	})
+}
+
+// UnmarshalJSON handles custom JSON unmarshalling for the Want struct.
+func (n *Want) UnmarshalJSON(data []byte) error {
+	type Alias Want
+	aux := &struct {
+		State map[string]any `json:"state"`
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	for key, value := range aux.State {
+		n.State.Store(key, value)
+	}
+	return nil
 }
 
 // SetStatus sets the status of this want.
@@ -432,10 +468,7 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 
 	// Batch parameter changes during Exec cycles (like state changes)
 	if n.inExecCycle {
-		if n.pendingParameterChanges == nil {
-			n.pendingParameterChanges = make(map[string]any)
-		}
-		n.pendingParameterChanges[paramName] = paramValue
+		n.pendingParameterChanges.Store(paramName, paramValue)
 	} else {
 		n.addToParameterHistory(paramName, paramValue, previousValue)
 	}
@@ -453,12 +486,11 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
-	// Always create fresh maps to avoid concurrent map access issues This is safer than iterating and deleting from existing maps
-	// pendingStateChanges is only wiped if PreservePendingState is false
+	// Always create fresh sync.Map to avoid concurrent access issues
 	if !n.PreservePendingState {
-		n.pendingStateChanges = make(map[string]any)
+		n.pendingStateChanges = sync.Map{}
 	}
-	n.pendingParameterChanges = make(map[string]any)
+	n.pendingParameterChanges = sync.Map{}
 	n.pendingLogs = make([]string, 0)
 }
 
@@ -469,12 +501,8 @@ func (n *Want) EndProgressCycle() {
 	}
 
 	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
-	// This handles cases where SetStatus(achieved) was called in this cycle
-	// but Status update might race with earlier achieving_percentage calculations
 	if n.Status == WantStatusAchieved {
-		n.stateMutex.Lock()
-		n.pendingStateChanges["achieving_percentage"] = 100.0
-		n.stateMutex.Unlock()
+		n.pendingStateChanges.Store("achieving_percentage", 100.0)
 	}
 
 	// Auto-override final_result from FinalResultField if configured.
@@ -507,41 +535,30 @@ func (n *Want) EndProgressCycle() {
 }
 
 func (n *Want) AggregateChanges() {
-	// Lock to safely copy and clear pending changes
-	n.stateMutex.Lock()
 	changesCopy := make(map[string]any)
-	if len(n.pendingStateChanges) > 0 {
-		// Copy pending changes before releasing lock
-		for key, value := range n.pendingStateChanges {
-			changesCopy[key] = value
-		}
-		// Clear pending changes after copying to prevent re-recording on next cycle
-		n.pendingStateChanges = make(map[string]any)
-	}
+	n.pendingStateChanges.Range(func(key, value any) bool {
+		k := key.(string)
+		changesCopy[k] = value
+		n.State.Store(k, value)
+		n.pendingStateChanges.Delete(key)
+		return true
+	})
 
-	// Apply changes INSIDE the lock to prevent concurrent map read/write
 	if len(changesCopy) > 0 {
-		if n.State == nil {
-			n.State = make(map[string]any)
-		}
-
-		// Apply all pending changes to actual state (CRITICAL: must hold lock!)
-		for key, value := range changesCopy {
-			n.State[key] = value
-		}
-	}
-	n.stateMutex.Unlock()
-	if len(changesCopy) > 0 {
-		n.addAggregatedStateHistory()
-	}
-	if len(n.pendingParameterChanges) > 0 {
-		n.addAggregatedParameterHistory()
-
-		// Clear pending parameter changes after aggregating
-		n.pendingParameterChanges = make(map[string]any)
+		n.addAggregatedStateHistory(changesCopy)
 	}
 
-	// Commit any pending logs at this checkpoint
+	paramChanges := make(map[string]any)
+	n.pendingParameterChanges.Range(func(key, value any) bool {
+		k := key.(string)
+		paramChanges[k] = value
+		n.pendingParameterChanges.Delete(key)
+		return true
+	})
+	if len(paramChanges) > 0 {
+		n.addAggregatedParameterHistory(paramChanges)
+	}
+
 	if len(n.pendingLogs) > 0 {
 		n.addAggregatedLogHistory()
 	}
@@ -992,27 +1009,19 @@ func (n *Want) SetSuspended(suspended bool) {
 // For cross-want coordination use MergeParentState() (ThinkAgent only) or signal
 // the target want via a flag + RestartWant().
 func (n *Want) StoreState(key string, value any) {
-	// CRITICAL: Always use mutex to protect both State and pendingStateChanges Agent goroutines can call StoreState concurrently, so we must synchronize access
-	n.stateMutex.Lock()
-	previousValue, exists := n.getStateUnsafe(key)
-	if exists && n.valuesEqual(previousValue, value) {
-		// No change, skip entirely
-		n.stateMutex.Unlock()
+	previousValue, _ := n.State.Load(key)
+	if n.valuesEqual(previousValue, value) {
 		return
 	}
 
-	// Value has changed, store it Store the state - preserve existing State to maintain parameterHistory
-	if n.State == nil {
-		n.State = make(map[string]any)
-	}
-	n.State[key] = value
+	n.State.Store(key, value)
 
-	// Stage the change in pending state changes This allows us to batch related changes and create minimal history entries
-	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]any)
+	if n.inExecCycle {
+		n.pendingStateChanges.Store(key, value)
+	} else {
+		n.addToStateHistory(key, value, previousValue)
 	}
-	n.pendingStateChanges[key] = value
-	n.stateMutex.Unlock()
+
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
 		StateKey:       key,
@@ -1037,56 +1046,45 @@ func (n *Want) StoreState(key string, value any) {
 //	GetState("1") → reads from pending → returns description (immediately)
 //	EndProgressCycle() → dumps all pending together → both recorded
 func (n *Want) MergeState(updates map[string]any) {
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-
-	// Stage all updates in pending state changes for batch processing
-	if n.pendingStateChanges == nil {
-		n.pendingStateChanges = make(map[string]any)
-	}
-
-	// Helper function to extract map from any
 	extractMap := func(v any) (map[string]any, bool) {
-		if m, ok := v.(map[string]any); ok {
-			return m, true
-		}
-		if m, ok := v.(map[string]interface{}); ok {
-			return m, true
-		}
+		if m, ok := v.(map[string]any); ok { return m, true }
+		if m, ok := v.(map[string]interface{}); ok { return m, true }
 		return nil, false
 	}
 
 	for key, value := range updates {
 		valueMap, isValueMap := extractMap(value)
 
-		if isValueMap {
-			// Check pending state first, then fall back to persisted State
-			var existingMap map[string]any
-			if existingVal, exists := n.pendingStateChanges[key]; exists {
-				existingMap, _ = extractMap(existingVal)
-			} else if stateVal, exists := n.State[key]; exists {
-				existingMap, _ = extractMap(stateVal)
-			}
-
-			// If we found an existing map, merge it
-			if existingMap != nil {
-				// Deep merge: combine existing and new map entries
-				merged := make(map[string]any, len(existingMap)+len(valueMap))
-				for k, v := range existingMap {
-					merged[k] = v
-				}
-				for k, v := range valueMap {
-					merged[k] = v
-				}
-				n.pendingStateChanges[key] = merged
-				continue
-			}
+		if !isValueMap {
+			n.StoreState(key, value)
+			continue
 		}
-		// For non-map values or when no existing value, just set directly
-		n.pendingStateChanges[key] = value
+
+		// Use per-key mutex for atomic read-modify-write of maps
+		muRaw, _ := n.keyMutexes.LoadOrStore(key, &sync.Mutex{})
+		mu := muRaw.(*sync.Mutex)
+		mu.Lock()
+
+		var merged map[string]any
+		if oldVal, ok := n.State.Load(key); ok {
+			if oldMap, isOldMap := extractMap(oldVal); isOldMap {
+				merged = make(map[string]any, len(oldMap)+len(valueMap))
+				for k, v := range oldMap { merged[k] = v }
+				for k, v := range valueMap { merged[k] = v }
+			} else {
+				merged = valueMap
+			}
+		} else {
+			merged = valueMap
+		}
+
+		n.State.Store(key, merged)
+		if n.inExecCycle {
+			n.pendingStateChanges.Store(key, merged)
+		}
+		mu.Unlock()
 	}
 
-	// Signal hook (e.g. Target.stateNotify) — buffered channel so non-blocking
 	if n.onMergeState != nil {
 		n.onMergeState()
 	}
@@ -1212,31 +1210,22 @@ func (n *Want) SuggestParent(directions []string) {
 // STATE OWNERSHIP RULE: Same as StoreState — only call on the receiver want.
 // From an Agent Exec function use StoreStateMultiForAgent() instead.
 func (n *Want) StoreStateMulti(updates map[string]any) {
-	// CRITICAL: Use mutex to protect both State and pendingStateChanges
-	n.stateMutex.Lock()
-
-	// Collect all notifications before releasing the lock
+	// Collect all notifications
 	var notifications []StateNotification
 	for key, value := range updates {
-		previousValue, exists := n.getStateUnsafe(key)
-		if exists && n.valuesEqual(previousValue, value) {
-			// No change, skip this key
+		previousValue, _ := n.State.Load(key)
+		if n.valuesEqual(previousValue, value) {
 			continue
 		}
 
-		// Value has changed, store it Store the state - preserve existing State to maintain history
-		if n.State == nil {
-			n.State = make(map[string]any)
-		}
-		n.State[key] = value
+		n.State.Store(key, value)
 
-		// Stage the change in pending state changes
-		if n.pendingStateChanges == nil {
-			n.pendingStateChanges = make(map[string]any)
+		if n.inExecCycle {
+			n.pendingStateChanges.Store(key, value)
+		} else {
+			n.addToStateHistory(key, value, previousValue)
 		}
-		n.pendingStateChanges[key] = value
 
-		// Prepare notification for this change
 		notification := StateNotification{
 			SourceWantName: n.Metadata.Name,
 			StateKey:       key,
@@ -1247,7 +1236,6 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 		notifications = append(notifications, notification)
 	}
 
-	n.stateMutex.Unlock()
 	for _, notification := range notifications {
 		sendStateNotifications(notification)
 	}
@@ -1285,42 +1273,22 @@ func (n *Want) StoreLog(message string, args ...any) {
 }
 
 func (n *Want) GetState(key string) (any, bool) {
-	n.stateMutex.RLock()
-	defer n.stateMutex.RUnlock()
-
-	// CRITICAL: Check pendingStateChanges first to see latest updates
-	// This ensures GetState returns values from concurrent MergeState() calls immediately
-	// without waiting for EndProgressCycle() to dump to disk
-	if n.pendingStateChanges != nil {
-		if value, exists := n.pendingStateChanges[key]; exists {
-			return value, true
+	if n.inExecCycle {
+		if val, ok := n.pendingStateChanges.Load(key); ok {
+			return val, true
 		}
 	}
-
-	// Fallback to persisted State if not in pending
-	if n.State == nil {
-		return nil, false
-	}
-
-	value, exists := n.State[key]
-	return value, exists
+	return n.State.Load(key)
 }
 
 // GetPendingStateChanges returns a copy of pending state changes (changes not yet committed)
 // This is useful for external agent execution to return only changed fields
 func (n *Want) GetPendingStateChanges() map[string]any {
-	n.stateMutex.RLock()
-	defer n.stateMutex.RUnlock()
-
-	if n.pendingStateChanges == nil {
-		return make(map[string]any)
-	}
-
-	// Return a copy to avoid concurrent access issues
-	changes := make(map[string]any, len(n.pendingStateChanges))
-	for k, v := range n.pendingStateChanges {
-		changes[k] = v
-	}
+	changes := make(map[string]any)
+	n.pendingStateChanges.Range(func(key, value any) bool {
+		changes[key.(string)] = value
+		return true
+	})
 	return changes
 }
 
@@ -1568,41 +1536,37 @@ func (n *Want) CalculateAchievingPercentage() int {
 }
 
 // ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
-func (n *Want) addAggregatedStateHistory() {
+func (n *Want) addAggregatedStateHistory(changes map[string]any) {
 	n.initHistoryRings()
 
-	// Read state under short read-lock, then release before ring buffer operations
-	n.stateMutex.RLock()
-	if n.State == nil {
-		n.stateMutex.RUnlock()
-		return
-	}
 	stateSnapshot := make(map[string]any)
 	reservedFields := SystemReservedStateFields()
-	for key, value := range n.State {
-		// Skip internal fields starting with underscore - they are internal markers only
-		if strings.HasPrefix(key, "_") {
-			continue
+
+	n.State.Range(func(key, value any) bool {
+		k := key.(string)
+		// Skip internal fields starting with underscore
+		if strings.HasPrefix(k, "_") {
+			return true
 		}
 		// Always include system-reserved fields in history
 		isReservedField := false
 		for _, reserved := range reservedFields {
-			if key == reserved {
+			if k == reserved {
 				isReservedField = true
 				break
 			}
 		}
 		if isReservedField {
-			stateSnapshot[key] = value
-			continue
+			stateSnapshot[k] = value
+			return true
 		}
-		// If ProvidedStateFields is defined, only include those fields in history
-		if len(n.ProvidedStateFields) > 0 && !Contains(n.ProvidedStateFields, key) {
-			continue
+		// If ProvidedStateFields is defined, only include those fields
+		if len(n.ProvidedStateFields) > 0 && !Contains(n.ProvidedStateFields, k) {
+			return true
 		}
-		stateSnapshot[key] = value
-	}
-	n.stateMutex.RUnlock()
+		stateSnapshot[k] = value
+		return true
+	})
 
 	// Extract action_by_agent from state snapshot for StateHistoryEntry
 	var actionByAgent string
@@ -1653,25 +1617,131 @@ func (n *Want) addAggregatedStateHistory() {
 		Timestamp:     time.Now(),
 		ActionByAgent: actionByAgent,
 	}
+
 	n.stateHistoryRing.Append(entry)
 }
-func (n *Want) addAggregatedParameterHistory() {
-	if len(n.pendingParameterChanges) == 0 {
-		return
-	}
+
+// addToStateHistory records a single state field change into history
+func (n *Want) addToStateHistory(key string, value any, previousValue any) {
+	n.initHistoryRings()
+	n.stateHistoryRing.Append(StateHistoryEntry{
+		WantName:   n.Metadata.Name,
+		StateValue: map[string]any{key: value},
+		Timestamp:  time.Now(),
+	})
+}
+
+func (n *Want) addAggregatedParameterHistory(changes map[string]any) {
 	n.initHistoryRings()
 	entry := StateHistoryEntry{
 		WantName:   n.Metadata.Name,
-		StateValue: n.pendingParameterChanges,
+		StateValue: changes,
 		Timestamp:  time.Now(),
 	}
 	n.parameterHistoryRing.Append(entry)
+}
 
-	// Clear pending parameter changes after adding to history
-	for k := range n.pendingParameterChanges {
-		delete(n.pendingParameterChanges, k)
+// SetStateLabels populates the static StateLabels map from a WantTypeDefinition.
+func (n *Want) SetStateLabels(def *WantTypeDefinition) {
+	if def == nil {
+		return
+	}
+	n.StateLabels = make(map[string]StateLabel)
+	for _, s := range def.State {
+		var label StateLabel
+		switch s.Label {
+		case "goal":
+			label = LabelGoal
+		case "current":
+			label = LabelCurrent
+		case "plan":
+			label = LabelPlan
+		case "predefined":
+			label = LabelPredefined
+		case "internal":
+			label = LabelInternal
+		default:
+			label = LabelNone
+		}
+		n.StateLabels[s.Name] = label
 	}
 }
+
+// ============================================================================
+// Agent State Labeling Helpers
+// ============================================================================
+
+func (n *Want) SetGoal(key string, value any) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
+		n.StoreState(key, value)
+	}
+}
+
+func (n *Want) GetGoal(key string) (any, bool) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
+		return n.GetState(key)
+	}
+	return nil, false
+}
+
+func (n *Want) SetCurrent(key string, value any) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+		n.StoreState(key, value)
+	}
+}
+
+func (n *Want) GetCurrent(key string) (any, bool) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+		return n.GetState(key)
+	}
+	return nil, false
+}
+
+func (n *Want) SetPlan(key string, value any) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
+		n.StoreState(key, value)
+	}
+}
+
+func (n *Want) GetPlan(key string) (any, bool) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
+		return n.GetState(key)
+	}
+	return nil, false
+}
+
+func (n *Want) ClearPlan(key string) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
+		n.StoreState(key, nil)
+	}
+}
+
+func (n *Want) SetPredefined(key string, value any) {
+	// Predefined fields might not be in StateLabels if they are truly system-wide
+	n.StoreState(key, value)
+}
+
+func (n *Want) GetPredefined(key string) (any, bool) {
+	if label, ok := n.StateLabels[key]; ok && label == LabelPredefined {
+		return n.GetState(key)
+	}
+	// Also check raw state for system-wide fields
+	return n.GetState(key)
+}
+
+func (n *Want) SetInternal(key string, value any) {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") {
+		n.StoreState(key, value)
+	}
+}
+
+func (n *Want) GetInternal(key string) (any, bool) {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") {
+		return n.GetState(key)
+	}
+	return nil, false
+}
+
 func (n *Want) addAggregatedLogHistory() {
 	if len(n.pendingLogs) == 0 {
 		return
@@ -1733,37 +1803,13 @@ func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
 }
 
-// migrateAgentHistoryFromState removes agent_history from state if it exists This ensures agent history is only stored in the top-level AgentHistory field
-func (n *Want) migrateAgentHistoryFromState() {
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
-
-	if n.State != nil {
-		if _, exists := n.State["agent_history"]; exists {
-			delete(n.State, "agent_history")
-			log.Printf("[MIGRATION] Removed agent_history from state for want %s\n", n.Metadata.Name)
-		}
-	}
-}
-func (n *Want) getStateUnsafe(key string) (any, bool) {
-	if n.State == nil {
-		return nil, false
-	}
-	value, exists := n.State[key]
-	return value, exists
-}
 func (n *Want) GetAllState() map[string]any {
-	n.stateMutex.RLock()
-	defer n.stateMutex.RUnlock()
-
-	if n.State == nil {
-		return make(map[string]any)
-	}
-	stateCopy := make(map[string]any)
-	for k, v := range n.State {
-		stateCopy[k] = v
-	}
-	return stateCopy
+	state := make(map[string]any)
+	n.State.Range(func(key, value any) bool {
+		state[key.(string)] = value
+		return true
+	})
+	return state
 }
 func (n *Want) GetStopChannel() chan struct{} {
 	if n.stopChannel == nil {
@@ -2017,7 +2063,6 @@ func (n *Want) UnusedExists(timeoutMs int) bool {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
 	n.SetStatus(WantStatusInitializing) // Set to initializing first
-	n.State = make(map[string]any)
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
 	n.initHistoryRings()
@@ -2272,8 +2317,8 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 	n.WantTypeDefinition = typeDef
 	n.metadataMutex.Unlock()
 
-	n.stateMutex.Lock()
-	defer n.stateMutex.Unlock()
+	// Initialize labels from definition
+	n.SetStateLabels(typeDef)
 
 	// Apply default FinalResultField from type definition if not set in spec
 	if n.Spec.FinalResultField == "" && typeDef.FinalResultField != "" {
@@ -2287,11 +2332,7 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 
 		// Initialize state field with initial value if provided
 		if stateDef.InitialValue != nil {
-			// Using direct map access as we hold the lock
-			if n.State == nil {
-				n.State = make(map[string]any)
-			}
-			n.State[stateDef.Name] = stateDef.InitialValue
+			n.State.Store(stateDef.Name, stateDef.InitialValue)
 		}
 	}
 
@@ -2843,7 +2884,7 @@ func CalculateWantHash(w *Want) string {
 		Metadata: w.Metadata,
 		Spec:     w.Spec,
 		Status:   w.Status,
-		State:    w.State, // Include all state fields
+		State:    w.GetAllState(), // Include all state fields
 	}
 
 	// Serialize to JSON

@@ -1,101 +1,91 @@
-# Migration Guide: Agent-State Interaction Rule (GCP Pattern)
+# Migration Guide: Agent State Labeling
 
-This document outlines the specific implementation changes required for each agent type to adopt the Goal-Current-Plan (GCP) pattern.
+This document outlines the implementation of the "State Labeling" pattern, which provides semantic meaning to state fields while maximizing concurrent access performance.
 
-## 1. Naming Conventions
+## 1. Core Concept: Labeled State Fields
 
-All agents must interact with the `Want` state using the following key prefixes:
+This pattern separates a want's state into two distinct maps:
+1.  **`State` (`sync.Map`)**: Stores the actual key-value data. It uses a `sync.Map` for highly concurrent, lock-free reads and writes of individual fields.
+2.  **`StateLabels` (`map[string]StateLabel`)**: A static map that defines the semantic "label" for each key in the `State`. This map is typically populated during want initialization and is read-only thereafter.
 
-| Prefix | Category | Owner | Description |
-| :--- | :--- | :--- | :--- |
-| `goal.*` | Goal | Think Agent | The desired end state (e.g., `goal.status: "confirmed"`). |
-| `current.*` | Current | Monitor Agent | The observed reality from the world (e.g., `current.status: "none"`). |
-| `plan.*` | Plan | Think Agent | Specific instructions for Do Agents (e.g., `plan.action: "reserve"`). |
+This design avoids complex `StateEntry` structs and costly string manipulations, while ensuring high performance for dynamic state updates.
 
----
+### StateLabel Enum
 
-## 2. Specific Implementation Changes
+A new enum defines the possible semantic labels for a state field.
 
-### A. Think Agent (The Planner)
-Think Agents are the orchestrators of the GCP loop.
+```go
+// engine/core/state_types.go
+package mywant
 
-**Changes:**
-1. **Initialize Goals**: On the first run, read `spec.params` and initialize `goal.*` fields.
-   - *Logic*: `if state["goal.xyz"] == nil { state["goal.xyz"] = params["xyz"] }`
-2. **Monitor Context**: Wait for `current.*` fields to be populated by Monitor Agents.
-   - *Logic*: `if state["current.xyz"] == nil { return wait }`
-3. **Generate Plans**: Compare `goal` and `current`. If they differ, set a `plan.*`.
-   - *Logic*: `if goal.xyz != current.xyz { state["plan.xyz"] = "execute" }`
+type StateLabel int
 
-### B. Monitor Agent (The Observer)
-Monitor Agents focus purely on observing the external world.
+const (
+    LabelNone StateLabel = iota
+    LabelGoal
+    LabelCurrent
+    LabelPlan
+    LabelPredefined // For system/UI reserved words
+    LabelInternal   // For agent-internal flags
+)
+```
 
-**Changes:**
-1. **Redirect Outputs**: Change all state writes to use the `current.` prefix.
-   - *Example*: `want.StoreState("status", "confirmed")` → `want.StoreState("current.status", "confirmed")`
-2. **Stateless Observation**: Ensure the monitor does not check goals or plans; it only reports facts.
+## 2. Helper Method Implementation
 
-### C. Do Agent (The Actor)
-Do Agents execute based on the plans provided by Think Agents.
+Helper methods will be implemented to provide a clean, semantic interface for agents, abstracting away the two-map system.
 
-**Changes:**
-1. **Check Plan**: Before executing, check if a relevant `plan.*` exists.
-   - *Logic*: `if state["plan.reserve"] == "execute" { ... }`
-2. **Execute & Feedback**: Perform the action and update `current.*` if the result is immediate.
-3. **Cleanup**: Upon success, remove or overwrite the `plan.*` field.
-   - *Logic*: `want.StoreState("plan.reserve", nil)`
-4. **Backward Compatibility**: Ensure the agent can still run via direct `ExecuteAgents()` calls if the plan is absent but required by legacy code.
+```go
+// Example: engine/core/want.go
 
----
+// Want struct change
+type Want struct {
+    // ...
+    State       sync.Map                `json:"-" yaml:"-"`
+    StateLabels map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
+    // ...
+}
 
-## 3. Case Studies: Comprehensive Mappings
+// SetCurrent updates the 'State' sync.Map atomically.
+// It assumes the label for 'key' is already defined in 'StateLabels'.
+func (n *Want) SetCurrent(key string, value any) {
+    if label, ok := n.StateLabels[key]; !ok || label != LabelCurrent {
+        // Log a warning: this field is not defined as a 'Current' value
+        return
+    }
+    n.State.Store(key, value)
+    // ... (pending changes and history logic)
+}
 
-How legacy keys transform into the GCP pattern across different agent types:
+// GetCurrent checks the label and then loads from the 'State' sync.Map.
+func (n *Want) GetCurrent(key string) (any, bool) {
+    if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+        return n.State.Load(key)
+    }
+    return nil, false
+}
+```
 
-### A. Think Agent Case Study: `condition_thinker`
-The Think Agent is responsible for the transition from "what we want" (Goal) to "what we should do" (Plan).
+## 3. Agent Implementation Changes
 
-| Legacy / Source | New GCP Key | Responsibility |
-| :--- | :--- | :--- |
-| `spec.params["hotel_type"]` | `goal.hotel_type` | **Think**: Initialize goal from parameters. |
-| `parent.state["target_budgets"]`| `current.budget_limit` | **Think**: Fetch context from parent and store as current fact. |
-| `good_to_reserve` | `plan.execute_booking` | **Think**: Set plan when goal != current and budget is OK. |
-| `_thinker_itinerary_registered` | `_thinker.itinerary_done` | **Internal**: Use underscore for internal tracking flags. |
+Agent logic becomes much cleaner. There are no prefixes, and agents simply call the method corresponding to the semantic action they are performing.
 
-### B. Monitor Agent Case Study: `monitor_flight_api`
-The Monitor Agent focuses purely on updating the `current.*` state based on external reality.
+### Think Agent Example
+```go
+// The 'reservation_status' field will be defined with the 'LabelGoal'
+// in the 'StateLabels' map when the want is initialized.
+want.SetGoal("reservation_status", "confirmed")
+```
 
-| Legacy Key | New GCP Key | Responsibility |
-| :--- | :--- | :--- |
-| `flight_status` | `current.status` | **Monitor**: Update with latest observation (e.g., "delayed"). |
-| `departure_time` | `current.departure_time` | **Monitor**: Reflect actual time from API. |
-| `status_message` | `current.message` | **Monitor**: Provide details about the current status. |
-| `_monitor_state_hash` | `_monitor.last_hash` | **Internal**: Tracking for differential updates. |
+### Monitor Agent Example
+```go
+// The 'flight_status' field will have the 'LabelCurrent' in StateLabels.
+want.SetCurrent("flight_status", "delayed")
+```
 
-### C. Do Agent Case Study: `agent_premium` (Reservation)
-The Do Agent acts on the `plan.*` and provides initial feedback to `current.*`.
-
-| Plan / Trigger Key | Action & Result Key | Responsibility |
-| :--- | :--- | :--- |
-| `plan.execute_booking` | (Read Trigger) | **Do**: Start execution if this is true. |
-| `reservation_id` | `current.res_id` | **Do**: Store the ID immediately after API success. |
-| `status` | `current.res_status` | **Do**: Update to "confirmed" upon completion. |
-| (Post-Execution) | `plan.execute_booking` | **Do**: Set to `nil` or `false` to mark plan as handled. |
-
-### D. Orchestration Case Study: `dispatch_thinker`
-For complex parent wants managing children.
-
-| Legacy Key | New GCP Key | Responsibility |
-| :--- | :--- | :--- |
-| `directions` | `goal.directions` | **Think**: The sequence of sub-wants to achieve. |
-| `_dispatched_directions` | `current.dispatched` | **Monitor/Think**: Tracking what has actually been created. |
-| (New Dispatch Request) | `plan.dispatch_child` | **Think**: Signal to the system to create a new sub-want. |
-
----
-
-## 4. Implementation Steps
-
-1. **Helper Methods**: Implement `SetGoal`, `GetCurrent`, `SetPlan` in `engine/core/want.go`.
-2. **Refactor Thinkers**: Update `condition_thinker` and `budget_thinker`.
-3. **Refactor Monitors**: Update `monitor_flight_api` and generic webhook monitors.
-4. **Refactor Actors**: Update `agent_premium` and reservation logic.
+### System Metadata Example
+```go
+// The 'achieving_percentage' field will have the 'LabelPredefined'.
+// The SetPredefined method can handle dual-writing to a legacy top-level
+// field if needed for UI compatibility, hiding that detail from the agent.
+want.SetPredefined("achieving_percentage", 100)
+```

@@ -16,8 +16,14 @@ func init() {
 }
 
 // executeBuffetReservation performs a buffet reservation.
-
 func executeBuffetReservation(ctx context.Context, want *Want) error {
+	// ── GCP Pattern: Only execute if a plan exists ────────────────────────
+	if plan, _ := want.GetPlan("execute_booking"); plan == nil {
+		if legacy, _ := want.GetStateBool("good_to_reserve", false); !legacy {
+			return nil // No plan to execute
+		}
+	}
+
 	schedule := generateBuffetSchedule(want)
 	return executeReservation(want, agentBuffetName, schedule, func(s interface{}, isRebooking bool) (string, string) {
 		sch := s.(BuffetSchedule)
@@ -37,16 +43,11 @@ func executeBuffetReservation(ctx context.Context, want *Want) error {
 func generateBuffetCost(buffetType string) float64 {
 	var minCost, maxCost float64
 	switch buffetType {
-	case "continental":
-		minCost, maxCost = 20.0, 45.0
-	case "full":
-		minCost, maxCost = 35.0, 70.0
-	case "asian":
-		minCost, maxCost = 30.0, 65.0
-	case "vegetarian":
-		minCost, maxCost = 25.0, 55.0
-	default: // international
-		minCost, maxCost = 40.0, 90.0
+	case "continental": minCost, maxCost = 20.0, 45.0
+	case "full": minCost, maxCost = 35.0, 70.0
+	case "asian": minCost, maxCost = 30.0, 65.0
+	case "vegetarian": minCost, maxCost = 25.0, 55.0
+	default: minCost, maxCost = 40.0, 90.0
 	}
 	cost := minCost + rand.Float64()*(maxCost-minCost)
 	return math.Round(cost*100) / 100

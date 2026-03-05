@@ -118,10 +118,10 @@ func TestRPCExecutor_DoAgent(t *testing.T) {
 		nil,
 		"base",
 	)
-	want.State = map[string]any{
+	want.StoreStateMulti(map[string]any{
 		"departure": "NRT",
 		"arrival":   "LAX",
-	}
+	})
 
 	// Execute
 	err := executor.Execute(context.Background(), agent, want)

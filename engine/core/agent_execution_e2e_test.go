@@ -46,7 +46,7 @@ func TestAgentExecutionModes(t *testing.T) {
 			nil,
 			"base",
 		)
-		want.State = map[string]any{"departure": "NRT"}
+		want.StoreStateMulti(map[string]any{"departure": "NRT"})
 
 		want.BeginProgressCycle()
 
@@ -110,7 +110,7 @@ func TestAgentExecutionModes(t *testing.T) {
 			nil,
 			"base",
 		)
-		want.State = map[string]any{"departure": "NRT"}
+		want.StoreStateMulti(map[string]any{"departure": "NRT"})
 
 		// Execute via webhook
 		err := executor.Execute(context.Background(), agent, want)
@@ -153,7 +153,7 @@ func TestMonitorAgentStateSync(t *testing.T) {
 	}
 
 	// MonitorAgent implementation - checks flight status
-	monitorAction := func(ctx context.Context, want *Want) error {
+	monitorAction := func(ctx context.Context, want *Want) (bool, error) {
 		// Read current state
 		status, _ := want.GetState("flight_status")
 		delayRaw, _ := want.GetState("delay_minutes")
@@ -176,7 +176,7 @@ func TestMonitorAgentStateSync(t *testing.T) {
 		}
 
 		t.Logf("Monitor cycle: status=%v, delay=%v", status, delay)
-		return nil
+		return false, nil
 	}
 
 	t.Run("StateSyncBeforeEachCycle", func(t *testing.T) {
@@ -226,8 +226,8 @@ func TestMonitorAgentStateSync(t *testing.T) {
 				// Execute monitor with provided state
 				want := &Want{
 					Metadata: Metadata{Name: req.WantID},
-					State:    req.WantState,
 				}
+				want.StoreStateMulti(req.WantState)
 				want.BeginProgressCycle()
 				monitorAgent.Monitor(context.Background(), want)
 				stateUpdates := want.GetPendingStateChanges()
@@ -316,10 +316,10 @@ func TestMonitorAgentStateSync(t *testing.T) {
 			nil,
 			"base",
 		)
-		want.State = map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"flight_status": "scheduled",
 			"delay_minutes": 0,
-		}
+		})
 
 		// Execute once
 		err := executor.Execute(context.Background(), monitorAgent, want)
@@ -482,12 +482,12 @@ func TestCompleteAgentWorkflow(t *testing.T) {
 		return nil
 	}
 
-	monitorAction := func(ctx context.Context, want *Want) error {
+	monitorAction := func(ctx context.Context, want *Want) (bool, error) {
 		status, _ := want.GetState("flight_status")
 		if status == "confirmed" {
 			want.StoreState("last_check", time.Now().Format(time.RFC3339))
 		}
-		return nil
+		return false, nil
 	}
 
 	// Create registry with both agents
@@ -530,10 +530,10 @@ func TestCompleteAgentWorkflow(t *testing.T) {
 		nil,
 		"base",
 	)
-	want.State = map[string]any{
+	want.StoreStateMulti(map[string]any{
 		"departure": "NRT",
 		"arrival":   "LAX",
-	}
+	})
 
 	// Step 1: Execute booking agent
 	err := executor.Execute(context.Background(), bookingAgent, want)
@@ -589,8 +589,8 @@ func createAgentServiceMockServer(registry *AgentRegistry) *httptest.Server {
 			// Execute agent
 			want := &Want{
 				Metadata: Metadata{Name: req.WantID},
-				State:    req.WantState,
 			}
+			want.StoreStateMulti(req.WantState)
 			want.BeginProgressCycle()
 
 			start := time.Now()
@@ -630,8 +630,8 @@ func createAgentServiceMockServer(registry *AgentRegistry) *httptest.Server {
 			// Execute monitor
 			want := &Want{
 				Metadata: Metadata{Name: req.WantID},
-				State:    req.WantState,
 			}
+			want.StoreStateMulti(req.WantState)
 			want.SetRemoteCallback(req.CallbackURL, req.AgentName)
 			want.BeginProgressCycle()
 

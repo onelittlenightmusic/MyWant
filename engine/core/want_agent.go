@@ -486,19 +486,8 @@ func (n *Want) CommitStateChanges() {
 	if hasStateChanges {
 		n.SetStateAtomic(changesCopy)
 
-		// Step 3: Add single history entry with all changes with stateMutex protection
-		historyEntry := StateHistoryEntry{
-			WantName:   n.Metadata.Name,
-			StateValue: changesCopy,
-			Timestamp:  time.Now(),
-		}
-
-		n.stateMutex.Lock()
-		if n.History.StateHistory == nil {
-			n.History.StateHistory = make([]StateHistoryEntry, 0)
-		}
-		n.History.StateHistory = append(n.History.StateHistory, historyEntry)
-		n.stateMutex.Unlock()
+		// Step 3: Add single history entry with all changes using the aggregated helper
+		n.addAggregatedStateHistory(changesCopy)
 
 		log.Printf("💾 Committed %d state changes for want %s in single batch\n",
 			changeCount, n.Metadata.Name)

@@ -23,53 +23,35 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 		"reaction_queue_id": &existingQueueID,
 	})
 
-	if phase == "" {
-		// No phase set yet, nothing to do
-		return nil
-	}
+	// Prefer GCP current if available
+	if p, ok := want.GetCurrent("phase"); ok && p != nil { phase = p.(string) }
+	if q, ok := want.GetCurrent("reaction_queue_id"); ok && q != nil { existingQueueID = q.(string) }
 
-	// Get HTTP client for API calls
+	if phase == "" { return nil }
+
 	httpClient := want.GetHTTPClient()
-	if httpClient == nil {
-		return fmt.Errorf("HTTP client not available - cannot manage reaction queue")
-	}
+	if httpClient == nil { return fmt.Errorf("no http client") }
 
-	// Handle phase transitions
-
-	// Handle phase transitions
 	switch phase {
 	case ReminderPhaseWaiting, ReminderPhaseReaching:
-		// Create queue when entering waiting or reaching phase
-		// If we already have a queue ID, delete it first to ensure a new DIFFERENT one is created (avoid reuse)
 		if existingQueueID != "" && phase == ReminderPhaseWaiting {
-			want.StoreLog("[INFO] Deleting existing reaction queue %s before creating a new one for fresh start", existingQueueID)
 			_ = deleteReactionQueue(httpClient, existingQueueID)
 			existingQueueID = ""
 		}
 
 		if existingQueueID == "" {
 			queueID, err := createReactionQueue(httpClient)
-			if err != nil {
-				want.StoreLog("[ERROR] Failed to create reaction queue for want %s: %v", want.Metadata.ID, err)
-				return err
-			}
-
-			// Store queue ID in want state
-			want.StoreState("reaction_queue_id", queueID)
-			want.StoreLog("[INFO] Created reaction queue %s for reminder want %s (phase: %s)", queueID, want.Metadata.ID, phase)
+			if err != nil { return err }
+			want.SetCurrent("reaction_queue_id", queueID)
+			want.StoreLog("[INFO] Created reaction queue %s", queueID)
 		}
 
 	case ReminderPhaseCompleted, ReminderPhaseFailed:
-		// Delete queue when completed or failed (if queue exists)
 		if existingQueueID != "" {
 			err := deleteReactionQueue(httpClient, existingQueueID)
-			if err != nil {
-				// Log error but don't fail - queue cleanup is not critical
-				want.StoreLog("[WARN] Failed to delete reaction queue %s for want %s: %v", existingQueueID, want.Metadata.ID, err)
-			} else {
-				want.StoreLog("[INFO] Deleted reaction queue %s for reminder want %s", existingQueueID, want.Metadata.ID)
-				// Clear queue ID from state
-				want.StoreState("reaction_queue_id", "")
+			if err == nil {
+				want.SetCurrent("reaction_queue_id", "")
+				want.StoreLog("[INFO] Deleted reaction queue %s", existingQueueID)
 			}
 		}
 	}
@@ -77,50 +59,20 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 	return nil
 }
 
-// createReactionQueue calls POST /api/v1/reactions/ to create a new queue
 func createReactionQueue(httpClient *mywant.HTTPClient) (string, error) {
 	resp, err := httpClient.POST("/api/v1/reactions/", nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create reaction queue: %w", err)
-	}
-
-	var result struct {
-		QueueID   string `json:"queue_id"`
-		CreatedAt string `json:"created_at"`
-	}
-
-	if err := httpClient.DecodeJSON(resp, &result); err != nil {
-		return "", fmt.Errorf("failed to decode queue creation response: %w", err)
-	}
-
-	if result.QueueID == "" {
-		return "", fmt.Errorf("queue creation returned empty queue ID")
-	}
-
+	if err != nil { return "", err }
+	var result struct { QueueID string `json:"queue_id"` }
+	if err := httpClient.DecodeJSON(resp, &result); err != nil { return "", err }
 	return result.QueueID, nil
 }
 
-// deleteReactionQueue calls DELETE /api/v1/reactions/{id} to delete a queue
 func deleteReactionQueue(httpClient *mywant.HTTPClient, queueID string) error {
 	path := fmt.Sprintf("/api/v1/reactions/%s", queueID)
-	resp, err := httpClient.DELETE(path)
-	if err != nil {
-		return fmt.Errorf("failed to delete reaction queue: %w", err)
-	}
+	resp, err := httpClient.DELETE(path); if err != nil { return err }
 	defer resp.Body.Close()
-
-	var result struct {
-		QueueID string `json:"queue_id"`
-		Deleted bool   `json:"deleted"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Errorf("failed to decode queue deletion response: %w", err)
-	}
-
-	if !result.Deleted {
-		return fmt.Errorf("queue deletion failed for queue %s", queueID)
-	}
-
+	var result struct { Deleted bool `json:"deleted"` }
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil { return err }
+	if !result.Deleted { return fmt.Errorf("not deleted") }
 	return nil
 }

@@ -272,7 +272,6 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 			Using:  dryWant.Using,
 		},
 		Status: WantStatusIdle,
-		State:  make(map[string]any),
 	}
 
 	return want, nil
@@ -323,7 +322,6 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 			Using:  wantRecipe.Spec.Using,
 		},
 		Status: WantStatusIdle,
-		State:  make(map[string]any),
 	}
 
 	return want, nil

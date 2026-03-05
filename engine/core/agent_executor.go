@@ -95,7 +95,7 @@ func (e *WebhookExecutor) executeSyncWebhook(ctx context.Context, agent Agent, w
 		WantID:      want.Metadata.Name,
 		AgentName:   agent.GetName(),
 		Operation:   "execute",
-		WantState:   want.State,
+		WantState:   want.GetAllState(),
 		CallbackURL: e.config.CallbackURL,
 	}
 
@@ -158,7 +158,7 @@ func (e *WebhookExecutor) executeAsyncWebhook(ctx context.Context, agent Agent, 
 		WantID:      want.Metadata.Name,
 		AgentName:   agent.GetName(),
 		CallbackURL: e.config.CallbackURL,
-		WantState:   want.State,
+		WantState:   want.GetAllState(),
 	}
 
 	body, err := json.Marshal(request)
@@ -206,7 +206,7 @@ func (e *WebhookExecutor) executeMonitorWithSync(ctx context.Context, agent Agen
 	latestState, err := e.fetchLatestWantState(want.Metadata.Name)
 	if err != nil {
 		log.Printf("[WEBHOOK] Failed to fetch latest state: %v, using current state", err)
-		latestState = want.State // Fallback to current state
+		latestState = want.GetAllState() // Fallback to current state
 	}
 
 	// 2. Create request with latest state
@@ -400,9 +400,10 @@ func (e *RPCExecutor) executeGRPC(ctx context.Context, agent Agent, want *Want) 
 func (e *RPCExecutor) executeGRPCDoAgent(ctx context.Context, agent Agent, want *Want) error {
 	// Convert want state to map[string]string for proto
 	stateMap := make(map[string]string)
-	for k, v := range want.State {
-		stateMap[k] = fmt.Sprintf("%v", v)
-	}
+	want.State.Range(func(key, value any) bool {
+		stateMap[key.(string)] = fmt.Sprintf("%v", value)
+		return true
+	})
 
 	req := &pb.ExecuteRequest{
 		WantId:    want.Metadata.Name,
@@ -440,9 +441,10 @@ func (e *RPCExecutor) executeGRPCDoAgent(ctx context.Context, agent Agent, want 
 func (e *RPCExecutor) executeGRPCMonitorAgent(ctx context.Context, agent Agent, want *Want) error {
 	// Convert want state to map[string]string for proto
 	stateMap := make(map[string]string)
-	for k, v := range want.State {
-		stateMap[k] = fmt.Sprintf("%v", v)
-	}
+	want.State.Range(func(key, value any) bool {
+		stateMap[key.(string)] = fmt.Sprintf("%v", value)
+		return true
+	})
 
 	req := &pb.MonitorRequest{
 		WantId:      want.Metadata.Name,

@@ -11,7 +11,6 @@ import (
 func makeWantWithParams(params map[string]any) *Want {
 	w := &Want{
 		Metadata: Metadata{Name: "test", Type: "test"},
-		State:    make(map[string]any),
 	}
 	if params != nil {
 		w.Spec.Params = params

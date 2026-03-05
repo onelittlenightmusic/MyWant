@@ -7,16 +7,18 @@ import (
 )
 
 // PollWebhook contains common polling logic shared by all webhook monitor agents.
-// It trims the message buffer to 20 entries and performs health checks.
 func PollWebhook(ctx context.Context, want *Want, cfg WebhookWantConfig) (shouldStop bool, err error) {
-	status, _ := want.GetStateString(cfg.StatusKey(), "active")
+	statusRaw, ok := want.GetCurrent("status")
+	status := "active"
+	if ok && statusRaw != nil { status = statusRaw.(string) }
+	
 	if status == "stopped" {
 		return true, nil
 	}
 
-	// Get current messages
+	// Get current messages from GCP current state
 	var messages []any
-	if existing, ok := want.GetState(cfg.MessagesKey()); ok {
+	if existing, ok := want.GetCurrent("messages"); ok {
 		if arr, ok := existing.([]any); ok {
 			messages = arr
 		}
@@ -25,17 +27,14 @@ func PollWebhook(ctx context.Context, want *Want, cfg WebhookWantConfig) (should
 	// Trim to last 20 messages if needed
 	if len(messages) > 20 {
 		messages = messages[len(messages)-20:]
-		want.StoreStateMultiForAgent(map[string]any{
-			cfg.MessagesKey(): messages,
-			"action_by_agent": "MonitorAgent",
-		})
+		want.SetCurrent("messages", messages)
 	}
 
 	// Health check logging for error state
 	if status == "error" {
 		var messageCount int
-		if countVal, ok := want.GetState(cfg.MessageCountKey()); ok {
-			messageCount = ParseMessageCount(countVal)
+		if countVal, ok := want.GetCurrent("message_count"); ok {
+			messageCount = int(toFloat64(countVal))
 		}
 		want.StoreLog("%s-MONITOR Webhook in error state, total messages: %d", cfg.LogPrefix, messageCount)
 	}

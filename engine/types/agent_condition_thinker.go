@@ -11,25 +11,22 @@ func init() {
 	RegisterThinkAgent(conditionThinkerAgentName, conditionThinkerThink)
 }
 
-// conditionThinkerThink runs in three phases on each tick:
-//
-//  1. Itinerary registration (one-shot): adds own {want_type, want_name} entry to the
-//     parent coordinator's "itinerary" map so BudgetThinker can allocate per-want budgets.
-//     If no parent exists, sets good_to_reserve=true immediately.
-//
-//  2. Target budget check: once BudgetThinker has written "target_budgets" to the
-//     parent state, reads own allocation, stores it, and sets good_to_reserve=true.
-//
-//  3. Cost propagation (existing): after reservation completes, propagates the final
-//     cost to the parent's "costs" map for BudgetThinker aggregation.
 func conditionThinkerThink(ctx context.Context, want *Want) error {
-	// ── Phase 1: Register in parent itinerary (only once) ──────────────────
-	registered, _ := want.GetStateBool("_thinker_itinerary_registered", false)
-	if !registered {
+	// ── Phase 1: Initialize Goal & Register in parent itinerary ──────────
+	goalSet, _ := want.GetInternal("thinker.goal_initialized")
+	if goalSet == nil {
+		// Initialize the standard goal for any reservation-based want
+		want.SetGoal("reservation_status", "confirmed")
+		want.SetInternal("thinker.goal_initialized", true)
+	}
+
+	registered, _ := want.GetInternal("thinker.itinerary_done")
+	if registered == nil {
 		if !want.HasParent() {
 			// Standalone want (no coordinator) – approve immediately
-			want.StoreState("good_to_reserve", true)
-			want.StoreState("_thinker_good_to_reserve_set", true)
+			want.SetPlan("execute_booking", true)
+			want.SetPredefined("good_to_reserve", true)
+			want.SetInternal("thinker.plan_set", true)
 		} else {
 			want.MergeParentState(map[string]any{
 				"itinerary": map[string]any{
@@ -41,117 +38,87 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 			})
 			want.StoreLog("[ConditionThinker] Registered in itinerary: %s (%s)", want.Metadata.Name, want.Metadata.Type)
 		}
-		want.StoreState("_thinker_itinerary_registered", true)
+		want.SetInternal("thinker.itinerary_done", true)
 	}
 
-	// ── Phase 2: Check for own target budget allocation ────────────────────
-	goodToReserveSet, _ := want.GetStateBool("_thinker_good_to_reserve_set", false)
-	if !goodToReserveSet {
+	// ── Phase 2: Planning (Budget check & Approve execution) ──────────────
+	planSet, _ := want.GetInternal("thinker.plan_set")
+	if planSet == nil {
 		targetBudgetsRaw, hasTB := want.GetParentState("target_budgets")
 		if hasTB {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
-				want.StoreState("target_budget", tb)
-				want.StoreState("good_to_reserve", true)
-				want.StoreState("_thinker_good_to_reserve_set", true)
-				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → good_to_reserve=true", tb)
+				want.SetCurrent("budget_limit", tb)
+				want.SetPlan("execute_booking", true)
+				want.SetPredefined("good_to_reserve", true)
+				want.SetInternal("thinker.plan_set", true)
+				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → plan.execute_booking=true", tb)
 			}
-			// else: target_budgets exists but our entry not yet added — wait for next tick
 		} else {
-			// target_budgets key absent: parent may have no BudgetThinker (e.g. no budget want).
-			// Count ticks since itinerary registration; self-approve after a short wait so
-			// coordinators without budget tracking still allow agents to run.
-			ticksWaited, _ := want.GetStateInt("_thinker_ticks_waited", 0)
+			ticksWaitedRaw, _ := want.GetInternal("thinker.ticks_waited")
+			ticksWaited := 0
+			if ticksWaitedRaw != nil {
+				ticksWaited = int(toFloat64(ticksWaitedRaw))
+			}
 			ticksWaited++
-			want.StoreState("_thinker_ticks_waited", ticksWaited)
+			want.SetInternal("thinker.ticks_waited", ticksWaited)
 			if ticksWaited >= 3 {
-				want.StoreState("good_to_reserve", true)
-				want.StoreState("_thinker_good_to_reserve_set", true)
-				want.StoreLog("[ConditionThinker] No budget coordination after %d ticks → good_to_reserve=true", ticksWaited)
+				want.SetPlan("execute_booking", true)
+				want.SetPredefined("good_to_reserve", true)
+				want.SetInternal("thinker.plan_set", true)
+				want.StoreLog("[ConditionThinker] No budget coordination after %d ticks → plan.execute_booking=true", ticksWaited)
 			}
 		}
 	}
 
-	// ── Phase 3: Cost propagation ──────────────────────────────────────────
-	// Skip propagation for cancelled wants: their cost should not be counted
-	// in the parent's totals (BudgetThinker would otherwise double-count
-	// the original booking alongside the cheaper rebook).
-	if cancelled, _ := want.GetStateBool("_cancelled", false); cancelled {
-		// Zero out our cost contribution in parent's "costs" map before stopping.
+	// ── Phase 3: Cost propagation (Current State -> Parent) ────────────────
+	if cancelled, _ := want.GetStateBool("_cancelled", false); cancelled || want.Status == WantStatusCancelled {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{want.Metadata.Name: 0.0},
 		})
 		return nil
 	}
-	
-	// Also handle the system-level Cancelled status
-	if want.Status == WantStatusCancelled {
-		want.MergeParentState(map[string]any{
-			"costs": map[string]any{want.Metadata.Name: 0.0},
-		})
-		return nil
+
+	// Try to get cost from GCP 'current.actual_cost'
+	var cost float64
+	if currentCost, ok := want.GetCurrent("actual_cost"); ok {
+		cost = toFloat64(currentCost)
+	} else if legacyCost, ok := want.GetState("cost"); ok {
+		cost = toFloat64(legacyCost)
+		want.SetCurrent("actual_cost", cost)
 	}
-	costRaw, exists := want.GetState("cost")
-	if !exists || costRaw == nil {
-		return nil
-	}
-	cost := toFloat64(costRaw)
-	// Skip propagation of zero cost: the want type YAML may set initialValue: 0.0
-	// for the cost field, meaning cost=0 is present before the actual booking is made.
-	// Propagating 0 would cause BudgetThinker to aggregate a premature total, making
-	// the budget want achieve before all real costs are known.
+
 	if cost == 0 {
 		return nil
 	}
-	// Always propagate the current cost to the parent on every tick.
-	// MergeParentState is idempotent so repeated writes of the same value are safe.
-	// Skipping when the value is unchanged would break re-propagation after a
-	// coordinator state reset (e.g. server restart), leaving costs permanently empty.
+
 	want.MergeParentState(map[string]any{
 		"costs": map[string]any{want.Metadata.Name: cost},
 	})
-	want.StoreLog("[ConditionThinker] Propagated cost %.2f to parent want", cost)
 	return nil
 }
 
 // toFloat64 converts various numeric types to float64.
 func toFloat64(v any) float64 {
-	if v == nil {
-		return 0
-	}
+	if v == nil { return 0 }
 	switch n := v.(type) {
-	case float64:
-		return n
-	case float32:
-		return float64(n)
-	case int:
-		return float64(n)
-	case int64:
-		return float64(n)
-	case int32:
-		return float64(n)
-	case uint:
-		return float64(n)
-	case uint64:
-		return float64(n)
+	case float64: return n
+	case float32: return float64(n)
+	case int: return float64(n)
+	case int64: return float64(n)
+	case int32: return float64(n)
+	case uint: return float64(n)
+	case uint64: return float64(n)
 	}
 	return 0
 }
 
-// extractTargetBudget looks up the target_budget for wantName in the target_budgets map.
-// target_budgets is structured as: map[wantName]map[string]any{"target_budget": float64, ...}
 func extractTargetBudget(targetBudgetsRaw any, wantName string) (float64, bool) {
 	tb, ok := targetBudgetsRaw.(map[string]any)
-	if !ok {
-		return 0, false
-	}
+	if !ok { return 0, false }
 	entry, ok := tb[wantName]
-	if !ok {
-		return 0, false
-	}
+	if !ok { return 0, false }
 	entryMap, ok := entry.(map[string]any)
-	if !ok {
-		return 0, false
-	}
+	if !ok { return 0, false }
 	budget := toFloat64(entryMap["target_budget"])
 	return budget, budget > 0
 }

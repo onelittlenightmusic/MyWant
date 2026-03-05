@@ -218,9 +218,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 					Spec:        want.Spec,
 					Status:      want.GetStatus(),
 					History:     want.BuildHistory(),
-					State:       want.GetExplicitState(),
 					HiddenState: want.GetHiddenState(),
 				}
+				wantCopy.StoreStateMulti(want.GetExplicitState())
 				wantsByID[want.Metadata.ID] = wantCopy
 			}
 		}
@@ -235,9 +235,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				Spec:        want.Spec,
 				Status:      want.GetStatus(),
 				History:     want.BuildHistory(),
-				State:       want.GetExplicitState(),
 				HiddenState: want.GetHiddenState(),
 			}
+			wantCopy.StoreStateMulti(want.GetExplicitState())
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -314,7 +314,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 						Spec:                 want.Spec,
 						Status:               want.GetStatus(),
 						History:              want.BuildHistory(),
-						State:                want.GetExplicitState(),
 						HiddenState:          want.GetHiddenState(),
 						ConnectivityMetadata: want.ConnectivityMetadata,
 					}
@@ -324,10 +323,10 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 						Spec:        want.Spec,
 						Status:      want.GetStatus(),
 						History:     want.BuildHistory(),
-						State:       want.GetExplicitState(),
 						HiddenState: want.GetHiddenState(),
 					}
 				}
+				wantCopy.StoreStateMulti(want.GetExplicitState())
 
 				json.NewEncoder(w).Encode(wantCopy)
 				return
@@ -356,7 +355,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					Spec:                 want.Spec,
 					Status:               want.GetStatus(),
 					History:              want.BuildHistory(),
-					State:                want.GetExplicitState(),
 					HiddenState:          want.GetHiddenState(),
 					ConnectivityMetadata: want.ConnectivityMetadata,
 				}
@@ -366,10 +364,10 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 					Spec:        want.Spec,
 					Status:      want.GetStatus(),
 					History:     want.BuildHistory(),
-					State:       want.GetExplicitState(),
 					HiddenState: want.GetHiddenState(),
 				}
 			}
+			wantCopy.StoreStateMulti(want.GetExplicitState())
 
 			json.NewEncoder(w).Encode(wantCopy)
 			return

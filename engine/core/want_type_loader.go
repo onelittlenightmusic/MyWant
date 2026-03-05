@@ -68,6 +68,7 @@ type StateDef struct {
 	Name         string `json:"name" yaml:"name"`
 	Description  string `json:"description" yaml:"description"`
 	Type         string `json:"type" yaml:"type"`
+	Label        string `json:"label,omitempty" yaml:"label,omitempty"` // goal, current, plan, predefined, internal
 	Persistent   bool   `json:"persistent" yaml:"persistent"`
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`

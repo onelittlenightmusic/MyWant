@@ -126,10 +126,10 @@ func TestWebhookExecutor_DoAgent(t *testing.T) {
 		nil,
 		"base",
 	)
-	want.State = map[string]any{
+	want.StoreStateMulti(map[string]any{
 		"departure": "NRT",
 		"arrival":   "LAX",
-	}
+	})
 
 	// Execute
 	err := executor.Execute(context.Background(), agent, want)
@@ -607,9 +607,9 @@ func TestWebhookExecutor_MonitorWithSync_StateFetchFailure(t *testing.T) {
 	)
 
 	// Set initial state
-	want.State = map[string]any{
+	want.StoreStateMulti(map[string]any{
 		"initial_field": "initial_value",
-	}
+	})
 
 	// Execute should succeed even though state fetch fails (uses fallback)
 	err := executor.executeMonitorWithSync(context.Background(), agent, want)

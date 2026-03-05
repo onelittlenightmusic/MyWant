@@ -89,15 +89,9 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Status = runtimeWant.want.Status
 			want.Metadata.OrderKey = runtimeWant.want.Metadata.OrderKey // Sync order key
 
-			// Lock state when copying to prevent concurrent map access
-			runtimeWant.want.stateMutex.RLock()
-			stateCopy := make(map[string]any)
-			for k, v := range runtimeWant.want.State {
-				stateCopy[k] = v
-			}
-			runtimeWant.want.stateMutex.RUnlock()
-
-			want.State = stateCopy
+			// Correctly copy state using the thread-safe helper
+			stateCopy := runtimeWant.want.GetAllState()
+			want.StoreStateMulti(stateCopy)
 			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
@@ -108,22 +102,17 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
 
-			// Lock state when copying to prevent concurrent map access
-			runtimeWant.want.stateMutex.RLock()
-			stateCopy := make(map[string]any)
-			for k, v := range runtimeWant.want.State {
-				stateCopy[k] = v
-			}
-			runtimeWant.want.stateMutex.RUnlock()
+			// Correctly copy state using the thread-safe helper
+			stateCopy := runtimeWant.want.GetAllState()
 
 			wantConfig := &Want{
 				Metadata: runtimeWant.GetMetadata(),
 				Spec:     *runtimeWant.GetSpec(),
 				// Stats field removed - data now in State
 				Status:  runtimeWant.want.Status,
-				State:   stateCopy,
 				History: runtimeWant.want.BuildHistory(), // Include history in stats writes
 			}
+			wantConfig.StoreStateMulti(stateCopy)
 			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
 		}
 	}
@@ -210,9 +199,9 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML_disabled() error {
 			Spec:     *runtimeWant.GetSpec(), // This preserves using
 			// Stats field removed - data now in State
 			Status:  runtimeWant.want.Status,
-			State:   stateCopy,                       // Use copy to avoid concurrent modification
 			History: runtimeWant.want.BuildHistory(), // Include history in memory dump
 		}
+		want.StoreStateMulti(stateCopy)
 
 		wants = append(wants, want)
 	}

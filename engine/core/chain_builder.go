@@ -1055,9 +1055,13 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		return
 	}
 
+	var wantPtr *Want
+	var typeDef *WantTypeDefinition
+
 	// Apply want type definition defaults (including Requires) if available
 	if cb.wantTypeDefinitions != nil {
-		if typeDef, exists := cb.wantTypeDefinitions[wantConfig.Metadata.Type]; exists {
+		if td, exists := cb.wantTypeDefinitions[wantConfig.Metadata.Type]; exists {
+			typeDef = td
 			// Apply Requires from want type definition if not already set in wantConfig
 			if len(wantConfig.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
 				wantConfig.Spec.Requires = typeDef.Requires
@@ -1073,15 +1077,13 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
-		wantPtr := &Want{
+		wantPtr = &Want{
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
 			Status:   WantStatusFailed,
-			State: Dict{
-				"error": err.Error(),
-			},
-			History: wantConfig.History,
+			History:  wantConfig.History,
 		}
+		wantPtr.StoreState("error", err.Error())
 		wantPtr.InitializeSubscriptionSystem()
 
 		runtimeWant := &runtimeWant{
@@ -1093,28 +1095,16 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	}
 
 	// Try to extract Want pointer from the want function (if it has one embedded)
-	var wantPtr *Want
-
 	// First try direct *Want pointer
 	if w, ok := wantFunction.(*Want); ok {
 		wantPtr = w
 	} else {
 		// Try to extract embedded Want via reflection
 		wantPtr = extractWantViaReflection(wantFunction)
-		if wantPtr != nil {
-		}
 	}
 
 	// If no Want was found in the want function, create a new one (This handles want types that don't embed or return a Want)
 	if wantPtr == nil {
-		stateMap := make(map[string]any)
-		if wantConfig.State != nil {
-			// Use StoreStateMulti for proper state batching
-			if len(wantConfig.State) > 0 {
-				wantPtr.StoreStateMulti(wantConfig.State)
-			}
-		}
-
 		// Copy History field from config
 		historyField := wantConfig.History
 		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
@@ -1130,7 +1120,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			Metadata: wantConfig.Metadata,
 			Spec:     wantConfig.Spec,
 			Status:   WantStatusIdle,
-			State:    stateMap,
 			History:  historyField,
 		}
 	} else {
@@ -1153,14 +1142,6 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		wantPtr.Spec = wantConfig.Spec
 		wantPtr.SetStatus(WantStatusIdle)
 
-		// Merge state data if provided
-		if wantConfig.State != nil {
-			// Use StoreStateMulti for proper state batching
-			if len(wantConfig.State) > 0 {
-				wantPtr.StoreStateMulti(wantConfig.State)
-			}
-		}
-
 		// Update history
 		wantPtr.History = wantConfig.History
 		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
@@ -1172,6 +1153,18 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			wantPtr.History.ParameterHistory = append(wantPtr.History.ParameterHistory, entry)
 		}
 	}
+
+	// Initialize labels from definition
+	if typeDef != nil {
+		wantPtr.SetStateLabels(typeDef)
+	}
+
+	// Merge state data if provided
+	stateUpdates := wantConfig.GetAllState()
+	if len(stateUpdates) > 0 {
+		wantPtr.StoreStateMulti(stateUpdates)
+	}
+
 	wantPtr.InitializeSubscriptionSystem()
 
 	// Inject agent registry if available
