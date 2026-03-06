@@ -1204,10 +1204,53 @@ func (n *Want) MergeParentState(updates map[string]any) {
 }
 
 // SuggestParent suggests a set of directions to the parent want (or global state).
-// This is typically used by planning wants (like Itinerary) to request the 
+// This is typically used by planning wants (like Itinerary) to request the
 // parent's DispatchThinker to realize new child wants.
+// It appends to existing directions instead of overwriting to support incremental planning.
 func (n *Want) SuggestParent(directions []string) {
-	n.StoreParentState("directions", directions)
+	parent := n.getParentWant()
+
+	var existing []string
+	var raw any
+	var exists bool
+
+	if parent != nil {
+		raw, exists = parent.GetState("directions")
+	} else {
+		raw, exists = GetGlobalState("directions")
+	}
+
+	if exists {
+		if slice, ok := raw.([]string); ok {
+			existing = slice
+		} else if slice, ok := raw.([]any); ok {
+			for _, item := range slice {
+				if s, ok := item.(string); ok {
+					existing = append(existing, s)
+				}
+			}
+		}
+	}
+
+	changed := false
+	for _, d := range directions {
+		if !Contains(existing, d) {
+			existing = append(existing, d)
+			changed = true
+		}
+	}
+
+	if changed || (!exists && len(directions) > 0) {
+		if parent != nil {
+			DebugLog("[SUGGEST] Adding %d directions to parent %s (total: %d)",
+				len(directions), parent.Metadata.Name, len(existing))
+			n.MergeParentState(map[string]any{"directions": existing})
+		} else {
+			DebugLog("[SUGGEST] Adding %d directions to global state (total: %d)",
+				len(directions), len(existing))
+			MergeGlobalState(map[string]any{"directions": existing})
+		}
+	}
 }
 
 // StoreStateMulti is the batch variant of StoreState: it writes all key-value pairs

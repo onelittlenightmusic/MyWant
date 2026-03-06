@@ -69,6 +69,30 @@ wantType:
       - expensive
       - luxury
   state:
+  - name: actual_cost
+    description: Reported cost for this reservation (GCP)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
+  - name: reservation_status
+    description: Current status of the reservation
+    type: string
+    persistent: true
+    initialValue: ''
+    label: goal
+  - name: res_status
+    description: Current status of the reservation (GCP)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: execute_booking
+    description: Plan flag to trigger agent execution
+    type: bool
+    persistent: true
+    initialValue: false
+    label: plan
   - name: completed
     description: Whether reservation has been completed
     type: bool

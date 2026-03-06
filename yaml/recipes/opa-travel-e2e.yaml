@@ -63,6 +63,33 @@ recipe:
         }
       }
 
+  state:
+    - name: costs
+      description: Map of child want names to reported costs
+      type: object
+      persistent: true
+      initialValue: {}
+    - name: directions
+      description: List of suggested planning directions
+      type: object
+      persistent: true
+      initialValue: []
+    - name: hotel_cost
+      description: Last reported hotel cost
+      type: float64
+      persistent: true
+      initialValue: 0
+    - name: dinner_cost
+      description: Last reported dinner cost
+      type: float64
+      persistent: true
+      initialValue: 0
+    - name: goal_achieved
+      description: Planning completion status
+      type: bool
+      persistent: true
+      initialValue: false
+
   wants:
     - metadata:
         type: itinerary

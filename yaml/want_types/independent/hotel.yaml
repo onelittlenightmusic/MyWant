@@ -40,6 +40,30 @@ wantType:
     persistent: true
     example: 800.0
     initialValue: 0.0
+  - name: actual_cost
+    description: Reported cost for this reservation (GCP)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
+  - name: reservation_status
+    description: Current status of the reservation
+    type: string
+    persistent: true
+    initialValue: ''
+    label: goal
+  - name: res_status
+    description: Current status of the reservation (GCP)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: execute_booking
+    description: Plan flag to trigger agent execution
+    type: bool
+    persistent: true
+    initialValue: false
+    label: plan
   - name: total_processed
     description: Count of successful reservations
     type: int

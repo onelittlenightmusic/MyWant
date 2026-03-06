@@ -22,11 +22,16 @@ type BudgetWant struct {
 func (b *BudgetWant) Initialize() {
 	budget := b.GetFloatParam("budget", 5000.0)
 	currency := b.GetStringParam("currency", "USD")
+
+	// Set both legacy state and GCP-style Goal
+	b.SetGoal("budget_limit", budget)
+
 	b.StoreStateMulti(Dict{
 		"budget":               budget,
 		"currency":             currency,
 		"costs":                map[string]any{},
 		"total_cost":           0.0,
+		"total_spent":          0.0,
 		"remaining_budget":     budget,
 		"budget_exceeded":      false,
 		"achieving_percentage": 0,

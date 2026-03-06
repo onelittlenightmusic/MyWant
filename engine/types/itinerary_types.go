@@ -60,16 +60,32 @@ func (o *ItineraryWant) Progress() {
 	}
 
 	if len(directions) > 0 {
-		o.SuggestParent(directions)
-		o.SetInternal("planned_count", float64(len(directions)))
+		var lastSuggested []string
+		if raw, ok := o.GetInternal("_last_suggested"); ok {
+			if slice, ok := raw.([]string); ok {
+				lastSuggested = slice
+			} else if slice, ok := raw.([]any); ok {
+				for _, item := range slice {
+					if s, ok := item.(string); ok {
+						lastSuggested = append(lastSuggested, s)
+					}
+				}
+			}
+		}
+
+		if !reflect.DeepEqual(lastSuggested, directions) {
+			o.SuggestParent(directions)
+			o.SetInternal("_last_suggested", directions)
+			o.SetInternal("planned_count", float64(len(directions)))
+		}
 	}
 
 	if hash, _ := o.GetStateString("_opa_input_hash", ""); hash != "" {
-		if len(directions) == 0 {
-			o.SetInternal("goal_achieved", true)
-		} else {
-			o.SetInternal("goal_achieved", false)
-		}
+		achieved := len(directions) == 0
+		o.SetInternal("goal_achieved", achieved)
+		
+		// Propagation: inform parent that this planner has finished its goal
+		o.MergeParentState(map[string]any{"goal_achieved": achieved})
 	}
 }
 

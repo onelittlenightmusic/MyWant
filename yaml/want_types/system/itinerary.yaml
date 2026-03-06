@@ -80,42 +80,56 @@ wantType:
     type: object
     persistent: true
     initialValue: {}
+    label: goal
 
   - name: current
     description: Current observed state (updated when travel wants complete)
     type: object
     persistent: true
     initialValue: {}
+    label: current
+
+  - name: costs
+    description: Map of child want names to reported costs
+    type: object
+    persistent: true
+    initialValue: {}
+    label: internal
 
   - name: directions
     description: Direction list produced by ThinkAgent on each replan
     type: object
     persistent: true
     initialValue: []
+    label: plan
 
   - name: goal_achieved
     description: True when ThinkAgent returns an empty directions list
     type: bool
     persistent: true
     initialValue: false
+    label: internal
 
   - name: planned_count
     description: Number of directions in the current plan
     type: int
     persistent: true
     initialValue: 0
+    label: internal
 
   - name: dispatched_count
     description: Number of directions currently in-flight
     type: int
     persistent: true
     initialValue: 0
+    label: internal
 
   - name: dispatched_directions
     description: Internal map of direction name → dispatched want ID
     type: object
     persistent: true
     initialValue: {}
+    label: internal
 
   requires:
     - opa_llm_planning

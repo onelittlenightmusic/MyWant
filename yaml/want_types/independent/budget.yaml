@@ -29,6 +29,12 @@ wantType:
       - GBP
     example: USD
   state:
+  - name: budget_limit
+    description: Goal budget limit
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: goal
   - name: budget
     description: Total budget amount
     type: float64
@@ -44,6 +50,13 @@ wantType:
     type: map
     persistent: true
     initialValue: {}
+    label: current
+  - name: total_spent
+    description: Sum of all reported costs
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
   - name: total_cost
     description: Sum of all reported costs
     type: float64
@@ -54,16 +67,19 @@ wantType:
     type: float64
     persistent: true
     initialValue: 0.0
+    label: current
   - name: budget_exceeded
     description: Whether total cost exceeds budget
     type: bool
     persistent: true
     initialValue: false
+    label: current
   - name: budget_summary
     description: Human-readable budget summary
     type: string
     persistent: true
     initialValue: ''
+    label: current
   - name: achieving_percentage
     description: Progress percentage toward completion
     type: int
