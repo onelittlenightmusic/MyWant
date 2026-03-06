@@ -50,6 +50,7 @@ wantType:
     description: Whether command execution has completed
     type: bool
     persistent: true
+    label: current
     initialValue: false
     example: true
 
@@ -57,6 +58,7 @@ wantType:
     description: Execution status (pending, running, completed, failed)
     type: string
     persistent: true
+    label: current
     initialValue: pending
     example: completed
 
@@ -64,6 +66,7 @@ wantType:
     description: The command that was executed
     type: string
     persistent: true
+    label: predefined
     initialValue: ''
     example: "echo 'Hello World'"
 
@@ -71,6 +74,7 @@ wantType:
     description: Exit code returned by the command
     type: int
     persistent: true
+    label: current
     initialValue: 0
     example: 0
 
@@ -78,6 +82,7 @@ wantType:
     description: Standard output captured from the command
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: 'Hello World'
 
@@ -85,6 +90,7 @@ wantType:
     description: Standard error captured from the command
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: ''
 
@@ -92,6 +98,7 @@ wantType:
     description: Combined stdout and stderr output
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: 'Hello World'
 
@@ -99,6 +106,7 @@ wantType:
     description: Time taken to execute the command in milliseconds
     type: int
     persistent: true
+    label: current
     initialValue: 0
     example: 25
 
@@ -106,6 +114,7 @@ wantType:
     description: RFC3339 timestamp when command started
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: '2025-12-24T10:30:45Z'
 
@@ -113,6 +122,7 @@ wantType:
     description: RFC3339 timestamp when command completed
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: '2025-12-24T10:30:45Z'
 
@@ -120,6 +130,7 @@ wantType:
     description: Error message if execution failed
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: 'Exit code: 1'
 
@@ -127,6 +138,7 @@ wantType:
     description: Raw result from ExecutionAgent
     type: object
     persistent: false
+    label: internal
     initialValue: {}
     example: '{"exit_code": 0, "stdout": "Hello World", "stderr": "", "execution_time_ms": 25, "started_at": "2025-12-24T10:30:45Z", "completed_at": "2025-12-24T10:30:45Z", "success": true}'
 

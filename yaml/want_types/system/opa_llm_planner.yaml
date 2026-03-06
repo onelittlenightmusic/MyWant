@@ -79,6 +79,7 @@ wantType:
       Written by the caller; read by the OPA LLM Planner on each tick.
     type: object
     persistent: true
+    label: goal
     initialValue: {}
     example: '{"service": "deployed", "replicas": 3}'
 
@@ -88,6 +89,7 @@ wantType:
       Written by the caller (e.g. a monitoring want); read by the OPA LLM Planner on each tick.
     type: object
     persistent: true
+    label: current
     initialValue: {}
     example: '{"service": "stopped", "replicas": 0}'
 
@@ -97,6 +99,7 @@ wantType:
       Updated whenever goal or current state changes.
     type: object
     persistent: true
+    label: plan
     initialValue: []
     example: '[{"type": "start_service", "target": "my-app"}]'
 

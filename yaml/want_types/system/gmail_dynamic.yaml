@@ -23,17 +23,20 @@ wantType:
     description: Current evolution phase (discovery, coding, compiling, validation, stable)
     type: string
     persistent: true
+    label: current
     initialValue: "discovery"
 
   - name: wasm_path
     description: Path to the generated WASM binary
     type: string
     persistent: true
+    label: internal
 
   - name: final_result
     description: Result of the execution
     type: any
     persistent: true
+    label: current
 
   require:
     type: none

@@ -33,6 +33,7 @@ wantType:
     description: Array of identified prime numbers
     type: '[]int'
     persistent: true
+    label: current
     example:
     - 2
     - 3
@@ -45,24 +46,28 @@ wantType:
     description: Total count of primes identified
     type: int
     persistent: true
+    label: current
     example: 25
     initialValue: 0
   - name: lastPrimeFound
     description: Most recent prime identified
     type: int
     persistent: true
+    label: current
     example: 97
     initialValue: 0
   - name: total_processed
     description: Total numbers processed through sieve
     type: int
     persistent: true
+    label: current
     example: 100
     initialValue: 0
   - name: last_number_processed
     description: Last number examined
     type: int
     persistent: true
+    label: current
     example: 100
     initialValue: 0
   agents: []

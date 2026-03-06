@@ -44,24 +44,28 @@ wantType:
     description: Whether generation cycle has completed
     type: bool
     persistent: true
+    label: current
     example: true
     initialValue: false
   - name: generated_count
     description: Total number of values generated (end - start + 1)
     type: int
     persistent: true
+    label: current
     example: 100
     initialValue: 0
   - name: start_value
     description: Starting value used for generation
     type: int
     persistent: true
+    label: predefined
     example: 2
     initialValue: 0
   - name: end_value
     description: Ending value used for generation
     type: int
     persistent: true
+    label: predefined
     example: 100
     initialValue: 0
   agents: []

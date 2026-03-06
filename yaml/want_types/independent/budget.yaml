@@ -39,11 +39,13 @@ wantType:
     description: Total budget amount
     type: float64
     persistent: true
+    label: predefined
     initialValue: 5000.0
   - name: currency
     description: Currency code
     type: string
     persistent: true
+    label: predefined
     initialValue: USD
   - name: costs
     description: Map of child want names to their reported costs
@@ -61,6 +63,7 @@ wantType:
     description: Sum of all reported costs
     type: float64
     persistent: true
+    label: current
     initialValue: 0.0
   - name: remaining_budget
     description: Budget minus total cost
@@ -84,11 +87,13 @@ wantType:
     description: Progress percentage toward completion
     type: int
     persistent: true
+    label: current
     initialValue: 0
   - name: final_result
     description: Final result summary
     type: string
     persistent: true
+    label: current
     initialValue: ''
   agents: []
   connect:

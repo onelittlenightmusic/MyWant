@@ -56,6 +56,7 @@ wantType:
     description: Current status of the Gmail operation (initialized, executing, completed, failed)
     type: string
     persistent: true
+    label: current
     initialValue: "pending"
     example: "completed"
 
@@ -63,6 +64,7 @@ wantType:
     description: Error message if the operation failed
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: "MCP operation failed"
 
@@ -70,6 +72,7 @@ wantType:
     description: MCP operation being performed (search_emails, read_email, send_email)
     type: string
     persistent: true
+    label: plan
     initialValue: ''
     example: "search_emails"
 
@@ -77,6 +80,7 @@ wantType:
     description: Search query for MCP search operations
     type: string
     persistent: true
+    label: plan
     initialValue: ''
     example: "from:boss@company.com is:unread"
 
@@ -84,6 +88,7 @@ wantType:
     description: Maximum number of results to return for search operations
     type: int
     persistent: true
+    label: predefined
     initialValue: 10
     example: 10
 
@@ -91,6 +96,7 @@ wantType:
     description: Final result from the Gmail operation
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: "Found 3 emails from boss@company.com"
 

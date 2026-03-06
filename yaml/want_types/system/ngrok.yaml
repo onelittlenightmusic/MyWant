@@ -49,6 +49,7 @@ wantType:
     description: Current phase of the tunnel lifecycle
     type: string
     persistent: true
+    label: current
     initialValue: starting
     example: running
 
@@ -56,6 +57,7 @@ wantType:
     description: Process ID of the running ngrok process (0 if not running)
     type: int
     persistent: true
+    label: internal
     initialValue: 0
     example: 12345
 
@@ -63,6 +65,7 @@ wantType:
     description: Public forwarding URL assigned by ngrok
     type: string
     persistent: true
+    label: current
     initialValue: ""
     example: "https://torchy-maxine-condensible.ngrok-free.dev"
 
@@ -70,6 +73,7 @@ wantType:
     description: Error message if tunnel failed to start
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   connectivity:

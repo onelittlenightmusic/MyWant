@@ -48,6 +48,7 @@ wantType:
     description: Current phase of the tunnel lifecycle
     type: string
     persistent: true
+    label: current
     initialValue: starting
     example: running
 
@@ -55,6 +56,7 @@ wantType:
     description: Process ID of the running cloudflared process (0 if not running)
     type: int
     persistent: true
+    label: internal
     initialValue: 0
     example: 12345
 
@@ -62,6 +64,7 @@ wantType:
     description: Public forwarding URL assigned by Cloudflare (trycloudflare.com)
     type: string
     persistent: true
+    label: current
     initialValue: ""
     example: "https://torchy-maxine-condensible.trycloudflare.com"
 
@@ -69,6 +72,7 @@ wantType:
     description: Error message if tunnel failed to start
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   connectivity:

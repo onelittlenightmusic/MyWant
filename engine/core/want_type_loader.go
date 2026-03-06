@@ -355,6 +355,15 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 		if state.Type == "" {
 			return fmt.Errorf("state key %s missing type", state.Name)
 		}
+		if state.Label == "" {
+			// CRITICAL: Every state field must have a label for the GCP pattern to function.
+			// Without a label, SetCurrent/GetGoal/etc will silently fail.
+			return fmt.Errorf("state key '%s' missing mandatory label (must be one of: goal, current, plan, predefined, internal)", state.Name)
+		}
+		validLabels := map[string]bool{"goal": true, "current": true, "plan": true, "predefined": true, "internal": true}
+		if !validLabels[state.Label] {
+			return fmt.Errorf("state key '%s' has invalid label '%s' (must be one of: goal, current, plan, predefined, internal)", state.Name, state.Label)
+		}
 	}
 
 	// Validation of require field is handled by OpenAPI spec

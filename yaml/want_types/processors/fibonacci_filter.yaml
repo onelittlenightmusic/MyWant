@@ -43,6 +43,7 @@ wantType:
     description: Array of Fibonacci numbers that passed the filter
     type: '[]int'
     persistent: true
+    label: current
     example:
     - 89
     - 144
@@ -53,24 +54,28 @@ wantType:
     description: Number of values that passed the filter
     type: int
     persistent: true
+    label: current
     example: 8
     initialValue: 0
   - name: total_processed
     description: Total number of input values processed
     type: int
     persistent: true
+    label: current
     example: 20
     initialValue: 0
   - name: min_value_seen
     description: Smallest value that passed the filter
     type: int
     persistent: true
+    label: current
     example: 89
     initialValue: 0
   - name: max_value_seen
     description: Largest value that passed the filter
     type: int
     persistent: true
+    label: current
     example: 4181
     initialValue: 0
   agents: []

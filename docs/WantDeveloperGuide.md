@@ -354,6 +354,63 @@ coordinator.Provide(someData)
 - [ ] **【所有権】Agent Exec内では want.StoreStateForAgent() を使っている（渡された want のみに書く）**
 - [ ] **【所有権】他Wantへのキャンセル指示は _cancel_requested フラグ + RestartWant() 経由にしている**
 
+## よくある間違いとトラブルシューティング
+
+WantやAgentの開発において、特に状態管理（State）に関連して陥りやすい落とし穴をまとめました。
+
+### 1. GCPラベル未定義によるサイレントな失敗（重要）
+
+`SetCurrent` や `GetGoal` などのGCP専用メソッドを使用する場合、**YAML定義で正しいラベルが付与されていないと、操作はサイレントに無視されます。**
+
+*   **症状:** Agentが `SetCurrent` を呼んでいるのにステートが更新されない、または `GetCurrent` が常に `nil` を返す。
+*   **原因:** YAMLの `state:` セクションで `label: current` などが設定されていない。
+*   **対策:** YAMLを確認し、アクセスしようとしているフィールドに適切なラベルを付けてください。
+    ```yaml
+    # ✅ 正しい例
+    state:
+      - name: actual_cost
+        type: float64
+        label: current  # これがないと SetCurrent/GetCurrent は動作しない
+    ```
+
+### 2. フィールド名の不一致（タイポ）
+
+Goのコード内では文字列キーでステートにアクセスするため、YAMLで定義した名前と1文字でも異なると動作しません。
+
+*   **症状:** ログには「成功」と出ているが、UIや他のWantから値が見えない。
+*   **原因:** YAMLでは `reminder_phase` と定義しているが、Goコードで `phase` と書いていた。
+*   **対策:** キー名を定数化するか、YAMLとコードを注意深く突き合わせてください。
+
+### 3. YAML定義がないフィールドの不可視性
+
+`StoreState` などの低レベルメソッドを使えば、YAMLに定義のないフィールドにも書き込みは可能ですが、**外部（API、UI、コマンドライン）からは一切見えなくなります。**
+
+*   **症状:** `DebugLog` では値が入っていることを確認できるが、`mywant wants get` の出力に現れない。
+*   **原因:** YAMLの `state:` セクションにフィールド名が列挙されていない。
+*   **対策:** APIやUIに公開したい動的なフィールドは、必ずYAMLの `state:` に追加してください。
+
+### 4. リスト・マップの上書き問題
+
+複数のソースから情報を集約する場合（例：複数のプランナーからの提案、複数の子Wantからのコスト集計）、`StoreState` を使うと前のデータが消えてしまいます。
+
+*   **症状:** 最後に完了したWantのコストしか残っていない。複数の提案をしたはずなのに、最後の1つしか表示されない。
+*   **原因:** `StoreState` でリストやマップ全体を毎回上書きしている。
+*   **対策:** 
+    *   **Map（辞書型）への追記:** `MergeState` または `MergeParentState` を使用してください。
+    *   **List（配列型）への追記:** `SuggestParent`（重複排除機能付き）を使用してください。
+
+### 5. 親Wantへの完了伝搬
+
+`Target`（レシピ）の下で動くプランナーWant（例：`Itinerary`）が完了しても、親のステータスが自動的に完了するわけではありません。
+
+*   **症状:** 子Wantはすべて `achieved` なのに、親の `Target` がずっと `reaching (50%)` のまま。
+*   **原因:** 子Wantが親の `goal_achieved` フラグを更新していない。
+*   **対策:** プランナーの最終ステップで親のステートを更新してください。
+    ```go
+    // Itineraryプランニング完了時
+    w.MergeParentState(map[string]any{"goal_achieved": true})
+    ```
+
 ## 参考資料
 
 - [want-system.md](want-system.md) - Want システムの全体像

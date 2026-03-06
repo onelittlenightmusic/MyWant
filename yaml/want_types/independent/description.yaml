@@ -36,34 +36,40 @@ wantType:
     description: Whether description has been generated and sent
     type: bool
     persistent: true
+    label: current
     example: true
     initialValue: false
   - name: description_format
     description: Format template used for description
     type: string
     persistent: true
+    label: predefined
     initialValue: ''
   - name: approval_id
     description: Associated approval process ID
     type: string
     persistent: true
+    label: predefined
     example: APR-2024-001
     initialValue: ''
   - name: description
     description: Generated description text
     type: string
     persistent: true
+    label: current
     example: 'Request for approval: APR-2024-001'
     initialValue: ''
   - name: description_provided_at
     description: Timestamp when description was generated
     type: string
     persistent: true
+    label: current
     initialValue: ''
   - name: total_processed
     description: Count of description packets generated
     type: int
     persistent: true
+    label: current
     example: 1
     initialValue: 0
   agents: []

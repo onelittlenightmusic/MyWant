@@ -44,12 +44,14 @@ wantType:
     persistent: true
     initialValue: "active"
     example: "active"
+    label: current
 
   - name: webhook_secret
     description: Signing secret (stored from params)
     type: string
     persistent: true
     initialValue: ""
+    label: internal
 
   - name: slack_latest_message
     description: Most recently received Slack message
@@ -57,6 +59,7 @@ wantType:
     persistent: true
     initialValue: {}
     example: '{"sender": "U01ABCDEF", "text": "Hello", "timestamp": "2026-02-09T12:00:00Z", "channel_id": "C01ABCDEF23"}'
+    label: current
 
   - name: slack_message_count
     description: Total number of messages received
@@ -64,6 +67,7 @@ wantType:
     persistent: true
     initialValue: 0
     example: 5
+    label: current
 
   - name: slack_messages
     description: FIFO buffer of last 20 received messages
@@ -71,12 +75,14 @@ wantType:
     persistent: true
     initialValue: []
     example: '[{"sender": "U01ABCDEF", "text": "Hello", "timestamp": "2026-02-09T12:00:00Z", "channel_id": "C01ABCDEF23"}]'
+    label: current
 
   - name: channel_filter
     description: Active channel filter (from params)
     type: string
     persistent: true
     initialValue: ""
+    label: internal
 
   - name: achieving_percentage
     description: Progress percentage (50% while active, 100% when stopped)
@@ -84,6 +90,7 @@ wantType:
     persistent: true
     initialValue: 0
     example: 50
+    label: current
 
   finalResultField: slack_latest_message.text
 

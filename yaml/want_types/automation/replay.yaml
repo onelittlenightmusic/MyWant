@@ -49,150 +49,175 @@ wantType:
     description: Webhook ID for triggering start_recording ("want-id-start")
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: stopWebhookId
     description: Webhook ID for triggering stop_recording ("want-id-stop")
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: start_recording_requested
     description: Signal set by the start webhook handler; consumed by the MonitorAgent
     type: bool
     persistent: true
+    label: internal
     initialValue: false
 
   - name: stop_recording_requested
     description: Signal set by the stop webhook handler; consumed by the MonitorAgent
     type: bool
     persistent: true
+    label: internal
     initialValue: false
 
   - name: start_debug_recording_requested
     description: Signal set by the debug-start webhook handler; consumed by the MonitorAgent
     type: bool
     persistent: true
+    label: internal
     initialValue: false
 
   - name: stop_debug_recording_requested
     description: Signal set by the debug-stop webhook handler; consumed by the MonitorAgent
     type: bool
     persistent: true
+    label: internal
     initialValue: false
 
   - name: recording_active
     description: True while a Playwright recording session is in progress
     type: bool
     persistent: true
+    label: current
     initialValue: false
 
   - name: recording_session_id
     description: Session identifier returned by the Playwright MCP App Server
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: recording_iframe_url
     description: URL of the Playwright App Server UI to embed in an iframe
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_script
     description: The recorded Playwright .spec.ts script
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: final_result
     description: Mirrors replay_script once recording completes (set via FinalResultField)
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: debugStartWebhookId
     description: Webhook ID for triggering start_debug_recording ("want-id-debug-start")
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: debugStopWebhookId
     description: Webhook ID for triggering stop_debug_recording ("want-id-debug-stop")
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: debug_recording_active
     description: True while a debug Chrome recording session is in progress
     type: bool
     persistent: true
+    label: current
     initialValue: false
 
   - name: debug_recording_session_id
     description: Session identifier for the debug recording session
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: replayWebhookId
     description: Webhook ID for triggering replay ("want-id-replay")
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: start_replay_requested
     description: Signal set by replay webhook; consumed by MonitorAgent
     type: bool
     persistent: true
+    label: internal
     initialValue: false
 
   - name: replay_active
     description: True while replay is executing in the background
     type: bool
     persistent: true
+    label: current
     initialValue: false
 
   - name: replay_session_id
     description: Session ID for the active replay
     type: string
     persistent: true
+    label: internal
     initialValue: ''
 
   - name: replay_iframe_url
     description: URL of the MCP App UI iframe showing the replay
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_result
     description: JSON result captured after replay (selected_text, active_element, url)
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_error
     description: Error message if replay failed
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_screenshot_url
     description: API URL of the screenshot taken at the end of replay
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_actions
     description: JSON array of raw recorded action strings used for replay
     type: string
     persistent: true
+    label: current
     initialValue: ''
 
   - name: replay_start_url
     description: Starting URL for replay execution
     type: string
     persistent: true
+    label: predefined
     initialValue: ''
 
   requires:

@@ -42,29 +42,34 @@ wantType:
     description: Whether evidence has been generated and sent
     type: bool
     persistent: true
+    label: current
     example: true
     initialValue: false
   - name: evidence_type
     description: Type of evidence provided
     type: string
     persistent: true
+    label: predefined
     example: audit
     initialValue: ''
   - name: approval_id
     description: Associated approval process ID
     type: string
     persistent: true
+    label: predefined
     example: APR-2024-001
     initialValue: ''
   - name: evidence_provided_at
     description: Timestamp when evidence was generated
     type: string
     persistent: true
+    label: current
     initialValue: ''
   - name: total_processed
     description: Count of evidence packets generated
     type: int
     persistent: true
+    label: current
     example: 1
     initialValue: 0
   agents: []

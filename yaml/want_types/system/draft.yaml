@@ -27,6 +27,7 @@ wantType:
     description: The interactive session ID associated with this draft
     type: string
     persistent: true
+    label: internal
     initialValue: ''
     example: 'sess-abc123'
 
@@ -34,6 +35,7 @@ wantType:
     description: The user's original message that started this draft
     type: string
     persistent: true
+    label: goal
     initialValue: ''
     example: 'リマインダがほしい'
 
@@ -41,6 +43,7 @@ wantType:
     description: Array of AI-generated recommendations (JSON)
     type: array
     persistent: true
+    label: current
     initialValue: []
     example: '[{"id": "rec-1", "title": "Example", "config": {"wants": []}}]'
 
@@ -48,6 +51,7 @@ wantType:
     description: Whether the AI is still generating recommendations
     type: bool
     persistent: true
+    label: current
     initialValue: false
     example: true
 
@@ -55,6 +59,7 @@ wantType:
     description: Error message if recommendation generation failed
     type: string
     persistent: true
+    label: current
     initialValue: ''
     example: 'AI service unavailable'
 
@@ -62,6 +67,7 @@ wantType:
     description: When the draft was created
     type: string
     persistent: true
+    label: internal
     initialValue: ''
     example: '2026-01-14T07:38:06Z'
 

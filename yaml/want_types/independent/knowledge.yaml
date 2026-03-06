@@ -46,21 +46,25 @@ wantType:
     description: Last time the information was successfully updated
     type: string
     persistent: true
+    label: current
     initialValue: ''
   - name: content_hash
     description: Hash of the file content to detect external changes
     type: string
     persistent: true
+    label: internal
     initialValue: ''
   - name: knowledge_status
     description: Current state of information (fresh, stale, updating)
     type: string
     persistent: true
+    label: current
     initialValue: 'stale'
   - name: discovered_updates
     description: Temporary storage for new information found by monitor
     type: array
     persistent: false
+    label: internal
     initialValue: []
   agents:
   - name: KnowledgeMonitor

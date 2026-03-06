@@ -97,96 +97,112 @@ wantType:
     description: Whether reservation has been completed
     type: bool
     persistent: true
+    label: current
     example: true
     initialValue: false
   - name: cost
     description: Reported cost for this reservation
     type: float64
     persistent: true
+    label: current
     example: 150.0
     initialValue: 0.0
   - name: total_processed
     description: Count of successful reservations
     type: int
     persistent: true
+    label: current
     example: 1
     initialValue: 0
   - name: reservation_type
     description: Type of restaurant reserved
     type: string
     persistent: true
+    label: current
     example: fine dining
     initialValue: ''
   - name: reservation_start_time
     description: Reservation start time in HH:MM format
     type: string
     persistent: true
+    label: current
     example: '19:30'
     initialValue: ''
   - name: reservation_end_time
     description: Reservation end time in HH:MM format
     type: string
     persistent: true
+    label: current
     example: '21:30'
     initialValue: ''
   - name: reservation_duration_hours
     description: Duration of reservation in hours
     type: float64
     persistent: true
+    label: current
     example: 2.0
     initialValue: 0.0
   - name: reservation_name
     description: Human-readable name of the reservation
     type: string
     persistent: true
+    label: current
     example: The French Laundry - Party of 2 at fine dining restaurant
     initialValue: ''
   - name: schedule_date
     description: Date of the reservation in YYYY-MM-DD format
     type: string
     persistent: true
+    label: current
     example: '2024-01-15'
     initialValue: ''
   - name: achieving_percentage
     description: Progress percentage toward completion
     type: int
     persistent: true
+    label: current
     example: 100
     initialValue: 0
   - name: final_result
     description: Final result summary
     type: string
     persistent: true
+    label: current
     example: The French Laundry - Party of 2 at fine dining restaurant
     initialValue: ''
   - name: execution_source
     description: Source of execution (monitor or agent)
     type: string
     persistent: true
+    label: internal
     example: agent
     initialValue: ''
   - name: premium_processed
     description: Whether premium features were applied
     type: bool
     persistent: true
+    label: current
     example: false
     initialValue: false
   - name: premium_level
     description: Premium tier if applicable
     type: string
     persistent: true
+    label: current
     example: platinum
     initialValue: ''
   - name: service_tier
     description: Service tier selected
     type: string
     persistent: true
+    label: current
     example: concierge
     initialValue: ''
   - name: premium_amenities
     description: Array of premium amenities included
     type: '[]string'
     persistent: true
+    label: current
     example:
     - priority seating
     - sommelier service
@@ -195,12 +211,14 @@ wantType:
     description: Status of agent execution (completed, failed, pending)
     type: string
     persistent: true
+    label: internal
     example: completed
     initialValue: ''
   - name: agent_execution_error
     description: Error message if agent execution failed
     type: string
     persistent: true
+    label: internal
     initialValue: ''
   agents:
   - name: MonitorRestaurant
