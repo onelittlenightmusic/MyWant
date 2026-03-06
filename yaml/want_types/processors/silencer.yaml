@@ -23,17 +23,32 @@ wantType:
     type: int
     persistent: true
     initialValue: 0
+    label: current
   - name: last_processed_id
     description: ID of the last processed reaction
     type: string
     persistent: true
     initialValue: ""
+    label: current
+  - name: silencer_phase
+    description: Current phase of the silencer
+    type: string
+    persistent: true
+    initialValue: "active"
+    label: current
+  - name: target_reaction_id
+    description: ID of the reaction currently being processed
+    type: string
+    persistent: false
+    initialValue: ""
+    label: internal
   - name: achieving_percentage
     description: Progress percentage of the silencer
     type: int
     persistent: true
     initialValue: 0
     example: 100
+    label: current
   require:
     type: providers
     providers:

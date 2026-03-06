@@ -14,7 +14,7 @@ func init() {
 }
 
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
-	phaseRaw, ok := want.GetCurrent("phase")
+	phaseRaw, ok := want.GetCurrent("reminder_phase")
 	phase := ""
 	if ok && phaseRaw != nil { phase = phaseRaw.(string) }
 	
@@ -45,7 +45,7 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 	want.GetStateMulti(Dict{"reminder_phase": &phase, "require_reaction": &requireReaction, "reaction_queue_id": &queueID})
 
 	// Prefer current labels if available
-	if p, ok := want.GetCurrent("phase"); ok && p != nil { phase = p.(string) }
+	if p, ok := want.GetCurrent("reminder_phase"); ok && p != nil { phase = p.(string) }
 	if q, ok := want.GetCurrent("reaction_queue_id"); ok && q != nil { queueID = q.(string) }
 
 	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching { return nil }

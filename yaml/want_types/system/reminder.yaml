@@ -78,6 +78,7 @@ wantType:
     persistent: true
     initialValue: waiting
     example: reaching
+    label: current
 
   - name: message
     description: The reminder message
@@ -85,6 +86,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: "Team meeting in 10 minutes"
+    label: goal
 
   - name: ahead
     description: Duration string for advance notification (e.g., "5 minutes")
@@ -92,6 +94,7 @@ wantType:
     persistent: true
     initialValue: "5 minutes"
     example: "10 minutes"
+    label: goal
 
   - name: event_time
     description: RFC3339 timestamp of the scheduled event
@@ -99,6 +102,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: "2025-12-28T14:00:00Z"
+    label: goal
 
   - name: duration_from_now
     description: Duration string used to calculate event_time (e.g., "20 seconds", "5 minutes")
@@ -106,6 +110,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: "20 seconds"
+    label: goal
 
   - name: reaching_time
     description: RFC3339 timestamp when reminder enters reaching phase
@@ -113,6 +118,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: "2025-12-28T13:50:00Z"
+    label: internal
 
   - name: reaction_queue_id
     description: Unique identifier for tracking user reactions
@@ -120,6 +126,14 @@ wantType:
     persistent: true
     initialValue: ''
     example: 'reminder-meeting-1735376400123'
+    label: current
+
+  - name: webhook_url
+    description: Full URL for webhook-based reaction (populated when reaction_type is webhook)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
 
   - name: require_reaction
     description: Whether user reaction is required
@@ -127,6 +141,7 @@ wantType:
     persistent: true
     initialValue: false
     example: true
+    label: goal
 
   - name: reaction_type
     description: Type of reaction channel
@@ -134,6 +149,7 @@ wantType:
     persistent: true
     initialValue: 'internal'
     example: 'slack'
+    label: goal
 
   - name: user_reaction
     description: User's reaction (written by MonitorAgent)
@@ -141,6 +157,7 @@ wantType:
     persistent: true
     initialValue: {}
     example: '{"approved": true, "comment": "Approved"}'
+    label: current
 
   - name: reaction_result
     description: Result of user reaction (approved or rejected)
@@ -148,6 +165,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: 'approved'
+    label: current
 
   - name: timeout
     description: Whether the reminder timed out waiting for reaction
@@ -155,6 +173,7 @@ wantType:
     persistent: true
     initialValue: false
     example: true
+    label: current
 
   - name: auto_completed
     description: Whether the reminder auto-completed without requiring reaction
@@ -162,6 +181,7 @@ wantType:
     persistent: true
     initialValue: false
     example: true
+    label: current
 
   - name: error_message
     description: Error message if reminder failed
@@ -169,6 +189,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: 'Invalid event_time format'
+    label: current
 
   - name: achieving_percentage
     description: Progress percentage of the reminder
@@ -176,6 +197,7 @@ wantType:
     persistent: true
     initialValue: 0
     example: 50
+    label: current
 
   - name: time_remaining
     description: Time remaining until the next event (formatted as human-readable string like "5m30s", "2h15m")
@@ -183,6 +205,7 @@ wantType:
     persistent: true
     initialValue: ''
     example: "5m30s"
+    label: current
 
   constraints:
   - description: Message parameter is required
@@ -464,4 +487,3 @@ wantType:
   requires:
     - reminder_monitoring
     - reminder_queue_management
-

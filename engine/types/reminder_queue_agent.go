@@ -24,7 +24,7 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 	})
 
 	// Prefer GCP current if available
-	if p, ok := want.GetCurrent("phase"); ok && p != nil { phase = p.(string) }
+	if p, ok := want.GetCurrent("reminder_phase"); ok && p != nil { phase = p.(string) }
 	if q, ok := want.GetCurrent("reaction_queue_id"); ok && q != nil { existingQueueID = q.(string) }
 
 	if phase == "" { return nil }
@@ -42,8 +42,17 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 		if existingQueueID == "" {
 			queueID, err := createReactionQueue(httpClient)
 			if err != nil { return err }
+			
+			// Get reaction type to see if we should set webhook_url
+			reactionType, _ := want.GetStateString("reaction_type", "internal")
+			
 			want.SetCurrent("reaction_queue_id", queueID)
-			want.StoreLog("[INFO] Created reaction queue %s", queueID)
+			
+			// Always set webhook_url if we have a queue ID, as it's the endpoint for reactions
+			webhookURL := fmt.Sprintf("/api/v1/reactions/%s", queueID)
+			want.SetCurrent("webhook_url", webhookURL)
+			
+			want.StoreLog("[INFO] Created reaction queue %s (type: %s)", queueID, reactionType)
 		}
 
 	case ReminderPhaseCompleted, ReminderPhaseFailed:

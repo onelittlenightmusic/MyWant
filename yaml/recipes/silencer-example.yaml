@@ -48,3 +48,14 @@ recipe:
     - want_name: "auto_silencer"
       state_field: "processed_count"
       description: "Number of reactions handled by the silencer"
+
+  example:
+    wants:
+      - metadata:
+          name: "silencer-demo"
+          type: "silencer_example"
+        spec:
+          params:
+            reminder_message: "Auto-approval test"
+            wait_duration: "10 seconds"
+            ahead_duration: "5 seconds"

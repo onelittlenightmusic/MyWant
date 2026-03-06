@@ -109,8 +109,8 @@ func (s *SilencerWant) processPacket(data any) {
 
 	locals := s.GetLocals()
 	if reactionType == "internal" {
-		// Store target reaction ID for agents - use SetStateAtomic for immediate visibility
-		s.SetStateAtomic(map[string]any{"_target_reaction_id": reactionID})
+		// Store target reaction ID for agents - use SetInternal for consistent retrieval by DoAgent
+		s.SetInternal("target_reaction_id", reactionID)
 
 		// If policy is all_true, trigger DoAgent for auto-approval
 		if locals.Policy == "all_true" {
