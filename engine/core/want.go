@@ -258,17 +258,18 @@ type Want struct {
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for batching state changes during Exec cycles
-	pendingStateChanges     sync.Map `json:"-" yaml:"-"`
-	pendingParameterChanges sync.Map `json:"-" yaml:"-"`
-	execCycleCount          int      `json:"-" yaml:"-"`
-	inExecCycle             bool     `json:"-" yaml:"-"`
-	pendingLogs             []string `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
+	pendingStateChanges     *sync.Map `json:"-" yaml:"-"`
+	pendingParameterChanges *sync.Map `json:"-" yaml:"-"`
+	execCycleCount          int       `json:"-" yaml:"-"`
+	inExecCycle             bool      `json:"-" yaml:"-"`
+	pendingLogs             []string  `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
-	agentStateChanges map[string]any                `json:"-" yaml:"-"`
-	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"`
+	agentStateChanges *sync.Map                     `json:"-" yaml:"-"`
+	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"` // Mutex for runningAgents
+
 
 	// Background agents for long-running operations
 	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
@@ -486,11 +487,13 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
-	// Always create fresh sync.Map to avoid concurrent access issues
-	if !n.PreservePendingState {
-		n.pendingStateChanges = sync.Map{}
+	// Initialize pointer-based sync.Maps to avoid copying the sync.Map struct
+	if n.pendingStateChanges == nil || !n.PreservePendingState {
+		n.pendingStateChanges = new(sync.Map)
 	}
-	n.pendingParameterChanges = sync.Map{}
+	if n.pendingParameterChanges == nil {
+		n.pendingParameterChanges = new(sync.Map)
+	}
 	n.pendingLogs = make([]string, 0)
 }
 
@@ -535,12 +538,14 @@ func (n *Want) EndProgressCycle() {
 }
 
 func (n *Want) AggregateChanges() {
+	if n.pendingStateChanges == nil { return }
+	
 	changesCopy := make(map[string]any)
 	n.pendingStateChanges.Range(func(key, value any) bool {
 		k := key.(string)
 		changesCopy[k] = value
 		n.State.Store(k, value)
-		n.pendingStateChanges.Delete(key)
+		n.pendingStateChanges.Delete(key) // Clear from pending
 		return true
 	})
 
@@ -548,11 +553,13 @@ func (n *Want) AggregateChanges() {
 		n.addAggregatedStateHistory(changesCopy)
 	}
 
+	if n.pendingParameterChanges == nil { return }
+	
 	paramChanges := make(map[string]any)
 	n.pendingParameterChanges.Range(func(key, value any) bool {
 		k := key.(string)
 		paramChanges[k] = value
-		n.pendingParameterChanges.Delete(key)
+		n.pendingParameterChanges.Delete(key) // Clear from pending
 		return true
 	})
 	if len(paramChanges) > 0 {
@@ -1285,10 +1292,12 @@ func (n *Want) GetState(key string) (any, bool) {
 // This is useful for external agent execution to return only changed fields
 func (n *Want) GetPendingStateChanges() map[string]any {
 	changes := make(map[string]any)
-	n.pendingStateChanges.Range(func(key, value any) bool {
-		changes[key.(string)] = value
-		return true
-	})
+	if n.pendingStateChanges != nil {
+		n.pendingStateChanges.Range(func(key, value any) bool {
+			changes[key.(string)] = value
+			return true
+		})
+	}
 	return changes
 }
 

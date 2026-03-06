@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -442,12 +443,12 @@ func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
 	defer n.agentStateMutex.Unlock()
 
 	if n.agentStateChanges == nil {
-		n.agentStateChanges = make(map[string]any)
+		n.agentStateChanges = new(sync.Map)
 	}
 	if len(value) == 0 {
 		if stateObject, ok := keyOrObject.(map[string]any); ok {
 			for k, v := range stateObject {
-				n.agentStateChanges[k] = v
+				n.agentStateChanges.Store(k, v)
 			}
 			return nil
 		}
@@ -456,7 +457,7 @@ func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
 	}
 	if len(value) == 1 {
 		if key, ok := keyOrObject.(string); ok {
-			n.agentStateChanges[key] = value[0]
+			n.agentStateChanges.Store(key, value[0])
 			return nil
 		}
 		// Invalid usage - first arg is not a string
@@ -471,19 +472,23 @@ func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
 func (n *Want) CommitStateChanges() {
 	// Step 1: Copy staged changes while holding agentStateMutex
 	n.agentStateMutex.Lock()
-	hasStateChanges := len(n.agentStateChanges) > 0
-	changesCopy := make(map[string]any)
-	for k, v := range n.agentStateChanges {
-		changesCopy[k] = v
+	if n.agentStateChanges == nil {
+		n.agentStateMutex.Unlock()
+		return
 	}
-	changeCount := len(n.agentStateChanges)
 
-	// Clear staged changes while holding the lock
-	n.agentStateChanges = make(map[string]any)
+	changesCopy := make(map[string]any)
+	changeCount := 0
+	n.agentStateChanges.Range(func(key, value any) bool {
+		changesCopy[key.(string)] = value
+		changeCount++
+		n.agentStateChanges.Delete(key)
+		return true
+	})
 	n.agentStateMutex.Unlock()
 
 	// Step 2: Apply changes to State using encapsulated method
-	if hasStateChanges {
+	if changeCount > 0 {
 		n.SetStateAtomic(changesCopy)
 
 		// Step 3: Add single history entry with all changes using the aggregated helper
@@ -502,15 +507,14 @@ func (n *Want) GetStagedChanges() map[string]any {
 	n.agentStateMutex.RLock()
 	defer n.agentStateMutex.RUnlock()
 
-	if n.agentStateChanges == nil {
-		return make(map[string]any)
+	changes := make(map[string]any)
+	if n.agentStateChanges != nil {
+		n.agentStateChanges.Range(func(key, value any) bool {
+			changes[key.(string)] = value
+			return true
+		})
 	}
-
-	staged := make(map[string]any)
-	for k, v := range n.agentStateChanges {
-		staged[k] = v
-	}
-	return staged
+	return changes
 }
 func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
 	n.initHistoryRings()
@@ -722,13 +726,13 @@ func (w *Want) StoreStateForAgent(key string, value any) {
 	defer w.agentStateMutex.Unlock()
 
 	if w.agentStateChanges == nil {
-		w.agentStateChanges = make(map[string]any)
+		w.agentStateChanges = new(sync.Map)
 	}
-	w.agentStateChanges[key] = value
+	w.agentStateChanges.Store(key, value)
 }
 
 // StoreStateMultiForAgent is the batch variant of StoreStateForAgent.
-// All entries in updates are staged in a single mutex-protected pass.
+// All entries in updates are staged in a single pass.
 //
 // STATE OWNERSHIP RULE: Same as StoreStateForAgent — only call on the want that
 // owns the agent (the want argument of Exec).
@@ -741,10 +745,10 @@ func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
 	defer w.agentStateMutex.Unlock()
 
 	if w.agentStateChanges == nil {
-		w.agentStateChanges = make(map[string]any)
+		w.agentStateChanges = new(sync.Map)
 	}
 	for key, value := range updates {
-		w.agentStateChanges[key] = value
+		w.agentStateChanges.Store(key, value)
 	}
 }
 
@@ -752,17 +756,22 @@ func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
 // The agentType parameter identifies which agent (e.g., "MonitorAgent", "DoAgent") made the changes.
 func (w *Want) DumpStateForAgent(agentType string) {
 	w.agentStateMutex.Lock()
-	if len(w.agentStateChanges) == 0 {
+	if w.agentStateChanges == nil {
 		w.agentStateMutex.Unlock()
 		return
 	}
 
 	changesCopy := make(map[string]any)
-	for k, v := range w.agentStateChanges {
-		changesCopy[k] = v
-	}
-	w.agentStateChanges = make(map[string]any)
+	w.agentStateChanges.Range(func(key, value any) bool {
+		changesCopy[key.(string)] = value
+		w.agentStateChanges.Delete(key)
+		return true
+	})
 	w.agentStateMutex.Unlock()
+
+	if len(changesCopy) == 0 {
+		return
+	}
 
 	w.StoreState("action_by_agent", agentType)
 	for key, value := range changesCopy {
@@ -777,5 +786,14 @@ func (w *Want) HasPendingAgentStateChanges() bool {
 	w.agentStateMutex.RLock()
 	defer w.agentStateMutex.RUnlock()
 
-	return len(w.agentStateChanges) > 0
+	if w.agentStateChanges == nil {
+		return false
+	}
+	
+	hasChanges := false
+	w.agentStateChanges.Range(func(_, _ any) bool {
+		hasChanges = true
+		return false // Stop after first entry
+	})
+	return hasChanges
 }
