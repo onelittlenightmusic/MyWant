@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -260,4 +261,34 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 
 		return nil
 	})
+}
+
+// ShouldRunAgent checks if an agent should run based on its input data.
+// It calculates a hash of the input data and compares it with a previously stored hash.
+// If the hash has changed, it returns true and the new hash.
+// The caller should call want.SetInternal(hashKey, newHash) after successful execution.
+func ShouldRunAgent(want *Want, hashKey string, inputs ...any) (bool, string) {
+	if len(inputs) == 0 {
+		return true, ""
+	}
+
+	// Serialize all inputs to JSON to compute a combined hash
+	var combined []byte
+	for _, input := range inputs {
+		if input == nil {
+			combined = append(combined, []byte("null")...)
+			continue
+		}
+		data, err := json.Marshal(input)
+		if err != nil {
+			// If marshalling fails, we can't reliably detect changes, so we assume it changed
+			return true, ""
+		}
+		combined = append(combined, data...)
+	}
+
+	hash := fmt.Sprintf("%x", md5.Sum(combined))
+	prevHash := GetInternal(want, hashKey, "")
+
+	return prevHash != hash, hash
 }

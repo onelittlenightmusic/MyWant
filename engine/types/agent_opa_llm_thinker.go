@@ -2,9 +2,7 @@ package types
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,29 +61,16 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	// Step 2: Change detection via MD5 hash of serialized inputs
-	goalBytes, err := json.Marshal(goalRaw)
-	if err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR marshalling goal: %v", err)
-		return nil
-	}
-	currentBytes, err := json.Marshal(currentRaw)
-	if err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR marshalling current: %v", err)
-		return nil
-	}
-
-	combined := append(goalBytes, currentBytes...)
-	hashBytes := md5.Sum(combined)
-	inputHash := fmt.Sprintf("%x", hashBytes)
-
-	prevHash := GetInternal(want, "_opa_input_hash", "")
-	if prevHash == inputHash {
-		// No changes detected; skip planning
+	// Step 2: Change detection via helper
+	shouldRun, inputHash := ShouldRunAgent(want, "_opa_input_hash", goalRaw, currentRaw)
+	if !shouldRun {
 		return nil
 	}
 
 	// Step 3: Write inputs to temp files
+	goalBytes, _ := json.Marshal(goalRaw)
+	currentBytes, _ := json.Marshal(currentRaw)
+	
 	tmpDir, err := os.MkdirTemp("", "opa-llm-thinker-*")
 	if err != nil {
 		want.DirectLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)
