@@ -23,17 +23,16 @@ func (n *Want) GetAgentRegistry() *AgentRegistry {
 // This records a human-readable description of what the agent just did,
 // e.g. "Flight reservation has been created".
 func (n *Want) SetAgentActivity(agentName string, activity string) {
-	n.initHistoryRings()
 	// Find the ExecutionID of the most recent event for this agent
 	execID := ""
-	snapshot := n.agentHistoryRing.Snapshot(0)
+	snapshot := n.getHistoryManager().AgentHistoryRing.Snapshot(0)
 	for i := len(snapshot) - 1; i >= 0; i-- {
 		if snapshot[i].AgentName == agentName {
 			execID = snapshot[i].ExecutionID
 			break
 		}
 	}
-	n.agentHistoryRing.Append(AgentExecution{
+	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 		ExecutionID: execID,
 		AgentName:   agentName,
 		Timestamp:   time.Now(),
@@ -222,9 +221,8 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 	}
 
 	// Record start in history
-	n.initHistoryRings()
 	execID := GenerateUUID()
-	n.agentHistoryRing.Append(AgentExecution{
+	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 		ExecutionID: execID,
 		AgentName:   agentName,
 		AgentType:   string(agentType),
@@ -266,7 +264,6 @@ func (n *Want) runDoAgent(agent Agent) error {
 	if n.RunningAgents == nil {
 		n.RunningAgents = make([]string, 0)
 	}
-	n.initHistoryRings()
 	executionID := GenerateUUID()
 	n.RunningAgents = append(n.RunningAgents, agentName)
 	n.CurrentAgent = agentName
@@ -276,7 +273,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		n.StoreState("_running_agents", n.RunningAgents)
 	}
 	// Append "running" start event
-	n.agentHistoryRing.Append(AgentExecution{
+	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 		ExecutionID:   executionID,
 		AgentName:     agentName,
 		AgentType:     string(agent.GetType()),
@@ -297,7 +294,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		}
 
 		// Append completion event
-		n.agentHistoryRing.Append(AgentExecution{
+		n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 			ExecutionID: executionID,
 			AgentName:   agentName,
 			AgentType:   string(agent.GetType()),
@@ -373,14 +370,14 @@ func (n *Want) StopAllAgents() {
 		// Append termination event (pure append)
 		// Find the ExecutionID of the last running event for this agent
 		execID := ""
-		snapshot := n.agentHistoryRing.Snapshot(0)
+		snapshot := n.getHistoryManager().AgentHistoryRing.Snapshot(0)
 		for i := len(snapshot) - 1; i >= 0; i-- {
 			if snapshot[i].AgentName == ac.name && snapshot[i].Status == "running" {
 				execID = snapshot[i].ExecutionID
 				break
 			}
 		}
-		n.agentHistoryRing.Append(AgentExecution{
+		n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 			ExecutionID: execID,
 			AgentName:   ac.name,
 			Timestamp:   time.Now(),
@@ -402,14 +399,14 @@ func (n *Want) StopAgent(agentName string) {
 
 		// Append termination event (pure append)
 		execID := ""
-		snapshot := n.agentHistoryRing.Snapshot(0)
+		snapshot := n.getHistoryManager().AgentHistoryRing.Snapshot(0)
 		for i := len(snapshot) - 1; i >= 0; i-- {
 			if snapshot[i].AgentName == agentName && snapshot[i].Status == "running" {
 				execID = snapshot[i].ExecutionID
 				break
 			}
 		}
-		n.agentHistoryRing.Append(AgentExecution{
+		n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
 			ExecutionID: execID,
 			AgentName:   agentName,
 			Timestamp:   time.Now(),

@@ -245,24 +245,19 @@ type Want struct {
 	Hash        string                  `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// History ring buffers - private, lock-free concurrent stores (populated at runtime, not serialized)
-	stateHistoryRing     *ringBuffer[StateHistoryEntry] `json:"-" yaml:"-"`
-	parameterHistoryRing *ringBuffer[StateHistoryEntry] `json:"-" yaml:"-"`
-	logHistoryRing       *ringBuffer[LogHistoryEntry]   `json:"-" yaml:"-"`
-	agentHistoryRing     *ringBuffer[AgentExecution]    `json:"-" yaml:"-"`
+	// History tracking (ring buffers)
+	history *HistoryManager `json:"-" yaml:"-"`
 
 	// Lifecycle control
-	PreservePendingState bool `json:"-" yaml:"-"` // If true, BeginProgressCycle won't wipe pendingStateChanges
+	PreservePendingState bool `json:"-" yaml:"-"` // Deprecated: no longer used
 
 	// Agent execution information
 	CurrentAgent  string   `json:"current_agent,omitempty" yaml:"current_agent,omitempty"`
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
-	// Internal fields for batching state changes during Exec cycles
-	pendingStateChanges     *sync.Map `json:"-" yaml:"-"`
-	pendingParameterChanges *sync.Map `json:"-" yaml:"-"`
-	execCycleCount          int       `json:"-" yaml:"-"`
-	inExecCycle             bool      `json:"-" yaml:"-"`
-	pendingLogs             []string  `json:"-" yaml:"-"` // Buffer for logs during Exec cycle
+	// Internal fields for execution tracking
+	execCycleCount int
+	inExecCycle    bool
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
@@ -455,23 +450,14 @@ func (n *Want) SetStateAtomic(stateData map[string]any) {
 
 // UpdateParameter updates a parameter and propagates the change to children
 func (n *Want) UpdateParameter(paramName string, paramValue any) {
-	var previousValue any
-	if n.Spec.Params != nil {
-		previousValue = n.Spec.Params[paramName]
-	}
-
 	// Update the parameter in spec
 	if n.Spec.Params == nil {
 		n.Spec.Params = make(map[string]any)
 	}
 	n.Spec.Params[paramName] = paramValue
 
-	// Batch parameter changes during Exec cycles (like state changes)
-	if n.inExecCycle {
-		n.pendingParameterChanges.Store(paramName, paramValue)
-	} else {
-		n.addToParameterHistory(paramName, paramValue, previousValue)
-	}
+	n.getHistoryManager().AddParameterEntry(paramName, paramValue)
+
 	notification := StateNotification{
 		SourceWantName:   n.Metadata.Name,
 		StateKey:         paramName,
@@ -482,18 +468,10 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 	sendParameterNotifications(notification)
 }
 
-// BeginProgressCycle starts a new execution cycle for batching state changes
+// BeginProgressCycle starts a new execution cycle
 func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
-	// Initialize pointer-based sync.Maps to avoid copying the sync.Map struct
-	if n.pendingStateChanges == nil || !n.PreservePendingState {
-		n.pendingStateChanges = new(sync.Map)
-	}
-	if n.pendingParameterChanges == nil {
-		n.pendingParameterChanges = new(sync.Map)
-	}
-	n.pendingLogs = make([]string, 0)
 }
 
 // EndProgressCycle completes the execution cycle and commits all batched state and parameter changes
@@ -504,15 +482,14 @@ func (n *Want) EndProgressCycle() {
 
 	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
 	if n.Status == WantStatusAchieved {
-		n.pendingStateChanges.Store("achieving_percentage", 100.0)
+		n.StoreState("achieving_percentage", 100.0)
 	}
 
 	// Auto-override final_result from FinalResultField if configured.
-	// Supports dot-notation for nested fields, e.g. "slack_latest_message.text".
 	if field := n.Spec.FinalResultField; field != "" {
 		val, ok := resolveNestedStateField(n, field)
 		if ok && val != nil {
-			// Skip zero values to avoid overwriting with initial defaults
+			// Skip zero values
 			skip := false
 			switch v := val.(type) {
 			case string:
@@ -526,40 +503,6 @@ func (n *Want) EndProgressCycle() {
 				n.StoreState("final_result", val)
 			}
 		}
-	}
-
-	// Aggregate state changes into history
-	if n.pendingStateChanges != nil {
-		changesCopy := make(map[string]any)
-		n.pendingStateChanges.Range(func(key, value any) bool {
-			k := key.(string)
-			changesCopy[k] = value
-			n.State.Store(k, value)
-			n.pendingStateChanges.Delete(key) // Clear from pending
-			return true
-		})
-
-		if len(changesCopy) > 0 {
-			n.addAggregatedStateHistory(changesCopy)
-		}
-	}
-
-	// Aggregate parameter changes into history
-	if n.pendingParameterChanges != nil {
-		paramChanges := make(map[string]any)
-		n.pendingParameterChanges.Range(func(key, value any) bool {
-			k := key.(string)
-			paramChanges[k] = value
-			n.pendingParameterChanges.Delete(key) // Clear from pending
-			return true
-		})
-		if len(paramChanges) > 0 {
-			n.addAggregatedParameterHistory(paramChanges)
-		}
-	}
-
-	if len(n.pendingLogs) > 0 {
-		n.addAggregatedLogHistory()
 	}
 
 	n.inExecCycle = false
@@ -1011,12 +954,7 @@ func (n *Want) StoreState(key string, value any) {
 	}
 
 	n.State.Store(key, value)
-
-	if n.inExecCycle {
-		n.pendingStateChanges.Store(key, value)
-	} else {
-		n.addToStateHistory(key, value, previousValue)
-	}
+	n.getHistoryManager().AddStateEntry(key, value)
 
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
@@ -1075,9 +1013,7 @@ func (n *Want) MergeState(updates map[string]any) {
 		}
 
 		n.State.Store(key, merged)
-		if n.inExecCycle {
-			n.pendingStateChanges.Store(key, merged)
-		}
+		n.getHistoryManager().AddStateEntry(key, merged)
 		mu.Unlock()
 	}
 
@@ -1258,12 +1194,7 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 		}
 
 		n.State.Store(key, value)
-
-		if n.inExecCycle {
-			n.pendingStateChanges.Store(key, value)
-		} else {
-			n.addToStateHistory(key, value, previousValue)
-		}
+		n.getHistoryManager().AddStateEntry(key, value)
 
 		notification := StateNotification{
 			SourceWantName: n.Metadata.Name,
@@ -1295,42 +1226,22 @@ func (n *Want) StoreStateMulti(updates map[string]any) {
 func (n *Want) DirectLog(message string, args ...any) {
 	formatted := fmt.Sprintf(message, args...)
 	InfoLog("[%s] %s", n.Metadata.Name, formatted)
-	n.initHistoryRings()
-	entry := LogHistoryEntry{
-		Timestamp: time.Now(),
-		Logs:      formatted,
-	}
-	n.logHistoryRing.Append(entry)
+	n.getHistoryManager().AddLogEntry(formatted)
 }
 
 func (n *Want) StoreLog(message string, args ...any) {
-	// Only buffer logs if we're in an Exec cycle
-	if !n.inExecCycle {
-		return
-	}
-	n.pendingLogs = append(n.pendingLogs, fmt.Sprintf(message, args...))
+	formatted := fmt.Sprintf(message, args...)
+	n.getHistoryManager().AddLogEntry(formatted)
 }
 
 func (n *Want) GetState(key string) (any, bool) {
-	if n.inExecCycle {
-		if val, ok := n.pendingStateChanges.Load(key); ok {
-			return val, true
-		}
-	}
 	return n.State.Load(key)
 }
 
-// GetPendingStateChanges returns a copy of pending state changes (changes not yet committed)
-// This is useful for external agent execution to return only changed fields
+// GetPendingStateChanges returns a copy of pending state changes
 func (n *Want) GetPendingStateChanges() map[string]any {
-	changes := make(map[string]any)
-	if n.pendingStateChanges != nil {
-		n.pendingStateChanges.Range(func(key, value any) bool {
-			changes[key.(string)] = value
-			return true
-		})
-	}
-	return changes
+	// Obsolete: pending changes are now committed immediately
+	return make(map[string]any)
 }
 
 // SetRemoteCallback configures Want for remote execution mode with callback support
@@ -1576,111 +1487,7 @@ func (n *Want) CalculateAchievingPercentage() int {
 	}
 }
 
-// ENHANCEMENT: Merges status-only changes into the previous entry instead of creating new entries
-func (n *Want) addAggregatedStateHistory(changes map[string]any) {
-	n.initHistoryRings()
-
-	stateSnapshot := make(map[string]any)
-	reservedFields := SystemReservedStateFields()
-
-	n.State.Range(func(key, value any) bool {
-		k := key.(string)
-		// Skip internal fields starting with underscore
-		if strings.HasPrefix(k, "_") {
-			return true
-		}
-		// Always include system-reserved fields in history
-		isReservedField := false
-		for _, reserved := range reservedFields {
-			if k == reserved {
-				isReservedField = true
-				break
-			}
-		}
-		if isReservedField {
-			stateSnapshot[k] = value
-			return true
-		}
-		// If ProvidedStateFields is defined, only include those fields
-		if len(n.ProvidedStateFields) > 0 && !Contains(n.ProvidedStateFields, k) {
-			return true
-		}
-		stateSnapshot[k] = value
-		return true
-	})
-
-	// Extract action_by_agent from state snapshot for StateHistoryEntry
-	var actionByAgent string
-	if agentType, ok := stateSnapshot["action_by_agent"].(string); ok {
-		actionByAgent = agentType
-	}
-
-	// DIFFERENTIAL CHECK: Only record if state has actually changed from last history entry
-	if lastEntry, ok := n.stateHistoryRing.PeekLast(); ok {
-		lastState, ok := lastEntry.StateValue.(map[string]any)
-		if !ok {
-			lastState = make(map[string]any)
-		}
-
-		// Compare current state with last recorded state
-		if n.stateSnapshotsEqual(lastState, stateSnapshot) {
-			return
-		}
-
-		// SMART MERGING: If only status fields changed, merge into the previous entry
-		if n.isOnlyStatusChange(lastState, stateSnapshot) {
-			captured := actionByAgent
-			snapshotCopy := stateSnapshot
-			n.stateHistoryRing.UpdateLast(func(e *StateHistoryEntry) {
-				if lastStateMap, ok := e.StateValue.(map[string]any); ok {
-					for key, newVal := range snapshotCopy {
-						isStatusField := len(key) >= 7 && key[len(key)-7:] == "_status"
-						isMetadataField := key == "updated_at" || key == "last_poll_time" ||
-							key == "status_changed_at" || key == "status_changed" ||
-							key == "status_change_history_count"
-						if isStatusField || isMetadataField {
-							lastStateMap[key] = newVal
-						}
-					}
-				}
-				e.Timestamp = time.Now()
-				if captured != "" {
-					e.ActionByAgent = captured
-				}
-			})
-			return
-		}
-	}
-
-	entry := StateHistoryEntry{
-		WantName:      n.Metadata.Name,
-		StateValue:    stateSnapshot,
-		Timestamp:     time.Now(),
-		ActionByAgent: actionByAgent,
-	}
-
-	n.stateHistoryRing.Append(entry)
-}
-
-// addToStateHistory records a single state field change into history
-func (n *Want) addToStateHistory(key string, value any, previousValue any) {
-	n.initHistoryRings()
-	n.stateHistoryRing.Append(StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: map[string]any{key: value},
-		Timestamp:  time.Now(),
-	})
-}
-
-func (n *Want) addAggregatedParameterHistory(changes map[string]any) {
-	n.initHistoryRings()
-	entry := StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: changes,
-		Timestamp:  time.Now(),
-	}
-	n.parameterHistoryRing.Append(entry)
-}
+// SetStateLabels populates the static StateLabels map from a WantTypeDefinition.
 
 // SetStateLabels populates the static StateLabels map from a WantTypeDefinition.
 func (n *Want) SetStateLabels(def *WantTypeDefinition) {
@@ -1904,51 +1711,6 @@ func convertToType[T any](val any, defaultVal T) T {
 	return result.(T)
 }
 
-func (n *Want) addAggregatedLogHistory() {
-	if len(n.pendingLogs) == 0 {
-		return
-	}
-	n.initHistoryRings()
-
-	// Concatenate all log messages with newlines This preserves the order and allows reading individual lines
-	logsText := ""
-	for i, log := range n.pendingLogs {
-		if i > 0 {
-			logsText += "\n"
-		}
-		logsText += log
-	}
-	entry := LogHistoryEntry{
-		Timestamp: time.Now(),
-		Logs:      logsText,
-	}
-	n.logHistoryRing.Append(entry)
-	n.pendingLogs = make([]string, 0)
-
-	// Write logs to the actual log file via InfoLog
-	// Split by newlines and output each line separately so each gets a timestamp
-	lines := strings.Split(logsText, "\n")
-	for _, line := range lines {
-		if line != "" { // Skip empty lines
-			InfoLog("[%s] %s", n.Metadata.Name, line)
-		}
-	}
-}
-
-func (n *Want) addToParameterHistory(paramName string, paramValue any, previousValue any) {
-	n.initHistoryRings()
-	paramMap := Dict{
-		paramName: paramValue,
-	}
-	entry := StateHistoryEntry{
-		WantName:   n.Metadata.Name,
-		StateValue: paramMap,
-		Timestamp:  time.Now(),
-	}
-	n.parameterHistoryRing.Append(entry)
-	DebugLog("[PARAM HISTORY] Want %s: %s changed from %v to %v\n",
-		n.Metadata.Name, paramName, previousValue, paramValue)
-}
 func (n *Want) GetParameter(paramName string) (any, bool) {
 	if n.Spec.Params == nil {
 		return nil, false
@@ -2227,7 +1989,6 @@ func (n *Want) Init() {
 	n.SetStatus(WantStatusInitializing) // Set to initializing first
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
-	n.initHistoryRings()
 
 	// Initialize system-reserved state fields using StoreState
 	n.StoreState(StateFieldActionByAgent, "")
@@ -2237,33 +1998,17 @@ func (n *Want) Init() {
 	n.SetStatus(WantStatusIdle) // Transition to idle after initialization
 }
 
-// initHistoryRings lazily allocates ring buffers for history tracking.
-// Safe to call multiple times (no-op if already initialized).
-func (n *Want) initHistoryRings() {
-	if n.stateHistoryRing == nil {
-		n.stateHistoryRing = newRingBuffer[StateHistoryEntry](200)
+func (n *Want) getHistoryManager() *HistoryManager {
+	if n.history == nil {
+		n.history = NewHistoryManager()
 	}
-	if n.parameterHistoryRing == nil {
-		n.parameterHistoryRing = newRingBuffer[StateHistoryEntry](50)
-	}
-	if n.logHistoryRing == nil {
-		n.logHistoryRing = newRingBuffer[LogHistoryEntry](100)
-	}
-	if n.agentHistoryRing == nil {
-		n.agentHistoryRing = newRingBuffer[AgentExecution](100)
-	}
+	return n.history
 }
 
 // BuildHistory constructs a WantHistory snapshot from the ring buffers.
 // Use this instead of accessing want.History directly for API responses.
 func (n *Want) BuildHistory() WantHistory {
-	n.initHistoryRings()
-	return WantHistory{
-		StateHistory:     n.stateHistoryRing.Snapshot(0),
-		ParameterHistory: n.parameterHistoryRing.Snapshot(0),
-		LogHistory:       n.logHistoryRing.Snapshot(0),
-		AgentHistory:     n.agentHistoryRing.Snapshot(0),
-	}
+	return n.getHistoryManager().GetHistory()
 }
 
 // AddMonitoringAgent is a helper to easily create and add a polling-based monitoring agent
@@ -2842,23 +2587,20 @@ func (n *Want) AppendToStateArray(key string, value any) error {
 
 // SafeAppendToStateHistory safely appends a state history entry to the ring buffer.
 func (n *Want) SafeAppendToStateHistory(entry StateHistoryEntry) error {
-	n.initHistoryRings()
-	n.stateHistoryRing.Append(entry)
+	n.getHistoryManager().StateHistoryRing.Append(entry)
 	return nil
 }
 
 // SafeAppendToLogHistory safely appends a log history entry to the ring buffer.
 func (n *Want) SafeAppendToLogHistory(entry LogHistoryEntry) error {
-	n.initHistoryRings()
-	n.logHistoryRing.Append(entry)
+	n.getHistoryManager().LogHistoryRing.Append(entry)
 	return nil
 }
 
 // FindRunningAgentHistory finds the most recent "running" event for the given agent.
 // Returns (event, index-in-snapshot, true) or (nil, -1, false) if not found.
 func (n *Want) FindRunningAgentHistory(agentName string) (*AgentExecution, int, bool) {
-	n.initHistoryRings()
-	snapshot := n.agentHistoryRing.Snapshot(0)
+	snapshot := n.getHistoryManager().AgentHistoryRing.Snapshot(0)
 	for i := len(snapshot) - 1; i >= 0; i-- {
 		if snapshot[i].AgentName == agentName && snapshot[i].Status == "running" {
 			e := snapshot[i]
