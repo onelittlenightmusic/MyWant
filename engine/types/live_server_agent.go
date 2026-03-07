@@ -198,10 +198,13 @@ func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) 
 // getConfigArgs reads args from state (JSON string) first, then falls back to params.
 func getConfigArgs(want *mywant.Want) []string {
 	if v := mywant.GetCurrent(want, "server_args", ""); v != "" {
+		want.DirectLog("[DEBUG] Unmarshalling server_args: %q", v)
 		// Stored as JSON array string
 		var args []string
-		if json.Unmarshal([]byte(v), &args) == nil {
+		if err := json.Unmarshal([]byte(v), &args); err == nil {
 			return args
+		} else {
+			want.DirectLog("[DEBUG] Unmarshal failed: %v", err)
 		}
 	}
 	return getArgsParam(want)
