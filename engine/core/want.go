@@ -1756,7 +1756,14 @@ func (n *Want) SetCurrent(key string, value any) {
 
 func (n *Want) GetCurrent(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; (ok && label == LabelCurrent) || strings.HasPrefix(key, "server_") {
-		return n.GetState(key)
+		val, ok := n.GetState(key)
+		if strings.HasPrefix(key, "server_") {
+			n.DirectLog("[DEBUG] GetCurrent(%s) found in state: %v (ok=%v)", key, val, ok)
+		}
+		return val, ok
+	}
+	if strings.HasPrefix(key, "server_") {
+		n.DirectLog("[DEBUG] GetCurrent(%s) NOT allowed by StateLabels", key)
 	}
 	return nil, false
 }
