@@ -67,8 +67,10 @@ func (k *KnowledgeWant) Initialize() {
 		k.SetCurrent("knowledge_status", "stale")
 	}
 
-	k.CreateInternal("content_hash", "")
-	k.CreateInternal("discovered_updates", []any{})
+	k.CreateInternalMulti(map[string]any{
+		"content_hash":      "",
+		"discovered_updates": []any{},
+	})
 	k.StoreLog("[KNOWLEDGE] Knowledge want initialized for topic: %s", locals.Topic)
 }
 

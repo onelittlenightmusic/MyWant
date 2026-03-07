@@ -28,13 +28,15 @@ func (o *ItineraryWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
-	o.CreateInternal("goal_achieved", false)
-	o.CreateInternal("planned_count", 0)
-	o.CreateInternal("dispatched_count", 0)
-	o.CreateInternal("dispatched_directions", map[string]any{})
-	o.CreateInternal("_opa_input_hash", "")
-	o.CreateInternal("_last_suggested", []string{})
-	o.CreateInternal("costs", map[string]any{})
+	o.CreateInternalMulti(map[string]any{
+		"goal_achieved":        false,
+		"planned_count":        0,
+		"dispatched_count":     0,
+		"dispatched_directions": map[string]any{},
+		"_opa_input_hash":      "",
+		"_last_suggested":      []string{},
+		"costs":                map[string]any{},
+	})
 }
 
 func (o *ItineraryWant) IsAchieved() bool {

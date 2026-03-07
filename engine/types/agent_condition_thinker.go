@@ -13,10 +13,12 @@ func init() {
 
 func conditionThinkerThink(ctx context.Context, want *Want) error {
 	// Register internal fields on first tick (idempotent)
-	want.CreateInternal("thinker.goal_initialized", false)
-	want.CreateInternal("thinker.itinerary_done", false)
-	want.CreateInternal("thinker.plan_set", false)
-	want.CreateInternal("thinker.ticks_waited", 0)
+	want.CreateInternalMulti(map[string]any{
+		"thinker.goal_initialized": false,
+		"thinker.itinerary_done":   false,
+		"thinker.plan_set":         false,
+		"thinker.ticks_waited":     0,
+	})
 
 	// ── Phase 1: Initialize Goal & Register in parent itinerary ──────────
 	if !GetInternal(want, "thinker.goal_initialized", false) {

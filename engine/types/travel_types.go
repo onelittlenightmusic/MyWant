@@ -629,12 +629,14 @@ func (f *FlightWant) Initialize() {
 	locals := f.GetLocals()
 	locals.monitoringDone = make(chan struct{})
 
-	f.CreateInternal("_flight_phase", PhaseInitial)
-	f.CreateInternal("_previous_flight_id", "")
-	f.CreateInternal("_previous_flight_status", "")
-	f.CreateInternal("_monitor_state_hash", "")
-	f.CreateInternal("monitor_state_hash", "")
-	f.CreateInternal("attempted", false)
+	f.CreateInternalMulti(map[string]any{
+		"_flight_phase":          PhaseInitial,
+		"_previous_flight_id":    "",
+		"_previous_flight_status": "",
+		"_monitor_state_hash":    "",
+		"monitor_state_hash":     "",
+		"attempted":              false,
+	})
 }
 
 // IsAchieved checks if flight booking is complete (all phases finished)

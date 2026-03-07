@@ -68,8 +68,10 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 	want.SetCurrent(cfg.MessageCountKey(), 0)
 	want.SetCurrent("webhook_url", webhookURL)
 
-	want.CreateInternal("webhook_secret", locals.Secret)
-	want.CreateInternal("channel_filter", locals.ChannelFilter)
+	want.CreateInternalMulti(map[string]any{
+		"webhook_secret": locals.Secret,
+		"channel_filter": locals.ChannelFilter,
+	})
 
 	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
