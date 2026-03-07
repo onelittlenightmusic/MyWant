@@ -136,7 +136,7 @@ func (n *NgrokWant) CalculateAchievingPercentage() int {
 
 // failWithError transitions to failed phase with an error message
 func (n *NgrokWant) failWithError(locals *NgrokLocals, msg string) {
-	n.StoreLog("[ERROR] %s", msg)
+	n.DirectLog("[ERROR] %s", msg)
 	locals.Phase = NgrokPhaseFailed
 	n.SetCurrent("server_phase", NgrokPhaseFailed)
 	n.SetCurrent("error_message", msg)

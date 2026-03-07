@@ -138,7 +138,7 @@ func (n *CloudflareTunnelWant) CalculateAchievingPercentage() int {
 
 // failWithError transitions to failed phase with an error message
 func (n *CloudflareTunnelWant) failWithError(locals *CloudflareTunnelLocals, msg string) {
-	n.StoreLog("[ERROR] %s", msg)
+	n.DirectLog("[ERROR] %s", msg)
 	locals.Phase = CloudflareTunnelPhaseFailed
 	n.SetCurrent("server_phase", CloudflareTunnelPhaseFailed)
 	n.SetCurrent("error_message", msg)
