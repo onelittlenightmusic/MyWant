@@ -103,5 +103,12 @@ wantType:
     initialValue: []
     example: '[{"type": "start_service", "target": "my-app"}]'
 
+  - name: _opa_input_hash
+    description: Hash of inputs used for the last plan
+    type: string
+    persistent: true
+    initialValue: ""
+    label: internal
+
   requires:
     - opa_llm_planning
