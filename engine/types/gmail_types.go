@@ -21,6 +21,16 @@ type GmailLocals struct {
 	GmailTokenPath     string
 	GoogleClientID     string
 	GoogleClientSecret string
+
+	// Internal MCP state
+	McpEnv        map[string]string
+	McpServerName string
+	McpCommand    string
+	McpArgs       []string
+	McpNative     bool
+	McpOperation  string
+	McpQuery      string
+	McpMaxResults int
 }
 
 // GmailWant represents a want that executes Gmail operations via Claude
@@ -35,17 +45,6 @@ func (g *GmailWant) GetLocals() *GmailLocals {
 // Initialize prepares the Gmail want for execution
 func (g *GmailWant) Initialize() {
 	g.StoreLog("[GMAIL] Initializing Gmail want: %s", g.Metadata.Name)
-
-	g.CreateInternalMulti(map[string]any{
-		"mcp_env":         map[string]string{},
-		"mcp_server_name": "",
-		"mcp_command":     "",
-		"mcp_args":        []string{},
-		"mcp_native":      false,
-		"mcp_operation":   "",
-		"mcp_query":       "",
-		"mcp_max_results": 0,
-	})
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := g.GetLocals()

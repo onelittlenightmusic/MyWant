@@ -9,9 +9,12 @@ import (
 
 // WebhookLocals holds common local state shared by all webhook want types.
 type WebhookLocals struct {
-	Secret             string
-	ChannelFilter      string
 	LastProcessedCount int
+
+	// State fields (auto-synced)
+	WebhookSecret string `mywant:"internal,webhook_secret"`
+	ChannelFilter string `mywant:"internal,channel_filter"`
+	WebhookUrl    string `mywant:"current,webhook_url"`
 }
 
 // WebhookWantConfig defines per-webhook-type prefixes and names used by the common helpers.
@@ -48,8 +51,6 @@ func ParseMessageCount(val any) int {
 }
 
 // InitializeWebhook performs common initialization for any webhook want type.
-// It stops existing background agents, reads params, stores initial state and
-// starts the monitor agent.
 func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 	want.StoreLog("%s Initializing webhook: %s", cfg.LogPrefix, want.Metadata.Name)
 
@@ -57,21 +58,14 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 		want.StoreLog("ERROR: Failed to stop existing background agents: %v", err)
 	}
 
-	locals.Secret = want.GetStringParam(cfg.SecretParamName, "")
+	locals.WebhookSecret = want.GetStringParam(cfg.SecretParamName, "")
 	locals.ChannelFilter = want.GetStringParam("channel_filter", "")
 	locals.LastProcessedCount = 0
-
-	webhookURL := fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name)
+	locals.WebhookUrl = fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name)
 	
 	want.SetCurrent(cfg.StatusKey(), "active")
 	want.SetCurrent(cfg.MessagesKey(), []any{})
 	want.SetCurrent(cfg.MessageCountKey(), 0)
-	want.SetCurrent("webhook_url", webhookURL)
-
-	want.CreateInternalMulti(map[string]any{
-		"webhook_secret": locals.Secret,
-		"channel_filter": locals.ChannelFilter,
-	})
 
 	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
@@ -95,8 +89,7 @@ func StartWebhookMonitor(want *Want, cfg WebhookWantConfig) {
 	}
 }
 
-// ProgressWebhook performs common progress-cycle logic: check for new messages,
-// provide to downstream, and update locals.
+// ProgressWebhook performs common progress-cycle logic
 func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 	status := GetCurrent(want, cfg.StatusKey(), "active")
 	if status == "stopped" {
@@ -142,7 +135,7 @@ func CalcWebhookPercentage(want *Want, cfg WebhookWantConfig) int {
 func RestoreWebhookLocals(want *Want, cfg WebhookWantConfig) *WebhookLocals {
 	locals := &WebhookLocals{}
 	locals.LastProcessedCount = GetCurrent(want, cfg.MessageCountKey(), 0)
-	locals.Secret = GetInternal(want, "webhook_secret", "")
+	locals.WebhookSecret = GetInternal(want, "webhook_secret", "")
 	locals.ChannelFilter = GetInternal(want, "channel_filter", "")
 	want.Locals = locals
 	return locals

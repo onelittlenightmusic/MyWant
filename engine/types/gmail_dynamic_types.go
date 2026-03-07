@@ -23,7 +23,16 @@ const (
 )
 
 // GmailDynamicLocals holds type-specific local state for GmailDynamicWant
-type GmailDynamicLocals struct{}
+type GmailDynamicLocals struct {
+	// State fields (auto-synced)
+	Phase             string `mywant:"current,phase"`
+	LastLoggedPhase   string `mywant:"current,last_logged_phase"`
+	RawSamples        any    `mywant:"internal,raw_samples"`
+	ErrorFeedback     string `mywant:"current,error_feedback"`
+	SourceCode        string `mywant:"current,source_code"`
+	WasmPath          string `mywant:"current,wasm_path"`
+	ValidationSuccess bool   `mywant:"current,validation_success"`
+}
 
 // GmailDynamicWant represents a self-evolving Gmail want
 type GmailDynamicWant struct {
@@ -36,21 +45,20 @@ func (g *GmailDynamicWant) GetLocals() *GmailDynamicLocals {
 
 func (g *GmailDynamicWant) Initialize() {
 	g.StoreLog("[GMAIL-DYNAMIC] Initializing dynamic want: %s", g.Metadata.Name)
-	g.CreateInternal("raw_samples", map[string]any{})
 
 	// Initialize PhaseRetryCount map
 	if g.PhaseRetryCount == nil {
 		g.PhaseRetryCount = make(map[string]int)
 	}
 
-	phase := mywant.GetCurrent(g, "phase", "")
-	if phase == "" {
-		g.SetCurrent("phase", string(PhaseDiscovery))
+	locals := g.GetLocals()
+	if locals.Phase == "" {
+		locals.Phase = string(PhaseDiscovery)
 	}
 }
 
 func (g *GmailDynamicWant) IsAchieved() bool {
-	return mywant.GetCurrent(g, "phase", "") == string(PhaseStable)
+	return g.GetLocals().Phase == string(PhaseStable)
 }
 
 func (g *GmailDynamicWant) Progress() {
@@ -58,14 +66,14 @@ func (g *GmailDynamicWant) Progress() {
 		return
 	}
 
-	phaseStr := mywant.GetCurrent(g, "phase", string(PhaseDiscovery))
+	locals := g.GetLocals()
+	phaseStr := locals.Phase
 	phase := GmailDynamicPhase(phaseStr)
 
 	// Only log phase transition or significant events to avoid spam
-	lastLoggedPhase := mywant.GetCurrent(g, "last_logged_phase", "")
-	if lastLoggedPhase != phaseStr {
+	if locals.LastLoggedPhase != phaseStr {
 		g.StoreLog("[GMAIL-DYNAMIC] Transitioned to phase: %s", phase)
-		g.SetCurrent("last_logged_phase", phaseStr)
+		locals.LastLoggedPhase = phaseStr
 	}
 
 	// Get current retry count for this phase
@@ -74,22 +82,21 @@ func (g *GmailDynamicWant) Progress() {
 	// Before executing any agent, check if we've exceeded max retries
 	if currentRetries >= MaxRetriesPerPhase {
 		g.SetStatus(mywant.WantStatusFailed)
-		feedback := mywant.GetCurrent(g, "error_feedback", "No detailed feedback")
 		g.StoreLog("[GMAIL-DYNAMIC][CRITICAL] Terminating: Failed in phase %s after %d retries. Detail: %s",
-			phase, currentRetries, feedback)
+			phase, currentRetries, locals.ErrorFeedback)
 		return
 	}
 
 	var err error
 	switch phase {
 	case PhaseDiscovery:
-		err = g.handleDiscovery()
+		err = g.handleDiscovery(locals)
 	case PhaseCoding:
-		err = g.handleCoding()
+		err = g.handleCoding(locals)
 	case PhaseCompiling:
-		err = g.handleCompiling()
+		err = g.handleCompiling(locals)
 	case PhaseValidation:
-		err = g.handleValidation()
+		err = g.handleValidation(locals)
 	case PhaseStable:
 		return
 	}
@@ -99,10 +106,9 @@ func (g *GmailDynamicWant) Progress() {
 		g.PhaseRetryCount[string(phase)] = currentRetries + 1
 		g.LastPhaseError = err.Error()
 
-		feedback := mywant.GetCurrent(g, "error_feedback", "")
 		errorMsg := fmt.Sprintf("Agent failed: %v", err)
-		if feedback != "" {
-			errorMsg = fmt.Sprintf("%s | Compiler Output: %s", errorMsg, feedback)
+		if locals.ErrorFeedback != "" {
+			errorMsg = fmt.Sprintf("%s | Compiler Output: %s", errorMsg, locals.ErrorFeedback)
 		}
 
 		g.StoreLog("[GMAIL-DYNAMIC][RETRY %d/%d] Phase %s: %s",
@@ -120,7 +126,7 @@ func (g *GmailDynamicWant) Progress() {
 	g.SetStatus(mywant.WantStatusReaching)
 }
 
-func (g *GmailDynamicWant) handleDiscovery() error {
+func (g *GmailDynamicWant) handleDiscovery(locals *GmailDynamicLocals) error {
 	g.StoreLog("[PHASE:DISCOVERY] Requesting tool discovery via Goose/Gemini")
 
 	if err := g.ExecuteAgents(); err != nil {
@@ -128,8 +134,8 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 	}
 
 	// Check if samples were collected
-	if samples := mywant.GetInternal(g, "raw_samples", any(nil)); samples != nil {
-		g.SetCurrent("phase", string(PhaseCoding))
+	if locals.RawSamples != nil {
+		locals.Phase = string(PhaseCoding)
 		g.StoreLog("[PHASE:DISCOVERY] Samples collected. Moving to PhaseCoding.")
 	} else {
 		return fmt.Errorf("Discovery Agent did not return raw_samples")
@@ -137,9 +143,8 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 	return nil
 }
 
-func (g *GmailDynamicWant) handleCoding() error {
-	feedback := mywant.GetCurrent(g, "error_feedback", "")
-	if feedback != "" {
+func (g *GmailDynamicWant) handleCoding(locals *GmailDynamicLocals) error {
+	if locals.ErrorFeedback != "" {
 		g.StoreLog("[PHASE:CODING] Re-generating Go code with error feedback")
 	} else {
 		g.StoreLog("[PHASE:CODING] Generating Go code for WASM plugin")
@@ -149,8 +154,8 @@ func (g *GmailDynamicWant) handleCoding() error {
 		return fmt.Errorf("Developer Agent failed: %w", err)
 	}
 
-	if source := mywant.GetCurrent(g, "source_code", ""); source != "" {
-		g.SetCurrent("phase", string(PhaseCompiling))
+	if locals.SourceCode != "" {
+		locals.Phase = string(PhaseCompiling)
 		g.StoreLog("[PHASE:CODING] Code generated. Moving to PhaseCompiling.")
 	} else {
 		return fmt.Errorf("Developer Agent did not return source_code")
@@ -158,12 +163,11 @@ func (g *GmailDynamicWant) handleCoding() error {
 	return nil
 }
 
-func (g *GmailDynamicWant) handleCompiling() error {
+func (g *GmailDynamicWant) handleCompiling(locals *GmailDynamicLocals) error {
 	g.StoreLog("[PHASE:COMPILING] Compiling Go code to WASM")
 
 	if err := g.ExecuteAgents(); err != nil {
-		feedback := mywant.GetCurrent(g, "error_feedback", "")
-		g.StoreLog("[PHASE:COMPILING][ERROR] Compilation failed: %s", feedback)
+		g.StoreLog("[PHASE:COMPILING][ERROR] Compilation failed: %s", locals.ErrorFeedback)
 
 		// Check current retry count for compiling phase
 		currentRetries := g.PhaseRetryCount[string(PhaseCompiling)]
@@ -177,32 +181,27 @@ func (g *GmailDynamicWant) handleCompiling() error {
 
 		// Increment retry count and go back to coding phase with feedback for regeneration
 		g.PhaseRetryCount[string(PhaseCompiling)] = currentRetries + 1
-		g.SetCurrent("phase", string(PhaseCoding))
+		locals.Phase = string(PhaseCoding)
 		g.StoreLog("[PHASE:COMPILING] Moving back to PhaseCoding with error feedback for code regeneration (attempt %d/%d)", currentRetries+1, MaxRetriesPerPhase)
 		return nil // Don't return error - let State be committed and retry in next loop
 	}
 
-	wasmPath := mywant.GetCurrent(g, "wasm_path", "")
-	if wasmPath != "" {
-		g.SetCurrent("phase", string(PhaseValidation))
-		g.StoreLog("[PHASE:COMPILING] WASM compiled at %s. Moving to PhaseValidation.", wasmPath)
+	if locals.WasmPath != "" {
+		locals.Phase = string(PhaseValidation)
+		g.StoreLog("[PHASE:COMPILING] WASM compiled at %s. Moving to PhaseValidation.", locals.WasmPath)
 		// Clear error_feedback on success
-		g.SetCurrent("error_feedback", "")
+		locals.ErrorFeedback = ""
 	} else {
 		return fmt.Errorf("Compiler Agent did not return wasm_path")
 	}
 	return nil
 }
 
-func (g *GmailDynamicWant) handleValidation() error {
+func (g *GmailDynamicWant) handleValidation(locals *GmailDynamicLocals) error {
 	g.StoreLog("[PHASE:VALIDATION] Validating WASM logic with direct MCP call")
 
-	// Here we use the WasmManager to run the code
-	// and check if it successfully communicates with the Gmail MCP server
-
 	if err := g.ExecuteAgents(); err != nil {
-		feedback := mywant.GetCurrent(g, "error_feedback", "")
-		g.StoreLog("[PHASE:VALIDATION][ERROR] Validation failed: %s", feedback)
+		g.StoreLog("[PHASE:VALIDATION][ERROR] Validation failed: %s", locals.ErrorFeedback)
 
 		// Check current retry count for validation phase
 		currentRetries := g.PhaseRetryCount[string(PhaseValidation)]
@@ -210,21 +209,20 @@ func (g *GmailDynamicWant) handleValidation() error {
 		// If this will be the 3rd failure, don't go back to coding - just fail
 		if currentRetries+1 >= MaxRetriesPerPhase {
 			g.StoreLog("[PHASE:VALIDATION][CRITICAL] Validation failed %d times. Want will be marked as Failed.", currentRetries+1)
-			// Don't change phase - let Progress() handle the failure
-			return fmt.Errorf("Validator Agent failed after %d attempts: %w. Feedback: %s", currentRetries+1, err, feedback)
+			return fmt.Errorf("Validator Agent failed after %d attempts: %w. Feedback: %s", currentRetries+1, err, locals.ErrorFeedback)
 		}
 
 		// Go back to coding phase for regeneration
-		g.SetCurrent("phase", string(PhaseCoding))
+		locals.Phase = string(PhaseCoding)
 		g.StoreLog("[PHASE:VALIDATION] Moving back to PhaseCoding with error feedback for code regeneration (attempt %d/%d)", currentRetries+1, MaxRetriesPerPhase)
-		return fmt.Errorf("Validator Agent failed: %w. Feedback: %s", err, feedback)
+		return fmt.Errorf("Validator Agent failed: %w. Feedback: %s", err, locals.ErrorFeedback)
 	}
 
-	if success := mywant.GetCurrent(g, "validation_success", false); success {
-		g.SetCurrent("phase", string(PhaseStable))
+	if locals.ValidationSuccess {
+		locals.Phase = string(PhaseStable)
 		g.StoreLog("[PHASE:VALIDATION] Success! Moving to PhaseStable.")
 		// Clear error_feedback on success
-		g.SetCurrent("error_feedback", "")
+		locals.ErrorFeedback = ""
 	} else {
 		return fmt.Errorf("Validator Agent did not report validation_success")
 	}
@@ -234,6 +232,4 @@ func (g *GmailDynamicWant) handleValidation() error {
 func (g *GmailDynamicWant) handleStable() {
 	// Re-use the existing WASM for any incoming prompts
 	g.StoreLog("[PHASE:STABLE] Using optimized WASM logic for execution")
-
-	// Final result handling...
 }

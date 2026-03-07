@@ -13,6 +13,25 @@ func init() {
 // ReplayLocals holds type-specific local state for ReplayWant
 type ReplayLocals struct {
 	MonitorStarted bool
+
+	// State fields (auto-synced)
+	StartWebhookId               string `mywant:"internal,startWebhookId"`
+	StopWebhookId                string `mywant:"internal,stopWebhookId"`
+	StartRecordingRequested      bool   `mywant:"internal,start_recording_requested"`
+	StopRecordingRequested       bool   `mywant:"internal,stop_recording_requested"`
+	StartDebugRecordingRequested bool   `mywant:"internal,start_debug_recording_requested"`
+	StopDebugRecordingRequested  bool   `mywant:"internal,stop_debug_recording_requested"`
+	RecordingSessionId           string `mywant:"internal,recording_session_id"`
+	DebugStartWebhookId          string `mywant:"internal,debugStartWebhookId"`
+	DebugStopWebhookId           string `mywant:"internal,debugStopWebhookId"`
+	DebugRecordingSessionId      string `mywant:"internal,debug_recording_session_id"`
+	ReplayWebhookId              string `mywant:"internal,replayWebhookId"`
+	StartReplayRequested         bool   `mywant:"internal,start_replay_requested"`
+	ReplaySessionId              string `mywant:"internal,replay_session_id"`
+
+	// Fields from YAML (Current)
+	RecordingActive bool   `mywant:"current,recording_active"`
+	ReplayScript    string `mywant:"current,replay_script"`
 }
 
 // ReplayWant represents a browser recording want driven by the playwright_record_monitor agent
@@ -25,29 +44,26 @@ func (r *ReplayWant) GetLocals() *ReplayLocals {
 }
 
 // Initialize starts the background playwright recording monitor agent.
-// The agent is discovered generically via MonitorCapabilities (derived from replay.yaml requires field)
-// rather than by hardcoded agent name.
 func (r *ReplayWant) Initialize() {
 	r.StoreLog("[REPLAY] Initializing browser recording want: %s", r.Metadata.Name)
 
 	locals := r.GetLocals()
 	locals.MonitorStarted = false
 
-	r.CreateInternalMulti(map[string]any{
-		"startWebhookId":                  "",
-		"stopWebhookId":                   "",
-		"start_recording_requested":       false,
-		"stop_recording_requested":        false,
-		"start_debug_recording_requested": false,
-		"stop_debug_recording_requested":  false,
-		"recording_session_id":            "",
-		"debugStartWebhookId":             "",
-		"debugStopWebhookId":              "",
-		"debug_recording_session_id":      "",
-		"replayWebhookId":                 "",
-		"start_replay_requested":          false,
-		"replay_session_id":               "",
-	})
+	// Clear/Initialize state
+	locals.StartWebhookId = ""
+	locals.StopWebhookId = ""
+	locals.StartRecordingRequested = false
+	locals.StopRecordingRequested = false
+	locals.StartDebugRecordingRequested = false
+	locals.StopDebugRecordingRequested = false
+	locals.RecordingSessionId = ""
+	locals.DebugStartWebhookId = ""
+	locals.DebugStopWebhookId = ""
+	locals.DebugRecordingSessionId = ""
+	locals.ReplayWebhookId = ""
+	locals.StartReplayRequested = false
+	locals.ReplaySessionId = ""
 
 	typeDef := r.WantTypeDefinition
 	if typeDef == nil || len(typeDef.MonitorCapabilities) == 0 {
@@ -83,18 +99,19 @@ func (r *ReplayWant) Initialize() {
 
 // IsAchieved returns true when a replay script has been recorded
 func (r *ReplayWant) IsAchieved() bool {
-	return GetCurrent(r, "replay_script", "") != ""
+	return r.GetLocals().ReplayScript != ""
 }
 
 // CalculateAchievingPercentage returns progress percentage
 func (r *ReplayWant) CalculateAchievingPercentage() int {
+	locals := r.GetLocals()
 	if r.IsAchieved() || r.Status == WantStatusAchieved {
 		return 100
 	}
-	if GetCurrent(r, "recording_active", false) {
+	if locals.RecordingActive {
 		return 50
 	}
-	if id := GetCurrent(r, "startWebhookId", ""); id != "" {
+	if locals.StartWebhookId != "" {
 		return 10
 	}
 	return 0

@@ -17,7 +17,7 @@ type ExecutionResultWantLocals struct {
 	Timeout          int // seconds
 	WorkingDirectory string
 	Shell            string
-	Phase            string
+	Phase            string `mywant:"internal,_phase"`
 	StartTime        time.Time
 	ExecutionTimeMs  int64
 	ExitCode         int
@@ -66,7 +66,6 @@ func (e *ExecutionResultWant) Initialize() {
 	e.SetCurrent("completed_at", "")
 	e.SetCurrent("execution_time_ms", 0)
 	e.SetPredefined("achieving_percentage", 0)
-	e.CreateInternal("_phase", string(ExecutionPhaseInitial))
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()

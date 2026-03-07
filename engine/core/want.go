@@ -1605,33 +1605,6 @@ func (n *Want) SetInternal(key string, value any) {
 	}
 }
 
-// CreateInternal dynamically registers a key as an internal label and stores its initial value.
-// Idempotent: if the key is already registered and has a value, it is left unchanged.
-// Use this in Initialize() for state machine fields that don't need to be defined in YAML.
-func (n *Want) CreateInternal(key string, value any) {
-	if n.StateLabels == nil {
-		n.StateLabels = make(map[string]StateLabel)
-	}
-	n.StateLabels[key] = LabelInternal
-	if _, exists := n.GetState(key); !exists {
-		n.StoreState(key, value)
-	}
-}
-
-// CreateInternalMulti registers multiple keys as internal and stores their initial values.
-// Idempotent per key: existing values are not overwritten.
-func (n *Want) CreateInternalMulti(fields map[string]any) {
-	if len(n.StateLabels) == 0 {
-		n.StateLabels = make(map[string]StateLabel)
-	}
-	for key, value := range fields {
-		n.StateLabels[key] = LabelInternal
-		if _, exists := n.GetState(key); !exists {
-			n.StoreState(key, value)
-		}
-	}
-}
-
 func (n *Want) GetInternal(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
 		return n.GetState(key)

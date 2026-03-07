@@ -17,6 +17,13 @@ type KnowledgeLocals struct {
 	Depth           string
 	Provider        string
 	RefreshInterval time.Duration
+
+	// State fields (auto-synced)
+	KnowledgeStatus   string    `mywant:"current,knowledge_status"`
+	ContentHash       string    `mywant:"internal,content_hash"`
+	DiscoveredUpdates []any     `mywant:"internal,discovered_updates"`
+	LastSyncTime      string    `mywant:"current,last_sync_time"`
+	Error             string    `mywant:"current,error"`
 }
 
 // KnowledgeWant represents a want that maintains fresh information in a Markdown file
@@ -63,28 +70,25 @@ func (k *KnowledgeWant) Initialize() {
 	locals.RefreshInterval = interval
 
 	// Initial state setup
-	if status := GetCurrent(k, "knowledge_status", ""); status == "" {
-		k.SetCurrent("knowledge_status", "stale")
+	if locals.KnowledgeStatus == "" {
+		locals.KnowledgeStatus = "stale"
 	}
 
-	k.CreateInternalMulti(map[string]any{
-		"content_hash":      "",
-		"discovered_updates": []any{},
-	})
 	k.StoreLog("[KNOWLEDGE] Knowledge want initialized for topic: %s", locals.Topic)
 }
 
 func (k *KnowledgeWant) fail(msg string) {
+	locals := k.GetLocals()
 	k.StoreLog("ERROR: %s", msg)
-	k.SetCurrent("knowledge_status", "failed")
-	k.SetCurrent("error", msg)
+	locals.KnowledgeStatus = "failed"
+	locals.Error = msg
 	k.Status = "failed"
 }
 
 // CalculateAchievingPercentage returns the progress percentage
 func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
-	status := GetCurrent(k, "knowledge_status", "")
-	switch status {
+	locals := k.GetLocals()
+	switch locals.KnowledgeStatus {
 	case "stale":
 		return 10
 	case "updating":
@@ -100,41 +104,41 @@ func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
 
 // IsAchieved returns true when the knowledge is fresh and the file is up to date
 func (k *KnowledgeWant) IsAchieved() bool {
-	return GetCurrent(k, "knowledge_status", "") == "fresh"
+	return k.GetLocals().KnowledgeStatus == "fresh"
 }
 
 // Progress orchestrates the monitoring and updating of knowledge
 func (k *KnowledgeWant) Progress() {
+	locals := k.GetLocals()
+	k.SetPredefined("achieving_percentage", k.CalculateAchievingPercentage())
+
 	if k.IsAchieved() {
 		// Even if achieved, we check if it's time to refresh
 		if k.shouldRefresh() {
 			k.StoreLog("[KNOWLEDGE] Refresh interval reached, marking as stale")
-			k.SetCurrent("knowledge_status", "stale")
+			locals.KnowledgeStatus = "stale"
 		} else {
 			return
 		}
 	}
 
-	status := GetCurrent(k, "knowledge_status", "")
-
-	if status == "stale" {
+	if locals.KnowledgeStatus == "stale" {
 		k.runMonitor()
-	} else if status == "updating" {
+	} else if locals.KnowledgeStatus == "updating" {
 		k.runUpdater()
 	}
 }
 
 func (k *KnowledgeWant) shouldRefresh() bool {
-	lastTimeStr := GetCurrent(k, "last_sync_time", "")
-	if lastTimeStr == "" {
+	locals := k.GetLocals()
+	if locals.LastSyncTime == "" {
 		return true
 	}
-	lastTime, err := time.Parse(time.RFC3339, lastTimeStr)
+	lastTime, err := time.Parse(time.RFC3339, locals.LastSyncTime)
 	if err != nil {
 		return true
 	}
 
-	locals := k.GetLocals()
 	return time.Since(lastTime) > locals.RefreshInterval
 }
 
@@ -143,9 +147,6 @@ func (k *KnowledgeWant) runMonitor() {
 		k.StoreLog("ERROR: KnowledgeMonitor failed: %v", err)
 		return
 	}
-
-	// The agent should set knowledge_status to 'updating' if new info found,
-	// or 'fresh' (and update last_sync_time) if no new info.
 }
 
 func (k *KnowledgeWant) runUpdater() {
@@ -153,6 +154,4 @@ func (k *KnowledgeWant) runUpdater() {
 		k.StoreLog("ERROR: KnowledgeUpdater failed: %v", err)
 		return
 	}
-
-	// The agent should set knowledge_status to 'fresh' and update last_sync_time
 }

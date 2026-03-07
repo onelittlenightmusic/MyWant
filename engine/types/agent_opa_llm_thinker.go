@@ -41,7 +41,6 @@ func (o *OpaLLMPlannerWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
-	o.CreateInternal("_opa_input_hash", "")
 }
 
 // IsAchieved always returns false — the planner runs indefinitely.

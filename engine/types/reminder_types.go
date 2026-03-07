@@ -28,9 +28,19 @@ type ReminderLocals struct {
 	ReachingTime    time.Time
 	RequireReaction bool
 	ReactionType    string
-	Phase           string
-	TimeoutSeconds  int
 	LastCheckTime   time.Time
+
+	// State fields (auto-synced)
+	Phase                 string         `mywant:"current,reminder_phase"`
+	TimeoutSeconds        int            `mywant:"current,timeout"`
+	ReactionQueueId       string         `mywant:"current,reaction_queue_id"`
+	UserReaction          map[string]any `mywant:"current,user_reaction"`
+	ReactionResult        string         `mywant:"current,reaction_result"`
+	AutoCompleted         bool           `mywant:"current,auto_completed"`
+	ReactionPacketEmitted bool           `mywant:"internal,_reaction_packet_emitted"`
+	ReachingTimeStr       string         `mywant:"internal,reaching_time"`
+	ErrorMessage          string         `mywant:"current,error_message"`
+	TimeRemaining         string         `mywant:"current,time_remaining"`
 }
 
 // ReminderWant represents a want that sends reminders at scheduled times
@@ -47,7 +57,6 @@ func (r *ReminderWant) Initialize() {
 	r.StoreLog("[REMINDER] Initializing reminder: %s", r.Metadata.Name)
 
 	// CRITICAL: Stop any existing background agents (like monitor) before fresh start
-	// This ensures we don't have multiple goroutines monitoring different queue IDs
 	if err := r.StopAllBackgroundAgents(); err != nil {
 		r.StoreLog("ERROR: Failed to stop existing background agents: %v", err)
 	}
@@ -59,38 +68,28 @@ func (r *ReminderWant) Initialize() {
 	locals.TimeoutSeconds = 300 // 5 minutes default timeout
 
 	// Parse and validate parameters using ConfigError pattern
-	// Message (required)
 	locals.Message = r.GetStringParam("message", "")
 	if locals.Message == "" {
 		r.SetConfigError("message", "Missing required parameter 'message'")
 		return
 	}
 
-	// Ahead parameter (default: "5 minutes")
 	locals.Ahead = r.GetStringParam("ahead", "5 minutes")
-
-	// Parse ahead duration
 	aheadDuration, err := parseDurationString(locals.Ahead)
 	if err != nil {
 		r.SetConfigError("ahead", fmt.Sprintf("Invalid ahead parameter '%s': %v", locals.Ahead, err))
 		return
 	}
 
-	// event_time parameter
 	eventTimeStr := r.GetStringParam("event_time", "")
-
-	// duration_from_now parameter
 	durationFromNowStr := r.GetStringParam("duration_from_now", "")
 
-	// Check for mutually exclusive parameters
 	if eventTimeStr != "" && durationFromNowStr != "" {
 		r.SetConfigError("event_time/duration_from_now", "Cannot provide both 'event_time' and 'duration_from_now'")
 		return
 	}
 
 	var eventTime time.Time
-
-	// Parse event_time if provided
 	if eventTimeStr != "" {
 		var parseErr error
 		eventTime, parseErr = time.Parse(time.RFC3339, eventTimeStr)
@@ -99,7 +98,6 @@ func (r *ReminderWant) Initialize() {
 			return
 		}
 	} else if durationFromNowStr != "" {
-		// Calculate event_time from duration_from_now
 		duration, parseErr := parseDurationString(durationFromNowStr)
 		if parseErr != nil {
 			r.SetConfigError("duration_from_now", fmt.Sprintf("Invalid duration_from_now format: %v", parseErr))
@@ -112,66 +110,45 @@ func (r *ReminderWant) Initialize() {
 		return
 	}
 
-	// Calculate reaching time if we have event_time
 	if !eventTime.IsZero() {
 		reachingTime := eventTime.Add(-aheadDuration)
 		locals.ReachingTime = reachingTime
 		locals.EventTime = eventTime
+		locals.ReachingTimeStr = reachingTime.Format(time.RFC3339)
 
-		// Check if event time is in the past
 		if eventTime.Before(time.Now()) {
 			locals.Phase = ReminderPhaseReaching
 		}
 	}
 
-	// require_reaction parameter (default: false)
 	locals.RequireReaction = r.GetBoolParam("require_reaction", false)
-
-	// reaction_type parameter (default: "internal")
 	locals.ReactionType = r.GetStringParam("reaction_type", "internal")
 
 	// Store initial state
-	r.SetCurrent("reminder_phase", locals.Phase)
 	r.SetGoal("message", locals.Message)
 	r.SetGoal("ahead", locals.Ahead)
 	r.SetGoal("require_reaction", locals.RequireReaction)
 	r.SetGoal("reaction_type", locals.ReactionType)
-	r.SetCurrent("timeout", 300)
-	r.SetCurrent("reaction_queue_id", "")    // ALWAYS clear on fresh initialization to ensure new queue
-	r.CreateInternalMulti(map[string]any{
-		"_reaction_packet_emitted": false,
-		"reaching_time":            "",
-	})
-	r.SetCurrent("user_reaction", nil)   // Clear previous user reaction
-	r.SetCurrent("reaction_result", "")    // Clear previous reaction result
+	locals.ReactionQueueId = ""
+	locals.ReactionPacketEmitted = false
+	locals.UserReaction = nil
+	locals.ReactionResult = ""
 
-	// Add duration_from_now if it was provided
 	if locals.DurationFromNow != "" {
 		r.SetGoal("duration_from_now", locals.DurationFromNow)
 	}
 
-	if !locals.ReachingTime.IsZero() {
-		r.SetInternal("reaching_time", locals.ReachingTime.Format(time.RFC3339))
+	if !locals.EventTime.IsZero() {
 		r.SetGoal("event_time", locals.EventTime.Format(time.RFC3339))
 	}
 
-	r.Locals = locals
-
-	// Set up scheduler agent if we have when specs
-	if r.hasWhenSpec() {
-		// Scheduler agent will be set up by the caller
-	}
-
-	// Execute DoAgent to create reaction queue (synchronous)
 	if locals.RequireReaction {
 		if err := r.ExecuteAgents(); err != nil {
 			r.StoreLog("ERROR: Failed to execute agents: %v", err)
-			r.SetCurrent("reminder_phase", ReminderPhaseFailed)
-			r.SetCurrent("error_message", fmt.Sprintf("Agent execution failed: %v", err))
+			locals.Phase = ReminderPhaseFailed
+			locals.ErrorMessage = fmt.Sprintf("Agent execution failed: %v", err)
 			return
 		}
-
-		// Start background monitoring agent as soon as queue is created
 		r.startMonitoringIfNeeded()
 	}
 }
@@ -183,8 +160,7 @@ func (r *ReminderWant) startMonitoringIfNeeded() {
 		return
 	}
 
-	queueID := GetCurrent(r, "reaction_queue_id", "")
-	if queueID != "" {
+	if locals.ReactionQueueId != "" {
 		agentName := "reaction-monitor-" + r.Metadata.ID
 		if _, exists := r.GetBackgroundAgent(agentName); !exists {
 			registry := r.GetAgentRegistry()
@@ -205,23 +181,20 @@ func (r *ReminderWant) startMonitoringIfNeeded() {
 	}
 }
 
-// hasWhenSpec checks if this want has when specifications
 func (r *ReminderWant) hasWhenSpec() bool {
 	return r.Spec.When != nil && len(r.Spec.When) > 0
 }
 
-// IsAchieved checks if the reminder has been completed
 func (r *ReminderWant) IsAchieved() bool {
-	return GetCurrent(r, "reminder_phase", "") == ReminderPhaseCompleted
+	return r.GetLocals().Phase == ReminderPhaseCompleted
 }
 
-// CalculateAchievingPercentage returns the progress percentage
 func (r *ReminderWant) CalculateAchievingPercentage() int {
 	if r.IsAchieved() || r.Status == WantStatusAchieved || r.Status == WantStatusFailed {
 		return 100
 	}
-	phase := GetCurrent(r, "reminder_phase", "")
-	switch phase {
+	locals := r.GetLocals()
+	switch locals.Phase {
 	case ReminderPhaseWaiting:
 		return 10
 	case ReminderPhaseReaching:
@@ -233,338 +206,177 @@ func (r *ReminderWant) CalculateAchievingPercentage() int {
 	}
 }
 
-// Progress implements Progressable for ReminderWant
 func (r *ReminderWant) Progress() {
 	locals := r.GetLocals()
-
-	// Update achieving percentage based on current phase
 	r.SetPredefined("achieving_percentage", r.CalculateAchievingPercentage())
-
-	// Calculate and store time remaining
-	timeRemaining := r.calculateTimeRemaining(locals)
-	r.SetCurrent("time_remaining", timeRemaining)
+	locals.TimeRemaining = r.calculateTimeRemaining(locals)
 
 	switch locals.Phase {
 	case ReminderPhaseWaiting:
 		r.handlePhaseWaiting(locals)
-
 	case ReminderPhaseReaching:
 		r.handlePhaseReaching(locals)
-
-	case ReminderPhaseCompleted:
-		// Already completed, nothing to do
+	case ReminderPhaseCompleted, ReminderPhaseFailed:
 		break
-
-	case ReminderPhaseFailed:
-		// Already failed, nothing to do
-		break
-
 	default:
 		r.SetModuleError("Phase", fmt.Sprintf("Unknown phase: %s", locals.Phase))
 	}
 }
 
-// calculateTimeRemaining calculates the time remaining until the next event
 func (r *ReminderWant) calculateTimeRemaining(locals *ReminderLocals) string {
 	now := time.Now()
-
 	switch locals.Phase {
 	case ReminderPhaseWaiting:
-		// Time until reaching_time
 		if !locals.ReachingTime.IsZero() {
 			duration := locals.ReachingTime.Sub(now)
-			if duration < 0 {
-				return "0s"
-			}
+			if duration < 0 { return "0s" }
 			return formatDuration(duration)
 		}
-		return ""
-
 	case ReminderPhaseReaching:
-		// Time until event_time
 		if !locals.EventTime.IsZero() {
 			duration := locals.EventTime.Sub(now)
-			if duration < 0 {
-				return "0s"
-			}
+			if duration < 0 { return "0s" }
 			return formatDuration(duration)
 		}
-		return ""
-
 	case ReminderPhaseCompleted, ReminderPhaseFailed:
-		// No time remaining for completed or failed reminders
 		return "0s"
-
-	default:
-		return ""
 	}
+	return ""
 }
 
-// formatDuration formats a duration into a human-readable string
 func formatDuration(d time.Duration) string {
-	if d < 0 {
-		return "0s"
-	}
-
-	// Round to seconds
+	if d < 0 { return "0s" }
 	d = d.Round(time.Second)
-
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-
+	if d < time.Minute { return fmt.Sprintf("%ds", int(d.Seconds())) }
 	if d < time.Hour {
-		minutes := int(d.Minutes())
-		seconds := int(d.Seconds()) % 60
-		if seconds == 0 {
-			return fmt.Sprintf("%dm", minutes)
-		}
-		return fmt.Sprintf("%dm%ds", minutes, seconds)
+		min := int(d.Minutes())
+		sec := int(d.Seconds()) % 60
+		if sec == 0 { return fmt.Sprintf("%dm", min) }
+		return fmt.Sprintf("%dm%ds", min, sec)
 	}
-
-	hours := int(d.Hours())
-	minutes := int(d.Minutes()) % 60
-	seconds := int(d.Seconds()) % 60
-
-	if minutes == 0 && seconds == 0 {
-		return fmt.Sprintf("%dh", hours)
-	}
-	if seconds == 0 {
-		return fmt.Sprintf("%dh%dm", hours, minutes)
-	}
-	return fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+	if m == 0 && s == 0 { return fmt.Sprintf("%dh", h) }
+	if s == 0 { return fmt.Sprintf("%dh%dm", h, m) }
+	return fmt.Sprintf("%dh%dm%ds", h, m, s)
 }
 
-// handlePhaseWaiting waits for the reaching time
 func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
-	if locals.ReachingTime.IsZero() {
-		// No reaching time set, might be from when spec
-		// Check if time has passed via scheduler
-		return
-	}
-
-	// Check if reaching time has arrived
-	now := time.Now()
-	if now.After(locals.ReachingTime) {
-		// Clear existing queue ID to force creation of a new one for this new cycle
-		r.SetCurrent("reminder_phase", ReminderPhaseReaching)
-		r.SetCurrent("reaction_queue_id", "")
-		r.SetInternal("_reaction_packet_emitted", false)
-		r.SetCurrent("user_reaction", nil) // Clear previous reaction
-		r.SetCurrent("reaction_result", "")  // Clear previous result
-
+	if locals.ReachingTime.IsZero() { return }
+	if time.Now().After(locals.ReachingTime) {
 		locals.Phase = ReminderPhaseReaching
-
-		// Trigger agent to create new queue immediately
+		locals.ReactionQueueId = ""
+		locals.ReactionPacketEmitted = false
+		locals.UserReaction = nil
+		locals.ReactionResult = ""
 		r.ExecuteAgents()
 	}
 }
 
-// emitReactionPacketIfNeeded sends the reaction request packet to connected users
 func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
-	if !locals.RequireReaction {
-		return
-	}
-
-	// Check if already emitted in this state
-	if GetInternal(r, "_reaction_packet_emitted", false) {
-		return
-	}
-
-	queueID := GetCurrent(r, "reaction_queue_id", "")
-	if queueID != "" {
-		// Emit reaction request packet to connected users (silencers)
-		packet := map[string]any{
-			"reaction_id":   queueID,
+	if !locals.RequireReaction || locals.ReactionPacketEmitted { return }
+	if locals.ReactionQueueId != "" {
+		r.Provide(map[string]any{
+			"reaction_id":   locals.ReactionQueueId,
 			"reaction_type": locals.ReactionType,
 			"source_want":   r.Metadata.Name,
-		}
-		r.Provide(packet)
-		r.SetInternal("_reaction_packet_emitted", true)
+		})
+		locals.ReactionPacketEmitted = true
 	}
 }
 
-// handlePhaseReaching handles the reaching phase
 func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
-	// If this is a recurring reminder and we are in reaching phase again,
-	// we might need to reset the queue ID if the previous one was already processed.
-	// However, for recurring reminders triggered by scheduler, the want status
-	// is reset to Idle then Reaching, which calls Initialize().
-	// But our test showed it might stay in reaching status.
-
-	// Ensure packet is emitted (handles both transition and restart-while-reaching)
 	r.emitReactionPacketIfNeeded(locals)
-
-	// Set WaitingUserAction status when waiting for user reaction
 	if locals.RequireReaction && r.GetStatus() != WantStatusWaitingUserAction {
 		r.SetStatus(WantStatusWaitingUserAction)
 	}
 
-	// Check if user reaction is available
 	if locals.RequireReaction {
-		// Background monitoring agent continuously polls HTTP API for reactions
-		// No need to call ExecuteAgents() here - monitoring runs in separate goroutine
-
-		// Check state for user reaction (populated by MonitorAgent via HTTP API)
-		userReaction := GetCurrent(r, "user_reaction", map[string]any{})
-		if len(userReaction) > 0 {
-			if _, ok := userReaction["approved"].(bool); ok {
-				r.processReaction(locals, userReaction)
+		if len(locals.UserReaction) > 0 {
+			if _, ok := locals.UserReaction["approved"].(bool); ok {
+				r.processReaction(locals, locals.UserReaction)
 				return
 			}
 		}
-
-		// Start background monitoring agent if not already running
-		// (This covers the case where we restarted while in reaching phase)
-		if locals.RequireReaction {
-			r.startMonitoringIfNeeded()
-		}
-
-		// Check for timeout
-		now := time.Now()
-		if now.Unix()-locals.LastCheckTime.Unix() > int64(locals.TimeoutSeconds) {
+		r.startMonitoringIfNeeded()
+		if time.Now().Unix()-locals.LastCheckTime.Unix() > int64(locals.TimeoutSeconds) {
 			r.handleTimeout(locals)
-			return
 		}
 	} else {
-		// No reaction required, check if event time has passed
 		if !locals.EventTime.IsZero() && time.Now().After(locals.EventTime) {
-			r.StoreLog("📦 Event time passed, completing reminder")
-			r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
-			r.SetCurrent("auto_completed", true)
-			r.SetInternal("_reaction_packet_emitted", false)
-			r.SetPredefined("achieving_percentage", 100)
-			
-			locals.Phase = ReminderPhaseCompleted
-			r.ProvideDone()
-			return
-		}
-
-		// For reminders without reaction required and without explicit event_time,
-		// complete after 10 seconds of reaching
-		if now := time.Now(); now.After(locals.LastCheckTime.Add(10 * time.Second)) {
-			r.StoreLog("📦 Completing reminder (no reaction required)")
-			r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
-			r.SetCurrent("auto_completed", true)
-			r.SetInternal("_reaction_packet_emitted", false)
-			r.SetPredefined("achieving_percentage", 100)
-			
-			locals.Phase = ReminderPhaseCompleted
-			r.ProvideDone()
+			r.completeReminder(locals, "📦 Event time passed, completing reminder")
+		} else if time.Now().After(locals.LastCheckTime.Add(10 * time.Second)) {
+			r.completeReminder(locals, "📦 Completing reminder (no reaction required)")
 		}
 	}
 }
 
-// processReaction processes user reaction
-func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any) {
-	// Handle reaction data
-	if reactionMap, ok := reactionData.(map[string]any); ok {
-		if approved, ok := reactionMap["approved"].(bool); ok {
-			if approved {
-				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
-				r.StoreLog("📦 Reminder approved by user")
-				r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
-				r.SetCurrent("reaction_result", "approved")
-				r.SetInternal("_reaction_packet_emitted", false)
-				r.SetPredefined("achieving_percentage", 100)
-				
-				locals.Phase = ReminderPhaseCompleted
-				r.ProvideDone()
+func (r *ReminderWant) completeReminder(locals *ReminderLocals, logMsg string) {
+	r.StoreLog(logMsg)
+	locals.Phase = ReminderPhaseCompleted
+	locals.AutoCompleted = true
+	locals.ReactionPacketEmitted = false
+	r.SetPredefined("achieving_percentage", 100)
+	r.ProvideDone()
+}
 
-				// Trigger agent to delete queue immediately
-				r.ExecuteAgents()
-			} else {
-				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
-				r.StoreLog("📦 Reminder rejected by user")
-				r.SetCurrent("reminder_phase", ReminderPhaseFailed)
-				r.SetCurrent("reaction_result", "rejected")
-				r.SetInternal("_reaction_packet_emitted", false)
-				r.SetPredefined("achieving_percentage", 100)
-				
-				locals.Phase = ReminderPhaseFailed
-
-				// Trigger agent to delete queue immediately
-				r.ExecuteAgents()
-			}
+func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionMap map[string]any) {
+	if approved, ok := reactionMap["approved"].(bool); ok {
+		r.SetStatus(WantStatusReaching)
+		if approved {
+			r.StoreLog("📦 Reminder approved by user")
+			locals.Phase = ReminderPhaseCompleted
+			locals.ReactionResult = "approved"
+		} else {
+			r.StoreLog("📦 Reminder rejected by user")
+			locals.Phase = ReminderPhaseFailed
+			locals.ReactionResult = "rejected"
 		}
+		locals.ReactionPacketEmitted = false
+		r.SetPredefined("achieving_percentage", 100)
+		if locals.Phase == ReminderPhaseCompleted { r.ProvideDone() }
+		r.ExecuteAgents()
 	}
 }
 
-// handleTimeout handles reaction timeout
 func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
+	r.SetStatus(WantStatusReaching)
+	r.StoreLog("📦 Reaction timeout")
 	if locals.RequireReaction {
-		r.SetStatus(WantStatusReaching) // Clear WaitingUserAction before transitioning
-		r.StoreLog("📦 Reaction timeout - marking as failed")
-		r.SetCurrent("reminder_phase", ReminderPhaseFailed)
-		r.SetCurrent("timeout", true)
-		r.SetInternal("_reaction_packet_emitted", false)
-		r.SetPredefined("achieving_percentage", 100)
-		
 		locals.Phase = ReminderPhaseFailed
-
-		// Trigger agent to delete queue immediately
-		r.ExecuteAgents()
+		locals.ReactionResult = "timeout"
 	} else {
-		r.StoreLog("📦 Reaction timeout - auto-completing")
-		r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
-		r.SetCurrent("auto_completed", true)
-		r.SetInternal("_reaction_packet_emitted", false)
-		r.SetPredefined("achieving_percentage", 100)
-		
 		locals.Phase = ReminderPhaseCompleted
+		locals.AutoCompleted = true
 		r.ProvideDone()
-
-		// Trigger agent to delete queue immediately (if any existed)
-		r.ExecuteAgents()
 	}
+	locals.ReactionPacketEmitted = false
+	r.SetPredefined("achieving_percentage", 100)
+	r.ExecuteAgents()
 }
 
-// parseDurationString parses duration strings like "5 minutes", "10 seconds", etc.
 func parseDurationString(s string) (time.Duration, error) {
-	// Simple parser for common formats
 	var unit time.Duration
-
-	// Parse from the end to find the unit
-	if len(s) < 2 {
-		return 0, fmt.Errorf("invalid duration format: %s", s)
-	}
-
-	// Extract number and unit
+	if len(s) < 2 { return 0, fmt.Errorf("invalid duration format: %s", s) }
 	var numStr string
 	for i, c := range s {
-		if c >= '0' && c <= '9' {
-			numStr += string(c)
-		} else {
+		if c >= '0' && c <= '9' { numStr += string(c) } else {
 			s = s[i:]
 			break
 		}
 	}
-
-	if numStr == "" {
-		return 0, fmt.Errorf("no number found in duration: %s", s)
-	}
-
-	// Parse the unit
+	if numStr == "" { return 0, fmt.Errorf("no number found in duration: %s", s) }
 	s = strings.TrimSpace(s)
 	switch s {
-	case "second", "seconds":
-		unit = time.Second
-	case "minute", "minutes":
-		unit = time.Minute
-	case "hour", "hours":
-		unit = time.Hour
-	case "day", "days":
-		unit = 24 * time.Hour
-	default:
-		return 0, fmt.Errorf("unknown duration unit: %s", s)
+	case "second", "seconds": unit = time.Second
+	case "minute", "minutes": unit = time.Minute
+	case "hour", "hours": unit = time.Hour
+	case "day", "days": unit = 24 * time.Hour
+	default: return 0, fmt.Errorf("unknown duration unit: %s", s)
 	}
-
-	// Parse the number
 	var num int
 	_, err := fmt.Sscanf(numStr, "%d", &num)
-	if err != nil {
-		return 0, fmt.Errorf("invalid number in duration: %s", numStr)
-	}
-
+	if err != nil { return 0, fmt.Errorf("invalid number in duration: %s", numStr) }
 	return time.Duration(num) * unit, nil
 }

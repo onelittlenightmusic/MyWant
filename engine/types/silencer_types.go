@@ -20,7 +20,8 @@ func (s *SilencerWant) GetLocals() *SilencerLocals {
 
 // SilencerLocals holds type-specific local state for SilencerWant
 type SilencerLocals struct {
-	Policy string
+	Policy           string
+	TargetReactionId string `mywant:"internal,target_reaction_id"`
 }
 
 // Initialize prepares the silencer want for execution
@@ -35,7 +36,6 @@ func (s *SilencerWant) Initialize() {
 	s.SetCurrent("processed_count", 0)
 	s.SetCurrent("last_processed_id", "")
 	s.SetCurrent("silencer_phase", "active")
-	s.CreateInternal("target_reaction_id", "")
 }
 
 // IsAchieved - Silencers are processors, they stay active to process stream
@@ -105,8 +105,8 @@ func (s *SilencerWant) processPacket(data any) {
 
 	locals := s.GetLocals()
 	if reactionType == "internal" {
-		// Store target reaction ID for agents - use SetInternal for consistent retrieval by DoAgent
-		s.SetInternal("target_reaction_id", reactionID)
+		// Store target reaction ID for agents via auto-syncing locals
+		locals.TargetReactionId = reactionID
 
 		// If policy is all_true, trigger DoAgent for auto-approval
 		if locals.Policy == "all_true" {
