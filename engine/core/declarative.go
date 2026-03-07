@@ -362,20 +362,20 @@ func SyncLocalsState(n *Want, locals any, toStruct bool) {
 		}
 
 		// 2. Determine state type (Current vs Internal) based on StateLabels
-		label := n.StateLabels[stateKey]
+		// If not in StateLabels, automatically register as internal
+		label, exists := n.StateLabels[stateKey]
+		if !exists {
+			if n.StateLabels == nil {
+				n.StateLabels = make(map[string]StateLabel)
+			}
+			n.StateLabels[stateKey] = LabelInternal
+			label = LabelInternal
+		}
 		isCurrent := (label == LabelCurrent)
 
 		if toStruct {
-			// Copy from State to Struct
-			var stateVal any
-			var ok bool
-			if isCurrent {
-				stateVal, ok = n.GetCurrent(stateKey)
-			} else {
-				stateVal, ok = n.GetInternal(stateKey)
-			}
-
-			if ok {
+			// Copy from State to Struct (try GetState directly)
+			if stateVal, ok := n.GetState(stateKey); ok {
 				setFieldValue(field, stateVal)
 			}
 		} else {
@@ -385,6 +385,8 @@ func SyncLocalsState(n *Want, locals any, toStruct bool) {
 				if isCurrent {
 					n.SetCurrent(stateKey, structVal)
 				} else {
+					// Directly store internal state. Since we just registered it
+					// in StateLabels above, this is now a valid internal field.
 					n.SetInternal(stateKey, structVal)
 				}
 			}

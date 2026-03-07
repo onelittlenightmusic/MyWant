@@ -97,5 +97,19 @@ wantType:
     initialValue: []
     label: plan
 
+  - name: goal_achieved
+    description: True when the planner has no more directions to suggest
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+
+  - name: costs
+    description: Map of direction name → actual cost
+    type: object
+    persistent: true
+    initialValue: {}
+    label: current
+
   requires:
     - opa_llm_planning
