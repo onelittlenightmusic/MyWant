@@ -267,7 +267,6 @@ type Want struct {
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
 	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
-	agentStateChanges *sync.Map                     `json:"-" yaml:"-"`
 	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"` // Mutex for runningAgents
 
 
@@ -529,48 +528,42 @@ func (n *Want) EndProgressCycle() {
 		}
 	}
 
-	n.AggregateChanges()
+	// Aggregate state changes into history
+	if n.pendingStateChanges != nil {
+		changesCopy := make(map[string]any)
+		n.pendingStateChanges.Range(func(key, value any) bool {
+			k := key.(string)
+			changesCopy[k] = value
+			n.State.Store(k, value)
+			n.pendingStateChanges.Delete(key) // Clear from pending
+			return true
+		})
+
+		if len(changesCopy) > 0 {
+			n.addAggregatedStateHistory(changesCopy)
+		}
+	}
+
+	// Aggregate parameter changes into history
+	if n.pendingParameterChanges != nil {
+		paramChanges := make(map[string]any)
+		n.pendingParameterChanges.Range(func(key, value any) bool {
+			k := key.(string)
+			paramChanges[k] = value
+			n.pendingParameterChanges.Delete(key) // Clear from pending
+			return true
+		})
+		if len(paramChanges) > 0 {
+			n.addAggregatedParameterHistory(paramChanges)
+		}
+	}
+
 	if len(n.pendingLogs) > 0 {
 		n.addAggregatedLogHistory()
 	}
 
 	n.inExecCycle = false
 }
-
-func (n *Want) AggregateChanges() {
-	if n.pendingStateChanges == nil { return }
-	
-	changesCopy := make(map[string]any)
-	n.pendingStateChanges.Range(func(key, value any) bool {
-		k := key.(string)
-		changesCopy[k] = value
-		n.State.Store(k, value)
-		n.pendingStateChanges.Delete(key) // Clear from pending
-		return true
-	})
-
-	if len(changesCopy) > 0 {
-		n.addAggregatedStateHistory(changesCopy)
-	}
-
-	if n.pendingParameterChanges == nil { return }
-	
-	paramChanges := make(map[string]any)
-	n.pendingParameterChanges.Range(func(key, value any) bool {
-		k := key.(string)
-		paramChanges[k] = value
-		n.pendingParameterChanges.Delete(key) // Clear from pending
-		return true
-	})
-	if len(paramChanges) > 0 {
-		n.addAggregatedParameterHistory(paramChanges)
-	}
-
-	if len(n.pendingLogs) > 0 {
-		n.addAggregatedLogHistory()
-	}
-}
-
 
 // SetProgressable sets the concrete progressable implementation for this want
 func (n *Want) SetProgressable(progressable Progressable) {
@@ -1008,13 +1001,9 @@ func (n *Want) SetSuspended(suspended bool) {
 //
 // STATE OWNERSHIP RULE: Only call StoreState on the want that owns the state.
 //   - In Progress() / Initialize(): call on receiver (b.StoreState / o.StoreState).
-//   - In a DoAgent / MonitorAgent Exec: use want.StoreStateForAgent() instead, which
-//     goes through the agent-side staging buffer and is committed atomically.
+//   - In a DoAgent / MonitorAgent Exec: call on the want passed into the agent.
 //   - NEVER call want_A.StoreState(...) from code that runs on behalf of want_B.
 //     Cross-want state writes bypass locking assumptions and can corrupt state history.
-//
-// For cross-want coordination use MergeParentState() (ThinkAgent only) or signal
-// the target want via a flag + RestartWant().
 func (n *Want) StoreState(key string, value any) {
 	previousValue, _ := n.State.Load(key)
 	if n.valuesEqual(previousValue, value) {
@@ -1725,11 +1714,7 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 
 func (n *Want) SetGoal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		if n.inExecCycle {
-			n.StoreState(key, value)
-		} else {
-			n.StoreStateForAgent(key, value)
-		}
+		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}

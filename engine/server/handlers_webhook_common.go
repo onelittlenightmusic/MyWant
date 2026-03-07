@@ -62,7 +62,7 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 	messageCount++
 
 	// Update want state
-	want.StoreStateMultiForAgent(map[string]any{
+	want.StoreStateMulti(map[string]any{
 		cfg.LatestMessageKey: msgMap,
 		cfg.MessagesKey:      messages,
 		cfg.MessageCountKey:  messageCount,

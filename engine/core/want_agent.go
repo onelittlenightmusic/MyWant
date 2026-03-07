@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -120,9 +119,6 @@ func (n *Want) ExecuteAgents() error {
 			}
 		}
 	}
-
-	// Make changes from synchronous (Do) agents immediately visible in the current cycle
-	n.AggregateChanges()
 
 	return nil
 }
@@ -278,7 +274,6 @@ func (n *Want) runDoAgent(agent Agent) error {
 		// Store current agent state
 		n.StoreState("_current_agent", agentName)
 		n.StoreState("_running_agents", n.RunningAgents)
-		n.AggregateChanges()
 	}
 	// Append "running" start event
 	n.agentHistoryRing.Append(AgentExecution{
@@ -325,9 +320,8 @@ func (n *Want) runDoAgent(agent Agent) error {
 			n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 		}
 		{
-			n.StoreStateForAgent("_current_agent", n.CurrentAgent)
-			n.StoreStateForAgent("_running_agents", n.RunningAgents)
-			n.DumpStateForAgent("DoAgent")
+			n.StoreState("_current_agent", n.CurrentAgent)
+			n.StoreState("_running_agents", n.RunningAgents)
 		}
 
 		delete(n.runningAgents, agentName)
@@ -341,7 +335,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		finalError = err.Error()
 		agentErr = err
 	} else {
-		n.DumpStateForAgent("DoAgent")
+		n.StoreState("action_by_agent", "DoAgent")
 	}
 
 	return agentErr
@@ -439,228 +433,6 @@ func (n *Want) StopAgent(agentName string) {
 	}
 }
 
-// StageStateChange stages state changes for later commit (used by agents) Can be called with either:
-// 1. Single key-value: StageStateChange("key", "value") 2. Object with multiple pairs: StageStateChange(map[string]any{"key1": "value1", "key2": "value2"})
-func (n *Want) StageStateChange(keyOrObject any, value ...any) error {
-	n.agentStateMutex.Lock()
-	defer n.agentStateMutex.Unlock()
-
-	if n.agentStateChanges == nil {
-		n.agentStateChanges = new(sync.Map)
-	}
-	if len(value) == 0 {
-		if stateObject, ok := keyOrObject.(map[string]any); ok {
-			for k, v := range stateObject {
-				n.agentStateChanges.Store(k, v)
-			}
-			return nil
-		}
-		// Invalid usage - no value provided and not a map
-		return fmt.Errorf("StageStateChange: when called with single argument, it must be map[string]any")
-	}
-	if len(value) == 1 {
-		if key, ok := keyOrObject.(string); ok {
-			n.agentStateChanges.Store(key, value[0])
-			return nil
-		}
-		// Invalid usage - first arg is not a string
-		return fmt.Errorf("StageStateChange: when called with two arguments, first must be string")
-	}
-
-	// Invalid usage - too many arguments
-	return fmt.Errorf("StageStateChange: accepts either 1 argument (map) or 2 arguments (key, value)")
-}
-
-// CommitStateChanges commits all staged state changes in a single atomic operation
-func (n *Want) CommitStateChanges() {
-	// Step 1: Copy staged changes while holding agentStateMutex
-	n.agentStateMutex.Lock()
-	if n.agentStateChanges == nil {
-		n.agentStateMutex.Unlock()
-		return
-	}
-
-	changesCopy := make(map[string]any)
-	changeCount := 0
-	n.agentStateChanges.Range(func(key, value any) bool {
-		changesCopy[key.(string)] = value
-		changeCount++
-		n.agentStateChanges.Delete(key)
-		return true
-	})
-	n.agentStateMutex.Unlock()
-
-	// Step 2: Apply changes to State using encapsulated method
-	if changeCount > 0 {
-		n.SetStateAtomic(changesCopy)
-
-		// Step 3: Add single history entry with all changes using the aggregated helper
-		n.addAggregatedStateHistory(changesCopy)
-
-		log.Printf("💾 Committed %d state changes for want %s in single batch\n",
-			changeCount, n.Metadata.Name)
-	}
-
-	// Step 4: Commit pending logs (same as EndProgressCycle)
-	if len(n.pendingLogs) > 0 {
-		n.addAggregatedLogHistory()
-	}
-}
-func (n *Want) GetStagedChanges() map[string]any {
-	n.agentStateMutex.RLock()
-	defer n.agentStateMutex.RUnlock()
-
-	changes := make(map[string]any)
-	if n.agentStateChanges != nil {
-		n.agentStateChanges.Range(func(key, value any) bool {
-			changes[key.(string)] = value
-			return true
-		})
-	}
-	return changes
-}
-func (n *Want) GetAgentHistoryByName(agentName string) []AgentExecution {
-	n.initHistoryRings()
-	var result []AgentExecution
-	for _, exec := range n.agentHistoryRing.Snapshot(0) {
-		if exec.AgentName == agentName {
-			result = append(result, exec)
-		}
-	}
-	if result == nil {
-		return []AgentExecution{}
-	}
-	return result
-}
-func (n *Want) GetAgentHistoryByType(agentType string) []AgentExecution {
-	n.initHistoryRings()
-	var result []AgentExecution
-	for _, exec := range n.agentHistoryRing.Snapshot(0) {
-		if exec.AgentType == agentType {
-			result = append(result, exec)
-		}
-	}
-	if result == nil {
-		return []AgentExecution{}
-	}
-	return result
-}
-
-// ============================================================================
-// Background Agent Management
-// ============================================================================
-
-// AddBackgroundAgent registers and starts a background agent
-// The agent's Start() method is called immediately
-func (w *Want) AddBackgroundAgent(agent BackgroundAgent) error {
-	if agent == nil {
-		return fmt.Errorf("background agent cannot be nil")
-	}
-
-	w.backgroundMutex.Lock()
-	defer w.backgroundMutex.Unlock()
-
-	// Initialize background agents map if needed
-	if w.backgroundAgents == nil {
-		w.backgroundAgents = make(map[string]BackgroundAgent)
-	}
-
-	agentID := agent.ID()
-
-	// Check if agent already exists
-	if _, exists := w.backgroundAgents[agentID]; exists {
-		return fmt.Errorf("background agent with ID %q already exists", agentID)
-	}
-
-	// Start the agent with background context
-	if err := agent.Start(context.Background(), w); err != nil {
-		return fmt.Errorf("failed to start background agent %q: %w", agentID, err)
-	}
-
-	// Store the agent
-	w.backgroundAgents[agentID] = agent
-
-	return nil
-}
-
-// DeleteBackgroundAgent stops and removes a background agent by ID
-func (w *Want) DeleteBackgroundAgent(agentID string) error {
-	w.backgroundMutex.Lock()
-	defer w.backgroundMutex.Unlock()
-
-	agent, exists := w.backgroundAgents[agentID]
-	if !exists {
-		return fmt.Errorf("background agent with ID %q not found", agentID)
-	}
-
-	// Stop the agent
-	if err := agent.Stop(); err != nil {
-		return fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
-	}
-
-	// Remove from map
-	delete(w.backgroundAgents, agentID)
-
-	return nil
-}
-
-// StopAllBackgroundAgents stops all running background agents
-// Called automatically when a want completes
-func (w *Want) StopAllBackgroundAgents() error {
-	w.backgroundMutex.Lock()
-	defer w.backgroundMutex.Unlock()
-
-	if w.backgroundAgents == nil || len(w.backgroundAgents) == 0 {
-		return nil
-	}
-
-	var lastErr error
-	for agentID, agent := range w.backgroundAgents {
-		if err := agent.Stop(); err != nil {
-			lastErr = fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
-			w.StoreLog("ERROR: %v", lastErr)
-		}
-	}
-
-	// Clear all agents
-	w.backgroundAgents = make(map[string]BackgroundAgent)
-
-	return lastErr
-}
-
-// GetBackgroundAgent returns a specific background agent by ID
-func (w *Want) GetBackgroundAgent(agentID string) (BackgroundAgent, bool) {
-	w.backgroundMutex.RLock()
-	defer w.backgroundMutex.RUnlock()
-
-	agent, exists := w.backgroundAgents[agentID]
-	return agent, exists
-}
-
-// GetBackgroundAgentCount returns the number of active background agents
-func (w *Want) GetBackgroundAgentCount() int {
-	w.backgroundMutex.RLock()
-	defer w.backgroundMutex.RUnlock()
-
-	return len(w.backgroundAgents)
-}
-
-// FlushThinkingAgents runs all ThinkingAgents' think function once synchronously.
-// Called before StopAllBackgroundAgents() when a want achieves completion,
-// ensuring any pending state changes (e.g. cost propagation) are committed.
-func (w *Want) FlushThinkingAgents(ctx context.Context) {
-	w.backgroundMutex.RLock()
-	defer w.backgroundMutex.RUnlock()
-
-	for agentID, agent := range w.backgroundAgents {
-		if ta, ok := agent.(*ThinkingAgent); ok {
-			if err := ta.Flush(ctx); err != nil {
-				w.StoreLog("[FlushThinkingAgents] Error flushing agent %q: %v", agentID, err)
-			}
-		}
-	}
-}
-
 // validateAgentStateKey validates a state key against the agent's specification
 // Returns true if validation passes, false otherwise
 // Logs warnings for invalid keys but does not reject them (backward compatibility)
@@ -710,93 +482,120 @@ func (w *Want) validateAgentStateKey(key string) bool {
 	return false // Validation failed, but write still allowed
 }
 
-// StoreStateForAgent stages a state change from a background (DoAgent / MonitorAgent) goroutine.
-// The change is buffered in agentStateChanges and committed atomically into State at the
-// end of the next Progress cycle via CommitPendingAgentState().
-//
-// STATE OWNERSHIP RULE: Always call StoreStateForAgent on the want passed into the
-// Agent's Exec(ctx, want) function — i.e. the want that owns the agent.
-// It is illegal to obtain a foreign want from cb.GetWants() and call
-// StoreStateForAgent on it.  Each want is the sole owner of its own State.
-//
-// For cross-want coordination, write a signal flag to the target want's state via
-// the target want's own goroutine (Progress / Initialize), or use MergeParentState()
-// from a ThinkAgent registered on that want.
-func (w *Want) StoreStateForAgent(key string, value any) {
-	w.validateAgentStateKey(key)
+// ============================================================================
+// Background Agent Management
+// ============================================================================
 
-	w.agentStateMutex.Lock()
-	defer w.agentStateMutex.Unlock()
-
-	if w.agentStateChanges == nil {
-		w.agentStateChanges = new(sync.Map)
+// AddBackgroundAgent registers and starts a background agent
+func (w *Want) AddBackgroundAgent(agent BackgroundAgent) error {
+	if agent == nil {
+		return fmt.Errorf("background agent cannot be nil")
 	}
-	w.agentStateChanges.Store(key, value)
+
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	if w.backgroundAgents == nil {
+		w.backgroundAgents = make(map[string]BackgroundAgent)
+	}
+
+	agentID := agent.ID()
+	if _, exists := w.backgroundAgents[agentID]; exists {
+		return fmt.Errorf("background agent with ID %q already exists", agentID)
+	}
+
+	if err := agent.Start(context.Background(), w); err != nil {
+		return fmt.Errorf("failed to start background agent %q: %w", agentID, err)
+	}
+
+	w.backgroundAgents[agentID] = agent
+	return nil
 }
 
-// StoreStateMultiForAgent is the batch variant of StoreStateForAgent.
-// All entries in updates are staged in a single pass.
-//
-// STATE OWNERSHIP RULE: Same as StoreStateForAgent — only call on the want that
-// owns the agent (the want argument of Exec).
-func (w *Want) StoreStateMultiForAgent(updates map[string]any) {
-	for key := range updates {
-		w.validateAgentStateKey(key)
+// DeleteBackgroundAgent stops and removes a background agent by ID
+func (w *Want) DeleteBackgroundAgent(agentID string) error {
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	agent, exists := w.backgroundAgents[agentID]
+	if !exists {
+		return fmt.Errorf("background agent with ID %q not found", agentID)
 	}
 
-	w.agentStateMutex.Lock()
-	defer w.agentStateMutex.Unlock()
-
-	if w.agentStateChanges == nil {
-		w.agentStateChanges = new(sync.Map)
+	if err := agent.Stop(); err != nil {
+		return fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
 	}
-	for key, value := range updates {
-		w.agentStateChanges.Store(key, value)
+
+	delete(w.backgroundAgents, agentID)
+	return nil
+}
+
+// StopAllBackgroundAgents stops all running background agents
+func (w *Want) StopAllBackgroundAgents() error {
+	w.backgroundMutex.Lock()
+	defer w.backgroundMutex.Unlock()
+
+	if w.backgroundAgents == nil || len(w.backgroundAgents) == 0 {
+		return nil
+	}
+
+	var lastErr error
+	for agentID, agent := range w.backgroundAgents {
+		if err := agent.Stop(); err != nil {
+			lastErr = fmt.Errorf("failed to stop background agent %q: %w", agentID, err)
+			w.StoreLog("ERROR: %v", lastErr)
+		}
+	}
+
+	w.backgroundAgents = make(map[string]BackgroundAgent)
+	return lastErr
+}
+
+// GetBackgroundAgent returns a specific background agent by ID
+func (w *Want) GetBackgroundAgent(agentID string) (BackgroundAgent, bool) {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	agent, exists := w.backgroundAgents[agentID]
+	return agent, exists
+}
+
+// GetBackgroundAgentCount returns the number of active background agents
+func (w *Want) GetBackgroundAgentCount() int {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	return len(w.backgroundAgents)
+}
+
+// FlushThinkingAgents runs all ThinkingAgents' think function once synchronously.
+func (w *Want) FlushThinkingAgents(ctx context.Context) {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+
+	for agentID, agent := range w.backgroundAgents {
+		if ta, ok := agent.(*ThinkingAgent); ok {
+			if err := ta.Flush(ctx); err != nil {
+				w.StoreLog("[FlushThinkingAgents] Error flushing agent %q: %v", agentID, err)
+			}
+		}
 	}
 }
 
-// DumpStateForAgent commits all staged agent state changes to the Want's state.
-// The agentType parameter identifies which agent (e.g., "MonitorAgent", "DoAgent") made the changes.
+// --- Obsolete Methods (Stubs for Backward Compatibility) ---
+
+// CommitStateChanges is obsolete; StoreState now handles updates immediately or via pendingStateChanges.
+func (w *Want) CommitStateChanges() {
+	// No-op
+}
+
+// DumpStateForAgent is obsolete; StoreState now handles updates immediately.
 func (w *Want) DumpStateForAgent(agentType string) {
-	w.agentStateMutex.Lock()
-	if w.agentStateChanges == nil {
-		w.agentStateMutex.Unlock()
-		return
-	}
-
-	changesCopy := make(map[string]any)
-	w.agentStateChanges.Range(func(key, value any) bool {
-		changesCopy[key.(string)] = value
-		w.agentStateChanges.Delete(key)
-		return true
-	})
-	w.agentStateMutex.Unlock()
-
-	if len(changesCopy) == 0 {
-		return
-	}
-
 	w.StoreState("action_by_agent", agentType)
-	for key, value := range changesCopy {
-		w.StoreState(key, value)
-	}
-
-	w.StoreLog("💾 Agent state dumped for %s (agent: %s): %d changes (will be recorded in next Progress cycle)\n", w.Metadata.Name, agentType, len(changesCopy))
 }
 
-// HasPendingAgentStateChanges returns true if there are staged agent state changes.
+// HasPendingAgentStateChanges is obsolete.
 func (w *Want) HasPendingAgentStateChanges() bool {
-	w.agentStateMutex.RLock()
-	defer w.agentStateMutex.RUnlock()
-
-	if w.agentStateChanges == nil {
-		return false
-	}
-	
-	hasChanges := false
-	w.agentStateChanges.Range(func(_, _ any) bool {
-		hasChanges = true
-		return false // Stop after first entry
-	})
-	return hasChanges
+	return false
 }
+

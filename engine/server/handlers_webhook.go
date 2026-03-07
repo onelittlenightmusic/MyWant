@@ -84,7 +84,7 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generic webhook: store payload as-is
-	want.StoreStateMultiForAgent(map[string]any{
+	want.StoreStateMulti(map[string]any{
 		"webhook_payload":     payload,
 		"webhook_received_at": time.Now().Format(time.RFC3339),
 		"action_by_agent":     "webhook_handler",
@@ -137,33 +137,33 @@ func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) 
 func (s *Server) handleReplayWebhook(w http.ResponseWriter, want *mywant.Want, action string) {
 	switch action {
 	case "start_recording":
-		want.StoreStateMultiForAgent(map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"start_recording_requested": true,
 			"stop_recording_requested":  false,
 			"action_by_agent":           "webhook_handler",
 		})
 		log.Printf("[REPLAY-WEBHOOK] start_recording signal set for want %s\n", want.Metadata.ID)
 	case "stop_recording":
-		want.StoreStateMultiForAgent(map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"stop_recording_requested": true,
 			"action_by_agent":          "webhook_handler",
 		})
 		log.Printf("[REPLAY-WEBHOOK] stop_recording signal set for want %s\n", want.Metadata.ID)
 	case "start_debug_recording":
-		want.StoreStateMultiForAgent(map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"start_debug_recording_requested": true,
 			"stop_debug_recording_requested":  false,
 			"action_by_agent":                 "webhook_handler",
 		})
 		log.Printf("[REPLAY-WEBHOOK] start_debug_recording signal set for want %s\n", want.Metadata.ID)
 	case "stop_debug_recording":
-		want.StoreStateMultiForAgent(map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"stop_debug_recording_requested": true,
 			"action_by_agent":                "webhook_handler",
 		})
 		log.Printf("[REPLAY-WEBHOOK] stop_debug_recording signal set for want %s\n", want.Metadata.ID)
 	case "start_replay":
-		want.StoreStateMultiForAgent(map[string]any{
+		want.StoreStateMulti(map[string]any{
 			"start_replay_requested": true,
 			"action_by_agent":        "webhook_handler",
 		})
