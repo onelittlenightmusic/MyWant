@@ -167,8 +167,9 @@ class MyWantApiClient {
     return response.data;
   }
 
-  async listWants(): Promise<Want[]> {
-    const data = await this.deduplicatedGet<{wants: Want[], execution_id: string, timestamp: string}>('/api/v1/wants');
+  async listWants(options?: { includeCancelled?: boolean }): Promise<Want[]> {
+    const url = options?.includeCancelled ? '/api/v1/wants?includeCancelled=true' : '/api/v1/wants';
+    const data = await this.deduplicatedGet<{wants: Want[], execution_id: string, timestamp: string}>(url);
     return data.wants;
   }
 

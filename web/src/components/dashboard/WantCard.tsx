@@ -209,7 +209,22 @@ const ChildWantCard: React.FC<ChildWantCardProps> = ({
     }
   };
 
+  const childStackCount = Math.min((child.metadata?.version ?? 1) - 1, 3);
+  const childVersion = child.metadata?.version ?? 1;
+
   return (
+    <div className="relative" style={{ isolation: 'isolate' }}>
+    {childStackCount > 0 && Array.from({ length: childStackCount }).map((_, i) => (
+      <div
+        key={i}
+        className="absolute inset-0 rounded-md border border-gray-400 dark:border-gray-500 bg-gray-300 dark:bg-gray-600"
+        style={{
+          transform: `translate(${(childStackCount - i) * 6}px, ${(childStackCount - i) * 6}px)`,
+          zIndex: -(childStackCount - i),
+          opacity: 0.9 - i * 0.15,
+        }}
+      />
+    ))}
     <div
       data-keyboard-nav-selected={isChildSelected}
       data-keyboard-nav-id={childId}
@@ -218,7 +233,7 @@ const ChildWantCard: React.FC<ChildWantCardProps> = ({
       onDragStart={handleDragStart}
       onDragEnd={(e) => { e.stopPropagation(); setDraggingWant(null); }}
       className={classNames(
-        'relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset',
+        'relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset min-h-[7rem]',
         isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300',
         (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
         isHighlighted && styles.highlighted,
@@ -232,6 +247,13 @@ const ChildWantCard: React.FC<ChildWantCardProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+    {childVersion >= 2 && !isSelectMode && (
+      <div className="absolute top-1 left-1 z-20 pointer-events-none">
+        <span className="inline-flex items-center px-1 py-0.5 rounded text-xs font-semibold bg-gray-700 dark:bg-gray-600 text-white opacity-80">
+          v{childVersion}
+        </span>
+      </div>
+    )}
       <CardProgressBars achievingPercentage={childAchievingPercentage} />
       <CardCorrelationOverlay rate={correlationRate} />
 
@@ -265,6 +287,7 @@ const ChildWantCard: React.FC<ChildWantCardProps> = ({
           onViewResults={onViewResults}
         />
       </div>
+    </div>
     </div>
   );
 };
@@ -560,16 +583,16 @@ export const WantCard: React.FC<WantCardProps> = ({
   const version = want.metadata?.version ?? 1;
 
   return (
-    <div className="relative h-full">
+    <div className="relative h-full" style={{ isolation: 'isolate' }}>
       {/* Stacked background layers representing past versions */}
       {stackCount > 0 && Array.from({ length: stackCount }).map((_, i) => (
         <div
           key={i}
-          className="absolute inset-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+          className="absolute inset-0 rounded-lg border border-gray-400 dark:border-gray-500 bg-gray-300 dark:bg-gray-600"
           style={{
-            transform: `translate(${(stackCount - i) * 3}px, ${(stackCount - i) * 3}px)`,
+            transform: `translate(${(stackCount - i) * 6}px, ${(stackCount - i) * 6}px)`,
             zIndex: -(stackCount - i),
-            opacity: 0.6 - i * 0.15,
+            opacity: 0.9 - i * 0.15,
           }}
         />
       ))}

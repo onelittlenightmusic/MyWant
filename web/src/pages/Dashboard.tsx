@@ -103,10 +103,14 @@ export const Dashboard: React.FC = () => {
     return wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId)) || sidebar.selectedItem;
   }, [sidebar.selectedItem, wants]);
 
-  const seriesWants = useMemo(() => {
-    if (!selectedWant?.metadata?.series) return [];
-    return wants.filter(w => w.metadata?.series === selectedWant.metadata.series);
-  }, [selectedWant, wants]);
+  const [seriesWants, setSeriesWants] = useState<Want[]>([]);
+  useEffect(() => {
+    const series = selectedWant?.metadata?.series;
+    if (!series) { setSeriesWants([]); return; }
+    apiClient.listWants({ includeCancelled: true })
+      .then(all => setSeriesWants(all.filter(w => w.metadata?.series === series)))
+      .catch(() => setSeriesWants([]));
+  }, [selectedWant?.metadata?.series]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<WantExecutionStatus[]>([]);
