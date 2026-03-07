@@ -1731,7 +1731,7 @@ func (n *Want) SetGoal(key string, value any) {
 			n.StoreStateForAgent(key, value)
 		}
 	} else {
-		n.StoreLog("[WARN] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.StoreLog("[FAILED] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
 }
 
@@ -1750,7 +1750,7 @@ func (n *Want) SetCurrent(key string, value any) {
 			n.StoreStateForAgent(key, value)
 		}
 	} else {
-		n.StoreLog("[WARN] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.StoreLog("[FAILED] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
 }
 
@@ -1769,7 +1769,7 @@ func (n *Want) SetPlan(key string, value any) {
 			n.StoreStateForAgent(key, value)
 		}
 	} else {
-		n.StoreLog("[WARN] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.StoreLog("[FAILED] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
 }
 
@@ -1815,7 +1815,7 @@ func (n *Want) SetInternal(key string, value any) {
 			n.StoreStateForAgent(key, value)
 		}
 	} else {
-		n.StoreLog("[WARN] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.StoreLog("[FAILED] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
 }
 
