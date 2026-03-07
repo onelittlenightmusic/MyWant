@@ -18,6 +18,12 @@ func TestWantStateConcurrency(t *testing.T) {
 		"internal_flag":   LabelInternal,
 	}
 
+	// Call BeginProgressCycle so SetCurrent/SetGoal route to StoreState (which writes
+	// directly to State sync.Map) rather than StoreStateForAgent (which writes to
+	// agentStateChanges and is not visible to GetCurrent/GetState).
+	// This also initializes pendingStateChanges to avoid nil panics.
+	want.BeginProgressCycle()
+
 	var wg sync.WaitGroup
 	iterations := 1000
 
