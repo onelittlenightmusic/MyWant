@@ -46,13 +46,6 @@ wantType:
     example: "active"
     label: current
 
-  - name: webhook_secret
-    description: Signing secret (stored from params)
-    type: string
-    persistent: true
-    initialValue: ""
-    label: internal
-
   - name: slack_latest_message
     description: Most recently received Slack message
     type: object
@@ -76,13 +69,6 @@ wantType:
     initialValue: []
     example: '[{"sender": "U01ABCDEF", "text": "Hello", "timestamp": "2026-02-09T12:00:00Z", "channel_id": "C01ABCDEF23"}]'
     label: current
-
-  - name: channel_filter
-    description: Active channel filter (from params)
-    type: string
-    persistent: true
-    initialValue: ""
-    label: internal
 
   - name: achieving_percentage
     description: Progress percentage (50% while active, 100% when stopped)

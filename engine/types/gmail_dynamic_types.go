@@ -36,6 +36,7 @@ func (g *GmailDynamicWant) GetLocals() *GmailDynamicLocals {
 
 func (g *GmailDynamicWant) Initialize() {
 	g.StoreLog("[GMAIL-DYNAMIC] Initializing dynamic want: %s", g.Metadata.Name)
+	g.CreateInternal("raw_samples", map[string]any{})
 
 	// Initialize PhaseRetryCount map
 	if g.PhaseRetryCount == nil {

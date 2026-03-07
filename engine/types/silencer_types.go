@@ -35,6 +35,7 @@ func (s *SilencerWant) Initialize() {
 	s.SetCurrent("processed_count", 0)
 	s.SetCurrent("last_processed_id", "")
 	s.SetCurrent("silencer_phase", "active")
+	s.CreateInternal("target_reaction_id", "")
 }
 
 // IsAchieved - Silencers are processors, they stay active to process stream

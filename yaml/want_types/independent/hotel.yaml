@@ -155,12 +155,7 @@ wantType:
     - spa
     - suite upgrade
     initialValue: &id001 []
-  - name: agent_requirements
-    description: Requirements passed to agent system
-    type: '[]string'
-    persistent: false
-    label: internal
-    initialValue: *id001
+
   - name: execution_source
     description: Source of execution (monitor or agent)
     type: string
@@ -186,24 +181,6 @@ wantType:
     persistent: true
     label: current
     initialValue: null
-  - name: thinker.goal_initialized
-    description: Whether the condition thinker has initialized its goal
-    type: bool
-    persistent: false
-    label: internal
-    initialValue: false
-  - name: thinker.itinerary_done
-    description: Whether the itinerary is complete per condition thinker
-    type: bool
-    persistent: false
-    label: internal
-    initialValue: false
-  - name: thinker.ticks_waited
-    description: Number of ticks the condition thinker has waited
-    type: int
-    persistent: false
-    label: internal
-    initialValue: 0
   agents:
   - name: MonitorHotel
     role: monitor

@@ -364,7 +364,7 @@ WantやAgentの開発において、特に状態管理（State）に関連して
 
 *   **症状:** Agentが `SetCurrent` を呼んでいるのにステートが更新されない、または `GetCurrent` が常に `nil` を返す。
 *   **原因:** YAMLの `state:` セクションで `label: current` などが設定されていない。
-*   **対策:** YAMLを確認し、アクセスしようとしているフィールドに適切なラベルを付けてください。
+*   **対策（外部公開フィールド）:** YAMLを確認し、アクセスしようとしているフィールドに適切なラベルを付けてください。
     ```yaml
     # ✅ 正しい例
     state:
@@ -372,6 +372,17 @@ WantやAgentの開発において、特に状態管理（State）に関連して
         type: float64
         label: current  # これがないと SetCurrent/GetCurrent は動作しない
     ```
+
+*   **対策（内部ステートマシン用フィールド）:** APIやUIに公開不要な内部状態（例: ステートマシンのフェーズ）は `CreateInternal` を使って `Initialize()` 内で動的に登録できます。YAMLへの定義は不要です。
+    ```go
+    // ✅ Initialize() 内でステートマシンの初期フェーズを登録
+    func (f *FlightWant) Initialize() {
+        // ...
+        // YAMLに定義不要。内部フィールドを動的に生成してラベル登録する
+        f.CreateInternal("_flight_phase", PhaseInitial)
+    }
+    ```
+    `CreateInternal` は冪等です。すでに値が存在する場合は上書きしません。`StateLabels` に `internal` ラベルを登録したうえで値を保存するので、その後 `SetInternal` / `GetInternal` が正常に動作します。
 
 ### 2. フィールド名の不一致（タイポ）
 

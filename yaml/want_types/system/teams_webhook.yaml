@@ -47,13 +47,6 @@ wantType:
     example: "active"
     label: current
 
-  - name: webhook_secret
-    description: HMAC verification secret (stored from params)
-    type: string
-    persistent: true
-    initialValue: ""
-    label: internal
-
   - name: teams_latest_message
     description: Most recently received Teams message
     type: object
@@ -77,13 +70,6 @@ wantType:
     initialValue: []
     example: '[{"sender": "User", "text": "Hello", "timestamp": "2026-02-08T12:00:00Z", "channel_id": "19:xxx"}]'
     label: current
-
-  - name: channel_filter
-    description: Active channel filter (from params)
-    type: string
-    persistent: true
-    initialValue: ""
-    label: internal
 
   - name: achieving_percentage
     description: Progress percentage (50% while active, 100% when stopped)

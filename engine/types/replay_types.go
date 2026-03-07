@@ -33,6 +33,20 @@ func (r *ReplayWant) Initialize() {
 	locals := r.GetLocals()
 	locals.MonitorStarted = false
 
+	r.CreateInternal("startWebhookId", "")
+	r.CreateInternal("stopWebhookId", "")
+	r.CreateInternal("start_recording_requested", false)
+	r.CreateInternal("stop_recording_requested", false)
+	r.CreateInternal("start_debug_recording_requested", false)
+	r.CreateInternal("stop_debug_recording_requested", false)
+	r.CreateInternal("recording_session_id", "")
+	r.CreateInternal("debugStartWebhookId", "")
+	r.CreateInternal("debugStopWebhookId", "")
+	r.CreateInternal("debug_recording_session_id", "")
+	r.CreateInternal("replayWebhookId", "")
+	r.CreateInternal("start_replay_requested", false)
+	r.CreateInternal("replay_session_id", "")
+
 	typeDef := r.WantTypeDefinition
 	if typeDef == nil || len(typeDef.MonitorCapabilities) == 0 {
 		r.StoreLog("[REPLAY] WARNING: no MonitorCapabilities found in type definition")

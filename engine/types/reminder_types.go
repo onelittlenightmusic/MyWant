@@ -138,7 +138,8 @@ func (r *ReminderWant) Initialize() {
 	r.SetGoal("reaction_type", locals.ReactionType)
 	r.SetCurrent("timeout", 300)
 	r.SetCurrent("reaction_queue_id", "")    // ALWAYS clear on fresh initialization to ensure new queue
-	r.SetInternal("_reaction_packet_emitted", false) // Reset emission flag for new cycle
+	r.CreateInternal("_reaction_packet_emitted", false)
+	r.CreateInternal("reaching_time", "")
 	r.SetCurrent("user_reaction", nil)   // Clear previous user reaction
 	r.SetCurrent("reaction_result", "")    // Clear previous reaction result
 

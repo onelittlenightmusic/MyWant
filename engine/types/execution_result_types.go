@@ -66,7 +66,7 @@ func (e *ExecutionResultWant) Initialize() {
 	e.SetCurrent("completed_at", "")
 	e.SetCurrent("execution_time_ms", 0)
 	e.SetPredefined("achieving_percentage", 0)
-	e.SetInternal("_phase", string(ExecutionPhaseInitial))
+	e.CreateInternal("_phase", string(ExecutionPhaseInitial))
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()

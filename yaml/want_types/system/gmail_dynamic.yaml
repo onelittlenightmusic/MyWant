@@ -30,7 +30,7 @@ wantType:
     description: Path to the generated WASM binary
     type: string
     persistent: true
-    label: internal
+    label: current
 
   - name: final_result
     description: Result of the execution

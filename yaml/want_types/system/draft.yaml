@@ -23,14 +23,6 @@ wantType:
     required: false
 
   state:
-  - name: sessionId
-    description: The interactive session ID associated with this draft
-    type: string
-    persistent: true
-    label: internal
-    initialValue: ''
-    example: 'sess-abc123'
-
   - name: message
     description: The user's original message that started this draft
     type: string
@@ -63,13 +55,6 @@ wantType:
     initialValue: ''
     example: 'AI service unavailable'
 
-  - name: createdAt
-    description: When the draft was created
-    type: string
-    persistent: true
-    label: internal
-    initialValue: ''
-    example: '2026-01-14T07:38:06Z'
 
   examples:
   - name: Simple Draft

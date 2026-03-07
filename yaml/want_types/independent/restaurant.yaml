@@ -238,24 +238,6 @@ wantType:
     persistent: true
     label: current
     initialValue: null
-  - name: thinker.goal_initialized
-    description: Whether the condition thinker has initialized its goal
-    type: bool
-    persistent: false
-    label: internal
-    initialValue: false
-  - name: thinker.itinerary_done
-    description: Whether the itinerary is complete per condition thinker
-    type: bool
-    persistent: false
-    label: internal
-    initialValue: false
-  - name: thinker.ticks_waited
-    description: Number of ticks the condition thinker has waited
-    type: int
-    persistent: false
-    label: internal
-    initialValue: 0
   agents:
   - name: MonitorRestaurant
     role: monitor

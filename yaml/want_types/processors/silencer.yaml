@@ -36,12 +36,6 @@ wantType:
     persistent: true
     initialValue: "active"
     label: current
-  - name: target_reaction_id
-    description: ID of the reaction currently being processed
-    type: string
-    persistent: false
-    initialValue: ""
-    label: internal
   - name: achieving_percentage
     description: Progress percentage of the silencer
     type: int

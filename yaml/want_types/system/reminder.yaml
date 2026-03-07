@@ -112,13 +112,6 @@ wantType:
     example: "20 seconds"
     label: goal
 
-  - name: reaching_time
-    description: RFC3339 timestamp when reminder enters reaching phase
-    type: string
-    persistent: true
-    initialValue: ''
-    example: "2025-12-28T13:50:00Z"
-    label: internal
 
   - name: reaction_queue_id
     description: Unique identifier for tracking user reactions

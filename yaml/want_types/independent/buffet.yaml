@@ -156,12 +156,7 @@ wantType:
     - champagne service
     - private area
     initialValue: &id001 []
-  - name: agent_requirements
-    description: Requirements passed to agent system
-    type: '[]string'
-    persistent: false
-    label: internal
-    initialValue: *id001
+
   - name: execution_source
     description: Source of execution (monitor or agent)
     type: string

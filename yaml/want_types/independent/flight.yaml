@@ -160,6 +160,112 @@ wantType:
     persistent: true
     initialValue: 0
     label: predefined
+  - name: flight_id
+    description: Flight reservation ID from booking API
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: from
+    description: Departure city/airport
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: to
+    description: Arrival city/airport
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_message
+    description: Human-readable status description
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: created_at
+    description: Reservation creation timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: updated_at
+    description: Reservation last update timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: canceled_at
+    description: Reservation cancellation timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: execution_source
+    description: Source of execution (agent, local)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: total_processed
+    description: Number of bookings processed
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+  - name: schedule_date
+    description: Date of the flight schedule
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_changed
+    description: Whether flight status has changed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: status_changed_at
+    description: Timestamp when status last changed
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_change_history_count
+    description: Number of status changes recorded
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+  - name: status_history
+    description: History of flight status changes
+    type: array
+    persistent: true
+    label: current
+  - name: premium_level
+    description: Premium service level if applicable
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: service_tier
+    description: Service tier for premium bookings
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: premium_amenities
+    description: List of premium amenities included
+    type: array
+    persistent: true
+    label: current
+  - name: premium_processed
+    description: Whether premium processing was applied
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
   agents:
   - name: agent_flight_api
     role: action

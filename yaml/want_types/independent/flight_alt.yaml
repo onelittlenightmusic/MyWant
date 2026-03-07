@@ -38,13 +38,6 @@ wantType:
       max: 24
     example: 11.0
   state:
-  - name: is_alternative
-    description: Flag indicating this is alternative booking
-    type: bool
-    persistent: true
-    label: internal
-    example: true
-    initialValue: false
   - name: flight_number
     description: Alternative flight number
     type: string

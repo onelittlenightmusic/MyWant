@@ -50,12 +50,6 @@ wantType:
     label: current
     example: active
     initialValue: ''
-  - name: created_at
-    description: Timestamp when owner relationship created
-    type: string
-    persistent: true
-    label: internal
-    initialValue: ''
   - name: total_owned
     description: Count of wants owned
     type: int

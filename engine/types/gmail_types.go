@@ -36,6 +36,15 @@ func (g *GmailWant) GetLocals() *GmailLocals {
 func (g *GmailWant) Initialize() {
 	g.StoreLog("[GMAIL] Initializing Gmail want: %s", g.Metadata.Name)
 
+	g.CreateInternal("mcp_env", map[string]string{})
+	g.CreateInternal("mcp_server_name", "")
+	g.CreateInternal("mcp_command", "")
+	g.CreateInternal("mcp_args", []string{})
+	g.CreateInternal("mcp_native", false)
+	g.CreateInternal("mcp_operation", "")
+	g.CreateInternal("mcp_query", "")
+	g.CreateInternal("mcp_max_results", 0)
+
 	// Get locals (guaranteed to be initialized by framework)
 	locals := g.GetLocals()
 
