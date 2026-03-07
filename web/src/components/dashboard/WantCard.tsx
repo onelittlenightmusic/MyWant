@@ -24,6 +24,8 @@ const getStatusColor = (status: WantExecutionStatus): string => {
     case 'stopped':
     case 'waiting_user_action':
       return '#f59e0b'; // Amber/Yellow
+    case 'cancelled':
+      return '#9ca3af'; // Gray for cancelled (superseded by rebook)
     default:
       return '#d1d5db'; // Gray for created, initializing, suspended
   }
@@ -296,6 +298,7 @@ interface WantCardProps {
   onCreateWant?: (parentWant?: Want) => void;
   correlationRate?: number;
   correlationHighlights?: Map<string, number>;
+  stackCount?: number; // Number of stacked background layers (past versions)
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -325,6 +328,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   onCreateWant,
   correlationRate,
   correlationHighlights,
+  stackCount = 0,
 }) => {
   const wantId = want.metadata?.id || want.id;
   const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId } = useWantStore();
@@ -553,8 +557,22 @@ export const WantCard: React.FC<WantCardProps> = ({
   const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, false);
   const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
   const replayScreenshotUrl = want.state?.replay_screenshot_url as string | undefined;
+  const version = want.metadata?.version ?? 1;
 
   return (
+    <div className="relative h-full">
+      {/* Stacked background layers representing past versions */}
+      {stackCount > 0 && Array.from({ length: stackCount }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute inset-0 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+          style={{
+            transform: `translate(${(stackCount - i) * 3}px, ${(stackCount - i) * 3}px)`,
+            zIndex: -(stackCount - i),
+            opacity: 0.6 - i * 0.15,
+          }}
+        />
+      ))}
     <div
       ref={cardRef}
       draggable={!isSelectMode && !isBeingProcessed}
@@ -611,6 +629,15 @@ export const WantCard: React.FC<WantCardProps> = ({
       {isSelectMode && (
         <div className="absolute top-2 right-2 z-20 pointer-events-none">
           {selected ? <CheckSquare className="w-6 h-6 text-blue-600 bg-white rounded-md" /> : <Square className="w-6 h-6 text-gray-400 bg-white rounded-md opacity-50" />}
+        </div>
+      )}
+
+      {/* Version badge - shown when version >= 2 (has past cancelled versions) */}
+      {version >= 2 && !isSelectMode && (
+        <div className="absolute top-2 left-2 z-20 pointer-events-none">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-700 dark:bg-gray-600 text-white opacity-80">
+            v{version}
+          </span>
         </div>
       )}
 
@@ -706,6 +733,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

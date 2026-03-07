@@ -82,6 +82,7 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
     case 'deleting':
       return 'red';
     case 'terminated':
+    case 'cancelled':
         return 'gray';
     default:
       return 'gray';

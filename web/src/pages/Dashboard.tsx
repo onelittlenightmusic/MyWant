@@ -103,6 +103,11 @@ export const Dashboard: React.FC = () => {
     return wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId)) || sidebar.selectedItem;
   }, [sidebar.selectedItem, wants]);
 
+  const seriesWants = useMemo(() => {
+    if (!selectedWant?.metadata?.series) return [];
+    return wants.filter(w => w.metadata?.series === selectedWant.metadata.series);
+  }, [selectedWant, wants]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<WantExecutionStatus[]>([]);
   const [filteredWants, setFilteredWants] = useState<Want[]>([]);
@@ -809,15 +814,16 @@ export const Dashboard: React.FC = () => {
             want={selectedWant}
             initialTab={sidebarInitialTab}
             initialTabVersion={sidebarTabVersion}
-            onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }} 
-            onHeaderStateChange={setHeaderState} 
-            onRegisterHeaderActions={sidebar.registerHeaderActions} 
-            onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
-            onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
-            onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
-            onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')} 
-            onDelete={() => handleShowDeleteConfirmation(selectedWant!)} 
-            onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)} 
+            onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }}
+            onHeaderStateChange={setHeaderState}
+            onRegisterHeaderActions={sidebar.registerHeaderActions}
+            onStart={() => startWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
+            onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
+            onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
+            onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
+            onDelete={() => handleShowDeleteConfirmation(selectedWant!)}
+            onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)}
+            seriesWants={seriesWants}
             summaryProps={{
               wants,
               loading,

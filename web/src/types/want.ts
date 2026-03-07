@@ -51,6 +51,8 @@ export interface WantMetadata {
   isSystemWant?: boolean; // true for system-managed wants (e.g., system-scheduler)
   orderKey?: string; // Fractional index for custom ordering (supports drag-and-drop reordering)
   correlation?: CorrelationEntry[]; // Inter-Want correlation (computed by correlationPhase, read-only)
+  series?: string;  // Series ID shared across cancel+rebook cycles
+  version?: number; // Version number starting at 1; increments on each rebook
 }
 
 export interface WhenSpec {
@@ -85,7 +87,7 @@ export interface ConfigMetadata {
   labels?: Record<string, string>;
 }
 
-export type WantExecutionStatus = 'created' | 'initializing' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped' | 'terminated' | 'deleting' | 'config_error' | 'module_error' | 'waiting_user_action';
+export type WantExecutionStatus = 'created' | 'initializing' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped' | 'terminated' | 'deleting' | 'config_error' | 'module_error' | 'waiting_user_action' | 'cancelled';
 
 export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'achieved' | 'failed' | 'stopped' | 'terminated' | 'config_error' | 'module_error' | 'waiting_user_action';
 

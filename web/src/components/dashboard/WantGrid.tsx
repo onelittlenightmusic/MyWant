@@ -308,6 +308,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
               onCreateWant={onCreateWant}
               correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
               correlationHighlights={correlationHighlights}
+              stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
             />
 
             {/* Drop Indicator After (only for the last item) */}

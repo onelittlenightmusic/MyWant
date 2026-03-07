@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -12,6 +12,8 @@ import { formatDate, formatDuration, formatRelativeTime, classNames, truncateTex
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import { updateWantParameters, updateWantScheduling, updateWantLabels, updateWantDependencies } from '@/utils/wantUtils';
 import { WantControlButtons } from '@/components/dashboard/WantControlButtons';
+import { WantCardContent } from '@/components/dashboard/WantCardContent';
+import { StatusBadge } from '@/components/common/StatusBadge';
 import { ParametersSection } from '@/components/forms/sections/ParametersSection';
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
 import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
@@ -29,8 +31,9 @@ import {
 
 interface WantDetailsSidebarProps {
   want: Want | null;
-  initialTab?: 'settings' | 'results' | 'logs' | 'agents';
+  initialTab?: 'settings' | 'results' | 'logs' | 'agents' | 'versions';
   initialTabVersion?: number;
+  seriesWants?: Want[]; // All wants in the same series (for Versions tab)
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
   onRegisterHeaderActions?: (handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => void;
@@ -65,7 +68,7 @@ interface WantDetailsSidebarProps {
   };
 }
 
-type TabType = 'settings' | 'results' | 'logs' | 'agents';
+type TabType = 'settings' | 'results' | 'logs' | 'agents' | 'versions';
 
 // Unified section container styling for all metadata/state sections
 const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
@@ -83,7 +86,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   onResume,
   onDelete,
   onSaveRecipe,
-  summaryProps
+  summaryProps,
+  seriesWants = [],
 }) => {
   // Check if this is a flight want
   const isFlightWant = want?.metadata?.type === 'flight';
@@ -407,11 +411,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     );
   }
 
+  const hasMultipleVersions = seriesWants.length > 1;
   const tabs = [
     { id: 'results' as TabType, label: 'Results', icon: Database },
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'logs' as TabType, label: 'Logs', icon: FileText },
     { id: 'agents' as TabType, label: 'Agents', icon: Bot },
+    ...(hasMultipleVersions ? [{ id: 'versions' as TabType, label: 'Versions', icon: History }] : []),
   ];
 
   // Get current tab index
@@ -528,6 +534,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 <AgentsTab want={wantDetails} />
               </div>
             )}
+            {showPrevTab && prevTabId === 'versions' && (
+              <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <VersionsTab seriesWants={seriesWants} currentWantId={wantId} />
+              </div>
+            )}
 
             {/* Current tab - animate in */}
             {activeTab === 'settings' && (
@@ -571,6 +582,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             {activeTab === 'agents' && (
               <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
                 <AgentsTab want={wantDetails} />
+              </div>
+            )}
+
+            {activeTab === 'versions' && (
+              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <VersionsTab seriesWants={seriesWants} currentWantId={wantId} />
               </div>
             )}
           </>
@@ -1568,6 +1585,57 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
           <p className="text-gray-500">No logs or parameter history available</p>
         </div>
       )}
+    </div>
+  );
+};
+
+// ─── VersionsTab ─────────────────────────────────────────────────────────────
+
+const VersionsTab: React.FC<{ seriesWants: Want[]; currentWantId?: string }> = ({
+  seriesWants,
+  currentWantId,
+}) => {
+  const sorted = [...seriesWants].sort(
+    (a, b) => (b.metadata?.version ?? 1) - (a.metadata?.version ?? 1)
+  );
+
+  if (sorted.length === 0) {
+    return (
+      <div className="text-center py-8 px-4">
+        <History className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+        <p className="text-gray-500 dark:text-gray-400">No version history available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-y-auto p-4 space-y-3">
+      {sorted.map((want) => (
+        <div
+          key={want.metadata?.id}
+          className={classNames(
+            'rounded-lg border p-3 transition-colors',
+            want.metadata?.id === currentWantId
+              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800',
+          )}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              v{want.metadata?.version ?? 1}
+              {want.metadata?.id === currentWantId && (
+                <span className="ml-2 text-blue-600 dark:text-blue-400">(current)</span>
+              )}
+            </span>
+            <StatusBadge status={want.status} />
+          </div>
+          <WantCardContent
+            want={want}
+            isChild={true}
+            onView={() => {}}
+          />
+        </div>
+      ))}
     </div>
   );
 };
