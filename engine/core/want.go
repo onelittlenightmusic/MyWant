@@ -1743,7 +1743,7 @@ func (n *Want) GetGoal(key string) (any, bool) {
 }
 
 func (n *Want) SetCurrent(key string, value any) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelCurrent) || strings.HasPrefix(key, "server_") {
+	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
 		if n.inExecCycle {
 			n.StoreState(key, value)
 		} else {
@@ -1755,15 +1755,8 @@ func (n *Want) SetCurrent(key string, value any) {
 }
 
 func (n *Want) GetCurrent(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelCurrent) || strings.HasPrefix(key, "server_") {
-		val, ok := n.GetState(key)
-		if strings.HasPrefix(key, "server_") {
-			n.DirectLog("[DEBUG] GetCurrent(%s) found in state: %v (ok=%v)", key, val, ok)
-		}
-		return val, ok
-	}
-	if strings.HasPrefix(key, "server_") {
-		n.DirectLog("[DEBUG] GetCurrent(%s) NOT allowed by StateLabels", key)
+	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+		return n.GetState(key)
 	}
 	return nil, false
 }
@@ -1815,7 +1808,7 @@ func (n *Want) GetPredefined(key string) (any, bool) {
 }
 
 func (n *Want) SetInternal(key string, value any) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") || strings.HasPrefix(key, "server_") {
+	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
 		if n.inExecCycle {
 			n.StoreState(key, value)
 		} else {
@@ -1827,7 +1820,7 @@ func (n *Want) SetInternal(key string, value any) {
 }
 
 func (n *Want) GetInternal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") || strings.HasPrefix(key, "server_") {
+	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
 		return n.GetState(key)
 	}
 	return nil, false
