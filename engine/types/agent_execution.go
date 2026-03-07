@@ -12,25 +12,13 @@ import (
 
 // executeCommand performs the actual command execution
 func executeCommand(ctx context.Context, want *mywant.Want) error {
-	var commandStr, shellStr, workingDirStr string
-	var timeoutSec int
+	// Read parameters from want state using generic GetCurrent
+	commandStr := mywant.GetCurrent(want, "command", "")
+	shellStr := mywant.GetCurrent(want, "shell", "/bin/bash")
+	workingDirStr := mywant.GetCurrent(want, "working_directory", "")
+	timeoutSec := mywant.GetCurrent(want, "timeout", 30)
 
-	// Read parameters from want state by binding to local variables
-	want.GetStateMulti(mywant.Dict{
-		"command":           &commandStr,
-		"shell":             &shellStr,
-		"working_directory": &workingDirStr,
-		"timeout":           &timeoutSec,
-	})
-
-	if shellStr == "" {
-		shellStr = "/bin/bash"
-	}
-	if timeoutSec == 0 {
-		timeoutSec = 30
-	}
-
-	want.StoreState("achieving_percentage", 50)
+	want.SetPredefined("achieving_percentage", 50)
 	want.StoreLog("Starting command execution...")
 
 	// Record start time
@@ -84,7 +72,7 @@ func executeCommand(ctx context.Context, want *mywant.Want) error {
 	}
 
 	// Store result in standard agent_result key
-	want.StoreState("agent_result", result)
+	want.SetPredefined("agent_result", result)
 
 	if exitCode == 0 {
 		want.StoreLog("Command executed successfully in %dms", executionTimeMs)

@@ -46,14 +46,14 @@ Steps:
 	}
 
 	want.StoreLog("[DISCOVERY][SUCCESS] Tool discovery completed")
-	want.StoreState("raw_samples", result)
+	want.SetInternal("raw_samples", result)
 	return nil
 }
 
 // --- Developer Action ---
 func executeDeveloperAction(ctx context.Context, want *mywant.Want) error {
-	samples, _ := want.GetState("raw_samples")
-	feedback, _ := want.GetStateString("error_feedback", "")
+	samples := mywant.GetInternal(want, "raw_samples", map[string]any{})
+	feedback := mywant.GetCurrent(want, "error_feedback", "")
 
 	if feedback != "" {
 		want.StoreLog("[DEVELOPER] Re-generating code with error feedback: %s", feedback)
@@ -127,13 +127,13 @@ func ParseResponse(...) ...
 	}
 
 	want.StoreLog("[DEVELOPER][SUCCESS] Code generated (%d characters)", len(code))
-	want.StoreState("source_code", code)
+	want.SetCurrent("source_code", code)
 	return nil
 }
 
 // --- Compiler Action ---
 func executeCompilerAction(ctx context.Context, want *mywant.Want) error {
-	code, _ := want.GetStateString("source_code", "")
+	code := mywant.GetCurrent(want, "source_code", "")
 	if code == "" {
 		return fmt.Errorf("no source code found in state")
 	}
@@ -173,7 +173,7 @@ func executeCompilerAction(ctx context.Context, want *mywant.Want) error {
 	if err != nil {
 		errMsg := string(output)
 		errorFeedback := fmt.Sprintf("Compilation error: %s", errMsg)
-		want.StoreState("error_feedback", errorFeedback)
+		want.SetCurrent("error_feedback", errorFeedback)
 		want.StoreLog("[COMPILER][ERROR] %s", errorFeedback)
 
 		// PRINT TO STDOUT FOR IMMEDIATE VISIBILITY
@@ -184,14 +184,14 @@ func executeCompilerAction(ctx context.Context, want *mywant.Want) error {
 
 	fmt.Printf("[WASM-COMPILER-SUCCESS] Want %s compiled successfully to: %s\n", want.Metadata.ID, wasmPath)
 	want.StoreLog("[COMPILER][SUCCESS] WASM compiled successfully: %s", wasmPath)
-	want.StoreState("wasm_path", wasmPath)
-	want.StoreState("error_feedback", "") // Clear any previous error feedback
+	want.SetCurrent("wasm_path", wasmPath)
+	want.SetCurrent("error_feedback", "") // Clear any previous error feedback
 	return nil
 }
 
 // --- Validator Action ---
 func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
-	wasmPath, _ := want.GetStateString("wasm_path", "")
+	wasmPath := mywant.GetCurrent(want, "wasm_path", "")
 	prompt, _ := want.GetParameter("prompt")
 
 	want.StoreLog("[VALIDATOR] Starting validation with WASM: %s", wasmPath)
@@ -204,7 +204,7 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	mcpReqRaw, err := manager.ExecuteFunction(ctx, wasmPath, "transform_request", inputJSON)
 	if err != nil {
 		errorFeedback := fmt.Sprintf("WASM TransformRequest error: %v", err)
-		want.StoreState("error_feedback", errorFeedback)
+		want.SetCurrent("error_feedback", errorFeedback)
 		want.StoreLog("[VALIDATOR][ERROR] %s", errorFeedback)
 		return err
 	}
@@ -216,13 +216,13 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	// 2. Call MCP Directly
 	native := GetNativeMCPManager(ctx)
 	// We need to know which tool to call - should be part of WASM result or state
-	toolName, _ := want.GetStateString("mcp_tool_name", "search_emails")
+	toolName := mywant.GetCurrent(want, "mcp_tool_name", "search_emails")
 
 	want.StoreLog("[VALIDATOR] Calling MCP tool: %s with args: %v", toolName, mcpReq)
 	toolResult, err := native.ExecuteTool(ctx, "gmail", "npx", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"}, toolName, mcpReq)
 	if err != nil {
 		errorFeedback := fmt.Sprintf("MCP execution error: %v", err)
-		want.StoreState("error_feedback", errorFeedback)
+		want.SetCurrent("error_feedback", errorFeedback)
 		want.StoreLog("[VALIDATOR][ERROR] %s", errorFeedback)
 		return err
 	}
@@ -232,7 +232,7 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	finalResRaw, err := manager.ExecuteFunction(ctx, wasmPath, "parse_response", respRaw)
 	if err != nil {
 		errorFeedback := fmt.Sprintf("WASM ParseResponse error: %v", err)
-		want.StoreState("error_feedback", errorFeedback)
+		want.SetCurrent("error_feedback", errorFeedback)
 		want.StoreLog("[VALIDATOR][ERROR] %s", errorFeedback)
 		return err
 	}
@@ -241,8 +241,8 @@ func executeValidatorAction(ctx context.Context, want *mywant.Want) error {
 	json.Unmarshal(finalResRaw, &finalRes)
 
 	want.StoreLog("[VALIDATOR][SUCCESS] Validation passed. Final result: %v", finalRes)
-	want.StoreState("mcp_result", finalRes)
-	want.StoreState("validation_success", true)
-	want.StoreState("error_feedback", "") // Clear any previous error feedback
+	want.SetCurrent("mcp_result", finalRes)
+	want.SetCurrent("validation_success", true)
+	want.SetCurrent("error_feedback", "") // Clear any previous error feedback
 	return nil
 }

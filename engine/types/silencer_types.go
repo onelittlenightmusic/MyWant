@@ -32,18 +32,15 @@ func (s *SilencerWant) Initialize() {
 	locals.Policy = s.GetStringParam("policy", "all_true")
 
 	// Initialize state
-	s.StoreStateMulti(map[string]any{
-		"processed_count":   0,
-		"last_processed_id": "",
-		"silencer_phase":    "active",
-	})
+	s.SetCurrent("processed_count", 0)
+	s.SetCurrent("last_processed_id", "")
+	s.SetCurrent("silencer_phase", "active")
 }
 
 // IsAchieved - Silencers are processors, they stay active to process stream
 // until they receive a completion signal
 func (s *SilencerWant) IsAchieved() bool {
-	phase, _ := s.GetStateString("silencer_phase", "active")
-	return phase == "completed"
+	return GetCurrent(s, "silencer_phase", "active") == "completed"
 }
 
 // CalculateAchievingPercentage returns the progress percentage
@@ -57,7 +54,7 @@ func (s *SilencerWant) CalculateAchievingPercentage() int {
 // Progress implements Progressable for SilencerWant
 func (s *SilencerWant) Progress() {
 	// Update achieving percentage
-	s.StoreState("achieving_percentage", s.CalculateAchievingPercentage())
+	s.SetPredefined("achieving_percentage", s.CalculateAchievingPercentage())
 
 	// Try to get a packet from input channels
 	// Use blocking wait (infinite) for stream processing
@@ -69,10 +66,8 @@ func (s *SilencerWant) Progress() {
 
 	if done {
 		s.StoreLog("📦 Silencer received DONE signal")
-		s.StoreStateMulti(map[string]any{
-			"silencer_phase":       "completed",
-			"achieving_percentage": 100,
-		})
+		s.SetCurrent("silencer_phase", "completed")
+		s.SetPredefined("achieving_percentage", 100)
 		return
 	}
 
@@ -118,11 +113,9 @@ func (s *SilencerWant) processPacket(data any) {
 				s.StoreLog("[SILENCER] ERROR: Failed to execute auto-approval agent: %v", err)
 			} else {
 				// Update state after successful execution
-				count, _ := s.GetStateInt("processed_count", 0)
-				s.StoreStateMulti(map[string]any{
-					"processed_count":   count + 1,
-					"last_processed_id": reactionID,
-				})
+				count := GetCurrent(s, "processed_count", 0)
+				s.SetCurrent("processed_count", count+1)
+				s.SetCurrent("last_processed_id", reactionID)
 				s.StoreLog("📦 Silencer auto-approved reaction: %s", reactionID)
 			}
 		} else {

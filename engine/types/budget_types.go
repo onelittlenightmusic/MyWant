@@ -26,16 +26,13 @@ func (b *BudgetWant) Initialize() {
 	// Set both legacy state and GCP-style Goal
 	b.SetGoal("budget_limit", budget)
 
-	b.StoreStateMulti(Dict{
-		"budget":               budget,
-		"currency":             currency,
-		"costs":                map[string]any{},
-		"total_cost":           0.0,
-		"total_spent":          0.0,
-		"remaining_budget":     budget,
-		"budget_exceeded":      false,
-		"achieving_percentage": 0,
-	})
+	b.SetCurrent("costs", map[string]any{})
+	b.SetCurrent("currency", currency)
+	b.SetCurrent("total_cost", 0.0)
+	b.SetCurrent("total_spent", 0.0)
+	b.SetCurrent("remaining_budget", budget)
+	b.SetCurrent("budget_exceeded", false)
+	b.SetPredefined("achieving_percentage", 0)
 }
 
 // Progress is a no-op: BudgetThinker (ThinkAgent) is started automatically
@@ -51,10 +48,8 @@ func (b *BudgetWant) Progress() {}
 // be stopped before processing later cost updates (e.g. a hotel booking that
 // arrives after the restaurant has already reported its cost).
 func (b *BudgetWant) IsAchieved() bool {
-	costsRaw, _ := b.GetState("costs")
-	costs, _ := costsRaw.(map[string]any)
-	exceeded, _ := b.GetState("budget_exceeded")
-	budgetExceeded, _ := exceeded.(bool)
+	costs := GetCurrent(b, "costs", map[string]any{})
+	budgetExceeded := GetCurrent(b, "budget_exceeded", false)
 	if len(costs) == 0 || budgetExceeded {
 		return false
 	}
@@ -62,15 +57,12 @@ func (b *BudgetWant) IsAchieved() bool {
 	// If this budget want has a parent coordinator, wait until every item in the
 	// coordinator's itinerary has reported a non-zero cost.  This ensures
 	// BudgetThinker stays alive long enough to aggregate all final costs.
-	itineraryRaw, hasItinerary := b.GetParentState("itinerary")
-	if hasItinerary {
-		if itinerary, ok := itineraryRaw.(map[string]any); ok && len(itinerary) > 0 {
-			parentCostsRaw, _ := b.GetParentState("costs")
-			parentCosts, _ := parentCostsRaw.(map[string]any)
-			if len(parentCosts) < len(itinerary) {
-				// Not all itinerary items have reported costs yet.
-				return false
-			}
+	itinerary := GetParentState(b, "itinerary", map[string]any{})
+	if len(itinerary) > 0 {
+		parentCosts := GetParentState(b, "costs", map[string]any{})
+		if len(parentCosts) < len(itinerary) {
+			// Not all itinerary items have reported costs yet.
+			return false
 		}
 	}
 
@@ -82,8 +74,8 @@ func (b *BudgetWant) CalculateAchievingPercentage() int {
 	if b.IsAchieved() {
 		return 100
 	}
-	costsRaw, _ := b.GetState("costs")
-	if m, ok := costsRaw.(map[string]any); ok && len(m) > 0 {
+	costs := GetCurrent(b, "costs", map[string]any{})
+	if len(costs) > 0 {
 		return 50
 	}
 	return 0

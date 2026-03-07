@@ -28,7 +28,7 @@ func (g *FibonacciNumbers) Initialize() {
 
 // IsAchieved checks if fibonacci generation is complete
 func (g *FibonacciNumbers) IsAchieved() bool {
-	sentCount, _ := g.GetStateInt("sent_count", 0)
+	sentCount := GetCurrent(g, "sent_count", 0)
 	count := g.GetIntParam("count", 20)
 	return sentCount >= count
 }
@@ -36,9 +36,9 @@ func (g *FibonacciNumbers) IsAchieved() bool {
 // Progress returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Progress() {
 	count := g.GetIntParam("count", 20)
-	a, _ := g.GetStateInt("a", 0)
-	b, _ := g.GetStateInt("b", 1)
-	sentCount, _ := g.GetStateInt("sent_count", 0)
+	a := GetCurrent(g, "a", 0)
+	b := GetCurrent(g, "b", 1)
+	sentCount := GetCurrent(g, "sent_count", 0)
 
 	sentCount += 1
 	g.Provide(a)
@@ -46,21 +46,17 @@ func (g *FibonacciNumbers) Progress() {
 	// Calculate achieving percentage
 	achievingPercentage := int(float64(sentCount) * 100 / float64(count))
 
-	g.StoreStateMulti(Dict{
-		"a":                    b,
-		"b":                    a + b,
-		"sent_count":           sentCount,
-		"achieving_percentage": achievingPercentage,
-	})
+	g.SetCurrent("a", b)
+	g.SetCurrent("b", a+b)
+	g.SetCurrent("sent_count", sentCount)
+	g.SetPredefined("achieving_percentage", achievingPercentage)
 
 	if sentCount >= count {
 		// Send end signal
 		g.ProvideDone()
-		g.StoreStateMulti(Dict{
-			"achieving_percentage": 100,
-			"achieved":             true,
-			"completed":            true,
-		})
+		g.SetPredefined("achieving_percentage", 100)
+		g.SetPredefined("achieved", true)
+		g.SetCurrent("completed", true)
 	}
 
 }
@@ -90,8 +86,7 @@ func (f *FibonacciFilter) Initialize() {
 
 // IsAchieved checks if fibonacci filtering is complete
 func (f *FibonacciFilter) IsAchieved() bool {
-	achieved, _ := f.GetStateBool("achieved", false)
-	return achieved
+	return GetPredefined(f, "achieved", false)
 }
 
 // Progress returns the generalized chain function for the filter
@@ -100,15 +95,10 @@ func (f *FibonacciFilter) IsAchieved() bool {
 func (f *FibonacciFilter) Progress() {
 	locals := f.GetLocals()
 
-	totalProcessed, _ := f.GetStateInt("total_processed", 0)
+	totalProcessed := GetCurrent(f, "total_processed", 0)
 
 	// Restore filtered array from persistent state if it exists
-	filteredVal, _ := f.GetState("filtered")
-	if filteredVal != nil {
-		if flt, ok := filteredVal.([]int); ok {
-			locals.filtered = flt
-		}
-	}
+	locals.filtered = GetCurrent(f, "filtered", []int{})
 
 	// Try to receive one packet - wait forever until packet or DONE signal arrives
 	_, i, done, ok := f.UseForever()
@@ -120,13 +110,11 @@ func (f *FibonacciFilter) Progress() {
 	// Check for end signal
 	if done {
 		// End signal received - finalize and complete
-		f.StoreStateMulti(Dict{
-			"filtered":             locals.filtered,
-			"count":                len(locals.filtered),
-			"total_processed":      totalProcessed,
-			"achieved":             true,
-			"achieving_percentage": 100,
-		})
+		f.SetCurrent("filtered", locals.filtered)
+		f.SetCurrent("count", len(locals.filtered))
+		f.SetCurrent("total_processed", totalProcessed)
+		f.SetPredefined("achieved", true)
+		f.SetPredefined("achieving_percentage", 100)
 		return
 	}
 
@@ -142,18 +130,13 @@ func (f *FibonacciFilter) Progress() {
 		// Calculate achieving percentage based on processed count
 		// Since we don't know the total, use 50% while processing
 		achievingPercentage := 50
-		if totalProcessed > 0 {
-			achievingPercentage = 50 // Partial progress for streaming without count
-		}
 
 		// Update state for this packet
-		f.StoreStateMulti(Dict{
-			"total_processed":       totalProcessed,
-			"filtered":              locals.filtered,
-			"count":                 len(locals.filtered),
-			"last_number_processed": val,
-			"achieving_percentage":  achievingPercentage,
-		})
+		f.SetCurrent("total_processed", totalProcessed)
+		f.SetCurrent("filtered", locals.filtered)
+		f.SetCurrent("count", len(locals.filtered))
+		f.SetCurrent("last_number_processed", val)
+		f.SetPredefined("achieving_percentage", achievingPercentage)
 	}
 
 	// Yield control - will be called again for next packet

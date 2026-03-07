@@ -173,13 +173,13 @@ func (r *RestaurantWant) Initialize() {
 func (r *RestaurantWant) tryAgentExecution() any {
 	if len(r.Spec.Requires) > 0 {
 		if err := r.ExecuteAgents(); err != nil {
-			r.StoreState("agent_execution_status", "failed")
-			r.StoreState("agent_execution_error", err.Error())
+			r.SetCurrent("agent_execution_status", "failed")
+			r.SetCurrent("agent_execution_error", err.Error())
 			return nil
 		}
 
-		r.StoreState("agent_execution_status", "completed")
-		r.StoreState("execution_source", "agent")
+		r.SetCurrent("agent_execution_status", "completed")
+		r.SetCurrent("execution_source", "agent")
 
 		if schedule, ok := GetStateAs[RestaurantSchedule](&r.Want, "agent_result"); ok {
 			return &schedule
@@ -218,16 +218,15 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	r.StoreStateMulti(Dict{
-		"total_processed":            1,
-		"reservation_type":           restaurantLocals.RestaurantType,
-		"reservation_start_time":     newEvent.Start.Format("15:04"),
-		"reservation_end_time":       newEvent.End.Format("15:04"),
-		"reservation_duration_hours": restaurantLocals.Duration.Hours(),
-		"reservation_name":           newEvent.Name,
-		"schedule_date":              baseDate.Format("2006-01-02"),
-		"achieving_percentage":       100,
-	})
+	r.SetCurrent("total_processed", 1)
+	r.SetCurrent("reservation_type", restaurantLocals.RestaurantType)
+	r.SetCurrent("reservation_start_time", newEvent.Start.Format("15:04"))
+	r.SetCurrent("reservation_end_time", newEvent.End.Format("15:04"))
+	r.SetCurrent("reservation_duration_hours", restaurantLocals.Duration.Hours())
+	r.SetCurrent("reservation_name", newEvent.Name)
+	r.SetCurrent("schedule_date", baseDate.Format("2006-01-02"))
+	r.SetPredefined("achieving_percentage", 100)
+
 	r.StoreLog("📦 Restaurant reservation created: %s", newEvent.Name)
 	return newSchedule
 }
@@ -257,29 +256,28 @@ func (r *RestaurantWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := Dict{
-		"completed":                  true,
-		"reservation_start_time":     s.ReservationTime.Format("15:04"),
-		"reservation_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04"),
-		"restaurant_type":            s.RestaurantType,
-		"reservation_duration_hours": s.DurationHours,
-		"reservation_name":           s.ReservationName,
-		"cost":                       s.Cost,
-		"total_processed":            1,
-		"schedule_date":              s.ReservationTime.Format("2006-01-02"),
-	}
+	r.SetCurrent("completed", true)
+	r.SetCurrent("reservation_start_time", s.ReservationTime.Format("15:04"))
+	r.SetCurrent("reservation_end_time", s.ReservationTime.Add(time.Duration(s.DurationHours*float64(time.Hour))).Format("15:04"))
+	r.SetCurrent("restaurant_type", s.RestaurantType)
+	r.SetCurrent("reservation_duration_hours", s.DurationHours)
+	r.SetCurrent("reservation_name", s.ReservationName)
+	r.SetCurrent("cost", s.Cost)
+	r.SetCurrent("actual_cost", s.Cost)
+	r.SetCurrent("total_processed", 1)
+	r.SetCurrent("schedule_date", s.ReservationTime.Format("2006-01-02"))
+
 	if s.PremiumLevel != "" {
-		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = s.PremiumLevel
+		r.SetCurrent("premium_processed", true)
+		r.SetCurrent("premium_level", s.PremiumLevel)
 	}
 	if s.ServiceTier != "" {
-		stateUpdates["service_tier"] = s.ServiceTier
+		r.SetCurrent("service_tier", s.ServiceTier)
 	}
 	if len(s.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = s.PremiumAmenities
+		r.SetCurrent("premium_amenities", s.PremiumAmenities)
 	}
 
-	r.Want.StoreStateMulti(stateUpdates)
 	r.ProvideDone()
 }
 
@@ -397,12 +395,12 @@ func (h *HotelWant) tryAgentExecution() any {
 	if len(h.Spec.Requires) > 0 {
 		// Use dynamic agent execution based on requirements
 		if err := h.ExecuteAgents(); err != nil {
-			h.StoreState("agent_execution_status", "failed")
-			h.StoreState("agent_execution_error", err.Error())
+			h.SetCurrent("agent_execution_status", "failed")
+			h.SetCurrent("agent_execution_error", err.Error())
 			return nil
 		}
 
-		h.StoreState("agent_execution_status", "completed")
+		h.SetCurrent("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if schedule, ok := GetStateAs[HotelSchedule](&h.Want, "agent_result"); ok {
@@ -445,15 +443,15 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	h.StoreStateMulti(Dict{
-		"total_processed":      1,
-		"hotel_type":           hotelLocals.HotelType,
-		"check_in_time":        newEvent.Start.Format("15:04 Jan 2"),
-		"check_out_time":       newEvent.End.Format("15:04 Jan 2"),
-		"stay_duration_hours":  newEvent.End.Sub(newEvent.Start).Hours(),
-		"reservation_name":     newEvent.Name,
-		"achieving_percentage": 100,
-	})
+	
+	h.SetCurrent("total_processed", 1)
+	h.SetCurrent("hotel_type", hotelLocals.HotelType)
+	h.SetCurrent("check_in_time", newEvent.Start.Format("15:04 Jan 2"))
+	h.SetCurrent("check_out_time", newEvent.End.Format("15:04 Jan 2"))
+	h.SetCurrent("stay_duration_hours", newEvent.End.Sub(newEvent.Start).Hours())
+	h.SetCurrent("reservation_name", newEvent.Name)
+	h.SetPredefined("achieving_percentage", 100)
+
 	h.StoreLog("📦 Hotel reservation created: %s", newEvent.Name)
 	return newSchedule
 }
@@ -478,12 +476,12 @@ func (b *BuffetWant) tryAgentExecution() any {
 	if len(b.Spec.Requires) > 0 {
 		// Use dynamic agent execution based on requirements
 		if err := b.ExecuteAgents(); err != nil {
-			b.StoreState("agent_execution_status", "failed")
-			b.StoreState("agent_execution_error", err.Error())
+			b.SetCurrent("agent_execution_status", "failed")
+			b.SetCurrent("agent_execution_error", err.Error())
 			return nil
 		}
 
-		b.StoreState("agent_execution_status", "completed")
+		b.SetCurrent("agent_execution_status", "completed")
 
 		// Wait for agent to complete and retrieve result Check for agent_result in state
 		if schedule, ok := GetStateAs[BuffetSchedule](&b.Want, "agent_result"); ok {
@@ -523,15 +521,15 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 		Events:    []TimeSlot{newEvent},
 		Completed: true,
 	}
-	b.StoreStateMulti(Dict{
-		"total_processed":       1,
-		"buffet_type":           buffetLocals.BuffetType,
-		"buffet_start_time":     newEvent.Start.Format("15:04 Jan 2"),
-		"buffet_end_time":       newEvent.End.Format("15:04 Jan 2"),
-		"buffet_duration_hours": buffetLocals.Duration.Hours(),
-		"reservation_name":      newEvent.Name,
-		"achieving_percentage":  100,
-	})
+	
+	b.SetCurrent("total_processed", 1)
+	b.SetCurrent("buffet_type", buffetLocals.BuffetType)
+	b.SetCurrent("buffet_start_time", newEvent.Start.Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_end_time", newEvent.End.Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_duration_hours", buffetLocals.Duration.Hours())
+	b.SetCurrent("reservation_name", newEvent.Name)
+	b.SetPredefined("achieving_percentage", 100)
+
 	b.StoreLog("📦 Buffet reservation created: %s", newEvent.Name)
 	return newSchedule
 }
@@ -561,28 +559,27 @@ func (b *BuffetWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := Dict{
-		"completed":             true,
-		"buffet_start_time":     s.ReservationTime.Format("15:04 Jan 2"),
-		"buffet_end_time":       s.ReservationTime.Add(time.Duration(s.DurationHours * float64(time.Hour))).Format("15:04 Jan 2"),
-		"buffet_type":           s.BuffetType,
-		"buffet_duration_hours": s.DurationHours,
-		"reservation_name":      s.ReservationName,
-		"cost":                  s.Cost,
-		"total_processed":       1,
-	}
+	b.SetCurrent("completed", true)
+	b.SetCurrent("buffet_start_time", s.ReservationTime.Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_end_time", s.ReservationTime.Add(time.Duration(s.DurationHours*float64(time.Hour))).Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_type", s.BuffetType)
+	b.SetCurrent("buffet_duration_hours", s.DurationHours)
+	b.SetCurrent("reservation_name", s.ReservationName)
+	b.SetCurrent("cost", s.Cost)
+	b.SetCurrent("actual_cost", s.Cost)
+	b.SetCurrent("total_processed", 1)
+
 	if s.PremiumLevel != "" {
-		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = s.PremiumLevel
+		b.SetCurrent("premium_processed", true)
+		b.SetCurrent("premium_level", s.PremiumLevel)
 	}
 	if s.ServiceTier != "" {
-		stateUpdates["service_tier"] = s.ServiceTier
+		b.SetCurrent("service_tier", s.ServiceTier)
 	}
 	if len(s.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = s.PremiumAmenities
+		b.SetCurrent("premium_amenities", s.PremiumAmenities)
 	}
 
-	b.Want.StoreStateMulti(stateUpdates)
 	b.ProvideDone()
 }
 
@@ -701,13 +698,13 @@ func (f *FlightWant) Progress() {
 
 	_, connectionAvailable := f.GetFirstOutputChannel()
 
-	phase, _ := f.GetStateString("_flight_phase", PhaseInitial)
+	phase := GetInternal(f, "_flight_phase", PhaseInitial)
 
 	// Only log phase transition to avoid spam
-	lastLoggedPhase, _ := f.GetStateString("last_logged_phase", "")
+	lastLoggedPhase := GetCurrent(f, "last_logged_phase", "")
 	if lastLoggedPhase != phase {
 		f.StoreLog("[FLIGHT] Transitioned to phase: %s", phase)
-		f.StoreState("last_logged_phase", phase)
+		f.SetCurrent("last_logged_phase", phase)
 	}
 
 	// State machine: handle each phase
@@ -715,7 +712,7 @@ func (f *FlightWant) Progress() {
 
 	// === Phase 1: Initial Setup ===
 	case PhaseInitial:
-		f.StoreState("_flight_phase", PhaseBooking)
+		f.SetInternal("_flight_phase", PhaseBooking)
 		return
 
 	// === Phase 2: Initial Booking ===
@@ -726,11 +723,10 @@ func (f *FlightWant) Progress() {
 			locals.monitoringDuration = time.Duration(completionTimeoutSeconds) * time.Second
 		}
 
-		f.StoreState("completed", true)
+		f.SetCurrent("completed", true)
 		f.tryAgentExecution()
 
-		agentResult, hasResult := f.GetState("agent_result")
-		if hasResult && agentResult != nil {
+		if agentResult := GetPredefined(f, "agent_result", any(nil)); agentResult != nil {
 			agentSchedule := f.extractFlightSchedule(agentResult)
 			if agentSchedule != nil {
 				f.SetSchedule(*agentSchedule)
@@ -741,7 +737,7 @@ func (f *FlightWant) Progress() {
 
 				// Transition to monitoring phase
 				locals.monitoringStartTime = time.Now()
-				f.StoreState("_flight_phase", PhaseMonitoring)
+				f.SetInternal("_flight_phase", PhaseMonitoring)
 				return
 			}
 		}
@@ -755,11 +751,9 @@ func (f *FlightWant) Progress() {
 			elapsed := time.Since(locals.monitoringStartTime)
 			if f.shouldCancelAndRebook() {
 				f.StoreLog("📦 Delay detected at %v, initiating cancellation", elapsed)
-				f.StoreStateMulti(Dict{
-					"flight_action": "cancel_flight",
-					"completed":     false,
-					"_flight_phase": PhaseCanceling,
-				})
+				f.SetPlan("flight_action", "cancel_flight")
+				f.SetCurrent("completed", false)
+				f.SetInternal("_flight_phase", PhaseCanceling)
 				return
 			}
 
@@ -775,23 +769,19 @@ func (f *FlightWant) Progress() {
 		} else {
 			// Monitoring period expired - flight stable, complete
 			f.StoreLog("📦 Flight monitoring completed successfully")
-			f.StoreStateMulti(Dict{
-				"_flight_phase":        PhaseCompleted,
-				"achieving_percentage": 100,
-			})
+			f.SetInternal("_flight_phase", PhaseCompleted)
+			f.SetPredefined("achieving_percentage", 100)
 			f.ProvideDone()
 			return
 		}
 
 	// === Phase 4: Canceling ===
 	case PhaseCanceling:
-		flightID, ok := f.GetStateString("flight_id", "")
-		if !ok || flightID == "" {
+		flightID := GetCurrent(f, "flight_id", "")
+		if flightID == "" {
 			f.ResetFlightState()
-			f.StoreStateMulti(Dict{
-				"_flight_phase": PhaseBooking,
-				"completed":     false,
-			})
+			f.SetInternal("_flight_phase", PhaseBooking)
+			f.SetCurrent("completed", false)
 			return
 		}
 
@@ -802,16 +792,14 @@ func (f *FlightWant) Progress() {
 
 		// Reset flight state and transition back to booking phase for rebooking
 		f.ResetFlightState()
-		f.StoreStateMulti(Dict{
-			"_flight_phase": PhaseBooking,
-			"completed":     false,
-		})
+		f.SetInternal("_flight_phase", PhaseBooking)
+		f.SetCurrent("completed", false)
 		return
 
 	// === Phase 5: Completed ===
 	case PhaseCompleted:
 		// Clear agent_result to prevent reuse in next execution cycle
-		f.StoreState("agent_result", nil)
+		f.SetPredefined("agent_result", nil)
 		return
 
 	default:
@@ -850,16 +838,14 @@ func (f *FlightWant) tryAgentExecution() any {
 	if len(f.Spec.Requires) > 0 {
 		// Execute agents via ExecuteAgents() which properly tracks agent history
 		if err := f.ExecuteAgents(); err != nil {
-			f.StoreStateMulti(Dict{
-				"agent_execution_status": "failed",
-				"agent_execution_error":  err.Error(),
-			})
+			f.SetCurrent("agent_execution_status", "failed")
+			f.SetCurrent("agent_execution_error", err.Error())
 			return nil
 		}
 
-		f.StoreState("agent_execution_status", "completed")
-		if result, exists := f.GetState("agent_result"); exists && result != nil {
-			f.StoreState("execution_source", "agent")
+		f.SetCurrent("agent_execution_status", "completed")
+		if result := GetPredefined(f, "agent_result", any(nil)); result != nil {
+			f.SetCurrent("execution_source", "agent")
 
 			// Start background monitoring for this flight using a MonitorAgent derived
 			// from the want type's MonitorCapabilities (computed from flight.yaml requires field).
@@ -923,31 +909,30 @@ func (f *FlightWant) SetSchedule(schedule any) {
 		}
 	}
 
-	stateUpdates := Dict{
-		"completed":             true,
-		"departure_time":        s.DepartureTime.Format("15:04 Jan 2"),
-		"arrival_time":          s.ArrivalTime.Format("15:04 Jan 2"),
-		"flight_type":           s.FlightType,
-		"flight_duration_hours": s.ArrivalTime.Sub(s.DepartureTime).Hours(),
-		"flight_number":         s.FlightNumber,
-		"reservation_name":      s.ReservationName,
-		"cost":                  s.Cost,
-		"total_processed":       1,
-		"schedule_date":         s.DepartureTime.Format("2006-01-02"),
-		"achieving_percentage":  100,
-	}
+	f.SetCurrent("completed", true)
+	f.SetCurrent("departure_time", s.DepartureTime.Format("15:04 Jan 2"))
+	f.SetCurrent("arrival_time", s.ArrivalTime.Format("15:04 Jan 2"))
+	f.SetCurrent("flight_type", s.FlightType)
+	f.SetCurrent("duration_hours", s.ArrivalTime.Sub(s.DepartureTime).Hours())
+	f.SetCurrent("flight_number", s.FlightNumber)
+	f.SetCurrent("reservation_name", s.ReservationName)
+	f.SetCurrent("cost", s.Cost)
+	f.SetCurrent("actual_cost", s.Cost)
+	f.SetCurrent("total_processed", 1)
+	f.SetCurrent("schedule_date", s.DepartureTime.Format("2006-01-02"))
+	f.SetPredefined("achieving_percentage", 100)
+
 	if s.PremiumLevel != "" {
-		stateUpdates["premium_processed"] = true
-		stateUpdates["premium_level"] = s.PremiumLevel
+		f.SetCurrent("premium_processed", true)
+		f.SetCurrent("premium_level", s.PremiumLevel)
 	}
 	if s.ServiceTier != "" {
-		stateUpdates["service_tier"] = s.ServiceTier
+		f.SetCurrent("service_tier", s.ServiceTier)
 	}
 	if len(s.PremiumAmenities) > 0 {
-		stateUpdates["premium_amenities"] = s.PremiumAmenities
+		f.SetCurrent("premium_amenities", s.PremiumAmenities)
 	}
 
-	f.StoreStateMulti(stateUpdates)
 	f.ProvideDone()
 }
 
@@ -976,18 +961,40 @@ func (f *FlightWant) ResetFlightState() {
 		"service_tier",
 		"premium_amenities",
 		"premium_processed",
-		"flight_duration_hours",
+		"duration_hours",
 		"total_processed",
 		"schedule_date",
 		"canceled_at",
 		"_previous_flight_status",
 		"_monitor_state_hash",
 		"cost",
+		"actual_cost",
+		"good_to_reserve",
+		"completed",
+		"cancelled",
+		"last_logged_phase",
 		// NOTE: _previous_flight_id is NOT reset - it's used to detect rebooking state
 	}
 
 	for _, key := range resetKeys {
-		f.StoreState(key, nil)
+		if strings.HasPrefix(key, "_") {
+			f.SetInternal(key, nil)
+		} else if label, ok := f.StateLabels[key]; ok {
+			switch label {
+			case LabelGoal:
+				f.SetGoal(key, nil)
+			case LabelCurrent:
+				f.SetCurrent(key, nil)
+			case LabelPlan:
+				f.SetPlan(key, nil)
+			case LabelPredefined:
+				f.SetPredefined(key, nil)
+			case LabelInternal:
+				f.SetInternal(key, nil)
+			}
+		} else {
+			f.StoreState(key, nil)
+		}
 	}
 
 	f.StoreLog("Flight state reset for rebooking attempt")

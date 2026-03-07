@@ -115,6 +115,46 @@ func ToStringSlice(value interface{}, defaultVal []string) []string {
 	}
 }
 
+// ToIntSlice converts an interface{} value to []int with a default fallback
+func ToIntSlice(value interface{}, defaultVal []int) []int {
+	if value == nil {
+		return defaultVal
+	}
+
+	switch v := value.(type) {
+	case []int:
+		return v
+	case []interface{}:
+		result := make([]int, 0, len(v))
+		for _, item := range v {
+			result = append(result, ToInt(item, 0))
+		}
+		return result
+	default:
+		return defaultVal
+	}
+}
+
+// ToFloat64Slice converts an interface{} value to []float64 with a default fallback
+func ToFloat64Slice(value interface{}, defaultVal []float64) []float64 {
+	if value == nil {
+		return defaultVal
+	}
+
+	switch v := value.(type) {
+	case []float64:
+		return v
+	case []interface{}:
+		result := make([]float64, 0, len(v))
+		for _, item := range v {
+			result = append(result, ToFloat64(item, 0.0))
+		}
+		return result
+	default:
+		return defaultVal
+	}
+}
+
 // ExtractParamsWithDefaults extracts multiple parameters from a map with type conversion
 type ParamExtractor struct {
 	params map[string]interface{}

@@ -31,8 +31,7 @@ func (o *ItineraryWant) Initialize() {
 }
 
 func (o *ItineraryWant) IsAchieved() bool {
-	achieved, _ := o.GetInternal("goal_achieved")
-	return achieved != nil && achieved.(bool)
+	return GetInternal(o, "goal_achieved", false)
 }
 
 func (o *ItineraryWant) Progress() {
@@ -52,26 +51,10 @@ func (o *ItineraryWant) Progress() {
 	
 	if len(updates) > 0 { o.mergeCurrent(updates) }
 
-	var directions []string
-	if raw, ok := o.GetState("directions"); ok {
-		if slice, ok := raw.([]string); ok { directions = slice } else if slice, ok := raw.([]any); ok {
-			for _, item := range slice { if s, ok := item.(string); ok { directions = append(directions, s) } }
-		}
-	}
+	directions := GetPlan(o, "directions", []string{})
 
 	if len(directions) > 0 {
-		var lastSuggested []string
-		if raw, ok := o.GetInternal("_last_suggested"); ok {
-			if slice, ok := raw.([]string); ok {
-				lastSuggested = slice
-			} else if slice, ok := raw.([]any); ok {
-				for _, item := range slice {
-					if s, ok := item.(string); ok {
-						lastSuggested = append(lastSuggested, s)
-					}
-				}
-			}
-		}
+		lastSuggested := GetInternal(o, "_last_suggested", []string{})
 
 		if !reflect.DeepEqual(lastSuggested, directions) {
 			o.SuggestParent(directions)
@@ -80,7 +63,7 @@ func (o *ItineraryWant) Progress() {
 		}
 	}
 
-	if hash, _ := o.GetStateString("_opa_input_hash", ""); hash != "" {
+	if hash := GetInternal(o, "_opa_input_hash", ""); hash != "" {
 		achieved := len(directions) == 0
 		o.SetInternal("goal_achieved", achieved)
 		
@@ -91,10 +74,7 @@ func (o *ItineraryWant) Progress() {
 
 func (o *ItineraryWant) mergeCurrent(updates map[string]any) {
 	if len(updates) == 0 { return }
-	current := map[string]any{}
-	if raw, ok := o.GetCurrent("current"); ok {
-		if m, ok := raw.(map[string]any); ok { for k, v := range m { current[k] = v } }
-	}
+	current := GetCurrent(o, "current", map[string]any{})
 	
 	changed := false
 	for k, v := range updates {

@@ -14,18 +14,9 @@ func init() {
 
 // manageReactionQueue handles queue creation and deletion based on reminder phase
 func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
-	var phase string
-	var existingQueueID string
-
-	// Get current reminder phase and queue ID
-	want.GetStateMulti(mywant.Dict{
-		"reminder_phase":    &phase,
-		"reaction_queue_id": &existingQueueID,
-	})
-
-	// Prefer GCP current if available
-	if p, ok := want.GetCurrent("reminder_phase"); ok && p != nil { phase = p.(string) }
-	if q, ok := want.GetCurrent("reaction_queue_id"); ok && q != nil { existingQueueID = q.(string) }
+	// Get current reminder phase and queue ID using generic accessors
+	phase := mywant.GetCurrent(want, "reminder_phase", "")
+	existingQueueID := mywant.GetCurrent(want, "reaction_queue_id", "")
 
 	if phase == "" { return nil }
 
@@ -44,7 +35,7 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 			if err != nil { return err }
 			
 			// Get reaction type to see if we should set webhook_url
-			reactionType, _ := want.GetStateString("reaction_type", "internal")
+			reactionType := mywant.GetGoal(want, "reaction_type", "internal")
 			
 			want.SetCurrent("reaction_queue_id", queueID)
 			

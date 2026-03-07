@@ -75,14 +75,13 @@ func (n *CloudflareTunnelWant) Initialize() {
 	// Store config in state for live_server_manager agent to read
 	// cloudflared tunnel --url http://localhost:8080
 	argsJSON, _ := json.Marshal([]string{"tunnel", "--url", targetURL})
-	n.StoreStateMulti(map[string]any{
-		"server_phase":    "starting",
-		"server_pid":      0,
-		"tunnel_url":      "",
-		"server_command":  "cloudflared",
-		"server_args":     string(argsJSON),
-		"server_log_file": logFile,
-	})
+	
+	n.SetCurrent("server_phase", "starting")
+	n.SetCurrent("server_pid", 0)
+	n.SetCurrent("tunnel_url", "")
+	n.SetCurrent("server_command", "cloudflared")
+	n.SetCurrent("server_args", string(argsJSON))
+	n.SetCurrent("server_log_file", logFile)
 
 	// Start cloudflared process via live_server_manager agent
 	if err := n.ExecuteAgents(); err != nil {
@@ -90,8 +89,8 @@ func (n *CloudflareTunnelWant) Initialize() {
 		return
 	}
 
-	pid, ok := n.GetStateInt("server_pid", 0)
-	if !ok || pid == 0 {
+	pid := GetCurrent(n, "server_pid", 0)
+	if pid == 0 {
 		n.failWithError(locals, "agent did not start cloudflared process")
 		return
 	}
@@ -106,17 +105,15 @@ func (n *CloudflareTunnelWant) Initialize() {
 
 	locals.TunnelURL = url
 	locals.Phase = CloudflareTunnelPhaseRunning
-	n.StoreStateMulti(map[string]any{
-		"tunnel_url":   url,
-		"server_phase": CloudflareTunnelPhaseRunning,
-	})
+	n.SetCurrent("tunnel_url", url)
+	n.SetCurrent("server_phase", CloudflareTunnelPhaseRunning)
 	n.StoreLog("[CLOUDFLARE] Tunnel running - PID: %d, URL: %s", pid, url)
 }
 
 // IsAchieved checks if the cloudflare tunnel is running with a public URL
 func (n *CloudflareTunnelWant) IsAchieved() bool {
-	phase, _ := n.GetStateString("server_phase", "")
-	url, _ := n.GetStateString("tunnel_url", "")
+	phase := GetCurrent(n, "server_phase", "")
+	url := GetCurrent(n, "tunnel_url", "")
 	return phase == CloudflareTunnelPhaseRunning && url != ""
 }
 
@@ -125,7 +122,7 @@ func (n *CloudflareTunnelWant) CalculateAchievingPercentage() int {
 	if n.IsAchieved() || n.Status == WantStatusAchieved {
 		return 100
 	}
-	phase, _ := n.GetStateString("server_phase", "")
+	phase := GetCurrent(n, "server_phase", "")
 	switch phase {
 	case CloudflareTunnelPhaseRunning:
 		return 100
@@ -142,25 +139,25 @@ func (n *CloudflareTunnelWant) CalculateAchievingPercentage() int {
 func (n *CloudflareTunnelWant) failWithError(locals *CloudflareTunnelLocals, msg string) {
 	n.StoreLog("[ERROR] %s", msg)
 	locals.Phase = CloudflareTunnelPhaseFailed
-	n.StoreState("server_phase", CloudflareTunnelPhaseFailed)
-	n.StoreState("error_message", msg)
+	n.SetCurrent("server_phase", CloudflareTunnelPhaseFailed)
+	n.SetCurrent("error_message", msg)
 	n.Status = "failed"
 }
 
 // Progress implements Progressable for CloudflareTunnelWant
 func (n *CloudflareTunnelWant) Progress() {
 	locals := n.GetLocals()
-	n.StoreState("achieving_percentage", n.CalculateAchievingPercentage())
+	n.SetPredefined("achieving_percentage", n.CalculateAchievingPercentage())
 
 	switch locals.Phase {
 	case CloudflareTunnelPhaseRunning:
 		n.ProvideDone()
 
 	case CloudflareTunnelPhaseStopping:
-		if pid, _ := n.GetStateInt("server_pid", 0); pid == 0 {
-			n.StoreState("tunnel_url", "")
+		if pid := GetCurrent(n, "server_pid", 0); pid == 0 {
+			n.SetCurrent("tunnel_url", "")
 			locals.Phase = CloudflareTunnelPhaseStopped
-			n.StoreState("server_phase", CloudflareTunnelPhaseStopped)
+			n.SetCurrent("server_phase", CloudflareTunnelPhaseStopped)
 			n.StoreLog("[CLOUDFLARE] Tunnel stopped successfully")
 		}
 
@@ -174,7 +171,7 @@ func (n *CloudflareTunnelWant) OnDelete() {
 	n.StoreLog("[CLOUDFLARE] Want is being deleted, stopping tunnel")
 
 	// Kill process directly (and its process group)
-	if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
+	if pid := GetCurrent(n, "server_pid", 0); pid > 0 {
 		n.StoreLog("[CLOUDFLARE] Killing cloudflared process group PID %d", pid)
 		// Try to kill process group first (since live_server_manager starts with Setpgid: true)
 		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
@@ -186,7 +183,7 @@ func (n *CloudflareTunnelWant) OnDelete() {
 				}
 			}
 		}
-		n.StoreState("server_pid", 0)
+		n.SetCurrent("server_pid", 0)
 	}
 
 	if err := n.StopAllBackgroundAgents(); err != nil {

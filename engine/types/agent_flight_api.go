@@ -46,21 +46,21 @@ type CreateFlightRequest struct {
 
 // executeFlightAction handles both create_flight and cancel_flight actions
 func executeFlightAction(ctx context.Context, want *Want) error {
-	action, _ := want.GetStateString("flight_action", "")
+	action := GetPlan(want, "flight_action", "")
 	switch action {
 	case "cancel_flight":
 		want.StoreLog("Executing cancel_flight action")
 		if err := cancelFlight(ctx, want); err != nil {
 			return err
 		}
-		want.StoreStateForAgent("flight_action", "")
+		want.SetPlan("flight_action", "")
 		return nil
 	case "create_flight":
 		want.StoreLog("Executing create_flight action")
 		if err := createFlight(ctx, want); err != nil {
 			return err
 		}
-		want.StoreStateForAgent("flight_action", "")
+		want.SetPlan("flight_action", "")
 		return nil
 	}
 
@@ -71,8 +71,8 @@ func executeFlightAction(ctx context.Context, want *Want) error {
 func createFlight(ctx context.Context, want *Want) error {
 	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
 	params := want.Spec.Params
-	want.StoreStateForAgent("flight_status", "in process")
-	prevFlightID, _ := want.GetStateString("_previous_flight_id", "")
+	want.SetCurrent("flight_status", "in process")
+	prevFlightID := GetInternal(want, "_previous_flight_id", "")
 	isRebooking := prevFlightID != ""
 
 	// Extract parameters using ParamExtractor
@@ -152,25 +152,24 @@ func createFlight(ctx context.Context, want *Want) error {
 	if err := json.NewDecoder(resp.Body).Decode(&reservation); err != nil {
 		return fmt.Errorf("failed to decode response: %v", err)
 	}
-	want.StoreStateMultiForAgent(map[string]any{
-		"flight_id":      reservation.ID,
-		"flight_status":  "created",
-		"flight_number":  reservation.FlightNumber,
-		"from":           reservation.From,
-		"to":             reservation.To,
-		"departure_time": reservation.DepartureTime.Format(time.RFC3339),
-		"arrival_time":   reservation.ArrivalTime.Format(time.RFC3339),
-		"status_message": "Flight reservation created and awaiting confirmation",
-		"created_at":     reservation.CreatedAt.Format(time.RFC3339),
-		"updated_at":     reservation.UpdatedAt.Format(time.RFC3339),
-		"agent_result": FlightSchedule{
-			DepartureTime:   reservation.DepartureTime,
-			ArrivalTime:     reservation.ArrivalTime,
-			FlightType:      reservation.FlightClass,
-			FlightNumber:    reservation.FlightNumber,
-			ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
-			Cost:            reservation.Cost,
-		},
+	want.SetCurrent("flight_id", reservation.ID)
+	want.SetCurrent("flight_status", "created")
+	want.SetCurrent("flight_number", reservation.FlightNumber)
+	want.SetCurrent("from", reservation.From)
+	want.SetCurrent("to", reservation.To)
+	want.SetCurrent("departure_time", reservation.DepartureTime.Format(time.RFC3339))
+	want.SetCurrent("arrival_time", reservation.ArrivalTime.Format(time.RFC3339))
+	want.SetCurrent("status_message", "Flight reservation created and awaiting confirmation")
+	want.SetCurrent("created_at", reservation.CreatedAt.Format(time.RFC3339))
+	want.SetCurrent("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
+	
+	want.SetPredefined("agent_result", FlightSchedule{
+		DepartureTime:   reservation.DepartureTime,
+		ArrivalTime:     reservation.ArrivalTime,
+		FlightType:      reservation.FlightClass,
+		FlightNumber:    reservation.FlightNumber,
+		ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
+		Cost:            reservation.Cost,
 	})
 
 	// Record activity description for agent history
@@ -187,8 +186,8 @@ func createFlight(ctx context.Context, want *Want) error {
 // cancelFlight cancels a flight reservation via DELETE /api/flights/{id}
 func cancelFlight(ctx context.Context, want *Want) error {
 	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
-	flightID, ok := want.GetStateString("flight_id", "")
-	if !ok || flightID == "" {
+	flightID := GetCurrent(want, "flight_id", "")
+	if flightID == "" {
 		return fmt.Errorf("no flight_id found in state")
 	}
 
@@ -209,16 +208,14 @@ func cancelFlight(ctx context.Context, want *Want) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-	want.StoreStateMultiForAgent(map[string]any{
-		"flight_status":           "canceled",
-		"status_message":          "Flight canceled by agent",
-		"canceled_at":             time.Now().Format(time.RFC3339),
-		"_previous_flight_id":     flightID,
-		"_previous_flight_status": "canceled",
-		"flight_id":               "",
-		"attempted":               false,
-		// DO NOT SET agent_result: nil here!
-	})
+	
+	want.SetCurrent("flight_status", "canceled")
+	want.SetCurrent("status_message", "Flight canceled by agent")
+	want.SetCurrent("canceled_at", time.Now().Format(time.RFC3339))
+	want.SetInternal("_previous_flight_id", flightID)
+	want.SetInternal("_previous_flight_status", "canceled")
+	want.SetCurrent("flight_id", "")
+	want.SetInternal("attempted", false)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightID)

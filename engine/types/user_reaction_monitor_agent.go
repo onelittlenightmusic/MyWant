@@ -14,9 +14,7 @@ func init() {
 }
 
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
-	phaseRaw, ok := want.GetCurrent("reminder_phase")
-	phase := ""
-	if ok && phaseRaw != nil { phase = phaseRaw.(string) }
+	phase := GetCurrent(want, "reminder_phase", "")
 	
 	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
 		return true, nil
@@ -25,13 +23,11 @@ func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 	err := monitorUserReactions(ctx, want)
 	if err != nil { return false, err }
 
-	userReaction, exists := want.GetCurrent("user_reaction")
-	if exists && userReaction != nil {
-		if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
-			if _, ok := reactionMap["approved"].(bool); ok {
-				want.StoreLog("[MONITOR] Valid reaction received, stopping monitor")
-				return true, nil
-			}
+	userReaction := GetCurrent(want, "user_reaction", map[string]any{})
+	if len(userReaction) > 0 {
+		if _, ok := userReaction["approved"].(bool); ok {
+			want.StoreLog("[MONITOR] Valid reaction received, stopping monitor")
+			return true, nil
 		}
 	}
 
@@ -41,12 +37,9 @@ func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 func monitorUserReactions(ctx context.Context, want *Want) error {
 	if want.Metadata.Type != "reminder" { return nil }
 
-	var phase string; var requireReaction bool; var queueID string
-	want.GetStateMulti(Dict{"reminder_phase": &phase, "require_reaction": &requireReaction, "reaction_queue_id": &queueID})
-
-	// Prefer current labels if available
-	if p, ok := want.GetCurrent("reminder_phase"); ok && p != nil { phase = p.(string) }
-	if q, ok := want.GetCurrent("reaction_queue_id"); ok && q != nil { queueID = q.(string) }
+	phase := GetCurrent(want, "reminder_phase", "")
+	requireReaction := GetGoal(want, "require_reaction", false)
+	queueID := GetCurrent(want, "reaction_queue_id", "")
 
 	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching { return nil }
 	if !requireReaction || queueID == "" { return nil }

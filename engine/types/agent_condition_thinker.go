@@ -13,15 +13,13 @@ func init() {
 
 func conditionThinkerThink(ctx context.Context, want *Want) error {
 	// ── Phase 1: Initialize Goal & Register in parent itinerary ──────────
-	goalSet, _ := want.GetInternal("thinker.goal_initialized")
-	if goalSet == nil {
+	if !GetInternal(want, "thinker.goal_initialized", false) {
 		// Initialize the standard goal for any reservation-based want
 		want.SetGoal("reservation_status", "confirmed")
 		want.SetInternal("thinker.goal_initialized", true)
 	}
 
-	registered, _ := want.GetInternal("thinker.itinerary_done")
-	if registered == nil {
+	if !GetInternal(want, "thinker.itinerary_done", false) {
 		if !want.HasParent() {
 			// Standalone want (no coordinator) – approve immediately
 			want.SetPlan("execute_booking", true)
@@ -42,10 +40,9 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	// ── Phase 2: Planning (Budget check & Approve execution) ──────────────
-	planSet, _ := want.GetInternal("thinker.plan_set")
-	if planSet == nil {
-		targetBudgetsRaw, hasTB := want.GetParentState("target_budgets")
-		if hasTB {
+	if !GetInternal(want, "thinker.plan_set", false) {
+		targetBudgetsRaw := GetParentState(want, "target_budgets", map[string]any{})
+		if len(targetBudgetsRaw) > 0 {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
 				want.SetCurrent("budget_limit", tb)
 				want.SetPlan("execute_booking", true)
@@ -54,11 +51,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → plan.execute_booking=true", tb)
 			}
 		} else {
-			ticksWaitedRaw, _ := want.GetInternal("thinker.ticks_waited")
-			ticksWaited := 0
-			if ticksWaitedRaw != nil {
-				ticksWaited = int(toFloat64(ticksWaitedRaw))
-			}
+			ticksWaited := GetInternal(want, "thinker.ticks_waited", 0)
 			ticksWaited++
 			want.SetInternal("thinker.ticks_waited", ticksWaited)
 			if ticksWaited >= 3 {
@@ -71,7 +64,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	// ── Phase 3: Cost propagation (Current State -> Parent) ────────────────
-	if cancelled, _ := want.GetStateBool("_cancelled", false); cancelled || want.Status == WantStatusCancelled {
+	if GetInternal(want, "_cancelled", false) || want.Status == WantStatusCancelled {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{want.Metadata.Name: 0.0},
 		})
@@ -79,12 +72,12 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	// Try to get cost from GCP 'current.actual_cost'
-	var cost float64
-	if currentCost, ok := want.GetCurrent("actual_cost"); ok {
-		cost = toFloat64(currentCost)
-	} else if legacyCost, ok := want.GetState("cost"); ok {
-		cost = toFloat64(legacyCost)
-		want.SetCurrent("actual_cost", cost)
+	cost := GetCurrent(want, "actual_cost", 0.0)
+	if cost == 0 {
+		cost = GetState(want, "cost", 0.0)
+		if cost != 0 {
+			want.SetCurrent("actual_cost", cost)
+		}
 	}
 
 	if cost == 0 {

@@ -62,19 +62,18 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 	locals.LastProcessedCount = 0
 
 	webhookURL := fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name)
-	stateMap := map[string]any{
-		cfg.StatusKey():       "active",
-		cfg.MessagesKey():     []any{},
-		cfg.MessageCountKey(): 0,
-		"webhook_url":         webhookURL,
-	}
+	
+	want.SetCurrent(cfg.StatusKey(), "active")
+	want.SetCurrent(cfg.MessagesKey(), []any{})
+	want.SetCurrent(cfg.MessageCountKey(), 0)
+	want.SetCurrent("webhook_url", webhookURL)
+
 	if locals.Secret != "" {
-		stateMap["webhook_secret"] = locals.Secret
+		want.SetInternal("webhook_secret", locals.Secret)
 	}
 	if locals.ChannelFilter != "" {
-		stateMap["channel_filter"] = locals.ChannelFilter
+		want.SetInternal("channel_filter", locals.ChannelFilter)
 	}
-	want.StoreStateMulti(stateMap)
 
 	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
@@ -101,36 +100,32 @@ func StartWebhookMonitor(want *Want, cfg WebhookWantConfig) {
 // ProgressWebhook performs common progress-cycle logic: check for new messages,
 // provide to downstream, and update locals.
 func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
-	status, _ := want.GetStateString(cfg.StatusKey(), "active")
+	status := GetCurrent(want, cfg.StatusKey(), "active")
 	if status == "stopped" {
 		return
 	}
 
 	StartWebhookMonitor(want, cfg)
 
-	currentCount := 0
-	if countVal, ok := want.GetState(cfg.MessageCountKey()); ok {
-		currentCount = ParseMessageCount(countVal)
-	}
+	currentCount := GetCurrent(want, cfg.MessageCountKey(), 0)
 
 	if currentCount > locals.LastProcessedCount {
 		newCount := currentCount - locals.LastProcessedCount
 		want.StoreLog("%s %d new message(s) received (total: %d)", cfg.LogPrefix, newCount, currentCount)
 
-		if latestMsg, ok := want.GetState(cfg.LatestMessageKey()); ok {
+		if latestMsg, ok := want.GetCurrent(cfg.LatestMessageKey()); ok && latestMsg != nil {
 			want.Provide(latestMsg)
 		}
 
 		locals.LastProcessedCount = currentCount
 	}
 
-	want.StoreState("achieving_percentage", CalcWebhookPercentage(want, cfg))
+	want.SetPredefined("achieving_percentage", CalcWebhookPercentage(want, cfg))
 }
 
 // IsWebhookAchieved returns true when the webhook status is "stopped".
 func IsWebhookAchieved(want *Want, cfg WebhookWantConfig) bool {
-	status, _ := want.GetStateString(cfg.StatusKey(), "")
-	return status == "stopped"
+	return GetCurrent(want, cfg.StatusKey(), "") == "stopped"
 }
 
 // CalcWebhookPercentage returns 100 when stopped, 50 when active, 0 otherwise.
@@ -138,7 +133,7 @@ func CalcWebhookPercentage(want *Want, cfg WebhookWantConfig) int {
 	if IsWebhookAchieved(want, cfg) {
 		return 100
 	}
-	status, _ := want.GetStateString(cfg.StatusKey(), "")
+	status := GetCurrent(want, cfg.StatusKey(), "")
 	if status == "active" {
 		return 50
 	}
@@ -148,13 +143,9 @@ func CalcWebhookPercentage(want *Want, cfg WebhookWantConfig) int {
 // RestoreWebhookLocals restores locals from persisted state.
 func RestoreWebhookLocals(want *Want, cfg WebhookWantConfig) *WebhookLocals {
 	locals := &WebhookLocals{}
-	if count, ok := want.GetState(cfg.MessageCountKey()); ok {
-		locals.LastProcessedCount = ParseMessageCount(count)
-	}
-	secret, _ := want.GetStateString("webhook_secret", "")
-	locals.Secret = secret
-	filter, _ := want.GetStateString("channel_filter", "")
-	locals.ChannelFilter = filter
+	locals.LastProcessedCount = GetCurrent(want, cfg.MessageCountKey(), 0)
+	locals.Secret = GetInternal(want, "webhook_secret", "")
+	locals.ChannelFilter = GetInternal(want, "channel_filter", "")
 	want.Locals = locals
 	return locals
 }

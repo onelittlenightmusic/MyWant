@@ -20,39 +20,25 @@ func init() {
 }
 
 func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
-	flightID, ok := want.GetStateString("flight_id", "")
-	if !ok || flightID == "" {
+	flightID := GetCurrent(want, "flight_id", "")
+	if flightID == "" {
 		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
 	}
 
 	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
 	agentName := "flight-monitor-" + flightID
 
-	var lastKnownStatus string
-	if s, ok := want.GetCurrent("status"); ok {
-		lastKnownStatus, _ = s.(string)
-	} else {
-		lastKnownStatus, _ = want.GetStateString("flight_status", "unknown")
-	}
+	lastKnownStatus := GetCurrent(want, "status", "unknown")
 
 	var statusChangeHistory []StatusChange
-	if historyI, exists := want.GetState("status_history"); exists {
-		if historyStrs, ok := historyI.([]any); ok {
-			for _, entryI := range historyStrs {
-				if entry, ok := entryI.(string); ok {
-					if parsed, ok := parseStatusHistoryEntry(entry); ok {
-						statusChangeHistory = append(statusChangeHistory, parsed)
-					}
-				}
-			}
+	historyStrs := GetCurrent(want, "status_history", []string{})
+	for _, entry := range historyStrs {
+		if parsed, ok := parseStatusHistoryEntry(entry); ok {
+			statusChangeHistory = append(statusChangeHistory, parsed)
 		}
 	}
 
-	lastRecordedStateHash, _ := want.GetInternal("monitor_state_hash")
-	lastHashStr := ""
-	if lastRecordedStateHash != nil {
-		lastHashStr, _ = lastRecordedStateHash.(string)
-	}
+	lastHashStr := GetInternal(want, "monitor_state_hash", "")
 
 	url := fmt.Sprintf("%s/api/flights/%s", serverURL, flightID)
 	resp, err := http.Get(url)

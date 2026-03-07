@@ -131,31 +131,25 @@ func (r *ReminderWant) Initialize() {
 	locals.ReactionType = r.GetStringParam("reaction_type", "internal")
 
 	// Store initial state
-	stateMap := map[string]any{
-		"reminder_phase":           locals.Phase,
-		"message":                  locals.Message,
-		"ahead":                    locals.Ahead,
-		"require_reaction":         locals.RequireReaction,
-		"reaction_type":            locals.ReactionType,
-		"timeout":                  300,
-		"reaction_queue_id":        "",    // ALWAYS clear on fresh initialization to ensure new queue
-		"_reaction_packet_emitted": false, // Reset emission flag for new cycle
-		"user_reaction":            nil,   // Clear previous user reaction
-		"reaction_result":          "",    // Clear previous reaction result
-	}
+	r.SetCurrent("reminder_phase", locals.Phase)
+	r.SetGoal("message", locals.Message)
+	r.SetGoal("ahead", locals.Ahead)
+	r.SetGoal("require_reaction", locals.RequireReaction)
+	r.SetGoal("reaction_type", locals.ReactionType)
+	r.SetCurrent("timeout", 300)
+	r.SetCurrent("reaction_queue_id", "")    // ALWAYS clear on fresh initialization to ensure new queue
+	r.SetInternal("_reaction_packet_emitted", false) // Reset emission flag for new cycle
+	r.SetCurrent("user_reaction", nil)   // Clear previous user reaction
+	r.SetCurrent("reaction_result", "")    // Clear previous reaction result
 
 	// Add duration_from_now if it was provided
 	if locals.DurationFromNow != "" {
-		stateMap["duration_from_now"] = locals.DurationFromNow
+		r.SetGoal("duration_from_now", locals.DurationFromNow)
 	}
 
-	r.StoreStateMulti(stateMap)
-
 	if !locals.ReachingTime.IsZero() {
-		r.StoreStateMulti(map[string]any{
-			"reaching_time": locals.ReachingTime.Format(time.RFC3339),
-			"event_time":    locals.EventTime.Format(time.RFC3339),
-		})
+		r.SetInternal("reaching_time", locals.ReachingTime.Format(time.RFC3339))
+		r.SetGoal("event_time", locals.EventTime.Format(time.RFC3339))
 	}
 
 	r.Locals = locals
@@ -169,8 +163,8 @@ func (r *ReminderWant) Initialize() {
 	if locals.RequireReaction {
 		if err := r.ExecuteAgents(); err != nil {
 			r.StoreLog("ERROR: Failed to execute agents: %v", err)
-			r.StoreState("reminder_phase", ReminderPhaseFailed)
-			r.StoreState("error_message", fmt.Sprintf("Agent execution failed: %v", err))
+			r.SetCurrent("reminder_phase", ReminderPhaseFailed)
+			r.SetCurrent("error_message", fmt.Sprintf("Agent execution failed: %v", err))
 			return
 		}
 
@@ -186,7 +180,8 @@ func (r *ReminderWant) startMonitoringIfNeeded() {
 		return
 	}
 
-	if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
+	queueID := GetCurrent(r, "reaction_queue_id", "")
+	if queueID != "" {
 		agentName := "reaction-monitor-" + r.Metadata.ID
 		if _, exists := r.GetBackgroundAgent(agentName); !exists {
 			registry := r.GetAgentRegistry()
@@ -214,8 +209,7 @@ func (r *ReminderWant) hasWhenSpec() bool {
 
 // IsAchieved checks if the reminder has been completed
 func (r *ReminderWant) IsAchieved() bool {
-	phase, _ := r.GetStateString("reminder_phase", "")
-	return phase == ReminderPhaseCompleted
+	return GetCurrent(r, "reminder_phase", "") == ReminderPhaseCompleted
 }
 
 // CalculateAchievingPercentage returns the progress percentage
@@ -223,7 +217,7 @@ func (r *ReminderWant) CalculateAchievingPercentage() int {
 	if r.IsAchieved() || r.Status == WantStatusAchieved || r.Status == WantStatusFailed {
 		return 100
 	}
-	phase, _ := r.GetState("reminder_phase")
+	phase := GetCurrent(r, "reminder_phase", "")
 	switch phase {
 	case ReminderPhaseWaiting:
 		return 10
@@ -241,11 +235,11 @@ func (r *ReminderWant) Progress() {
 	locals := r.GetLocals()
 
 	// Update achieving percentage based on current phase
-	r.StoreState("achieving_percentage", r.CalculateAchievingPercentage())
+	r.SetPredefined("achieving_percentage", r.CalculateAchievingPercentage())
 
 	// Calculate and store time remaining
 	timeRemaining := r.calculateTimeRemaining(locals)
-	r.StoreState("time_remaining", timeRemaining)
+	r.SetCurrent("time_remaining", timeRemaining)
 
 	switch locals.Phase {
 	case ReminderPhaseWaiting:
@@ -350,13 +344,11 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 	now := time.Now()
 	if now.After(locals.ReachingTime) {
 		// Clear existing queue ID to force creation of a new one for this new cycle
-		r.StoreStateMulti(map[string]any{
-			"reminder_phase":           ReminderPhaseReaching,
-			"reaction_queue_id":        "",
-			"_reaction_packet_emitted": false,
-			"user_reaction":            nil, // Clear previous reaction
-			"reaction_result":          "",  // Clear previous result
-		})
+		r.SetCurrent("reminder_phase", ReminderPhaseReaching)
+		r.SetCurrent("reaction_queue_id", "")
+		r.SetInternal("_reaction_packet_emitted", false)
+		r.SetCurrent("user_reaction", nil) // Clear previous reaction
+		r.SetCurrent("reaction_result", "")  // Clear previous result
 
 		locals.Phase = ReminderPhaseReaching
 
@@ -372,12 +364,12 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 	}
 
 	// Check if already emitted in this state
-	emitted, _ := r.GetStateBool("_reaction_packet_emitted", false)
-	if emitted {
+	if GetInternal(r, "_reaction_packet_emitted", false) {
 		return
 	}
 
-	if queueID, ok := r.GetStateString("reaction_queue_id", ""); ok && queueID != "" {
+	queueID := GetCurrent(r, "reaction_queue_id", "")
+	if queueID != "" {
 		// Emit reaction request packet to connected users (silencers)
 		packet := map[string]any{
 			"reaction_id":   queueID,
@@ -385,7 +377,7 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 			"source_want":   r.Metadata.Name,
 		}
 		r.Provide(packet)
-		r.StoreState("_reaction_packet_emitted", true)
+		r.SetInternal("_reaction_packet_emitted", true)
 	}
 }
 
@@ -411,13 +403,11 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// No need to call ExecuteAgents() here - monitoring runs in separate goroutine
 
 		// Check state for user reaction (populated by MonitorAgent via HTTP API)
-		if userReaction, exists := r.GetState("user_reaction"); exists {
-			// Check if it's a non-empty reaction
-			if reactionMap, ok := userReaction.(map[string]any); ok && len(reactionMap) > 0 {
-				if _, ok := reactionMap["approved"].(bool); ok {
-					r.processReaction(locals, userReaction)
-					return
-				}
+		userReaction := GetCurrent(r, "user_reaction", map[string]any{})
+		if len(userReaction) > 0 {
+			if _, ok := userReaction["approved"].(bool); ok {
+				r.processReaction(locals, userReaction)
+				return
 			}
 		}
 
@@ -437,12 +427,11 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// No reaction required, check if event time has passed
 		if !locals.EventTime.IsZero() && time.Now().After(locals.EventTime) {
 			r.StoreLog("📦 Event time passed, completing reminder")
-			r.StoreStateMulti(map[string]any{
-				"reminder_phase":           ReminderPhaseCompleted,
-				"auto_completed":           true,
-				"_reaction_packet_emitted": false,
-				"achieving_percentage":     100,
-			})
+			r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
+			r.SetCurrent("auto_completed", true)
+			r.SetInternal("_reaction_packet_emitted", false)
+			r.SetPredefined("achieving_percentage", 100)
+			
 			locals.Phase = ReminderPhaseCompleted
 			r.ProvideDone()
 			return
@@ -452,12 +441,11 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 		// complete after 10 seconds of reaching
 		if now := time.Now(); now.After(locals.LastCheckTime.Add(10 * time.Second)) {
 			r.StoreLog("📦 Completing reminder (no reaction required)")
-			r.StoreStateMulti(map[string]any{
-				"reminder_phase":           ReminderPhaseCompleted,
-				"auto_completed":           true,
-				"_reaction_packet_emitted": false,
-				"achieving_percentage":     100,
-			})
+			r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
+			r.SetCurrent("auto_completed", true)
+			r.SetInternal("_reaction_packet_emitted", false)
+			r.SetPredefined("achieving_percentage", 100)
+			
 			locals.Phase = ReminderPhaseCompleted
 			r.ProvideDone()
 		}
@@ -472,12 +460,11 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 			if approved {
 				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
 				r.StoreLog("📦 Reminder approved by user")
-				r.StoreStateMulti(map[string]any{
-					"reminder_phase":           ReminderPhaseCompleted,
-					"reaction_result":          "approved",
-					"_reaction_packet_emitted": false,
-					"achieving_percentage":     100,
-				})
+				r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
+				r.SetCurrent("reaction_result", "approved")
+				r.SetInternal("_reaction_packet_emitted", false)
+				r.SetPredefined("achieving_percentage", 100)
+				
 				locals.Phase = ReminderPhaseCompleted
 				r.ProvideDone()
 
@@ -486,12 +473,11 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionData any)
 			} else {
 				r.SetStatus(WantStatusReaching) // Clear WaitingUserAction
 				r.StoreLog("📦 Reminder rejected by user")
-				r.StoreStateMulti(map[string]any{
-					"reminder_phase":           ReminderPhaseFailed,
-					"reaction_result":          "rejected",
-					"_reaction_packet_emitted": false,
-					"achieving_percentage":     100,
-				})
+				r.SetCurrent("reminder_phase", ReminderPhaseFailed)
+				r.SetCurrent("reaction_result", "rejected")
+				r.SetInternal("_reaction_packet_emitted", false)
+				r.SetPredefined("achieving_percentage", 100)
+				
 				locals.Phase = ReminderPhaseFailed
 
 				// Trigger agent to delete queue immediately
@@ -506,24 +492,22 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	if locals.RequireReaction {
 		r.SetStatus(WantStatusReaching) // Clear WaitingUserAction before transitioning
 		r.StoreLog("📦 Reaction timeout - marking as failed")
-		r.StoreStateMulti(map[string]any{
-			"reminder_phase":           ReminderPhaseFailed,
-			"timeout":                  true,
-			"_reaction_packet_emitted": false,
-			"achieving_percentage":     100,
-		})
+		r.SetCurrent("reminder_phase", ReminderPhaseFailed)
+		r.SetCurrent("timeout", true)
+		r.SetInternal("_reaction_packet_emitted", false)
+		r.SetPredefined("achieving_percentage", 100)
+		
 		locals.Phase = ReminderPhaseFailed
 
 		// Trigger agent to delete queue immediately
 		r.ExecuteAgents()
 	} else {
 		r.StoreLog("📦 Reaction timeout - auto-completing")
-		r.StoreStateMulti(map[string]any{
-			"reminder_phase":           ReminderPhaseCompleted,
-			"auto_completed":           true,
-			"_reaction_packet_emitted": false,
-			"achieving_percentage":     100,
-		})
+		r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
+		r.SetCurrent("auto_completed", true)
+		r.SetInternal("_reaction_packet_emitted", false)
+		r.SetPredefined("achieving_percentage", 100)
+		
 		locals.Phase = ReminderPhaseCompleted
 		r.ProvideDone()
 

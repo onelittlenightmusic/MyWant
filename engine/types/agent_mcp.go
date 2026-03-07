@@ -131,13 +131,17 @@ func GetGooseManager(ctx context.Context) (*GooseManager, error) {
 
 // executeMCPOperation performs the actual MCP tool invocation via Goose or Native SDK
 func executeMCPOperation(ctx context.Context, want *mywant.Want) error {
-	if plan, _ := want.GetPlan("execute_operation"); plan == nil {
-		if op, _ := want.GetStateString("mcp_operation", ""); op == "" { return nil }
+	if plan := mywant.GetPlan(want, "execute_operation", false); !plan {
+		if op := mywant.GetCurrent(want, "mcp_operation", ""); op == "" {
+			return nil
+		}
 	}
 
-	var operationStr string; var useNative bool
-	want.GetStateMulti(mywant.Dict{"mcp_operation": &operationStr, "mcp_native":    &useNative})
-	if operationStr == "" { return fmt.Errorf("mcp_operation not specified") }
+	operationStr := mywant.GetCurrent(want, "mcp_operation", "")
+	useNative := mywant.GetCurrent(want, "mcp_native", false)
+	if operationStr == "" {
+		return fmt.Errorf("mcp_operation not specified")
+	}
 
 	want.SetPredefined("achieving_percentage", 25)
 

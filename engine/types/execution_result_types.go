@@ -56,19 +56,17 @@ func (e *ExecutionResultWant) GetLocals() *ExecutionResultWantLocals {
 // Initialize resets execution state before starting
 func (e *ExecutionResultWant) Initialize() {
 	// Reset completion state for fresh execution using batch update
-	e.StoreStateMulti(map[string]any{
-		"completed":            false,
-		"status":               "pending",
-		"stdout":               "",
-		"stderr":               "",
-		"error_message":        "",
-		"exit_code":            0,
-		"started_at":           "",
-		"completed_at":         "",
-		"execution_time_ms":    0,
-		"achieving_percentage": 0,
-		"_phase":               string(ExecutionPhaseInitial),
-	})
+	e.SetCurrent("completed", false)
+	e.SetCurrent("status", "pending")
+	e.SetCurrent("stdout", "")
+	e.SetCurrent("stderr", "")
+	e.SetCurrent("error_message", "")
+	e.SetCurrent("exit_code", 0)
+	e.SetCurrent("started_at", "")
+	e.SetCurrent("completed_at", "")
+	e.SetCurrent("execution_time_ms", 0)
+	e.SetPredefined("achieving_percentage", 0)
+	e.SetInternal("_phase", string(ExecutionPhaseInitial))
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()
@@ -79,8 +77,7 @@ func (e *ExecutionResultWant) Initialize() {
 
 // IsAchieved checks if execution is completed
 func (e *ExecutionResultWant) IsAchieved() bool {
-	completed, _ := e.GetStateBool("completed", false)
-	return completed
+	return GetCurrent(e, "completed", false)
 }
 
 // Progress implements Progressable for ExecutionResultWant
@@ -140,12 +137,10 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	}
 
 	// Initialize state
-	e.StoreStateMulti(map[string]any{
-		"status":               "pending",
-		"command":              locals.Command,
-		"completed":            false,
-		"achieving_percentage": 0,
-	})
+	e.SetCurrent("status", "pending")
+	e.SetCurrent("command", locals.Command)
+	e.SetCurrent("completed", false)
+	e.SetPredefined("achieving_percentage", 0)
 
 	// Transition to executing phase
 	locals.Phase = ExecutionPhaseExecuting
@@ -155,11 +150,9 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
 	locals := e.GetLocals()
 	// Store command parameters in state for agent to read
-	e.StoreStateMulti(map[string]any{
-		"shell":             locals.Shell,
-		"timeout":           locals.Timeout,
-		"working_directory": locals.WorkingDirectory,
-	})
+	e.SetCurrent("shell", locals.Shell)
+	e.SetCurrent("timeout", locals.Timeout)
+	e.SetCurrent("working_directory", locals.WorkingDirectory)
 
 	// Execute agents via framework
 	if err := e.ExecuteAgents(); err != nil {
@@ -167,10 +160,9 @@ func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
 	}
 
 	// Retrieve agent result from state
-	if result, exists := e.GetState("agent_result"); exists {
-		if resultMap, ok := result.(map[string]any); ok {
-			return resultMap, nil
-		}
+	result := GetPredefined(e, "agent_result", map[string]any{})
+	if len(result) > 0 {
+		return result, nil
 	}
 
 	return nil, fmt.Errorf("no agent result found")
@@ -182,8 +174,8 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	result, err := e.tryAgentExecution()
 	if err != nil {
 		// Handle agent execution failure
-		e.StoreState("status", "failed")
-		e.StoreState("error_message", fmt.Sprintf("Agent execution error: %v", err))
+		e.SetCurrent("status", "failed")
+		e.SetCurrent("error_message", fmt.Sprintf("Agent execution error: %v", err))
 		e.StoreLog("ERROR: Agent execution failed: %v", err)
 		locals.Phase = ExecutionPhaseFailed
 		return
@@ -191,65 +183,46 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 
 	// Extract results from agent with type safety
 	if result == nil {
-		e.StoreState("status", "failed")
-		e.StoreState("error_message", "Agent returned nil result")
+		e.SetCurrent("status", "failed")
+		e.SetCurrent("error_message", "Agent returned nil result")
 		e.StoreLog("ERROR: Agent returned nil result")
 		locals.Phase = ExecutionPhaseFailed
 		return
 	}
 
 	// Safely extract results with type handling
-	var exitCode int
-	if ec, ok := result["exit_code"].(int); ok {
-		exitCode = ec
-	} else if ec, ok := result["exit_code"].(float64); ok {
-		exitCode = int(ec)
-	} else {
-		exitCode = -1
-	}
+	exitCode := ToInt(result["exit_code"], -1)
 
 	locals.ExitCode = exitCode
-	if stdout, ok := result["stdout"].(string); ok {
-		locals.Stdout = stdout
-	}
-	if stderr, ok := result["stderr"].(string); ok {
-		locals.Stderr = stderr
-	}
+	locals.Stdout = ToString(result["stdout"], "")
+	locals.Stderr = ToString(result["stderr"], "")
 
-	// Handle execution_time_ms as int64 or float64
-	if etm, ok := result["execution_time_ms"].(int64); ok {
-		locals.ExecutionTimeMs = etm
-	} else if etm, ok := result["execution_time_ms"].(float64); ok {
-		locals.ExecutionTimeMs = int64(etm)
-	}
+	// Handle execution_time_ms
+	locals.ExecutionTimeMs = int64(ToFloat64(result["execution_time_ms"], 0))
 
-	// Build state updates batch
-	stateUpdates := map[string]any{
-		"exit_code":         exitCode,
-		"stdout":            locals.Stdout,
-		"stderr":            locals.Stderr,
-		"execution_time_ms": locals.ExecutionTimeMs,
-		"started_at":        result["started_at"],
-		"completed_at":      result["completed_at"],
-	}
+	// Update state
+	e.SetCurrent("exit_code", exitCode)
+	e.SetCurrent("stdout", locals.Stdout)
+	e.SetCurrent("stderr", locals.Stderr)
+	e.SetCurrent("execution_time_ms", locals.ExecutionTimeMs)
+	e.SetCurrent("started_at", result["started_at"])
+	e.SetCurrent("completed_at", result["completed_at"])
 
 	// Set status based on exit code
 	if exitCode == 0 {
-		stateUpdates["completed"] = true
-		stateUpdates["status"] = "completed"
-		stateUpdates["achieving_percentage"] = 100
+		e.SetCurrent("completed", true)
+		e.SetCurrent("status", "completed")
+		e.SetPredefined("achieving_percentage", 100)
 		e.StoreLog("Command executed successfully in %dms", locals.ExecutionTimeMs)
 		locals.Phase = ExecutionPhaseCompleted
 	} else {
-		stateUpdates["completed"] = false
-		stateUpdates["status"] = "failed"
-		stateUpdates["error_message"] = fmt.Sprintf("Exit code: %d", exitCode)
+		e.SetCurrent("completed", false)
+		e.SetCurrent("status", "failed")
+		e.SetCurrent("error_message", fmt.Sprintf("Exit code: %d", exitCode))
 		e.StoreLog("Command failed with exit code %d", exitCode)
 		locals.Phase = ExecutionPhaseFailed
 		e.SetStatus(WantStatusFailed)
 	}
 
-	// Store all results in batch
-	e.StoreStateMulti(stateUpdates)
 	e.ProvideDone()
 }

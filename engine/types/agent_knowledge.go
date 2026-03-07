@@ -57,14 +57,14 @@ func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
 
 	if len(facts) == 0 {
 		want.StoreLog("[KNOWLEDGE-AGENT] No new facts found. Knowledge is up to date.")
-		want.StoreState("knowledge_status", "fresh")
-		want.StoreState("last_sync_time", time.Now().Format(time.RFC3339))
+		want.SetCurrent("knowledge_status", "fresh")
+		want.SetCurrent("last_sync_time", time.Now().Format(time.RFC3339))
 		return nil
 	}
 
 	want.StoreLog("[KNOWLEDGE-AGENT] Found %d new facts. Transitioning to updating state.", len(facts))
-	want.StoreState("discovered_updates", facts)
-	want.StoreState("knowledge_status", "updating")
+	want.SetInternal("discovered_updates", facts)
+	want.SetCurrent("knowledge_status", "updating")
 	return nil
 }
 
@@ -74,8 +74,9 @@ func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 	depth := want.Spec.Params["depth"].(string)
 	provider, _ := want.Spec.Params["provider"].(string)
 
-	updates, _ := want.GetState("discovered_updates")
+	updates := mywant.GetInternal(want, "discovered_updates", []any{})
 	updatesJSON, _ := json.MarshalIndent(updates, "", "  ")
+
 
 	want.StoreLog("[KNOWLEDGE-AGENT] Updating document: %s (provider: %s)", path, provider)
 
@@ -129,9 +130,9 @@ func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.StoreLog("[KNOWLEDGE-AGENT] Successfully updated %s", path)
-	want.StoreState("knowledge_status", "fresh")
-	want.StoreState("last_sync_time", time.Now().Format(time.RFC3339))
-	want.StoreState("discovered_updates", nil) // Clear temporary data
+	want.SetCurrent("knowledge_status", "fresh")
+	want.SetCurrent("last_sync_time", time.Now().Format(time.RFC3339))
+	want.SetInternal("discovered_updates", nil) // Clear temporary data
 
 	return nil
 }

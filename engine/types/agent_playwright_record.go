@@ -39,78 +39,64 @@ func init() {
 func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) (bool, error) {
 	// First run: register webhook IDs in state so the frontend can use them.
 	// Check value emptiness (not just key existence) because YAML initializes the key to "" at creation.
-	startID, _ := want.GetStateString("startWebhookId", "")
+	startID := mywant.GetCurrent(want, "startWebhookId", "")
 	if startID == "" {
-		want.StoreStateMultiForAgent(map[string]any{
-			"startWebhookId":      want.Metadata.ID + "-start",
-			"stopWebhookId":       want.Metadata.ID + "-stop",
-			"debugStartWebhookId": want.Metadata.ID + "-debug-start",
-			"debugStopWebhookId":  want.Metadata.ID + "-debug-stop",
-			"replayWebhookId":     want.Metadata.ID + "-replay",
-			"action_by_agent":     playwrightRecordAgentName,
-		})
+		want.SetCurrent("startWebhookId", want.Metadata.ID+"-start")
+		want.SetCurrent("stopWebhookId", want.Metadata.ID+"-stop")
+		want.SetCurrent("debugStartWebhookId", want.Metadata.ID+"-debug-start")
+		want.SetCurrent("debugStopWebhookId", want.Metadata.ID+"-debug-stop")
+		want.SetCurrent("replayWebhookId", want.Metadata.ID+"-replay")
+		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+
 		want.StoreLog("[PLAYWRIGHT-RECORD] Registered webhook IDs: %s-start / %s-stop / %s-debug-start / %s-debug-stop / %s-replay",
 			want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID)
 		return false, nil
 	}
 
-	active, _ := want.GetState("recording_active")
-	isActive, _ := active.(bool)
-
-	debugActive, _ := want.GetState("debug_recording_active")
-	isDebugActive, _ := debugActive.(bool)
-
-	replayActive, _ := want.GetState("replay_active")
-	isReplayActive, _ := replayActive.(bool)
+	isActive := mywant.GetCurrent(want, "recording_active", false)
+	isDebugActive := mywant.GetCurrent(want, "debug_recording_active", false)
+	isReplayActive := mywant.GetCurrent(want, "replay_active", false)
 
 	if !isActive && !isDebugActive && !isReplayActive {
 		// Waiting for normal start signal
-		startReq, _ := want.GetState("start_recording_requested")
-		if req, ok := startReq.(bool); ok && req {
+		if mywant.GetPlan(want, "start_recording_requested", false) {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_recording_requested=true, starting Playwright recording...")
 			return false, startPlaywrightRecording(ctx, want)
 		}
 		// Waiting for debug start signal
-		debugStartReq, _ := want.GetState("start_debug_recording_requested")
-		if req, ok := debugStartReq.(bool); ok && req {
+		if mywant.GetPlan(want, "start_debug_recording_requested", false) {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_debug_recording_requested=true, starting debug recording...")
 			return false, startDebugRecording(ctx, want)
 		}
 
 		// Waiting for replay signal
-		replayReq, _ := want.GetState("start_replay_requested")
-		if req, ok := replayReq.(bool); ok && req {
+		if mywant.GetPlan(want, "start_replay_requested", false) {
 			want.StoreLog("[PLAYWRIGHT-RECORD] start_replay_requested=true, starting replay...")
 			return false, startReplay(ctx, want)
 		}
 		// Idle - nothing to do
 		return false, nil
-		}
-
+	}
 
 	if isActive {
 		// Normal recording active - check for stop signal
-		stopReq, _ := want.GetState("stop_recording_requested")
-		if req, ok := stopReq.(bool); ok && req {
+		if mywant.GetPlan(want, "stop_recording_requested", false) {
 			want.StoreLog("[PLAYWRIGHT-RECORD] stop_recording_requested=true, stopping Playwright recording...")
 			return false, stopPlaywrightRecording(ctx, want)
 		}
 		want.StoreLog("[PLAYWRIGHT-RECORD] Recording active, waiting for stop signal...")
 		return false, nil
-		}
-
+	}
 
 	if isDebugActive {
 		// Debug recording active - check for stop signal
-		stopReq, _ := want.GetState("stop_debug_recording_requested")
-		if req, ok := stopReq.(bool); ok && req {
+		if mywant.GetPlan(want, "stop_debug_recording_requested", false) {
 			want.StoreLog("[PLAYWRIGHT-RECORD] stop_debug_recording_requested=true, stopping debug recording...")
 			return false, stopDebugRecording(ctx, want)
 		}
 		want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording active, waiting for finish signal...")
 		return false, nil
-		}
-
+	}
 
 	if isReplayActive {
 		// Replay in progress - poll for completion
@@ -213,19 +199,17 @@ func startPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Recording started: session=%s ui=%s", sessionID, uiURL)
-	want.StoreStateMultiForAgent(map[string]any{
-		"recording_session_id":      sessionID,
-		"recording_iframe_url":      uiURL,
-		"recording_active":          true,
-		"start_recording_requested": false,
-		"action_by_agent":           playwrightRecordAgentName,
-	})
+	want.SetCurrent("recording_session_id", sessionID)
+	want.SetCurrent("recording_iframe_url", uiURL)
+	want.SetCurrent("recording_active", true)
+	want.SetPlan("start_recording_requested", false)
+	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
 // stopPlaywrightRecording sends stop_recording to the MCP App Server and saves the script.
 func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
-	sessionID, _ := want.GetStateString("recording_session_id", "")
+	sessionID := mywant.GetCurrent(want, "recording_session_id", "")
 	if sessionID == "" {
 		return fmt.Errorf("no recording_session_id found in state")
 	}
@@ -248,15 +232,14 @@ func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	want.StoreLog("[PLAYWRIGHT-RECORD] Recording stopped, script length=%d bytes", len(script))
 
 	actionsJSON, _ := json.Marshal(actions)
-	want.StoreStateMultiForAgent(map[string]any{
-		"replay_script":            script,
-		"final_result":             script,
-		"replay_actions":           string(actionsJSON),
-		"replay_start_url":         startURL,
-		"recording_active":         false,
-		"stop_recording_requested": false,
-		"action_by_agent":          playwrightRecordAgentName,
-	})
+	want.SetCurrent("replay_script", script)
+	want.SetPredefined("final_result", script)
+	want.SetCurrent("replay_actions", string(actionsJSON))
+	want.SetCurrent("replay_start_url", startURL)
+	want.SetCurrent("recording_active", false)
+	want.SetPlan("stop_recording_requested", false)
+	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	
 	want.SetStatus(mywant.WantStatusAchieved)
 	return nil
 }
@@ -316,11 +299,9 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 		errMsg := extractMCPErrorText(result)
 		want.StoreLog("[PLAYWRIGHT-RECORD] ERROR from start_recording_debug tool: %s", errMsg)
 		// Clear the request flag so we don't keep retrying on a permanent error
-		want.StoreStateMultiForAgent(map[string]any{
-			"start_debug_recording_requested": false,
-			"debug_recording_error":           errMsg,
-			"action_by_agent":                 playwrightRecordAgentName,
-		})
+		want.SetPlan("start_debug_recording_requested", false)
+		want.SetCurrent("debug_recording_error", errMsg)
+		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 		return nil
 	}
 
@@ -332,18 +313,16 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording started: session=%s cdp=%s", sessionID, cdpURL)
-	want.StoreStateMultiForAgent(map[string]any{
-		"debug_recording_session_id":      sessionID,
-		"debug_recording_active":          true,
-		"start_debug_recording_requested": false,
-		"action_by_agent":                 playwrightRecordAgentName,
-	})
+	want.SetCurrent("debug_recording_session_id", sessionID)
+	want.SetCurrent("debug_recording_active", true)
+	want.SetPlan("start_debug_recording_requested", false)
+	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
 // stopDebugRecording stops the debug recording, saves the Playwright script, and captures target_object.
 func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
-	sessionID, _ := want.GetStateString("debug_recording_session_id", "")
+	sessionID := mywant.GetCurrent(want, "debug_recording_session_id", "")
 	if sessionID == "" {
 		return fmt.Errorf("no debug_recording_session_id found in state")
 	}
@@ -366,27 +345,25 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 	want.StoreLog("[PLAYWRIGHT-RECORD] Debug recording stopped, script=%d bytes target_object=%v", len(script), targetObject != nil)
 
 	actionsJSON, _ := json.Marshal(actions)
-	stateUpdate := map[string]any{
-		"replay_script":                  script,
-		"final_result":                   script,
-		"replay_actions":                 string(actionsJSON),
-		"replay_start_url":               startURL,
-		"debug_recording_active":         false,
-		"stop_debug_recording_requested": false,
-		"action_by_agent":                playwrightRecordAgentName,
-	}
+	want.SetCurrent("replay_script", script)
+	want.SetPredefined("final_result", script)
+	want.SetCurrent("replay_actions", string(actionsJSON))
+	want.SetCurrent("replay_start_url", startURL)
+	want.SetCurrent("debug_recording_active", false)
+	want.SetPlan("stop_debug_recording_requested", false)
+	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	
 	if targetObject != nil {
-		stateUpdate["target_object"] = targetObject
+		want.SetCurrent("target_object", targetObject)
 	}
-	want.StoreStateMultiForAgent(stateUpdate)
 	want.SetStatus(mywant.WantStatusAchieved)
 	return nil
 }
 
 // startReplay launches a replay session via the run_replay MCP tool.
 func startReplay(ctx context.Context, want *mywant.Want) error {
-	actionsJSON, _ := want.GetStateString("replay_actions", "[]")
-	startURL, _ := want.GetStateString("replay_start_url", "")
+	actionsJSON := mywant.GetCurrent(want, "replay_actions", "[]")
+	startURL := mywant.GetCurrent(want, "replay_start_url", "")
 	if startURL == "" {
 		startURL = want.GetStringParam("target_url", "https://example.com")
 	}
@@ -394,7 +371,8 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 	var actions []string
 	if err := json.Unmarshal([]byte(actionsJSON), &actions); err != nil || len(actions) == 0 {
 		want.StoreLog("[PLAYWRIGHT-RECORD] No replay_actions available for replay")
-		want.StoreStateMultiForAgent(map[string]any{"start_replay_requested": false, "action_by_agent": playwrightRecordAgentName})
+		want.SetPlan("start_replay_requested", false)
+		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 		return nil
 	}
 
@@ -422,21 +400,20 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.StoreLog("[PLAYWRIGHT-RECORD] Replay started: session=%s ui=%s", sessionID, uiURL)
-	want.StoreStateMultiForAgent(map[string]any{
-		"replay_session_id":      sessionID,
-		"replay_iframe_url":      uiURL,
-		"replay_active":          true,
-		"start_replay_requested": false,
-		"action_by_agent":        playwrightRecordAgentName,
-	})
+	want.SetCurrent("replay_session_id", sessionID)
+	want.SetCurrent("replay_iframe_url", uiURL)
+	want.SetCurrent("replay_active", true)
+	want.SetPlan("start_replay_requested", false)
+	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
 // pollReplay checks the replay status via check_replay MCP tool.
 func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
-	sessionID, _ := want.GetStateString("replay_session_id", "")
+	sessionID := mywant.GetCurrent(want, "replay_session_id", "")
 	if sessionID == "" {
-		want.StoreStateMultiForAgent(map[string]any{"replay_active": false, "action_by_agent": playwrightRecordAgentName})
+		want.SetCurrent("replay_active", false)
+		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
 		return true, nil
 	}
 
@@ -466,32 +443,31 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 			}
 			// Replay complete
 			replayResultJSON, _ := json.Marshal(inner.Result)
-			stateUpdate := map[string]any{
-				"replay_active":     false,
-				"replay_session_id": "",
-				"replay_iframe_url": "",
-				"action_by_agent":   playwrightRecordAgentName,
-			}
+			
+			want.SetCurrent("replay_active", false)
+			want.SetCurrent("replay_session_id", "")
+			want.SetCurrent("replay_iframe_url", "")
+			want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+
 			if inner.Error != "" {
-				stateUpdate["replay_error"] = inner.Error
+				want.SetCurrent("replay_error", inner.Error)
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay failed: %s", inner.Error)
 			} else {
-				stateUpdate["replay_result"] = string(replayResultJSON)
+				want.SetCurrent("replay_result", string(replayResultJSON))
 				// Set final_result to the selected_text from the replay result
 				if selectedText, ok := inner.Result["selected_text"].(string); ok && selectedText != "" {
-					stateUpdate["final_result"] = selectedText
+					want.SetPredefined("final_result", selectedText)
 				}
 				// Move screenshot from MCP-written path to want-specific path
 				if screenshotPath, ok := inner.Result["screenshot_path"].(string); ok && screenshotPath != "" {
 					if screenshotURL, err := moveReplayScreenshot(screenshotPath, want.Metadata.ID); err == nil {
-						stateUpdate["replay_screenshot_url"] = screenshotURL
+						want.SetCurrent("replay_screenshot_url", screenshotURL)
 					} else {
 						want.StoreLog("[PLAYWRIGHT-RECORD] Failed to save screenshot: %s", err)
 					}
 				}
 				want.StoreLog("[PLAYWRIGHT-RECORD] Replay complete: result=%s", string(replayResultJSON))
 			}
-			want.StoreStateMultiForAgent(stateUpdate)
 			return true, nil
 		}
 	}

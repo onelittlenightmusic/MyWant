@@ -121,6 +121,9 @@ func (n *Want) ExecuteAgents() error {
 		}
 	}
 
+	// Make changes from synchronous (Do) agents immediately visible in the current cycle
+	n.AggregateChanges()
+
 	return nil
 }
 

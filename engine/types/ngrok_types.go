@@ -73,14 +73,13 @@ func (n *NgrokWant) Initialize() {
 
 	// Store config in state for live_server_manager agent to read
 	argsJSON, _ := json.Marshal([]string{locals.Protocol, locals.Port, "--log=stdout"})
-	n.StoreStateMulti(map[string]any{
-		"server_phase":    "starting",
-		"server_pid":      0,
-		"ngrok_url":       "",
-		"server_command":  "ngrok",
-		"server_args":     string(argsJSON),
-		"server_log_file": logFile,
-	})
+	
+	n.SetCurrent("server_phase", "starting")
+	n.SetCurrent("server_pid", 0)
+	n.SetCurrent("ngrok_url", "")
+	n.SetCurrent("server_command", "ngrok")
+	n.SetCurrent("server_args", string(argsJSON))
+	n.SetCurrent("server_log_file", logFile)
 
 	// Start ngrok process via live_server_manager agent
 	if err := n.ExecuteAgents(); err != nil {
@@ -88,8 +87,8 @@ func (n *NgrokWant) Initialize() {
 		return
 	}
 
-	pid, ok := n.GetStateInt("server_pid", 0)
-	if !ok || pid == 0 {
+	pid := GetCurrent(n, "server_pid", 0)
+	if pid == 0 {
 		n.failWithError(locals, "agent did not start ngrok process")
 		return
 	}
@@ -104,17 +103,15 @@ func (n *NgrokWant) Initialize() {
 
 	locals.NgrokURL = url
 	locals.Phase = NgrokPhaseRunning
-	n.StoreStateMulti(map[string]any{
-		"ngrok_url":    url,
-		"server_phase": NgrokPhaseRunning,
-	})
+	n.SetCurrent("ngrok_url", url)
+	n.SetCurrent("server_phase", NgrokPhaseRunning)
 	n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
 }
 
 // IsAchieved checks if the ngrok tunnel is running with a public URL
 func (n *NgrokWant) IsAchieved() bool {
-	phase, _ := n.GetStateString("server_phase", "")
-	url, _ := n.GetStateString("ngrok_url", "")
+	phase := GetCurrent(n, "server_phase", "")
+	url := GetCurrent(n, "ngrok_url", "")
 	return phase == NgrokPhaseRunning && url != ""
 }
 
@@ -123,7 +120,7 @@ func (n *NgrokWant) CalculateAchievingPercentage() int {
 	if n.IsAchieved() || n.Status == WantStatusAchieved {
 		return 100
 	}
-	phase, _ := n.GetStateString("server_phase", "")
+	phase := GetCurrent(n, "server_phase", "")
 	switch phase {
 	case NgrokPhaseRunning:
 		return 100
@@ -140,25 +137,25 @@ func (n *NgrokWant) CalculateAchievingPercentage() int {
 func (n *NgrokWant) failWithError(locals *NgrokLocals, msg string) {
 	n.StoreLog("[ERROR] %s", msg)
 	locals.Phase = NgrokPhaseFailed
-	n.StoreState("server_phase", NgrokPhaseFailed)
-	n.StoreState("error_message", msg)
+	n.SetCurrent("server_phase", NgrokPhaseFailed)
+	n.SetCurrent("error_message", msg)
 	n.Status = "failed"
 }
 
 // Progress implements Progressable for NgrokWant
 func (n *NgrokWant) Progress() {
 	locals := n.GetLocals()
-	n.StoreState("achieving_percentage", n.CalculateAchievingPercentage())
+	n.SetPredefined("achieving_percentage", n.CalculateAchievingPercentage())
 
 	switch locals.Phase {
 	case NgrokPhaseRunning:
 		n.ProvideDone()
 
 	case NgrokPhaseStopping:
-		if pid, _ := n.GetStateInt("server_pid", 0); pid == 0 {
-			n.StoreState("ngrok_url", "")
+		if pid := GetCurrent(n, "server_pid", 0); pid == 0 {
+			n.SetCurrent("ngrok_url", "")
 			locals.Phase = NgrokPhaseStopped
-			n.StoreState("server_phase", NgrokPhaseStopped)
+			n.SetCurrent("server_phase", NgrokPhaseStopped)
 			n.StoreLog("[NGROK] Tunnel stopped successfully")
 		}
 
@@ -172,7 +169,7 @@ func (n *NgrokWant) OnDelete() {
 	n.StoreLog("[NGROK] Want is being deleted, stopping tunnel")
 
 	// Kill process directly (and its process group)
-	if pid, ok := n.GetStateInt("server_pid", 0); ok && pid > 0 {
+	if pid := GetCurrent(n, "server_pid", 0); pid > 0 {
 		n.StoreLog("[NGROK] Killing ngrok process group PID %d", pid)
 		// Try to kill process group first (since live_server_manager starts with Setpgid: true)
 		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
@@ -184,7 +181,7 @@ func (n *NgrokWant) OnDelete() {
 				}
 			}
 		}
-		n.StoreState("server_pid", 0)
+		n.SetCurrent("server_pid", 0)
 	}
 
 	if err := n.StopAllBackgroundAgents(); err != nil {

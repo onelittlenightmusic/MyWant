@@ -63,7 +63,7 @@ func (r *MCPServerRegistry) Unregister(name string) {
 func startMCPServer(ctx context.Context, want *mywant.Want) error {
 	serverName := want.GetStringParam("mcp_server_name", "default")
 	command := want.GetStringParam("mcp_command", "npx")
-	argsRaw, _ := want.GetState("mcp_args")
+	args := mywant.GetCurrent(want, "mcp_args", []string{})
 
 	// レジストリを確認
 	registry := GetMCPServerRegistry()
@@ -74,30 +74,14 @@ func startMCPServer(ctx context.Context, want *mywant.Want) error {
 		}
 	}
 
-	var args []string
-	if a, ok := argsRaw.([]string); ok {
-		args = a
-	} else if a, ok := argsRaw.([]interface{}); ok {
-		for _, v := range a {
-			args = append(args, fmt.Sprintf("%v", v))
-		}
-	}
-
 	cmd := exec.CommandContext(ctx, command, args...)
 
 	// 環境変数の設定 (GMAIL_TOKEN_PATH, GOOGLE_CLIENT_ID など)
-	envMap, _ := want.GetState("mcp_env")
+	envMap := mywant.GetCurrent(want, "mcp_env", map[string]any{})
 	cmd.Env = os.Environ()
-	if envs, ok := envMap.(map[string]interface{}); ok {
-		for k, v := range envs {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%v", k, v))
-			want.StoreLog("[MCP-PROCESS] Injecting env: %s", k)
-		}
-	} else if envs, ok := envMap.(map[string]string); ok {
-		for k, v := range envs {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
-			want.StoreLog("[MCP-PROCESS] Injecting env: %s", k)
-		}
+	for k, v := range envMap {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%v", k, v))
+		want.StoreLog("[MCP-PROCESS] Injecting env: %s", k)
 	}
 
 	stdin, err := cmd.StdinPipe()
@@ -122,8 +106,8 @@ func startMCPServer(ctx context.Context, want *mywant.Want) error {
 		Name:   serverName,
 	})
 
-	want.StoreState("mcp_server_status", "running")
-	want.StoreState("mcp_server_pid", cmd.Process.Pid)
+	want.SetCurrent("mcp_server_status", "running")
+	want.SetCurrent("mcp_server_pid", cmd.Process.Pid)
 	return nil
 }
 
@@ -134,22 +118,22 @@ func monitorMCPServer(ctx context.Context, want *mywant.Want) (bool, error) {
 
 	proc, ok := registry.Get(serverName)
 	if !ok {
-		want.StoreState("mcp_server_status", "stopped")
+		want.SetCurrent("mcp_server_status", "stopped")
 		return false, nil
 	}
 
 	if proc.Cmd.Process == nil {
-		want.StoreState("mcp_server_status", "stopped")
+		want.SetCurrent("mcp_server_status", "stopped")
 		return false, nil
 	}
 
 	// プロセスの生存確認 (Waitせずに状態だけチェック)
 	// プロセスが存在し、終了していないことを確認
 	if proc.Cmd.ProcessState != nil && proc.Cmd.ProcessState.Exited() {
-		want.StoreState("mcp_server_status", "stopped")
+		want.SetCurrent("mcp_server_status", "stopped")
 		want.StoreLog("[MCP-PROCESS] Server '%s' has exited", serverName)
 	} else {
-		want.StoreState("mcp_server_status", "running")
+		want.SetCurrent("mcp_server_status", "running")
 	}
 
 	return false, nil

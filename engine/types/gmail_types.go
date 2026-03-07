@@ -93,18 +93,18 @@ func (g *GmailWant) Initialize() {
 		g.StoreLog("Warning: claude command not found. Claude Code CLI features may be limited.")
 	}
 
-	g.StoreState("gmail_status", "initialized")
+	g.SetCurrent("gmail_status", "initialized")
 }
 
 // IsAchieved returns true when the Gmail operation is complete or failed
 func (g *GmailWant) IsAchieved() bool {
-	status, _ := g.GetStateString("gmail_status", "pending")
+	status := GetCurrent(g, "gmail_status", "pending")
 	return status == "completed" || status == "failed"
 }
 
 // CalculateAchievingPercentage returns the progress percentage
 func (g *GmailWant) CalculateAchievingPercentage() float64 {
-	status, _ := g.GetStateString("gmail_status", "pending")
+	status := GetCurrent(g, "gmail_status", "pending")
 	switch status {
 	case "pending", "initialized":
 		return 10
@@ -129,16 +129,16 @@ func (g *GmailWant) Progress() {
 	}
 
 	if locals.Prompt == "" {
-		g.StoreState("gmail_status", "failed")
-		g.StoreState("error", "No prompt available")
+		g.SetCurrent("gmail_status", "failed")
+		g.SetCurrent("error", "No prompt available")
 		return
 	}
 
-	status, _ := g.GetStateString("gmail_status", "pending")
+	status := GetCurrent(g, "gmail_status", "pending")
 
 	// State: pending or initialized -> Start execution
 	if status == "pending" || status == "initialized" {
-		g.StoreState("gmail_status", "executing")
+		g.SetCurrent("gmail_status", "executing")
 
 		// Set up environment variables from parameters
 		env := make(map[string]string)
@@ -151,16 +151,16 @@ func (g *GmailWant) Progress() {
 		if locals.GoogleClientSecret != "" {
 			env["GOOGLE_CLIENT_SECRET"] = locals.GoogleClientSecret
 		}
-		g.StoreState("mcp_env", env)
-		g.StoreState("mcp_server_name", "gmail")
-		g.StoreState("mcp_command", "npx")
-		g.StoreState("mcp_args", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"})
-		g.StoreState("mcp_native", true)
+		g.SetInternal("mcp_env", env)
+		g.SetInternal("mcp_server_name", "gmail")
+		g.SetInternal("mcp_command", "npx")
+		g.SetInternal("mcp_args", []string{"-y", "@gongrzhe/server-gmail-autoauth-mcp"})
+		g.SetInternal("mcp_native", true)
 
 		// Store the prompt as an MCP operation for the agent
-		g.StoreState("mcp_operation", "gmail_search")
-		g.StoreState("mcp_query", locals.Prompt)
-		g.StoreState("mcp_max_results", 10)
+		g.SetInternal("mcp_operation", "gmail_search")
+		g.SetInternal("mcp_query", locals.Prompt)
+		g.SetInternal("mcp_max_results", 10)
 
 		return // Yield and let agents run in their own turn
 	}
@@ -170,30 +170,21 @@ func (g *GmailWant) Progress() {
 		// Execute Agents via agent framework (this triggers them if they haven't run)
 		if err := g.ExecuteAgents(); err != nil {
 			g.StoreLog("ERROR: Failed to execute MCP agent: %v", err)
-			g.StoreState("gmail_status", "failed")
-			g.StoreState("error", fmt.Sprintf("MCP agent failed: %v", err))
+			g.SetCurrent("gmail_status", "failed")
+			g.SetCurrent("error", fmt.Sprintf("MCP agent failed: %v", err))
 			return
 		}
 
 		// Check if result has arrived from MCPAgent
-		agentResult, exists := g.GetState("agent_result")
-		if !exists {
+		agentResult := GetPredefined(g, "agent_result", map[string]any{})
+		if len(agentResult) == 0 {
 			// Result not ready yet, wait for next cycle
-			return
-		}
-
-		// Convert agent result to map
-		resultMap, ok := agentResult.(map[string]interface{})
-		if !ok {
-			g.StoreLog("ERROR: Agent result is not a map: %T", agentResult)
-			g.StoreState("gmail_status", "failed")
-			g.StoreState("error", "Invalid agent result format")
 			return
 		}
 
 		// Flatten and parse emails from MCP content
 		emails := []map[string]string{}
-		if content := resultMap["content"]; content != nil {
+		if content := agentResult["content"]; content != nil {
 			// Handle both []string and []interface{} for robustness
 			if strSlice, ok := content.([]string); ok {
 				for _, text := range strSlice {
@@ -208,8 +199,8 @@ func (g *GmailWant) Progress() {
 			}
 		}
 
-		g.StoreState("gmail_result", emails)
-		g.StoreState("gmail_status", "completed")
+		g.SetCurrent("gmail_result", emails)
+		g.SetCurrent("gmail_status", "completed")
 		g.StoreLog("📦 Gmail search completed for '%s': found %d emails", locals.Prompt, len(emails))
 
 		// Provide result to output channels

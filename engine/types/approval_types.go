@@ -48,22 +48,20 @@ func (e *EvidenceWant) Initialize() {
 
 // IsAchieved checks if evidence has been provided
 func (e *EvidenceWant) IsAchieved() bool {
-	provided, _ := e.GetStateBool("evidence_provided", false)
-	return provided
+	return GetCurrent(e, "evidence_provided", false)
 }
 
 func (e *EvidenceWant) Progress() {
 	locals := e.GetLocals()
 
-	provided, _ := e.GetStateBool("evidence_provided", false)
-	if provided {
+	if GetCurrent(e, "evidence_provided", false) {
 		return
 	}
 
 	// NOTE: Framework ensures output connections exist before Progress() is called
 	// due to require: "users" in type-evidence.yaml
 
-	e.StoreState("evidence_provided", true)
+	e.SetCurrent("evidence_provided", true)
 
 	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
 
@@ -73,14 +71,13 @@ func (e *EvidenceWant) Progress() {
 		Description: "Supporting evidence for approval process",
 		Timestamp:   time.Now(),
 	}
-	e.StoreStateMulti(Dict{
-		"evidence":             evidence,
-		"evidence_type":        locals.EvidenceType,
-		"approval_id":          locals.ApprovalID,
-		"evidence_provided_at": evidenceData.Timestamp.Format(time.RFC3339),
-		"total_processed":      1,
-		"achieving_percentage": 100,
-	})
+	
+	e.SetCurrent("evidence", evidence)
+	e.SetCurrent("evidence_type", locals.EvidenceType)
+	e.SetGoal("approval_id", locals.ApprovalID)
+	e.SetCurrent("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
+	e.SetCurrent("total_processed", 1)
+	e.SetPredefined("achieving_percentage", 100)
 
 	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount())
 
@@ -94,8 +91,7 @@ func (e *EvidenceWant) Progress() {
 
 // CalculateAchievingPercentage calculates the progress toward completion for EvidenceWant Returns 100 if evidence has been provided, 0 otherwise
 func (e *EvidenceWant) CalculateAchievingPercentage() int {
-	provided, _ := e.GetStateBool("evidence_provided", false)
-	if provided {
+	if GetCurrent(e, "evidence_provided", false) {
 		return 100
 	}
 	return 0
@@ -128,22 +124,20 @@ func (d *DescriptionWant) Initialize() {
 
 // IsAchieved checks if description has been provided
 func (d *DescriptionWant) IsAchieved() bool {
-	provided, _ := d.GetStateBool("description_provided", false)
-	return provided
+	return GetCurrent(d, "description_provided", false)
 }
 
 func (d *DescriptionWant) Progress() {
 	locals := d.GetLocals()
 
-	provided, _ := d.GetStateBool("description_provided", false)
-	if provided {
+	if GetCurrent(d, "description_provided", false) {
 		return
 	}
 
 	// NOTE: Framework ensures output connections exist before Progress() is called
 	// due to require: "users" in type-description.yaml
 
-	d.StoreState("description_provided", true)
+	d.SetCurrent("description_provided", true)
 
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
 
@@ -153,14 +147,13 @@ func (d *DescriptionWant) Progress() {
 		Description: description,
 		Timestamp:   time.Now(),
 	}
-	d.StoreStateMulti(Dict{
-		"description_format":      locals.DescriptionFormat,
-		"approval_id":             locals.ApprovalID,
-		"description":             description,
-		"description_provided_at": descriptionData.Timestamp.Format(time.RFC3339),
-		"total_processed":         1,
-		"achieving_percentage":    100,
-	})
+	
+	d.SetCurrent("description_format", locals.DescriptionFormat)
+	d.SetGoal("approval_id", locals.ApprovalID)
+	d.SetCurrent("description", description)
+	d.SetCurrent("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
+	d.SetCurrent("total_processed", 1)
+	d.SetPredefined("achieving_percentage", 100)
 
 	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, d.GetOutCount())
 
@@ -174,8 +167,7 @@ func (d *DescriptionWant) Progress() {
 
 // CalculateAchievingPercentage calculates the progress toward completion for DescriptionWant Returns 100 if description has been provided, 0 otherwise
 func (d *DescriptionWant) CalculateAchievingPercentage() int {
-	provided, _ := d.GetStateBool("description_provided", false)
-	if provided {
+	if GetCurrent(d, "description_provided", false) {
 		return 100
 	}
 	return 0

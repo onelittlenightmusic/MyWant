@@ -147,14 +147,13 @@ func (g *Numbers) Progress() {
 			}
 		}
 		g.StoreLog("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount))
-		g.StoreStateMulti(mywant.Dict{
-			"total_processed":      locals.currentCount,
-			"average_wait_time":    0.0, // Generators don't have wait time
-			"total_wait_time":      0.0,
-			"current_time":         locals.currentTime,
-			"current_count":        locals.currentCount,
-			"achieving_percentage": achievingPercentage,
-		})
+		
+		g.SetCurrent("total_processed", locals.currentCount)
+		g.SetCurrent("average_wait_time", 0.0) // Generators don't have wait time
+		g.SetCurrent("total_wait_time", 0.0)
+		g.SetCurrent("current_time", locals.currentTime)
+		g.SetCurrent("current_count", locals.currentCount)
+		g.SetPredefined("achieving_percentage", achievingPercentage)
 	}
 
 	g.Provide(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
@@ -162,9 +161,7 @@ func (g *Numbers) Progress() {
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
 		g.StoreLog("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount)
-		g.StoreStateMulti(mywant.Dict{
-			"achieving_percentage": 100,
-		})
+		g.SetPredefined("achieving_percentage", 100)
 
 		g.ProvideDone()
 	}
@@ -205,7 +202,7 @@ func (q *Queue) Initialize() {
 
 // IsAchieved checks if queue is complete (end signal received)
 func (q *Queue) IsAchieved() bool {
-	completed, _ := q.GetStateBool("completed", false)
+	completed := mywant.GetCurrent(q, "completed", false)
 	if completed {
 		q.StoreLog("[QUEUE-ISACHIEVED] Completed! Shifting to achieved")
 	}
@@ -251,7 +248,7 @@ func (q *Queue) Progress() {
 		// Forward end signal to next want
 		q.ProvideDone()
 		q.StoreLog("[QUEUE-EXEC] Setting completed=true")
-		q.StoreState("completed", true)
+		q.SetCurrent("completed", true)
 		return
 	}
 
@@ -270,7 +267,7 @@ func (q *Queue) Progress() {
 
 	// Batch mechanism: only update statistics every N packets
 	if locals.processedCount%locals.batchUpdateInterval == 0 {
-		q.StoreState("last_packet_wait_time", waitTime)
+		q.SetCurrent("last_packet_wait_time", waitTime)
 		q.flushBatch(locals)
 		locals.lastBatchCount = locals.processedCount
 	}
@@ -299,16 +296,14 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 	}
 
 	// Batch update all statistics at once
-	q.StoreStateMulti(mywant.Dict{
-		"serverFreeTime":           locals.serverFreeTime,
-		"waitTimeSum":              locals.waitTimeSum,
-		"processedCount":           locals.processedCount,
-		"average_wait_time":        avgWaitTime,
-		"total_processed":          locals.processedCount,
-		"total_wait_time":          locals.waitTimeSum,
-		"current_server_free_time": locals.serverFreeTime,
-		"achieving_percentage":     achievingPercentage,
-	})
+	q.SetCurrent("serverFreeTime", locals.serverFreeTime)
+	q.SetCurrent("waitTimeSum", locals.waitTimeSum)
+	q.SetCurrent("processedCount", locals.processedCount)
+	q.SetCurrent("average_wait_time", avgWaitTime)
+	q.SetCurrent("total_processed", locals.processedCount)
+	q.SetCurrent("total_wait_time", locals.waitTimeSum)
+	q.SetCurrent("current_server_free_time", locals.serverFreeTime)
+	q.SetPredefined("achieving_percentage", achievingPercentage)
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
@@ -318,13 +313,12 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	if locals.processedCount > 0 {
 		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
-	q.StoreStateMulti(mywant.Dict{
-		"average_wait_time":        avgWaitTime,
-		"total_processed":          locals.processedCount,
-		"total_wait_time":          locals.waitTimeSum,
-		"current_server_free_time": locals.serverFreeTime,
-		"achieving_percentage":     100,
-	})
+	
+	q.SetCurrent("average_wait_time", avgWaitTime)
+	q.SetCurrent("total_processed", locals.processedCount)
+	q.SetCurrent("total_wait_time", locals.waitTimeSum)
+	q.SetCurrent("current_server_free_time", locals.serverFreeTime)
+	q.SetPredefined("achieving_percentage", 100)
 
 	return nil
 }
@@ -348,8 +342,7 @@ func (q *Queue) CalculateAchievingPercentage() int {
 	}
 
 	// Fallback: returns 100 when termination is received, 50 during processing
-	completed, _ := q.GetStateBool("completed", false)
-	if completed {
+	if mywant.GetCurrent(q, "completed", false) {
 		return 100
 	}
 
@@ -376,15 +369,14 @@ func (c *Combiner) Initialize() {
 
 // IsAchieved checks if combiner is complete (end signal received)
 func (c *Combiner) IsAchieved() bool {
-	completed, _ := c.GetStateBool("completed", false)
-	return completed
+	return mywant.GetCurrent(c, "completed", false)
 }
 
 // Progress executes the combiner directly
 func (c *Combiner) Progress() {
 	locals := c.GetLocals()
 
-	processed, _ := c.GetStateInt("processed", 0)
+	processed := mywant.GetCurrent(c, "processed", 0)
 	if c.GetInCount() == 0 || c.GetOutCount() == 0 {
 		return
 	}
@@ -402,7 +394,7 @@ func (c *Combiner) Progress() {
 		}
 		// Forward end signal to next want
 		c.ProvideDone()
-		c.StoreState("completed", true)
+		c.SetCurrent("completed", true)
 		return
 	}
 
@@ -410,18 +402,17 @@ func (c *Combiner) Progress() {
 	processed++
 	c.Provide(packet)
 
-	c.StoreState("processed", processed)
+	c.SetCurrent("processed", processed)
 }
 
 // OnEnded implements PacketHandler interface for Combiner termination callbacks
 func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
-	processed, _ := c.GetStateInt("processed", 0)
-	c.StoreStateMulti(mywant.Dict{
-		"total_processed":   processed,
-		"average_wait_time": 0.0, // Combiners don't add wait time
-		"total_wait_time":   0.0,
-	})
+	processed := mywant.GetCurrent(c, "processed", 0)
+	
+	c.SetCurrent("total_processed", processed)
+	c.SetCurrent("average_wait_time", 0.0) // Combiners don't add wait time
+	c.SetCurrent("total_wait_time", 0.0)
 
 	return nil
 }

@@ -67,8 +67,7 @@ func (r *ReplayWant) Initialize() {
 
 // IsAchieved returns true when a replay script has been recorded
 func (r *ReplayWant) IsAchieved() bool {
-	script, _ := r.GetStateString("replay_script", "")
-	return script != ""
+	return GetCurrent(r, "replay_script", "") != ""
 }
 
 // CalculateAchievingPercentage returns progress percentage
@@ -76,11 +75,10 @@ func (r *ReplayWant) CalculateAchievingPercentage() int {
 	if r.IsAchieved() || r.Status == WantStatusAchieved {
 		return 100
 	}
-	active, _ := r.GetStateBool("recording_active", false)
-	if active {
+	if GetCurrent(r, "recording_active", false) {
 		return 50
 	}
-	if _, exists := r.GetState("startWebhookId"); exists {
+	if id := GetCurrent(r, "startWebhookId", ""); id != "" {
 		return 10
 	}
 	return 0
@@ -88,7 +86,7 @@ func (r *ReplayWant) CalculateAchievingPercentage() int {
 
 // Progress monitors recording state and marks the want as achieved when done
 func (r *ReplayWant) Progress() {
-	r.StoreState("achieving_percentage", r.CalculateAchievingPercentage())
+	r.SetPredefined("achieving_percentage", r.CalculateAchievingPercentage())
 
 	if r.IsAchieved() {
 		r.SetStatus(WantStatusAchieved)

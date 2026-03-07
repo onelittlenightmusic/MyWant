@@ -86,13 +86,12 @@ func (r *ReminderSchedulerAgent) checkAndTriggerTransitions(w *Want) {
 	now := time.Now()
 
 	// Get current phase from state
-	phase, _ := w.GetState("reminder_phase")
-	phaseStr := fmt.Sprintf("%v", phase)
+	phaseStr := GetCurrent(w, "reminder_phase", "")
 
 	// Check if we should transition to reaching phase
 	if phaseStr == ReminderPhaseWaiting && now.After(r.reachingTime) {
 		w.StoreLog("[REMINDER-SCHEDULER] Reaching time detected, transitioning to reaching phase\n")
-		w.StoreState("reminder_phase", ReminderPhaseReaching)
+		w.SetCurrent("reminder_phase", ReminderPhaseReaching)
 	}
 
 	// Check if event time has passed while in reaching phase

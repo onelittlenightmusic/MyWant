@@ -23,13 +23,13 @@ func init() {
 func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 	want.StoreLog("[AGENT] manageLiveServer called for want %s", want.Metadata.Name)
 
-	phase, ok := want.GetStateString("server_phase", "")
-	if !ok || phase == "" {
+	phase := mywant.GetCurrent(want, "server_phase", "")
+	if phase == "" {
 		want.StoreLog("[AGENT] No server_phase set, returning")
 		return nil
 	}
 
-	existingPID, _ := want.GetStateInt("server_pid", 0)
+	existingPID := mywant.GetCurrent(want, "server_pid", 0)
 
 	switch phase {
 	case "starting":
@@ -39,7 +39,7 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 				want.StoreLog("[ERROR] Failed to start server: %v", err)
 				return err
 			}
-			want.StoreState("server_pid", pid)
+			want.SetCurrent("server_pid", pid)
 			want.StoreLog("[INFO] Started server with PID %d", pid)
 
 			// If health_check_url is configured, poll for readiness
@@ -51,10 +51,10 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 					if proc, findErr := os.FindProcess(pid); findErr == nil {
 						proc.Signal(syscall.SIGTERM)
 					}
-					want.StoreState("server_pid", 0)
+					want.SetCurrent("server_pid", 0)
 					return err
 				}
-				want.StoreState("health_check_response", body)
+				want.SetCurrent("health_check_response", body)
 				want.StoreLog("[INFO] Health check passed")
 			}
 		} else {
@@ -68,8 +68,8 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 				want.StoreLog("[WARN] Failed to stop server PID %d: %v", existingPID, err)
 			} else {
 				want.StoreLog("[INFO] Stopped server PID %d", existingPID)
-				want.StoreState("server_pid", 0)
-				want.StoreState("health_check_response", "")
+				want.SetCurrent("server_pid", 0)
+				want.SetCurrent("health_check_response", "")
 			}
 		}
 	}
@@ -180,7 +180,7 @@ func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (str
 // getConfigString reads a value from state (stateKey) first, then falls back to params (paramKey).
 // Want types store derived config in state; direct YAML usage stores in params.
 func getConfigString(want *mywant.Want, stateKey, paramKey, defaultVal string) string {
-	if v, ok := want.GetStateString(stateKey, ""); ok && v != "" {
+	if v := mywant.GetCurrent(want, stateKey, ""); v != "" {
 		return v
 	}
 	return getStringParam(want, paramKey, defaultVal)
@@ -188,7 +188,7 @@ func getConfigString(want *mywant.Want, stateKey, paramKey, defaultVal string) s
 
 // getConfigInt reads an int from state first, then falls back to params.
 func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) int {
-	if v, ok := want.GetStateInt(stateKey, 0); ok && v != 0 {
+	if v := mywant.GetCurrent(want, stateKey, 0); v != 0 {
 		return v
 	}
 	return getIntParam(want, paramKey, defaultVal)
@@ -196,7 +196,7 @@ func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) 
 
 // getConfigArgs reads args from state (JSON string) first, then falls back to params.
 func getConfigArgs(want *mywant.Want) []string {
-	if v, ok := want.GetStateString("server_args", ""); ok && v != "" {
+	if v := mywant.GetCurrent(want, "server_args", ""); v != "" {
 		// Stored as JSON array string
 		var args []string
 		if json.Unmarshal([]byte(v), &args) == nil {

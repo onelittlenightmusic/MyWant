@@ -18,8 +18,8 @@ func init() {
 // executeHotelReservation performs a hotel reservation.
 func executeHotelReservation(ctx context.Context, want *Want) error {
 	// ── GCP Pattern: Only execute if a plan exists ────────────────────────
-	if plan, _ := want.GetPlan("execute_booking"); plan == nil {
-		if legacy, _ := want.GetStateBool("good_to_reserve", false); !legacy {
+	if !GetPlan(want, "execute_booking", false) {
+		if !GetCurrent(want, "good_to_reserve", false) {
 			return nil // No plan to execute
 		}
 	}

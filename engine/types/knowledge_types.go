@@ -63,8 +63,8 @@ func (k *KnowledgeWant) Initialize() {
 	locals.RefreshInterval = interval
 
 	// Initial state setup
-	if _, exists := k.GetState("knowledge_status"); !exists {
-		k.StoreState("knowledge_status", "stale")
+	if status := GetCurrent(k, "knowledge_status", ""); status == "" {
+		k.SetCurrent("knowledge_status", "stale")
 	}
 
 	k.StoreLog("[KNOWLEDGE] Knowledge want initialized for topic: %s", locals.Topic)
@@ -72,14 +72,14 @@ func (k *KnowledgeWant) Initialize() {
 
 func (k *KnowledgeWant) fail(msg string) {
 	k.StoreLog("ERROR: %s", msg)
-	k.StoreState("knowledge_status", "failed")
-	k.StoreState("error", msg)
+	k.SetCurrent("knowledge_status", "failed")
+	k.SetCurrent("error", msg)
 	k.Status = "failed"
 }
 
 // CalculateAchievingPercentage returns the progress percentage
 func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
-	status, _ := k.GetStateString("knowledge_status", "")
+	status := GetCurrent(k, "knowledge_status", "")
 	switch status {
 	case "stale":
 		return 10
@@ -96,8 +96,7 @@ func (k *KnowledgeWant) CalculateAchievingPercentage() float64 {
 
 // IsAchieved returns true when the knowledge is fresh and the file is up to date
 func (k *KnowledgeWant) IsAchieved() bool {
-	status, _ := k.GetStateString("knowledge_status", "")
-	return status == "fresh"
+	return GetCurrent(k, "knowledge_status", "") == "fresh"
 }
 
 // Progress orchestrates the monitoring and updating of knowledge
@@ -106,13 +105,13 @@ func (k *KnowledgeWant) Progress() {
 		// Even if achieved, we check if it's time to refresh
 		if k.shouldRefresh() {
 			k.StoreLog("[KNOWLEDGE] Refresh interval reached, marking as stale")
-			k.StoreState("knowledge_status", "stale")
+			k.SetCurrent("knowledge_status", "stale")
 		} else {
 			return
 		}
 	}
 
-	status, _ := k.GetStateString("knowledge_status", "")
+	status := GetCurrent(k, "knowledge_status", "")
 
 	if status == "stale" {
 		k.runMonitor()
@@ -122,8 +121,12 @@ func (k *KnowledgeWant) Progress() {
 }
 
 func (k *KnowledgeWant) shouldRefresh() bool {
-	lastTime, ok := k.GetStateTime("last_sync_time", time.Time{})
-	if !ok {
+	lastTimeStr := GetCurrent(k, "last_sync_time", "")
+	if lastTimeStr == "" {
+		return true
+	}
+	lastTime, err := time.Parse(time.RFC3339, lastTimeStr)
+	if err != nil {
 		return true
 	}
 

@@ -42,15 +42,14 @@ func (g *GmailDynamicWant) Initialize() {
 		g.PhaseRetryCount = make(map[string]int)
 	}
 
-	phase, _ := g.GetStateString("phase", "")
+	phase := mywant.GetCurrent(g, "phase", "")
 	if phase == "" {
-		g.StoreState("phase", string(PhaseDiscovery))
+		g.SetCurrent("phase", string(PhaseDiscovery))
 	}
 }
 
 func (g *GmailDynamicWant) IsAchieved() bool {
-	phase, _ := g.GetStateString("phase", "")
-	return phase == string(PhaseStable)
+	return mywant.GetCurrent(g, "phase", "") == string(PhaseStable)
 }
 
 func (g *GmailDynamicWant) Progress() {
@@ -58,14 +57,14 @@ func (g *GmailDynamicWant) Progress() {
 		return
 	}
 
-	phaseStr, _ := g.GetStateString("phase", string(PhaseDiscovery))
+	phaseStr := mywant.GetCurrent(g, "phase", string(PhaseDiscovery))
 	phase := GmailDynamicPhase(phaseStr)
 
 	// Only log phase transition or significant events to avoid spam
-	lastLoggedPhase, _ := g.GetStateString("last_logged_phase", "")
+	lastLoggedPhase := mywant.GetCurrent(g, "last_logged_phase", "")
 	if lastLoggedPhase != phaseStr {
 		g.StoreLog("[GMAIL-DYNAMIC] Transitioned to phase: %s", phase)
-		g.StoreState("last_logged_phase", phaseStr)
+		g.SetCurrent("last_logged_phase", phaseStr)
 	}
 
 	// Get current retry count for this phase
@@ -74,7 +73,7 @@ func (g *GmailDynamicWant) Progress() {
 	// Before executing any agent, check if we've exceeded max retries
 	if currentRetries >= MaxRetriesPerPhase {
 		g.SetStatus(mywant.WantStatusFailed)
-		feedback, _ := g.GetStateString("error_feedback", "No detailed feedback")
+		feedback := mywant.GetCurrent(g, "error_feedback", "No detailed feedback")
 		g.StoreLog("[GMAIL-DYNAMIC][CRITICAL] Terminating: Failed in phase %s after %d retries. Detail: %s",
 			phase, currentRetries, feedback)
 		return
@@ -99,7 +98,7 @@ func (g *GmailDynamicWant) Progress() {
 		g.PhaseRetryCount[string(phase)] = currentRetries + 1
 		g.LastPhaseError = err.Error()
 
-		feedback, _ := g.GetStateString("error_feedback", "")
+		feedback := mywant.GetCurrent(g, "error_feedback", "")
 		errorMsg := fmt.Sprintf("Agent failed: %v", err)
 		if feedback != "" {
 			errorMsg = fmt.Sprintf("%s | Compiler Output: %s", errorMsg, feedback)
@@ -128,8 +127,8 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 	}
 
 	// Check if samples were collected
-	if _, ok := g.GetState("raw_samples"); ok {
-		g.StoreState("phase", string(PhaseCoding))
+	if samples := mywant.GetInternal(g, "raw_samples", any(nil)); samples != nil {
+		g.SetCurrent("phase", string(PhaseCoding))
 		g.StoreLog("[PHASE:DISCOVERY] Samples collected. Moving to PhaseCoding.")
 	} else {
 		return fmt.Errorf("Discovery Agent did not return raw_samples")
@@ -138,7 +137,7 @@ func (g *GmailDynamicWant) handleDiscovery() error {
 }
 
 func (g *GmailDynamicWant) handleCoding() error {
-	feedback, _ := g.GetStateString("error_feedback", "")
+	feedback := mywant.GetCurrent(g, "error_feedback", "")
 	if feedback != "" {
 		g.StoreLog("[PHASE:CODING] Re-generating Go code with error feedback")
 	} else {
@@ -149,8 +148,8 @@ func (g *GmailDynamicWant) handleCoding() error {
 		return fmt.Errorf("Developer Agent failed: %w", err)
 	}
 
-	if source, _ := g.GetStateString("source_code", ""); source != "" {
-		g.StoreState("phase", string(PhaseCompiling))
+	if source := mywant.GetCurrent(g, "source_code", ""); source != "" {
+		g.SetCurrent("phase", string(PhaseCompiling))
 		g.StoreLog("[PHASE:CODING] Code generated. Moving to PhaseCompiling.")
 	} else {
 		return fmt.Errorf("Developer Agent did not return source_code")
@@ -162,7 +161,7 @@ func (g *GmailDynamicWant) handleCompiling() error {
 	g.StoreLog("[PHASE:COMPILING] Compiling Go code to WASM")
 
 	if err := g.ExecuteAgents(); err != nil {
-		feedback, _ := g.GetStateString("error_feedback", "")
+		feedback := mywant.GetCurrent(g, "error_feedback", "")
 		g.StoreLog("[PHASE:COMPILING][ERROR] Compilation failed: %s", feedback)
 
 		// Check current retry count for compiling phase
@@ -177,17 +176,17 @@ func (g *GmailDynamicWant) handleCompiling() error {
 
 		// Increment retry count and go back to coding phase with feedback for regeneration
 		g.PhaseRetryCount[string(PhaseCompiling)] = currentRetries + 1
-		g.StoreState("phase", string(PhaseCoding))
+		g.SetCurrent("phase", string(PhaseCoding))
 		g.StoreLog("[PHASE:COMPILING] Moving back to PhaseCoding with error feedback for code regeneration (attempt %d/%d)", currentRetries+1, MaxRetriesPerPhase)
 		return nil // Don't return error - let State be committed and retry in next loop
 	}
 
-	wasmPath, exists := g.GetStateString("wasm_path", "")
-	if exists && wasmPath != "" {
-		g.StoreState("phase", string(PhaseValidation))
+	wasmPath := mywant.GetCurrent(g, "wasm_path", "")
+	if wasmPath != "" {
+		g.SetCurrent("phase", string(PhaseValidation))
 		g.StoreLog("[PHASE:COMPILING] WASM compiled at %s. Moving to PhaseValidation.", wasmPath)
 		// Clear error_feedback on success
-		g.StoreState("error_feedback", "")
+		g.SetCurrent("error_feedback", "")
 	} else {
 		return fmt.Errorf("Compiler Agent did not return wasm_path")
 	}
@@ -201,7 +200,7 @@ func (g *GmailDynamicWant) handleValidation() error {
 	// and check if it successfully communicates with the Gmail MCP server
 
 	if err := g.ExecuteAgents(); err != nil {
-		feedback, _ := g.GetStateString("error_feedback", "")
+		feedback := mywant.GetCurrent(g, "error_feedback", "")
 		g.StoreLog("[PHASE:VALIDATION][ERROR] Validation failed: %s", feedback)
 
 		// Check current retry count for validation phase
@@ -215,16 +214,16 @@ func (g *GmailDynamicWant) handleValidation() error {
 		}
 
 		// Go back to coding phase for regeneration
-		g.StoreState("phase", string(PhaseCoding))
+		g.SetCurrent("phase", string(PhaseCoding))
 		g.StoreLog("[PHASE:VALIDATION] Moving back to PhaseCoding with error feedback for code regeneration (attempt %d/%d)", currentRetries+1, MaxRetriesPerPhase)
 		return fmt.Errorf("Validator Agent failed: %w. Feedback: %s", err, feedback)
 	}
 
-	if success, _ := g.GetStateBool("validation_success", false); success {
-		g.StoreState("phase", string(PhaseStable))
+	if success := mywant.GetCurrent(g, "validation_success", false); success {
+		g.SetCurrent("phase", string(PhaseStable))
 		g.StoreLog("[PHASE:VALIDATION] Success! Moving to PhaseStable.")
 		// Clear error_feedback on success
-		g.StoreState("error_feedback", "")
+		g.SetCurrent("error_feedback", "")
 	} else {
 		return fmt.Errorf("Validator Agent did not report validation_success")
 	}

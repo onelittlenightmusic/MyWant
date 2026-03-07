@@ -33,7 +33,7 @@ func (g *PrimeNumbers) Initialize() {
 func (g *PrimeNumbers) IsAchieved() bool {
 	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
-	currentNumber, _ := g.GetStateInt("current_number", start-1)
+	currentNumber := GetCurrent(g, "current_number", start-1)
 	return currentNumber >= end
 }
 
@@ -41,7 +41,7 @@ func (g *PrimeNumbers) IsAchieved() bool {
 func (g *PrimeNumbers) Progress() {
 	start := g.GetIntParam("start", 1)
 	end := g.GetIntParam("end", 100)
-	currentNumber, _ := g.GetStateInt("current_number", start-1) // Start from start-1 so first iteration sends start
+	currentNumber := GetCurrent(g, "current_number", start-1) // Start from start-1 so first iteration sends start
 
 	currentNumber += 1
 
@@ -61,19 +61,15 @@ func (g *PrimeNumbers) Progress() {
 		achievingPercentage = 100
 	}
 
-	g.StoreStateMulti(Dict{
-		"current_number":       currentNumber,
-		"achieving_percentage": achievingPercentage,
-	})
+	g.SetCurrent("current_number", currentNumber)
+	g.SetPredefined("achieving_percentage", achievingPercentage)
 
 	if currentNumber >= end {
 		// Send end signal
 		g.ProvideDone()
-		g.StoreStateMulti(Dict{
-			"achieving_percentage": 100,
-			"achieved":             true,
-			"completed":            true,
-		})
+		g.SetPredefined("achieving_percentage", 100)
+		g.SetPredefined("achieved", true)
+		g.SetCurrent("completed", true)
 	}
 }
 
@@ -103,8 +99,7 @@ func (f *PrimeSequence) Initialize() {
 
 // IsAchieved checks if prime sequence filtering is complete
 func (f *PrimeSequence) IsAchieved() bool {
-	achieved, _ := f.GetStateBool("achieved", false)
-	return achieved
+	return GetPredefined(f, "achieved", false)
 }
 
 // Progress returns the generalized chain function for the filter
@@ -113,32 +108,14 @@ func (f *PrimeSequence) IsAchieved() bool {
 func (f *PrimeSequence) Progress() {
 	locals := f.GetLocals()
 
-	achieved, _ := f.GetStateBool("achieved", false)
-	if achieved {
+	if GetPredefined(f, "achieved", false) {
 		return
 	}
 
-	totalProcessed, _ := f.GetStateInt("total_processed", 0)
+	totalProcessed := GetCurrent(f, "total_processed", 0)
 
 	// Restore foundPrimes from persistent state if it exists
-	foundPrimesVal, _ := f.GetState("foundPrimes")
-	if foundPrimesVal != nil {
-		// Handle both direct []int and interface{} from JSON deserialization
-		switch v := foundPrimesVal.(type) {
-		case []int:
-			locals.foundPrimes = v
-		case []interface{}:
-			// Convert []interface{} to []int (from JSON deserialization)
-			locals.foundPrimes = make([]int, 0, len(v))
-			for _, item := range v {
-				if num, ok := item.(float64); ok {
-					locals.foundPrimes = append(locals.foundPrimes, int(num))
-				} else if num, ok := item.(int); ok {
-					locals.foundPrimes = append(locals.foundPrimes, num)
-				}
-			}
-		}
-	}
+	locals.foundPrimes = GetCurrent(f, "foundPrimes", []int{})
 
 	// Try to receive one packet - wait forever until packet or DONE signal arrives
 	_, i, done, ok := f.UseForever()
@@ -150,13 +127,11 @@ func (f *PrimeSequence) Progress() {
 	// Check for end signal
 	if done {
 		// End signal received - finalize and complete
-		f.StoreStateMulti(Dict{
-			"foundPrimes":          locals.foundPrimes,
-			"primeCount":           len(locals.foundPrimes),
-			"total_processed":      totalProcessed,
-			"achieved":             true,
-			"achieving_percentage": 100,
-		})
+		f.SetCurrent("foundPrimes", locals.foundPrimes)
+		f.SetCurrent("primeCount", len(locals.foundPrimes))
+		f.SetCurrent("total_processed", totalProcessed)
+		f.SetPredefined("achieved", true)
+		f.SetPredefined("achieving_percentage", 100)
 		f.ProvideDone()
 		return
 	}
@@ -190,18 +165,13 @@ func (f *PrimeSequence) Progress() {
 		// Calculate achieving percentage based on processed count
 		// Since we don't know the total, use 50% while processing
 		achievingPercentage := 50
-		if totalProcessed > 0 {
-			achievingPercentage = 50 // Partial progress for streaming without count
-		}
 
 		// Update state for this packet
-		f.StoreStateMulti(Dict{
-			"total_processed":       totalProcessed,
-			"last_number_processed": val,
-			"foundPrimes":           locals.foundPrimes,
-			"primeCount":            len(locals.foundPrimes),
-			"achieving_percentage":  achievingPercentage,
-		})
+		f.SetCurrent("total_processed", totalProcessed)
+		f.SetCurrent("last_number_processed", val)
+		f.SetCurrent("foundPrimes", locals.foundPrimes)
+		f.SetCurrent("primeCount", len(locals.foundPrimes))
+		f.SetPredefined("achieving_percentage", achievingPercentage)
 	}
 
 	// Yield control - will be called again for next packet

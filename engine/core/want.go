@@ -1725,7 +1725,11 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 
 func (n *Want) SetGoal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		n.StoreState(key, value)
+		if n.inExecCycle {
+			n.StoreState(key, value)
+		} else {
+			n.StoreStateForAgent(key, value)
+		}
 	}
 }
 
@@ -1738,7 +1742,11 @@ func (n *Want) GetGoal(key string) (any, bool) {
 
 func (n *Want) SetCurrent(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		n.StoreState(key, value)
+		if n.inExecCycle {
+			n.StoreState(key, value)
+		} else {
+			n.StoreStateForAgent(key, value)
+		}
 	}
 }
 
@@ -1751,7 +1759,11 @@ func (n *Want) GetCurrent(key string) (any, bool) {
 
 func (n *Want) SetPlan(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.StoreState(key, value)
+		if n.inExecCycle {
+			n.StoreState(key, value)
+		} else {
+			n.StoreStateForAgent(key, value)
+		}
 	}
 }
 
@@ -1764,13 +1776,21 @@ func (n *Want) GetPlan(key string) (any, bool) {
 
 func (n *Want) ClearPlan(key string) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.StoreState(key, nil)
+		if n.inExecCycle {
+			n.StoreState(key, nil)
+		} else {
+			n.StoreStateForAgent(key, nil)
+		}
 	}
 }
 
 func (n *Want) SetPredefined(key string, value any) {
 	// Predefined fields might not be in StateLabels if they are truly system-wide
-	n.StoreState(key, value)
+	if n.inExecCycle {
+		n.StoreState(key, value)
+	} else {
+		n.StoreStateForAgent(key, value)
+	}
 }
 
 func (n *Want) GetPredefined(key string) (any, bool) {
@@ -1783,7 +1803,11 @@ func (n *Want) GetPredefined(key string) (any, bool) {
 
 func (n *Want) SetInternal(key string, value any) {
 	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") {
-		n.StoreState(key, value)
+		if n.inExecCycle {
+			n.StoreState(key, value)
+		} else {
+			n.StoreStateForAgent(key, value)
+		}
 	}
 }
 
@@ -1792,6 +1816,120 @@ func (n *Want) GetInternal(key string) (any, bool) {
 		return n.GetState(key)
 	}
 	return nil, false
+}
+
+// WantPointer is an interface for types that can provide a pointer to their underlying Want.
+// This allows our generic helpers to work with custom types that embed Want.
+type WantPointer interface {
+	GetWant() *Want
+}
+
+// GetWant implements the WantPointer interface for the base Want type.
+func (n *Want) GetWant() *Want {
+	return n
+}
+
+// --- Package-level Generic State Access Helpers ---
+
+// GetState retrieves a value from the want's state with automatic type conversion.
+func GetState[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetState(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetGoal retrieves a goal-labeled value with automatic type conversion.
+func GetGoal[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetGoal(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetCurrent retrieves a current-labeled value with automatic type conversion.
+func GetCurrent[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetCurrent(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetPlan retrieves a plan-labeled value with automatic type conversion.
+func GetPlan[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetPlan(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetInternal retrieves an internal-labeled value with automatic type conversion.
+func GetInternal[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetInternal(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetPredefined retrieves a predefined-labeled value with automatic type conversion.
+func GetPredefined[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetPredefined(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// GetParentState retrieves a value from the parent want's state with automatic type conversion.
+func GetParentState[T any](wp WantPointer, key string, defaultVal T) T {
+	n := wp.GetWant()
+	raw, ok := n.GetParentState(key)
+	if !ok || raw == nil {
+		return defaultVal
+	}
+	return convertToType(raw, defaultVal)
+}
+
+// convertToType is an internal helper that bridges generics to our conversion utilities.
+func convertToType[T any](val any, defaultVal T) T {
+	// Attempt direct type assertion first for performance and complex types
+	if tVal, ok := val.(T); ok {
+		return tVal
+	}
+
+	// Fallback to our flexible conversion utilities for common primitive types
+	var result any
+	switch d := any(defaultVal).(type) {
+	case string:
+		result = ToString(val, d)
+	case int:
+		result = ToInt(val, d)
+	case bool:
+		result = ToBool(val, d)
+	case float64:
+		result = ToFloat64(val, d)
+	case []string:
+		result = ToStringSlice(val, d)
+	case []int:
+		result = ToIntSlice(val, d)
+	case []float64:
+		result = ToFloat64Slice(val, d)
+	default:
+		// If we don't have a conversion helper, we've already tried direct assertion
+		return defaultVal
+	}
+	return result.(T)
 }
 
 func (n *Want) addAggregatedLogHistory() {

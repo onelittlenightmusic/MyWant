@@ -38,10 +38,10 @@ func (o *OpaLLMPlannerWant) GetLocals() *OpaLLMPlannerLocals {
 // Always overwrites because initialValue: {} from YAML is a non-nil empty map.
 func (o *OpaLLMPlannerWant) Initialize() {
 	if goal, ok := o.Spec.Params["goal"]; ok && goal != nil {
-		o.StoreState("goal", goal)
+		o.SetGoal("goal", goal)
 	}
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
-		o.StoreState("current", current)
+		o.SetCurrent("current", current)
 	}
 }
 
@@ -56,9 +56,9 @@ func (o *OpaLLMPlannerWant) Progress() {}
 // when neither goal nor current have changed since the last run.
 func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// Step 1: Read goal and current from state
-	goalRaw, goalExists := want.GetState("goal")
-	currentRaw, currentExists := want.GetState("current")
-	if !goalExists || goalRaw == nil || !currentExists || currentRaw == nil {
+	goalRaw := GetGoal(want, "goal", map[string]any{})
+	currentRaw := GetCurrent(want, "current", map[string]any{})
+	if len(goalRaw) == 0 || len(currentRaw) == 0 {
 		// Inputs not yet available; wait for next tick
 		return nil
 	}
@@ -79,7 +79,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	hashBytes := md5.Sum(combined)
 	inputHash := fmt.Sprintf("%x", hashBytes)
 
-	prevHash, _ := want.GetStateString("_opa_input_hash", "")
+	prevHash := GetInternal(want, "_opa_input_hash", "")
 	if prevHash == inputHash {
 		// No changes detected; skip planning
 		return nil
@@ -152,8 +152,8 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		}
 	}
 
-	want.StoreState("directions", directionTypes)
-	want.StoreState("_opa_input_hash", inputHash)
+	want.SetPlan("directions", directionTypes)
+	want.SetInternal("_opa_input_hash", inputHash)
 	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 
 	return nil
