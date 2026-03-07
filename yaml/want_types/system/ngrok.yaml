@@ -57,7 +57,7 @@ wantType:
     description: Process ID of the running ngrok process (0 if not running)
     type: int
     persistent: true
-    label: internal
+    label: current
     initialValue: 0
     example: 12345
 
@@ -65,21 +65,21 @@ wantType:
     description: Command to start the ngrok process
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: "ngrok"
 
   - name: server_args
     description: Arguments for the ngrok process (JSON array)
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ""
 
   - name: server_log_file
     description: Path to capture ngrok stdout
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ""
 
   - name: ngrok_url

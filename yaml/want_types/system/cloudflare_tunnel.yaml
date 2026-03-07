@@ -56,7 +56,7 @@ wantType:
     description: Process ID of the running cloudflared process (0 if not running)
     type: int
     persistent: true
-    label: internal
+    label: current
     initialValue: 0
     example: 12345
 
@@ -64,21 +64,21 @@ wantType:
     description: Command to start the cloudflared process
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: "cloudflared"
 
   - name: server_args
     description: Arguments for the cloudflared process (JSON array)
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ""
 
   - name: server_log_file
     description: Path to capture cloudflared output
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ""
 
   - name: tunnel_url

@@ -1755,7 +1755,7 @@ func (n *Want) SetCurrent(key string, value any) {
 }
 
 func (n *Want) GetCurrent(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelCurrent) || strings.HasPrefix(key, "server_") {
 		return n.GetState(key)
 	}
 	return nil, false
@@ -1820,7 +1820,7 @@ func (n *Want) SetInternal(key string, value any) {
 }
 
 func (n *Want) GetInternal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") || strings.HasPrefix(key, "server_") {
 		return n.GetState(key)
 	}
 	return nil, false
