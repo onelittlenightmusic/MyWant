@@ -22,15 +22,13 @@ import (
 
 // Config
 func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.config)
+	s.JSONResponse(w, http.StatusOK, s.config)
 }
 
 func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var newConfig Config
-	if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := DecodeRequest(r, &newConfig); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
@@ -41,14 +39,13 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()
 
-	json.NewEncoder(w).Encode(s.config)
+	s.JSONResponse(w, http.StatusOK, s.config)
 }
 
 // System Controls
 func (s *Server) stopServer(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	log.Printf("[SYSTEM] Stop requested via API from %s", r.RemoteAddr)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Server stopping..."})
+	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "Server stopping..."})
 
 	// Use a goroutine to send the signal after the response is sent
 	go func() {
@@ -59,9 +56,8 @@ func (s *Server) stopServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) restartServer(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	log.Printf("[SYSTEM] Restart requested via API from %s", r.RemoteAddr)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Server restarting..."})
+	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "Server restarting..."})
 
 	go func() {
 		// Wait a moment for the response to be sent
@@ -102,7 +98,6 @@ func (s *Server) restartServer(w http.ResponseWriter, r *http.Request) {
 
 // Health Check
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	s.wantsMu.RLock()
 	wantsCount := len(s.wants)
 	s.wantsMu.RUnlock()
@@ -113,15 +108,14 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 		"version": "1.0.0",
 		"server":  "mywant",
 	}
-	json.NewEncoder(w).Encode(health)
+	s.JSONResponse(w, http.StatusOK, health)
 }
 
 // Recipes
 func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var recipe mywant.GenericRecipe
-	if err := json.NewDecoder(r.Body).Decode(&recipe); err != nil {
-		http.Error(w, "Invalid recipe format", http.StatusBadRequest)
+	if err := DecodeRequest(r, &recipe); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid recipe format", err.Error())
 		return
 	}
 	// Always generate a dynamic GUID for the registry ID (non-persistent)
@@ -129,11 +123,11 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	recipe.Recipe.Metadata.ID = recipeID
 
 	if recipe.Recipe.Metadata.Name == "" {
-		http.Error(w, "Recipe name required", http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "Recipe name required", "")
 		return
 	}
 	if err := s.recipeRegistry.CreateRecipe(recipeID, &recipe); err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
+		s.JSONError(w, r, http.StatusConflict, err.Error(), "")
 		return
 	}
 
@@ -168,36 +162,32 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes", recipeID, "success", http.StatusCreated, "", "Recipe created")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"id": recipeID, "message": "Recipe created"})
+	s.JSONResponse(w, http.StatusCreated, map[string]string{"id": recipeID, "message": "Recipe created"})
 }
 
 func (s *Server) listRecipes(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s.recipeRegistry.ListRecipes())
+	s.JSONResponse(w, http.StatusOK, s.recipeRegistry.ListRecipes())
 }
 
 func (s *Server) getRecipe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	recipe, exists := s.recipeRegistry.GetRecipe(vars["id"])
 	if !exists {
-		http.Error(w, "Recipe not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "Recipe not found", "")
 		return
 	}
-	json.NewEncoder(w).Encode(recipe)
+	s.JSONResponse(w, http.StatusOK, recipe)
 }
 
 func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	var recipe mywant.GenericRecipe
-	if err := json.NewDecoder(r.Body).Decode(&recipe); err != nil {
-		http.Error(w, "Invalid format", http.StatusBadRequest)
+	if err := DecodeRequest(r, &recipe); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid format", err.Error())
 		return
 	}
 	if err := s.recipeRegistry.UpdateRecipe(vars["id"], &recipe); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, err.Error(), "")
 		return
 	}
 
@@ -232,7 +222,7 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/recipes/"+vars["id"], vars["id"], "success", http.StatusOK, "", "Recipe updated")
-	json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
+	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "updated"})
 }
 
 func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
@@ -241,12 +231,12 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 
 	recipe, exists := s.recipeRegistry.GetRecipe(recipeID)
 	if !exists {
-		http.Error(w, "Recipe not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "Recipe not found", "")
 		return
 	}
 
 	if err := s.recipeRegistry.DeleteRecipe(recipeID); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, err.Error(), "")
 		return
 	}
 
@@ -271,7 +261,6 @@ func (s *Server) deleteRecipe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
@@ -296,7 +285,7 @@ func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if parentWant == nil {
-		http.Error(w, "Want not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
 	}
 
@@ -350,19 +339,15 @@ func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	json.NewEncoder(w).Encode(analysis)
+	s.JSONResponse(w, http.StatusOK, analysis)
 }
 
 func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req SaveRecipeFromWantRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
-
-	// Implementation simplified for brevity - assume similar logic to main.go but utilizing helper methods if needed
-	// In a real refactor, we'd copy the full logic. For now, let's copy the core logic.
 
 	// Find parent want
 	var parentWant *mywant.Want
@@ -385,7 +370,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if parentWant == nil {
-		http.Error(w, "Want not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
 	}
 
@@ -409,13 +394,10 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parameterize child want params: replace runtime-resolved values with
-	// recipe-level parameter references, filtered to only declared params per type.
+	// Parameterize child want params
 	generatedParams, parameterizedWants := buildParameterizedRecipe(childWants, s.wantTypeLoader)
 
-	// Assuming req.Metadata is compatible or needs mapping
-	// In types.go we defined Metadata as `any`, here we need to cast or marshal/unmarshal
-	// Let's re-marshal to get GenericRecipeMetadata
+	// Map metadata
 	metaBytes, _ := json.Marshal(req.Metadata)
 	var recipeMeta mywant.GenericRecipeMetadata
 	json.Unmarshal(metaBytes, &recipeMeta)
@@ -433,7 +415,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 		recipe.Recipe.Metadata.Name = parentWant.Metadata.Name + "-recipe"
 	}
 
-	// Always generate a dynamic GUID for the registry ID (non-persistent)
+	// Always generate a dynamic GUID for the registry ID
 	recipeID := uuid.New().String()
 	recipe.Recipe.Metadata.ID = recipeID
 
@@ -445,7 +427,6 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	userRecipesDir := mywant.UserRecipesDir()
 	os.MkdirAll(userRecipesDir, 0755)
 
-	// Determine a meaningful filename based on custom_type or name
 	fileBase := recipe.Recipe.Metadata.CustomType
 	if fileBase == "" {
 		fileBase = recipe.Recipe.Metadata.Name
@@ -453,14 +434,11 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	fileBase = strings.ReplaceAll(fileBase, " ", "-")
 	filename := fmt.Sprintf("%s/%s.yaml", userRecipesDir, fileBase)
 
-	// Create a copy for saving to disk without the dynamic ID
 	saveRecipe := recipe
-	saveRecipe.Recipe.Metadata.ID = "" // Don't persist the dynamic GUID
+	saveRecipe.Recipe.Metadata.ID = ""
 	yamlData, _ := yaml.Marshal(saveRecipe)
 	os.WriteFile(filename, yamlData, 0644)
 
-	// Immediately register as custom target type if custom_type is provided
-	// This makes it available for use as a want type without restart
 	if recipe.Recipe.Metadata.CustomType != "" {
 		mywant.RegisterCustomTargetType(
 			s.recipeRegistry,
@@ -473,8 +451,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/recipes/from-want", recipeID, "success", http.StatusCreated, "", "Recipe saved")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"id": recipeID, "message": "Recipe saved", "file": filename, "wants": len(childWants),
 	})
 }
@@ -572,13 +549,15 @@ func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.Wan
 
 // Agents
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var data struct {
 		Name         string   `json:"name"`
 		Type         string   `json:"type"`
 		Capabilities []string `json:"capabilities"`
 	}
-	json.NewDecoder(r.Body).Decode(&data)
+	if err := DecodeRequest(r, &data); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
+		return
+	}
 
 	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type)}
 	var agent mywant.Agent
@@ -588,28 +567,25 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		agent = &mywant.MonitorAgent{BaseAgent: base}
 	}
 	s.agentRegistry.RegisterAgent(agent)
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]any{"name": agent.GetName(), "type": agent.GetType()})
+	s.JSONResponse(w, http.StatusCreated, map[string]any{"name": agent.GetName(), "type": agent.GetType()})
 }
 
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	agents := s.agentRegistry.GetAllAgents()
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
 		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
 	}
-	json.NewEncoder(w).Encode(map[string]any{"agents": res})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }
 
 func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	if agent, ok := s.agentRegistry.GetAgent(vars["name"]); ok {
-		json.NewEncoder(w).Encode(map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities()})
+		s.JSONResponse(w, http.StatusOK, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities()})
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
@@ -618,31 +594,30 @@ func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 // Capabilities
 func (s *Server) createCapability(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var cap mywant.Capability
-	json.NewDecoder(r.Body).Decode(&cap)
+	if err := DecodeRequest(r, &cap); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
+		return
+	}
 	s.agentRegistry.RegisterCapability(cap)
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(cap)
+	s.JSONResponse(w, http.StatusCreated, cap)
 }
 
 func (s *Server) listCapabilities(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"capabilities": s.agentRegistry.GetAllCapabilities()})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"capabilities": s.agentRegistry.GetAllCapabilities()})
 }
 
 func (s *Server) getCapability(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	if cap, ok := s.agentRegistry.GetCapability(mux.Vars(r)["name"]); ok {
-		json.NewEncoder(w).Encode(cap)
+		s.JSONResponse(w, http.StatusOK, cap)
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
@@ -650,11 +625,10 @@ func (s *Server) deleteCapability(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	agents := s.agentRegistry.FindAgentsByGives(mux.Vars(r)["name"])
 	if agents == nil {
 		agents = []mywant.Agent{}
@@ -663,20 +637,17 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	for i, a := range agents {
 		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
 	}
-	json.NewEncoder(w).Encode(map[string]any{"agents": res})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }
 
 // Want Types
 func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	if s.wantTypeLoader == nil {
-		http.Error(w, "Loader not ready", 503)
+		s.JSONError(w, r, 503, "Loader not ready", "")
 		return
 	}
 
 	defs := s.wantTypeLoader.GetAll()
-	// Filter logic omitted for brevity
-
 	res := make([]map[string]any, len(defs))
 	for i, d := range defs {
 		res[i] = map[string]any{
@@ -688,37 +659,33 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 			"system_type": d.Metadata.SystemType,
 		}
 	}
-	json.NewEncoder(w).Encode(map[string]any{"wantTypes": res, "count": len(res)})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"wantTypes": res, "count": len(res)})
 }
 
 func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	parts := strings.Split(r.URL.Path, "/")
 	name := parts[len(parts)-1]
 	if def := s.wantTypeLoader.GetDefinition(name); def != nil {
-		json.NewEncoder(w).Encode(def)
+		s.JSONResponse(w, http.StatusOK, def)
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	parts := strings.Split(r.URL.Path, "/")
 	name := parts[len(parts)-2]
 	if def := s.wantTypeLoader.GetDefinition(name); def != nil {
-		json.NewEncoder(w).Encode(map[string]any{"name": name, "examples": def.Examples})
+		s.JSONResponse(w, http.StatusOK, map[string]any{"name": name, "examples": def.Examples})
 		return
 	}
-	http.Error(w, "Not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 // Labels
 func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	if s.globalBuilder == nil {
-		http.Error(w, "Global builder not initialized", http.StatusInternalServerError)
+		s.JSONError(w, r, http.StatusInternalServerError, "Global builder not initialized", "")
 		return
 	}
 
@@ -795,40 +762,32 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		values[k] = vList
 	}
 
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"labelKeys":   keys,
 		"labelValues": values,
 	})
 }
 
 func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req struct {
 		Key   string `json:"key"`
 		Value string `json:"value"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		fmt.Printf("[SERVER-ERROR] Failed to decode addLabel request: %v\n", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
-	fmt.Printf("[SERVER-DEBUG] addLabel request: Key=%s, Value=%s\n", req.Key, req.Value)
-
 	if req.Key == "" || req.Value == "" {
-		http.Error(w, "Key and Value are required", http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "Key and Value are required", "")
 		return
 	}
 
 	if s.globalBuilder != nil {
 		s.globalBuilder.AddLabelToRegistry(req.Key, req.Value)
-		fmt.Printf("[SERVER-INFO] Registered global label via builder: %s=%s\n", req.Key, req.Value)
-	} else {
-		fmt.Printf("[SERVER-WARN] Global builder not available for label registration\n")
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	s.JSONResponse(w, http.StatusCreated, map[string]string{
 		"message": "Label registered (v2-verified)",
 		"key":     req.Key,
 		"value":   req.Value,
@@ -838,37 +797,33 @@ func (s *Server) addLabel(w http.ResponseWriter, r *http.Request) {
 
 // Errors & Logs
 func (s *Server) listErrorHistory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	sorted := make([]ErrorHistoryEntry, len(s.errorHistory))
 	copy(sorted, s.errorHistory)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Timestamp > sorted[j].Timestamp })
-	json.NewEncoder(w).Encode(map[string]any{"errors": sorted, "total": len(sorted)})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"errors": sorted, "total": len(sorted)})
 }
 
 func (s *Server) getErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 	for _, e := range s.errorHistory {
 		if e.ID == id {
-			json.NewEncoder(w).Encode(e)
+			s.JSONResponse(w, http.StatusOK, e)
 			return
 		}
 	}
-	http.Error(w, "Not found", 404)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) updateErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 	for i, e := range s.errorHistory {
 		if e.ID == id {
-			// Update logic omitted
 			s.errorHistory[i].Resolved = true
-			json.NewEncoder(w).Encode(s.errorHistory[i])
+			s.JSONResponse(w, http.StatusOK, s.errorHistory[i])
 			return
 		}
 	}
-	http.Error(w, "Not found", 404)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request) {
@@ -880,16 +835,15 @@ func (s *Server) deleteErrorHistoryEntry(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	http.Error(w, "Not found", 404)
+	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
 func (s *Server) getLogs(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var logs []mywant.APILogEntry
 	if s.globalBuilder != nil {
 		logs = s.globalBuilder.GetAPILogs()
 	}
-	json.NewEncoder(w).Encode(map[string]any{"logs": logs, "count": len(logs)})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"logs": logs, "count": len(logs)})
 }
 
 func (s *Server) clearLogs(w http.ResponseWriter, r *http.Request) {
@@ -901,9 +855,11 @@ func (s *Server) clearLogs(w http.ResponseWriter, r *http.Request) {
 
 // LLM
 func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req LLMRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
+		return
+	}
 
 	model := req.Model
 	if model == "" {
@@ -912,10 +868,10 @@ func (s *Server) queryLLM(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.callOllamaLLM(model, req.Message)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		s.JSONError(w, r, http.StatusInternalServerError, "LLM query failed", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(resp)
+	s.JSONResponse(w, http.StatusOK, resp)
 }
 
 func (s *Server) callOllamaLLM(model, prompt string) (*LLMResponse, error) {
@@ -938,57 +894,52 @@ func (s *Server) callOllamaLLM(model, prompt string) (*LLMResponse, error) {
 
 // Reactions
 func (s *Server) createReactionQueue(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	id, err := s.reactionQueueManager.CreateQueue()
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to create reaction queue", err.Error())
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"queue_id": id})
+	s.JSONResponse(w, http.StatusCreated, map[string]string{"queue_id": id})
 }
 
 func (s *Server) listReactionQueues(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	queues := s.reactionQueueManager.ListQueues()
-	json.NewEncoder(w).Encode(map[string]any{"queues": queues, "count": len(queues)})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"queues": queues, "count": len(queues)})
 }
 
 func (s *Server) getReactionQueue(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	queue, err := s.reactionQueueManager.GetQueue(mux.Vars(r)["id"])
 	if err != nil {
-		http.Error(w, err.Error(), 404)
+		s.JSONError(w, r, http.StatusNotFound, "Queue not found", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]any{"queue_id": queue.ID, "reactions": queue.GetReactions()})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"queue_id": queue.ID, "reactions": queue.GetReactions()})
 }
 
 func (s *Server) addReactionToQueue(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var req ReactionRequest
-	json.NewDecoder(r.Body).Decode(&req)
-	id, err := s.reactionQueueManager.AddReactionToQueue(mux.Vars(r)["id"], req.Approved, req.Comment)
-	if err != nil {
-		http.Error(w, err.Error(), 404)
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"reaction_id": id})
+	id, err := s.reactionQueueManager.AddReactionToQueue(mux.Vars(r)["id"], req.Approved, req.Comment)
+	if err != nil {
+		s.JSONError(w, r, http.StatusNotFound, "Queue not found", err.Error())
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]string{"reaction_id": id})
 }
 
 func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	if err := s.reactionQueueManager.DeleteQueue(mux.Vars(r)["id"]); err != nil {
-		http.Error(w, err.Error(), 404)
+		s.JSONError(w, r, http.StatusNotFound, "Queue not found", err.Error())
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]bool{"deleted": true})
+	s.JSONResponse(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 // OpenAPI Spec
 func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
-	// Try to find openapi.yaml in the root or current directory
 	specPaths := []string{"openapi.yaml", "../openapi.yaml", "../../openapi.yaml"}
 	var data []byte
 	var err error
@@ -1001,20 +952,17 @@ func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "OpenAPI specification not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "OpenAPI specification not found", err.Error())
 		return
 	}
 
-	// Determine content type based on request or default to yaml
 	if strings.Contains(r.Header.Get("Accept"), "application/json") {
-		// Convert YAML to JSON if requested
 		var body any
 		if err := yaml.Unmarshal(data, &body); err != nil {
-			http.Error(w, "Failed to parse specification", http.StatusInternalServerError)
+			s.JSONError(w, r, http.StatusInternalServerError, "Failed to parse specification", err.Error())
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(body)
+		s.JSONResponse(w, http.StatusOK, body)
 	} else {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.Write(data)
@@ -1025,22 +973,21 @@ func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
 func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	filename := vars["filename"]
-	// Basic safety check: only allow alphanumeric, hyphens, underscores, dots
 	for _, c := range filename {
 		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
-			http.Error(w, "invalid filename", http.StatusBadRequest)
+			s.JSONError(w, r, http.StatusBadRequest, "invalid filename", "")
 			return
 		}
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		http.Error(w, "server error", http.StatusInternalServerError)
+		s.JSONError(w, r, http.StatusInternalServerError, "server error", err.Error())
 		return
 	}
 	filePath := home + "/.mywant/screenshots/" + filename
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "not found", err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")
@@ -1050,7 +997,6 @@ func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 
 // GlobalState
 func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var stateMap map[string]any
 	if s.globalBuilder != nil {
 		stateMap = s.globalBuilder.GetGlobalStateAll()
@@ -1058,39 +1004,37 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	if stateMap == nil {
 		stateMap = make(map[string]any)
 	}
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"state":     stateMap,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
 func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	params := mywant.GetAllGlobalParameters()
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters": params,
 		"count":      len(params),
 	})
 }
 
 func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	var body struct {
 		Parameters map[string]any `json:"parameters"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 	if body.Parameters == nil {
 		body.Parameters = make(map[string]any)
 	}
 	if err := mywant.SetAllGlobalParameters(body.Parameters); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to save parameters: %v", err), http.StatusInternalServerError)
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to save parameters", err.Error())
 		return
 	}
 	params := mywant.GetAllGlobalParameters()
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters": params,
 		"count":      len(params),
 	})

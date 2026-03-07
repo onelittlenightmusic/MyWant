@@ -1,12 +1,9 @@
 package server
 
 import (
-	"bytes"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -19,18 +16,19 @@ import (
 )
 
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	// Read request body
-	var buf bytes.Buffer
-	io.Copy(&buf, r.Body)
-	data := buf.Bytes()
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Failed to read body", err.Error())
+		return
+	}
 
 	// First try to parse as a Config
 	var config mywant.Config
 	var configErr error
 
-	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "yaml") {
 		configErr = yaml.Unmarshal(data, &config)
 	} else {
 		configErr = json.Unmarshal(data, &config)
@@ -39,37 +37,25 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	// If config parsing failed or has no wants, try parsing as single Want
 	if configErr != nil || len(config.Wants) == 0 {
 		var newWant *mywant.Want
-
-		if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+		if strings.Contains(contentType, "yaml") {
 			configErr = yaml.Unmarshal(data, &newWant)
 		} else {
 			configErr = json.Unmarshal(data, &newWant)
 		}
 
 		if configErr != nil || newWant == nil {
-			errorMsg := fmt.Sprintf("Invalid request: must be either a Want object or Config with wants array. Error: %v", configErr)
-			s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "")
-			http.Error(w, errorMsg, http.StatusBadRequest)
+			s.JSONError(w, r, http.StatusBadRequest, "Invalid request: must be either a Want object or Config with wants array", configErr.Error())
 			return
 		}
 		config = mywant.Config{Wants: []*mywant.Want{newWant}}
 	}
+
 	if err := s.validateWantTypes(config); err != nil {
-		errorMsg := fmt.Sprintf("Invalid want type: %v", err)
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, "validation")
-		s.logError(r, http.StatusBadRequest, errorMsg, "validation", err.Error(), "")
-		http.Error(w, errorMsg, http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid want type", err.Error())
 		return
 	}
 	if err := s.validateWantSpec(config); err != nil {
-		errorMsg := fmt.Sprintf("Invalid want spec: %v", err)
-		details := "validation"
-		if strings.Contains(err.Error(), "ownerReferences") {
-			details = "invalid_owner_reference"
-		}
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusBadRequest, errorMsg, details)
-		s.logError(r, http.StatusBadRequest, errorMsg, details, err.Error(), "")
-		http.Error(w, errorMsg, http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid want spec", err.Error())
 		return
 	}
 
@@ -79,26 +65,16 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 			want.Metadata.ID = generateWantID()
 		}
 
-		// Apply want type definition defaults (including Requires) if not already set
+		// Apply want type definition defaults
 		typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
 		if typeDef != nil {
-			log.Printf("[API:CREATE] Found want type definition for '%s', Requires: %v\n",
-				want.Metadata.Type, typeDef.Requires)
 			if len(want.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
 				want.Spec.Requires = typeDef.Requires
-				log.Printf("[API:CREATE] Applied requires from want type definition for '%s': %v\n",
-					want.Metadata.Type, typeDef.Requires)
-			} else {
-				log.Printf("[API:CREATE] Skipped requires application for '%s' (spec.requires=%v, typeDef.requires=%v)\n",
-					want.Metadata.Type, want.Spec.Requires, typeDef.Requires)
 			}
-		} else {
-			log.Printf("[API:CREATE] No want type definition found for '%s'\n", want.Metadata.Type)
 		}
 	}
 
-	// Assign OrderKeys to wants that don't have them (for display ordering)
-	// Find the last used order key from existing wants
+	// Assign OrderKeys
 	allWantStates := s.globalBuilder.GetAllWantStates()
 	var lastOrderKey string
 	for _, existingWant := range allWantStates {
@@ -106,14 +82,11 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 			lastOrderKey = existingWant.Metadata.OrderKey
 		}
 	}
-	log.Printf("[ORDERKEY] Found %d existing wants, last order key: '%s'\n", len(allWantStates), lastOrderKey)
 
-	// Assign sequential order keys to new wants
 	for _, want := range config.Wants {
 		if want.Metadata.OrderKey == "" {
 			lastOrderKey = mywant.GenerateOrderKeyAfter(lastOrderKey)
 			want.Metadata.OrderKey = lastOrderKey
-			log.Printf("[ORDERKEY] Assigned order key '%s' to want '%s'\n", lastOrderKey, want.Metadata.Name)
 		}
 	}
 
@@ -133,57 +106,35 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		s.wantsMu.Lock()
 		delete(s.wants, executionID)
 		s.wantsMu.Unlock()
-		errorMsg := fmt.Sprintf("Failed to add wants: %v", err)
-		s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", "", "error", http.StatusConflict, errorMsg, "duplicate_name")
-		s.logError(r, http.StatusConflict, errorMsg, "duplicate_name", err.Error(), "")
-		http.Error(w, errorMsg, http.StatusConflict)
+		s.JSONError(w, r, http.StatusConflict, "Failed to add wants", err.Error())
 		return
 	}
 
-	for _, want := range config.Wants {
-		InfoLog("[API:CREATE] Want queued for addition: %s (%s, ID: %s)\n", want.Metadata.Name, want.Metadata.Type, want.Metadata.ID)
-	}
-	w.WriteHeader(http.StatusCreated)
-
-	wantCount := len(config.Wants)
 	wantNames := []string{}
 	for _, want := range config.Wants {
 		wantNames = append(wantNames, want.Metadata.Name)
 	}
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", wantCount))
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(config.Wants)))
 
-	response := map[string]any{
+	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"id":       executionID,
 		"status":   execution.Status,
-		"wants":    wantCount,
+		"wants":    len(config.Wants),
 		"want_ids": wantIDs,
 		"message":  "Wants created and added to execution queue",
-	}
-
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	includeSystemWants := strings.ToLower(r.URL.Query().Get("includeSystemWants")) == "true"
+	includeCancelled := strings.ToLower(r.URL.Query().Get("includeCancelled")) == "true"
 
-	includeSystemWants := false
-	if includeSystemWantsStr := r.URL.Query().Get("includeSystemWants"); includeSystemWantsStr != "" {
-		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
-	}
-
-	includeCancelled := false
-	if v := r.URL.Query().Get("includeCancelled"); v != "" {
-		includeCancelled = strings.ToLower(v) == "true"
-	}
-
-	// Build filters from query parameters
 	filters := mywant.WantFilters{
 		Type:         r.URL.Query().Get("type"),
 		Labels:       make(map[string]string),
 		UsingFilters: make(map[string]string),
 	}
 
-	// Parse label query parameters (format: key=value)
 	for _, label := range r.URL.Query()["label"] {
 		parts := strings.SplitN(label, "=", 2)
 		if len(parts) == 2 {
@@ -191,7 +142,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse using query parameters (format: key=value)
 	for _, u := range r.URL.Query()["using"] {
 		parts := strings.SplitN(u, "=", 2)
 		if len(parts) == 2 {
@@ -202,7 +152,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	wantsByID := make(map[string]*mywant.Want)
 
 	s.wantsMu.RLock()
-	// Copy execution pointers to avoid holding RLock while calling into builders
 	executions := make([]*WantExecution, 0, len(s.wants))
 	for _, exec := range s.wants {
 		executions = append(executions, exec)
@@ -210,9 +159,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	s.wantsMu.RUnlock()
 
 	for _, execution := range executions {
-		if execution.Builder != nil && execution.Builder != s.globalBuilder { // Avoid duplicate if globalBuilder is also in s.wants
-			currentStates := execution.Builder.GetAllWantStates()
-			for _, want := range currentStates {
+		if execution.Builder != nil && execution.Builder != s.globalBuilder {
+			for _, want := range execution.Builder.GetAllWantStates() {
 				wantCopy := &mywant.Want{
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
@@ -226,10 +174,8 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Always include global builder wants
 	if s.globalBuilder != nil {
-		currentStates := s.globalBuilder.GetAllWantStates()
-		for _, want := range currentStates {
+		for _, want := range s.globalBuilder.GetAllWantStates() {
 			wantCopy := &mywant.Want{
 				Metadata:    want.Metadata,
 				Spec:        want.Spec,
@@ -241,330 +187,188 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
+
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant {
-			continue
-		}
-		if !includeCancelled && want.Status == mywant.WantStatusCancelled {
-			continue
-		}
-		// Apply filters using common filtering function
-		if !want.MatchesFilters(filters) {
-			continue
-		}
-		// Calculate hash for change detection
+		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
+		if !includeCancelled && want.Status == mywant.WantStatusCancelled { continue }
+		if !want.MatchesFilters(filters) { continue }
 		want.Hash = mywant.CalculateWantHash(want)
 		allWants = append(allWants, want)
 	}
 
-	// Explicitly sort for stable ordering
 	sort.Slice(allWants, func(i, j int) bool {
-		keyI := allWants[i].Metadata.OrderKey
-		if keyI == "" {
-			keyI = allWants[i].Metadata.ID
-		}
-		keyJ := allWants[j].Metadata.OrderKey
-		if keyJ == "" {
-			keyJ = allWants[j].Metadata.ID
-		}
-		if keyI != keyJ {
-			return keyI < keyJ
-		}
+		keyI, keyJ := allWants[i].Metadata.OrderKey, allWants[j].Metadata.OrderKey
+		if keyI == "" { keyI = allWants[i].Metadata.ID }
+		if keyJ == "" { keyJ = allWants[j].Metadata.ID }
+		if keyI != keyJ { return keyI < keyJ }
 		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
 	})
 
-	response := map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"timestamp":    time.Now().Format(time.RFC3339),
 		"execution_id": fmt.Sprintf("api-dump-%d", time.Now().Unix()),
 		"wants":        allWants,
-	}
-
-	json.NewEncoder(w).Encode(response)
+	})
 }
 
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	wantID := vars["id"]
+	wantID := mux.Vars(r)["id"]
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 
-	log.Printf("[DEBUG] getWant: Looking for want ID: %s (includeConnectivity=%v)\n", wantID, includeConnectivity)
-
-	// 1. Search in runtime wants across all executions
 	s.wantsMu.RLock()
-	// Create a copy of pointers to avoid holding the lock while iterating and potentially calling deep logic
 	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
+	for _, exec := range s.wants { executions = append(executions, exec) }
 	s.wantsMu.RUnlock()
 
 	for _, execution := range executions {
-		// First try searching in the builder's internal state
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				log.Printf("[DEBUG] getWant: Found %s in runtime\n", wantID)
-
-				var wantCopy *mywant.Want
-				if includeConnectivity {
-					wantCopy = &mywant.Want{
-						Metadata:             want.Metadata,
-						Spec:                 want.Spec,
-						Status:               want.GetStatus(),
-						History:              want.BuildHistory(),
-						HiddenState:          want.GetHiddenState(),
-						ConnectivityMetadata: want.ConnectivityMetadata,
-					}
-				} else {
-					wantCopy = &mywant.Want{
-						Metadata:    want.Metadata,
-						Spec:        want.Spec,
-						Status:      want.GetStatus(),
-						History:     want.BuildHistory(),
-						HiddenState: want.GetHiddenState(),
-					}
-				}
-				wantCopy.StoreStateMulti(want.GetExplicitState())
-
-				json.NewEncoder(w).Encode(wantCopy)
-				return
-			}
-		}
-
-		// Fallback: If not in runtime yet, check the execution's config wants
-		for j, want := range execution.Config.Wants {
-			if want.Metadata.ID == wantID {
-				log.Printf("[DEBUG] getWant: Found %s in config at index %d\n", wantID, j)
-				json.NewEncoder(w).Encode(want)
-				return
-			}
-		}
-	}
-
-	// 2. Search in global builder (runtime and config)
-	if s.globalBuilder != nil {
-		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			log.Printf("[DEBUG] getWant: Found %s in globalBuilder\n", wantID)
-
-			var wantCopy *mywant.Want
-			if includeConnectivity {
-				wantCopy = &mywant.Want{
-					Metadata:             want.Metadata,
-					Spec:                 want.Spec,
-					Status:               want.GetStatus(),
-					History:              want.BuildHistory(),
-					HiddenState:          want.GetHiddenState(),
-					ConnectivityMetadata: want.ConnectivityMetadata,
-				}
-			} else {
-				wantCopy = &mywant.Want{
+				wantCopy := &mywant.Want{
 					Metadata:    want.Metadata,
 					Spec:        want.Spec,
 					Status:      want.GetStatus(),
 					History:     want.BuildHistory(),
 					HiddenState: want.GetHiddenState(),
 				}
+				if includeConnectivity {
+					wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
+				}
+				wantCopy.StoreStateMulti(want.GetExplicitState())
+				s.JSONResponse(w, http.StatusOK, wantCopy)
+				return
+			}
+		}
+		for _, want := range execution.Config.Wants {
+			if want.Metadata.ID == wantID {
+				s.JSONResponse(w, http.StatusOK, want)
+				return
+			}
+		}
+	}
+
+	if s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			wantCopy := &mywant.Want{
+				Metadata:    want.Metadata,
+				Spec:        want.Spec,
+				Status:      want.GetStatus(),
+				History:     want.BuildHistory(),
+				HiddenState: want.GetHiddenState(),
+			}
+			if includeConnectivity {
+				wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
 			}
 			wantCopy.StoreStateMulti(want.GetExplicitState())
-
-			json.NewEncoder(w).Encode(wantCopy)
+			s.JSONResponse(w, http.StatusOK, wantCopy)
 			return
 		}
 	}
 
-	log.Printf("[DEBUG] getWant: Want %s NOT FOUND in %d executions or globalBuilder\n", wantID, len(s.wants))
-	http.Error(w, "Want not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 }
 
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
+	wantID := mux.Vars(r)["id"]
 	var targetExecution *WantExecution
 	var targetWantIndex int = -1
 	var foundWant *mywant.Want
 
 	s.wantsMu.RLock()
-	// Loop over wants while holding read lock to find the target execution
 	for _, execution := range s.wants {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				targetExecution = execution
-				foundWant = want
-
-				for j, configWant := range execution.Config.Wants {
-					if configWant.Metadata.ID == wantID {
-						targetWantIndex = j
-						break
-					}
+				targetExecution, foundWant = execution, want
+				for j, cw := range execution.Config.Wants {
+					if cw.Metadata.ID == wantID { targetWantIndex = j; break }
 				}
 				break
 			}
 		}
-
-		// Fallback: search in config wants directly
-		for j, configWant := range execution.Config.Wants {
-			if configWant.Metadata.ID == wantID {
-				targetExecution = execution
-				foundWant = configWant
-				targetWantIndex = j
-				break
-			}
+		for j, cw := range execution.Config.Wants {
+			if cw.Metadata.ID == wantID { targetExecution, foundWant, targetWantIndex = execution, cw, j; break }
 		}
-		if foundWant != nil {
-			break
-		}
+		if foundWant != nil { break }
 	}
 	s.wantsMu.RUnlock()
 
-	if targetExecution == nil || foundWant == nil {
-		if s.globalBuilder != nil {
-			if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-				foundWant = want
-			}
-		}
+	if foundWant == nil && s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found { foundWant = want }
 	}
 
 	if foundWant == nil {
-		errorMsg := "Want not found"
-		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-		http.Error(w, errorMsg, http.StatusNotFound)
-		return
-	}
-
-	bodyData, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to read body: %v", err), http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
 	}
 
 	var updatedWant *mywant.Want
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "yaml") {
-		if err := yaml.Unmarshal(bodyData, &updatedWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid YAML: %v", err), http.StatusBadRequest)
-			return
-		}
-	} else {
-		if err := json.Unmarshal(bodyData, &updatedWant); err != nil {
-			http.Error(w, fmt.Sprintf("Invalid JSON: %v", err), http.StatusBadRequest)
-			return
-		}
-	}
-
-	if updatedWant == nil {
-		http.Error(w, "Want object required", http.StatusBadRequest)
+	if err := DecodeRequest(r, &updatedWant); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
 
-	tempConfig := mywant.Config{Wants: []*mywant.Want{updatedWant}}
-	if err := s.validateWantTypes(tempConfig); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := s.validateWantSpec(tempConfig); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Preserve the original want ID
 	updatedWant.Metadata.ID = foundWant.Metadata.ID
-
-	// Safety: Preserve ownerReferences if not provided in the request
-	if updatedWant.Metadata.OwnerReferences == nil && len(foundWant.Metadata.OwnerReferences) > 0 {
+	if updatedWant.Metadata.OwnerReferences == nil {
 		updatedWant.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
 	}
 
 	if targetExecution != nil {
-		// Update config in execution
-		if targetWantIndex >= 0 && targetWantIndex < len(targetExecution.Config.Wants) {
-			targetExecution.Config.Wants[targetWantIndex] = updatedWant
-		} else {
-			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
-		}
-
-		if targetExecution.Builder != nil {
-			targetExecution.Builder.UpdateWant(updatedWant)
-		}
-		targetExecution.Status = "updated"
+		if targetWantIndex >= 0 { targetExecution.Config.Wants[targetWantIndex] = updatedWant
+		} else { targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant) }
+		if targetExecution.Builder != nil { targetExecution.Builder.UpdateWant(updatedWant) }
 	} else if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
 	}
 
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
-	json.NewEncoder(w).Encode(updatedWant)
+	s.JSONResponse(w, http.StatusOK, updatedWant)
 }
 
 func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
+	wantID := mux.Vars(r)["id"]
 	var targetBuilder *mywant.ChainBuilder
 	var targetExecutionID string
 
 	s.wantsMu.RLock()
-	for executionID, execution := range s.wants {
-		if execution.Builder != nil {
-			currentStates := execution.Builder.GetAllWantStates()
-			for _, want := range currentStates {
-				if want.Metadata.ID == wantID {
-					targetBuilder = execution.Builder
-					targetExecutionID = executionID
-					break
-				}
+	for eid, exec := range s.wants {
+		if exec.Builder != nil {
+			for _, want := range exec.Builder.GetAllWantStates() {
+				if want.Metadata.ID == wantID { targetBuilder, targetExecutionID = exec.Builder, eid; break }
 			}
 		}
-		if targetBuilder != nil {
-			break
-		}
+		if targetBuilder != nil { break }
 	}
 	s.wantsMu.RUnlock()
 
 	if targetBuilder != nil {
 		targetBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
-		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued")
-
-		// Check if we need to clean up empty config
 		s.wantsMu.Lock()
-		if execution, exists := s.wants[targetExecutionID]; exists && len(execution.Config.Wants) == 0 {
-			delete(s.wants, targetExecutionID)
-		}
+		if exec, ok := s.wants[targetExecutionID]; ok && len(exec.Config.Wants) == 0 { delete(s.wants, targetExecutionID) }
 		s.wantsMu.Unlock()
-
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			// Immediately set status to deleting for quick UI feedback
 			want.SetStatus(mywant.WantStatusDeleting)
-
 			s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
-			s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/wants/{id}", wantID, "success", http.StatusNoContent, "", "Deletion queued from global builder")
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
-
-	http.Error(w, "Want not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 }
 
 func (s *Server) deleteWants(w http.ResponseWriter, r *http.Request) {
 	idsParam := r.URL.Query().Get("ids")
 	if idsParam != "" {
-		w.Header().Set("Content-Type", "application/json")
 		wantIDs := strings.Split(idsParam, ",")
 		if err := s.globalBuilder.QueueWantDelete(wantIDs); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.JSONError(w, r, http.StatusInternalServerError, "Batch deletion failed", err.Error())
 			return
 		}
-		w.WriteHeader(http.StatusAccepted)
-		json.NewEncoder(w).Encode(map[string]any{
+		s.JSONResponse(w, http.StatusAccepted, map[string]any{
 			"message": "Batch deletion queued",
 			"ids":     wantIDs,
 		})
@@ -592,188 +396,115 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, wantID, operation string) {
-	w.Header().Set("Content-Type", "application/json")
-
 	var err error
 	switch operation {
-	case "suspend":
-		err = s.globalBuilder.QueueWantSuspend([]string{wantID})
-	case "resume":
-		err = s.globalBuilder.QueueWantResume([]string{wantID})
-	case "stop":
-		err = s.globalBuilder.QueueWantStop([]string{wantID})
-	case "start":
-		err = s.globalBuilder.QueueWantStart([]string{wantID})
+	case "suspend": err = s.globalBuilder.QueueWantSuspend([]string{wantID})
+	case "resume":  err = s.globalBuilder.QueueWantResume([]string{wantID})
+	case "stop":    err = s.globalBuilder.QueueWantStop([]string{wantID})
+	case "start":   err = s.globalBuilder.QueueWantStart([]string{wantID})
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.JSONError(w, r, http.StatusInternalServerError, "Operation failed", err.Error())
 		return
 	}
 
 	s.globalBuilder.LogAPIOperation("POST", fmt.Sprintf("/api/v1/wants/{id}/%s", operation), wantID, "success", http.StatusAccepted, "", operation+" queued")
-	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusAccepted, map[string]any{
 		"message": operation + " operation queued",
 		"wantId":  wantID,
 	})
 }
 
-func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) {
-	s.handleBatchOperation(w, r, "suspend")
-}
-func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request) {
-	s.handleBatchOperation(w, r, "resume")
-}
-func (s *Server) stopWants(w http.ResponseWriter, r *http.Request) {
-	s.handleBatchOperation(w, r, "stop")
-}
-func (s *Server) startWants(w http.ResponseWriter, r *http.Request) {
-	s.handleBatchOperation(w, r, "start")
-}
+func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) { s.handleBatchOperation(w, r, "suspend") }
+func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request)  { s.handleBatchOperation(w, r, "resume") }
+func (s *Server) stopWants(w http.ResponseWriter, r *http.Request)    { s.handleBatchOperation(w, r, "stop") }
+func (s *Server) startWants(w http.ResponseWriter, r *http.Request)   { s.handleBatchOperation(w, r, "start") }
 
 func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, operation string) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var body struct {
-		IDs []string `json:"ids"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+	var body struct { IDs []string `json:"ids"` }
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
 
 	var err error
 	switch operation {
-	case "delete":
-		err = s.globalBuilder.QueueWantDelete(body.IDs)
-	case "suspend":
-		err = s.globalBuilder.QueueWantSuspend(body.IDs)
-	case "resume":
-		err = s.globalBuilder.QueueWantResume(body.IDs)
-	case "stop":
-		err = s.globalBuilder.QueueWantStop(body.IDs)
-	case "start":
-		err = s.globalBuilder.QueueWantStart(body.IDs)
+	case "delete":  err = s.globalBuilder.QueueWantDelete(body.IDs)
+	case "suspend": err = s.globalBuilder.QueueWantSuspend(body.IDs)
+	case "resume":  err = s.globalBuilder.QueueWantResume(body.IDs)
+	case "stop":    err = s.globalBuilder.QueueWantStop(body.IDs)
+	case "start":   err = s.globalBuilder.QueueWantStart(body.IDs)
 	}
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.JSONError(w, r, http.StatusInternalServerError, "Batch operation failed", err.Error())
 		return
 	}
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/"+operation, strings.Join(body.IDs, ","), "success", http.StatusAccepted, "", "Batch "+operation+" queued")
-	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusAccepted, map[string]any{
 		"message": "Batch " + operation + " operation queued",
 		"count":   len(body.IDs),
 	})
 }
 
 func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
-	if _, _, found := s.globalBuilder.FindWantByID(wantID); found {
-		// Simpler lookup via global builder which covers all
-		// Need actual want object to get status
-		want, _, _ := s.globalBuilder.FindWantByID(wantID)
-		json.NewEncoder(w).Encode(map[string]any{
+	wantID := mux.Vars(r)["id"]
+	if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+		s.JSONResponse(w, http.StatusOK, map[string]any{
 			"id":     wantID,
 			"status": string(want.GetStatus()),
 		})
 		return
 	}
-	http.Error(w, "Want not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 }
 
 func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
+	wantID := mux.Vars(r)["id"]
 	if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-		json.NewEncoder(w).Encode(map[string]any{
-			"data": want.GetAllState(),
-		})
+		s.JSONResponse(w, http.StatusOK, map[string]any{ "data": want.GetAllState() })
 		return
 	}
-	http.Error(w, "Want not found", http.StatusNotFound)
+	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 }
 
-func generateWantID() string {
-	uuid := make([]byte, 16)
-	rand.Read(uuid)
-	uuid[6] = (uuid[6] & 0x0f) | 0x40
-	uuid[8] = (uuid[8] & 0x3f) | 0x80
-	return fmt.Sprintf("want-%x-%x-%x-%x-%x",
-		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
-}
-
-// updateWantOrder handles PUT /api/v1/wants/{id}/order - updates the order key of a want for drag-and-drop reordering
+// updateWantOrder handles PUT /api/v1/wants/{id}/order
 func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	vars := mux.Vars(r)
-	wantID := vars["id"]
-
-	// Parse request body
+	wantID := mux.Vars(r)["id"]
 	var req struct {
-		PreviousWantID string `json:"previousWantId"` // ID of want before target position (empty = first)
-		NextWantID     string `json:"nextWantId"`     // ID of want after target position (empty = last)
+		PreviousWantID string `json:"previousWantId"`
+		NextWantID     string `json:"nextWantId"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errorMsg := fmt.Sprintf("Invalid request body: %v", err)
-		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "error", http.StatusBadRequest, errorMsg, "invalid_request")
-		http.Error(w, errorMsg, http.StatusBadRequest)
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
 
-	// Find the want to be reordered
 	want, _, found := s.globalBuilder.FindWantByID(wantID)
 	if !found {
-		errorMsg := "Want not found"
-		s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "error", http.StatusNotFound, errorMsg, "want_not_found")
-		http.Error(w, errorMsg, http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
 	}
 
-	// Get order keys of surrounding wants
 	var prevKey, nextKey string
-
 	if req.PreviousWantID != "" {
-		prevWant, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID)
-		if found && prevWant != nil {
-			prevKey = prevWant.Metadata.OrderKey
-		}
+		if pw, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID); found && pw != nil { prevKey = pw.Metadata.OrderKey }
 	}
-
 	if req.NextWantID != "" {
-		nextWant, _, found := s.globalBuilder.FindWantByID(req.NextWantID)
-		if found && nextWant != nil {
-			nextKey = nextWant.Metadata.OrderKey
-		}
+		if nw, _, found := s.globalBuilder.FindWantByID(req.NextWantID); found && nw != nil { nextKey = nw.Metadata.OrderKey }
 	}
 
-	log.Printf("[ORDERKEY:DEBUG] Generating key between prev='%s' and next='%s'\n", prevKey, nextKey)
-
-	// Generate new order key between the two
 	newOrderKey := mywant.GenerateOrderKeyBetween(prevKey, nextKey)
-	log.Printf("[ORDERKEY:DEBUG] Generated NEW key: '%s' (for want %s)\n", newOrderKey, want.Metadata.Name)
 	want.Metadata.OrderKey = newOrderKey
-
-	// Update the want (this will trigger persistence)
 	s.globalBuilder.UpdateWant(want)
 
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}/order", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated order key for want: %s", want.Metadata.Name))
-
-	// Return success response
-	response := map[string]interface{}{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"success":  true,
 		"orderKey": newOrderKey,
 		"wantId":   wantID,
-	}
-	json.NewEncoder(w).Encode(response)
+	})
 }

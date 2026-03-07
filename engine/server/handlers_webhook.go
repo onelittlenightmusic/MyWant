@@ -39,21 +39,19 @@ var slackStateCfg = webhookStateConfig{
 
 // receiveWebhook handles POST /api/v1/webhooks/{id}
 func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	vars := mux.Vars(r)
 	wantID := vars["id"]
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, `{"error":"failed to read request body"}`, http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "failed to read request body", err.Error())
 		return
 	}
 	defer r.Body.Close()
 
 	var payload map[string]any
 	if err := json.Unmarshal(body, &payload); err != nil {
-		http.Error(w, `{"error":"invalid JSON payload"}`, http.StatusBadRequest)
+		s.JSONError(w, r, http.StatusBadRequest, "invalid JSON payload", err.Error())
 		return
 	}
 
@@ -65,7 +63,7 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 
 	want := s.findWantByIDOrName(wantID)
 	if want == nil {
-		http.Error(w, `{"error":"want not found"}`, http.StatusNotFound)
+		s.JSONError(w, r, http.StatusNotFound, "want not found", "")
 		return
 	}
 
@@ -91,7 +89,7 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 
 	log.Printf("[WEBHOOK] Received generic webhook for want %s\n", wantID)
-	json.NewEncoder(w).Encode(map[string]string{
+	s.JSONResponse(w, http.StatusOK, map[string]string{
 		"status": "received",
 	})
 }
@@ -169,7 +167,7 @@ func (s *Server) handleReplayWebhook(w http.ResponseWriter, want *mywant.Want, a
 		})
 		log.Printf("[REPLAY-WEBHOOK] start_replay signal set for want %s\n", want.Metadata.ID)
 	}
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "action": action})
+	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "action": action})
 }
 
 // findWantByIDOrName searches for a Want across globalBuilder and execution builders by ID or Name
@@ -408,7 +406,7 @@ func (s *Server) listWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
 		endpoints = []webhookEndpoint{}
 	}
 
-	json.NewEncoder(w).Encode(map[string]any{
+	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"endpoints": endpoints,
 		"count":     len(endpoints),
 	})
