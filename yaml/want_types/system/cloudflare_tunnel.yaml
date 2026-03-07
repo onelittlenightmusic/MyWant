@@ -60,6 +60,27 @@ wantType:
     initialValue: 0
     example: 12345
 
+  - name: server_command
+    description: Command to start the cloudflared process
+    type: string
+    persistent: true
+    label: internal
+    initialValue: "cloudflared"
+
+  - name: server_args
+    description: Arguments for the cloudflared process (JSON array)
+    type: string
+    persistent: true
+    label: internal
+    initialValue: ""
+
+  - name: server_log_file
+    description: Path to capture cloudflared output
+    type: string
+    persistent: true
+    label: internal
+    initialValue: ""
+
   - name: tunnel_url
     description: Public forwarding URL assigned by Cloudflare (trycloudflare.com)
     type: string

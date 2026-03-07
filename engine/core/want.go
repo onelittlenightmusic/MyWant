@@ -1808,7 +1808,7 @@ func (n *Want) GetPredefined(key string) (any, bool) {
 }
 
 func (n *Want) SetInternal(key string, value any) {
-	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelInternal) || strings.HasPrefix(key, "_") || strings.HasPrefix(key, "server_") {
 		if n.inExecCycle {
 			n.StoreState(key, value)
 		} else {
