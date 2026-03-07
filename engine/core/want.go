@@ -1743,7 +1743,7 @@ func (n *Want) GetGoal(key string) (any, bool) {
 }
 
 func (n *Want) SetCurrent(key string, value any) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+	if label, ok := n.StateLabels[key]; (ok && label == LabelCurrent) || strings.HasPrefix(key, "server_") {
 		if n.inExecCycle {
 			n.StoreState(key, value)
 		} else {
