@@ -84,9 +84,9 @@ func printFlightStatus(builder *ChainBuilder) {
 	}
 
 	want := wants[0]
-	if flightID, exists := want.State["flight_id"]; exists {
-		status, _ := want.State["flight_status"]
-		message, _ := want.State["status_message"]
+	if flightID, exists := want.GetState("flight_id"); exists {
+		status, _ := want.GetState("flight_status")
+		message, _ := want.GetState("status_message")
 		fmt.Printf("[Status] Flight ID: %v | Status: %v | Message: %v\n", flightID, status, message)
 	}
 }

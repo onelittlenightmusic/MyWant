@@ -30,7 +30,7 @@ func main() {
 					},
 				},
 				Status: mywant.WantStatusIdle,
-				State:  make(map[string]any),
+
 			},
 		},
 	}
@@ -84,10 +84,10 @@ func main() {
 	for name, state := range states {
 		if state.Metadata.Type == "target" {
 			fmt.Printf("🎯 Parent '%s': %s\n", name, state.Status)
-			if result, ok := state.State["result"]; ok {
+			if result, ok := state.GetAllState()["result"]; ok {
 				fmt.Printf("   Result: %v\n", result)
 			}
-			if childCount, ok := state.State["childCount"]; ok {
+			if childCount, ok := state.GetAllState()["childCount"]; ok {
 				fmt.Printf("   Children: %v\n", childCount)
 			}
 

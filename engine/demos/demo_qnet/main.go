@@ -35,7 +35,7 @@ func main() {
 	states := builder.GetAllWantStates()
 	for name, state := range states {
 		fmt.Printf("  %s: %s (processed: %v)\n",
-			name, state.Status, state.State["total_processed"])
+			name, state.Status, state.GetAllState()["total_processed"])
 	}
 
 	fmt.Println("\n✅ QNet execution completed successfully!")

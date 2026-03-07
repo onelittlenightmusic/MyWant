@@ -153,7 +153,7 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 				primeSequenceCount++
 
 				// Check achieved state
-				achievedVal, hasAchieved := want.State["achieved"]
+				achievedVal, hasAchieved := want.GetAllState()["achieved"]
 				achieved, _ := achievedVal.(bool)
 
 				if !hasAchieved || !achieved {
@@ -161,8 +161,8 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 					notAchievedWants = append(notAchievedWants, want.Metadata.Name)
 
 					// Log detailed state for debugging
-					totalProcessed, _ := want.State["total_processed"]
-					primeCount, _ := want.State["primeCount"]
+					totalProcessed, _ := want.GetAllState()["total_processed"]
+					primeCount, _ := want.GetAllState()["primeCount"]
 					t.Logf("⏳ Want %s - achieved=%v, processed=%v, primes=%v",
 						want.Metadata.Name, achieved, totalProcessed, primeCount)
 				}
@@ -179,8 +179,8 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 			t.Log("\n=== Success Summary ===")
 			for _, want := range allStates {
 				if want.Metadata.Type == "prime sequence" {
-					primeCount := want.State["primeCount"]
-					totalProcessed := want.State["total_processed"]
+					primeCount := want.GetAllState()["primeCount"]
+					totalProcessed := want.GetAllState()["total_processed"]
 					t.Logf("  %s: found %v primes (processed %v numbers)",
 						want.Metadata.Name, primeCount, totalProcessed)
 				}
@@ -203,9 +203,9 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 	t.Log("\n=== Prime Numbers (Generators) State ===")
 	for _, want := range allStates {
 		if want.Metadata.Type == "prime numbers" {
-			currentNumber, _ := want.State["current_number"]
-			completed, _ := want.State["completed"]
-			achieved, _ := want.State["achieved"]
+			currentNumber, _ := want.GetAllState()["current_number"]
+			completed, _ := want.GetAllState()["completed"]
+			achieved, _ := want.GetAllState()["achieved"]
 			t.Logf("Want: %s - current=%v, completed=%v, achieved=%v, status=%v",
 				want.Metadata.Name, currentNumber, completed, achieved, want.Status)
 		}
@@ -215,14 +215,14 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 	t.Log("\n=== Prime Sequence (Processors) State ===")
 	for _, want := range allStates {
 		if want.Metadata.Type == "prime sequence" {
-			achievedVal, _ := want.State["achieved"]
+			achievedVal, _ := want.GetAllState()["achieved"]
 			achieved, _ := achievedVal.(bool)
 
 			if !achieved {
 				notAchievedCount++
 				t.Logf("\n--- Want: %s (ID: %s) ---", want.Metadata.Name, want.Metadata.ID)
 				t.Logf("  Type: %s", want.Metadata.Type)
-				t.Logf("  State: %+v", want.State)
+				t.Logf("  State: %+v", want.GetAllState())
 				t.Logf("  Status: %+v", want.Status)
 				t.Logf("  Using: %+v", want.Spec.Using)
 			}

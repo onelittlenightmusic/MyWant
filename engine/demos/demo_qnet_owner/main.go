@@ -57,11 +57,9 @@ func main() {
 	states := builder.GetAllWantStates()
 	for name, state := range states {
 		processed := 0
-		if state.State != nil {
-			if val, ok := state.State["total_processed"]; ok {
-				if intVal, ok := val.(int); ok {
-					processed = intVal
-				}
+		if val, ok := state.GetAllState()["total_processed"]; ok {
+			if intVal, ok := val.(int); ok {
+				processed = intVal
 			}
 		}
 		fmt.Printf("  %s: %s (processed: %d)\n",
@@ -73,13 +71,13 @@ func main() {
 	for name, state := range states {
 		if state.Metadata.Type == "target" {
 			fmt.Printf("  Target %s:\n", name)
-			if result, ok := state.State["result"]; ok {
+			if result, ok := state.GetAllState()["result"]; ok {
 				fmt.Printf("    Result: %v\n", result)
 			}
-			if recipePath, ok := state.State["recipePath"]; ok {
+			if recipePath, ok := state.GetAllState()["recipePath"]; ok {
 				fmt.Printf("    Recipe: %v\n", recipePath)
 			}
-			if childCount, ok := state.State["childCount"]; ok {
+			if childCount, ok := state.GetAllState()["childCount"]; ok {
 				fmt.Printf("    Children: %v\n", childCount)
 			}
 		}

@@ -69,8 +69,8 @@ func main() {
 	fmt.Printf("\nTotal wants: %d\n", len(allWants))
 	for _, want := range allWants {
 		if want.Metadata.Type != "scheduler" { // Skip the system scheduler
-			achieving, _ := want.State["achieving_percentage"]
-			finalResult, _ := want.State["final_result"]
+			achieving, _ := want.GetState("achieving_percentage")
+			finalResult, _ := want.GetState("final_result")
 			achieved := want.Status == "completed"
 
 			fmt.Printf("\n  Want: %s (type: %s)\n", want.Metadata.Name, want.Metadata.Type)
@@ -80,8 +80,8 @@ func main() {
 			fmt.Printf("    IsAchieved: %v\n", achieved)
 
 			// Print error if failed
-			if want.Status == "failed" && want.State != nil {
-				if errVal, ok := want.State["error"]; ok {
+			if want.Status == "failed" {
+				if errVal, ok := want.GetState("error"); ok {
 					fmt.Printf("    Error: %v\n", errVal)
 				}
 			}

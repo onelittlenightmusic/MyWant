@@ -30,9 +30,6 @@ func main() {
 						"rate":  1.0,
 					},
 				},
-				State: map[string]any{
-					"initial_state": "initialized",
-				},
 			},
 		},
 	}
@@ -40,6 +37,7 @@ func main() {
 
 	fmt.Println("🔧 Creating test want...")
 	testWant := config.Wants[0]
+	testWant.State.Store("initial_state", "initialized")
 
 	fmt.Println("📝 Testing parameter updates...")
 

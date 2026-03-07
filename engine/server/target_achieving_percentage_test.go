@@ -26,21 +26,18 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	child1 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-1", Type: "test"},
 		Spec:     mywant.WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 		Status:   mywant.WantStatusIdle,
 	}
 
 	child2 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-2", Type: "test"},
 		Spec:     mywant.WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 		Status:   mywant.WantStatusIdle,
 	}
 
 	child3 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-3", Type: "test"},
 		Spec:     mywant.WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 		Status:   mywant.WantStatusIdle,
 	}
 
@@ -117,7 +114,6 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 	child := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-1", Type: "test"},
 		Spec:     mywant.WantSpec{Params: make(map[string]any)},
-		State:    make(map[string]any),
 		Status:   mywant.WantStatusIdle,
 	}
 
@@ -205,7 +201,6 @@ func TestTargetStateConsistency(t *testing.T) {
 		child := &mywant.Want{
 			Metadata: mywant.Metadata{Name: "child-" + string(rune('0'+i)), Type: "test"},
 			Spec:     mywant.WantSpec{Params: make(map[string]any)},
-			State:    make(map[string]any),
 			Status:   mywant.WantStatusIdle,
 		}
 		children = append(children, child)
@@ -263,7 +258,6 @@ func BenchmarkTargetProgressCycle(b *testing.B) {
 		child := &mywant.Want{
 			Metadata: mywant.Metadata{Name: "child-bench-" + string(rune('0'+i)), Type: "test"},
 			Spec:     mywant.WantSpec{Params: make(map[string]any)},
-			State:    make(map[string]any),
 			Status:   mywant.WantStatusIdle,
 		}
 		children = append(children, child)
