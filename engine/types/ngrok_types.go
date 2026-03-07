@@ -72,7 +72,7 @@ func (n *NgrokWant) Initialize() {
 	locals.LogFile = logFile
 
 	// Store config in state for live_server_manager agent to read
-	argsJSON, _ := json.Marshal([]string{locals.Protocol, locals.Port, "--log=stdout"})
+	argsJSON, _ := json.Marshal([]string{"http", locals.Port, "--log", "stdout"})
 	
 	n.SetCurrent("server_phase", "starting")
 	n.SetCurrent("server_pid", 0)
