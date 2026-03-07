@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LucideIcon, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
@@ -30,13 +30,30 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 }) => {
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
+  const [isAnyDragging, setIsAnyDragging] = useState(false);
+
+  useEffect(() => {
+    const handleDragStart = () => setIsAnyDragging(true);
+    const handleDragEnd = () => setIsAnyDragging(false);
+
+    window.addEventListener('dragstart', handleDragStart);
+    window.addEventListener('dragend', handleDragEnd);
+
+    return () => {
+      window.removeEventListener('dragstart', handleDragStart);
+      window.removeEventListener('dragend', handleDragEnd);
+    };
+  }, []);
 
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity z-40 lg:hidden"
+          className={classNames(
+            "fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity z-40 lg:hidden",
+            isAnyDragging ? "pointer-events-none opacity-0" : "bg-opacity-50"
+          )}
           onClick={onClose}
         />
       )}
