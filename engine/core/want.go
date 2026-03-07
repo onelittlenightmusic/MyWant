@@ -1744,11 +1744,7 @@ func (n *Want) GetGoal(key string) (any, bool) {
 
 func (n *Want) SetCurrent(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		if n.inExecCycle {
-			n.StoreState(key, value)
-		} else {
-			n.StoreStateForAgent(key, value)
-		}
+		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
@@ -1763,11 +1759,7 @@ func (n *Want) GetCurrent(key string) (any, bool) {
 
 func (n *Want) SetPlan(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		if n.inExecCycle {
-			n.StoreState(key, value)
-		} else {
-			n.StoreStateForAgent(key, value)
-		}
+		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
@@ -1782,21 +1774,12 @@ func (n *Want) GetPlan(key string) (any, bool) {
 
 func (n *Want) ClearPlan(key string) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		if n.inExecCycle {
-			n.StoreState(key, nil)
-		} else {
-			n.StoreStateForAgent(key, nil)
-		}
+		n.StoreState(key, nil)
 	}
 }
 
 func (n *Want) SetPredefined(key string, value any) {
-	// Predefined fields might not be in StateLabels if they are truly system-wide
-	if n.inExecCycle {
-		n.StoreState(key, value)
-	} else {
-		n.StoreStateForAgent(key, value)
-	}
+	n.StoreState(key, value)
 }
 
 func (n *Want) GetPredefined(key string) (any, bool) {
@@ -1809,11 +1792,7 @@ func (n *Want) GetPredefined(key string) (any, bool) {
 
 func (n *Want) SetInternal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
-		if n.inExecCycle {
-			n.StoreState(key, value)
-		} else {
-			n.StoreStateForAgent(key, value)
-		}
+		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
 	}
