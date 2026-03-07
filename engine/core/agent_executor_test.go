@@ -26,7 +26,7 @@ func TestLocalExecutor(t *testing.T) {
 			ExecutionConfig: DefaultExecutionConfig(),
 		},
 		Action: func(ctx context.Context, want *Want) error {
-			want.StageStateChange("test_key", "test_value")
+			want.StoreState("test_key", "test_value")
 			return nil
 		},
 	}

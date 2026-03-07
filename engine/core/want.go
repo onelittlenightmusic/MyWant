@@ -1238,9 +1238,8 @@ func (n *Want) GetState(key string) (any, bool) {
 	return n.State.Load(key)
 }
 
-// GetPendingStateChanges returns a copy of pending state changes
+// GetPendingStateChanges is obsolete; state changes are committed immediately via StoreState.
 func (n *Want) GetPendingStateChanges() map[string]any {
-	// Obsolete: pending changes are now committed immediately
 	return make(map[string]any)
 }
 
