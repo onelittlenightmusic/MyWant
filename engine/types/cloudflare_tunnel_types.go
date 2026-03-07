@@ -51,7 +51,7 @@ var (
 
 // Initialize starts the cloudflared process and waits for the forwarding URL
 func (n *CloudflareTunnelWant) Initialize() {
-	n.StoreLog("[CLOUDFLARE] Initializing: %s", n.Metadata.Name)
+	n.DirectLog("[CLOUDFLARE] Initializing: %s", n.Metadata.Name)
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := n.GetLocals()
@@ -97,9 +97,10 @@ func (n *CloudflareTunnelWant) Initialize() {
 	locals.ServerPID = pid
 
 	// Wait for tunnel URL in log file
+	n.DirectLog("[CLOUDFLARE] Waiting for tunnel URL in %s", logFile)
 	url := n.waitForTunnelURL(logFile)
 	if url == "" {
-		n.failWithError(locals, "timed out waiting for cloudflare tunnel URL")
+		n.failWithError(locals, fmt.Sprintf("timed out waiting for cloudflared tunnel URL in %s", logFile))
 		return
 	}
 
@@ -107,7 +108,7 @@ func (n *CloudflareTunnelWant) Initialize() {
 	locals.Phase = CloudflareTunnelPhaseRunning
 	n.SetCurrent("tunnel_url", url)
 	n.SetCurrent("server_phase", CloudflareTunnelPhaseRunning)
-	n.StoreLog("[CLOUDFLARE] Tunnel running - PID: %d, URL: %s", pid, url)
+	n.DirectLog("[CLOUDFLARE] Tunnel running - PID: %d, URL: %s", pid, url)
 }
 
 // IsAchieved checks if the cloudflare tunnel is running with a public URL
@@ -206,7 +207,7 @@ func (n *CloudflareTunnelWant) waitForTunnelURL(logFile string) string {
 		if url := parseCloudflareURL(logFile); url != "" {
 			return url
 		}
-		n.StoreLog("[DEBUG] Waiting for cloudflare URL (attempt %d/%d)...", i+1, maxRetries)
+		n.DirectLog("[DEBUG] Waiting for cloudflare tunnel URL (attempt %d/%d)...", i+1, maxRetries)
 		time.Sleep(interval)
 	}
 	return ""

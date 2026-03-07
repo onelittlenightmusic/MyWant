@@ -53,7 +53,7 @@ var (
 
 // Initialize starts the ngrok process and waits for the forwarding URL
 func (n *NgrokWant) Initialize() {
-	n.StoreLog("[NGROK] Initializing: %s", n.Metadata.Name)
+	n.DirectLog("[NGROK] Initializing: %s", n.Metadata.Name)
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := n.GetLocals()
@@ -95,9 +95,10 @@ func (n *NgrokWant) Initialize() {
 	locals.ServerPID = pid
 
 	// Wait for forwarding URL in log file
+	n.DirectLog("[NGROK] Waiting for forwarding URL in %s", logFile)
 	url := n.waitForNgrokURL(logFile)
 	if url == "" {
-		n.failWithError(locals, "timed out waiting for ngrok forwarding URL")
+		n.failWithError(locals, fmt.Sprintf("timed out waiting for ngrok forwarding URL in %s", logFile))
 		return
 	}
 
@@ -105,7 +106,7 @@ func (n *NgrokWant) Initialize() {
 	locals.Phase = NgrokPhaseRunning
 	n.SetCurrent("ngrok_url", url)
 	n.SetCurrent("server_phase", NgrokPhaseRunning)
-	n.StoreLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
+	n.DirectLog("[NGROK] Tunnel running - PID: %d, URL: %s", pid, url)
 }
 
 // IsAchieved checks if the ngrok tunnel is running with a public URL
@@ -204,7 +205,7 @@ func (n *NgrokWant) waitForNgrokURL(logFile string) string {
 		if url := parseNgrokURL(logFile); url != "" {
 			return url
 		}
-		n.StoreLog("[DEBUG] Waiting for ngrok URL (attempt %d/%d)...", i+1, maxRetries)
+		n.DirectLog("[DEBUG] Waiting for ngrok URL (attempt %d/%d)...", i+1, maxRetries)
 		time.Sleep(interval)
 	}
 	return ""
