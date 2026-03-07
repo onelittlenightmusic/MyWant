@@ -21,11 +21,11 @@ func init() {
 
 // manageLiveServer handles server start and stop based on want phase
 func manageLiveServer(ctx context.Context, want *mywant.Want) error {
-	want.StoreLog("[AGENT] manageLiveServer called for want %s", want.Metadata.Name)
+	want.DirectLog("[AGENT] manageLiveServer called for want %s", want.Metadata.Name)
 
 	phase := mywant.GetCurrent(want, "server_phase", "")
 	if phase == "" {
-		want.StoreLog("[AGENT] No server_phase set, returning")
+		want.DirectLog("[AGENT] No server_phase set, returning")
 		return nil
 	}
 
@@ -36,18 +36,18 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 		if existingPID == 0 {
 			pid, err := startLiveServer(want)
 			if err != nil {
-				want.StoreLog("[ERROR] Failed to start server: %v", err)
+				want.DirectLog("[ERROR] Failed to start server: %v", err)
 				return err
 			}
 			want.SetCurrent("server_pid", pid)
-			want.StoreLog("[INFO] Started server with PID %d", pid)
+			want.DirectLog("[INFO] Started server with PID %d", pid)
 
 			// If health_check_url is configured, poll for readiness
 			healthCheckURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
 			if healthCheckURL != "" {
 				body, err := waitForHealthCheck(ctx, want, healthCheckURL)
 				if err != nil {
-					want.StoreLog("[ERROR] Health check failed: %v", err)
+					want.DirectLog("[ERROR] Health check failed: %v", err)
 					if proc, findErr := os.FindProcess(pid); findErr == nil {
 						proc.Signal(syscall.SIGTERM)
 					}
@@ -55,19 +55,19 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 					return err
 				}
 				want.SetCurrent("health_check_response", body)
-				want.StoreLog("[INFO] Health check passed")
+				want.DirectLog("[INFO] Health check passed")
 			}
 		} else {
-			want.StoreLog("[INFO] Server already running with PID %d", existingPID)
+			want.DirectLog("[INFO] Server already running with PID %d", existingPID)
 		}
 
 	case "stopping":
 		if existingPID != 0 {
 			err := stopLiveServer(existingPID, want)
 			if err != nil {
-				want.StoreLog("[WARN] Failed to stop server PID %d: %v", existingPID, err)
+				want.DirectLog("[WARN] Failed to stop server PID %d: %v", existingPID, err)
 			} else {
-				want.StoreLog("[INFO] Stopped server PID %d", existingPID)
+				want.DirectLog("[INFO] Stopped server PID %d", existingPID)
 				want.SetCurrent("server_pid", 0)
 				want.SetCurrent("health_check_response", "")
 			}
@@ -95,6 +95,7 @@ func startLiveServer(want *mywant.Want) (int, error) {
 		binPath = command
 	}
 
+	want.DirectLog("[INFO] Executing: %s %v", binPath, args)
 	cmd := exec.Command(binPath, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -122,7 +123,7 @@ func startLiveServer(want *mywant.Want) (int, error) {
 	}
 
 	pid := cmd.Process.Pid
-	want.StoreLog("[INFO] Server started: %s %v (PID: %d)", binPath, args, pid)
+	want.DirectLog("[INFO] Server started: %s %v (PID: %d)", binPath, args, pid)
 
 	go func() {
 		cmd.Wait()
@@ -155,7 +156,7 @@ func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (str
 
 		resp, err := client.Get(url)
 		if err != nil {
-			want.StoreLog("[DEBUG] Waiting for health check (attempt %d/%d)...", i+1, maxRetries)
+			want.DirectLog("[DEBUG] Waiting for health check (attempt %d/%d)...", i+1, maxRetries)
 			time.Sleep(interval)
 			continue
 		}
@@ -259,7 +260,7 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 	// On Unix, sending signal to -pid sends it to the entire process group
 	err := syscall.Kill(-pid, syscall.SIGTERM)
 	if err == nil {
-		want.StoreLog("[INFO] Sent SIGTERM to process group %d", pid)
+		want.DirectLog("[INFO] Sent SIGTERM to process group %d", pid)
 		return nil
 	}
 
@@ -270,12 +271,12 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 	}
 
 	if err := process.Signal(syscall.SIGTERM); err != nil {
-		want.StoreLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
+		want.DirectLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
 		if err := process.Kill(); err != nil {
 			return fmt.Errorf("failed to kill process %d: %w", pid, err)
 		}
 	}
 
-	want.StoreLog("[INFO] Sent termination signal to server PID %d", pid)
+	want.DirectLog("[INFO] Sent termination signal to server PID %d", pid)
 	return nil
 }
