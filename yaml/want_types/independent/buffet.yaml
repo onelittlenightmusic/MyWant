@@ -41,6 +41,48 @@ wantType:
     label: current
     example: 45.0
     initialValue: 0.0
+  - name: actual_cost
+    description: Reported cost for this reservation (GCP)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
+  - name: reservation_status
+    description: Current status of the reservation
+    type: string
+    persistent: true
+    initialValue: ''
+    label: goal
+  - name: res_status
+    description: Current status of the reservation (GCP)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: execute_booking
+    description: Plan flag to trigger agent execution
+    type: bool
+    persistent: true
+    initialValue: false
+    label: plan
+  - name: good_to_reserve
+    description: Coordination flag from parent to allow booking
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: completed
+    description: Whether reservation has been completed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: cancelled
+    description: Whether reservation has been cancelled
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
   - name: total_processed
     description: Count of successful buffet reservations
     type: int
@@ -120,18 +162,24 @@ wantType:
     persistent: false
     label: internal
     initialValue: *id001
+  - name: execution_source
+    description: Source of execution (monitor or agent)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
   - name: agent_execution_status
     description: Status of agent execution (completed, failed, pending)
     type: string
     persistent: true
-    label: internal
+    label: current
     example: completed
     initialValue: ''
   - name: agent_execution_error
     description: Error message if agent execution failed
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ''
   agents:
   - name: MonitorBuffet

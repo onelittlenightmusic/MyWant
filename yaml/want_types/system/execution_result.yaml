@@ -66,9 +66,30 @@ wantType:
     description: The command that was executed
     type: string
     persistent: true
-    label: predefined
+    label: current
     initialValue: ''
     example: "echo 'Hello World'"
+
+  - name: shell
+    description: Shell used for execution
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: timeout
+    description: Timeout used for execution
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+
+  - name: working_directory
+    description: Working directory used for execution
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
 
   - name: exit_code
     description: Exit code returned by the command
@@ -138,9 +159,16 @@ wantType:
     description: Raw result from ExecutionAgent
     type: object
     persistent: false
-    label: internal
+    label: predefined
     initialValue: {}
     example: '{"exit_code": 0, "stdout": "Hello World", "stderr": "", "execution_time_ms": 25, "started_at": "2025-12-24T10:30:45Z", "completed_at": "2025-12-24T10:30:45Z", "success": true}'
+
+  - name: achieving_percentage
+    description: Progress percentage
+    type: int
+    persistent: true
+    label: predefined
+    initialValue: 0
 
   agents:
   - name: execution_command

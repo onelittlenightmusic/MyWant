@@ -53,6 +53,12 @@ wantType:
     label: current
     example: 1200.0
     initialValue: 0.0
+  - name: actual_cost
+    description: Reported cost for this booking (GCP)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
   - name: flight_type
     description: Class of flight booked
     type: string
@@ -112,6 +118,48 @@ wantType:
     label: current
     example: created
     initialValue: ''
+  - name: good_to_reserve
+    description: Coordination flag from parent to allow booking
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: completed
+    description: Whether reservation has been completed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: cancelled
+    description: Whether reservation has been cancelled
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: last_logged_phase
+    description: Last phase logged by the agent
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: agent_execution_status
+    description: Status of agent execution (completed, failed, pending)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: agent_execution_error
+    description: Error message if agent execution failed
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    initialValue: 0
+    label: predefined
   agents:
   - name: agent_flight_api
     role: action

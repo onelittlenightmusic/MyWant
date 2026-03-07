@@ -64,7 +64,7 @@ wantType:
     description: Progress percentage toward completion
     type: int
     persistent: true
-    label: current
+    label: predefined
     initialValue: 0
     example: 100
   - name: final_result

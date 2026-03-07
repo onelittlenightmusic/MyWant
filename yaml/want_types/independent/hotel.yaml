@@ -65,6 +65,24 @@ wantType:
     persistent: true
     initialValue: false
     label: plan
+  - name: good_to_reserve
+    description: Coordination flag from parent to allow booking
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: completed
+    description: Whether reservation has been completed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: cancelled
+    description: Whether reservation has been cancelled
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
   - name: total_processed
     description: Count of successful reservations
     type: int
@@ -143,18 +161,24 @@ wantType:
     persistent: false
     label: internal
     initialValue: *id001
+  - name: execution_source
+    description: Source of execution (monitor or agent)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
   - name: agent_execution_status
     description: Status of agent execution (completed, failed, pending)
     type: string
     persistent: true
-    label: internal
+    label: current
     example: completed
     initialValue: ''
   - name: agent_execution_error
     description: Error message if agent execution failed
     type: string
     persistent: true
-    label: internal
+    label: current
     initialValue: ''
   agents:
   - name: MonitorHotel

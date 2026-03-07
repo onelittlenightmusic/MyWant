@@ -30,6 +30,24 @@ wantType:
       max: 10000
     example: 50
   state:
+  - name: a
+    description: Current Fibonacci number (n-1)
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: b
+    description: Next Fibonacci number (n)
+    type: int
+    persistent: true
+    label: current
+    initialValue: 1
+  - name: sent_count
+    description: Number of values sent so far
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
   - name: completed
     description: Whether generation cycle has completed
     type: bool
@@ -37,6 +55,18 @@ wantType:
     label: current
     example: true
     initialValue: false
+  - name: achieved
+    description: Whether the goal has been achieved
+    type: bool
+    persistent: true
+    label: predefined
+    initialValue: false
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    label: predefined
+    initialValue: 0
   - name: generated_count
     description: Number of values generated in this cycle
     type: int

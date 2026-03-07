@@ -40,6 +40,12 @@ wantType:
       max: 1000000
     example: 1000
   state:
+  - name: current_number
+    description: The current number being generated
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
   - name: completed
     description: Whether generation cycle has completed
     type: bool
@@ -53,6 +59,18 @@ wantType:
     persistent: true
     label: current
     example: 100
+    initialValue: 0
+  - name: achieved
+    description: Whether the goal has been achieved
+    type: bool
+    persistent: true
+    label: predefined
+    initialValue: false
+  - name: achieving_percentage
+    description: Progress percentage
+    type: int
+    persistent: true
+    label: predefined
     initialValue: 0
   - name: start_value
     description: Starting value used for generation
