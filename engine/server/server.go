@@ -107,6 +107,21 @@ func New(config Config) *Server {
 		wantTypeLoader.EnrichMonitorCapabilities(agentRegistry)
 	}
 
+	// Register core system want types
+	mywant.RegisterMonitorWantTypes(globalBuilder)
+	mywant.RegisterOwnerWantTypes(globalBuilder)
+	mywant.RegisterSchedulerWantTypes(globalBuilder)
+
+	// Transfer loaded want type definitions to global builder for state initialization.
+	// This must happen in New() (not just Start()) so tests that call setupRoutes()
+	// directly also have StateLabels populated before ExecuteWithMode runs.
+	if wantTypeLoader != nil {
+		allDefs := wantTypeLoader.GetAll()
+		for _, def := range allDefs {
+			globalBuilder.StoreWantTypeDefinition(def)
+		}
+	}
+
 	// Record want type load warnings into the API log so they are visible via
 	// GET /api/v1/logs and `./bin/mywant logs`.
 	if wantTypeLoader != nil {
@@ -160,24 +175,6 @@ func (s *Server) Start() error {
 				log.Printf("⚠️  pprof server error: %v\n", err)
 			}
 		}()
-	}
-
-	// Register core system want types
-	mywant.RegisterMonitorWantTypes(s.globalBuilder)
-	mywant.RegisterOwnerWantTypes(s.globalBuilder)
-	mywant.RegisterSchedulerWantTypes(s.globalBuilder)
-
-	// Note: Domain-specific want types (Travel, QNet, etc.) are now automatically
-	// registered via init() functions in the 'types' package when their YAML
-	// definitions are stored in the global builder below.
-
-	// Transfer loaded want type definitions to global builder for state initialization
-	// This will trigger automatic registration of Go implementations via StoreWantTypeDefinition
-	if s.wantTypeLoader != nil {
-		allDefs := s.wantTypeLoader.GetAll()
-		for _, def := range allDefs {
-			s.globalBuilder.StoreWantTypeDefinition(def)
-		}
 	}
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
