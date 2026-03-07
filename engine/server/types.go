@@ -13,8 +13,9 @@ type Config struct {
 	Debug          bool            `json:"debug"`
 	HeaderPosition string          `json:"header_position"`
 	ColorMode      string          `json:"color_mode"`
-	ConfigPath     string          `json:"config_path"` // Path to persistent config file (~/.mywant/config.yaml)
-	MemoryPath     string          `json:"memory_path"` // Path to persistent state file (~/.mywant/state.yaml)
+	ConfigPath     string          `json:"config_path"`    // Path to persistent config file (~/.mywant/config.yaml)
+	MemoryPath     string          `json:"memory_path"`    // Path to persistent state file (~/.mywant/state.yaml)
+	WantTypesDir   string          `json:"want_types_dir"` // Override path for YAML want type definitions (default: yaml/want_types)
 	WebFS          http.FileSystem `json:"-"`           // Embedded web assets filesystem (injected by caller)
 }
 
