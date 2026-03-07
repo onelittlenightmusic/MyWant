@@ -3,6 +3,8 @@ package mywant
 import (
 	"log"
 	"mywant/engine/core/chain"
+	"reflect"
+	"strings"
 	"time"
 )
 
@@ -320,4 +322,122 @@ func (u *UsageLimitSpec) ToConnectivityMetadata(wantType string) ConnectivityMet
 	}
 }
 
-// ChangeEventType represents the type of change detected
+// SyncLocalsState synchronizes fields of a Locals struct with the want's state.
+// It uses naming conventions (CamelCase -> snake_case) and respects StateLabels
+// to determine whether to use Current or Internal state.
+func SyncLocalsState(n *Want, locals any, toStruct bool) {
+	if locals == nil {
+		return
+	}
+
+	val := reflect.ValueOf(locals)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return
+	}
+
+	typ := val.Type()
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		structField := typ.Field(i)
+
+		// 1. Determine the state key
+		stateKey := ""
+		tag := structField.Tag.Get("mywant")
+		if tag != "" {
+			parts := strings.Split(tag, ",")
+			if len(parts) >= 2 {
+				stateKey = parts[1]
+			} else {
+				stateKey = parts[0]
+			}
+		}
+
+		if stateKey == "" {
+			// Convention: FieldName -> field_name
+			stateKey = toSnakeCase(structField.Name)
+		}
+
+		// 2. Determine state type (Current vs Internal) based on StateLabels
+		label := n.StateLabels[stateKey]
+		isCurrent := (label == LabelCurrent)
+
+		if toStruct {
+			// Copy from State to Struct
+			var stateVal any
+			var ok bool
+			if isCurrent {
+				stateVal, ok = n.GetCurrent(stateKey)
+			} else {
+				stateVal, ok = n.GetInternal(stateKey)
+			}
+
+			if ok {
+				setFieldValue(field, stateVal)
+			}
+		} else {
+			// Copy from Struct to State
+			if field.CanInterface() {
+				structVal := field.Interface()
+				if isCurrent {
+					n.SetCurrent(stateKey, structVal)
+				} else {
+					n.SetInternal(stateKey, structVal)
+				}
+			}
+		}
+	}
+}
+
+func toSnakeCase(str string) string {
+	var result strings.Builder
+	for i, r := range str {
+		if i > 0 && r >= 'A' && r <= 'Z' {
+			result.WriteRune('_')
+		}
+		result.WriteRune(rune(strings.ToLower(string(r))[0]))
+	}
+	// Special handling for acronyms (e.g., PID -> pid, not p_i_d)
+	s := result.String()
+	s = strings.ReplaceAll(s, "_p_i_d", "_pid")
+	s = strings.ReplaceAll(s, "_u_r_l", "_url")
+	return s
+}
+
+func setFieldValue(field reflect.Value, value any) {
+	if !field.CanSet() {
+		return
+	}
+
+	val := reflect.ValueOf(value)
+	if !val.IsValid() {
+		return
+	}
+
+	// Basic type conversion
+	if val.Type().AssignableTo(field.Type()) {
+		field.Set(val)
+		return
+	}
+
+	// Handle pointer to value
+	if field.Kind() == reflect.Ptr && val.Type().AssignableTo(field.Type().Elem()) {
+		ptr := reflect.New(field.Type().Elem())
+		ptr.Elem().Set(val)
+		field.Set(ptr)
+		return
+	}
+
+	// For basic types, handle common conversions (e.g. float64 from JSON -> int)
+	if field.Kind() == reflect.Int {
+		field.SetInt(int64(ToInt(value, 0)))
+		return
+	}
+	if field.Kind() == reflect.String {
+		field.SetString(ToString(value, ""))
+		return
+	}
+}

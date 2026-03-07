@@ -779,7 +779,23 @@ func (n *Want) StartProgressionLoop(
 						}
 					}
 				}()
+				// Declarative mapping: State -> Locals
+				var locals any
+				if progressableVal := reflect.ValueOf(n.progressable); progressableVal.Kind() == reflect.Ptr {
+					method := progressableVal.MethodByName("GetLocals")
+					if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
+						results := method.Call(nil)
+						locals = results[0].Interface()
+						SyncLocalsState(n, locals, true)
+					}
+				}
+
 				n.progressable.Progress()
+
+				// Declarative mapping: Locals -> State
+				if locals != nil {
+					SyncLocalsState(n, locals, false)
+				}
 			}()
 
 			// 8. End execution cycle (commit batched changes)

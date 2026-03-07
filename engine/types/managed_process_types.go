@@ -29,10 +29,10 @@ const (
 
 // ManagedProcessLocals holds type-specific local state
 type ManagedProcessLocals struct {
-	Phase     string
-	LogFile   string
-	ServerPID int
-	ResultURL string
+	ServerPhase   string
+	ServerLogFile string
+	ServerPid     int
+	ResultUrl     string
 }
 
 // ManagedProcessWant is a generic want type for managing external processes
@@ -47,8 +47,8 @@ func (n *ManagedProcessWant) GetLocals() *ManagedProcessLocals {
 // Initialize starts the process and waits for a result URL in the logs
 func (n *ManagedProcessWant) Initialize() {
 	locals := n.GetLocals()
-	locals.ServerPID = 0
-	locals.ResultURL = ""
+	locals.ServerPid = 0
+	locals.ResultUrl = ""
 
 	// 1. Read process configuration from params
 	command := n.GetStringParam("command", "")
@@ -70,7 +70,7 @@ func (n *ManagedProcessWant) Initialize() {
 	if logFile == "" {
 		logFile = fmt.Sprintf("/tmp/managed-process-%s.log", n.Metadata.Name)
 	}
-	locals.LogFile = logFile
+	locals.ServerLogFile = logFile
 
 	n.DirectLog("[%s] Initializing process: %s %v", n.Metadata.Name, command, args)
 
@@ -93,7 +93,7 @@ func (n *ManagedProcessWant) Initialize() {
 		n.failWithError(locals, "agent did not start process")
 		return
 	}
-	locals.ServerPID = pid
+	locals.ServerPid = pid
 
 	// 4. Optionally wait for a pattern in logs
 	urlRegex := n.GetStringParam("url_regex", "")
@@ -104,16 +104,16 @@ func (n *ManagedProcessWant) Initialize() {
 			n.failWithError(locals, fmt.Sprintf("timed out waiting for result URL in %s", logFile))
 			return
 		}
-		locals.ResultURL = url
+		locals.ResultUrl = url
 		n.SetCurrent("result_url", url)
 		// Specific field for backward compatibility or UI (can be parameterized)
 		resultField := n.GetStringParam("result_field", "result_url")
 		n.SetCurrent(resultField, url)
 	}
 
-	locals.Phase = ProcessPhaseRunning
+	locals.ServerPhase = ProcessPhaseRunning
 	n.SetCurrent("server_phase", ProcessPhaseRunning)
-	n.DirectLog("[%s] Process running - PID: %d, URL: %s", n.Metadata.Name, pid, locals.ResultURL)
+	n.DirectLog("[%s] Process running - PID: %d, URL: %s", n.Metadata.Name, pid, locals.ResultUrl)
 }
 
 func (n *ManagedProcessWant) IsAchieved() bool {
@@ -140,7 +140,7 @@ func (n *ManagedProcessWant) CalculateAchievingPercentage() int {
 
 func (n *ManagedProcessWant) failWithError(locals *ManagedProcessLocals, msg string) {
 	n.DirectLog("[ERROR] %s", msg)
-	locals.Phase = ProcessPhaseFailed
+	locals.ServerPhase = ProcessPhaseFailed
 	n.SetCurrent("server_phase", ProcessPhaseFailed)
 	n.SetCurrent("error_message", msg)
 	n.Status = "failed"
@@ -150,13 +150,12 @@ func (n *ManagedProcessWant) Progress() {
 	locals := n.GetLocals()
 	n.SetPredefined("achieving_percentage", n.CalculateAchievingPercentage())
 
-	switch locals.Phase {
+	switch locals.ServerPhase {
 	case ProcessPhaseRunning:
 		n.ProvideDone()
 	case ProcessPhaseStopping:
-		if pid := GetCurrent(n, "server_pid", 0); pid == 0 {
-			locals.Phase = ProcessPhaseStopped
-			n.SetCurrent("server_phase", ProcessPhaseStopped)
+		if locals.ServerPid == 0 {
+			locals.ServerPhase = ProcessPhaseStopped
 			n.StoreLog("[%s] Process stopped successfully", n.Metadata.Name)
 		}
 	}
@@ -173,8 +172,8 @@ func (n *ManagedProcessWant) OnDelete() {
 	n.StopAllBackgroundAgents()
 
 	locals := n.GetLocals()
-	if locals.LogFile != "" {
-		os.Remove(locals.LogFile)
+	if locals.ServerLogFile != "" {
+		os.Remove(locals.ServerLogFile)
 	}
 }
 
