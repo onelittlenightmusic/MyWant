@@ -18,6 +18,30 @@ wantType:
   finalResultField: ngrok_url
 
   parameters:
+  - name: command
+    description: Command to start the ngrok process
+    type: string
+    required: false
+    default: "ngrok"
+
+  - name: args
+    description: Arguments for the ngrok process (JSON array string)
+    type: string
+    required: false
+    default: '["http", "8080", "--log", "stdout"]'
+
+  - name: url_regex
+    description: Regex to extract the forwarding URL from logs
+    type: string
+    required: false
+    default: '(?:Forwarding\s+|url=)(https?://\S+)'
+
+  - name: result_field
+    description: State field name to store the extracted URL
+    type: string
+    required: false
+    default: 'ngrok_url'
+
   - name: port
     description: Local port to expose through the ngrok tunnel
     type: string

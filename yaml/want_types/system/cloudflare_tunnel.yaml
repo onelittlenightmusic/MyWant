@@ -17,6 +17,30 @@ wantType:
   finalResultField: tunnel_url
 
   parameters:
+  - name: command
+    description: Command to start the cloudflared process
+    type: string
+    required: false
+    default: "cloudflared"
+
+  - name: args
+    description: Arguments for the cloudflared process (JSON array string)
+    type: string
+    required: false
+    default: '["tunnel", "--url", "http://localhost:8080"]'
+
+  - name: url_regex
+    description: Regex to extract the forwarding URL from logs
+    type: string
+    required: false
+    default: '\|\s+(https://[a-zA-Z0-9-]+\.trycloudflare\.com)\s+'
+
+  - name: result_field
+    description: State field name to store the extracted URL
+    type: string
+    required: false
+    default: 'tunnel_url'
+
   - name: port
     description: Local port to expose through the Cloudflare tunnel
     type: string
