@@ -313,7 +313,7 @@ func (r *ReminderWant) handlePhaseReaching(locals *ReminderLocals) {
 }
 
 func (r *ReminderWant) completeReminder(locals *ReminderLocals, logMsg string) {
-	r.StoreLog(logMsg)
+	r.StoreLog("%s", logMsg)
 	locals.Phase = ReminderPhaseCompleted
 	locals.AutoCompleted = true
 	locals.ReactionPacketEmitted = false
