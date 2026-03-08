@@ -59,6 +59,12 @@ wantType:
     label: current
     example: 0.0
     initialValue: 0.0
+  - name: completed
+    description: Whether combiner has received end signal and finished
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
   agents: []
   constraints:
   - description: Operation must be valid strategy

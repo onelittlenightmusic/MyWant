@@ -98,6 +98,24 @@ wantType:
     label: current
     initialValue: 0
     example: 100
+  - name: serverFreeTime
+    description: Internal tracking of when server becomes free next
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 0.0
+  - name: waitTimeSum
+    description: Internal accumulator for total wait time
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 0.0
+  - name: processedCount
+    description: Internal counter for processed packets
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
   agents: []
   constraints:
   - description: Service time must be positive

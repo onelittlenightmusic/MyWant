@@ -416,13 +416,11 @@ type FlightWantLocals struct {
 	monitoringDone      chan struct{}
 
 	// State fields (auto-synced)
-	FlightPhase          string `mywant:"internal,_flight_phase"`
-	PreviousFlightId     string `mywant:"internal,_previous_flight_id"`
-	PreviousFlightStatus string `mywant:"internal,_previous_flight_status"`
-	MonitorStateHash     string `mywant:"internal,_monitor_state_hash"`
-	MonitorStateHashPub  string `mywant:"current,monitor_state_hash"`
-	Attempted            bool   `mywant:"current,attempted"`
-	LastLoggedPhase      string `mywant:"current,last_logged_phase"`
+	// Only FlightPhase is internal (Progress() owns it exclusively).
+	// Agent-written fields (_previous_flight_id, _previous_flight_status, monitor_state_hash,
+	// attempted) are registered as label:current in flight.yaml and accessed via SetCurrent/GetCurrent.
+	FlightPhase     string `mywant:"internal,_flight_phase"`
+	LastLoggedPhase string `mywant:"current,last_logged_phase"`
 }
 
 type StatusChange struct {

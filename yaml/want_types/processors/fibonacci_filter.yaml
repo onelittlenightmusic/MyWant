@@ -78,6 +78,12 @@ wantType:
     label: current
     example: 4181
     initialValue: 0
+  - name: last_number_processed
+    description: Last Fibonacci number that was processed by the filter
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
   agents: []
   constraints:
   - description: Min value must be less than or equal to max value
