@@ -16,11 +16,11 @@ type ItineraryLocals struct {
 	PlannedCount         int            `mywant:"internal,planned_count"`
 	DispatchedCount      int            `mywant:"internal,dispatched_count"`
 	DispatchedDirections map[string]any `mywant:"internal,dispatched_directions"`
-	OpaInputHash         string         `mywant:"internal,_opa_input_hash"`
 	LastSuggested        []string       `mywant:"internal,_last_suggested"`
-	// Costs is intentionally excluded: it is managed externally via MergeParentState
-	// from child wants (e.g. BudgetWant). Including it here would cause SyncLocalsState
-	// to overwrite the externally-set costs with stale values every cycle.
+	// OpaInputHash (_opa_input_hash) and Costs (costs) are intentionally excluded:
+	// they are written by external agents/wants (OPA thinker, BudgetWant via
+	// MergeParentState). Including them here would cause SyncLocalsState(false)
+	// to overwrite externally-set values with stale data every cycle.
 }
 
 type ItineraryWant struct {
@@ -72,7 +72,7 @@ func (o *ItineraryWant) Progress() {
 		}
 	}
 
-	if locals.OpaInputHash != "" {
+	if GetInternal(o, "_opa_input_hash", "") != "" {
 		achieved := len(directions) == 0
 		locals.GoalAchieved = achieved
 		
