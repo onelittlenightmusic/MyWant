@@ -256,8 +256,9 @@ type Want struct {
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for execution tracking
-	execCycleCount int
-	inExecCycle    bool
+	execCycleCount      int
+	inExecCycle         bool
+	labelViolationCount int // incremented on each SetGoal/SetCurrent/SetPlan/SetInternal label mismatch
 
 	// Agent system
 	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
@@ -479,6 +480,17 @@ func (n *Want) EndProgressCycle() {
 	if !n.inExecCycle {
 		return
 	}
+
+	// Check for label violations accumulated during this cycle.
+	// Skip cycle 1 to allow initialization (SetGoal in Initialize()) before labels are fully wired.
+	if n.labelViolationCount > 0 && n.execCycleCount > 1 {
+		violations := n.labelViolationCount
+		n.labelViolationCount = 0
+		n.inExecCycle = false
+		_ = n.SetModuleError("LabelViolation", fmt.Sprintf("%d label violation(s) in cycle %d - check logs for [FAILED] entries", violations, n.execCycleCount))
+		return
+	}
+	n.labelViolationCount = 0
 
 	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
 	if n.Status == WantStatusAchieved {
@@ -1539,6 +1551,7 @@ func (n *Want) SetGoal(key string, value any) {
 		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.labelViolationCount++
 	}
 }
 
@@ -1554,6 +1567,7 @@ func (n *Want) SetCurrent(key string, value any) {
 		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.labelViolationCount++
 	}
 }
 
@@ -1569,6 +1583,7 @@ func (n *Want) SetPlan(key string, value any) {
 		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.labelViolationCount++
 	}
 }
 
@@ -1602,6 +1617,7 @@ func (n *Want) SetInternal(key string, value any) {
 		n.StoreState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		n.labelViolationCount++
 	}
 }
 

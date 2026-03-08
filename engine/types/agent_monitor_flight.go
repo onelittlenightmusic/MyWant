@@ -38,7 +38,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 		}
 	}
 
-	lastHashStr := GetInternal(want, "monitor_state_hash", "")
+	lastHashStr := GetCurrent(want, "monitor_state_hash", "")
 
 	url := fmt.Sprintf("%s/api/flights/%s", serverURL, flightID)
 	resp, err := http.Get(url)
@@ -110,7 +110,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 			want.SetCurrent("status_history", statusHistoryStrs)
 		}
 		
-		want.SetInternal("monitor_state_hash", currentStateHash)
+		want.SetCurrent("monitor_state_hash", currentStateHash)
 
 		// Stop monitoring if confirmed or cancelled
 		if newStatus == "confirmed" || newStatus == "cancelled" {

@@ -266,6 +266,54 @@ wantType:
     persistent: true
     initialValue: false
     label: current
+  - name: _previous_flight_id
+    description: Flight ID of the previously cancelled flight (for rebooking)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: _previous_flight_status
+    description: Status of the previously cancelled flight
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: attempted
+    description: Whether a booking attempt has been made
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: monitor_state_hash
+    description: MD5 hash of last known flight state for change detection
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: thinker.goal_initialized
+    description: Whether the condition thinker has initialized the goal
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.itinerary_done
+    description: Whether the condition thinker has registered with parent itinerary
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.plan_set
+    description: Whether the condition thinker has set the execution plan
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.ticks_waited
+    description: Number of ticks waited for budget coordination
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
   agents:
   - name: agent_flight_api
     role: action

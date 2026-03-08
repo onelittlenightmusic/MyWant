@@ -72,7 +72,7 @@ func createFlight(ctx context.Context, want *Want) error {
 	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
 	params := want.Spec.Params
 	want.SetCurrent("flight_status", "in process")
-	prevFlightID := GetInternal(want, "_previous_flight_id", "")
+	prevFlightID := GetCurrent(want, "_previous_flight_id", "")
 	isRebooking := prevFlightID != ""
 
 	// Extract parameters using ParamExtractor
@@ -212,10 +212,10 @@ func cancelFlight(ctx context.Context, want *Want) error {
 	want.SetCurrent("flight_status", "canceled")
 	want.SetCurrent("status_message", "Flight canceled by agent")
 	want.SetCurrent("canceled_at", time.Now().Format(time.RFC3339))
-	want.SetInternal("_previous_flight_id", flightID)
-	want.SetInternal("_previous_flight_status", "canceled")
+	want.SetCurrent("_previous_flight_id", flightID)
+	want.SetCurrent("_previous_flight_status", "canceled")
 	want.SetCurrent("flight_id", "")
-	want.SetInternal("attempted", false)
+	want.SetCurrent("attempted", false)
 
 	// Record activity description for agent history
 	activity := fmt.Sprintf("Flight reservation has been cancelled (Flight ID: %s)", flightID)

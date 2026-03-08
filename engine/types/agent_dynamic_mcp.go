@@ -46,13 +46,13 @@ Steps:
 	}
 
 	want.StoreLog("[DISCOVERY][SUCCESS] Tool discovery completed")
-	want.SetInternal("raw_samples", result)
+	want.SetCurrent("raw_samples", result)
 	return nil
 }
 
 // --- Developer Action ---
 func executeDeveloperAction(ctx context.Context, want *mywant.Want) error {
-	samples := mywant.GetInternal(want, "raw_samples", map[string]any{})
+	samples := mywant.GetCurrent(want, "raw_samples", map[string]any{})
 	feedback := mywant.GetCurrent(want, "error_feedback", "")
 
 	if feedback != "" {

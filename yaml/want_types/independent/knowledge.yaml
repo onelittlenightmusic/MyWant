@@ -54,6 +54,12 @@ wantType:
     persistent: true
     label: current
     initialValue: 'stale'
+  - name: discovered_updates
+    description: Temporary storage for facts discovered during monitoring phase
+    type: array
+    persistent: true
+    label: current
+    initialValue: []
   agents:
   - name: KnowledgeMonitor
     role: monitor

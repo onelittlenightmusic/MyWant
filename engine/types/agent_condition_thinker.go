@@ -13,18 +13,18 @@ func init() {
 
 func conditionThinkerThink(ctx context.Context, want *Want) error {
 	// ── Phase 1: Initialize Goal & Register in parent itinerary ──────────
-	if !GetInternal(want, "thinker.goal_initialized", false) {
+	if !GetCurrent(want, "thinker.goal_initialized", false) {
 		// Initialize the standard goal for any reservation-based want
 		want.SetGoal("reservation_status", "confirmed")
-		want.SetInternal("thinker.goal_initialized", true)
+		want.SetCurrent("thinker.goal_initialized", true)
 	}
 
-	if !GetInternal(want, "thinker.itinerary_done", false) {
+	if !GetCurrent(want, "thinker.itinerary_done", false) {
 		if !want.HasParent() {
 			// Standalone want (no coordinator) – approve immediately
 			want.SetPlan("execute_booking", true)
 			want.SetPredefined("good_to_reserve", true)
-			want.SetInternal("thinker.plan_set", true)
+			want.SetCurrent("thinker.plan_set", true)
 		} else {
 			want.MergeParentState(map[string]any{
 				"itinerary": map[string]any{
@@ -36,35 +36,35 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 			})
 			want.StoreLog("[ConditionThinker] Registered in itinerary: %s (%s)", want.Metadata.Name, want.Metadata.Type)
 		}
-		want.SetInternal("thinker.itinerary_done", true)
+		want.SetCurrent("thinker.itinerary_done", true)
 	}
 
 	// ── Phase 2: Planning (Budget check & Approve execution) ──────────────
-	if !GetInternal(want, "thinker.plan_set", false) {
+	if !GetCurrent(want, "thinker.plan_set", false) {
 		targetBudgetsRaw := GetParentState(want, "target_budgets", map[string]any{})
 		if len(targetBudgetsRaw) > 0 {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
 				want.SetCurrent("budget_limit", tb)
 				want.SetPlan("execute_booking", true)
 				want.SetPredefined("good_to_reserve", true)
-				want.SetInternal("thinker.plan_set", true)
+				want.SetCurrent("thinker.plan_set", true)
 				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → plan.execute_booking=true", tb)
 			}
 		} else {
-			ticksWaited := GetInternal(want, "thinker.ticks_waited", 0)
+			ticksWaited := GetCurrent(want, "thinker.ticks_waited", 0)
 			ticksWaited++
-			want.SetInternal("thinker.ticks_waited", ticksWaited)
+			want.SetCurrent("thinker.ticks_waited", ticksWaited)
 			if ticksWaited >= 3 {
 				want.SetPlan("execute_booking", true)
 				want.SetPredefined("good_to_reserve", true)
-				want.SetInternal("thinker.plan_set", true)
+				want.SetCurrent("thinker.plan_set", true)
 				want.StoreLog("[ConditionThinker] No budget coordination after %d ticks → plan.execute_booking=true", ticksWaited)
 			}
 		}
 	}
 
 	// ── Phase 3: Cost propagation (Current State -> Parent) ────────────────
-	if GetInternal(want, "_cancelled", false) || want.Status == WantStatusCancelled {
+	if GetCurrent(want, "_cancelled", false) || want.Status == WantStatusCancelled {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{want.Metadata.Name: 0.0},
 		})
