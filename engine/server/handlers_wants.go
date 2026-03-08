@@ -168,7 +168,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 					History:     want.BuildHistory(),
 					HiddenState: want.GetHiddenState(),
 				}
-				wantCopy.StoreStateMulti(want.GetExplicitState())
+				mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 				wantsByID[want.Metadata.ID] = wantCopy
 			}
 		}
@@ -183,7 +183,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 				History:     want.BuildHistory(),
 				HiddenState: want.GetHiddenState(),
 			}
-			wantCopy.StoreStateMulti(want.GetExplicitState())
+			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -234,7 +234,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 				if includeConnectivity {
 					wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
 				}
-				wantCopy.StoreStateMulti(want.GetExplicitState())
+				mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 				s.JSONResponse(w, http.StatusOK, wantCopy)
 				return
 			}
@@ -259,7 +259,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 			if includeConnectivity {
 				wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
 			}
-			wantCopy.StoreStateMulti(want.GetExplicitState())
+			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 			s.JSONResponse(w, http.StatusOK, wantCopy)
 			return
 		}

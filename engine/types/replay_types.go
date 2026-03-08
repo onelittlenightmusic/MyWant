@@ -129,7 +129,7 @@ func (r *ReplayWant) CalculateAchievingPercentage() int {
 
 // Progress monitors recording state and marks the want as achieved when done
 func (r *ReplayWant) Progress() {
-	r.SetPredefined("achieving_percentage", r.CalculateAchievingPercentage())
+	r.SetCurrent("achieving_percentage", r.CalculateAchievingPercentage())
 
 	if r.IsAchieved() {
 		r.SetStatus(WantStatusAchieved)

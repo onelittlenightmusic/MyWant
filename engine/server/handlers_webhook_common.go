@@ -1,7 +1,7 @@
 package server
 
 import (
-	"encoding/json"
+	"log"
 
 	mywant "mywant/engine/core"
 )
@@ -26,12 +26,7 @@ type webhookStateConfig struct {
 // increments the message count. This logic is shared between Teams and Slack handlers.
 func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookStateConfig) {
 	// Get existing messages
-	var messages []any
-	if existing, ok := want.GetState(cfg.MessagesKey); ok {
-		if arr, ok := existing.([]any); ok {
-			messages = arr
-		}
-	}
+	messages := mywant.GetState(want, cfg.MessagesKey, []any{})
 
 	// Append new message (FIFO, keep last 20)
 	msgMap := map[string]any{
@@ -46,30 +41,18 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 	}
 
 	// Get current message count
-	var messageCount int
-	if countVal, ok := want.GetState(cfg.MessageCountKey); ok {
-		switch v := countVal.(type) {
-		case int:
-			messageCount = v
-		case float64:
-			messageCount = int(v)
-		case json.Number:
-			if n, err := v.Int64(); err == nil {
-				messageCount = int(n)
-			}
-		}
-	}
+	messageCount := mywant.GetState(want, cfg.MessageCountKey, 0)
 	messageCount++
 
 	// Update want state
-	want.StoreStateMulti(map[string]any{
+	mywant.StoreStateMulti(want, map[string]any{
 		cfg.LatestMessageKey: msgMap,
 		cfg.MessagesKey:      messages,
 		cfg.MessageCountKey:  messageCount,
 		"action_by_agent":    "webhook_handler",
 	})
 
-	want.StoreLog("%s Received message from %s: %s", cfg.LogPrefix, msg.Sender, msg.Text)
+	log.Printf("%s Received message: %s from %s", cfg.LogPrefix, msg.Text, msg.Sender)
 }
 
 // webhookTypes is the list of want types that represent webhook endpoints.

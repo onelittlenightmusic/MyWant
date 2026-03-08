@@ -112,6 +112,18 @@ wantType:
     label: current
     example: true
     initialValue: false
+  - name: restaurant_type
+    description: Type of restaurant reserved
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: reservation_time
+    description: Time of the reservation
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
   - name: cost
     description: Reported cost for this reservation
     type: float64

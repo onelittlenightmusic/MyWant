@@ -9,6 +9,5 @@ const (
 	LabelGoal
 	LabelCurrent
 	LabelPlan
-	LabelPredefined
 	LabelInternal
 )

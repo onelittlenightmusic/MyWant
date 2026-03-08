@@ -18,7 +18,7 @@ func (l *LoggerWant) Progress() {
 	timestamp := time.Now().Format("15:04:05")
 	fmt.Printf("[%s] Scheduled execution #%d for Want '%s'\n",
 		timestamp, count, l.Metadata.Name)
-	l.StoreState("last_execution", timestamp)
+	l.SetCurrent("last_execution", timestamp)
 }
 
 // IsAchieved returns false so the want keeps running

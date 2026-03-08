@@ -68,7 +68,7 @@ type StateDef struct {
 	Name         string `json:"name" yaml:"name"`
 	Description  string `json:"description" yaml:"description"`
 	Type         string `json:"type" yaml:"type"`
-	Label        string `json:"label,omitempty" yaml:"label,omitempty"` // goal, current, plan, predefined, internal
+	Label        string `json:"label,omitempty" yaml:"label,omitempty"` // goal, current, plan, internal
 	Persistent   bool   `json:"persistent" yaml:"persistent"`
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
@@ -136,6 +136,17 @@ type WantTypeLoader struct {
 	validPatterns   []string
 	validCategories map[string]bool
 	loadWarnings    []string
+	predefinedState []StateDef // Common state fields merged into every want type
+}
+
+// PredefinedStateFile is the special YAML file containing common state fields
+const PredefinedStateFile = "predefined.yaml"
+
+// PredefinedWrapper wraps the predefined state YAML structure
+type PredefinedWrapper struct {
+	Predefined struct {
+		State []StateDef `yaml:"state"`
+	} `yaml:"predefined"`
 }
 
 // NewWantTypeLoader creates a new want type loader
@@ -150,10 +161,47 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 	}
 }
 
+// loadPredefinedState loads the predefined.yaml file and stores common state fields.
+func (w *WantTypeLoader) loadPredefinedState() {
+	predefinedPath := filepath.Join(w.directory, PredefinedStateFile)
+	data, err := os.ReadFile(predefinedPath)
+	if err != nil {
+		return // predefined.yaml is optional
+	}
+	var wrapper PredefinedWrapper
+	if err := yaml.Unmarshal(data, &wrapper); err != nil {
+		log.Printf("Warning: failed to parse predefined.yaml: %v", err)
+		return
+	}
+	w.predefinedState = wrapper.Predefined.State
+	log.Printf("[WANT-TYPE-LOADER] Loaded %d predefined state fields", len(w.predefinedState))
+}
+
+// mergePredefinedState merges predefined state fields into a definition.
+// Type-specific fields take precedence (predefined fields are only added if not already present).
+func (w *WantTypeLoader) mergePredefinedState(def *WantTypeDefinition) {
+	if len(w.predefinedState) == 0 {
+		return
+	}
+	existing := make(map[string]bool, len(def.State))
+	for _, s := range def.State {
+		existing[s.Name] = true
+	}
+	for _, s := range w.predefinedState {
+		if !existing[s.Name] {
+			def.State = append(def.State, s)
+		}
+	}
+}
+
 // LoadAllWantTypes loads all want type YAML files from the directory
 func (w *WantTypeLoader) LoadAllWantTypes() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// Load predefined common state fields first
+	w.loadPredefinedState()
+
 	var yamlFiles []string
 	err := filepath.Walk(w.directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -166,8 +214,8 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		}
 
 		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
-			// Skip template files
-			if filepath.Base(path) == "WANT_TYPE_TEMPLATE.yaml" {
+			// Skip template and predefined files
+			if filepath.Base(path) == "WANT_TYPE_TEMPLATE.yaml" || filepath.Base(path) == PredefinedStateFile {
 				return nil
 			}
 			yamlFiles = append(yamlFiles, path)
@@ -195,6 +243,9 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 			loadErrors = append(loadErrors, fmt.Errorf("failed to load %s: %v", filePath, err))
 			continue
 		}
+
+		// Merge predefined common state fields (type-specific fields take precedence)
+		w.mergePredefinedState(def)
 
 		// Register definition
 		w.definitions[def.Metadata.Name] = def
@@ -358,11 +409,11 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 		if state.Label == "" {
 			// CRITICAL: Every state field must have a label for the GCP pattern to function.
 			// Without a label, SetCurrent/GetGoal/etc will silently fail.
-			return fmt.Errorf("state key '%s' missing mandatory label (must be one of: goal, current, plan, predefined, internal)", state.Name)
+			return fmt.Errorf("state key '%s' missing mandatory label (must be one of: goal, current, plan, internal)", state.Name)
 		}
-		validLabels := map[string]bool{"goal": true, "current": true, "plan": true, "predefined": true, "internal": true}
+		validLabels := map[string]bool{"goal": true, "current": true, "plan": true, "internal": true}
 		if !validLabels[state.Label] {
-			return fmt.Errorf("state key '%s' has invalid label '%s' (must be one of: goal, current, plan, predefined, internal)", state.Name, state.Label)
+			return fmt.Errorf("state key '%s' has invalid label '%s' (must be one of: goal, current, plan, internal)", state.Name, state.Label)
 		}
 	}
 

@@ -49,13 +49,13 @@ func (g *FibonacciNumbers) Progress() {
 	g.SetCurrent("a", b)
 	g.SetCurrent("b", a+b)
 	g.SetCurrent("sent_count", sentCount)
-	g.SetPredefined("achieving_percentage", achievingPercentage)
+	g.SetCurrent("achieving_percentage", achievingPercentage)
 
 	if sentCount >= count {
 		// Send end signal
 		g.ProvideDone()
-		g.SetPredefined("achieving_percentage", 100)
-		g.SetPredefined("achieved", true)
+		g.SetCurrent("achieving_percentage", 100)
+		g.SetCurrent("achieved", true)
 		g.SetCurrent("completed", true)
 	}
 
@@ -86,7 +86,7 @@ func (f *FibonacciFilter) Initialize() {
 
 // IsAchieved checks if fibonacci filtering is complete
 func (f *FibonacciFilter) IsAchieved() bool {
-	return GetPredefined(f, "achieved", false)
+	return GetCurrent(f, "achieved", false)
 }
 
 // Progress returns the generalized chain function for the filter
@@ -113,8 +113,8 @@ func (f *FibonacciFilter) Progress() {
 		f.SetCurrent("filtered", locals.filtered)
 		f.SetCurrent("count", len(locals.filtered))
 		f.SetCurrent("total_processed", totalProcessed)
-		f.SetPredefined("achieved", true)
-		f.SetPredefined("achieving_percentage", 100)
+		f.SetCurrent("achieved", true)
+		f.SetCurrent("achieving_percentage", 100)
 		return
 	}
 
@@ -136,7 +136,7 @@ func (f *FibonacciFilter) Progress() {
 		f.SetCurrent("filtered", locals.filtered)
 		f.SetCurrent("count", len(locals.filtered))
 		f.SetCurrent("last_number_processed", val)
-		f.SetPredefined("achieving_percentage", achievingPercentage)
+		f.SetCurrent("achieving_percentage", achievingPercentage)
 	}
 
 	// Yield control - will be called again for next packet

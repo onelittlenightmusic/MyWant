@@ -26,7 +26,7 @@ func TestLocalExecutor(t *testing.T) {
 			ExecutionConfig: DefaultExecutionConfig(),
 		},
 		Action: func(ctx context.Context, want *Want) error {
-			want.StoreState("test_key", "test_value")
+			want.storeState("test_key", "test_value")
 			return nil
 		},
 	}
@@ -50,7 +50,7 @@ func TestLocalExecutor(t *testing.T) {
 	want.EndProgressCycle()
 
 	// Verify state was updated
-	if val, exists := want.GetState("test_key"); !exists || val != "test_value" {
+	if val, exists := want.getState("test_key"); !exists || val != "test_value" {
 		t.Errorf("Expected state 'test_key' = 'test_value', got %v (exists: %v)", val, exists)
 	}
 }
@@ -126,7 +126,7 @@ func TestWebhookExecutor_DoAgent(t *testing.T) {
 		nil,
 		"base",
 	)
-	want.StoreStateMulti(map[string]any{
+	want.storeStateMulti(map[string]any{
 		"departure": "NRT",
 		"arrival":   "LAX",
 	})
@@ -138,11 +138,11 @@ func TestWebhookExecutor_DoAgent(t *testing.T) {
 	}
 
 	// Verify state was updated from webhook response
-	if val, exists := want.GetState("booking_id"); !exists || val != "TEST-123" {
+	if val, exists := want.getState("booking_id"); !exists || val != "TEST-123" {
 		t.Errorf("Expected booking_id 'TEST-123', got %v (exists: %v)", val, exists)
 	}
 
-	if val, exists := want.GetState("status"); !exists || val != "confirmed" {
+	if val, exists := want.getState("status"); !exists || val != "confirmed" {
 		t.Errorf("Expected status 'confirmed', got %v (exists: %v)", val, exists)
 	}
 
@@ -607,7 +607,7 @@ func TestWebhookExecutor_MonitorWithSync_StateFetchFailure(t *testing.T) {
 	)
 
 	// Set initial state
-	want.StoreStateMulti(map[string]any{
+	want.storeStateMulti(map[string]any{
 		"initial_field": "initial_value",
 	})
 

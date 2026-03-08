@@ -11,7 +11,7 @@ type EarlyAchievedWant struct {
 }
 
 func (m *EarlyAchievedWant) Initialize() {
-	m.StoreState("some_field", "some_value")
+	m.storeState("some_field", "some_value")
 	m.achieved = true
 }
 
@@ -51,7 +51,7 @@ func TestEarlyAchievementFinalResult(t *testing.T) {
 	select {
 	case <-done:
 		// Check if final_result is populated
-		val, ok := ew.Want.GetState("final_result")
+		val, ok := ew.Want.getState("final_result")
 		if !ok || val != "some_value" {
 			t.Errorf("Expected final_result to be 'some_value', got %v", val)
 		}

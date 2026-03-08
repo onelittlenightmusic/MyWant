@@ -1,0 +1,36 @@
+# predefined.yaml
+# Common state fields automatically merged into every want type definition.
+# These fields are available in SetCurrent/GetCurrent without repeating them in each type's YAML.
+# Type-specific definitions in individual YAMLs take precedence over these defaults.
+predefined:
+  state:
+    - name: achieved
+      description: Whether the want has achieved its goal
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+    - name: achieving_percentage
+      description: Progress percentage towards the goal (0-100)
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: completed
+      description: Whether execution has completed
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+    - name: action_by_agent
+      description: Name of the agent that last acted on this want
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: final_result
+      description: Final output value of this want
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""

@@ -60,7 +60,7 @@ func TestSendCallback(t *testing.T) {
 	}
 
 	// Test 3: With changes (callback is async, so we just verify no panic)
-	want.StoreState("test_key", "test_value")
+	want.storeState("test_key", "test_value")
 	err = want.SendCallback()
 	if err != nil {
 		t.Errorf("Expected no error, got %v", err)
@@ -81,10 +81,10 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	)
 
 	want.BeginProgressCycle()
-	want.StoreState("reservation_name", "Le Bernardin")
+	want.storeState("reservation_name", "Le Bernardin")
 	want.EndProgressCycle()
 
-	val, exists := want.GetState("final_result")
+	val, exists := want.getState("final_result")
 	if !exists {
 		t.Fatal("Expected final_result to exist after EndProgressCycle")
 	}
@@ -101,10 +101,10 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	)
 
 	want2.BeginProgressCycle()
-	want2.StoreState("some_field", "some_value")
+	want2.storeState("some_field", "some_value")
 	want2.EndProgressCycle()
 
-	_, exists = want2.GetState("final_result")
+	_, exists = want2.getState("final_result")
 	if exists {
 		t.Error("Expected final_result NOT to exist when FinalResultField is empty")
 	}
@@ -118,10 +118,10 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	)
 
 	want3.BeginProgressCycle()
-	want3.StoreState("result", "")
+	want3.storeState("result", "")
 	want3.EndProgressCycle()
 
-	val, exists = want3.GetState("final_result")
+	val, exists = want3.getState("final_result")
 	if exists && val != nil && val != "" {
 		t.Errorf("Expected final_result to be empty/nonexistent for zero-value, got %v", val)
 	}
@@ -135,10 +135,10 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	)
 
 	want4.BeginProgressCycle()
-	want4.StoreState("count", 42)
+	want4.storeState("count", 42)
 	want4.EndProgressCycle()
 
-	val, exists = want4.GetState("final_result")
+	val, exists = want4.getState("final_result")
 	if !exists {
 		t.Fatal("Expected final_result to exist for int value")
 	}
@@ -156,7 +156,7 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 
 	// First cycle: set the url
 	want5.BeginProgressCycle()
-	want5.StoreState("url", "https://example.ngrok.io")
+	want5.storeState("url", "https://example.ngrok.io")
 	want5.EndProgressCycle()
 
 	// Second cycle: don't change url, but EndProgressCycle should still copy it
@@ -164,7 +164,7 @@ func TestFinalResultFieldAutoOverride(t *testing.T) {
 	// Don't store anything new
 	want5.EndProgressCycle()
 
-	val, exists = want5.GetState("final_result")
+	val, exists = want5.getState("final_result")
 	if !exists {
 		t.Fatal("Expected final_result to persist from previous cycle")
 	}
@@ -184,13 +184,13 @@ func TestFinalResultFieldNestedDotNotation(t *testing.T) {
 	)
 
 	want.BeginProgressCycle()
-	want.StoreState("slack_latest_message", map[string]any{
+	want.storeState("slack_latest_message", map[string]any{
 		"sender": "U01ABC",
 		"text":   "hello world",
 	})
 	want.EndProgressCycle()
 
-	val, exists := want.GetState("final_result")
+	val, exists := want.getState("final_result")
 	if !exists {
 		t.Fatal("Expected final_result to exist for nested dot-notation field")
 	}
@@ -207,14 +207,14 @@ func TestFinalResultFieldNestedDotNotation(t *testing.T) {
 	)
 
 	want2.BeginProgressCycle()
-	want2.StoreState("outer", map[string]any{
+	want2.storeState("outer", map[string]any{
 		"inner": map[string]any{
 			"value": "deep",
 		},
 	})
 	want2.EndProgressCycle()
 
-	val, exists = want2.GetState("final_result")
+	val, exists = want2.getState("final_result")
 	if !exists {
 		t.Fatal("Expected final_result for two-level nesting")
 	}
@@ -231,10 +231,10 @@ func TestFinalResultFieldNestedDotNotation(t *testing.T) {
 	)
 
 	want3.BeginProgressCycle()
-	want3.StoreState("msg", map[string]any{"text": "hi"})
+	want3.storeState("msg", map[string]any{"text": "hi"})
 	want3.EndProgressCycle()
 
-	_, exists = want3.GetState("final_result")
+	_, exists = want3.getState("final_result")
 	if exists {
 		t.Error("Expected final_result NOT to be set when nested key is missing")
 	}

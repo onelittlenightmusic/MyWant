@@ -83,7 +83,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 			}
 			statusChangeHistory = append(statusChangeHistory, statusChange)
 
-			want.SetPredefined("status_changed", true)
+			want.SetCurrent("status_changed", true)
 			want.SetCurrent("status_changed_at", time.Now().Format(time.RFC3339))
 
 			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
@@ -97,7 +97,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 			}
 			want.SetCurrent("reservation_name", schedule.ReservationName)
-			want.SetPredefined("agent_result", schedule)
+			want.SetCurrent("agent_result", schedule)
 			
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range statusChangeHistory {

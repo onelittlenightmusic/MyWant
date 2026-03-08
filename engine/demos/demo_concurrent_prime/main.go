@@ -101,8 +101,8 @@ func main() {
 					notAchievedWants = append(notAchievedWants, want.Metadata.Name)
 
 					// Print detailed state
-					achievedState, _ := want.GetState("achieved")
-					totalProcessed, _ := want.GetState("total_processed")
+					achievedState := GetCurrent(want, "achieved", false)
+					totalProcessed := GetCurrent(want, "total_processed", 0)
 					log.Printf("⏳ Want %s not achieved - status=%s, achieved=%v, total_processed=%v",
 						want.Metadata.Name, want.GetStatus(), achievedState, totalProcessed)
 				}
@@ -117,8 +117,8 @@ func main() {
 			log.Println("\n=== Success Summary ===")
 			for _, want := range wants {
 				if want.Metadata.Type == "prime sequence" {
-					primeCount, _ := want.GetState("primeCount")
-					totalProcessed, _ := want.GetState("total_processed")
+					primeCount := GetCurrent(want, "primeCount", 0)
+					totalProcessed := GetCurrent(want, "total_processed", 0)
 					log.Printf("  %s: found %v primes (processed %v numbers)",
 						want.Metadata.Name, primeCount, totalProcessed)
 				}

@@ -142,9 +142,9 @@ func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	migratedCount := 0
 	for _, runtimeWant := range cb.wants {
 		if runtimeWant.want != nil {
-			if _, exists := runtimeWant.want.GetState("agent_history"); exists {
+			if _, exists := runtimeWant.want.getState("agent_history"); exists {
 				// Remove legacy agent_history from state
-				runtimeWant.want.StoreState("agent_history", nil)
+				runtimeWant.want.storeState("agent_history", nil)
 				migratedCount++
 			}
 		}
@@ -375,7 +375,7 @@ func SyncLocalsState(n *Want, locals any, toStruct bool) {
 			// Copy from State to Struct ONLY for internal labels.
 			// Current, Goal, etc. must be accessed via GetCurrent(), GetGoal() etc.
 			if label == LabelInternal {
-				if stateVal, ok := n.GetState(stateKey); ok {
+				if stateVal, ok := n.getState(stateKey); ok {
 					setFieldValue(field, stateVal)
 				}
 			}

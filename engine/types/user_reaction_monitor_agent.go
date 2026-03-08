@@ -68,7 +68,7 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 	}
 
 	want.SetCurrent("user_reaction", reactionData)
-	want.SetPredefined("action_by_agent", "MonitorAgent")
+	want.SetCurrent("action_by_agent", "MonitorAgent")
 
 	if reaction.Approved {
 		want.StoreLog("User approved reminder reaction")

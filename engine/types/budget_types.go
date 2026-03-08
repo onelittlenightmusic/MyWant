@@ -32,7 +32,7 @@ func (b *BudgetWant) Initialize() {
 	b.SetCurrent("total_spent", 0.0)
 	b.SetCurrent("remaining_budget", budget)
 	b.SetCurrent("budget_exceeded", false)
-	b.SetPredefined("achieving_percentage", 0)
+	b.SetCurrent("achieving_percentage", 0)
 }
 
 // Progress is a no-op: BudgetThinker (ThinkAgent) is started automatically

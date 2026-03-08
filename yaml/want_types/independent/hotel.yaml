@@ -34,6 +34,12 @@ wantType:
       - boutique
     example: luxury
   state:
+  - name: hotel_name
+    description: Name of the hotel reserved
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
   - name: cost
     description: Reported cost for this reservation
     type: float64

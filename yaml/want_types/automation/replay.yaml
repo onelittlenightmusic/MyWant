@@ -126,7 +126,7 @@ wantType:
     description: Starting URL for replay execution
     type: string
     persistent: true
-    label: predefined
+    label: current
     initialValue: ''
 
   requires:

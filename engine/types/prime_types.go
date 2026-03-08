@@ -62,13 +62,13 @@ func (g *PrimeNumbers) Progress() {
 	}
 
 	g.SetCurrent("current_number", currentNumber)
-	g.SetPredefined("achieving_percentage", achievingPercentage)
+	g.SetCurrent("achieving_percentage", achievingPercentage)
 
 	if currentNumber >= end {
 		// Send end signal
 		g.ProvideDone()
-		g.SetPredefined("achieving_percentage", 100)
-		g.SetPredefined("achieved", true)
+		g.SetCurrent("achieving_percentage", 100)
+		g.SetCurrent("achieved", true)
 		g.SetCurrent("completed", true)
 	}
 }
@@ -99,7 +99,7 @@ func (f *PrimeSequence) Initialize() {
 
 // IsAchieved checks if prime sequence filtering is complete
 func (f *PrimeSequence) IsAchieved() bool {
-	return GetPredefined(f, "achieved", false)
+	return GetCurrent(f, "achieved", false)
 }
 
 // Progress returns the generalized chain function for the filter
@@ -108,7 +108,7 @@ func (f *PrimeSequence) IsAchieved() bool {
 func (f *PrimeSequence) Progress() {
 	locals := f.GetLocals()
 
-	if GetPredefined(f, "achieved", false) {
+	if GetCurrent(f, "achieved", false) {
 		return
 	}
 
@@ -130,8 +130,8 @@ func (f *PrimeSequence) Progress() {
 		f.SetCurrent("foundPrimes", locals.foundPrimes)
 		f.SetCurrent("primeCount", len(locals.foundPrimes))
 		f.SetCurrent("total_processed", totalProcessed)
-		f.SetPredefined("achieved", true)
-		f.SetPredefined("achieving_percentage", 100)
+		f.SetCurrent("achieved", true)
+		f.SetCurrent("achieving_percentage", 100)
 		f.ProvideDone()
 		return
 	}
@@ -171,7 +171,7 @@ func (f *PrimeSequence) Progress() {
 		f.SetCurrent("last_number_processed", val)
 		f.SetCurrent("foundPrimes", locals.foundPrimes)
 		f.SetCurrent("primeCount", len(locals.foundPrimes))
-		f.SetPredefined("achieving_percentage", achievingPercentage)
+		f.SetCurrent("achieving_percentage", achievingPercentage)
 	}
 
 	// Yield control - will be called again for next packet

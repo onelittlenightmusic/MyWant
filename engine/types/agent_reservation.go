@@ -11,7 +11,7 @@ type ActivityFormatter func(schedule interface{}, isRebooking bool) (activity, l
 func executeReservation(want *Want, agentName string, schedule interface{}, formatter ActivityFormatter) error {
 	// 1. Store the full schedule in GCP current state and system metadata
 	want.SetCurrent("reservation_detail", schedule)
-	want.SetPredefined("agent_result", schedule)
+	want.SetCurrent("agent_result", schedule)
 
 	// 2. Extract cost and reservation name
 	cost := extractCostFromSchedule(schedule)

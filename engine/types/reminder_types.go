@@ -207,7 +207,7 @@ func (r *ReminderWant) CalculateAchievingPercentage() int {
 
 func (r *ReminderWant) Progress() {
 	locals := r.GetLocals()
-	r.SetPredefined("achieving_percentage", r.CalculateAchievingPercentage())
+	r.SetCurrent("achieving_percentage", r.CalculateAchievingPercentage())
 	timeRemaining := r.calculateTimeRemaining(locals)
 	r.SetCurrent("time_remaining", timeRemaining)
 
@@ -341,7 +341,7 @@ func (r *ReminderWant) completeReminder(locals *ReminderLocals, logMsg string) {
 	r.SetCurrent("reminder_phase", ReminderPhaseCompleted)
 	r.SetCurrent("auto_completed", true)
 	locals.ReactionPacketEmitted = false
-	r.SetPredefined("achieving_percentage", 100)
+	r.SetCurrent("achieving_percentage", 100)
 	r.ProvideDone()
 }
 
@@ -363,7 +363,7 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionMap map[s
 		r.SetCurrent("reaction_result", result)
 		r.SetCurrent("user_reaction", reactionMap)
 		locals.ReactionPacketEmitted = false
-		r.SetPredefined("achieving_percentage", 100)
+		r.SetCurrent("achieving_percentage", 100)
 		if phase == ReminderPhaseCompleted { r.ProvideDone() }
 		r.ExecuteAgents()
 	}
@@ -386,7 +386,7 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	r.SetCurrent("reminder_phase", phase)
 	r.SetCurrent("reaction_result", result)
 	locals.ReactionPacketEmitted = false
-	r.SetPredefined("achieving_percentage", 100)
+	r.SetCurrent("achieving_percentage", 100)
 	r.ExecuteAgents()
 }
 

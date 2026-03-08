@@ -39,7 +39,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 	return NewThinkingAgent(id, 1*time.Second, DispatchThinkerName, func(ctx context.Context, w *Want) error {
 		// 1. Get desired directions from state (set by Itinerary or other planners)
 		var desiredDirections []string
-		if raw, ok := w.GetState("directions"); ok {
+		if raw, ok := w.getState("directions"); ok {
 			if slice, ok := raw.([]string); ok {
 				desiredDirections = slice
 			} else if slice, ok := raw.([]any); ok {
@@ -74,7 +74,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 
 		// 3. Load tracking state
 		dispatched := make(map[string]string)
-		if raw, ok := w.GetState("_dispatched_directions"); ok {
+		if raw, ok := w.getState("_dispatched_directions"); ok {
 			if m, ok := raw.(map[string]string); ok {
 				dispatched = m
 			} else if m, ok := raw.(map[string]any); ok {
@@ -85,7 +85,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 		}
 		
 		completedIDs := make(map[string]string)
-		if raw, ok := w.GetState("_completed_direction_ids"); ok {
+		if raw, ok := w.getState("_completed_direction_ids"); ok {
 			if m, ok := raw.(map[string]string); ok {
 				completedIDs = m
 			} else if m, ok := raw.(map[string]any); ok {
@@ -128,7 +128,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 							if len(cfg.Sets) > 0 {
 								// Get current sets from parent
 								sets := make(map[string]any)
-								if raw, ok := w.GetState("sets"); ok {
+								if raw, ok := w.getState("sets"); ok {
 									if m, ok := raw.(map[string]any); ok {
 										for k, v := range m { sets[k] = v }
 									}
@@ -137,9 +137,9 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 								for k, v := range cfg.Sets {
 									sets[k] = v
 									// Also write directly to parent state for convenience
-									w.StoreState(k, v) 
+									w.storeState(k, v) 
 								}
-								w.StoreState("sets", sets)
+								w.storeState("sets", sets)
 							}
 
 							// 2. Sync cost
@@ -158,7 +158,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 									// Write cost to the designated field in parent state.
 									// NOTE: We don't add to the "costs" map here to avoid
 									// double-counting with the ConditionThinker.
-									w.StoreState(cfg.CostField, cost)
+									w.storeState(cfg.CostField, cost)
 									w.StoreLog("[%s] Propagated cost %.2f to %s", DispatchThinkerName, cost, cfg.CostField)
 								}
 							}
@@ -197,9 +197,9 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 						// Send cancel signal
 						for _, target := range cb.GetWants() {
 							if target.Metadata.ID == oldWantID {
-								target.StoreState("_cancel_requested", true)
+								target.storeState("_cancel_requested", true)
 								cb.RestartWant(oldWantID)
-								w.StoreState(cancelKey, oldWantID)
+								w.storeState(cancelKey, oldWantID)
 								w.StoreLog("[%s] Requested cancel for old direction '%s' (want: %s)", DispatchThinkerName, cfg.CancelsDirection, oldWantID)
 								break
 							}
@@ -215,6 +215,13 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 								oldCancelled = true
 								inheritedSeries = target.Metadata.Series
 								inheritedVersion = target.Metadata.Version
+							} else if target.Status == WantStatusModuleError || target.Status == WantStatusFailed {
+								// Cancel ended in error; force to cancelled and proceed with replacement
+								inheritedSeries = target.Metadata.Series
+								inheritedVersion = target.Metadata.Version
+								target.SetStatus(WantStatusCancelled)
+								oldCancelled = true
+								w.StoreLog("[%s] Cancel for '%s' ended in %s; forced cancelled, proceeding with replacement", DispatchThinkerName, cfg.CancelsDirection, target.Status)
 							}
 							break
 						}
@@ -222,7 +229,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 					if !oldCancelled {
 						continue // Still waiting
 					}
-					w.StoreState(cancelKey, "") // Clear marker
+					w.storeState(cancelKey, "") // Clear marker
 				}
 			}
 
@@ -255,8 +262,8 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 		}
 
 		if changed || true { // Always save to ensure sync
-			w.StoreState("_dispatched_directions", dispatched)
-			w.StoreState("_completed_direction_ids", completedIDs)
+			w.storeState("_dispatched_directions", dispatched)
+			w.storeState("_completed_direction_ids", completedIDs)
 		}
 
 		return nil

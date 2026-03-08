@@ -30,7 +30,7 @@ wantType:
     description: Stored owner identifier
     type: string
     persistent: true
-    label: predefined
+    label: current
     example: owner-travel-planner
     initialValue: ''
   - name: owned_wants

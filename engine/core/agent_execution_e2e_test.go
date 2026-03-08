@@ -25,8 +25,8 @@ func TestMonitorAgentStateSync(t *testing.T) {
 	// MonitorAgent implementation - checks flight status
 	monitorAction := func(ctx context.Context, want *Want) (bool, error) {
 		// Read current state
-		status, _ := want.GetState("flight_status")
-		delayRaw, _ := want.GetState("delay_minutes")
+		status, _ := want.getState("flight_status")
+		delayRaw, _ := want.getState("delay_minutes")
 
 		// Convert delay to int (JSON unmarshals numbers as float64)
 		var delay int
@@ -41,8 +41,8 @@ func TestMonitorAgentStateSync(t *testing.T) {
 
 		// If delayed, update local tracking
 		if delay > 0 {
-			want.StoreState("last_check", time.Now().Format(time.RFC3339))
-			want.StoreState("alert_sent", true)
+			want.storeState("last_check", time.Now().Format(time.RFC3339))
+			want.storeState("alert_sent", true)
 		}
 
 		t.Logf("Monitor cycle: status=%v, delay=%v", status, delay)
@@ -97,7 +97,7 @@ func TestMonitorAgentStateSync(t *testing.T) {
 				want := &Want{
 					Metadata: Metadata{Name: req.WantID},
 				}
-				want.StoreStateMulti(req.WantState)
+				want.storeStateMulti(req.WantState)
 				want.BeginProgressCycle()
 				monitorAgent.Monitor(context.Background(), want)
 				stateUpdates := want.GetPendingStateChanges()
@@ -186,7 +186,7 @@ func TestMonitorAgentStateSync(t *testing.T) {
 			nil,
 			"base",
 		)
-		want.StoreStateMulti(map[string]any{
+		want.storeStateMulti(map[string]any{
 			"flight_status": "scheduled",
 			"delay_minutes": 0,
 		})
@@ -262,7 +262,7 @@ func TestAgentExecutionErrors(t *testing.T) {
 				Type: DoAgentType,
 			},
 			Action: func(ctx context.Context, want *Want) error {
-				want.StoreState("test", "value")
+				want.storeState("test", "value")
 				return nil
 			},
 		}
@@ -359,7 +359,7 @@ func createAgentServiceMockServer(registry *AgentRegistry) *httptest.Server {
 			want := &Want{
 				Metadata: Metadata{Name: req.WantID},
 			}
-			want.StoreStateMulti(req.WantState)
+			want.storeStateMulti(req.WantState)
 			want.BeginProgressCycle()
 
 			start := time.Now()
@@ -400,7 +400,7 @@ func createAgentServiceMockServer(registry *AgentRegistry) *httptest.Server {
 			want := &Want{
 				Metadata: Metadata{Name: req.WantID},
 			}
-			want.StoreStateMulti(req.WantState)
+			want.storeStateMulti(req.WantState)
 			want.SetRemoteCallback(req.CallbackURL, req.AgentName)
 			want.BeginProgressCycle()
 

@@ -18,7 +18,7 @@ func executeCommand(ctx context.Context, want *mywant.Want) error {
 	workingDirStr := mywant.GetCurrent(want, "working_directory", "")
 	timeoutSec := mywant.GetCurrent(want, "timeout", 30)
 
-	want.SetPredefined("achieving_percentage", 50)
+	want.SetCurrent("achieving_percentage", 50)
 	want.StoreLog("Starting command execution...")
 
 	// Record start time
@@ -72,7 +72,7 @@ func executeCommand(ctx context.Context, want *mywant.Want) error {
 	}
 
 	// Store result in standard agent_result key
-	want.SetPredefined("agent_result", result)
+	want.SetCurrent("agent_result", result)
 
 	if exitCode == 0 {
 		want.StoreLog("Command executed successfully in %dms", executionTimeMs)

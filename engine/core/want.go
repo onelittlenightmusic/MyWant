@@ -399,7 +399,7 @@ func (n *Want) SetStatus(status WantStatus) {
 			// CRITICAL: When want achieves, always set achieving_percentage to 100%
 			// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 			// MergeState adds to pendingStateChanges which can be overwritten by later StoreState calls
-			n.StoreState("achieving_percentage", 100.0)
+			n.storeState("achieving_percentage", 100.0)
 
 			n.NotifyCompletion()
 			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
@@ -438,7 +438,7 @@ func (n *Want) ReconcileStateFromConfig(sourceState map[string]any) {
 	}
 
 	// Use StoreStateMulti to ensure proper batching and reconciliation
-	n.StoreStateMulti(sourceState)
+	n.storeStateMulti(sourceState)
 }
 func (n *Want) SetStateAtomic(stateData map[string]any) {
 	if stateData == nil {
@@ -446,7 +446,7 @@ func (n *Want) SetStateAtomic(stateData map[string]any) {
 	}
 
 	// Use StoreStateMulti to ensure proper batching and mutex protection
-	n.StoreStateMulti(stateData)
+	n.storeStateMulti(stateData)
 }
 
 // UpdateParameter updates a parameter and propagates the change to children
@@ -494,7 +494,7 @@ func (n *Want) EndProgressCycle() {
 
 	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
 	if n.Status == WantStatusAchieved {
-		n.StoreState("achieving_percentage", 100.0)
+		n.storeState("achieving_percentage", 100.0)
 	}
 
 	// Auto-override final_result from FinalResultField if configured.
@@ -512,7 +512,7 @@ func (n *Want) EndProgressCycle() {
 				skip = v == 0
 			}
 			if !skip {
-				n.StoreState("final_result", val)
+				n.storeState("final_result", val)
 			}
 		}
 	}
@@ -973,7 +973,7 @@ func (n *Want) SetSuspended(suspended bool) {
 // STATE OWNERSHIP RULE: Only call StoreState on the want that owns the state.
 //   - In Progress() / Initialize(): call on receiver (b.StoreState / o.StoreState).
 //   - In a DoAgent / MonitorAgent Exec: call on the want passed into the agent.
-//   - NEVER call want_A.StoreState(...) from code that runs on behalf of want_B.
+//   - NEVER call want_A.storeState(...) from code that runs on behalf of want_B.
 //     Cross-want state writes bypass locking assumptions and can corrupt state history.
 func (n *Want) StoreState(key string, value any) {
 	previousValue, _ := n.State.Load(key)
@@ -1018,7 +1018,7 @@ func (n *Want) MergeState(updates map[string]any) {
 		valueMap, isValueMap := extractMap(value)
 
 		if !isValueMap {
-			n.StoreState(key, value)
+			n.storeState(key, value)
 			continue
 		}
 
@@ -1135,7 +1135,7 @@ func (n *Want) GetParentState(key string) (any, bool) {
 	if parent == nil {
 		return GetGlobalState(key) // fallback to globalState for top-level wants
 	}
-	return parent.GetState(key)
+	return parent.getState(key)
 }
 
 func (n *Want) StoreParentState(key string, value any) {
@@ -1144,7 +1144,7 @@ func (n *Want) StoreParentState(key string, value any) {
 		StoreGlobalState(key, value) // fallback to globalState for top-level wants
 		return
 	}
-	parent.StoreState(key, value)
+	parent.storeState(key, value)
 }
 
 func (n *Want) MergeParentState(updates map[string]any) {
@@ -1168,7 +1168,7 @@ func (n *Want) SuggestParent(directions []string) {
 	var exists bool
 
 	if parent != nil {
-		raw, exists = parent.GetState("directions")
+		raw, exists = parent.getState("directions")
 	} else {
 		raw, exists = GetGlobalState("directions")
 	}
@@ -1212,7 +1212,7 @@ func (n *Want) SuggestParent(directions []string) {
 //
 // STATE OWNERSHIP RULE: Same as StoreState — only call on the receiver want.
 // From an Agent Exec function use StoreStateMultiForAgent() instead.
-func (n *Want) StoreStateMulti(updates map[string]any) {
+func (n *Want) storeStateMulti(updates map[string]any) {
 	// Collect all notifications
 	var notifications []StateNotification
 	for key, value := range updates {
@@ -1262,8 +1262,19 @@ func (n *Want) StoreLog(message string, args ...any) {
 	n.getHistoryManager().AddLogEntry(formatted)
 }
 
-func (n *Want) GetState(key string) (any, bool) {
+func (n *Want) getState(key string) (any, bool) {
 	return n.State.Load(key)
+}
+
+func (n *Want) storeState(key string, value any) {
+	n.State.Store(key, value)
+}
+
+// StoreStateMulti writes multiple key-value pairs into the want's state. 
+// This is a package-level helper for system-internal use (e.g. restoring state).
+// Deprecated: For logic within Progress(), use SetCurrent, SetGoal, etc.
+func StoreStateMulti(wp WantPointer, updates map[string]any) {
+	wp.GetWant().storeStateMulti(updates)
 }
 
 // GetPendingStateChanges is obsolete; state changes are committed immediately via StoreState.
@@ -1365,7 +1376,7 @@ func (n *Want) GetRunningAgents() []string {
 
 // if ok { // provided is a valid bool }
 func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		return defaultValue, false
 	}
@@ -1377,7 +1388,7 @@ func (n *Want) GetStateBool(key string, defaultValue bool) (bool, bool) {
 
 // count, ok := want.GetStateInt("total_processed", 0) if ok { // count is a valid int }
 func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		return defaultValue, false
 	}
@@ -1390,7 +1401,7 @@ func (n *Want) GetStateInt(key string, defaultValue int) (int, bool) {
 }
 
 func (n *Want) GetStateFloat64(key string, defaultValue float64) (float64, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		return defaultValue, false
 	}
@@ -1404,7 +1415,7 @@ func (n *Want) GetStateFloat64(key string, defaultValue float64) (float64, bool)
 
 // if ok { // name is a valid string }
 func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		return defaultValue, false
 	}
@@ -1415,7 +1426,7 @@ func (n *Want) GetStateString(key string, defaultValue string) (string, bool) {
 }
 
 func (n *Want) GetStateTime(key string, defaultValue time.Time) (time.Time, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		return defaultValue, false
 	}
@@ -1428,7 +1439,7 @@ func (n *Want) GetStateTime(key string, defaultValue time.Time) (time.Time, bool
 }
 
 func GetStateAs[T any](n *Want, key string) (T, bool) {
-	value, exists := n.GetState(key)
+	value, exists := n.getState(key)
 	if !exists {
 		var zero T
 		return zero, false
@@ -1443,7 +1454,7 @@ func GetStateAs[T any](n *Want, key string) (T, bool) {
 // and updates either the map entry or the value it points to (if it's a pointer).
 func (n *Want) GetStateMulti(data Dict) {
 	for key, templateValue := range data {
-		val, exists := n.GetState(key)
+		val, exists := n.getState(key)
 		if !exists {
 			continue
 		}
@@ -1531,8 +1542,6 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 			label = LabelCurrent
 		case "plan":
 			label = LabelPlan
-		case "predefined":
-			label = LabelPredefined
 		case "internal":
 			label = LabelInternal
 		default:
@@ -1548,7 +1557,7 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 
 func (n *Want) SetGoal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
 		n.labelViolationCount++
@@ -1557,14 +1566,14 @@ func (n *Want) SetGoal(key string, value any) {
 
 func (n *Want) GetGoal(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		return n.GetState(key)
+		return n.getState(key)
 	}
 	return nil, false
 }
 
 func (n *Want) SetCurrent(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
 		n.labelViolationCount++
@@ -1573,14 +1582,14 @@ func (n *Want) SetCurrent(key string, value any) {
 
 func (n *Want) GetCurrent(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		return n.GetState(key)
+		return n.getState(key)
 	}
 	return nil, false
 }
 
 func (n *Want) SetPlan(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
 		n.labelViolationCount++
@@ -1589,32 +1598,20 @@ func (n *Want) SetPlan(key string, value any) {
 
 func (n *Want) GetPlan(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		return n.GetState(key)
+		return n.getState(key)
 	}
 	return nil, false
 }
 
 func (n *Want) ClearPlan(key string) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.StoreState(key, nil)
+		n.storeState(key, nil)
 	}
-}
-
-func (n *Want) SetPredefined(key string, value any) {
-	n.StoreState(key, value)
-}
-
-func (n *Want) GetPredefined(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPredefined {
-		return n.GetState(key)
-	}
-	// Also check raw state for system-wide fields
-	return n.GetState(key)
 }
 
 func (n *Want) SetInternal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	} else {
 		n.StoreLog("[FAILED] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
 		n.labelViolationCount++
@@ -1623,7 +1620,7 @@ func (n *Want) SetInternal(key string, value any) {
 
 func (n *Want) GetInternal(key string) (any, bool) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
-		return n.GetState(key)
+		return n.getState(key)
 	}
 	return nil, false
 }
@@ -1644,7 +1641,7 @@ func (n *Want) GetWant() *Want {
 // GetState retrieves a value from the want's state with automatic type conversion.
 func GetState[T any](wp WantPointer, key string, defaultVal T) T {
 	n := wp.GetWant()
-	raw, ok := n.GetState(key)
+	raw, ok := n.getState(key)
 	if !ok || raw == nil {
 		return defaultVal
 	}
@@ -1685,16 +1682,6 @@ func GetPlan[T any](wp WantPointer, key string, defaultVal T) T {
 func GetInternal[T any](wp WantPointer, key string, defaultVal T) T {
 	n := wp.GetWant()
 	raw, ok := n.GetInternal(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetPredefined retrieves a predefined-labeled value with automatic type conversion.
-func GetPredefined[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetPredefined(key)
 	if !ok || raw == nil {
 		return defaultVal
 	}
@@ -1777,9 +1764,9 @@ func (n *Want) GetStopChannel() chan struct{} {
 func (n *Want) OnProcessEnd(finalState map[string]any) {
 	n.SetStatus(WantStatusAchieved)
 	for key, value := range finalState {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	}
-	n.StoreState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
+	n.storeState("completion_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
@@ -1810,10 +1797,10 @@ func (n *Want) OnProcessEnd(finalState map[string]any) {
 func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	n.SetStatus(WantStatusFailed)
 	for key, value := range errorState {
-		n.StoreState(key, value)
+		n.storeState(key, value)
 	}
-	n.StoreState("error", err.Error())
-	n.StoreState("failure_time", fmt.Sprintf("%d", getCurrentTimestamp()))
+	n.storeState("error", err.Error())
+	n.storeState("failure_time", fmt.Sprintf("%d", getCurrentTimestamp()))
 
 	// Commit any pending state changes into a single batched history entry
 	n.CommitStateChanges()
@@ -2022,9 +2009,9 @@ func (n *Want) Init() {
 	n.paths.Out = []PathInfo{}
 
 	// Initialize system-reserved state fields using StoreState
-	n.StoreState(StateFieldActionByAgent, "")
-	n.StoreState(StateFieldAchievingPercent, 0)
-	n.StoreState(StateFieldCompleted, false)
+	n.storeState(StateFieldActionByAgent, "")
+	n.storeState(StateFieldAchievingPercent, 0)
+	n.storeState(StateFieldCompleted, false)
 
 	n.SetStatus(WantStatusIdle) // Transition to idle after initialization
 }
@@ -2085,7 +2072,7 @@ func (e ConfigErrorPanic) Error() string {
 //	    return w.SetConfigError("topic", "Missing required parameter 'topic'")
 //	}
 func (w *Want) SetConfigError(field string, message string) error {
-	w.StoreStateMulti(map[string]any{
+	w.storeStateMulti(map[string]any{
 		"config_error_field":   field,
 		"config_error_message": message,
 		"error":                message,
@@ -2105,7 +2092,7 @@ func (w *Want) SetConfigError(field string, message string) error {
 //	    return w.SetModuleError("GetLocals", "Failed to access type-specific locals")
 //	}
 func (w *Want) SetModuleError(component string, message string) error {
-	w.StoreStateMulti(map[string]any{
+	w.storeStateMulti(map[string]any{
 		"module_error_component": component,
 		"module_error_message":   message,
 		"error":                  message,
@@ -2128,7 +2115,7 @@ func (w *Want) SetModuleError(component string, message string) error {
 //	    // Code after this line will NOT execute
 //	}
 func (w *Want) SetModuleErrorAndExit(component string, message string) {
-	w.StoreStateMulti(map[string]any{
+	w.storeStateMulti(map[string]any{
 		"module_error_component": component,
 		"module_error_message":   message,
 		"error":                  message,
@@ -2142,7 +2129,7 @@ func (w *Want) SetModuleErrorAndExit(component string, message string) {
 // Similar to SetModuleErrorAndExit but for configuration errors
 // StartProgressionLoop() will recover and keep the want in ConfigError state waiting for config update
 func (w *Want) SetConfigErrorAndExit(field string, message string) {
-	w.StoreStateMulti(map[string]any{
+	w.storeStateMulti(map[string]any{
 		"config_error_field":   field,
 		"config_error_message": message,
 		"error":                message,
@@ -2160,7 +2147,7 @@ func (w *Want) ClearConfigError() {
 	}
 
 	// Clear error-related state
-	w.StoreStateMulti(map[string]any{
+	w.storeStateMulti(map[string]any{
 		"config_error_field":   nil,
 		"config_error_message": nil,
 		"error":                nil,
@@ -2364,7 +2351,7 @@ func (n *Want) GetGlobalParameter(key string, defaultValue any) any {
 // count := want.IncrementIntState("total_processed")  // Returns new count
 func (n *Want) IncrementIntState(key string) int {
 	var newValue int
-	if val, exists := n.GetState(key); exists {
+	if val, exists := n.getState(key); exists {
 		if intVal, ok := val.(int); ok {
 			newValue = intVal + 1
 		} else {
@@ -2375,7 +2362,7 @@ func (n *Want) IncrementIntState(key string) int {
 	}
 
 	// Use StoreState to ensure proper batching and tracking
-	n.StoreState(key, newValue)
+	n.storeState(key, newValue)
 
 	return newValue
 }
@@ -2547,8 +2534,8 @@ func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
 			received = true
 
 			// Store packet receive info for debugging
-			n.StoreState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
-			n.StoreState("last_packet_received_timestamp", getCurrentTimestamp())
+			n.storeState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
+			n.storeState("last_packet_received_timestamp", getCurrentTimestamp())
 		} else {
 			// Channel was closed
 			return -1, nil, false, false
@@ -2575,28 +2562,28 @@ func (n *Want) UseForever() (int, any, bool, bool) {
 // If the state doesn't exist, starts from defaultStart value
 // Returns the new value after increment
 func (n *Want) IncrementIntStateValue(key string, defaultStart int) int {
-	val, exists := n.GetState(key)
+	val, exists := n.getState(key)
 	if !exists {
-		n.StoreState(key, defaultStart+1)
+		n.storeState(key, defaultStart+1)
 		return defaultStart + 1
 	}
 
 	currentVal, ok := AsInt(val)
 	if !ok {
 		// If not an int, reset to default and increment
-		n.StoreState(key, defaultStart+1)
+		n.storeState(key, defaultStart+1)
 		return defaultStart + 1
 	}
 
 	newValue := currentVal + 1
-	n.StoreState(key, newValue)
+	n.storeState(key, newValue)
 	return newValue
 }
 
 // AppendToStateArray safely appends a value to a state array
 // If the state doesn't exist, creates a new array
 func (n *Want) AppendToStateArray(key string, value any) error {
-	stateVal, exists := n.GetState(key)
+	stateVal, exists := n.getState(key)
 	var array []any
 
 	if exists {
@@ -2612,7 +2599,7 @@ func (n *Want) AppendToStateArray(key string, value any) error {
 	}
 
 	array = append(array, value)
-	n.StoreState(key, array)
+	n.storeState(key, array)
 	return nil
 }
 
@@ -2644,7 +2631,7 @@ func (n *Want) FindRunningAgentHistory(agentName string) (*AgentExecution, int, 
 // GetStateArrayElement safely gets an array element from state
 // Returns the element or nil if not found or state is not an array
 func (n *Want) GetStateArrayElement(key string, index int) any {
-	stateVal, exists := n.GetState(key)
+	stateVal, exists := n.getState(key)
 	if !exists {
 		return nil
 	}
@@ -2755,7 +2742,7 @@ func (w *Want) GetHTTPClient() *HTTPClient {
 // A plain key with no dots falls back to a normal GetState call.
 func resolveNestedStateField(n *Want, field string) (any, bool) {
 	parts := splitFirst(field, '.')
-	top, ok := n.GetState(parts[0])
+	top, ok := n.getState(parts[0])
 	if !ok || top == nil {
 		return nil, false
 	}

@@ -38,6 +38,30 @@ wantType:
     persistent: true
     label: current
 
+  - name: last_logged_phase
+    description: Last phase logged to history
+    type: string
+    persistent: true
+    label: current
+
+  - name: error_feedback
+    description: Feedback from compiler or validator
+    type: string
+    persistent: true
+    label: current
+
+  - name: source_code
+    description: Generated Go source code
+    type: string
+    persistent: true
+    label: current
+
+  - name: validation_success
+    description: Whether validation succeeded
+    type: bool
+    persistent: true
+    label: current
+
   require:
     type: none
 

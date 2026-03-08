@@ -44,28 +44,26 @@ func main() {
 		if state != nil {
 			// Show stats from prime filter
 			if state.Metadata.Type == "prime_filter" {
-				if totalProcessed, exists := state.GetAllState()["total_processed"]; exists {
+				totalProcessed := GetCurrent(state, "total_processed", 0)
+				if totalProcessed > 0 {
 					fmt.Printf("  🔢 Filter %s processed %v numbers\n", name, totalProcessed)
 				}
-				if primes, exists := state.GetState("foundPrimes"); exists {
-					if primeList, ok := primes.([]int); ok {
-						fmt.Printf("  🎯 Found %d primes: ", len(primeList))
-						for i, p := range primeList {
-							if i > 0 {
-								fmt.Print(", ")
-							}
-							fmt.Print(p)
-							if i >= 9 {
-								fmt.Printf("... (and %d more)", len(primeList)-10)
-								break
-							}
+				primeList := GetCurrent(state, "foundPrimes", []int{})
+				if len(primeList) > 0 {
+					fmt.Printf("  🎯 Found %d primes: ", len(primeList))
+					for i, p := range primeList {
+						if i > 0 {
+							fmt.Print(", ")
 						}
-						fmt.Println()
+						fmt.Print(p)
+						if i >= 9 {
+							fmt.Printf("... (and %d more)", len(primeList)-10)
+							break
+						}
 					}
+					fmt.Println()
 				}
 			}
-
-			// Show stats from prime generator
 			if state.Metadata.Type == "prime_numbers" {
 				if totalProcessed, exists := state.GetAllState()["total_processed"]; exists {
 					fmt.Printf("  📈 Generator %s produced %v numbers\n", name, totalProcessed)

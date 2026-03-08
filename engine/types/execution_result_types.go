@@ -65,7 +65,7 @@ func (e *ExecutionResultWant) Initialize() {
 	e.SetCurrent("started_at", "")
 	e.SetCurrent("completed_at", "")
 	e.SetCurrent("execution_time_ms", 0)
-	e.SetPredefined("achieving_percentage", 0)
+	e.SetCurrent("achieving_percentage", 0)
 
 	// Get locals (guaranteed to be initialized by framework)
 	locals := e.GetLocals()
@@ -139,7 +139,7 @@ func (e *ExecutionResultWant) handlePhaseInitial(locals *ExecutionResultWantLoca
 	e.SetCurrent("status", "pending")
 	e.SetCurrent("command", locals.Command)
 	e.SetCurrent("completed", false)
-	e.SetPredefined("achieving_percentage", 0)
+	e.SetCurrent("achieving_percentage", 0)
 
 	// Transition to executing phase
 	locals.Phase = ExecutionPhaseExecuting
@@ -159,7 +159,7 @@ func (e *ExecutionResultWant) tryAgentExecution() (map[string]any, error) {
 	}
 
 	// Retrieve agent result from state
-	result := GetPredefined(e, "agent_result", map[string]any{})
+	result := GetCurrent(e, "agent_result", map[string]any{})
 	if len(result) > 0 {
 		return result, nil
 	}
@@ -211,7 +211,7 @@ func (e *ExecutionResultWant) handlePhaseExecuting(locals *ExecutionResultWantLo
 	if exitCode == 0 {
 		e.SetCurrent("completed", true)
 		e.SetCurrent("status", "completed")
-		e.SetPredefined("achieving_percentage", 100)
+		e.SetCurrent("achieving_percentage", 100)
 		e.StoreLog("Command executed successfully in %dms", locals.ExecutionTimeMs)
 		locals.Phase = ExecutionPhaseCompleted
 	} else {

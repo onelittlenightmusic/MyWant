@@ -148,7 +148,7 @@ func (n *ManagedProcessWant) failWithError(locals *ManagedProcessLocals, msg str
 
 func (n *ManagedProcessWant) Progress() {
 	locals := n.GetLocals()
-	n.SetPredefined("achieving_percentage", n.CalculateAchievingPercentage())
+	n.SetCurrent("achieving_percentage", n.CalculateAchievingPercentage())
 
 	switch locals.ServerPhase {
 	case ProcessPhaseRunning:

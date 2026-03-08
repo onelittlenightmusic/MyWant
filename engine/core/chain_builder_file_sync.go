@@ -91,7 +91,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 			// Correctly copy state using the thread-safe helper
 			stateCopy := runtimeWant.want.GetAllState()
-			want.StoreStateMulti(stateCopy)
+			want.storeStateMulti(stateCopy)
 			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
 		}
 		updatedConfig.Wants = append(updatedConfig.Wants, want)
@@ -112,7 +112,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 				Status:  runtimeWant.want.Status,
 				History: runtimeWant.want.BuildHistory(), // Include history in stats writes
 			}
-			wantConfig.StoreStateMulti(stateCopy)
+			wantConfig.storeStateMulti(stateCopy)
 			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
 		}
 	}
@@ -201,7 +201,7 @@ func (cb *ChainBuilder) dumpWantMemoryToYAML_disabled() error {
 			Status:  runtimeWant.want.Status,
 			History: runtimeWant.want.BuildHistory(), // Include history in memory dump
 		}
-		want.StoreStateMulti(stateCopy)
+		want.storeStateMulti(stateCopy)
 
 		wants = append(wants, want)
 	}

@@ -23,7 +23,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 		if !want.HasParent() {
 			// Standalone want (no coordinator) – approve immediately
 			want.SetPlan("execute_booking", true)
-			want.SetPredefined("good_to_reserve", true)
+			want.SetCurrent("good_to_reserve", true)
 			want.SetCurrent("thinker.plan_set", true)
 		} else {
 			want.MergeParentState(map[string]any{
@@ -46,7 +46,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
 				want.SetCurrent("budget_limit", tb)
 				want.SetPlan("execute_booking", true)
-				want.SetPredefined("good_to_reserve", true)
+				want.SetCurrent("good_to_reserve", true)
 				want.SetCurrent("thinker.plan_set", true)
 				want.StoreLog("[ConditionThinker] Target budget allocated: %.2f → plan.execute_booking=true", tb)
 			}
@@ -56,7 +56,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 			want.SetCurrent("thinker.ticks_waited", ticksWaited)
 			if ticksWaited >= 3 {
 				want.SetPlan("execute_booking", true)
-				want.SetPredefined("good_to_reserve", true)
+				want.SetCurrent("good_to_reserve", true)
 				want.SetCurrent("thinker.plan_set", true)
 				want.StoreLog("[ConditionThinker] No budget coordination after %d ticks → plan.execute_booking=true", ticksWaited)
 			}

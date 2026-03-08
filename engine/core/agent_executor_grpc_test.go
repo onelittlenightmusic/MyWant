@@ -118,7 +118,7 @@ func TestRPCExecutor_DoAgent(t *testing.T) {
 		nil,
 		"base",
 	)
-	want.StoreStateMulti(map[string]any{
+	want.storeStateMulti(map[string]any{
 		"departure": "NRT",
 		"arrival":   "LAX",
 	})
@@ -130,7 +130,7 @@ func TestRPCExecutor_DoAgent(t *testing.T) {
 	}
 
 	// Verify state was updated
-	if val, exists := want.GetState("test_key"); !exists || val != "test_value" {
+	if val, exists := want.getState("test_key"); !exists || val != "test_value" {
 		t.Errorf("Expected test_key 'test_value', got %v (exists: %v)", val, exists)
 	}
 }

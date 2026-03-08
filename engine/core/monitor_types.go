@@ -80,9 +80,9 @@ func (mw *MonitorWant) Progress() {
 		return
 	}
 
-	mw.Want.StoreState("start_time", time.Now())
-	mw.Want.StoreState("status", "monitoring")
-	mw.Want.StoreState("alerts_triggered", 0)
+	mw.Want.storeState("start_time", time.Now())
+	mw.Want.storeState("status", "monitoring")
+	mw.Want.storeState("alerts_triggered", 0)
 	mw.Want.SetStatus(WantStatusReaching)
 
 	var monitorAgent *MonitorAgent
@@ -146,9 +146,9 @@ func (mw *MonitorWant) GetAlerts() []AlertRecord {
 // ClearAlerts clears the alert history
 func (mw *MonitorWant) ClearAlerts() {
 	mw.Alerts = mw.Alerts[:0]
-	mw.Want.StoreState("alerts_triggered", 0)
-	mw.Want.StoreState("last_alert", nil)
-	mw.Want.StoreState("last_alert_time", nil)
+	mw.Want.storeState("alerts_triggered", 0)
+	mw.Want.storeState("last_alert", nil)
+	mw.Want.storeState("last_alert_time", nil)
 }
 
 // RegisterMonitorWantTypes registers monitor want types with a ChainBuilder

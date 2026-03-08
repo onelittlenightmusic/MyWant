@@ -103,8 +103,8 @@ func (s *SchedulerWant) Progress() {
 	}
 
 	// Update scheduler statistics in state
-	s.StoreState("total_scheduled_wants", s.GetBackgroundAgentCount())
-	s.StoreState("last_scan_time", time.Now().Unix())
+	s.storeState("total_scheduled_wants", s.GetBackgroundAgentCount())
+	s.storeState("last_scan_time", time.Now().Unix())
 }
 
 // IsAchieved always returns false since the scheduler runs continuously

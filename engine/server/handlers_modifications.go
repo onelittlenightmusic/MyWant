@@ -34,7 +34,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 				History:     want.BuildHistory(),
 				HiddenState: want.GetHiddenState(),
 			}
-			wantCopy.StoreStateMulti(want.GetExplicitState())
+			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -49,7 +49,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 				History:     want.BuildHistory(),
 				HiddenState: want.GetHiddenState(),
 			}
-			wantCopy.StoreStateMulti(want.GetExplicitState())
+			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
 			wantsByID[want.Metadata.ID] = wantCopy
 		}
 	}
@@ -133,7 +133,7 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, want := range config.Wants {
 			if importedWant, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
-				importedWant.StoreStateMulti(want.GetAllState())
+				mywant.StoreStateMulti(importedWant, want.GetAllState())
 			}
 		}
 	}()

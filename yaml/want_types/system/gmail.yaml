@@ -88,7 +88,7 @@ wantType:
     description: Maximum number of results to return for search operations
     type: int
     persistent: true
-    label: predefined
+    label: plan
     initialValue: 10
     example: 10
 

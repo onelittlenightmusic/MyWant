@@ -57,8 +57,7 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	target.Progress()
 	target.EndProgressCycle()
 
-	achievingPercentage, exists := target.GetState("achieving_percentage")
-	assert.True(t, exists, "achieving_percentage should exist in state")
+	achievingPercentage := mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 0.0, achievingPercentage, "Initial achieving_percentage should be 0")
 
 	// Test 2: Mark one child as complete (33%)
@@ -68,7 +67,7 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	target.Progress()
 	target.EndProgressCycle()
 
-	achievingPercentage, _ = target.GetState("achieving_percentage")
+	achievingPercentage = mywant.GetState(target, "achieving_percentage", 0.0)
 	expectedPercentage := float64(100 / 3) // ~33.33%
 	assert.InDelta(t, expectedPercentage, achievingPercentage, 1.0, "achieving_percentage should be ~33% with 1/3 children complete")
 
@@ -79,7 +78,7 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	target.Progress()
 	target.EndProgressCycle()
 
-	achievingPercentage, _ = target.GetState("achieving_percentage")
+	achievingPercentage = mywant.GetState(target, "achieving_percentage", 0.0)
 	expectedPercentage = float64(200 / 3) // ~66.66%
 	assert.InDelta(t, expectedPercentage, achievingPercentage, 1.0, "achieving_percentage should be ~66% with 2/3 children complete")
 
@@ -90,7 +89,7 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	target.Progress()
 	target.EndProgressCycle()
 
-	achievingPercentage, _ = target.GetState("achieving_percentage")
+	achievingPercentage = mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 100.0, achievingPercentage, "achieving_percentage should be 100% with all children complete")
 
 	// Test 5: Target should reach ACHIEVED status when all children are complete
@@ -128,7 +127,7 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 	target.Progress()
 	target.EndProgressCycle()
 
-	achievingPercentage, _ := target.GetState("achieving_percentage")
+	achievingPercentage := mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 0.0, achievingPercentage, "Initially achieving_percentage should be 0")
 
 	// Mark child as complete and progress
@@ -139,7 +138,7 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 	target.EndProgressCycle()
 
 	// Verify achieving_percentage is 100
-	achievingPercentage, _ = target.GetState("achieving_percentage")
+	achievingPercentage = mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 100.0, achievingPercentage, "achieving_percentage should be 100 when all children complete")
 
 	// Verify status is ACHIEVED
@@ -149,7 +148,7 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 	target.BeginProgressCycle()
 	target.EndProgressCycle()
 
-	achievingPercentage, _ = target.GetState("achieving_percentage")
+	achievingPercentage = mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 100.0, achievingPercentage, "achieving_percentage should remain 100 after EndProgressCycle for ACHIEVED status")
 }
 
@@ -178,7 +177,7 @@ func TestTargetAchievingPercentageEdgeCases(t *testing.T) {
 	// Should reach ACHIEVED immediately if no children
 	assert.Equal(t, mywant.WantStatusAchieved, target.Want.Status, "Target should be ACHIEVED with no children")
 
-	achievingPercentage, _ := target.GetState("achieving_percentage")
+	achievingPercentage := mywant.GetState(target, "achieving_percentage", 0.0)
 	assert.Equal(t, 100.0, achievingPercentage, "achieving_percentage should be 100 with no children to complete")
 }
 
@@ -225,7 +224,7 @@ func TestTargetStateConsistency(t *testing.T) {
 		target.Progress()
 		target.EndProgressCycle()
 
-		achievingPercentage, _ := target.GetState("achieving_percentage")
+		achievingPercentage := mywant.GetState(target, "achieving_percentage", 0.0)
 		expectedPercentage := float64(i * 100 / 5)
 
 		assert.InDelta(t, expectedPercentage, achievingPercentage, 0.1,

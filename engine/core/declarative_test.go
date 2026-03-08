@@ -12,9 +12,9 @@ func TestWantStateManagement(t *testing.T) {
 	}
 
 	// Test storing state
-	want.StoreState("key", "value")
+	want.storeState("key", "value")
 
-	value, exists := want.GetState("key")
+	value, exists := want.getState("key")
 	if !exists {
 		t.Error("Expected state key to exist")
 	}
@@ -67,14 +67,14 @@ func TestWantExecCycle(t *testing.T) {
 
 	// Test exec cycle batching
 	want.BeginProgressCycle()
-	want.StoreState("key1", "value1")
-	want.StoreState("key2", "value2")
+	want.storeState("key1", "value1")
+	want.storeState("key2", "value2")
 
 	want.EndProgressCycle()
 
 	// Verify state was stored
-	value1, exists1 := want.GetState("key1")
-	value2, exists2 := want.GetState("key2")
+	value1, exists1 := want.getState("key1")
+	value2, exists2 := want.getState("key2")
 
 	if !exists1 || value1 != "value1" {
 		t.Error("State key1 not properly stored during exec cycle")
@@ -83,9 +83,9 @@ func TestWantExecCycle(t *testing.T) {
 		t.Error("State key2 not properly stored during exec cycle")
 	}
 
-	// Verify history was created
-	if len(want.BuildHistory().StateHistory) == 0 {
-		t.Error("Expected state history to be recorded")
+	// storeState is a raw write (no label, no history) - history should remain empty
+	if len(want.BuildHistory().StateHistory) != 0 {
+		t.Error("storeState should not record state history")
 	}
 }
 

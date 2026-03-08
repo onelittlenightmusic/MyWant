@@ -168,9 +168,9 @@ func (g *GmailWant) Progress() {
 		g.SetInternal("mcp_native", true)
 
 		// Store the prompt as an MCP operation for the agent
-		g.SetInternal("mcp_operation", "gmail_search")
-		g.SetInternal("mcp_query", locals.Prompt)
-		g.SetInternal("mcp_max_results", 10)
+		g.SetPlan("mcp_operation", "gmail_search")
+		g.SetPlan("mcp_query", locals.Prompt)
+		g.SetPlan("mcp_max_results", 10)
 
 		return // Yield and let agents run in their own turn
 	}
@@ -186,7 +186,7 @@ func (g *GmailWant) Progress() {
 		}
 
 		// Check if result has arrived from MCPAgent
-		agentResult := GetPredefined(g, "agent_result", map[string]any{})
+		agentResult := GetCurrent(g, "agent_result", map[string]any(nil))
 		if len(agentResult) == 0 {
 			// Result not ready yet, wait for next cycle
 			return

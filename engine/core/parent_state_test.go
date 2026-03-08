@@ -49,8 +49,8 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 		Spec: WantSpec{Params: make(map[string]any)},
 	}
 	// Set initial budget on parent
-	parentWant.StoreState("budget", 5000.0)
-	parentWant.StoreState("costs", map[string]any{})
+	parentWant.storeState("budget", 5000.0)
+	parentWant.storeState("costs", map[string]any{})
 
 	// Create ChainBuilder with parent want registered
 	cb := NewChainBuilder(Config{
@@ -88,7 +88,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 
 	// --- Test StoreParentState: child writes a simple value to parent ---
 	flightWant.StoreParentState("status", "booking")
-	val, ok := parentWant.GetState("status")
+	val, ok := parentWant.getState("status")
 	if !ok || val != "booking" {
 		t.Errorf("Expected parent state 'status'='booking', got %v (exists=%v)", val, ok)
 	}
@@ -105,7 +105,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 	})
 
 	// Verify all costs are merged in parent
-	costsVal, ok := parentWant.GetState("costs")
+	costsVal, ok := parentWant.getState("costs")
 	if !ok {
 		t.Fatal("Parent has no costs state")
 	}
@@ -140,7 +140,7 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 		},
 		Spec: WantSpec{Params: make(map[string]any)},
 	}
-	parentWant.StoreState("costs", map[string]any{})
+	parentWant.storeState("costs", map[string]any{})
 
 	cb := NewChainBuilder(Config{
 		Wants: []*Want{parentWant},
@@ -176,7 +176,7 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 	wg.Wait()
 
 	// Verify all entries exist
-	costsVal, ok := parentWant.GetState("costs")
+	costsVal, ok := parentWant.getState("costs")
 	if !ok {
 		t.Fatal("Parent has no costs state")
 	}
@@ -211,7 +211,7 @@ func TestParentStateAccess_Cache(t *testing.T) {
 		},
 		Spec: WantSpec{Params: make(map[string]any)},
 	}
-	parentWant.StoreState("value", "original")
+	parentWant.storeState("value", "original")
 
 	cb := NewChainBuilder(Config{
 		Wants: []*Want{parentWant},
@@ -263,8 +263,8 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 		},
 		Spec: WantSpec{Params: make(map[string]any)},
 	}
-	coordinator.StoreState("budget", 5000.0)
-	coordinator.StoreState("costs", map[string]any{})
+	coordinator.storeState("budget", 5000.0)
+	coordinator.storeState("costs", map[string]any{})
 
 	cb := NewChainBuilder(Config{
 		Wants: []*Want{coordinator},
@@ -285,7 +285,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{"flight": cost},
 		})
-		want.StoreState("booked", true)
+		want.storeState("booked", true)
 		return nil
 	}
 
@@ -301,7 +301,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{"hotel": cost},
 		})
-		want.StoreState("booked", true)
+		want.storeState("booked", true)
 		return nil
 	}
 
@@ -317,7 +317,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 		want.MergeParentState(map[string]any{
 			"costs": map[string]any{"restaurant": cost},
 		})
-		want.StoreState("booked", true)
+		want.storeState("booked", true)
 		return nil
 	}
 
@@ -397,7 +397,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 		exec.want.EndProgressCycle()
 
 		// Verify child's own state was set
-		booked, ok := exec.want.GetState("booked")
+		booked, ok := exec.want.getState("booked")
 		if !ok || booked != true {
 			t.Errorf("%s: expected booked=true, got %v", exec.name, booked)
 		}
@@ -405,7 +405,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 	}
 
 	// 6. Verify parent coordinator has all costs merged correctly
-	costsVal, ok := coordinator.GetState("costs")
+	costsVal, ok := coordinator.getState("costs")
 	if !ok {
 		t.Fatal("Parent coordinator has no costs state")
 	}
@@ -433,7 +433,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 	}
 
 	// 7. Verify budget constraint
-	budget, _ := coordinator.GetState("budget")
+	budget, _ := coordinator.getState("budget")
 	if totalCost > budget.(float64) {
 		t.Errorf("Total cost %.0f exceeds budget %.0f", totalCost, budget.(float64))
 	}
@@ -451,7 +451,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 		},
 		Spec: WantSpec{Params: make(map[string]any)},
 	}
-	coordinator.StoreState("costs", map[string]any{})
+	coordinator.storeState("costs", map[string]any{})
 
 	cb := NewChainBuilder(Config{
 		Wants: []*Want{coordinator},
@@ -510,7 +510,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 	wg.Wait()
 
 	// Verify all 10 cost entries are present
-	costsVal, ok := coordinator.GetState("costs")
+	costsVal, ok := coordinator.getState("costs")
 	if !ok {
 		t.Fatal("Coordinator has no costs state")
 	}

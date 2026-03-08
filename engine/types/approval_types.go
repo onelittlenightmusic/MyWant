@@ -77,7 +77,7 @@ func (e *EvidenceWant) Progress() {
 	e.SetGoal("approval_id", locals.ApprovalID)
 	e.SetCurrent("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
 	e.SetCurrent("total_processed", 1)
-	e.SetPredefined("achieving_percentage", 100)
+	e.SetCurrent("achieving_percentage", 100)
 
 	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount())
 
@@ -153,7 +153,7 @@ func (d *DescriptionWant) Progress() {
 	d.SetCurrent("description", description)
 	d.SetCurrent("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
 	d.SetCurrent("total_processed", 1)
-	d.SetPredefined("achieving_percentage", 100)
+	d.SetCurrent("achieving_percentage", 100)
 
 	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, d.GetOutCount())
 

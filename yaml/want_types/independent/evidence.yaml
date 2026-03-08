@@ -49,14 +49,14 @@ wantType:
     description: Type of evidence provided
     type: string
     persistent: true
-    label: predefined
+    label: current
     example: audit
     initialValue: ''
   - name: approval_id
     description: Associated approval process ID
     type: string
     persistent: true
-    label: predefined
+    label: current
     example: APR-2024-001
     initialValue: ''
   - name: evidence_provided_at

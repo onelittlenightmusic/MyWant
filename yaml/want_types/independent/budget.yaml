@@ -39,13 +39,13 @@ wantType:
     description: Total budget amount
     type: float64
     persistent: true
-    label: predefined
+    label: current
     initialValue: 5000.0
   - name: currency
     description: Currency code
     type: string
     persistent: true
-    label: predefined
+    label: current
     initialValue: USD
   - name: costs
     description: Map of child want names to their reported costs

@@ -269,8 +269,8 @@ func (n *Want) runDoAgent(agent Agent) error {
 	n.CurrentAgent = agentName
 	{
 		// Store current agent state
-		n.StoreState("_current_agent", agentName)
-		n.StoreState("_running_agents", n.RunningAgents)
+		n.storeState("_current_agent", agentName)
+		n.storeState("_running_agents", n.RunningAgents)
 	}
 	// Append "running" start event
 	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
@@ -317,8 +317,8 @@ func (n *Want) runDoAgent(agent Agent) error {
 			n.CurrentAgent = n.RunningAgents[len(n.RunningAgents)-1]
 		}
 		{
-			n.StoreState("_current_agent", n.CurrentAgent)
-			n.StoreState("_running_agents", n.RunningAgents)
+			n.storeState("_current_agent", n.CurrentAgent)
+			n.storeState("_running_agents", n.RunningAgents)
 		}
 
 		delete(n.runningAgents, agentName)
@@ -332,7 +332,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		finalError = err.Error()
 		agentErr = err
 	} else {
-		n.StoreState("action_by_agent", "DoAgent")
+		n.storeState("action_by_agent", "DoAgent")
 	}
 
 	return agentErr
@@ -588,7 +588,7 @@ func (w *Want) CommitStateChanges() {
 
 // DumpStateForAgent is obsolete; StoreState now handles updates immediately.
 func (w *Want) DumpStateForAgent(agentType string) {
-	w.StoreState("action_by_agent", agentType)
+	w.storeState("action_by_agent", agentType)
 }
 
 // HasPendingAgentStateChanges is obsolete.

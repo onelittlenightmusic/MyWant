@@ -305,8 +305,8 @@ func (t *Target) Initialize() {
 
 	// Initialize directions state if direction_map is present to prevent premature achievement
 	if dm, hasMap := t.Spec.Params["direction_map"]; hasMap && dm != nil {
-		if _, exists := t.GetState("directions"); !exists {
-			t.StoreState("directions", []string{})
+		if _, exists := t.getState("directions"); !exists {
+			t.storeState("directions", []string{})
 		}
 	}
 }
@@ -335,7 +335,7 @@ func (t *Target) DisownChild(wantID string) {
 
 		// Update stats and check if status needs to change back from achieved
 		t.childCount = len(t.childWants)
-		t.StoreState("child_count", t.childCount)
+		t.storeState("child_count", t.childCount)
 
 		if t.Status == WantStatusAchieved {
 			// If we were achieved but lost a child (or now have none), re-evaluate or reset
@@ -371,7 +371,7 @@ func (t *Target) AdoptChild(want *Want) {
 
 		// Update stats
 		t.childCount = len(t.childWants)
-		t.StoreState("child_count", t.childCount)
+		t.storeState("child_count", t.childCount)
 	}
 }
 
@@ -386,7 +386,7 @@ func (t *Target) AdoptChild(want *Want) {
 func (t *Target) Progress() {
 	// Guard: already achieved
 	if t.Status == WantStatusAchieved {
-		t.StoreState("achieving_percentage", 100.0)
+		t.storeState("achieving_percentage", 100.0)
 		return
 	}
 
@@ -476,11 +476,11 @@ drained:
 			}
 		}
 		achievingPercentage := float64(achievedCount*100) / float64(len(t.childWants))
-		t.StoreState("achieving_percentage", achievingPercentage)
+		t.storeState("achieving_percentage", achievingPercentage)
 	} else {
 		// Even if no childWants exist yet, we might have directions being realized
 		// by DispatchThinker. Stay reaching if there's evidence of ongoing work.
-		directions, directionsFound := t.GetState("directions")
+		directions, directionsFound := t.getState("directions")
 		plannedCount, _ := t.GetStateInt("planned_count", 0)
 		goalAchieved, _ := t.GetStateBool("goal_achieved", false)
 		
@@ -491,25 +491,25 @@ drained:
 		_, hasDirectionMap := t.Spec.Params["direction_map"]
 		
 		if hasDirectionMap && !directionsFound && !goalAchieved {
-			t.StoreState("achieving_percentage", 10.0)
+			t.storeState("achieving_percentage", 10.0)
 			allComplete = false
 		} else if (directions != nil || plannedCount > 0) && !goalAchieved {
-			t.StoreState("achieving_percentage", 50.0)
+			t.storeState("achieving_percentage", 50.0)
 			allComplete = false
 		} else {
-			t.StoreState("achieving_percentage", 100.0)
+			t.storeState("achieving_percentage", 100.0)
 			allComplete = true
 		}
 	}
 
 	// Dynamic Dispatch Check: check if all actions dispatched by DispatchThinker are done
 	if allComplete {
-		if dispatched, ok := t.GetState("_dispatched_directions"); ok {
+		if dispatched, ok := t.getState("_dispatched_directions"); ok {
 			if m, ok := dispatched.(map[string]any); ok {
 				for _, v := range m {
 					if id, ok := v.(string); ok && id != "DONE" {
 						allComplete = false
-						t.StoreState("achieving_percentage", 90.0)
+						t.storeState("achieving_percentage", 90.0)
 						break
 					}
 				}
@@ -535,7 +535,7 @@ drained:
 				finalResultDescription = fmt.Sprintf("Approval %s completed", approvalID)
 			}
 			var evidenceMap map[string]any
-			if ev, ok := t.GetState("final_itinerary"); ok {
+			if ev, ok := t.getState("final_itinerary"); ok {
 				if bytes, err := json.Marshal(ev); err == nil {
 					json.Unmarshal(bytes, &evidenceMap)
 				}
@@ -552,7 +552,7 @@ drained:
 			t.Provide(approvalData)
 			t.ProvideDone()
 			time.Sleep(10 * time.Millisecond)
-			t.StoreState("completion_packet_sent", true)
+			t.storeState("completion_packet_sent", true)
 			t.StoreLog("✅ Target %s completed and sent results to parent", t.Metadata.Name)
 		}
 
@@ -732,7 +732,7 @@ func (t *Target) computeTemplateResult() {
 			statName = "result"
 		}
 		metricKey := resultSpec.WantName + "_" + statName
-		t.StoreState(metricKey, metrics[metricKey])
+		t.storeState(metricKey, metrics[metricKey])
 
 		// Auto-register the computed key into ProvidedStateFields so it shows as explicit (not hidden)
 		if !Contains(t.ProvidedStateFields, metricKey) {
@@ -951,10 +951,10 @@ func (t *Target) getResultFromSpec(spec RecipeResultSpec, childWants map[string]
 	}
 
 	// Try to get the specified stat from the want's State map
-	if value, ok := want.GetState(fieldName); ok {
+	if value, ok := want.getState(fieldName); ok {
 		return value
 	}
-	if value, ok := want.GetState(strings.ToLower(fieldName)); ok {
+	if value, ok := want.getState(strings.ToLower(fieldName)); ok {
 		return value
 	}
 	if fieldName == "TotalProcessed" {
@@ -1062,7 +1062,7 @@ func (t *Target) computeFallbackResult() {
 			totalProcessed += processed
 		}
 	}
-	t.StoreState("result", fmt.Sprintf("processed: %d", totalProcessed))
+	t.storeState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
 	t.StoreLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
 }

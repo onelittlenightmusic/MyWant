@@ -68,13 +68,13 @@ func (bnw *BaseNotifiableWant) handleNotification(notification StateNotification
 		bnw.Want.Metadata.Name, notification.SourceWantName,
 		notification.StateKey, notification.StateValue, notification.NotificationType)
 	notificationKey := fmt.Sprintf("last_notification_%s_%s", notification.SourceWantName, notification.StateKey)
-	bnw.Want.StoreState(notificationKey, notification)
-	bnw.Want.StoreState("last_notification_time", notification.Timestamp)
+	bnw.Want.storeState(notificationKey, notification)
+	bnw.Want.storeState("last_notification_time", notification.Timestamp)
 
 	// Keep count of notifications received
 	countKey := "notification_count"
 	count, _ := bnw.Want.GetStateInt(countKey, 0)
-	bnw.Want.StoreState(countKey, count+1)
+	bnw.Want.storeState(countKey, count+1)
 }
 func (bnw *BaseNotifiableWant) GetNotificationBufferSize() int {
 	return len(bnw.NotificationBuffer)

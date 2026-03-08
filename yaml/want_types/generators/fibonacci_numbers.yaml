@@ -59,13 +59,13 @@ wantType:
     description: Whether the goal has been achieved
     type: bool
     persistent: true
-    label: predefined
+    label: current
     initialValue: false
   - name: achieving_percentage
     description: Progress percentage toward completion
     type: int
     persistent: true
-    label: predefined
+    label: current
     initialValue: 0
   - name: generated_count
     description: Number of values generated in this cycle

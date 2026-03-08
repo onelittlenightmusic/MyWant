@@ -80,12 +80,12 @@ type BaseTravelWant struct {
 // Initialize resets state before execution.
 func (b *BaseTravelWant) Initialize() {
 	if cancelReq, _ := b.GetStateBool("_cancel_requested", false); cancelReq {
-		b.StoreState("completed", false)
+		b.SetCurrent("completed", false)
 		return
 	}
 	thinkerID := conditionThinkerAgentName + "-" + b.Want.Metadata.ID
 	if _, running := b.Want.GetBackgroundAgent(thinkerID); !running {
-		b.StoreState("good_to_reserve", true)
+		b.SetCurrent("good_to_reserve", true)
 	}
 }
 
@@ -101,8 +101,8 @@ func (b *BaseTravelWant) Progress() {
 		b.Want.MergeParentState(map[string]any{
 			"costs": map[string]any{b.Want.Metadata.Name: 0.0},
 		})
-		b.StoreState("_cancel_requested", false)
-		b.StoreState("cancelled", true)
+		b.SetInternal("_cancel_requested", false)
+		b.SetCurrent("cancelled", true)
 		b.StoreLog("[CANCEL] Self-cancelling as requested by itinerary")
 		b.Want.SetStatus(WantStatusCancelled)
 		return
@@ -120,8 +120,8 @@ func (b *BaseTravelWant) Progress() {
 
 	// Try agent execution
 	if schedule := b.executor.tryAgentExecution(); schedule != nil {
-		b.StoreState("completed", true)
-		b.StoreState("final_result", b.executor.formatResult(schedule))
+		b.SetCurrent("completed", true)
+		b.SetCurrent("final_result", b.executor.formatResult(schedule))
 		b.executor.SetSchedule(schedule)
 		return
 	}
@@ -131,8 +131,8 @@ func (b *BaseTravelWant) Progress() {
 	_, connectionAvailable := b.GetFirstOutputChannel()
 	schedule := b.executor.generateSchedule(locals)
 	if schedule != nil {
-		b.StoreState("completed", true)
-		b.StoreState("final_result", b.executor.formatResult(schedule))
+		b.SetCurrent("completed", true)
+		b.SetCurrent("final_result", b.executor.formatResult(schedule))
 		if connectionAvailable {
 			b.Provide(schedule)
 			b.ProvideDone()
@@ -250,7 +250,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 	r.SetCurrent("reservation_duration_hours", rl.Duration.Hours())
 	r.SetCurrent("reservation_name", eventName)
 	r.SetCurrent("schedule_date", baseDate.Format("2006-01-02"))
-	r.SetPredefined("achieving_percentage", 100)
+	r.SetCurrent("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
@@ -316,18 +316,16 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 	h.SetCurrent("check_out_time", event.End.Format("15:04 Jan 2"))
 	h.SetCurrent("stay_duration_hours", event.End.Sub(event.Start).Hours())
 	h.SetCurrent("reservation_name", eventName)
-	h.SetPredefined("achieving_percentage", 100)
+	h.SetCurrent("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
 func (h *HotelWant) SetSchedule(schedule any) {
 	s, ok := schedule.(HotelSchedule)
 	if !ok { if sp, ok := schedule.(*HotelSchedule); ok { s = *sp } else { return } }
-	h.StoreStateMulti(Dict{
-		"hotel_name": s.HotelName,
-		"cost": s.Cost,
-		"reservation_name": s.ReservationName,
-	})
+	h.SetCurrent("hotel_name", s.HotelName)
+	h.SetCurrent("cost", s.Cost)
+	h.SetCurrent("reservation_name", s.ReservationName)
 	h.ProvideDone()
 }
 
@@ -391,14 +389,15 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 	b.SetCurrent("buffet_end_time", event.End.Format("15:04 Jan 2"))
 	b.SetCurrent("buffet_duration_hours", bl.Duration.Hours())
 	b.SetCurrent("reservation_name", eventName)
-	b.SetPredefined("achieving_percentage", 100)
+	b.SetCurrent("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
 func (b *BuffetWant) SetSchedule(schedule any) {
 	s, ok := schedule.(BuffetSchedule)
 	if !ok { if sp, ok := schedule.(*BuffetSchedule); ok { s = *sp } else { return } }
-	b.StoreStateMulti(Dict{"reservation_name": s.ReservationName, "cost": s.Cost})
+	b.SetCurrent("reservation_name", s.ReservationName)
+	b.SetCurrent("cost", s.Cost)
 	b.ProvideDone()
 }
 
@@ -481,7 +480,7 @@ func (f *FlightWant) tryAgentExecution() any {
 		if err := f.ExecuteAgents(); err != nil {
 			return nil
 		}
-		if result := GetPredefined(f, "agent_result", any(nil)); result != nil {
+		if result := GetCurrent(f, "agent_result", any(nil)); result != nil {
 			return f.extractFlightSchedule(result)
 		}
 	}
@@ -557,7 +556,7 @@ func (f *FlightWant) Progress() {
 			f.ExecuteAgents()
 		}
 	case PhaseCompleted:
-		f.SetPredefined("agent_result", nil)
+		f.SetCurrent("agent_result", nil)
 	}
 }
 

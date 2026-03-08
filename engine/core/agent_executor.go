@@ -139,7 +139,7 @@ func (e *WebhookExecutor) executeSyncWebhook(ctx context.Context, agent Agent, w
 	if len(response.StateUpdates) > 0 {
 		want.BeginProgressCycle()
 		for key, value := range response.StateUpdates {
-			want.StoreState(key, value)
+			want.storeState(key, value)
 		}
 		want.EndProgressCycle()
 		log.Printf("[WEBHOOK] Applied %d state updates from DoAgent %s", len(response.StateUpdates), agent.GetName())
@@ -423,7 +423,7 @@ func (e *RPCExecutor) executeGRPCDoAgent(ctx context.Context, agent Agent, want 
 	if len(resp.StateUpdates) > 0 {
 		want.BeginProgressCycle()
 		for key, value := range resp.StateUpdates {
-			want.StoreState(key, value)
+			want.storeState(key, value)
 		}
 		want.EndProgressCycle()
 		log.Printf("[gRPC] Applied %d state updates from DoAgent %s", len(resp.StateUpdates), agent.GetName())

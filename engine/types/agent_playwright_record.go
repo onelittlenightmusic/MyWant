@@ -46,7 +46,7 @@ func monitorPlaywrightRecording(ctx context.Context, want *mywant.Want) (bool, e
 		want.SetCurrent("debugStartWebhookId", want.Metadata.ID+"-debug-start")
 		want.SetCurrent("debugStopWebhookId", want.Metadata.ID+"-debug-stop")
 		want.SetCurrent("replayWebhookId", want.Metadata.ID+"-replay")
-		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+		want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 
 		want.StoreLog("[PLAYWRIGHT-RECORD] Registered webhook IDs: %s-start / %s-stop / %s-debug-start / %s-debug-stop / %s-replay",
 			want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID, want.Metadata.ID)
@@ -203,7 +203,7 @@ func startPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("recording_iframe_url", uiURL)
 	want.SetCurrent("recording_active", true)
 	want.SetPlan("start_recording_requested", false)
-	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
@@ -233,12 +233,12 @@ func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 
 	actionsJSON, _ := json.Marshal(actions)
 	want.SetCurrent("replay_script", script)
-	want.SetPredefined("final_result", script)
+	want.SetCurrent("final_result", script)
 	want.SetCurrent("replay_actions", string(actionsJSON))
 	want.SetCurrent("replay_start_url", startURL)
 	want.SetCurrent("recording_active", false)
 	want.SetPlan("stop_recording_requested", false)
-	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 	
 	want.SetStatus(mywant.WantStatusAchieved)
 	return nil
@@ -301,7 +301,7 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 		// Clear the request flag so we don't keep retrying on a permanent error
 		want.SetPlan("start_debug_recording_requested", false)
 		want.SetCurrent("debug_recording_error", errMsg)
-		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+		want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 		return nil
 	}
 
@@ -316,7 +316,7 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("debug_recording_session_id", sessionID)
 	want.SetCurrent("debug_recording_active", true)
 	want.SetPlan("start_debug_recording_requested", false)
-	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
@@ -346,12 +346,12 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 
 	actionsJSON, _ := json.Marshal(actions)
 	want.SetCurrent("replay_script", script)
-	want.SetPredefined("final_result", script)
+	want.SetCurrent("final_result", script)
 	want.SetCurrent("replay_actions", string(actionsJSON))
 	want.SetCurrent("replay_start_url", startURL)
 	want.SetCurrent("debug_recording_active", false)
 	want.SetPlan("stop_debug_recording_requested", false)
-	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 	
 	if targetObject != nil {
 		want.SetCurrent("target_object", targetObject)
@@ -372,7 +372,7 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 	if err := json.Unmarshal([]byte(actionsJSON), &actions); err != nil || len(actions) == 0 {
 		want.StoreLog("[PLAYWRIGHT-RECORD] No replay_actions available for replay")
 		want.SetPlan("start_replay_requested", false)
-		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+		want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 		return nil
 	}
 
@@ -404,7 +404,7 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("replay_iframe_url", uiURL)
 	want.SetCurrent("replay_active", true)
 	want.SetPlan("start_replay_requested", false)
-	want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 	return nil
 }
 
@@ -413,7 +413,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 	sessionID := mywant.GetCurrent(want, "replay_session_id", "")
 	if sessionID == "" {
 		want.SetCurrent("replay_active", false)
-		want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+		want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 		return true, nil
 	}
 
@@ -447,7 +447,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 			want.SetCurrent("replay_active", false)
 			want.SetCurrent("replay_session_id", "")
 			want.SetCurrent("replay_iframe_url", "")
-			want.SetPredefined("action_by_agent", playwrightRecordAgentName)
+			want.SetCurrent("action_by_agent", playwrightRecordAgentName)
 
 			if inner.Error != "" {
 				want.SetCurrent("replay_error", inner.Error)
@@ -456,7 +456,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 				want.SetCurrent("replay_result", string(replayResultJSON))
 				// Set final_result to the selected_text from the replay result
 				if selectedText, ok := inner.Result["selected_text"].(string); ok && selectedText != "" {
-					want.SetPredefined("final_result", selectedText)
+					want.SetCurrent("final_result", selectedText)
 				}
 				// Move screenshot from MCP-written path to want-specific path
 				if screenshotPath, ok := inner.Result["screenshot_path"].(string); ok && screenshotPath != "" {

@@ -143,7 +143,7 @@ func executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 		return fmt.Errorf("mcp_operation not specified")
 	}
 
-	want.SetPredefined("achieving_percentage", 25)
+	want.SetCurrent("achieving_percentage", 25)
 
 	var result map[string]interface{}
 	if useNative {
@@ -155,8 +155,8 @@ func executeMCPOperation(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.SetCurrent("result", result)
-	want.SetPredefined("final_result", result)
-	want.SetPredefined("achieving_percentage", 100)
+	want.SetCurrent("final_result", result)
+	want.SetCurrent("achieving_percentage", 100)
 	want.ClearPlan("execute_operation")
 
 	return nil

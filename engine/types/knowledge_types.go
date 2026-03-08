@@ -109,7 +109,7 @@ func (k *KnowledgeWant) IsAchieved() bool {
 
 // Progress orchestrates the monitoring and updating of knowledge
 func (k *KnowledgeWant) Progress() {
-	k.SetPredefined("achieving_percentage", k.CalculateAchievingPercentage())
+	k.SetCurrent("achieving_percentage", k.CalculateAchievingPercentage())
 	status := k.GetKnowledgeStatus()
 
 	if status == "fresh" {

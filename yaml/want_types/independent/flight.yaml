@@ -154,12 +154,18 @@ wantType:
     persistent: true
     initialValue: ''
     label: current
+  - name: agent_result
+    description: Result returned by the agent
+    type: any
+    persistent: true
+    initialValue: null
+    label: current
   - name: achieving_percentage
     description: Progress percentage toward completion
     type: int
     persistent: true
     initialValue: 0
-    label: predefined
+    label: current
   - name: flight_id
     description: Flight reservation ID from booking API
     type: string

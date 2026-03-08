@@ -64,26 +64,26 @@ wantType:
     description: Whether the goal has been achieved
     type: bool
     persistent: true
-    label: predefined
+    label: current
     initialValue: false
   - name: achieving_percentage
     description: Progress percentage
     type: int
     persistent: true
-    label: predefined
+    label: current
     initialValue: 0
   - name: start_value
     description: Starting value used for generation
     type: int
     persistent: true
-    label: predefined
+    label: current
     example: 2
     initialValue: 0
   - name: end_value
     description: Ending value used for generation
     type: int
     persistent: true
-    label: predefined
+    label: current
     example: 100
     initialValue: 0
   agents: []

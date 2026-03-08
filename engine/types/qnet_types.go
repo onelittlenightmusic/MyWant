@@ -153,7 +153,7 @@ func (g *Numbers) Progress() {
 		g.SetCurrent("total_wait_time", 0.0)
 		g.SetCurrent("current_time", locals.currentTime)
 		g.SetCurrent("current_count", locals.currentCount)
-		g.SetPredefined("achieving_percentage", achievingPercentage)
+		g.SetCurrent("achieving_percentage", achievingPercentage)
 	}
 
 	g.Provide(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
@@ -161,7 +161,7 @@ func (g *Numbers) Progress() {
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
 		g.StoreLog("[NUMBERS-EXEC] Last packet sent: currentCount=%d >= paramCount=%d", locals.currentCount, paramCount)
-		g.SetPredefined("achieving_percentage", 100)
+		g.SetCurrent("achieving_percentage", 100)
 
 		g.ProvideDone()
 	}
@@ -303,7 +303,7 @@ func (q *Queue) flushBatch(locals *QueueLocals) {
 	q.SetCurrent("total_processed", locals.processedCount)
 	q.SetCurrent("total_wait_time", locals.waitTimeSum)
 	q.SetCurrent("current_server_free_time", locals.serverFreeTime)
-	q.SetPredefined("achieving_percentage", achievingPercentage)
+	q.SetCurrent("achieving_percentage", achievingPercentage)
 }
 
 // OnEnded implements PacketHandler interface for packet termination callbacks
@@ -318,7 +318,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	q.SetCurrent("total_processed", locals.processedCount)
 	q.SetCurrent("total_wait_time", locals.waitTimeSum)
 	q.SetCurrent("current_server_free_time", locals.serverFreeTime)
-	q.SetPredefined("achieving_percentage", 100)
+	q.SetCurrent("achieving_percentage", 100)
 
 	return nil
 }

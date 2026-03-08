@@ -43,13 +43,13 @@ wantType:
     description: Format template used for description
     type: string
     persistent: true
-    label: predefined
+    label: current
     initialValue: ''
   - name: approval_id
     description: Associated approval process ID
     type: string
     persistent: true
-    label: predefined
+    label: current
     example: APR-2024-001
     initialValue: ''
   - name: description

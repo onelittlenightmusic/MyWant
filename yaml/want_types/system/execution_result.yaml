@@ -159,7 +159,7 @@ wantType:
     description: Raw result from ExecutionAgent
     type: object
     persistent: false
-    label: predefined
+    label: current
     initialValue: {}
     example: '{"exit_code": 0, "stdout": "Hello World", "stderr": "", "execution_time_ms": 25, "started_at": "2025-12-24T10:30:45Z", "completed_at": "2025-12-24T10:30:45Z", "success": true}'
 
@@ -167,7 +167,7 @@ wantType:
     description: Progress percentage
     type: int
     persistent: true
-    label: predefined
+    label: current
     initialValue: 0
 
   agents:

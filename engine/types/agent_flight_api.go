@@ -163,7 +163,7 @@ func createFlight(ctx context.Context, want *Want) error {
 	want.SetCurrent("created_at", reservation.CreatedAt.Format(time.RFC3339))
 	want.SetCurrent("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
 	
-	want.SetPredefined("agent_result", FlightSchedule{
+	want.SetCurrent("agent_result", FlightSchedule{
 		DepartureTime:   reservation.DepartureTime,
 		ArrivalTime:     reservation.ArrivalTime,
 		FlightType:      reservation.FlightClass,

@@ -1083,7 +1083,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			Status:   WantStatusFailed,
 			History:  wantConfig.History,
 		}
-		wantPtr.StoreState("error", err.Error())
+		wantPtr.storeState("error", err.Error())
 		wantPtr.InitializeSubscriptionSystem()
 
 		runtimeWant := &runtimeWant{
@@ -1162,7 +1162,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Merge state data if provided
 	stateUpdates := wantConfig.GetAllState()
 	if len(stateUpdates) > 0 {
-		wantPtr.StoreStateMulti(stateUpdates)
+		wantPtr.storeStateMulti(stateUpdates)
 	}
 
 	wantPtr.InitializeSubscriptionSystem()

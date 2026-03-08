@@ -110,7 +110,7 @@ func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 		locals.LastProcessedCount = currentCount
 	}
 
-	want.SetPredefined("achieving_percentage", CalcWebhookPercentage(want, cfg))
+	want.SetCurrent("achieving_percentage", CalcWebhookPercentage(want, cfg))
 }
 
 // IsWebhookAchieved returns true when the webhook status is "stopped".

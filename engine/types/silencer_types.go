@@ -54,7 +54,7 @@ func (s *SilencerWant) CalculateAchievingPercentage() int {
 // Progress implements Progressable for SilencerWant
 func (s *SilencerWant) Progress() {
 	// Update achieving percentage
-	s.SetPredefined("achieving_percentage", s.CalculateAchievingPercentage())
+	s.SetCurrent("achieving_percentage", s.CalculateAchievingPercentage())
 
 	// Try to get a packet from input channels
 	// Use blocking wait (infinite) for stream processing
@@ -67,7 +67,7 @@ func (s *SilencerWant) Progress() {
 	if done {
 		s.StoreLog("📦 Silencer received DONE signal")
 		s.SetCurrent("silencer_phase", "completed")
-		s.SetPredefined("achieving_percentage", 100)
+		s.SetCurrent("achieving_percentage", 100)
 		return
 	}
 

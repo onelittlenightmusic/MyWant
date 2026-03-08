@@ -164,7 +164,7 @@ func (w *Worker) handleAgentServiceExecute(rw http.ResponseWriter, r *http.Reque
 	want := &mywant.Want{
 		Metadata: mywant.Metadata{Name: req.WantID},
 	}
-	want.StoreStateMulti(req.WantState)
+	mywant.StoreStateMulti(want, req.WantState)
 	want.BeginProgressCycle()
 
 	// Execute the agent
@@ -223,7 +223,7 @@ func (w *Worker) handleAgentServiceMonitorExecute(rw http.ResponseWriter, r *htt
 	want := &mywant.Want{
 		Metadata: mywant.Metadata{Name: req.WantID},
 	}
-	want.StoreStateMulti(req.WantState)
+	mywant.StoreStateMulti(want, req.WantState)
 
 	// Set callback configuration
 	want.SetRemoteCallback(req.CallbackURL, req.AgentName)
