@@ -11,11 +11,16 @@ type ActivityFormatter func(schedule interface{}, isRebooking bool) (activity, l
 func executeReservation(want *Want, agentName string, schedule interface{}, formatter ActivityFormatter) error {
 	// 1. Store the full schedule in GCP current state and system metadata
 	want.SetCurrent("reservation_detail", schedule)
-	want.SetPredefined("final_result", schedule)
+	want.SetPredefined("agent_result", schedule)
 
-	// 2. Extract cost and update GCP current state
+	// 2. Extract cost and reservation name
 	cost := extractCostFromSchedule(schedule)
 	want.SetCurrent("actual_cost", cost)
+
+	reservationName := extractReservationNameFromSchedule(schedule)
+	if reservationName != "" {
+		want.SetCurrent("reservation_name", reservationName)
+	}
 
 	// 3. Update status to confirmed in GCP current state
 	want.SetCurrent("res_status", "confirmed")
@@ -29,6 +34,30 @@ func executeReservation(want *Want, agentName string, schedule interface{}, form
 	want.StoreLog("%s", logMsg)
 	
 	return nil
+}
+
+// extractReservationNameFromSchedule tries to extract a ReservationName field from various schedule types.
+func extractReservationNameFromSchedule(schedule interface{}) string {
+	switch s := schedule.(type) {
+	case RestaurantSchedule:
+		return s.ReservationName
+	case BuffetSchedule:
+		return s.ReservationName
+	case HotelSchedule:
+		return s.ReservationName
+	case *RestaurantSchedule:
+		return s.ReservationName
+	case *BuffetSchedule:
+		return s.ReservationName
+	case *HotelSchedule:
+		return s.ReservationName
+	case FlightSchedule:
+		return s.ReservationName
+	case *FlightSchedule:
+		return s.ReservationName
+	default:
+		return ""
+	}
 }
 
 // extractCostFromSchedule tries to extract a Cost field from various schedule types.
@@ -45,6 +74,10 @@ func extractCostFromSchedule(schedule interface{}) float64 {
 	case *BuffetSchedule:
 		return s.Cost
 	case *HotelSchedule:
+		return s.Cost
+	case FlightSchedule:
+		return s.Cost
+	case *FlightSchedule:
 		return s.Cost
 	default:
 		return 0

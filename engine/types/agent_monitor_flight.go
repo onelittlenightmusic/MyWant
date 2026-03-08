@@ -96,7 +96,8 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 				FlightNumber:    reservation.FlightNumber,
 				ReservationName: fmt.Sprintf("Flight %s from %s to %s", reservation.FlightNumber, reservation.From, reservation.To),
 			}
-			want.SetPredefined("final_result", schedule)
+			want.SetCurrent("reservation_name", schedule.ReservationName)
+			want.SetPredefined("agent_result", schedule)
 			
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range statusChangeHistory {

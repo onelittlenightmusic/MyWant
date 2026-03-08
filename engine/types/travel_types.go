@@ -455,7 +455,12 @@ func (f *FlightWant) Initialize() {
 }
 
 func (f *FlightWant) IsAchieved() bool {
-	return f.GetLocals().FlightPhase == PhaseCompleted
+	completed, _ := f.GetStateBool("completed", false)
+	if completed {
+		return true
+	}
+	phase := f.GetLocals().FlightPhase
+	return phase == PhaseMonitoring || phase == PhaseCompleted
 }
 
 type FlightSchedule struct {
@@ -473,7 +478,9 @@ type FlightSchedule struct {
 
 func (f *FlightWant) tryAgentExecution() any {
 	if len(f.Spec.Requires) > 0 {
-		if err := f.ExecuteAgents(); err != nil { return nil }
+		if err := f.ExecuteAgents(); err != nil {
+			return nil
+		}
 		if result := GetPredefined(f, "agent_result", any(nil)); result != nil {
 			return f.extractFlightSchedule(result)
 		}
@@ -485,7 +492,13 @@ func (f *FlightWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 
 func (f *FlightWant) SetSchedule(schedule any) {
 	s, ok := schedule.(FlightSchedule)
-	if !ok { if sp, ok := schedule.(*FlightSchedule); ok { s = *sp } else { return } }
+	if !ok {
+		if sp, ok := schedule.(*FlightSchedule); ok {
+			s = *sp
+		} else {
+			return
+		}
+	}
 	f.SetCurrent("completed", true)
 	f.SetCurrent("reservation_name", s.ReservationName)
 	f.SetCurrent("cost", s.Cost)
@@ -502,7 +515,9 @@ func (f *FlightWant) formatResult(result any) string {
 func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 	var s FlightSchedule
 	data, _ := json.Marshal(result)
-	if err := json.Unmarshal(data, &s); err == nil { return &s }
+	if err := json.Unmarshal(data, &s); err == nil {
+		return &s
+	}
 	return nil
 }
 
@@ -514,13 +529,23 @@ func (f *FlightWant) Progress() {
 	}
 
 	switch locals.FlightPhase {
-	case PhaseInitial: locals.FlightPhase = PhaseBooking
+	case PhaseInitial:
+		locals.FlightPhase = PhaseBooking
 	case PhaseBooking:
-		if res := f.tryAgentExecution(); res != nil {
+		res := f.tryAgentExecution()
+		if res != nil {
 			if s, ok := res.(*FlightSchedule); ok {
 				f.SetSchedule(*s)
 				locals.FlightPhase = PhaseMonitoring
 				locals.monitoringStartTime = time.Now()
+
+				// Ensure status is marked as achieved
+				f.SetCurrent("completed", true)
+				f.SetStatus(WantStatusAchieved)
+				f.ProvideDone()
+
+				// Force parent Target to re-evaluate children status by sending a state update
+				f.MergeParentState(map[string]any{"_child_updated": f.Metadata.Name})
 			}
 		}
 	case PhaseMonitoring:

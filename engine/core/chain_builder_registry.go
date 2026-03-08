@@ -137,6 +137,10 @@ func (cb *ChainBuilder) SetCustomTargetRegistry(registry *CustomTargetTypeRegist
 	cb.customRegistry = registry
 }
 
+func (cb *ChainBuilder) GetCustomTargetRegistry() *CustomTargetTypeRegistry {
+	return cb.customRegistry
+}
+
 func (cb *ChainBuilder) SetConfigInternal(config Config) {
 	cb.config = config
 }
