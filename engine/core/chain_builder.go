@@ -519,18 +519,21 @@ func (cb *ChainBuilder) reconcileWants() {
 		return
 	}
 
-	// Phase 2: CONNECT - Establish want topology
+	// Phase 2: ORPHAN CLEANUP - Remove child wants whose parent no longer exists
+	cb.orphanCleanupPhase()
+
+	// Phase 3: CONNECT - Establish want topology
 	if err := cb.connectPhase(); err != nil {
 		return
 	}
 
-	// Phase 3: START - Launch new/updated wants
+	// Phase 4: START - Launch new/updated wants
 	cb.startPhase()
 
-	// Phase 4: ACCESS - Build structural state access index (Dictionary)
+	// Phase 5: ACCESS - Build structural state access index (Dictionary)
 	cb.buildStateAccessIndex()
 
-	// Phase 5: CORRELATE - Annotate changed Wants with inter-Want correlation
+	// Phase 6: CORRELATE - Annotate changed Wants with inter-Want correlation
 	cb.correlationPhase()
 }
 
@@ -1321,6 +1324,39 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 		default:
 			// Channel already has a pending trigger, skip
 		}
+	}
+}
+
+// orphanCleanupPhase removes child wants whose parent want no longer exists in runtime.
+// A want is considered an orphan if it has a controlling OwnerReference (Kind="Want",
+// Controller=true) pointing to a parent ID that is no longer present in cb.wants.
+func (cb *ChainBuilder) orphanCleanupPhase() {
+	// Build a set of all currently existing want IDs for O(1) lookup
+	existingIDs := make(map[string]struct{}, len(cb.wants))
+	for _, rw := range cb.wants {
+		existingIDs[rw.want.Metadata.ID] = struct{}{}
+	}
+
+	// Collect orphan IDs (separate pass to avoid mutating map during iteration)
+	var orphanIDs []string
+	for _, rw := range cb.wants {
+		for _, ownerRef := range rw.want.Metadata.OwnerReferences {
+			if ownerRef.Kind == "Want" && ownerRef.Controller {
+				if _, parentExists := existingIDs[ownerRef.ID]; !parentExists {
+					log.Printf("[ORPHAN-CLEANUP] Orphan want '%s' (id=%s) detected: parent '%s' (id=%s) no longer exists. Scheduling deletion.\n",
+						rw.want.Metadata.Name, rw.want.Metadata.ID,
+						ownerRef.Name, ownerRef.ID)
+					orphanIDs = append(orphanIDs, rw.want.Metadata.ID)
+					break // one controlling owner is enough to mark as orphan
+				}
+			}
+		}
+	}
+
+	// Delete orphans
+	for _, orphanID := range orphanIDs {
+		cb.deleteWantByID(orphanID)
+		log.Printf("[ORPHAN-CLEANUP] Deleted orphan want id=%s\n", orphanID)
 	}
 }
 
