@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	. "mywant/engine/core"
+	"strings"
 	"time"
 )
 
@@ -62,18 +63,53 @@ func generateBuffetSchedule(want *Want) BuffetSchedule {
 	durationHours := GenerateRandomDuration(2.0, 4.0)
 
 	buffetType := want.GetStringParam("buffet_type", "international")
+	buffetName := generateRealisticBuffetName(buffetType)
 	buffetCost := generateBuffetCost(buffetType)
 	premiumLevel := want.GetStringParam("premium_level", "premium")
 	serviceTier := want.GetStringParam("service_tier", "premium")
 
-	return BuffetSchedule{
+	reservationName := fmt.Sprintf("%s (%s buffet)", buffetName, buffetType)
+	schedule := BuffetSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,
 		BuffetType:       buffetType,
-		ReservationName:  fmt.Sprintf("%s reservation at %s buffet", want.Metadata.Name, buffetType),
+		ReservationName:  reservationName,
 		Cost:             buffetCost,
 		PremiumLevel:     premiumLevel,
 		ServiceTier:      serviceTier,
 		PremiumAmenities: []string{"premium_stations", "chef_interaction", "unlimited_beverages"},
 	}
+
+	want.SetCurrent("reservation_name", reservationName)
+	want.SetCurrent("buffet_type", buffetType)
+	want.SetCurrent("buffet_start_time", reservationTime.Format("15:04 Jan 2"))
+	want.SetCurrent("buffet_end_time", reservationTime.Add(time.Duration(durationHours*float64(time.Hour))).Format("15:04 Jan 2"))
+	want.SetCurrent("buffet_duration_hours", durationHours)
+
+	return schedule
+}
+
+func generateRealisticBuffetName(buffetType string) string {
+	names := map[string][]string{
+		"continental": {
+			"The Continental Breakfast", "Morning Spread Buffet", "Continental Sunrise",
+			"Classic Breakfast House", "The Morning Table",
+		},
+		"international": {
+			"World Flavors Buffet", "Global Taste", "International Feast",
+			"The Passport Cafe", "Around the World Dining",
+		},
+		"asian": {
+			"Asian Cuisine Buffet", "Dragon's Feast", "The Orient Express",
+			"Asian Spice Buffet", "East Meets Plate",
+		},
+		"mediterranean": {
+			"Mediterranean Buffet", "The Greek Table", "Olive & Vine",
+			"Mediterranean Feast", "The Coastline",
+		},
+	}
+	if list, ok := names[strings.ToLower(buffetType)]; ok && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+	return names["continental"][rand.Intn(len(names["continental"]))]
 }

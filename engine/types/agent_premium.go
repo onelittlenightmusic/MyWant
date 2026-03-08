@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	. "mywant/engine/core"
+	"strings"
 	"time"
 )
 
@@ -61,18 +62,54 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 	checkOutTime := checkInTime.Add(time.Duration(GenerateRandomDuration(12.0, 24.0) * float64(time.Hour)))
 
 	hotelType := want.GetStringParam("hotel_type", "luxury")
+	hotelName := generateRealisticHotelName(hotelType)
 	hotelCost := generateHotelCost(hotelType)
 	premiumLevel := want.GetStringParam("premium_level", "premium")
 	serviceTier := want.GetStringParam("service_tier", "premium")
 
-	return HotelSchedule{
+	schedule := HotelSchedule{
 		CheckInTime:       checkInTime,
 		CheckOutTime:      checkOutTime,
+		HotelName:         hotelName,
 		HotelType:         hotelType,
-		ReservationName:   fmt.Sprintf("%s stay at %s hotel", want.Metadata.Name, hotelType),
+		ReservationName:   fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
 		Cost:              hotelCost,
 		PremiumLevel:      premiumLevel,
 		ServiceTier:       serviceTier,
 		PremiumAmenities:  []string{"spa_access", "concierge_service", "room_upgrade"},
 	}
+
+	want.SetCurrent("hotel_name", hotelName)
+	want.SetCurrent("reservation_name", schedule.ReservationName)
+	want.SetCurrent("hotel_type", hotelType)
+	want.SetCurrent("check_in_time", checkInTime.Format("15:04 Jan 2"))
+	want.SetCurrent("check_out_time", checkOutTime.Format("15:04 Jan 2"))
+	want.SetCurrent("stay_duration_hours", checkOutTime.Sub(checkInTime).Hours())
+
+	return schedule
+}
+
+func generateRealisticHotelName(hotelType string) string {
+	names := map[string][]string{
+		"luxury": {
+			"The Grand Plaza", "Royal Palace Hotel", "Platinum Suites", "Signature Towers",
+			"The Ritz Collection", "Prestige Residences", "Crown Jewel Hotel", "Luxury Haven",
+		},
+		"standard": {
+			"City Central Hotel", "Comfort Inn Express", "Downtown Plaza", "Urban Oasis",
+			"Gateway Hotel", "The Meridian", "Riverside Inn", "Sunrise Hotel",
+		},
+		"budget": {
+			"Budget Stay Inn", "Economy Hotel", "Value Lodge", "Basic Inn",
+			"The Affordable", "Quick Stop Hotel", "Smart Stay", "City Budget",
+		},
+		"boutique": {
+			"Artistic House", "Heritage Inn", "Boutique Noir", "Cultural Quarters",
+			"The Artisan Hotel", "Signature Boutique", "Modern Spaces", "Unique Stay",
+		},
+	}
+	if list, ok := names[strings.ToLower(hotelType)]; ok && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+	return names["standard"][rand.Intn(len(names["standard"]))]
 }

@@ -230,13 +230,23 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 	baseDate := time.Now().AddDate(0, 0, 1)
 	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local)
-	name := generateRealisticRestaurantNameForTravel(rl.RestaurantType)
+	restaurantName := generateRealisticRestaurantName(rl.RestaurantType)
+	partySize := r.GetIntParam("party_size", 2)
+	eventName := fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, rl.RestaurantType)
 	event := TimeSlot{
 		Start: dinnerStart,
 		End:   dinnerStart.Add(rl.Duration),
 		Type:  "restaurant",
-		Name:  name,
+		Name:  eventName,
 	}
+	r.SetCurrent("total_processed", 1)
+	r.SetCurrent("reservation_type", rl.RestaurantType)
+	r.SetCurrent("reservation_start_time", event.Start.Format("15:04"))
+	r.SetCurrent("reservation_end_time", event.End.Format("15:04"))
+	r.SetCurrent("reservation_duration_hours", rl.Duration.Hours())
+	r.SetCurrent("reservation_name", eventName)
+	r.SetCurrent("schedule_date", baseDate.Format("2006-01-02"))
+	r.SetPredefined("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
@@ -293,8 +303,16 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 	hl, ok := locals.(*HotelWantLocals)
 	if !ok { return nil }
 	baseDate := time.Now().AddDate(0, 0, 1)
-	name := generateRealisticHotelNameForTravel(hl.HotelType)
-	event := TimeSlot{Start: baseDate.Add(hl.CheckIn), End: baseDate.AddDate(0, 0, 1).Add(hl.CheckOut), Type: "hotel", Name: name}
+	hotelName := generateRealisticHotelName(hl.HotelType)
+	eventName := fmt.Sprintf("%s (%s hotel)", hotelName, hl.HotelType)
+	event := TimeSlot{Start: baseDate.Add(hl.CheckIn), End: baseDate.AddDate(0, 0, 1).Add(hl.CheckOut), Type: "hotel", Name: eventName}
+	h.SetCurrent("total_processed", 1)
+	h.SetCurrent("hotel_type", hl.HotelType)
+	h.SetCurrent("check_in_time", event.Start.Format("15:04 Jan 2"))
+	h.SetCurrent("check_out_time", event.End.Format("15:04 Jan 2"))
+	h.SetCurrent("stay_duration_hours", event.End.Sub(event.Start).Hours())
+	h.SetCurrent("reservation_name", eventName)
+	h.SetPredefined("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
@@ -358,8 +376,18 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 	bl, ok := locals.(*BuffetWantLocals)
 	if !ok { return nil }
 	baseDate := time.Now().AddDate(0, 0, 2)
-	name := generateRealisticBuffetNameForTravel(bl.BuffetType)
-	event := TimeSlot{Start: baseDate, End: baseDate.Add(bl.Duration), Type: "buffet", Name: name}
+	buffetName := generateRealisticBuffetName(bl.BuffetType)
+	eventName := fmt.Sprintf("%s (%s buffet)", buffetName, bl.BuffetType)
+	buffetStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
+		8+rand.Intn(2), rand.Intn(30), 0, 0, time.Local)
+	event := TimeSlot{Start: buffetStart, End: buffetStart.Add(bl.Duration), Type: "buffet", Name: eventName}
+	b.SetCurrent("total_processed", 1)
+	b.SetCurrent("buffet_type", bl.BuffetType)
+	b.SetCurrent("buffet_start_time", event.Start.Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_end_time", event.End.Format("15:04 Jan 2"))
+	b.SetCurrent("buffet_duration_hours", bl.Duration.Hours())
+	b.SetCurrent("reservation_name", eventName)
+	b.SetPredefined("achieving_percentage", 100)
 	return &TravelSchedule{Date: baseDate, Events: []TimeSlot{event}, Completed: true}
 }
 
@@ -509,7 +537,3 @@ func (f *FlightWant) Progress() {
 	}
 }
 
-// Helpers
-func generateRealisticRestaurantNameForTravel(t string) string { return t + " Palace" }
-func generateRealisticHotelNameForTravel(t string) string { return t + " Inn" }
-func generateRealisticBuffetNameForTravel(t string) string { return t + " Spread" }

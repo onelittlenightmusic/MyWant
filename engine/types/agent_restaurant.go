@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	. "mywant/engine/core"
+	"strings"
 	"time"
 )
 
@@ -61,18 +62,57 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 	durationHours := 2.5
 
 	cuisineType := want.GetStringParam("restaurant_type", "fine dining")
+	restaurantName := generateRealisticRestaurantName(cuisineType)
 	restaurantCost := generateRestaurantCost(cuisineType)
 	premiumLevel := want.GetStringParam("premium_level", "premium")
 	serviceTier := want.GetStringParam("service_tier", "premium")
+	partySize := want.GetIntParam("party_size", 2)
 
-	return RestaurantSchedule{
+	reservationName := fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, cuisineType)
+	schedule := RestaurantSchedule{
 		ReservationTime:  reservationTime,
 		DurationHours:    durationHours,
 		RestaurantType:   cuisineType,
-		ReservationName:  fmt.Sprintf("%s dinner at %s restaurant", want.Metadata.Name, cuisineType),
+		ReservationName:  reservationName,
 		Cost:             restaurantCost,
 		PremiumLevel:     premiumLevel,
 		ServiceTier:      serviceTier,
 		PremiumAmenities: []string{"window_seat", "sommelier_service", "complimentary_aperitif"},
 	}
+
+	want.SetCurrent("reservation_name", reservationName)
+	want.SetCurrent("reservation_type", cuisineType)
+	want.SetCurrent("reservation_start_time", reservationTime.Format("15:04"))
+	want.SetCurrent("reservation_end_time", reservationTime.Add(time.Duration(durationHours*float64(time.Hour))).Format("15:04"))
+	want.SetCurrent("reservation_duration_hours", durationHours)
+
+	return schedule
+}
+
+func generateRealisticRestaurantName(cuisineType string) string {
+	names := map[string][]string{
+		"fine dining": {
+			"L'Élégance", "The Michelin House", "Le Bernardin", "Per Se", "The French Laundry",
+			"Alinea", "The Ledbury", "Noma", "Chef's Table", "Sous Vide",
+		},
+		"casual": {
+			"The Garden Bistro", "Rustic Table", "Harvest Kitchen", "Homestead",
+			"The Local Taste", "Farm to Fork", "Urban Eats", "Downtown Cafe",
+		},
+		"buffet": {
+			"The Buffet House", "All You Can Eat Palace", "Golden Buffet", "Celebration Buffet",
+		},
+		"steakhouse": {
+			"The Prime Cut", "Bone & Barrel", "Wagyu House", "The Smokehouse",
+			"Texas Grill", "The Cattleman's", "Ribeye Room",
+		},
+		"seafood": {
+			"The Lobster Cove", "Catch of the Day", "The Oyster House", "Sea Pearl",
+			"Harbor View", "Dockside Grille", "The Fish House", "Captain's Table",
+		},
+	}
+	if list, ok := names[strings.ToLower(cuisineType)]; ok && len(list) > 0 {
+		return list[rand.Intn(len(list))]
+	}
+	return names["fine dining"][rand.Intn(len(names["fine dining"]))]
 }
