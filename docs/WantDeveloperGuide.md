@@ -422,6 +422,72 @@ Goのコード内では文字列キーでステートにアクセスするため
     w.MergeParentState(map[string]any{"goal_achieved": true})
     ```
 
+## State ラベル 読み書き権限表
+
+Wantのステート管理には5種類のラベルがあり、**誰が読み書きできるかが厳密に決まっています**。
+ラベルに対応したAPI以外での読み書きはサイレントに無視されます。
+
+### 権限表
+
+| ラベル | YAML `label:` | 書ける主体 | 読める主体 | SyncLocalsState の扱い | 主な用途 |
+|--------|--------------|-----------|-----------|------------------------|---------|
+| **goal** | `goal` | `Initialize()` のみ | Progress() / Agent | 読み込みのみ (state→struct) | 外部から与えられた目標値。一度セットしたら変更しない |
+| **current** | `current` | Progress() / **外部エージェント** / MergeParentState | Progress() / Agent / 親Want | 読み込みのみ (state→struct) | 現在の観測可能な状態。**外部から更新される値はここ** |
+| **plan** | `plan` | **ThinkAgent のみ** | Progress() | 読み込みのみ (state→struct) | ThinkAgent が出力する計画（`directions` など） |
+| **internal** | Locals struct tag | **Progress() 経由の Locals のみ** | Progress() のみ | 読み書き両方 (state↔struct) | Progress() が排他的に管理するステートマシンの内部状態 |
+| **predefined** | — (YAML 不要) | フレームワーク / Progress() | 誰でも | 対象外 | `achieving_percentage`, `final_result` などシステム予約フィールド |
+
+### internal ラベルの制約（重要）
+
+`internal` は `SyncLocalsState(false)`（Progress後）が **Locals の全フィールドを state に上書き** するため、
+Locals に含めたフィールドは「Progress() が唯一の書き込み主体」になります。
+
+```
+Progress()実行前: SyncLocalsState(state → Locals)  ← 外部の最新値を読み込む
+Progress()実行
+Progress()実行後: SyncLocalsState(Locals → state)  ← Locals の値で state を上書き ⚠️
+```
+
+**外部エージェントが `SetInternal` で書いても、次の Progress サイクルで Locals の古い値に上書きされます。**
+これが `internal` を外部エージェントが使えない理由です。
+
+### どのラベルを使うべきか
+
+```
+外部エージェント（DoAgent / ThinkAgent）が書く値
+  → label: current  （YAML に定義、SetCurrent / GetCurrent を使用）
+
+Progress() だけが読み書きする内部状態
+  → Locals struct のフィールドに mywant:"internal,key_name" タグで定義
+
+別 Want から MergeParentState で書かれる値（例: コスト集計）
+  → label: current  （Locals には絶対に含めない）
+
+外部から一度だけ与えられる目標値
+  → label: goal  （Initialize() で SetGoal）
+
+ThinkAgent が出力する計画
+  → label: plan  （SetPlan / GetPlan）
+```
+
+### API 早見表
+
+| API | ラベル要件 | 主な呼び出し元 |
+|-----|-----------|--------------|
+| `want.SetGoal(key, val)` | YAML `label: goal` | `Initialize()` |
+| `want.GetGoal(key)` | YAML `label: goal` | Progress() / Agent |
+| `want.SetCurrent(key, val)` | YAML `label: current` | Progress() / 外部Agent |
+| `want.GetCurrent(key)` | YAML `label: current` | Progress() / 外部Agent |
+| `want.SetPlan(key, val)` | YAML `label: plan` | ThinkAgent |
+| `want.GetPlan(key)` | YAML `label: plan` | Progress() |
+| `want.SetInternal(key, val)` | Locals struct tag のみ | Progress()（Locals 経由） |
+| `want.GetInternal(key)` | Locals struct tag のみ | Progress()（Locals 経由） |
+| `want.SetPredefined(key, val)` | 不要 | Progress() / フレームワーク |
+| `want.StoreState(key, val)` | 不要（ラベルチェックなし） | フレームワーク内部のみ（非推奨） |
+| `GetState[T](want, key, def)` | 不要（ラベルチェックなし） | ユーティリティ（`ShouldRunAgent` など） |
+| `want.MergeParentState(map)` | 親側の定義に依存 | Agent / Progress() |
+| `want.GetParentState(key)` | 親側の定義に依存 | Progress() |
+
 ## 参考資料
 
 - [want-system.md](want-system.md) - Want システムの全体像
