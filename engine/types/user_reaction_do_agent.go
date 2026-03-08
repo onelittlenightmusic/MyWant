@@ -13,7 +13,7 @@ func init() {
 func performAutoApproval(ctx context.Context, want *Want) error {
 	want.StoreLog("[SILENCER:DO] Starting auto-approval check")
 	
-	reactionID := GetInternal(want, "target_reaction_id", "")
+	reactionID := GetCurrent(want, "target_reaction_id", "")
 	
 	if reactionID == "" {
 		want.StoreLog("[SILENCER:DO] No target reaction ID found")
@@ -36,7 +36,7 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 	if resp.StatusCode != 200 { return fmt.Errorf("status %d", resp.StatusCode) }
 
 	want.StoreLog("[SILENCER:DO] Approved reaction %s", reactionID)
-	want.SetInternal("target_reaction_id", "")
+	want.SetCurrent("target_reaction_id", "")
 
 	return nil
 }

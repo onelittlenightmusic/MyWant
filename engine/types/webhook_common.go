@@ -14,7 +14,6 @@ type WebhookLocals struct {
 	// State fields (auto-synced)
 	WebhookSecret string `mywant:"internal,webhook_secret"`
 	ChannelFilter string `mywant:"internal,channel_filter"`
-	WebhookUrl    string `mywant:"current,webhook_url"`
 }
 
 // WebhookWantConfig defines per-webhook-type prefixes and names used by the common helpers.
@@ -61,8 +60,8 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 	locals.WebhookSecret = want.GetStringParam(cfg.SecretParamName, "")
 	locals.ChannelFilter = want.GetStringParam("channel_filter", "")
 	locals.LastProcessedCount = 0
-	locals.WebhookUrl = fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name)
 	
+	want.SetCurrent("webhook_url", fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name))
 	want.SetCurrent(cfg.StatusKey(), "active")
 	want.SetCurrent(cfg.MessagesKey(), []any{})
 	want.SetCurrent(cfg.MessageCountKey(), 0)

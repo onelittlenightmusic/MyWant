@@ -371,24 +371,21 @@ func SyncLocalsState(n *Want, locals any, toStruct bool) {
 			n.StateLabels[stateKey] = LabelInternal
 			label = LabelInternal
 		}
-		isCurrent := (label == LabelCurrent)
-
 		if toStruct {
-			// Copy from State to Struct (try GetState directly)
-			if stateVal, ok := n.GetState(stateKey); ok {
-				setFieldValue(field, stateVal)
+			// Copy from State to Struct ONLY for internal labels.
+			// Current, Goal, etc. must be accessed via GetCurrent(), GetGoal() etc.
+			if label == LabelInternal {
+				if stateVal, ok := n.GetState(stateKey); ok {
+					setFieldValue(field, stateVal)
+				}
 			}
 		} else {
-			// Copy from Struct to State
-			if field.CanInterface() {
-				structVal := field.Interface()
-				if isCurrent {
-					n.SetCurrent(stateKey, structVal)
-				} else {
-					// Directly store internal state. Since we just registered it
-					// in StateLabels above, this is now a valid internal field.
-					n.SetInternal(stateKey, structVal)
-				}
+			// Copy from Struct to State ONLY for internal labels.
+			// Goal, Plan, Current, etc. should be updated explicitly via SetCurrent() etc.
+			// to avoid accidental overwrites of state that might have been updated by agents
+			// or other external entities during the Progress() cycle.
+			if label == LabelInternal && field.CanInterface() {
+				n.SetInternal(stateKey, field.Interface())
 			}
 		}
 	}
@@ -441,5 +438,16 @@ func setFieldValue(field reflect.Value, value any) {
 	if field.Kind() == reflect.String {
 		field.SetString(ToString(value, ""))
 		return
+	}
+	if field.Kind() == reflect.Bool {
+		field.SetBool(ToBool(value, false))
+		return
+	}
+	if field.Kind() == reflect.Map && field.Type().Key().Kind() == reflect.String {
+		// Handle map[string]any assignment
+		if m, ok := value.(map[string]any); ok {
+			field.Set(reflect.ValueOf(m))
+			return
+		}
 	}
 }

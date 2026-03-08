@@ -59,6 +59,10 @@ type ScheduleConflict struct {
 // TravelWantLocalsInterface is a marker interface for all travel want locals
 type TravelWantLocalsInterface any
 
+type BaseTravelWantLocals struct {
+	// Common fields for travel want locals
+}
+
 // TravelWantInterface defines methods that specific travel wants must implement
 type TravelWantInterface interface {
 	tryAgentExecution() any // Returns *RestaurantSchedule, *HotelSchedule, or *BuffetSchedule
@@ -407,11 +411,8 @@ func (b *BuffetWant) formatResult(result any) string {
 
 // FlightWant Implementation
 type FlightWantLocals struct {
-	FlightType          string
-	Duration            time.Duration
-	DepartureDate       string
+	BaseTravelWantLocals
 	monitoringStartTime time.Time
-	monitoringDuration  time.Duration
 	lastLogTime         time.Time
 	monitoringDone      chan struct{}
 
@@ -419,8 +420,7 @@ type FlightWantLocals struct {
 	// Only FlightPhase is internal (Progress() owns it exclusively).
 	// Agent-written fields (_previous_flight_id, _previous_flight_status, monitor_state_hash,
 	// attempted) are registered as label:current in flight.yaml and accessed via SetCurrent/GetCurrent.
-	FlightPhase     string `mywant:"internal,_flight_phase"`
-	LastLoggedPhase string `mywant:"current,last_logged_phase"`
+	FlightPhase string `mywant:"internal,_flight_phase"`
 }
 
 type StatusChange struct {
@@ -523,9 +523,10 @@ func (f *FlightWant) extractFlightSchedule(result any) *FlightSchedule {
 
 func (f *FlightWant) Progress() {
 	locals := f.GetLocals()
-	if locals.LastLoggedPhase != locals.FlightPhase {
+	lastLoggedPhase := GetCurrent(f, "last_logged_phase", "")
+	if lastLoggedPhase != locals.FlightPhase {
 		f.StoreLog("[FLIGHT] Phase: %s", locals.FlightPhase)
-		locals.LastLoggedPhase = locals.FlightPhase
+		f.SetCurrent("last_logged_phase", locals.FlightPhase)
 	}
 
 	switch locals.FlightPhase {

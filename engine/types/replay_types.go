@@ -30,8 +30,14 @@ type ReplayLocals struct {
 	ReplaySessionId              string `mywant:"internal,replay_session_id"`
 
 	// Fields from YAML (Current)
-	RecordingActive bool   `mywant:"current,recording_active"`
-	ReplayScript    string `mywant:"current,replay_script"`
+}
+
+func (r *ReplayWant) IsRecordingActive() bool {
+	return GetCurrent(r, "recording_active", false)
+}
+
+func (r *ReplayWant) GetReplayScript() string {
+	return GetCurrent(r, "replay_script", "")
 }
 
 // ReplayWant represents a browser recording want driven by the playwright_record_monitor agent
@@ -64,6 +70,10 @@ func (r *ReplayWant) Initialize() {
 	locals.ReplayWebhookId = ""
 	locals.StartReplayRequested = false
 	locals.ReplaySessionId = ""
+
+	// Ensure current state is cleared
+	r.SetCurrent("recording_active", false)
+	r.SetCurrent("replay_script", "")
 
 	typeDef := r.WantTypeDefinition
 	if typeDef == nil || len(typeDef.MonitorCapabilities) == 0 {
@@ -99,7 +109,7 @@ func (r *ReplayWant) Initialize() {
 
 // IsAchieved returns true when a replay script has been recorded
 func (r *ReplayWant) IsAchieved() bool {
-	return r.GetLocals().ReplayScript != ""
+	return r.GetReplayScript() != ""
 }
 
 // CalculateAchievingPercentage returns progress percentage
@@ -108,7 +118,7 @@ func (r *ReplayWant) CalculateAchievingPercentage() int {
 	if r.IsAchieved() || r.Status == WantStatusAchieved {
 		return 100
 	}
-	if locals.RecordingActive {
+	if r.IsRecordingActive() {
 		return 50
 	}
 	if locals.StartWebhookId != "" {
