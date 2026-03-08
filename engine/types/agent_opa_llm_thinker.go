@@ -53,11 +53,13 @@ func (o *OpaLLMPlannerWant) Progress() {}
 // and stores the resulting actions back to state. It uses a hash to skip execution
 // when neither goal nor current have changed since the last run.
 func opaLLMThinkerThink(ctx context.Context, want *Want) error {
-	// Step 1: Read goal and current from state
-	goalRaw := GetGoal(want, "goal", map[string]any{})
-	currentRaw := GetCurrent(want, "current", map[string]any{})
-	if len(goalRaw) == 0 || len(currentRaw) == 0 {
-		// Inputs not yet available; wait for next tick
+	// Step 1: Collect all goal-labeled and current-labeled state fields, then
+	// merge their values into flat maps so OPA sees input.goal.X / input.current.X
+	// directly (not input.goal.<fieldName>.X).
+	goalRaw := mergeOPAInput(want.GetAllGoal())
+	currentRaw := mergeOPAInput(want.GetAllCurrent())
+	if len(goalRaw) == 0 {
+		// Goal not yet available; wait for next tick
 		return nil
 	}
 
@@ -142,4 +144,22 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 
 	return nil
+}
+
+// mergeOPAInput flattens a map of labeled state fields into a single map for OPA input.
+// Map-valued fields have their contents merged in (supporting the blob-per-field pattern),
+// so OPA sees input.goal.X / input.current.X directly rather than input.goal.<fieldName>.X.
+// Scalar-valued fields are included by their field name as-is.
+func mergeOPAInput(all map[string]any) map[string]any {
+	result := make(map[string]any, len(all))
+	for k, v := range all {
+		if m, ok := v.(map[string]any); ok {
+			for mk, mv := range m {
+				result[mk] = mv
+			}
+		} else {
+			result[k] = v
+		}
+	}
+	return result
 }

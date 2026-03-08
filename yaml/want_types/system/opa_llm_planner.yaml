@@ -103,5 +103,14 @@ wantType:
     initialValue: []
     example: '[{"type": "start_service", "target": "my-app"}]'
 
+  - name: opa_input_hash
+    description: |
+      MD5 hash of the last OPA input (goal + current) used for change detection.
+      The thinker skips planning when this hash matches the current input.
+    type: string
+    persistent: false
+    label: current
+    initialValue: ""
+
   requires:
     - opa_llm_planning

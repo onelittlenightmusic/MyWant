@@ -1597,6 +1597,35 @@ func (n *Want) GetCurrent(key string) (any, bool) {
 	return nil, false
 }
 
+// GetAllCurrent returns all state entries whose label is LabelCurrent.
+func (n *Want) GetAllCurrent() map[string]any {
+	return n.getAllByLabel(LabelCurrent)
+}
+
+// GetAllGoal returns all state entries whose label is LabelGoal.
+func (n *Want) GetAllGoal() map[string]any {
+	return n.getAllByLabel(LabelGoal)
+}
+
+// GetAllPlan returns all state entries whose label is LabelPlan.
+func (n *Want) GetAllPlan() map[string]any {
+	return n.getAllByLabel(LabelPlan)
+}
+
+// getAllByLabel collects all state key-value pairs registered under the given label.
+func (n *Want) getAllByLabel(label StateLabel) map[string]any {
+	result := make(map[string]any)
+	for key, l := range n.StateLabels {
+		if l != label {
+			continue
+		}
+		if val, ok := n.getState(key); ok {
+			result[key] = val
+		}
+	}
+	return result
+}
+
 func (n *Want) SetPlan(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
 		n.storeState(key, value)
