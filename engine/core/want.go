@@ -517,6 +517,16 @@ func (n *Want) EndProgressCycle() {
 		}
 	}
 
+	// Propagate final_result to parent (or global) state by merging into the
+	// "wants" map under the child's name.  Using MergeParentState preserves
+	// results from sibling wants and follows the same parent/global fallback
+	// pattern used by Thinker agents.
+	if finalResult, ok := n.getState("final_result"); ok && finalResult != nil {
+		n.MergeParentState(map[string]any{
+			"wants": map[string]any{n.Metadata.Name: finalResult},
+		})
+	}
+
 	n.inExecCycle = false
 }
 

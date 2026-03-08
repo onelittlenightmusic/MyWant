@@ -79,6 +79,16 @@ wantType:
     example: 50
     label: current
 
+  - name: webhook_url
+    description: Webhook endpoint URL for this want (POST to this path to deliver events)
+    type: string
+    persistent: true
+    initialValue: ""
+    example: "/api/v1/webhooks/teams-inbox"
+    label: current
+
+  finalResultField: webhook_url
+
   connectivity:
     outputs:
     - name: teams_messages
