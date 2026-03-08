@@ -288,7 +288,7 @@ func ShouldRunAgent(want *Want, hashKey string, inputs ...any) (bool, string) {
 	}
 
 	hash := fmt.Sprintf("%x", md5.Sum(combined))
-	prevHash := GetInternal(want, hashKey, "")
+	prevHash := GetState[string](want, hashKey, "")
 
 	return prevHash != hash, hash
 }

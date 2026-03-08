@@ -38,13 +38,6 @@ func (o *ItineraryWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
-	// Register externally-written internal keys in StateLabels so that
-	// SetInternal/GetInternal work correctly. These fields are NOT in
-	// ItineraryLocals to avoid SyncLocalsState(false) clobbering them.
-	if o.StateLabels == nil {
-		o.StateLabels = make(map[string]StateLabel)
-	}
-	o.StateLabels["_opa_input_hash"] = LabelInternal
 }
 
 func (o *ItineraryWant) IsAchieved() bool {
@@ -79,7 +72,7 @@ func (o *ItineraryWant) Progress() {
 		}
 	}
 
-	if GetInternal(o, "_opa_input_hash", "") != "" {
+	if GetCurrent(o, "opa_input_hash", "") != "" {
 		achieved := len(directions) == 0
 		locals.GoalAchieved = achieved
 		

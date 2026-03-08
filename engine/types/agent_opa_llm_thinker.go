@@ -62,7 +62,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	// Step 2: Change detection via helper
-	shouldRun, inputHash := ShouldRunAgent(want, "_opa_input_hash", goalRaw, currentRaw)
+	shouldRun, inputHash := ShouldRunAgent(want, "opa_input_hash", goalRaw, currentRaw)
 	if !shouldRun {
 		return nil
 	}
@@ -138,7 +138,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	}
 
 	want.SetPlan("directions", directionTypes)
-	want.SetInternal("_opa_input_hash", inputHash)
+	want.SetCurrent("opa_input_hash", inputHash)
 	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 
 	return nil
