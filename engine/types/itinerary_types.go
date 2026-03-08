@@ -18,7 +18,9 @@ type ItineraryLocals struct {
 	DispatchedDirections map[string]any `mywant:"internal,dispatched_directions"`
 	OpaInputHash         string         `mywant:"internal,_opa_input_hash"`
 	LastSuggested        []string       `mywant:"internal,_last_suggested"`
-	Costs                map[string]any `mywant:"internal,costs"`
+	// Costs is intentionally excluded: it is managed externally via MergeParentState
+	// from child wants (e.g. BudgetWant). Including it here would cause SyncLocalsState
+	// to overwrite the externally-set costs with stale values every cycle.
 }
 
 type ItineraryWant struct {
