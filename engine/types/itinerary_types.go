@@ -59,7 +59,7 @@ func (o *ItineraryWant) Progress() {
 			if val, ok := o.GetParentState(k); ok { updates[k] = val }
 		}
 	}
-	
+
 	if len(updates) > 0 { o.mergeCurrent(updates) }
 
 	directions := GetPlan(o, "directions", []string{})

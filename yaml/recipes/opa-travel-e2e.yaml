@@ -69,26 +69,55 @@ recipe:
       type: object
       persistent: true
       initialValue: {}
+      label: current
     - name: directions
       description: List of suggested planning directions
       type: object
       persistent: true
       initialValue: []
+      label: current
     - name: hotel_cost
       description: Last reported hotel cost
       type: float64
       persistent: true
       initialValue: 0
+      label: current
     - name: dinner_cost
       description: Last reported dinner cost
       type: float64
       persistent: true
       initialValue: 0
+      label: current
+    - name: hotel_reserved
+      description: Whether hotel has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: dinner_reserved
+      description: Whether dinner has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: hotel_reduced
+      description: Whether hotel cost has been reduced
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: dinner_reduced
+      description: Whether dinner cost has been reduced
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
     - name: goal_achieved
       description: Planning completion status
       type: bool
       persistent: true
       initialValue: false
+      label: current
 
   wants:
     - metadata:

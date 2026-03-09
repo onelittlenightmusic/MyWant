@@ -293,6 +293,41 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Initialize resets state before execution begins
 func (t *Target) Initialize() {
+	// Apply recipe-defined state labels early so SetGoal/SetCurrent/etc. work during Initialize.
+	// This mirrors what Progress() does on first run, but must happen here so child wants and
+	// the coordinator itself can call SetGoal/SetCurrent immediately.
+	if t.recipeLoader != nil {
+		if stateDefs, err := t.recipeLoader.GetRecipeState(t.RecipePath); err == nil {
+			if t.StateLabels == nil {
+				t.StateLabels = make(map[string]StateLabel)
+			}
+			for _, def := range stateDefs {
+				if def.Label != "" {
+					var label StateLabel
+					switch def.Label {
+					case "goal":
+						label = LabelGoal
+					case "current":
+						label = LabelCurrent
+					case "plan":
+						label = LabelPlan
+					case "internal":
+						label = LabelInternal
+					default:
+						label = LabelNone
+					}
+					t.StateLabels[def.Name] = label
+				}
+				// Initialize state with initial value if not already set
+				if def.InitialValue != nil {
+					if _, exists := t.getState(def.Name); !exists {
+						t.storeState(def.Name, def.InitialValue)
+					}
+				}
+			}
+		}
+	}
+
 	// Start DispatchThinkerAgent to handle child want dispatch requests from Itinerary
 	// Target is allowed to register this system agent in code.
 	dispatchThinkerID := DispatchThinkerName + "-" + t.Metadata.ID
@@ -401,11 +436,32 @@ func (t *Target) Progress() {
 
 		// Register recipe-defined state fields into ProvidedStateFields so they
 		// appear as regular state (not hidden_state) in the frontend.
+		// Also apply any label definitions to StateLabels so SetCurrent/SetGoal/etc.
+		// will accept these keys on the coordinator want.
 		if t.recipeLoader != nil {
 			if stateDefs, err := t.recipeLoader.GetRecipeState(t.RecipePath); err == nil {
+				if t.StateLabels == nil {
+					t.StateLabels = make(map[string]StateLabel)
+				}
 				for _, def := range stateDefs {
 					if !Contains(t.ProvidedStateFields, def.Name) {
 						t.ProvidedStateFields = append(t.ProvidedStateFields, def.Name)
+					}
+					if def.Label != "" {
+						var label StateLabel
+						switch def.Label {
+						case "goal":
+							label = LabelGoal
+						case "current":
+							label = LabelCurrent
+						case "plan":
+							label = LabelPlan
+						case "internal":
+							label = LabelInternal
+						default:
+							label = LabelNone
+						}
+						t.StateLabels[def.Name] = label
 					}
 				}
 			}

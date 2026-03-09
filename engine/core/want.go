@@ -1612,6 +1612,26 @@ func (n *Want) GetAllPlan() map[string]any {
 	return n.getAllByLabel(LabelPlan)
 }
 
+// GetParentAllCurrent returns all current-labeled state entries from the parent want,
+// or nil if there is no parent.
+func (n *Want) GetParentAllCurrent() map[string]any {
+	parent := n.getParentWant()
+	if parent == nil {
+		return nil
+	}
+	return parent.GetAllCurrent()
+}
+
+// GetParentAllGoal returns all goal-labeled state entries from the parent want,
+// or nil if there is no parent.
+func (n *Want) GetParentAllGoal() map[string]any {
+	parent := n.getParentWant()
+	if parent == nil {
+		return nil
+	}
+	return parent.GetAllGoal()
+}
+
 // getAllByLabel collects all state key-value pairs registered under the given label.
 func (n *Want) getAllByLabel(label StateLabel) map[string]any {
 	result := make(map[string]any)

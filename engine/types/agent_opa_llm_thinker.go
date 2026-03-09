@@ -53,18 +53,40 @@ func (o *OpaLLMPlannerWant) Progress() {}
 // and stores the resulting actions back to state. It uses a hash to skip execution
 // when neither goal nor current have changed since the last run.
 func opaLLMThinkerThink(ctx context.Context, want *Want) error {
-	// Step 1: Collect all goal-labeled and current-labeled state fields, then
-	// merge their values into flat maps so OPA sees input.goal.X / input.current.X
-	// directly (not input.goal.<fieldName>.X).
-	goalRaw := mergeOPAInput(want.GetAllGoal())
-	currentRaw := mergeOPAInput(want.GetAllCurrent())
+	// Step 1: Collect all goal-labeled and current-labeled state fields.
+	// The named "primary" blob (field named "goal"/"current") is expanded so OPA
+	// sees its contents directly (e.g. input.goal.trip.X, input.current.hotel_cost).
+	// All other labeled fields (costs, opa_input_hash, …) are kept as named keys
+	// so OPA can still access them as input.current.costs etc.
+	// Build goal: prefer parent's goal-labeled fields; fall back to own.
+	goalAll := want.GetAllGoal()
+	if parentGoal := want.GetParentAllGoal(); len(parentGoal) > 0 {
+		goalAll = parentGoal
+	}
+	goalRaw := mergeOPAInput(goalAll, "goal")
 	if len(goalRaw) == 0 {
 		// Goal not yet available; wait for next tick
 		return nil
 	}
 
-	// Step 2: Change detection via helper
-	shouldRun, inputHash := ShouldRunAgent(want, "opa_input_hash", goalRaw, currentRaw)
+	// Build current: start from own current-labeled fields, then overlay parent's.
+	// Parent (coordinator) carries costs written by ConditionThinker on child wants,
+	// so merging parent's current makes costs available to OPA without special-casing.
+	currentAll := want.GetAllCurrent()
+	for k, v := range want.GetParentAllCurrent() {
+		currentAll[k] = v
+	}
+	currentRaw := mergeOPAInput(currentAll, "current")
+
+	// Step 2: Change detection — exclude opa_input_hash from the hash input to
+	// avoid a circular dependency where the hash changes its own input every tick.
+	currentForHash := make(map[string]any, len(currentRaw))
+	for k, v := range currentRaw {
+		if k != "opa_input_hash" {
+			currentForHash[k] = v
+		}
+	}
+	shouldRun, inputHash := ShouldRunAgent(want, "opa_input_hash", goalRaw, currentForHash)
 	if !shouldRun {
 		return nil
 	}
@@ -146,20 +168,23 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// mergeOPAInput flattens a map of labeled state fields into a single map for OPA input.
-// Map-valued fields have their contents merged in (supporting the blob-per-field pattern),
-// so OPA sees input.goal.X / input.current.X directly rather than input.goal.<fieldName>.X.
-// Scalar-valued fields are included by their field name as-is.
-func mergeOPAInput(all map[string]any) map[string]any {
+// mergeOPAInput builds a flat map for OPA input from labeled state fields.
+// The field named primaryKey (e.g. "goal" or "current") is a blob whose contents
+// are merged to the top level so OPA sees input.goal.trip.X / input.current.hotel_cost
+// directly.  All other fields (e.g. "costs", "opa_input_hash") are kept as named
+// keys so OPA can access them as input.current.costs etc.
+func mergeOPAInput(all map[string]any, primaryKey string) map[string]any {
 	result := make(map[string]any, len(all))
 	for k, v := range all {
-		if m, ok := v.(map[string]any); ok {
-			for mk, mv := range m {
-				result[mk] = mv
+		if k == primaryKey {
+			if m, ok := v.(map[string]any); ok {
+				for mk, mv := range m {
+					result[mk] = mv
+				}
+				continue
 			}
-		} else {
-			result[k] = v
 		}
+		result[k] = v
 	}
 	return result
 }

@@ -6,7 +6,9 @@ package planner
 goal    := input.goal
 current := input.current
 
-# Total cost = sum of all values in current.costs map
+# Total cost = sum of all values in current.costs (keyed by direction name).
+# Populated by the itinerary from direction_map.cost_field entries, so adding new
+# cost types requires no rego changes.
 total_cost := sum([to_number(v) | v := current.costs[_]])
 
 # ─── Phase 1: Make initial bookings ───────────────────────────────────────────
