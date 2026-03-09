@@ -367,7 +367,7 @@ export const Dashboard: React.FC = () => {
     if (!reactionWantState || !reactionAction) return;
     setIsSubmittingReaction(true);
     try {
-      const qid = reactionWantState.state?.reaction_queue_id as string | undefined;
+      const qid = reactionWantState.state?.current?.reaction_queue_id as string | undefined;
       if (!qid) return;
       const r = await fetch(`/api/v1/reactions/${qid}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: reactionAction === 'approve', comment: `User ${reactionAction === 'approve' ? 'approved' : 'denied'} reminder` }) });
       if (!r.ok) throw new Error(`Failed: ${r.statusText}`);

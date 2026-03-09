@@ -1,9 +1,16 @@
+export interface WantState {
+  final_result?: unknown;            // Promoted to top level for convenient access
+  current?: Record<string, unknown>; // Fields labeled "current" + system-reserved fields
+  goal?: Record<string, unknown>;    // Fields labeled "goal"
+  plan?: Record<string, unknown>;    // Fields labeled "plan"
+}
+
 export interface Want {
   id?: string; // Want execution ID
   metadata: WantMetadata;
   spec: WantSpec;
   status: WantExecutionStatus;
-  state?: Record<string, unknown>; // Runtime state including error details
+  state?: WantState; // Hierarchical state grouped by label
   hidden_state?: Record<string, unknown>; // Internal framework fields
   stats?: WantStats;
   history?: WantHistory;
@@ -132,7 +139,7 @@ export interface UpdateWantRequest {
   metadata: WantMetadata;
   spec: WantSpec;
   status?: WantExecutionStatus;
-  state?: Record<string, unknown>;
+  state?: WantState;
   history?: WantHistory;
 }
 

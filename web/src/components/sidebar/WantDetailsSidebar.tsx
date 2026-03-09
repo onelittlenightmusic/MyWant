@@ -900,14 +900,14 @@ const SettingsTab: React.FC<{
             />
 
             {/* Error Information */}
-            {want.status === 'failed' && want.state?.error && (
+            {want.status === 'failed' && want.state?.current?.error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 mr-3 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <h4 className="text-base font-medium text-red-800 dark:text-red-300 mb-3">Error Details</h4>
                     <p className="text-sm text-red-600 dark:text-red-400 break-words leading-relaxed">
-                      {typeof want.state.error === 'string' ? want.state.error : JSON.stringify(want.state.error)}
+                      {typeof want.state.current.error === 'string' ? want.state.current.error : JSON.stringify(want.state.current.error)}
                     </p>
                   </div>
                 </div>
@@ -1158,34 +1158,40 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
 };
 
 const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
-  const hasState = want.state && Object.keys(want.state).length > 0;
+  const hasCurrent = want.state?.current && Object.keys(want.state.current).length > 0;
+  const hasGoal = want.state?.goal && Object.keys(want.state.goal).length > 0;
+  const hasPlan = want.state?.plan && Object.keys(want.state.plan).length > 0;
+  const hasAnyState = hasCurrent || hasGoal || hasPlan;
   const hasHiddenState = want.hidden_state && Object.keys(want.hidden_state).length > 0;
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
 
   return (
     <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
-      {hasState || hasHiddenState ? (
+      {hasAnyState || hasHiddenState ? (
         <div className="space-y-2">
-          {/* Execution Result Metadata */}
-          <div className={SECTION_CONTAINER_CLASS}>
-            <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Execution Result</h4>
-            <div className="space-y-2 sm:space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Status:</span>
-                <span className="font-medium text-xs sm:text-sm">{want.status || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Final Result:</span>
-                <span className="font-medium text-xs sm:text-sm">{want.state?.final_result ? (typeof want.state.final_result === 'string' ? truncateText(want.state.final_result, 30) : 'Object') : 'N/A'}</span>
+          {hasCurrent && (
+            <div className={SECTION_CONTAINER_CLASS}>
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Current</h4>
+              <div className="space-y-3 sm:space-y-4">
+                {renderKeyValuePairs(want.state!.current)}
               </div>
             </div>
-          </div>
+          )}
 
-          {hasState && (
+          {hasGoal && (
             <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Want State</h4>
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Goal</h4>
               <div className="space-y-3 sm:space-y-4">
-                {renderKeyValuePairs(want.state)}
+                {renderKeyValuePairs(want.state!.goal)}
+              </div>
+            </div>
+          )}
+
+          {hasPlan && (
+            <div className={SECTION_CONTAINER_CLASS}>
+              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Plan</h4>
+              <div className="space-y-3 sm:space-y-4">
+                {renderKeyValuePairs(want.state!.plan)}
               </div>
             </div>
           )}

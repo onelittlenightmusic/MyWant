@@ -31,8 +31,10 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
     },
     status: draft.isThinking ? 'reaching' : (draft.error ? 'failed' : 'created'),
     state: {
-      achieving_percentage: draft.isThinking ? 10 : 100,
-      error: draft.error
+      current: {
+        achieving_percentage: draft.isThinking ? 10 : 100,
+        error: draft.error
+      }
     }
   };
 

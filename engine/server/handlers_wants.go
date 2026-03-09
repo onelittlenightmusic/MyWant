@@ -161,40 +161,23 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	for _, execution := range executions {
 		if execution.Builder != nil && execution.Builder != s.globalBuilder {
 			for _, want := range execution.Builder.GetAllWantStates() {
-				wantCopy := &mywant.Want{
-					Metadata:    want.Metadata,
-					Spec:        want.Spec,
-					Status:      want.GetStatus(),
-					History:     want.BuildHistory(),
-					HiddenState: want.GetHiddenState(),
-				}
-				mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
-				wantsByID[want.Metadata.ID] = wantCopy
+				wantsByID[want.Metadata.ID] = want
 			}
 		}
 	}
 
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
-			wantCopy := &mywant.Want{
-				Metadata:    want.Metadata,
-				Spec:        want.Spec,
-				Status:      want.GetStatus(),
-				History:     want.BuildHistory(),
-				HiddenState: want.GetHiddenState(),
-			}
-			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
-			wantsByID[want.Metadata.ID] = wantCopy
+			wantsByID[want.Metadata.ID] = want
 		}
 	}
 
-	allWants := make([]*mywant.Want, 0, len(wantsByID))
+	allWants := make([]wantAPIResponse, 0, len(wantsByID))
 	for _, want := range wantsByID {
 		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
-		if !includeCancelled && want.Status == mywant.WantStatusCancelled { continue }
+		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled { continue }
 		if !want.MatchesFilters(filters) { continue }
-		want.Hash = mywant.CalculateWantHash(want)
-		allWants = append(allWants, want)
+		allWants = append(allWants, buildWantAPIResponse(want, false))
 	}
 
 	sort.Slice(allWants, func(i, j int) bool {
@@ -212,6 +195,72 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// hierarchicalState groups state fields by their label classification.
+// FinalResult is promoted to the top level for convenient access.
+type hierarchicalState struct {
+	FinalResult any            `json:"final_result,omitempty"`
+	Current     map[string]any `json:"current,omitempty"`
+	Goal        map[string]any `json:"goal,omitempty"`
+	Plan        map[string]any `json:"plan,omitempty"`
+}
+
+// wantAPIResponse is the API-level representation of a Want with hierarchical state.
+type wantAPIResponse struct {
+	Metadata             mywant.Metadata             `json:"metadata"`
+	Spec                 mywant.WantSpec             `json:"spec"`
+	Status               mywant.WantStatus           `json:"status,omitempty"`
+	State                hierarchicalState           `json:"state"`
+	HiddenState          map[string]any              `json:"hidden_state,omitempty"`
+	History              mywant.WantHistory          `json:"history"`
+	ConnectivityMetadata mywant.ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
+	Hash                 string                      `json:"hash,omitempty"`
+}
+
+// buildWantAPIResponse constructs a wantAPIResponse from a live Want, grouping state fields
+// into current/goal/plan buckets. Unlabeled explicit state fields (including system-reserved
+// fields like final_result) fall into the current bucket.
+func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIResponse {
+	explicitState := want.GetExplicitState()
+	current := make(map[string]any)
+	goal := make(map[string]any)
+	plan := make(map[string]any)
+	var finalResult any
+
+	for k, v := range explicitState {
+		if k == "final_result" {
+			finalResult = v
+			continue
+		}
+		label, hasLabel := want.StateLabels[k]
+		if !hasLabel {
+			label = mywant.LabelNone
+		}
+		switch label {
+		case mywant.LabelGoal:
+			goal[k] = v
+		case mywant.LabelPlan:
+			plan[k] = v
+		default:
+			// LabelCurrent, LabelNone (including system-reserved fields) → current
+			current[k] = v
+		}
+	}
+
+	resp := wantAPIResponse{
+		Metadata:    want.Metadata,
+		Spec:        want.Spec,
+		Status:      want.GetStatus(),
+		State:       hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan},
+		HiddenState: want.GetHiddenState(),
+		History:     want.BuildHistory(),
+		Hash:        mywant.CalculateWantHash(want),
+	}
+	if includeConnectivity {
+		resp.ConnectivityMetadata = want.ConnectivityMetadata
+	}
+	return resp
+}
+
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
@@ -224,18 +273,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	for _, execution := range executions {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				wantCopy := &mywant.Want{
-					Metadata:    want.Metadata,
-					Spec:        want.Spec,
-					Status:      want.GetStatus(),
-					History:     want.BuildHistory(),
-					HiddenState: want.GetHiddenState(),
-				}
-				if includeConnectivity {
-					wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
-				}
-				mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
-				s.JSONResponse(w, http.StatusOK, wantCopy)
+				s.JSONResponse(w, http.StatusOK, buildWantAPIResponse(want, includeConnectivity))
 				return
 			}
 		}
@@ -249,18 +287,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			wantCopy := &mywant.Want{
-				Metadata:    want.Metadata,
-				Spec:        want.Spec,
-				Status:      want.GetStatus(),
-				History:     want.BuildHistory(),
-				HiddenState: want.GetHiddenState(),
-			}
-			if includeConnectivity {
-				wantCopy.ConnectivityMetadata = want.ConnectivityMetadata
-			}
-			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
-			s.JSONResponse(w, http.StatusOK, wantCopy)
+			s.JSONResponse(w, http.StatusOK, buildWantAPIResponse(want, includeConnectivity))
 			return
 		}
 	}

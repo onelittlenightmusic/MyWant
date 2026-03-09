@@ -114,10 +114,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
   const wantDetails = selectedWantDetails;
   const hasAgentData = !!(wantDetails?.current_agent ||
     (wantDetails?.running_agents && wantDetails.running_agents.length > 0) ||
-    (wantDetails?.history?.agentHistory && wantDetails.history.agentHistory.length > 0) ||
-    (wantDetails?.state?.current_agent) ||
-    (Array.isArray(wantDetails?.state?.running_agents) && (wantDetails?.state?.running_agents as any[]).length > 0) ||
-    (Array.isArray(wantDetails?.state?.agent_history) && (wantDetails?.state?.agent_history as any[]).length > 0));
+    (wantDetails?.history?.agentHistory && wantDetails.history.agentHistory.length > 0));
 
   const tabs = [
     { id: 'results', label: 'Results', icon: BarChart3 },

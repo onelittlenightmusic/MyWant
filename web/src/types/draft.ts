@@ -39,17 +39,17 @@ export function wantToDraft(want: Want): DraftWant | null {
     return null;
   }
 
-  const state = want.state || {};
+  const current = want.state?.current || {};
 
   return {
     id: want.metadata.id || want.id || '',
-    sessionId: state.sessionId as string || '',
-    message: state.message as string || '',
-    recommendations: (state.recommendations as Recommendation[]) || [],
+    sessionId: current.sessionId as string || '',
+    message: current.message as string || '',
+    recommendations: (current.recommendations as Recommendation[]) || [],
     selectedRecommendation: null,
-    isThinking: state.isThinking as boolean || false,
-    createdAt: state.createdAt as string || '',
-    error: state.error as string | undefined
+    isThinking: current.isThinking as boolean || false,
+    createdAt: current.createdAt as string || '',
+    error: current.error as string | undefined
   };
 }
 

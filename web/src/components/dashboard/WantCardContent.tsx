@@ -57,38 +57,38 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   // Reminder-specific state
   const isReminder = want.metadata?.type === 'reminder';
-  const reminderPhase = want.state?.reminder_phase as string | undefined;
-  const queueId = want.state?.reaction_queue_id as string | undefined;
+  const reminderPhase = want.state?.current?.reminder_phase as string | undefined;
+  const queueId = want.state?.current?.reaction_queue_id as string | undefined;
   const requireReaction = want.spec?.params?.require_reaction !== false; // Default to true
   const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && queueId && requireReaction;
 
   // Replay-specific state
   const isReplay = wantType === 'replay';
-  const recordingActive = want.state?.recording_active === true;
-  const debugRecordingActive = want.state?.debug_recording_active === true;
-  const replayActive = want.state?.replay_active === true;
-  const iframeUrl = want.state?.recording_iframe_url as string | undefined;
-  const replayIframeUrl = want.state?.replay_iframe_url as string | undefined;
+  const recordingActive = want.state?.current?.recording_active === true;
+  const debugRecordingActive = want.state?.current?.debug_recording_active === true;
+  const replayActive = want.state?.current?.replay_active === true;
+  const iframeUrl = want.state?.current?.recording_iframe_url as string | undefined;
+  const replayIframeUrl = want.state?.current?.replay_iframe_url as string | undefined;
   const hasFinalResult = Boolean(want.state?.final_result);
-  const hasReplayActions = Boolean(want.state?.replay_actions && (want.state?.replay_actions as string) !== '[]');
-  const debugRecordingError = want.state?.debug_recording_error as string | undefined;
-  const replayError = want.state?.replay_error as string | undefined;
-  const replayResultRaw = want.state?.replay_result as string | undefined;
+  const hasReplayActions = Boolean(want.state?.current?.replay_actions && (want.state?.current?.replay_actions as string) !== '[]');
+  const debugRecordingError = want.state?.current?.debug_recording_error as string | undefined;
+  const replayError = want.state?.current?.replay_error as string | undefined;
+  const replayResultRaw = want.state?.current?.replay_result as string | undefined;
   const replayResult = (() => {
     if (!replayResultRaw) return null;
     try { return JSON.parse(replayResultRaw); } catch { return null; }
   })();
-  const replayScreenshotUrl = want.state?.replay_screenshot_url as string | undefined;
+  const replayScreenshotUrl = want.state?.current?.replay_screenshot_url as string | undefined;
 
 
   // Webhook IDs: prefer state value (set by MonitorAgent), fall back to predictable pattern from want ID.
   // This ensures the Record button appears immediately after want creation, before the MonitorAgent runs.
   const wantId = want.metadata?.id ?? '';
-  const startWebhookId = (want.state?.startWebhookId as string | undefined) || (wantId ? `${wantId}-start` : undefined);
-  const stopWebhookId = (want.state?.stopWebhookId as string | undefined) || (wantId ? `${wantId}-stop` : undefined);
-  const debugStartWebhookId = (want.state?.debugStartWebhookId as string | undefined) || (wantId ? `${wantId}-debug-start` : undefined);
-  const debugStopWebhookId = (want.state?.debugStopWebhookId as string | undefined) || (wantId ? `${wantId}-debug-stop` : undefined);
-  const replayWebhookId = (want.state?.replayWebhookId as string | undefined) || (wantId ? `${wantId}-replay` : undefined);
+  const startWebhookId = (want.state?.current?.startWebhookId as string | undefined) || (wantId ? `${wantId}-start` : undefined);
+  const stopWebhookId = (want.state?.current?.stopWebhookId as string | undefined) || (wantId ? `${wantId}-stop` : undefined);
+  const debugStartWebhookId = (want.state?.current?.debugStartWebhookId as string | undefined) || (wantId ? `${wantId}-debug-start` : undefined);
+  const debugStopWebhookId = (want.state?.current?.debugStopWebhookId as string | undefined) || (wantId ? `${wantId}-debug-stop` : undefined);
+  const replayWebhookId = (want.state?.current?.replayWebhookId as string | undefined) || (wantId ? `${wantId}-replay` : undefined);
 
   const handleStartRecording = async () => {
     if (!startWebhookId) return;
@@ -244,7 +244,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   const isRunning = want.status === 'reaching' || want.status === 'waiting_user_action';
   const isFailed = want.status === 'failed';
-  const hasError = Boolean(isFailed && want.state?.error);
+  const hasError = Boolean(isFailed && want.state?.current?.error);
   const isSuspended = want.status === 'suspended';
   const canControl = want.status === 'reaching' || want.status === 'waiting_user_action' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
@@ -514,7 +514,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             <div className="flex-1 min-w-0">
               <p className={`${sizes.errorTextSize} font-medium text-red-800 dark:text-red-200`}>Execution Failed</p>
               <p className={`${sizes.errorTextSize} text-red-600 dark:text-red-400 mt-1 truncate`}>
-                {truncateText(typeof want.state?.error === 'string' ? want.state.error : 'Unknown error', isChild ? 60 : 100)}
+                {truncateText(typeof want.state?.current?.error === 'string' ? want.state.current.error : 'Unknown error', isChild ? 60 : 100)}
               </p>
               <button
                 onClick={() => onView(want)}
@@ -685,9 +685,9 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             </svg>
             <span className="truncate">
               {truncateText(
-                typeof want.state.final_result === 'string'
-                  ? want.state.final_result
-                  : JSON.stringify(want.state.final_result),
+                typeof want.state!.final_result === 'string'
+                  ? want.state!.final_result as string
+                  : JSON.stringify(want.state!.final_result),
                 isChild ? 40 : 50
               )}
             </span>

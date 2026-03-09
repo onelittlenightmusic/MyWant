@@ -119,7 +119,7 @@ const ChildWantCard: React.FC<ChildWantCardProps> = ({
   const correlationStyle = isCorrelated ? buildCorrelationStyle(correlationRate!) : undefined;
 
   const childBackgroundStyle = getBackgroundStyle(child.metadata?.type, false);
-  const childAchievingPercentage = (child.state?.achieving_percentage as number) ?? 0;
+  const childAchievingPercentage = (child.state?.current?.achieving_percentage as number) ?? 0;
 
   const handleClick = (e: React.MouseEvent) => {
     if (isBeingProcessed) return;
@@ -578,8 +578,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   };
 
   const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, false);
-  const achievingPercentage = (want.state?.achieving_percentage as number) ?? 0;
-  const replayScreenshotUrl = want.state?.replay_screenshot_url as string | undefined;
+  const achievingPercentage = (want.state?.current?.achieving_percentage as number) ?? 0;
+  const replayScreenshotUrl = want.state?.current?.replay_screenshot_url as string | undefined;
   const version = want.metadata?.version ?? 1;
 
   return (
