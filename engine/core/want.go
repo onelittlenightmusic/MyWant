@@ -1004,6 +1004,11 @@ func (n *Want) StoreState(key string, value any) {
 	sendStateNotifications(notification)
 }
 
+// DeleteState removes a key from the want's state map.
+func (n *Want) DeleteState(key string) {
+	n.State.Delete(key)
+}
+
 // MergeState safely merges new state updates into pending state changes for batch processing
 // CRITICAL: Designed for async operations (e.g., concurrent Coordinator packet processing)
 // Strategy: Each async call adds to pendingStateChanges without blocking
