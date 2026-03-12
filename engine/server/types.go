@@ -129,3 +129,34 @@ type ReactionRequest struct {
 	Approved bool   `json:"approved"`
 	Comment  string `json:"comment,omitempty"`
 }
+
+// WantStateSnapshot is a state snapshot for a single Want used in cross-want state API responses.
+type WantStateSnapshot struct {
+	WantID   string            `json:"want_id"`
+	WantName string            `json:"want_name"`
+	State    hierarchicalState `json:"state"`
+}
+
+// StatesListResponse is the response for GET /api/v1/states.
+type StatesListResponse struct {
+	Wants       []WantStateSnapshot `json:"wants"`
+	GlobalState map[string]any      `json:"global_state,omitempty"`
+	Total       int                 `json:"total"`
+}
+
+// StateSearchResult is a single field match in the cross-want state search.
+type StateSearchResult struct {
+	WantID   string `json:"want_id,omitempty"`
+	WantName string `json:"want_name,omitempty"`
+	Field    string `json:"field"`
+	Value    any    `json:"value"`
+	Label    string `json:"label"`  // "current", "goal", "plan", "none"
+	Source   string `json:"source"` // "want" or "global"
+}
+
+// StateSearchResponse is the response for GET /api/v1/states/search.
+type StateSearchResponse struct {
+	Field   string              `json:"field"`
+	Results []StateSearchResult `json:"results"`
+	Total   int                 `json:"total"`
+}

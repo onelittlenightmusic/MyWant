@@ -135,6 +135,21 @@ func (s *Server) setupRoutes() {
 	// Global State endpoint
 	api.HandleFunc("/global-state", s.getGlobalState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/global-state", s.deleteGlobalState).Methods("DELETE", "OPTIONS")
+	api.HandleFunc("/global-state/{key}", s.setGlobalStateKey).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/global-state/{key}", s.deleteGlobalStateKey).Methods("DELETE", "OPTIONS")
+
+	// State API CRUD (cross-want state access)
+	states := api.PathPrefix("/states").Subrouter()
+	states.HandleFunc("", s.listStates).Methods("GET")
+	states.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	states.HandleFunc("/search", s.searchStates).Methods("GET")
+	states.HandleFunc("/search", s.handleOptions).Methods("OPTIONS")
+	states.HandleFunc("/{id}", s.getWantState).Methods("GET")
+	states.HandleFunc("/{id}", s.updateWantState).Methods("PUT")
+	states.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+	states.HandleFunc("/{id}/{key}", s.setWantStateKey).Methods("PUT")
+	states.HandleFunc("/{id}/{key}", s.deleteWantStateKey).Methods("DELETE")
+	states.HandleFunc("/{id}/{key}", s.handleOptions).Methods("OPTIONS")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")

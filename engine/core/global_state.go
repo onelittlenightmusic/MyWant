@@ -58,6 +58,12 @@ func (cb *ChainBuilder) GetGlobalStateAll() map[string]any {
 	return result
 }
 
+// DeleteGlobalStateKey removes a single key from the global state and persists to disk.
+func (cb *ChainBuilder) DeleteGlobalStateKey(key string) {
+	cb.globalState.Delete(key)
+	cb.saveGlobalStateToFile()
+}
+
 // ClearGlobalState removes all keys from the global state and persists the empty state.
 func (cb *ChainBuilder) ClearGlobalState() {
 	cb.globalState.Range(func(key, value any) bool {
@@ -174,6 +180,15 @@ func ClearGlobalState() {
 		return
 	}
 	cb.ClearGlobalState()
+}
+
+// DeleteGlobalStateKey removes a single key from the global state.
+func DeleteGlobalStateKey(key string) {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return
+	}
+	cb.DeleteGlobalStateKey(key)
 }
 
 // --- Want convenience methods ---
