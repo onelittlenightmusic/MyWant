@@ -56,6 +56,8 @@ func main() {
 
 	rootCmd.AddCommand(commands.ParamsCmd)
 
+	rootCmd.AddCommand(commands.StateCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
