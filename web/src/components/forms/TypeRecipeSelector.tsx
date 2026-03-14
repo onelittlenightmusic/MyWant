@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
-import { ChevronRight, Package, Zap, ChevronDown, Search, X } from 'lucide-react';
+import { ChevronRight, Package, Zap, ChevronDown, Search, X, Plane, Calculator, Layers, CheckCircle, Monitor, Tag } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -68,6 +68,15 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       collapsedButtonRef.current?.focus();
     }
   }));
+
+  const categoryIcons: Record<string, React.ReactNode> = {
+    travel: <Plane className="h-3 w-3" />,
+    mathematics: <Calculator className="h-3 w-3" />,
+    math: <Calculator className="h-3 w-3" />,
+    queue: <Layers className="h-3 w-3" />,
+    approval: <CheckCircle className="h-3 w-3" />,
+    system: <Monitor className="h-3 w-3" />,
+  };
 
   // Convert want types and recipes to selector items
   const items = useMemo(() => {
@@ -347,12 +356,13 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               key={category}
               type="button"
               onClick={() => setSelectedCategory(category)}
-              className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors capitalize ${
+              className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors capitalize ${
                 selectedCategory === category
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
+              {categoryIcons[category] || <Tag className="h-3 w-3" />}
               {category}
             </button>
           ))}
@@ -360,7 +370,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 sm:p-4 bg-white dark:bg-gray-800 min-h-0">
+      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 sm:p-4 bg-white dark:bg-gray-950 min-h-0">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
@@ -368,7 +378,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               <Zap className="w-4 h-4" />
               Want Types ({groupedItems.wantTypes.length})
             </h3>
-            <div className="space-y-1">
+            <div className="grid grid-cols-2 gap-1">
               {groupedItems.wantTypes.map((item, index) => {
                 const backgroundStyle = getBackgroundStyle(item.name);
                 const globalIndex = filteredItems.findIndex(i => i.id === item.id);
@@ -410,7 +420,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors relative overflow-hidden ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden ${
                       selectedId === item.id
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                         : isFocused
@@ -423,11 +433,13 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
                     <div className="flex items-center justify-between relative z-10">
-                      <div className="flex-1 flex items-center gap-2">
-                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
+                      <div className="flex-1 flex items-center gap-1.5">
                         {item.category && (
-                          <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded-full">{item.category}</span>
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0" title={item.category}>
+                            {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
+                          </span>
                         )}
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
                       </div>
                       {selectedId === item.id && (
                         <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2" />
@@ -447,8 +459,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               <Package className="w-4 h-4" />
               Recipes ({groupedItems.recipes.length})
             </h3>
-            <div className="space-y-1">
+            <div className="grid grid-cols-2 gap-1">
               {groupedItems.recipes.map((item, index) => {
+                const backgroundStyle = getBackgroundStyle(item.name);
                 const globalIndex = filteredItems.findIndex(i => i.id === item.id);
                 const isFocused = focusedIndex === globalIndex;
                 return (
@@ -469,7 +482,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         name: item.title
                       });
                       e.dataTransfer.setData('application/mywant-template', data);
-                      
+
                       useWantStore.getState().setDraggingTemplate({
                         id: item.id,
                         type: 'recipe',
@@ -488,26 +501,32 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border sm:border-2 transition-colors ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden ${
                       selectedId === item.id
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                         : isFocused
                         ? 'border-green-400 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-300'
-                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
-                    }`}
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
+                    } ${backgroundStyle.className}`}
+                    style={backgroundStyle.style}
                   >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
-                      {item.description && (
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 sm:mt-1">{item.description}</p>
+                    {backgroundStyle.hasBackgroundImage && (
+                      <div className={getBackgroundOverlayClass()}></div>
+                    )}
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="flex-1 flex items-center gap-1.5">
+                        {item.category && (
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0" title={item.category}>
+                            {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
+                          </span>
+                        )}
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
+                      </div>
+                      {selectedId === item.id && (
+                        <ChevronRight className="w-5 h-5 text-green-500 flex-shrink-0 ml-2" />
                       )}
                     </div>
-                    {selectedId === item.id && (
-                      <ChevronRight className="w-5 h-5 text-green-500 flex-shrink-0 ml-2" />
-                    )}
-                  </div>
-                </button>
+                  </button>
                 );
               })}
             </div>

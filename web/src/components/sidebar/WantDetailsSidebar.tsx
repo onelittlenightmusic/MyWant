@@ -73,7 +73,7 @@ interface WantDetailsSidebarProps {
 type TabType = 'settings' | 'results' | 'logs' | 'agents' | 'versions';
 
 // Unified section container styling for all metadata/state sections
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden p-3 sm:p-4';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,

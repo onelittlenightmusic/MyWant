@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, MoreHorizontal, Zap, Settings, Database, Share2 } from 'lucide-react';
+import { Eye, MoreHorizontal, Zap, Settings, Database, Share2, Plane, Calculator, Layers, CheckCircle, Monitor, Tag } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { truncateText, classNames } from '@/utils/helpers';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
@@ -34,6 +34,15 @@ const categoryColors: Record<string, string> = {
   approval: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
   system: 'bg-gray-50 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
   math: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+};
+
+const categoryIcons: Record<string, React.ReactNode> = {
+  travel: <Plane className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
+  mathematics: <Calculator className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
+  math: <Calculator className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
+  queue: <Layers className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
+  approval: <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
+  system: <Monitor className="h-3 w-3 sm:h-3.5 sm:w-3.5" />,
 };
 
 export const WantTypeCard: React.FC<WantTypeCardProps> = ({
@@ -117,8 +126,11 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
           </span>
 
           {/* Category badge */}
-          <span className={classNames('inline-block px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
-            {wantType.category}
+          <span
+            className={classNames('inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}
+            title={wantType.category}
+          >
+            {categoryIcons[wantType.category] || <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
           </span>
 
           {/* Actions menu */}

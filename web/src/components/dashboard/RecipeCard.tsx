@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Eye, Edit2, Trash2, MoreHorizontal, BookOpen, Play, Zap } from 'lucide-react';
 import { GenericRecipe } from '@/types/recipe';
 import { truncateText, classNames } from '@/utils/helpers';
+import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 
 interface RecipeCardProps {
   recipe: GenericRecipe;
@@ -80,6 +81,7 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
   };
 
   const hasExample = recipe.recipe.example?.wants && recipe.recipe.example.wants.length > 0;
+  const backgroundStyle = getBackgroundStyle(recipe.recipe.metadata.custom_type, true);
 
   return (
     <div
@@ -92,9 +94,14 @@ export const RecipeCard: React.FC<RecipeCardProps> = ({
         'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[8rem] sm:min-h-[12.5rem]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
         className || ''
-      )}>
+      )}
+      style={backgroundStyle.style}
+    >
+      {/* Background overlay */}
+      <div className={getBackgroundOverlayClass()}></div>
+
       {/* Header */}
-      <div className="flex items-start justify-between mb-2 sm:mb-4">
+      <div className="relative z-10 flex items-start justify-between mb-2 sm:mb-4">
         <div className="flex-1 min-w-0">
           <h3
             className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
