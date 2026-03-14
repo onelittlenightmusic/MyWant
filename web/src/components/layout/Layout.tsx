@@ -1,9 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Menu, ChevronRight } from 'lucide-react';
+import React from 'react';
 import { classNames } from '@/utils/helpers';
-import { Sidebar } from './Sidebar';
 import { useConfigStore } from '@/stores/configStore';
-import { useUIStore } from '@/stores/uiStore';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,97 +8,15 @@ interface LayoutProps {
   onSidebarMinimizedChange?: (minimized: boolean) => void;
 }
 
-export const Layout: React.FC<LayoutProps> = ({
-  children,
-  sidebarMinimized: controlledMinimized,
-  onSidebarMinimizedChange
-}) => {
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const config = useConfigStore(state => state.config);
-  const { sidebarMinimized: storeMinimized, setSidebarMinimized: setStoreMinimized } = useUIStore();
-  
   const isBottom = config?.header_position === 'bottom';
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Default to closed for mobile
-  const sidebarRef = useRef<HTMLDivElement>(null);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-  // Open sidebar by default on large screens
-  useEffect(() => {
-    if (window.innerWidth >= 1024) {
-      setSidebarOpen(true);
-    }
-  }, []);
-
-  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : storeMinimized;
-
-  const updateMinimized = (value: boolean) => {
-    if (onSidebarMinimizedChange) {
-      onSidebarMinimizedChange(value);
-    } else {
-      setStoreMinimized(value);
-    }
-  };
-
-  const handleMinimizeToggle = () => {
-    updateMinimized(!sidebarMinimized);
-  };
-
-  // Handle mouse enter - expand sidebar
-  const handleSidebarMouseEnter = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-    }
-    updateMinimized(false);
-  };
-
-  // Handle mouse leave - collapse sidebar after a delay
-  const handleSidebarMouseLeave = () => {
-    hoverTimeoutRef.current = setTimeout(() => {
-      updateMinimized(true);
-    }, 300); // 300ms delay before auto-collapse
-  };
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
-      {/* Mobile sidebar toggle - only show when sidebar is closed */}
-      {!sidebarOpen && (
-        <div className="lg:hidden fixed top-1/2 left-0 -translate-y-1/2 z-40">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-1 rounded-r-md bg-white shadow-md border border-l-0 border-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center h-12 w-6"
-            aria-label="Open menu"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </div>
-      )}
-
-      {/* Sidebar wrapper with hover handlers */}
       <div
-        ref={sidebarRef}
-        onMouseEnter={handleSidebarMouseEnter}
-        onMouseLeave={handleSidebarMouseLeave}
-      >
-        <Sidebar
-          isOpen={sidebarOpen}
-          isMinimized={sidebarMinimized}
-          onClose={() => setSidebarOpen(false)}
-          onMinimizeToggle={handleMinimizeToggle}
-        />
-      </div>
-
-      {/* Main content */}
-      <div 
         className={classNames(
-          "flex-1 flex flex-col relative transition-all duration-300 ease-in-out min-w-0",
-          sidebarMinimized ? "lg:ml-20" : "lg:ml-44",
+          "flex-1 flex flex-col relative min-w-0",
           isBottom ? "pb-16 sm:pb-20" : "pt-16 sm:pt-20"
         )}
         style={isBottom ? {} : { marginTop: 'env(safe-area-inset-top, 0px)' }}

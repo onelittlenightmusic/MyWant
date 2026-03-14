@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
-import { useUIStore } from '@/stores/uiStore';
+import { SettingsModal } from '@/components/modals/SettingsModal';
 import { Tooltip } from '@/components/ui/Tooltip';
 
 interface HeaderProps {
@@ -31,6 +32,17 @@ interface HeaderProps {
   onGlobalStateToggle?: () => void;
 }
 
+const menuItems = [
+  { id: 'wants', label: 'Wants', icon: Heart, href: '/dashboard' },
+  { id: 'agents', label: 'Agents', icon: Bot, href: '/agents' },
+];
+
+const advancedItems = [
+  { id: 'wantTypes', label: 'Want Types', icon: Zap, href: '/want-types' },
+  { id: 'recipes', label: 'Recipes', icon: BookOpen, href: '/recipes' },
+  { id: 'logs', label: 'Logs', icon: Activity, href: '/logs' },
+];
+
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
   onCreateTargetWant,
@@ -40,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   itemLabel,
   showSummary = false,
   onSummaryToggle,
-  sidebarMinimized: controlledMinimized,
+  sidebarMinimized: _controlledMinimized,
   hideCreateButton = false,
   showSelectMode = false,
   onToggleSelectMode,
@@ -56,13 +68,15 @@ export const Header: React.FC<HeaderProps> = ({
   onGlobalStateToggle
 }) => {
   const config = useConfigStore(state => state.config);
-  const { sidebarMinimized: storeMinimized } = useUIStore();
-  const sidebarMinimized = controlledMinimized !== undefined ? controlledMinimized : storeMinimized;
-  
+  const location = useLocation();
+
   const isBottom = config?.header_position === 'bottom';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Hide provider select and mobile bubble when clicking outside
   useEffect(() => {
@@ -80,6 +94,19 @@ export const Header: React.FC<HeaderProps> = ({
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
   }, [showProviderSelect, showBubbleOnMobile]);
+
+  // Close hamburger menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [menuOpen]);
 
   const handleRobotClick = () => {
     if (window.innerWidth < 1024) {
@@ -102,17 +129,97 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  // Dismiss keyboard on iOS when closing the menu
+  const closeMenu = () => {
+    (document.activeElement as HTMLElement)?.blur();
+    setMenuOpen(false);
+  };
+
   return (
-    <header 
+    <>
+    <header
       className={classNames(
-        "bg-white dark:bg-gray-900 px-3 sm:px-6 py-2 sm:py-4 fixed right-0 z-40 transition-all duration-300 ease-in-out left-0",
+        "bg-white dark:bg-gray-900 px-3 sm:px-6 py-2 sm:py-4 fixed left-0 right-0 z-40",
         isBottom ? "bottom-0 border-t border-gray-200 dark:border-gray-700" : "border-b border-gray-200 dark:border-gray-700",
-        sidebarMinimized ? "lg:left-20" : "lg:left-44"
       )}
       style={isBottom ? {} : { top: 'env(safe-area-inset-top, 0px)' }}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center space-x-4 min-w-0">
+      <div className="flex items-center justify-between gap-1 sm:gap-4">
+        <div className="flex items-center space-x-2 min-w-0" ref={menuRef}>
+          {/* Hamburger menu button */}
+          <div className="relative">
+            <button
+              onClick={() => setMenuOpen(prev => !prev)}
+              className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle menu"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+
+            {/* Dropdown menu */}
+            {menuOpen && (
+              <div className={classNames(
+                "absolute left-0 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50 overflow-hidden",
+                isBottom ? "bottom-full mb-2" : "top-full mt-2"
+              )}>
+                <nav className="p-2 space-y-1">
+                  {menuItems.map(item => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.href}
+                        onClick={closeMenu}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className={classNames(
+                          'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
+                        )}
+                      >
+                        <Icon className="h-4 w-4 mr-3" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+                <div className="border-t border-gray-200 dark:border-gray-800 p-2 space-y-1">
+                  <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Advanced</p>
+                  {advancedItems.map(item => {
+                    const Icon = item.icon;
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <Link
+                        key={item.id}
+                        to={item.href}
+                        onClick={closeMenu}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className={classNames(
+                          'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                          isActive
+                            ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
+                        )}
+                      >
+                        <Icon className="h-4 w-4 mr-3" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                  <button
+                    onClick={() => { setIsSettingsOpen(true); closeMenu(); }}
+                    className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+                  >
+                    <Settings className="h-4 w-4 mr-3" />
+                    Settings
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white whitespace-nowrap">{title}</h1>
           {itemLabel && (
             <div className="hidden sm:block text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -157,14 +264,14 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        <div className="flex items-center space-x-3 flex-shrink-0">
+        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
           {/* Robot toggle for mobile - only shown when onInteractSubmit is present */}
           {onInteractSubmit && (
             <Tooltip label="Speak to Agent">
               <button
                 onClick={handleRobotClick}
                 className={classNames(
-                  "lg:hidden p-2 rounded-full transition-colors bg-blue-600 shadow-md",
+                  "lg:hidden p-1.5 sm:p-2 rounded-full transition-colors bg-blue-600 shadow-md",
                   showBubbleOnMobile ? "ring-2 ring-blue-400" : ""
                 )}
               >
@@ -179,7 +286,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onMinimapToggle}
                 className={classNames(
-                  "lg:hidden p-2 rounded-md transition-colors",
+                  "lg:hidden p-1.5 sm:p-2 rounded-md transition-colors",
                   showMinimap ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
               >
@@ -194,7 +301,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onGlobalStateToggle}
                 className={classNames(
-                  "p-2 rounded-md transition-colors",
+                  "p-1.5 sm:p-2 rounded-md transition-colors",
                   showGlobalState
                     ? "text-green-600 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400 dark:ring-green-500"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -211,7 +318,7 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onRadarModeToggle}
                 className={classNames(
-                  "p-2 rounded-md transition-colors",
+                  "p-1.5 sm:p-2 rounded-md transition-colors",
                   showRadarMode
                     ? "text-orange-600 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-400 dark:ring-orange-500"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -226,7 +333,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
               <button
                 onClick={onToggleSelectMode}
-                className={`inline-flex items-center px-3 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={`inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   showSelectMode
                     ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
                     : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
@@ -241,7 +348,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Tooltip label={showSummary ? 'Hide Summary' : 'Summary'} shortcut="s">
               <button
                 onClick={onSummaryToggle}
-                className={`inline-flex items-center px-3 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={`inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                   showSummary
                     ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
                     : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
@@ -256,7 +363,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Tooltip label={createButtonLabel ?? 'Add Want'} shortcut="a">
               <button
                 onClick={onCreateWant}
-                className="inline-flex items-center px-3 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
               >
                 <span className="relative inline-flex flex-shrink-0">
                   <Heart className="h-4 w-4" />
@@ -269,7 +376,7 @@ export const Header: React.FC<HeaderProps> = ({
           {!hideCreateButton && onCreateTargetWant && (
             <button
               onClick={onCreateTargetWant}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 focus:ring-offset-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
+              className="inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 focus:ring-offset-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
             >
               <span className="relative inline-flex flex-shrink-0">
                 <span className="text-sm leading-none">🫙</span>
@@ -281,5 +388,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
       {isBottom && <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />}
     </header>
+    <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+    </>
   );
 };

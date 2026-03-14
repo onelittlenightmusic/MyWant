@@ -30,9 +30,9 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
-  // Auto-focus input when it becomes visible on mobile or requested
+  // Auto-focus input only when explicitly requested
   useEffect(() => {
-    if (autoFocus || (window.innerWidth < 1024 && inputRef.current)) {
+    if (autoFocus) {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
       }, 300); // Wait for slide-in animation
