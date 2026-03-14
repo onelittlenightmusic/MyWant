@@ -642,6 +642,7 @@ func (n *Want) StartProgressionLoop(
 		// This resets state for fresh execution (especially important for restarts)
 		if n.progressable != nil {
 			n.progressable.Initialize()
+			n.syncLocalsAfterInitialize()
 		}
 
 		// Phase 0: Start persistent background agents (Monitor/Poll/Think) before the loop.
@@ -683,6 +684,7 @@ func (n *Want) StartProgressionLoop(
 					}
 					if n.progressable != nil {
 						n.progressable.Initialize()
+						n.syncLocalsAfterInitialize()
 					}
 					// Re-start background agents that were stopped for restart
 					if err := n.StartBackgroundAgents(); err != nil {
@@ -2934,6 +2936,28 @@ func (w *Want) MatchesFilters(filters WantFilters) bool {
 	}
 
 	return true
+}
+
+// syncLocalsAfterInitialize persists the locals to internal state immediately after
+// Initialize() is called. Without this, the next SyncLocalsState(toStruct=true) would
+// read stale internal state (e.g., old _phase = "completed") and overwrite the
+// freshly initialized locals.Phase back to the old value, causing the want to
+// skip re-execution on restart.
+func (n *Want) syncLocalsAfterInitialize() {
+	if n.progressable == nil {
+		return
+	}
+	progressableVal := reflect.ValueOf(n.progressable)
+	if progressableVal.Kind() != reflect.Ptr {
+		return
+	}
+	method := progressableVal.MethodByName("GetLocals")
+	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
+		return
+	}
+	results := method.Call(nil)
+	locals := results[0].Interface()
+	SyncLocalsState(n, locals, false)
 }
 
 // FilterWants filters a list of wants based on the provided filters
