@@ -114,6 +114,11 @@ var StartCmd = &cobra.Command{
 				fmt.Printf("Warning: Failed to write PID file: %v\n", err)
 			}
 
+			// Frontend is embedded in the server binary; write gui.pid with same PID
+			if !dev {
+				os.WriteFile(guiPidFile, []byte(strconv.Itoa(process.Process.Pid)), 0644)
+			}
+
 			fmt.Printf("MyWant Server started in background (PID: %d)\n", process.Process.Pid)
 			if dev {
 				fmt.Println("Frontend development server enabled (npm run dev)")

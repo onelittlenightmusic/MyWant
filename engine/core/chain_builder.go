@@ -1669,9 +1669,16 @@ func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
 
 // addDynamicWantUnsafe adds a want to the builder and configuration without triggering reconciliation
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
-	// Check by ID to be safe
+	// Check runtime wants by ID
 	for _, rw := range cb.wants {
 		if rw.want.Metadata.ID == want.Metadata.ID {
+			return nil
+		}
+	}
+	// Also check cb.config.Wants to prevent duplicates accumulating across restarts
+	for _, cw := range cb.config.Wants {
+		if cw.Metadata.ID == want.Metadata.ID {
+			cb.addWant(want)
 			return nil
 		}
 	}

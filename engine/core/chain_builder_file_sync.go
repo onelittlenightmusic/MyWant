@@ -79,8 +79,14 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	}
 
 	// First, add all wants from config and update with current stats
+	// Deduplicate by ID to prevent state.yaml bloat from accumulated duplicates
+	seenIDs := make(map[string]bool)
 	configWantMap := make(map[string]bool)
 	for _, want := range cb.config.Wants {
+		if seenIDs[want.Metadata.ID] {
+			continue // Skip duplicate entries
+		}
+		seenIDs[want.Metadata.ID] = true
 		configWantMap[want.Metadata.Name] = true
 		if runtimeWant, exists := cb.wants[want.Metadata.Name]; exists {
 			// Update with runtime data including spec using
