@@ -420,7 +420,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
                       selectedId === item.id
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                         : isFocused
@@ -432,17 +432,17 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     {backgroundStyle.hasBackgroundImage && (
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex-1 flex items-center gap-1.5">
+                    <div className="flex items-start justify-between relative z-10 w-full">
+                      <div className="flex-1 flex items-start gap-1.5 min-w-0">
                         {item.category && (
-                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0" title={item.category}>
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" title={item.category}>
                             {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
                           </span>
                         )}
-                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words">{item.title}</h4>
                       </div>
                       {selectedId === item.id && (
-                        <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2" />
+                        <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2 mt-0.5" />
                       )}
                     </div>
                   </button>
@@ -501,7 +501,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden ${
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
                       selectedId === item.id
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                         : isFocused
@@ -513,17 +513,17 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     {backgroundStyle.hasBackgroundImage && (
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex-1 flex items-center gap-1.5">
+                    <div className="flex items-start justify-between relative z-10 w-full">
+                      <div className="flex-1 flex items-start gap-1.5 min-w-0">
                         {item.category && (
-                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0" title={item.category}>
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" title={item.category}>
                             {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
                           </span>
                         )}
-                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words">{item.title}</h4>
                       </div>
                       {selectedId === item.id && (
-                        <ChevronRight className="w-5 h-5 text-green-500 flex-shrink-0 ml-2" />
+                        <ChevronRight className="w-5 h-5 text-green-500 flex-shrink-0 ml-2 mt-0.5" />
                       )}
                     </div>
                   </button>

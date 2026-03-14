@@ -108,7 +108,7 @@ export const getBackgroundStyle = (
  * @returns CSS class for overlay
  */
 export const getBackgroundOverlayClass = (): string => {
-  return 'absolute inset-0 bg-white bg-opacity-70 dark:bg-gray-900 dark:bg-opacity-80 z-0 pointer-events-none';
+  return 'absolute inset-0 bg-white bg-opacity-40 dark:bg-gray-900 dark:bg-opacity-50 z-0 pointer-events-none';
 };
 
 /**
