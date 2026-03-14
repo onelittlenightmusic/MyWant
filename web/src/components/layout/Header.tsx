@@ -4,6 +4,7 @@ import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
 import { useUIStore } from '@/stores/uiStore';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface HeaderProps {
   onCreateWant: () => void;
@@ -159,112 +160,116 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center space-x-3 flex-shrink-0">
           {/* Robot toggle for mobile - only shown when onInteractSubmit is present */}
           {onInteractSubmit && (
-            <button
-              onClick={handleRobotClick}
-              className={classNames(
-                "lg:hidden p-2 rounded-full transition-colors bg-blue-600 shadow-md",
-                showBubbleOnMobile ? "ring-2 ring-blue-400" : ""
-              )}
-              title="Speak to Agent"
-            >
-              <Bot className="h-5 w-5 text-white" />
-            </button>
+            <Tooltip label="Speak to Agent">
+              <button
+                onClick={handleRobotClick}
+                className={classNames(
+                  "lg:hidden p-2 rounded-full transition-colors bg-blue-600 shadow-md",
+                  showBubbleOnMobile ? "ring-2 ring-blue-400" : ""
+                )}
+              >
+                <Bot className="h-5 w-5 text-white" />
+              </button>
+            </Tooltip>
           )}
 
           {/* Minimap toggle button - only shown on mobile (lg:hidden) */}
           {onMinimapToggle && (
-            <button
-              onClick={onMinimapToggle}
-              className={classNames(
-                "lg:hidden p-2 rounded-md transition-colors",
-                showMinimap ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-              )}
-              title={showMinimap ? "Hide minimap" : "Show minimap"}
-            >
-              <Map className="h-5 w-5" />
-            </button>
+            <Tooltip label={showMinimap ? 'Hide Minimap' : 'Minimap'}>
+              <button
+                onClick={onMinimapToggle}
+                className={classNames(
+                  "lg:hidden p-2 rounded-md transition-colors",
+                  showMinimap ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                )}
+              >
+                <Map className="h-5 w-5" />
+              </button>
+            </Tooltip>
           )}
 
           {/* Global State toggle button - left of Radar */}
           {onGlobalStateToggle && (
-            <button
-              onClick={onGlobalStateToggle}
-              className={classNames(
-                "p-2 rounded-md transition-colors",
-                showGlobalState
-                  ? "text-green-600 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400 dark:ring-green-500"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-              )}
-              title={showGlobalState ? "Memo panel ON (g)" : "Memo (g)"}
-            >
-              <StickyNote className="h-5 w-5" />
-            </button>
+            <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g">
+              <button
+                onClick={onGlobalStateToggle}
+                className={classNames(
+                  "p-2 rounded-md transition-colors",
+                  showGlobalState
+                    ? "text-green-600 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400 dark:ring-green-500"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                )}
+              >
+                <StickyNote className="h-5 w-5" />
+              </button>
+            </Tooltip>
           )}
 
           {/* Correlation Radar toggle button */}
           {onRadarModeToggle && (
-            <button
-              onClick={onRadarModeToggle}
-              className={classNames(
-                "p-2 rounded-md transition-colors",
-                showRadarMode
-                  ? "text-orange-600 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-400 dark:ring-orange-500"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-              )}
-              title={showRadarMode ? "Radar mode ON — click a want card to see correlations (x)" : "Correlation Radar (x)"}
-            >
-              <Radar className="h-5 w-5" />
-            </button>
+            <Tooltip label={showRadarMode ? 'Radar ON' : 'Correlation Radar'} shortcut="x">
+              <button
+                onClick={onRadarModeToggle}
+                className={classNames(
+                  "p-2 rounded-md transition-colors",
+                  showRadarMode
+                    ? "text-orange-600 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-400 dark:ring-orange-500"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                )}
+              >
+                <Radar className="h-5 w-5" />
+              </button>
+            </Tooltip>
           )}
 
           {onToggleSelectMode && (
-            <button
-              onClick={onToggleSelectMode}
-              className={`inline-flex items-center px-3 sm:px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
-                showSelectMode
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
-                  : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
-              }`}
-              title={showSelectMode ? 'Exit Select Mode' : 'Enter Select Mode'}
-            >
-              <ListChecks className="h-4 w-4 sm:mr-2 flex-shrink-0" />
-              <span className="hidden sm:inline">Select</span>
-            </button>
+            <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
+              <button
+                onClick={onToggleSelectMode}
+                className={`inline-flex items-center px-3 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  showSelectMode
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
+                    : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
+                }`}
+              >
+                <ListChecks className="h-4 w-4 flex-shrink-0" />
+              </button>
+            </Tooltip>
           )}
 
           {onSummaryToggle && (
-            <button
-              onClick={onSummaryToggle}
-              className={`inline-flex items-center px-3 sm:px-4 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap ${
-                showSummary
-                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
-                  : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
-              }`}
-              title={showSummary ? 'Hide summary' : 'Show summary'}
-            >
-              <BarChart3 className="h-4 w-4 sm:mr-2 flex-shrink-0" />
-              <span className="hidden sm:inline">Summary</span>
-            </button>
+            <Tooltip label={showSummary ? 'Hide Summary' : 'Summary'} shortcut="s">
+              <button
+                onClick={onSummaryToggle}
+                className={`inline-flex items-center px-3 py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  showSummary
+                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
+                    : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
+                }`}
+              >
+                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+              </button>
+            </Tooltip>
           )}
 
           {!hideCreateButton && (
-            <button
-              onClick={onCreateWant}
-              className="inline-flex items-center px-3 sm:px-4 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 whitespace-nowrap"
-            >
-              <span className="relative inline-flex sm:mr-2 flex-shrink-0">
-                <Heart className="h-4 w-4" />
-                <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
-              </span>
-              <span className="hidden sm:inline">{createButtonLabel}</span>
-            </button>
+            <Tooltip label={createButtonLabel ?? 'Add Want'} shortcut="a">
+              <button
+                onClick={onCreateWant}
+                className="inline-flex items-center px-3 py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
+              >
+                <span className="relative inline-flex flex-shrink-0">
+                  <Heart className="h-4 w-4" />
+                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
+                </span>
+              </button>
+            </Tooltip>
           )}
 
           {!hideCreateButton && onCreateTargetWant && (
             <button
               onClick={onCreateTargetWant}
               className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 focus:ring-offset-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-              title="Add Target Want"
             >
               <span className="relative inline-flex flex-shrink-0">
                 <span className="text-sm leading-none">🫙</span>
