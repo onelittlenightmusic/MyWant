@@ -465,6 +465,11 @@ class MyWantApiClient {
     await this.client.delete('/api/v1/global-state');
   }
 
+  // Want State (cross-want state access)
+  async clearWantState(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/states/${id}`);
+  }
+
   // Global Parameters
   async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number }> {
     return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters');

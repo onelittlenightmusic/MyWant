@@ -327,6 +327,22 @@ func (s *Server) setGlobalStateKey(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"key": key, "value": value})
 }
 
+// clearWantState handles DELETE /api/v1/states/{id}
+// Removes all state keys from the specified want.
+func (s *Server) clearWantState(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	want := s.findWantByIDInAll(wantID)
+	if want == nil {
+		s.JSONError(w, r, http.StatusNotFound, "want not found", "")
+		return
+	}
+
+	for key := range want.GetExplicitState() {
+		want.DeleteState(key)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // deleteGlobalStateKey handles DELETE /api/v1/global-state/{key}
 func (s *Server) deleteGlobalStateKey(w http.ResponseWriter, r *http.Request) {
 	key := mux.Vars(r)["key"]

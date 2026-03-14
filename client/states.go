@@ -116,6 +116,16 @@ func (c *Client) DeleteWantStateKey(wantID, key string) error {
 	return c.Request("DELETE", fmt.Sprintf("/api/v1/states/%s/%s", wantID, key), nil, nil)
 }
 
+// ClearWantState removes all state keys from a want.
+func (c *Client) ClearWantState(wantID string) error {
+	return c.Request("DELETE", fmt.Sprintf("/api/v1/states/%s", wantID), nil, nil)
+}
+
+// ClearGlobalState removes all keys from the global state.
+func (c *Client) ClearGlobalState() error {
+	return c.Request("DELETE", "/api/v1/global-state", nil, nil)
+}
+
 // SetGlobalStateKey sets a single key in the global state.
 func (c *Client) SetGlobalStateKey(key string, value any) error {
 	return c.Request("PUT", fmt.Sprintf("/api/v1/global-state/%s", key), value, nil)

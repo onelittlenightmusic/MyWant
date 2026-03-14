@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -206,6 +207,54 @@ Examples:
 	},
 }
 
+// ─── clear ─────────────────────────────────────────────────────────────────
+
+var stateClearCmd = &cobra.Command{
+	Use:   "clear <want-id|global>",
+	Short: "Clear all state keys from a want or global state",
+	Long: `Remove all state keys from the specified want, or clear the entire global state.
+
+Examples:
+  mywant state clear abc123
+  mywant state clear global`,
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: completeWantIDs,
+	Run: func(cmd *cobra.Command, args []string) {
+		target := args[0]
+		yes, _ := cmd.Flags().GetBool("yes")
+
+		label := target
+		if target != "global" {
+			label = fmt.Sprintf("want %s", target)
+		}
+
+		if !yes {
+			fmt.Printf("This will delete ALL state keys from %s. Continue? [y/N]: ", label)
+			reader := bufio.NewReader(os.Stdin)
+			line, _ := reader.ReadString('\n')
+			line = strings.TrimSpace(strings.ToLower(line))
+			if line != "y" && line != "yes" {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
+		c := client.NewClient(viper.GetString("server"))
+		if target == "global" {
+			if err := c.ClearGlobalState(); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := c.ClearWantState(target); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+		}
+		fmt.Printf("Cleared all state keys from %s.\n", label)
+	},
+}
+
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 func printHierarchicalState(s client.HierarchicalState) {
@@ -246,9 +295,13 @@ func init() {
 	// get flags
 	stateGetCmd.Flags().Bool("json", false, "Output as JSON")
 
+	// clear flags
+	stateClearCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+
 	StateCmd.AddCommand(stateListCmd)
 	StateCmd.AddCommand(stateSearchCmd)
 	StateCmd.AddCommand(stateGetCmd)
 	StateCmd.AddCommand(stateSetCmd)
 	StateCmd.AddCommand(stateDeleteCmd)
+	StateCmd.AddCommand(stateClearCmd)
 }

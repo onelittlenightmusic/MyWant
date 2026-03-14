@@ -429,6 +429,10 @@ func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, w
 	case "resume":  err = s.globalBuilder.QueueWantResume([]string{wantID})
 	case "stop":    err = s.globalBuilder.QueueWantStop([]string{wantID})
 	case "start":   err = s.globalBuilder.QueueWantStart([]string{wantID})
+	case "restart":
+		if err = s.globalBuilder.QueueWantStop([]string{wantID}); err == nil {
+			err = s.globalBuilder.QueueWantStart([]string{wantID})
+		}
 	}
 
 	if err != nil {
@@ -447,6 +451,11 @@ func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) { s.handle
 func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request)  { s.handleBatchOperation(w, r, "resume") }
 func (s *Server) stopWants(w http.ResponseWriter, r *http.Request)    { s.handleBatchOperation(w, r, "stop") }
 func (s *Server) startWants(w http.ResponseWriter, r *http.Request)   { s.handleBatchOperation(w, r, "start") }
+func (s *Server) restartWant(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	s.handleSingleLifecycle(w, r, vars["id"], "restart")
+}
+func (s *Server) restartWants(w http.ResponseWriter, r *http.Request) { s.handleBatchOperation(w, r, "restart") }
 
 func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, operation string) {
 	var body struct { IDs []string `json:"ids"` }
@@ -462,6 +471,10 @@ func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, op
 	case "resume":  err = s.globalBuilder.QueueWantResume(body.IDs)
 	case "stop":    err = s.globalBuilder.QueueWantStop(body.IDs)
 	case "start":   err = s.globalBuilder.QueueWantStart(body.IDs)
+	case "restart":
+		if err = s.globalBuilder.QueueWantStop(body.IDs); err == nil {
+			err = s.globalBuilder.QueueWantStart(body.IDs)
+		}
 	}
 
 	if err != nil {

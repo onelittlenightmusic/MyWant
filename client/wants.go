@@ -94,6 +94,11 @@ func (c *Client) StartWants(ids []string) error {
 	return c.Request("POST", "/api/v1/wants/start", BatchOperationRequest{IDs: ids}, nil)
 }
 
+// RestartWants restarts multiple wants (stop then start)
+func (c *Client) RestartWants(ids []string) error {
+	return c.Request("POST", "/api/v1/wants/restart", BatchOperationRequest{IDs: ids}, nil)
+}
+
 // ExportWants exports all wants as YAML
 func (c *Client) ExportWants() ([]byte, error) {
 	return c.RawRequest("POST", "/api/v1/wants/export", nil, "application/json")

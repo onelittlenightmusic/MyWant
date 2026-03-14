@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History, Eraser } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -19,6 +19,8 @@ import { LabelsSection } from '@/components/forms/sections/LabelsSection';
 import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
 import { SchedulingSection } from '@/components/forms/sections/SchedulingSection';
 import { SummarySidebarContent } from './SummarySidebarContent';
+import { ConfirmationBubble } from '@/components/notifications';
+import { apiClient } from '@/api/client';
 import {
   DetailsSidebar,
   TabContent,
@@ -119,6 +121,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showClearStateConfirmation, setShowClearStateConfirmation] = useState(false);
   const [editedConfig, setEditedConfig] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -187,6 +190,18 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
   const handleSaveRecipeClick = () => {
     if (wantDetails && canSaveRecipe && onSaveRecipe) onSaveRecipe(wantDetails);
+  };
+
+  const handleClearState = async () => {
+    if (!wantId) return;
+    try {
+      await apiClient.clearWantState(wantId);
+      await fetchWantDetails(wantId);
+    } catch (e) {
+      console.error('Failed to clear want state:', e);
+    } finally {
+      setShowClearStateConfirmation(false);
+    }
   };
 
   // Fetch details when want ID changes (not on every want object change)
@@ -438,6 +453,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
   return (
+    <>
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
@@ -521,7 +537,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             )}
             {showPrevTab && prevTabId === 'results' && (
               <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
-                <ResultsTab want={wantDetails} />
+                <ResultsTab want={wantDetails} onClearState={() => setShowClearStateConfirmation(true)} />
               </div>
             )}
             {showPrevTab && prevTabId === 'logs' && (
@@ -569,7 +585,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
             {activeTab === 'results' && (
               <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
-                <ResultsTab want={wantDetails} />
+                <ResultsTab want={wantDetails} onClearState={() => setShowClearStateConfirmation(true)} />
               </div>
             )}
 
@@ -595,6 +611,17 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
       </div>
     </div>
+
+      <ConfirmationBubble
+        isVisible={showClearStateConfirmation}
+        onConfirm={handleClearState}
+        onCancel={() => setShowClearStateConfirmation(false)}
+        onDismiss={() => setShowClearStateConfirmation(false)}
+        title="Clear State"
+        message="Are you sure you want to clear all state data for this want? This action cannot be undone."
+        layout="dashboard-right"
+      />
+    </>
   );
 };
 
@@ -1157,7 +1184,7 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
   return items;
 };
 
-const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
+const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want, onClearState }) => {
   const hasCurrent = want.state?.current && Object.keys(want.state.current).length > 0;
   const hasGoal = want.state?.goal && Object.keys(want.state.goal).length > 0;
   const hasPlan = want.state?.plan && Object.keys(want.state.plan).length > 0;
@@ -1169,6 +1196,17 @@ const ResultsTab: React.FC<{ want: Want }> = ({ want }) => {
     <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
       {hasAnyState || hasHiddenState ? (
         <div className="space-y-2">
+          {onClearState && (
+            <div className="flex justify-end mb-1">
+              <button
+                onClick={onClearState}
+                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                title="Clear all state data"
+              >
+                <Eraser className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           {hasCurrent && (
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Current</h4>

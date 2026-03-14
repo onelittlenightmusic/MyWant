@@ -307,6 +307,7 @@ func init() {
 	WantsCmd.AddCommand(resumeWantsCmd)
 	WantsCmd.AddCommand(stopWantsCmd)
 	WantsCmd.AddCommand(startWantsCmd)
+	WantsCmd.AddCommand(restartWantsCmd)
 }
 
 func printMap(m map[string]any) {
@@ -365,6 +366,17 @@ var startWantsCmd = &cobra.Command{
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		runBatchOperation(args, "start", (*client.Client).StartWants)
+	},
+}
+
+var restartWantsCmd = &cobra.Command{
+	Use:               "restart [id]...",
+	Aliases:           []string{"rs"},
+	Short:             "Restart want executions (stop then start)",
+	Args:              cobra.MinimumNArgs(1),
+	ValidArgsFunction: completeWantIDs,
+	Run: func(cmd *cobra.Command, args []string) {
+		runBatchOperation(args, "restart", (*client.Client).RestartWants)
 	},
 }
 
