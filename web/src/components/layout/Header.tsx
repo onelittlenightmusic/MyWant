@@ -149,10 +149,14 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Dropdown menu */}
             {menuOpen && (
               <div className={classNames(
-                "absolute left-0 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg z-50 overflow-hidden",
-                isBottom ? "bottom-full mb-2" : "top-full mt-2"
+                "absolute left-0 w-48 z-50",
+                isBottom ? "bottom-full pb-2" : "top-full pt-2"
               )}>
-                <nav className="p-2 space-y-1">
+                {/* Transparent bridge to prevent mouseleave when moving to menu */}
+                <div className="absolute inset-x-0 h-2 bg-transparent" style={isBottom ? { bottom: 0 } : { top: 0 }} />
+                
+                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg overflow-hidden">
+                  <nav className="p-2 space-y-1">
                   {menuItems.map(item => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.href;
@@ -207,6 +211,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                 </div>
               </div>
+            </div>
             )}
           </div>
 
