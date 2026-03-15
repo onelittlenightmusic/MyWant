@@ -108,6 +108,13 @@ wantType:
     label: current
     initialValue: ''
 
+  - name: debug_recording_error
+    description: Error message if debug recording failed
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
   - name: replay_screenshot_url
     description: API URL of the screenshot taken at the end of replay
     type: string
@@ -128,6 +135,111 @@ wantType:
     persistent: true
     label: current
     initialValue: ''
+
+  - name: recording_session_id
+    description: Session ID of the active normal recording
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debug_recording_session_id
+    description: Session ID of the active debug recording
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_session_id
+    description: Session ID of the active replay
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: target_object
+    description: Target object captured at the end of debug recording
+    type: object
+    persistent: true
+    label: current
+    initialValue: {}
+
+  - name: action_by_agent
+    description: Name of the agent that last updated state
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
+
+  - name: startWebhookId
+    description: Webhook ID for starting a recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: stopWebhookId
+    description: Webhook ID for stopping a recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debugStartWebhookId
+    description: Webhook ID for starting a debug Chrome recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debugStopWebhookId
+    description: Webhook ID for stopping a debug Chrome recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replayWebhookId
+    description: Webhook ID for triggering a replay execution
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: start_recording_requested
+    description: Signal to start a normal recording session (set by webhook, consumed by agent)
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: stop_recording_requested
+    description: Signal to stop a normal recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: start_debug_recording_requested
+    description: Signal to start a debug Chrome recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: stop_debug_recording_requested
+    description: Signal to stop a debug Chrome recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: start_replay_requested
+    description: Signal to start a replay session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
 
   requires:
     - playwright_recording

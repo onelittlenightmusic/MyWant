@@ -157,17 +157,24 @@ func ensurePlaywrightServer(ctx context.Context, serverPath string, forceRestart
 	return nil
 }
 
-// isPipeClosed returns true if the error indicates a closed stdio pipe.
+// isPipeClosed returns true if the error indicates the MCP server process has died or its stdio pipe is closed.
 func isPipeClosed(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "file already closed") || strings.Contains(msg, "broken pipe")
+	return strings.Contains(msg, "file already closed") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "connection closed") ||
+		strings.Contains(msg, "client is closing") ||
+		strings.Contains(msg, "EOF")
 }
 
 // startPlaywrightRecording launches the Playwright MCP App Server and begins recording.
 func startPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
+	// Consume the signal immediately so we don't retry on every cycle if this call fails
+	want.SetPlan("start_recording_requested", false)
+
 	targetURL := want.GetStringParam("target_url", "https://example.com")
 
 	serverPath := resolvePlaywrightServerPath()
@@ -239,13 +246,14 @@ func stopPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("recording_active", false)
 	want.SetPlan("stop_recording_requested", false)
 	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
-	
-	want.SetStatus(mywant.WantStatusAchieved)
 	return nil
 }
 
 // startDebugRecording attaches to an existing Chrome via CDP and begins recording.
 func startDebugRecording(ctx context.Context, want *mywant.Want) error {
+	// Consume the signal immediately so we don't retry on every cycle if this call fails
+	want.SetPlan("start_debug_recording_requested", false)
+
 	host := want.GetStringParam("debug_chrome_host", "localhost")
 	port := want.GetStringParam("debug_chrome_port", "9222")
 	cdpURL := fmt.Sprintf("http://%s:%s", host, port)
@@ -356,12 +364,14 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 	if targetObject != nil {
 		want.SetCurrent("target_object", targetObject)
 	}
-	want.SetStatus(mywant.WantStatusAchieved)
 	return nil
 }
 
 // startReplay launches a replay session via the run_replay MCP tool.
 func startReplay(ctx context.Context, want *mywant.Want) error {
+	// Consume the signal immediately so we don't retry on every cycle if this call fails
+	want.SetPlan("start_replay_requested", false)
+
 	actionsJSON := mywant.GetCurrent(want, "replay_actions", "[]")
 	startURL := mywant.GetCurrent(want, "replay_start_url", "")
 	if startURL == "" {

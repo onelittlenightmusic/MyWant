@@ -56,10 +56,27 @@ func (m *NativeMCPManager) ExecuteTool(ctx context.Context, serverName string, c
 		}
 		client := mcp.NewClient(&mcp.Implementation{Name: "mywant-native-client", Version: "1.0.0"}, nil)
 		transport := &mcp.IOTransport{Reader: reader, Writer: writer}
-		cs, err := client.Connect(ctx, transport, nil); if err != nil { return nil, err }
+		// Use context.Background() so the session lifetime is not tied to the tool-call context.
+		// The tool-call context (which may have a short timeout) would otherwise close the
+		// connection when it expires, breaking subsequent calls.
+		cs, err := client.Connect(context.Background(), transport, nil); if err != nil { return nil, err }
 		m.mu.Lock(); m.sessions[serverName] = cs; session = cs; m.mu.Unlock()
 	}
-	return session.CallTool(ctx, &mcp.CallToolParams{Name: toolName, Arguments: toolArgs})
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: toolName, Arguments: toolArgs})
+	if err != nil && isSessionClosed(err) {
+		// Stale session: remove it so the next call creates a fresh one
+		m.mu.Lock(); delete(m.sessions, serverName); m.mu.Unlock()
+	}
+	return result, err
+}
+
+func isSessionClosed(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "connection closed") ||
+		strings.Contains(msg, "client is closing") ||
+		strings.Contains(msg, "EOF") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "file already closed")
 }
 
 func (m *NativeMCPManager) CloseAllSessions() {

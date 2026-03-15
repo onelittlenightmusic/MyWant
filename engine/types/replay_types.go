@@ -107,9 +107,11 @@ func (r *ReplayWant) Initialize() {
 	}
 }
 
-// IsAchieved returns true when a replay script has been recorded
+// IsAchieved returns true when a replay has been successfully completed.
+// Recording alone does not achieve the want — the monitoring agent must stay alive
+// to handle replay requests after recording finishes.
 func (r *ReplayWant) IsAchieved() bool {
-	return r.GetReplayScript() != ""
+	return r.GetReplayScript() != "" && GetCurrent(r, "replay_result", "") != ""
 }
 
 // CalculateAchievingPercentage returns progress percentage
