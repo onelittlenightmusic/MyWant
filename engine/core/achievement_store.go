@@ -26,6 +26,9 @@ type Achievement struct {
 	EarnedAt          time.Time      `yaml:"earnedAt"                    json:"earnedAt"`
 	AwardedBy         string         `yaml:"awardedBy"                   json:"awardedBy"` // system / capability_manager / human
 	UnlocksCapability string         `yaml:"unlocksCapability,omitempty" json:"unlocksCapability,omitempty"`
+	// Unlocked controls whether the achievement's capability is active.
+	// Achievements start locked (false) and must be explicitly unlocked to take effect.
+	Unlocked          bool           `yaml:"unlocked"                    json:"unlocked"`
 	Metadata          map[string]any `yaml:"metadata,omitempty"          json:"metadata,omitempty"`
 }
 
@@ -66,17 +69,22 @@ type AchievementStore struct {
 // Typically used to register unlocked capabilities into the AgentRegistry.
 type OnAchievementAddedFunc func(a Achievement)
 
+// OnAchievementDeletedFunc is a hook called after an achievement is removed.
+// Typically used to recompute available_capabilities in global state.
+type OnAchievementDeletedFunc func(id string, remaining []Achievement)
+
 var (
 	globalAchievementStore     *achievementManager
 	globalAchievementStoreOnce sync.Once
 )
 
 type achievementManager struct {
-	mu       sync.RWMutex
-	path     string
-	lastHash string
-	store    AchievementStore
-	hooks    []OnAchievementAddedFunc
+	mu           sync.RWMutex
+	path         string
+	lastHash     string
+	store        AchievementStore
+	hooks        []OnAchievementAddedFunc
+	deleteHooks  []OnAchievementDeletedFunc
 }
 
 // GetAchievementManager returns the singleton achievement manager.
@@ -101,6 +109,14 @@ func RegisterOnAchievementAdded(fn OnAchievementAddedFunc) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.hooks = append(m.hooks, fn)
+}
+
+// RegisterOnAchievementDeleted registers a hook called after an achievement is deleted.
+func RegisterOnAchievementDeleted(fn OnAchievementDeletedFunc) {
+	m := GetAchievementManager()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.deleteHooks = append(m.deleteHooks, fn)
 }
 
 func (m *achievementManager) load() {
@@ -175,11 +191,14 @@ func (m *achievementManager) Add(a Achievement) Achievement {
 	}
 	m.store.Achievements = append(m.store.Achievements, a)
 	m.save()
-	hooks := make([]OnAchievementAddedFunc, len(m.hooks))
-	copy(hooks, m.hooks)
+	var hooks []OnAchievementAddedFunc
+	if a.Unlocked {
+		hooks = make([]OnAchievementAddedFunc, len(m.hooks))
+		copy(hooks, m.hooks)
+	}
 	m.mu.Unlock()
 
-	log.Printf("[AchievementStore] Added achievement %s (%s) for agent %s", a.ID, a.Title, a.AgentName)
+	log.Printf("[AchievementStore] Added achievement %s (%s) for agent %s (unlocked=%v)", a.ID, a.Title, a.AgentName, a.Unlocked)
 	for _, fn := range hooks {
 		fn(a)
 	}
@@ -188,29 +207,123 @@ func (m *achievementManager) Add(a Achievement) Achievement {
 
 func (m *achievementManager) Update(id string, updated Achievement) bool {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	var old *Achievement
 	for i, a := range m.store.Achievements {
 		if a.ID == id {
+			cp := a
+			old = &cp
 			updated.ID = id
 			m.store.Achievements[i] = updated
 			m.save()
-			return true
+			break
 		}
 	}
-	return false
+	if old == nil {
+		m.mu.Unlock()
+		return false
+	}
+	addHooks := make([]OnAchievementAddedFunc, len(m.hooks))
+	copy(addHooks, m.hooks)
+	delHooks := make([]OnAchievementDeletedFunc, len(m.deleteHooks))
+	copy(delHooks, m.deleteHooks)
+	remaining := make([]Achievement, len(m.store.Achievements))
+	copy(remaining, m.store.Achievements)
+	m.mu.Unlock()
+
+	// Fire hooks on Unlocked state transition.
+	if !old.Unlocked && updated.Unlocked {
+		log.Printf("[AchievementStore] Achievement %s unlocked — firing add hooks", id)
+		for _, fn := range addHooks {
+			fn(updated)
+		}
+	} else if old.Unlocked && !updated.Unlocked {
+		log.Printf("[AchievementStore] Achievement %s locked — firing delete hooks", id)
+		for _, fn := range delHooks {
+			fn(id, remaining)
+		}
+	}
+	return true
 }
 
 func (m *achievementManager) Delete(id string) bool {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for i, a := range m.store.Achievements {
 		if a.ID == id {
+			wasUnlocked := a.Unlocked
 			m.store.Achievements = append(m.store.Achievements[:i], m.store.Achievements[i+1:]...)
 			m.save()
+			remaining := make([]Achievement, len(m.store.Achievements))
+			copy(remaining, m.store.Achievements)
+			var hooks []OnAchievementDeletedFunc
+			if wasUnlocked {
+				hooks = make([]OnAchievementDeletedFunc, len(m.deleteHooks))
+				copy(hooks, m.deleteHooks)
+			}
+			m.mu.Unlock()
+			for _, fn := range hooks {
+				fn(id, remaining)
+			}
 			return true
 		}
 	}
+	m.mu.Unlock()
 	return false
+}
+
+// Lock sets Unlocked=false on the given achievement and fires OnAchievementDeleted hooks.
+func (m *achievementManager) Lock(id string) (*Achievement, bool) {
+	m.mu.Lock()
+	for i, a := range m.store.Achievements {
+		if a.ID == id {
+			if !a.Unlocked {
+				cp := a
+				m.mu.Unlock()
+				return &cp, true // already locked
+			}
+			m.store.Achievements[i].Unlocked = false
+			updated := m.store.Achievements[i]
+			m.save()
+			remaining := make([]Achievement, len(m.store.Achievements))
+			copy(remaining, m.store.Achievements)
+			hooks := make([]OnAchievementDeletedFunc, len(m.deleteHooks))
+			copy(hooks, m.deleteHooks)
+			m.mu.Unlock()
+			log.Printf("[AchievementStore] Achievement %s (%s) locked — firing delete hooks", id, updated.Title)
+			for _, fn := range hooks {
+				fn(id, remaining)
+			}
+			return &updated, true
+		}
+	}
+	m.mu.Unlock()
+	return nil, false
+}
+
+// Unlock sets Unlocked=true on the given achievement and fires OnAchievementAdded hooks.
+func (m *achievementManager) Unlock(id string) (*Achievement, bool) {
+	m.mu.Lock()
+	for i, a := range m.store.Achievements {
+		if a.ID == id {
+			if a.Unlocked {
+				cp := a
+				m.mu.Unlock()
+				return &cp, true // already unlocked
+			}
+			m.store.Achievements[i].Unlocked = true
+			updated := m.store.Achievements[i]
+			m.save()
+			hooks := make([]OnAchievementAddedFunc, len(m.hooks))
+			copy(hooks, m.hooks)
+			m.mu.Unlock()
+			log.Printf("[AchievementStore] Achievement %s (%s) unlocked — firing add hooks", id, updated.Title)
+			for _, fn := range hooks {
+				fn(updated)
+			}
+			return &updated, true
+		}
+	}
+	m.mu.Unlock()
+	return nil, false
 }
 
 func (m *achievementManager) ListByAgent(agentName string) []Achievement {
@@ -235,6 +348,19 @@ func (m *achievementManager) HasAchievement(agentName, title string) bool {
 		}
 	}
 	return false
+}
+
+// FindByAgentAndTitle returns the achievement matching agentName+title, regardless of lock state.
+func (m *achievementManager) FindByAgentAndTitle(agentName, title string) (*Achievement, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, a := range m.store.Achievements {
+		if a.AgentName == agentName && a.Title == title {
+			cp := a
+			return &cp, true
+		}
+	}
+	return nil, false
 }
 
 // ── Rules ─────────────────────────────────────────────────────────────────────
@@ -300,13 +426,44 @@ func (m *achievementManager) DeleteRule(id string) bool {
 
 // ── Package-level functions ───────────────────────────────────────────────────
 
-func AddAchievement(a Achievement) Achievement        { return GetAchievementManager().Add(a) }
-func ListAchievements() []Achievement                 { return GetAchievementManager().List() }
-func GetAchievement(id string) (*Achievement, bool)   { return GetAchievementManager().Get(id) }
-func DeleteAchievement(id string) bool                { return GetAchievementManager().Delete(id) }
-func UpdateAchievement(id string, u Achievement) bool { return GetAchievementManager().Update(id, u) }
-func ListAchievementsByAgent(n string) []Achievement  { return GetAchievementManager().ListByAgent(n) }
-func HasAchievement(agentName, title string) bool     { return GetAchievementManager().HasAchievement(agentName, title) }
+func AddAchievement(a Achievement) Achievement              { return GetAchievementManager().Add(a) }
+func ListAchievements() []Achievement                       { return GetAchievementManager().List() }
+func GetAchievement(id string) (*Achievement, bool)         { return GetAchievementManager().Get(id) }
+func DeleteAchievement(id string) bool                      { return GetAchievementManager().Delete(id) }
+func UpdateAchievement(id string, u Achievement) bool       { return GetAchievementManager().Update(id, u) }
+func LockAchievement(id string) (*Achievement, bool)        { return GetAchievementManager().Lock(id) }
+func UnlockAchievement(id string) (*Achievement, bool)      { return GetAchievementManager().Unlock(id) }
+func ListAchievementsByAgent(n string) []Achievement        { return GetAchievementManager().ListByAgent(n) }
+func HasAchievement(agentName, title string) bool                        { return GetAchievementManager().HasAchievement(agentName, title) }
+func FindAchievementByAgentAndTitle(agentName, title string) (*Achievement, bool) {
+	return GetAchievementManager().FindByAgentAndTitle(agentName, title)
+}
+
+// ReplayUnlockedAchievements calls OnAchievementAdded hooks for all currently-unlocked
+// achievements. Call this after all hooks are registered to restore runtime state
+// (e.g. available_capabilities) from persisted data after a server restart.
+func ReplayUnlockedAchievements() {
+	m := GetAchievementManager()
+	m.mu.RLock()
+	var unlocked []Achievement
+	for _, a := range m.store.Achievements {
+		if a.Unlocked {
+			unlocked = append(unlocked, a)
+		}
+	}
+	hooks := make([]OnAchievementAddedFunc, len(m.hooks))
+	copy(hooks, m.hooks)
+	m.mu.RUnlock()
+
+	for _, a := range unlocked {
+		for _, fn := range hooks {
+			fn(a)
+		}
+	}
+	if len(unlocked) > 0 {
+		log.Printf("[AchievementStore] Replayed %d unlocked achievements", len(unlocked))
+	}
+}
 
 func AddAchievementRule(r AchievementRule) AchievementRule    { return GetAchievementManager().AddRule(r) }
 func ListAchievementRules() []AchievementRule                  { return GetAchievementManager().ListRules() }

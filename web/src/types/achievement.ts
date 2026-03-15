@@ -10,6 +10,8 @@ export interface Achievement {
   earnedAt: string;
   awardedBy: string; // system | capability_manager | human
   unlocksCapability?: string;
+  /** When false (default), the achievement exists but its capability is not active yet. */
+  unlocked: boolean;
   metadata?: Record<string, unknown>;
 }
 

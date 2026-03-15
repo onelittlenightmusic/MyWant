@@ -1,14 +1,16 @@
 import React from 'react';
-import { Trash2, Unlock } from 'lucide-react';
+import { Trash2, Unlock, Lock } from 'lucide-react';
 import { Achievement, LEVEL_COLORS, LEVEL_EMOJI, LEVEL_LABELS } from '@/types/achievement';
 import { classNames } from '@/utils/helpers';
 
 interface AchievementCardProps {
   achievement: Achievement;
   onDelete?: (id: string) => void;
+  onUnlock?: (id: string) => void;
+  onLock?: (id: string) => void;
 }
 
-export const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, onDelete }) => {
+export const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, onDelete, onUnlock, onLock }) => {
   const level = achievement.level ?? 1;
   const colors = LEVEL_COLORS[level] ?? LEVEL_COLORS[1];
   const emoji = LEVEL_EMOJI[level] ?? '🏅';
@@ -23,19 +25,40 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, o
       className={classNames(
         'relative rounded-lg border-2 p-4 shadow-sm transition-shadow hover:shadow-md',
         colors.border,
-        colors.bg
+        colors.bg,
+        !achievement.unlocked ? 'opacity-60' : ''
       )}
     >
-      {/* Delete button */}
-      {onDelete && (
-        <button
-          onClick={() => onDelete(achievement.id)}
-          className="absolute top-2 right-2 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          title="Delete achievement"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      )}
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 flex gap-1">
+        {onUnlock && !achievement.unlocked && (
+          <button
+            onClick={() => onUnlock(achievement.id)}
+            className="p-1 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+            title="Unlock achievement (activate capability)"
+          >
+            <Lock className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onLock && achievement.unlocked && (
+          <button
+            onClick={() => onLock(achievement.id)}
+            className="p-1 rounded text-emerald-500 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Lock achievement (deactivate capability)"
+          >
+            <Unlock className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(achievement.id)}
+            className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title="Delete achievement"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
 
       {/* Header: emoji + title */}
       <div className="flex items-start gap-2 pr-6">
@@ -89,9 +112,17 @@ export const AchievementCard: React.FC<AchievementCardProps> = ({ achievement, o
 
       {/* Unlocks capability */}
       {achievement.unlocksCapability && (
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded px-2 py-1">
-          <Unlock className="w-3 h-3 flex-shrink-0" />
+        <div className={classNames(
+          'mt-3 flex items-center gap-1.5 text-xs rounded px-2 py-1',
+          achievement.unlocked
+            ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
+            : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
+        )}>
+          {achievement.unlocked
+            ? <Unlock className="w-3 h-3 flex-shrink-0" />
+            : <Lock className="w-3 h-3 flex-shrink-0" />}
           <span className="font-mono truncate">{achievement.unlocksCapability}</span>
+          {!achievement.unlocked && <span className="ml-auto text-gray-400">(locked)</span>}
         </div>
       )}
 

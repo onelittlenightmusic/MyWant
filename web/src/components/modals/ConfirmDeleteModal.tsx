@@ -22,11 +22,15 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
   want,
   loading = false,
   childrenCount = 0,
+  title,
+  message,
   layout = 'dashboard-right' // Default to side context
 }) => {
-  if (!want) return null;
+  if (!isOpen) return null;
 
-  const wantName = want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want';
+  const wantName = want
+    ? (want.metadata?.name || want.metadata?.id || want.id || 'Unnamed Want')
+    : (message ?? 'this item');
 
   return (
     <ConfirmationBubble
@@ -35,7 +39,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
       onConfirm={onConfirm}
       onCancel={onClose}
       loading={loading}
-      title="Delete"
+      title={title ?? "Delete"}
       layout={layout}
       message={null}
     >

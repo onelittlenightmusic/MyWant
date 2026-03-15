@@ -447,7 +447,7 @@ func (grl *GenericRecipeLoader) GetRecipeFinalResultField(recipePath string) (st
 	return genericRecipe.Recipe.FinalResultField, nil
 }
 
-// substituteParams performs parameter substitution in want params
+// substituteParams performs parameter substitution in want params, recursing into nested maps.
 func (grl *GenericRecipeLoader) substituteParams(params map[string]any, mergedParams map[string]any) map[string]any {
 	if params == nil {
 		return nil
@@ -455,17 +455,25 @@ func (grl *GenericRecipeLoader) substituteParams(params map[string]any, mergedPa
 
 	substituted := make(map[string]any)
 	for key, value := range params {
-		if strValue, ok := value.(string); ok {
-			if paramValue, exists := mergedParams[strValue]; exists {
-				substituted[key] = paramValue
-			} else {
-				substituted[key] = value
-			}
-		} else {
-			substituted[key] = value
-		}
+		substituted[key] = grl.substituteValue(value, mergedParams)
 	}
 	return substituted
+}
+
+// substituteValue resolves a single value: if it's a string matching a param key, replace it;
+// if it's a nested map, recurse; otherwise pass through unchanged.
+func (grl *GenericRecipeLoader) substituteValue(value any, mergedParams map[string]any) any {
+	switch v := value.(type) {
+	case string:
+		if paramValue, exists := mergedParams[v]; exists {
+			return paramValue
+		}
+		return v
+	case map[string]any:
+		return grl.substituteParams(v, mergedParams)
+	default:
+		return value
+	}
 }
 
 // autoConnect implements auto-connection logic for RecipeAgent wants NOTE: This is legacy recipe-level auto-connection. The real auto-connection happens system-wide during the connection phase in declarative.go

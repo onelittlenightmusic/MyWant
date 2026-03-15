@@ -17,14 +17,19 @@ has_hotel_expert {
     current.available_capabilities[_] == "hotel_expert"
 }
 
+# helper: true if luxury routing is active (prefer_luxury AND hotel_expert both true)
+luxury_with_expert {
+    goal.trip.prefer_luxury
+    has_hotel_expert
+}
+
 # ─── Phase 1: Hotel booking with capability-aware routing ─────────────────────
 
 # Luxury hotel when hotel_expert is available and goal prefers luxury
 missing[action] {
     goal.trip.require_hotel
     not current.hotel_reserved
-    goal.trip.prefer_luxury
-    has_hotel_expert
+    luxury_with_expert
     action := "reserve_hotel_luxury"
 }
 
@@ -32,7 +37,7 @@ missing[action] {
 missing[action] {
     goal.trip.require_hotel
     not current.hotel_reserved
-    not (goal.trip.prefer_luxury; has_hotel_expert)
+    not luxury_with_expert
     action := "reserve_hotel_budget"
 }
 

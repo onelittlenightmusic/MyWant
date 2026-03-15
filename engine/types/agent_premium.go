@@ -45,7 +45,8 @@ func generateHotelCost(hotelType string) float64 {
 	var minCost, maxCost float64
 	switch hotelType {
 	case "budget": minCost, maxCost = 50.0, 120.0
-	case "standard": minCost, maxCost = 120.0, 250.0
+	case "standard": minCost, maxCost = 250.0, 400.0  // always over 200 budget
+	case "discounted": minCost, maxCost = 80.0, 150.0 // always under 200 budget (hotel_discount capability)
 	case "boutique": minCost, maxCost = 200.0, 450.0
 	default: minCost, maxCost = 400.0, 1200.0
 	}
@@ -98,6 +99,10 @@ func generateRealisticHotelName(hotelType string) string {
 		"standard": {
 			"City Central Hotel", "Comfort Inn Express", "Downtown Plaza", "Urban Oasis",
 			"Gateway Hotel", "The Meridian", "Riverside Inn", "Sunrise Hotel",
+		},
+		"discounted": {
+			"City Central Hotel (割引)", "Comfort Inn Express (会員価格)", "Downtown Plaza (特別割引)",
+			"Urban Oasis (割引)", "Gateway Hotel (会員割引)", "The Meridian (特別料金)",
 		},
 		"budget": {
 			"Budget Stay Inn", "Economy Hotel", "Value Lodge", "Basic Inn",

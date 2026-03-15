@@ -4,46 +4,64 @@ recipe:
     description: |
       Verification scenario 3: Agent selection based on achievements.
 
-      Demonstrates how the hotel_expert capability — unlocked when an agent earns
-      the matching achievement — causes the OPA planner to route hotel bookings to
-      the luxury tier instead of the budget fallback.
+      Demonstrates how the hotel_discount capability — unlocked when an agent earns
+      the "割引の達人" achievement — causes the OPA planner to route hotel bookings to
+      a discounted tier (80–150 USD) instead of standard (250–400 USD).
+      With a budget of 200 USD, only the discounted route keeps costs within budget,
+      allowing the Budget want to achieve.
 
       Setup:
         1. Deploy this recipe (capability_manager + itinerary + budget start together).
-        2. Award the "ホテル達人" achievement to agent_premium via CLI or UI.
-           The achievement's unlocksCapability="hotel_expert" will automatically:
-             a. Register hotel_expert in the AgentRegistry.
-             b. Store it in global state (available_capabilities).
-             c. Propagate it into itinerary's OPA input on the next cycle.
-        3. The OPA policy (travel_with_expert.rego) detects hotel_expert and switches
-           from "reserve_hotel_budget" to "reserve_hotel_luxury".
+        2. Confirm without achievement: hotel booked at standard price (250–400 USD),
+           budget exceeded → Budget stays "reaching".
+        3. Award the "割引の達人" achievement (unlocksCapability="hotel_discount") via CLI:
+             mywant achievements create --title "割引の達人" --agent agent_premium \
+               --level 2 --category hotel --unlocks hotel_discount
+        4. Redeploy: OPA detects hotel_discount → books discounted hotel (80–150 USD)
+           → budget satisfied → Budget achieves.
 
       Expected outcome:
-        - Without hotel_expert → hotel want created with hotel_type="budget"
-        - With    hotel_expert → hotel want created with hotel_type="luxury"
+        - Without hotel_discount → hotel_type="standard" (250–400 USD) → budget exceeded
+        - With    hotel_discount → hotel_type="discounted" (80–150 USD)  → budget achieved
     custom_type: "achievement selection demo"
     category: "achievement"
-    version: "1.0.0"
+    version: "2.0.0"
 
   parameters:
     prefix: "ach-selection"
     destination: "Tokyo"
-    budget_target: 600
-    policy_dir: "yaml/policies/travel_with_expert.rego"
+    budget_target: 200
+    policy_dir: "yaml/policies/achievement"
     use_llm: false
+    direction_map: >-
+      {
+        "reserve_hotel_discounted": {
+          "type": "hotel",
+          "params": {"hotel_type": "discounted"},
+          "sets": {"hotel_reserved": true},
+          "cost_field": "hotel_cost"
+        },
+        "reserve_hotel_standard": {
+          "type": "hotel",
+          "params": {"hotel_type": "standard"},
+          "sets": {"hotel_reserved": true},
+          "cost_field": "hotel_cost"
+        }
+      }
 
   parameter_descriptions:
     prefix: "Name prefix for generated wants"
     destination: "Trip destination"
-    budget_target: "Budget ceiling in USD"
-    policy_dir: "Path to the OPA policy file (travel_with_expert.rego checks hotel_expert)"
+    budget_target: "Budget ceiling in USD (200 = between standard 250–400 and discounted 80–150)"
+    policy_dir: "Path to the OPA policy directory"
     use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+    direction_map: "JSON map of OPA action names to hotel want configurations"
 
   state:
     - name: available_capabilities
-      description: Capabilities unlocked via achievements, injected into OPA input
+      description: Computed on-demand from unlocked achievements — not persisted
       type: array
-      persistent: true
+      persistent: false
       initialValue: []
       label: current
     - name: hotel_reserved
@@ -81,7 +99,7 @@ recipe:
       spec:
         params: {}
 
-    # Itinerary — OPA-driven planner with hotel_expert-aware routing
+    # Itinerary — OPA-driven planner with hotel_discount-aware routing
     - metadata:
         type: itinerary
         labels:
@@ -96,30 +114,15 @@ recipe:
               require_hotel: true
               require_dinner: false
               require_transport: false
-              prefer_luxury: true
             budget_target: budget_target
           current:
             hotel_reserved: false
             hotel_cost: 0
           use_llm: use_llm
           policy_dir: policy_dir
-          direction_map: >-
-            {
-              "reserve_hotel_luxury": {
-                "type": "hotel",
-                "params": {"hotel_type": "luxury"},
-                "sets": {"hotel_reserved": true},
-                "cost_field": "hotel_cost"
-              },
-              "reserve_hotel_budget": {
-                "type": "hotel",
-                "params": {"hotel_type": "budget"},
-                "sets": {"hotel_reserved": true},
-                "cost_field": "hotel_cost"
-              }
-            }
+          direction_map: direction_map
 
-    # Budget tracker
+    # Budget tracker — achieves only when cost is within budget_target
     - metadata:
         type: budget
         labels:
@@ -140,5 +143,20 @@ recipe:
         spec:
           params:
             destination: "Tokyo"
-            budget_target: 600
+            budget_target: 200
             use_llm: false
+            direction_map: >-
+              {
+                "reserve_hotel_discounted": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "discounted"},
+                  "sets": {"hotel_reserved": true},
+                  "cost_field": "hotel_cost"
+                },
+                "reserve_hotel_standard": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "standard"},
+                  "sets": {"hotel_reserved": true},
+                  "cost_field": "hotel_cost"
+                }
+              }

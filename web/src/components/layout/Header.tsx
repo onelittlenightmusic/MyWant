@@ -96,18 +96,8 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [showProviderSelect, showBubbleOnMobile]);
 
-  // Close hamburger menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [menuOpen]);
+  // Close hamburger menu when mouse leaves the menu area
+  const handleMenuMouseLeave = () => setMenuOpen(false);
 
   const handleRobotClick = () => {
     if (window.innerWidth < 1024) {
@@ -147,10 +137,9 @@ export const Header: React.FC<HeaderProps> = ({
     >
       <div className="flex items-center justify-between gap-1 sm:gap-4">
         <div className="flex items-center space-x-2 min-w-0" ref={menuRef}>
-          {/* Hamburger menu button */}
-          <div className="relative">
+          {/* Hamburger menu button — opens on hover */}
+          <div className="relative" onMouseEnter={() => setMenuOpen(true)} onMouseLeave={handleMenuMouseLeave}>
             <button
-              onClick={() => setMenuOpen(prev => !prev)}
               className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
               aria-label="Toggle menu"
             >
@@ -236,13 +225,15 @@ export const Header: React.FC<HeaderProps> = ({
             // Desktop behavior: always flex
             "lg:flex lg:items-center",
             // Mobile behavior: absolute overlay or hidden
-            showBubbleOnMobile 
+            showBubbleOnMobile
               ? classNames(
                   "flex items-center absolute inset-x-0 bg-white dark:bg-gray-900 p-4 border-gray-200 dark:border-gray-700 shadow-lg z-50 animate-slide-in",
                   isBottom ? "bottom-full mb-px border-t" : "top-full border-b"
                 )
               : "hidden lg:flex"
-          )} ref={selectRef}>
+          )} ref={selectRef}
+          onMouseLeave={() => { if (window.innerWidth >= 1024) setShowProviderSelect(false); }}
+          >
             <div className={classNames(
               "transition-all duration-300 ease-in-out overflow-hidden",
               showProviderSelect ? "opacity-100 max-w-xs" : "opacity-0 max-w-0"
@@ -260,6 +251,7 @@ export const Header: React.FC<HeaderProps> = ({
               onSubmit={handleInteractSubmitInternal}
               isThinking={isInteractThinking}
               onRobotClick={handleRobotClick}
+              onRobotMouseEnter={() => { if (window.innerWidth >= 1024) setShowProviderSelect(true); }}
               autoFocus={showBubbleOnMobile}
             />
           </div>

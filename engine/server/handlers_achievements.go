@@ -65,6 +65,28 @@ func (s *Server) updateAchievement(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, a)
 }
 
+// lockAchievement sets Unlocked=false on an achievement, deactivating its capability.
+func (s *Server) lockAchievement(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	a, ok := mywant.LockAchievement(id)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Achievement not found", id)
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, a)
+}
+
+// unlockAchievement sets Unlocked=true on an achievement, activating its capability.
+func (s *Server) unlockAchievement(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	a, ok := mywant.UnlockAchievement(id)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Achievement not found", id)
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, a)
+}
+
 // deleteAchievement removes an achievement by ID.
 func (s *Server) deleteAchievement(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]

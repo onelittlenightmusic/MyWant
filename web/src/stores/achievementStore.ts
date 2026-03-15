@@ -11,6 +11,8 @@ interface AchievementStore {
 
   fetchAchievements: () => Promise<void>;
   createAchievement: (request: CreateAchievementRequest) => Promise<Achievement>;
+  lockAchievement: (id: string) => Promise<Achievement>;
+  unlockAchievement: (id: string) => Promise<Achievement>;
   deleteAchievement: (id: string) => Promise<void>;
   fetchRules: () => Promise<void>;
   createRule: (request: CreateRuleRequest) => Promise<AchievementRule>;
@@ -49,6 +51,32 @@ export const useAchievementStore = create<AchievementStore>()(
           error: error instanceof Error ? error.message : 'Failed to create achievement',
           loading: false,
         });
+        throw error;
+      }
+    },
+
+    lockAchievement: async (id: string) => {
+      try {
+        const updated = await apiClient.lockAchievement(id);
+        set((state) => ({
+          achievements: state.achievements.map((a) => (a.id === id ? updated : a)),
+        }));
+        return updated;
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : 'Failed to lock achievement' });
+        throw error;
+      }
+    },
+
+    unlockAchievement: async (id: string) => {
+      try {
+        const updated = await apiClient.unlockAchievement(id);
+        set((state) => ({
+          achievements: state.achievements.map((a) => (a.id === id ? updated : a)),
+        }));
+        return updated;
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : 'Failed to unlock achievement' });
         throw error;
       }
     },

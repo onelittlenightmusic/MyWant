@@ -142,6 +142,42 @@ var deleteAchievementCmd = &cobra.Command{
 	},
 }
 
+var lockAchievementCmd = &cobra.Command{
+	Use:   "lock [id]",
+	Short: "Deactivate an achievement's capability (set unlocked=false)",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		a, err := c.LockAchievement(args[0])
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Locked achievement: %s (%s) for agent %s\n", a.ID, a.Title, a.AgentName)
+		if a.UnlocksCapability != "" {
+			fmt.Printf("  Capability now inactive: %s\n", a.UnlocksCapability)
+		}
+	},
+}
+
+var unlockAchievementCmd = &cobra.Command{
+	Use:   "unlock [id]",
+	Short: "Activate an achievement's capability (set unlocked=true)",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		a, err := c.UnlockAchievement(args[0])
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Unlocked achievement: %s (%s) for agent %s\n", a.ID, a.Title, a.AgentName)
+		if a.UnlocksCapability != "" {
+			fmt.Printf("  Capability now active: %s\n", a.UnlocksCapability)
+		}
+	},
+}
+
 // ── Rules subcommand ──────────────────────────────────────────────────────────
 
 var rulesCmd = &cobra.Command{
@@ -282,5 +318,7 @@ func init() {
 	AchievementsCmd.AddCommand(getAchievementCmd)
 	AchievementsCmd.AddCommand(createAchievementCmd)
 	AchievementsCmd.AddCommand(deleteAchievementCmd)
+	AchievementsCmd.AddCommand(lockAchievementCmd)
+	AchievementsCmd.AddCommand(unlockAchievementCmd)
 	AchievementsCmd.AddCommand(rulesCmd)
 }

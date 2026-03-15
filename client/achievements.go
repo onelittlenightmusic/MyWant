@@ -18,6 +18,7 @@ type Achievement struct {
 	EarnedAt          time.Time      `json:"earnedAt"`
 	AwardedBy         string         `json:"awardedBy"`
 	UnlocksCapability string         `json:"unlocksCapability,omitempty"`
+	Unlocked          bool           `json:"unlocked"`
 	Metadata          map[string]any `json:"metadata,omitempty"`
 }
 
@@ -57,6 +58,24 @@ func (c *Client) CreateAchievement(a Achievement) (*Achievement, error) {
 func (c *Client) UpdateAchievement(id string, a Achievement) (*Achievement, error) {
 	var result Achievement
 	if err := c.Request("PUT", fmt.Sprintf("/api/v1/achievements/%s", id), a, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// LockAchievement deactivates an achievement's capability (sets unlocked=false).
+func (c *Client) LockAchievement(id string) (*Achievement, error) {
+	var result Achievement
+	if err := c.Request("PATCH", fmt.Sprintf("/api/v1/achievements/%s/lock", id), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UnlockAchievement activates an achievement's capability (sets unlocked=true).
+func (c *Client) UnlockAchievement(id string) (*Achievement, error) {
+	var result Achievement
+	if err := c.Request("PATCH", fmt.Sprintf("/api/v1/achievements/%s/unlock", id), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

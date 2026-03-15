@@ -78,6 +78,12 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	}
 	currentRaw := mergeOPAInput(currentAll, "current")
 
+	// Compute available_capabilities directly from the achievement store.
+	// Only achievements with Unlocked=true contribute, regardless of any stale value
+	// carried by parent overlays (e.g. coordinator initialValue:[]).
+	caps := computeAvailableCapabilities()
+	currentRaw["available_capabilities"] = caps
+
 	// Step 2: Change detection — exclude opa_input_hash from the hash input to
 	// avoid a circular dependency where the hash changes its own input every tick.
 	currentForHash := make(map[string]any, len(currentRaw))
@@ -187,4 +193,25 @@ func mergeOPAInput(all map[string]any, primaryKey string) map[string]any {
 		result[k] = v
 	}
 	return result
+}
+
+// computeAvailableCapabilities returns the list of capabilities unlocked by
+// achievements that have Unlocked=true. This is the single authoritative source —
+// no global state cache needed.
+func computeAvailableCapabilities() []string {
+	seen := make(map[string]bool)
+	var caps []string
+	for _, a := range ListAchievements() {
+		if !a.Unlocked || a.UnlocksCapability == "" {
+			continue
+		}
+		if !seen[a.UnlocksCapability] {
+			seen[a.UnlocksCapability] = true
+			caps = append(caps, a.UnlocksCapability)
+		}
+	}
+	if caps == nil {
+		caps = []string{}
+	}
+	return caps
 }

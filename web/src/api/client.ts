@@ -504,6 +504,16 @@ class MyWantApiClient {
     return response.data;
   }
 
+  async lockAchievement(id: string): Promise<Achievement> {
+    const response = await this.client.patch<Achievement>(`/api/v1/achievements/${id}/lock`);
+    return response.data;
+  }
+
+  async unlockAchievement(id: string): Promise<Achievement> {
+    const response = await this.client.patch<Achievement>(`/api/v1/achievements/${id}/unlock`);
+    return response.data;
+  }
+
   async deleteAchievement(id: string): Promise<void> {
     await this.client.delete(`/api/v1/achievements/${id}`);
   }

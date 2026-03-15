@@ -7,6 +7,8 @@ interface InteractBubbleProps {
   isThinking: boolean;
   disabled?: boolean;
   onRobotClick?: () => void;
+  onRobotMouseEnter?: () => void;
+  onRobotMouseLeave?: () => void;
   autoFocus?: boolean;
 }
 
@@ -15,6 +17,8 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
   isThinking,
   disabled = false,
   onRobotClick,
+  onRobotMouseEnter,
+  onRobotMouseLeave,
   autoFocus = false
 }) => {
   const [message, setMessage] = useState('');
@@ -84,6 +88,8 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
       <div
         className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-600 shadow-lg flex-shrink-0 cursor-pointer hover:bg-blue-700 transition-colors"
         onClick={onRobotClick}
+        onMouseEnter={onRobotMouseEnter}
+        onMouseLeave={onRobotMouseLeave}
       >
         <Bot className="h-6 w-6 text-white" />
       </div>

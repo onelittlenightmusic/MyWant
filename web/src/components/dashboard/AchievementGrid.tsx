@@ -7,12 +7,16 @@ interface AchievementGridProps {
   achievements: Achievement[];
   loading: boolean;
   onDelete?: (id: string) => void;
+  onUnlock?: (id: string) => void;
+  onLock?: (id: string) => void;
 }
 
 export const AchievementGrid: React.FC<AchievementGridProps> = ({
   achievements,
   loading,
   onDelete,
+  onUnlock,
+  onLock,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState<number | null>(null);
@@ -112,7 +116,7 @@ export const AchievementGrid: React.FC<AchievementGridProps> = ({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filtered.map((a) => (
-            <AchievementCard key={a.id} achievement={a} onDelete={onDelete} />
+            <AchievementCard key={a.id} achievement={a} onDelete={onDelete} onUnlock={onUnlock} onLock={onLock} />
           ))}
         </div>
       )}

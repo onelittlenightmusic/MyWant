@@ -14,6 +14,8 @@ export const AchievementsPage: React.FC = () => {
     achievements, rules, loading, error,
     fetchAchievements, fetchRules,
     createAchievement: _createAchievement,
+    lockAchievement,
+    unlockAchievement,
     deleteAchievement, createRule, deleteRule,
     clearError,
   } = useAchievementStore();
@@ -39,6 +41,14 @@ export const AchievementsPage: React.FC = () => {
       return () => clearTimeout(t);
     }
   }, [error, clearError]);
+
+  const handleLockAchievement = async (id: string) => {
+    await lockAchievement(id);
+  };
+
+  const handleUnlockAchievement = async (id: string) => {
+    await unlockAchievement(id);
+  };
 
   const handleDeleteAchievement = async () => {
     if (!pendingDeleteId) return;
@@ -130,7 +140,7 @@ export const AchievementsPage: React.FC = () => {
                 <p className="text-sm">Achievements are earned when agents successfully complete wants.</p>
               </div>
             ) : (
-              <AchievementGrid achievements={achievements} loading={loading} onDelete={(id) => setPendingDeleteId(id)} />
+              <AchievementGrid achievements={achievements} loading={loading} onDelete={(id) => setPendingDeleteId(id)} onUnlock={handleUnlockAchievement} onLock={handleLockAchievement} />
             )
           )}
 

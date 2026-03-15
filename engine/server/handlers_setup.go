@@ -190,6 +190,8 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}", s.getAchievement).Methods("GET", "OPTIONS")
 	achievements.HandleFunc("/{id}", s.updateAchievement).Methods("PUT", "OPTIONS")
 	achievements.HandleFunc("/{id}", s.deleteAchievement).Methods("DELETE", "OPTIONS")
+	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
+	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
 
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
