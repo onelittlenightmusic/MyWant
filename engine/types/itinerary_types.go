@@ -62,6 +62,11 @@ func (o *ItineraryWant) Progress() {
 
 	if len(updates) > 0 { o.mergeCurrent(updates) }
 
+	// Sync available_capabilities from global state into current so OPA can read them.
+	if caps, ok := GetGlobalState("available_capabilities"); ok {
+		o.mergeCurrent(map[string]any{"available_capabilities": caps})
+	}
+
 	directions := GetPlan(o, "directions", []string{})
 
 	if len(directions) > 0 {

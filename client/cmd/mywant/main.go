@@ -36,6 +36,8 @@ func main() {
 
 	rootCmd.AddCommand(commands.AgentsCmd)
 
+	rootCmd.AddCommand(commands.AchievementsCmd)
+
 	rootCmd.AddCommand(commands.CapabilitiesCmd)
 
 	rootCmd.AddCommand(commands.TypesCmd)

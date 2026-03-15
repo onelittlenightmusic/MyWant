@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
@@ -40,6 +40,7 @@ const menuItems = [
 const advancedItems = [
   { id: 'wantTypes', label: 'Want Types', icon: Zap, href: '/want-types' },
   { id: 'recipes', label: 'Recipes', icon: BookOpen, href: '/recipes' },
+  { id: 'achievements', label: 'Achievements', icon: Trophy, href: '/achievements' },
   { id: 'logs', label: 'Logs', icon: Activity, href: '/logs' },
 ];
 

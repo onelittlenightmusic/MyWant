@@ -1,0 +1,50 @@
+wants:
+  - metadata:
+      name: governance-itinerary
+      type: itinerary
+      labels:
+        role: planner
+        scenario: achievement-governance
+    spec:
+      params:
+        goal:
+          id: "goal-governance-test"
+          trip:
+            destination: "Osaka"
+            require_hotel: true
+            require_dinner: true
+            require_transport: false
+          budget_target: 300
+        current:
+          hotel_reserved: false
+          dinner_reserved: false
+          hotel_cost: 0
+          dinner_cost: 0
+        use_llm: false
+        policy_dir: "yaml/policies"
+        direction_map: >-
+          {
+            "reserve_hotel": {
+              "type": "hotel",
+              "params": {"hotel_type": "budget", "preferred_agent": "hotel_agent_dynamic"},
+              "sets": {"hotel_reserved": true},
+              "cost_field": "hotel_cost"
+            },
+            "reserve_dinner": {
+              "type": "restaurant",
+              "params": {"restaurant_type": "casual", "party_size": 2},
+              "sets": {"dinner_reserved": true},
+              "cost_field": "dinner_cost"
+            }
+          }
+
+  - metadata:
+      name: governance-budget
+      type: budget
+      labels:
+        role: tracker
+        scenario: achievement-governance
+    spec:
+      params:
+        budget: 300
+        currency: USD

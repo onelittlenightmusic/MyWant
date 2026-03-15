@@ -46,6 +46,10 @@ import {
   DRAFT_WANT_LABEL,
 } from '@/types/draft';
 import { ServerConfig } from '@/types/config';
+import {
+  Achievement, AchievementListResponse, CreateAchievementRequest,
+  AchievementRule, AchievementRuleListResponse, CreateRuleRequest,
+} from '@/types/achievement';
 
 class MyWantApiClient {
   private client: AxiosInstance;
@@ -478,6 +482,44 @@ class MyWantApiClient {
   async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number }> {
     const response = await this.client.put<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', { parameters });
     return response.data;
+  }
+
+  // Achievements
+  async listAchievements(): Promise<AchievementListResponse> {
+    return this.deduplicatedGet<AchievementListResponse>('/api/v1/achievements');
+  }
+
+  async getAchievement(id: string): Promise<Achievement> {
+    const response = await this.client.get<Achievement>(`/api/v1/achievements/${id}`);
+    return response.data;
+  }
+
+  async createAchievement(request: CreateAchievementRequest): Promise<Achievement> {
+    const response = await this.client.post<Achievement>('/api/v1/achievements', request);
+    return response.data;
+  }
+
+  async updateAchievement(id: string, request: Partial<Achievement>): Promise<Achievement> {
+    const response = await this.client.put<Achievement>(`/api/v1/achievements/${id}`, request);
+    return response.data;
+  }
+
+  async deleteAchievement(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/achievements/${id}`);
+  }
+
+  // Achievement Rules
+  async listAchievementRules(): Promise<AchievementRuleListResponse> {
+    return this.deduplicatedGet<AchievementRuleListResponse>('/api/v1/achievements/rules');
+  }
+
+  async createAchievementRule(request: CreateRuleRequest): Promise<AchievementRule> {
+    const response = await this.client.post<AchievementRule>('/api/v1/achievements/rules', request);
+    return response.data;
+  }
+
+  async deleteAchievementRule(id: string): Promise<void> {
+    await this.client.delete(`/api/v1/achievements/rules/${id}`);
   }
 }
 

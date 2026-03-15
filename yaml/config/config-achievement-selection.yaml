@@ -1,0 +1,49 @@
+wants:
+  - metadata:
+      name: achievement-selection-itinerary
+      type: itinerary
+      labels:
+        role: planner
+        scenario: achievement-selection
+    spec:
+      params:
+        goal:
+          id: "goal-selection-test"
+          trip:
+            destination: "Tokyo"
+            require_hotel: true
+            require_dinner: false
+            require_transport: false
+            prefer_luxury: true
+          budget_target: 600
+        current:
+          hotel_reserved: false
+          hotel_cost: 0
+        use_llm: false
+        policy_dir: "yaml/policies/travel_with_expert.rego"
+        direction_map: >-
+          {
+            "reserve_hotel_luxury": {
+              "type": "hotel",
+              "params": {"hotel_type": "luxury", "requires_capability": "hotel_expert"},
+              "sets": {"hotel_reserved": true},
+              "cost_field": "hotel_cost"
+            },
+            "reserve_hotel_budget": {
+              "type": "hotel",
+              "params": {"hotel_type": "budget"},
+              "sets": {"hotel_reserved": true},
+              "cost_field": "hotel_cost"
+            }
+          }
+
+  - metadata:
+      name: achievement-selection-budget
+      type: budget
+      labels:
+        role: tracker
+        scenario: achievement-selection
+    spec:
+      params:
+        budget: 600
+        currency: USD

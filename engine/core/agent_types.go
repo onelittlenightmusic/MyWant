@@ -388,6 +388,35 @@ func (r *AgentRegistry) UnregisterAgent(name string) bool {
 	return true
 }
 
+// LinkCapabilityToAgent registers a capability and links an existing agent to it.
+// Used by CapabilityManagerAgent to dynamically unlock capabilities via achievements.
+func (r *AgentRegistry) LinkCapabilityToAgent(agentName, capabilityName string) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	// Ensure the capability exists in the registry
+	if _, exists := r.capabilities[capabilityName]; !exists {
+		cap := Capability{
+			Name:        capabilityName,
+			Gives:       []string{capabilityName},
+			Description: "Dynamically unlocked capability",
+		}
+		r.capabilities[capabilityName] = cap
+		r.capabilityToAgents[capabilityName] = []string{}
+	}
+	// Link the agent to the capability's gives values
+	cap := r.capabilities[capabilityName]
+	for _, gives := range cap.Gives {
+		agentNames := r.capabilityToAgents[gives]
+		for _, n := range agentNames {
+			if n == agentName {
+				return // Already linked
+			}
+		}
+		r.capabilityToAgents[gives] = append(agentNames, agentName)
+		InfoLog("[REGISTRY] Dynamically linked agent '%s' to capability '%s'", agentName, gives)
+	}
+}
+
 // UnregisterCapability removes a capability from the registry
 func (r *AgentRegistry) UnregisterCapability(name string) bool {
 	r.mutex.Lock()

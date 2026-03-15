@@ -1,0 +1,144 @@
+recipe:
+  metadata:
+    name: "Achievement Selection Demo"
+    description: |
+      Verification scenario 3: Agent selection based on achievements.
+
+      Demonstrates how the hotel_expert capability — unlocked when an agent earns
+      the matching achievement — causes the OPA planner to route hotel bookings to
+      the luxury tier instead of the budget fallback.
+
+      Setup:
+        1. Deploy this recipe (capability_manager + itinerary + budget start together).
+        2. Award the "ホテル達人" achievement to agent_premium via CLI or UI.
+           The achievement's unlocksCapability="hotel_expert" will automatically:
+             a. Register hotel_expert in the AgentRegistry.
+             b. Store it in global state (available_capabilities).
+             c. Propagate it into itinerary's OPA input on the next cycle.
+        3. The OPA policy (travel_with_expert.rego) detects hotel_expert and switches
+           from "reserve_hotel_budget" to "reserve_hotel_luxury".
+
+      Expected outcome:
+        - Without hotel_expert → hotel want created with hotel_type="budget"
+        - With    hotel_expert → hotel want created with hotel_type="luxury"
+    custom_type: "achievement selection demo"
+    category: "achievement"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "ach-selection"
+    destination: "Tokyo"
+    budget_target: 600
+    policy_dir: "yaml/policies/travel_with_expert.rego"
+    use_llm: false
+
+  parameter_descriptions:
+    prefix: "Name prefix for generated wants"
+    destination: "Trip destination"
+    budget_target: "Budget ceiling in USD"
+    policy_dir: "Path to the OPA policy file (travel_with_expert.rego checks hotel_expert)"
+    use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+
+  state:
+    - name: available_capabilities
+      description: Capabilities unlocked via achievements, injected into OPA input
+      type: array
+      persistent: true
+      initialValue: []
+      label: current
+    - name: hotel_reserved
+      description: Whether hotel has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: hotel_cost
+      description: Last reported hotel cost
+      type: float64
+      persistent: true
+      initialValue: 0
+      label: current
+    - name: costs
+      description: Map of child want costs
+      type: object
+      persistent: true
+      initialValue: {}
+      label: current
+    - name: goal_achieved
+      description: Planning completion status
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+  wants:
+    # Capability manager — auto-evaluates achievement rules each tick
+    - metadata:
+        type: capability_manager
+        labels:
+          role: manager
+          scenario: achievement-selection
+      spec:
+        params: {}
+
+    # Itinerary — OPA-driven planner with hotel_expert-aware routing
+    - metadata:
+        type: itinerary
+        labels:
+          role: planner
+          scenario: achievement-selection
+      spec:
+        params:
+          goal:
+            id: "goal-selection"
+            trip:
+              destination: destination
+              require_hotel: true
+              require_dinner: false
+              require_transport: false
+              prefer_luxury: true
+            budget_target: budget_target
+          current:
+            hotel_reserved: false
+            hotel_cost: 0
+          use_llm: use_llm
+          policy_dir: policy_dir
+          direction_map: >-
+            {
+              "reserve_hotel_luxury": {
+                "type": "hotel",
+                "params": {"hotel_type": "luxury"},
+                "sets": {"hotel_reserved": true},
+                "cost_field": "hotel_cost"
+              },
+              "reserve_hotel_budget": {
+                "type": "hotel",
+                "params": {"hotel_type": "budget"},
+                "sets": {"hotel_reserved": true},
+                "cost_field": "hotel_cost"
+              }
+            }
+
+    # Budget tracker
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+          scenario: achievement-selection
+      spec:
+        params:
+          budget: budget_target
+          currency: USD
+
+  example:
+    wants:
+      - metadata:
+          name: "achievement-selection-demo"
+          type: "achievement selection demo"
+          labels:
+            recipe: "Achievement Selection Demo"
+        spec:
+          params:
+            destination: "Tokyo"
+            budget_target: 600
+            use_llm: false

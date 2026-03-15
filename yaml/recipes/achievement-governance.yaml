@@ -1,0 +1,161 @@
+recipe:
+  metadata:
+    name: "Achievement Governance Demo"
+    description: |
+      Verification scenario 4: Governance tracking of dynamically generated agents.
+
+      Demonstrates how a dynamically generated agent (hotel_agent_dynamic, with
+      provenance metadata) completes travel wants and builds an auditable achievement
+      trail in ~/.mywant/achievements.yaml.
+
+      Setup:
+        1. Deploy this recipe (capability_manager + itinerary + budget start together).
+        2. The itinerary dispatches reserve_hotel and reserve_dinner.
+           hotel_agent_dynamic handles the hotel booking (provenance: generatedBy=claude).
+        3. CapabilityManagerAgent detects the completion and — if a matching rule exists —
+           auto-awards "初陣" achievement to hotel_agent_dynamic.
+        4. Inspect the audit trail:
+             mywant achievements list --agent hotel_agent_dynamic
+             cat ~/.mywant/achievements.yaml
+
+      Expected outcome:
+        - achievements.yaml records what hotel_agent_dynamic completed.
+        - Agent provenance (generatedBy, reason, createdByWantID) is visible alongside
+          the achievement, answering "who made this agent and what did it do?"
+
+      Pre-requisite rule (add once):
+        mywant achievements rules create \
+          --capability hotel_agency \
+          --count 1 \
+          --title "初陣" \
+          --description "初めてのWant完遂" \
+          --level 1 \
+          --category execution
+    custom_type: "achievement governance demo"
+    category: "achievement"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "ach-governance"
+    destination: "Osaka"
+    budget_target: 300
+    policy_dir: "yaml/policies"
+    use_llm: false
+
+  parameter_descriptions:
+    prefix: "Name prefix for generated wants"
+    destination: "Trip destination"
+    budget_target: "Budget ceiling in USD"
+    policy_dir: "Path to OPA policy directory"
+    use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+
+  state:
+    - name: hotel_reserved
+      description: Whether hotel has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: dinner_reserved
+      description: Whether dinner has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: hotel_cost
+      description: Last reported hotel cost
+      type: float64
+      persistent: true
+      initialValue: 0
+      label: current
+    - name: dinner_cost
+      description: Last reported dinner cost
+      type: float64
+      persistent: true
+      initialValue: 0
+      label: current
+    - name: costs
+      description: Map of child want costs
+      type: object
+      persistent: true
+      initialValue: {}
+      label: current
+    - name: goal_achieved
+      description: Planning completion status
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+  wants:
+    # Capability manager — auto-awards achievements when rules match
+    - metadata:
+        type: capability_manager
+        labels:
+          role: manager
+          scenario: achievement-governance
+      spec:
+        params: {}
+
+    # Itinerary — dispatches hotel (→ hotel_agent_dynamic) and dinner wants
+    - metadata:
+        type: itinerary
+        labels:
+          role: planner
+          scenario: achievement-governance
+      spec:
+        params:
+          goal:
+            id: "goal-governance"
+            trip:
+              destination: destination
+              require_hotel: true
+              require_dinner: true
+              require_transport: false
+            budget_target: budget_target
+          current:
+            hotel_reserved: false
+            dinner_reserved: false
+            hotel_cost: 0
+            dinner_cost: 0
+          use_llm: use_llm
+          policy_dir: policy_dir
+          direction_map: >-
+            {
+              "reserve_hotel": {
+                "type": "hotel",
+                "params": {"hotel_type": "budget"},
+                "sets": {"hotel_reserved": true},
+                "cost_field": "hotel_cost"
+              },
+              "reserve_dinner": {
+                "type": "restaurant",
+                "params": {"restaurant_type": "casual", "party_size": 2},
+                "sets": {"dinner_reserved": true},
+                "cost_field": "dinner_cost"
+              }
+            }
+
+    # Budget tracker
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+          scenario: achievement-governance
+      spec:
+        params:
+          budget: budget_target
+          currency: USD
+
+  example:
+    wants:
+      - metadata:
+          name: "achievement-governance-demo"
+          type: "achievement governance demo"
+          labels:
+            recipe: "Achievement Governance Demo"
+        spec:
+          params:
+            destination: "Osaka"
+            budget_target: 300
+            use_llm: false

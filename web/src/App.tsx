@@ -6,6 +6,7 @@ import { LogsPage } from '@/pages/ErrorHistoryPage';
 import { AgentsPage } from '@/pages/AgentsPage';
 import RecipePage from '@/pages/RecipePage';
 import WantTypePage from '@/pages/WantTypePage';
+import { AchievementsPage } from '@/pages/AchievementsPage';
 import { useConfigStore } from '@/stores/configStore';
 import { Layout } from '@/components/layout/Layout';
 
@@ -28,6 +29,7 @@ function App() {
               <Route path="/recipes" element={<RecipePage />} />
               <Route path="/want-types" element={<WantTypePage />} />
               <Route path="/logs" element={<LogsPage />} />
+              <Route path="/achievements" element={<AchievementsPage />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Layout>

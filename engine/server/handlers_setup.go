@@ -178,6 +178,19 @@ func (s *Server) setupRoutes() {
 	// Screenshots (replay)
 	api.HandleFunc("/screenshots/{filename}", s.serveReplayScreenshot).Methods("GET")
 
+	// Achievements CRUD
+	achievements := api.PathPrefix("/achievements").Subrouter()
+	achievements.HandleFunc("", s.listAchievements).Methods("GET", "OPTIONS")
+	achievements.HandleFunc("", s.createAchievement).Methods("POST", "OPTIONS")
+	achievements.HandleFunc("/rules", s.listAchievementRules).Methods("GET", "OPTIONS")
+	achievements.HandleFunc("/rules", s.createAchievementRule).Methods("POST", "OPTIONS")
+	achievements.HandleFunc("/rules/{id}", s.getAchievementRule).Methods("GET", "OPTIONS")
+	achievements.HandleFunc("/rules/{id}", s.updateAchievementRule).Methods("PUT", "OPTIONS")
+	achievements.HandleFunc("/rules/{id}", s.deleteAchievementRule).Methods("DELETE", "OPTIONS")
+	achievements.HandleFunc("/{id}", s.getAchievement).Methods("GET", "OPTIONS")
+	achievements.HandleFunc("/{id}", s.updateAchievement).Methods("PUT", "OPTIONS")
+	achievements.HandleFunc("/{id}", s.deleteAchievement).Methods("DELETE", "OPTIONS")
+
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 
