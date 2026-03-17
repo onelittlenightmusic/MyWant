@@ -90,6 +90,7 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 2. **Server modifications**: Edit `engine/server/handlers_*.go`
 3. Always `StoreState(k,v)` / `GetState(k)` for state access
 4. Initialize StateHistory: `if want.History.StateHistory == nil { want.History.StateHistory = make([]StateHistoryEntry, 0) }`
+5. **NEVER call `AddChildWant` from within a Want's `Progress()` or `Initialize()`**. Child Want creation is exclusively the responsibility of the Target (recipe deployment / ChainBuilder). Wants must not self-spawn children.
 
 ## Want Execution Lifecycle
 

@@ -1,0 +1,14 @@
+capabilities:
+  - name: weather_agency
+    gives:
+      - weather_agency
+    description: Fetches weather information for a city
+    stateAccess:
+      - name: weather_text
+        type: string
+        description: Weather summary text
+        accessType: readUpdate
+      - name: weather_date
+        type: string
+        description: Date when weather was fetched
+        accessType: readUpdate

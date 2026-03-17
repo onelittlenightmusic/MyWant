@@ -157,10 +157,11 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 		return states
 	}
 
-	// If we can't get the lock, we are likely in the middle of a reconciliation
-	// that holds the write lock. In this case, we return a snapshot of the current
-	// wants without locking. This is safe because we are on the same thread/context
-	// or the data is being updated atomically.
+	// TryRLock failed (write lock held by reconciliation). Block on RLock to get
+	// a consistent snapshot — never iterate cb.wants without holding the lock.
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+
 	states := make(map[string]*Want)
 	for name, want := range cb.wants {
 		states[name] = want.want

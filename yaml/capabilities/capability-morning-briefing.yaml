@@ -1,0 +1,33 @@
+capabilities:
+  - name: morning_briefing_agency
+    gives:
+      - morning_briefing_agency
+    stateAccess:
+      - name: briefing_phase
+        type: string
+        description: Lifecycle phase (waiting, running, done, failed)
+        accessType: readUpdate
+      - name: briefing_status
+        type: string
+        description: Status set by the agent (running, done, failed)
+        accessType: readUpdate
+      - name: last_posted_date
+        type: string
+        description: Date of last successful Slack post (YYYY-MM-DD)
+        accessType: readUpdate
+      - name: last_posted_at
+        type: string
+        description: Timestamp of last successful Slack post (RFC3339)
+        accessType: readUpdate
+      - name: last_message
+        type: string
+        description: Full text of the last composed briefing
+        accessType: readUpdate
+      - name: error
+        type: string
+        description: Error message if the last run failed
+        accessType: readUpdate
+      - name: achieving_percentage
+        type: integer
+        description: Progress percentage
+        accessType: readUpdate

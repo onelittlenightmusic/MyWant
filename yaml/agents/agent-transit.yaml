@@ -1,0 +1,77 @@
+agents:
+  # AgentTransitAPI - Queries Google Maps Directions API for transit routes
+  - name: agent_transit_api
+    runtime: localGo
+    type: do
+    description: Queries Google Maps Directions API to find optimal transit route for a given arrival time
+    version: '1.0'
+    capabilities:
+      - transit_api_agency
+    uses: []
+    role: action
+    configuration:
+      api_key: ""  # Falls back to GOOGLE_MAPS_API_KEY env var
+      language: ja
+      mode: transit
+    actions:
+      - name: query_transit
+        description: Queries transit directions and recommends departure time
+        parameters:
+          origin:
+            type: string
+            description: Departure location (station name or address)
+            example: 渋谷駅
+          destination:
+            type: string
+            description: Arrival location (station name or address)
+            example: 新宿駅
+          arrive_by:
+            type: string
+            description: Target arrival time in HH:MM format (local time)
+            example: "09:00"
+          api_key:
+            type: string
+            description: Google Maps API key (overrides GOOGLE_MAPS_API_KEY env var)
+            required: false
+        state_updates:
+          - name: transit_status
+            type: string
+            description: Status of the transit query (querying, done, failed)
+          - name: recommended_departure
+            type: string
+            description: Recommended departure time text (e.g. "8:31")
+          - name: estimated_arrival
+            type: string
+            description: Estimated arrival time text (e.g. "9:00")
+          - name: duration_minutes
+            type: int
+            description: Total travel duration in minutes
+          - name: first_vehicle
+            type: string
+            description: Name of the first transit vehicle/line (e.g. "山手線")
+          - name: boarding_stop
+            type: string
+            description: Name of the first boarding stop
+          - name: transfers
+            type: int
+            description: Number of transfers required
+          - name: route_name
+            type: string
+            description: Human-readable route label
+          - name: transit_result
+            type: string
+            description: Full JSON result of the transit query
+          - name: queried_at
+            type: string
+            description: Timestamp of when the query was executed (RFC3339)
+    output:
+      transit_result:
+        type: TransitRouteResult
+        fields:
+          - route_name: label for this route
+          - recommended_departure: suggested departure time
+          - estimated_arrival: expected arrival time
+          - duration_minutes: total travel time in minutes
+          - first_vehicle: first train/bus line name
+          - boarding_stop: first boarding station
+          - transfers: number of transfers

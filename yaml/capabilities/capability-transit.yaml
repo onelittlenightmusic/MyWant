@@ -1,0 +1,37 @@
+capabilities:
+  - name: transit_api_agency
+    gives:
+      - transit_api_agency
+    stateAccess:
+      - name: transit_status
+        type: string
+        description: Query status (pending, done, failed)
+        accessType: readUpdate
+      - name: recommended_departure
+        type: string
+        description: Recommended departure time (HH:MM)
+        accessType: readUpdate
+      - name: estimated_arrival
+        type: string
+        description: Estimated arrival time (HH:MM)
+        accessType: readUpdate
+      - name: duration_minutes
+        type: integer
+        description: Total journey duration in minutes
+        accessType: readUpdate
+      - name: first_vehicle
+        type: string
+        description: Name of the first transit vehicle
+        accessType: readUpdate
+      - name: boarding_stop
+        type: string
+        description: Name of the boarding stop/station
+        accessType: readUpdate
+      - name: transfers
+        type: integer
+        description: Number of transfers required
+        accessType: readUpdate
+      - name: error
+        type: string
+        description: Error message if the query failed
+        accessType: readUpdate

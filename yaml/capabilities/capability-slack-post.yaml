@@ -1,0 +1,22 @@
+capabilities:
+  - name: slack_post_agency
+    gives:
+      - slack_post_agency
+    description: Posts composed messages to Slack via Incoming Webhook
+    stateAccess:
+      - name: briefing_status
+        type: string
+        description: Posting status (done, failed)
+        accessType: readUpdate
+      - name: last_posted_date
+        type: string
+        description: Date of last post
+        accessType: readUpdate
+      - name: last_posted_at
+        type: string
+        description: Timestamp of last post
+        accessType: readUpdate
+      - name: last_message
+        type: string
+        description: Last posted message text
+        accessType: readUpdate

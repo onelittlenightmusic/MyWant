@@ -703,8 +703,10 @@ func (n *Want) StartProgressionLoop(
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
 				// CRITICAL: Even if already achieved, we must run one cycle to ensure
-				// FinalResultField is processed and state is aggregated.
+				// FinalResultField is processed, state is aggregated, and child-to-parent
+				// propagation (MergeParentState) in Progress() is executed.
 				n.BeginProgressCycle()
+				n.progressable.Progress()
 				n.EndProgressCycle()
 
 				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)

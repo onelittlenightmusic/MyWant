@@ -14,14 +14,25 @@ import (
 
 // MyWantConfig represents the CLI configuration
 type MyWantConfig struct {
-	AgentMode        string `yaml:"agent_mode"`         // local, webhook, grpc
-	ServerHost       string `yaml:"server_host"`        // Main server host
-	ServerPort       int    `yaml:"server_port"`        // Main server port
-	AgentServiceHost string `yaml:"agent_service_host"` // Agent service host (for webhook mode)
-	AgentServicePort int    `yaml:"agent_service_port"` // Agent service port (for webhook mode)
-	MockFlightPort   int    `yaml:"mock_flight_port"`   // Mock flight server port
-	HeaderPosition   string `yaml:"header_position"`    // top or bottom
-	ColorMode        string `yaml:"color_mode"`         // light, dark, system
+	AgentMode        string            `yaml:"agent_mode"`         // local, webhook, grpc
+	ServerHost       string            `yaml:"server_host"`        // Main server host
+	ServerPort       int               `yaml:"server_port"`        // Main server port
+	AgentServiceHost string            `yaml:"agent_service_host"` // Agent service host (for webhook mode)
+	AgentServicePort int               `yaml:"agent_service_port"` // Agent service port (for webhook mode)
+	MockFlightPort   int               `yaml:"mock_flight_port"`   // Mock flight server port
+	HeaderPosition   string            `yaml:"header_position"`    // top or bottom
+	ColorMode        string            `yaml:"color_mode"`         // light, dark, system
+	Environments     map[string]string `yaml:"environments"`       // arbitrary env vars applied at startup
+}
+
+// ApplyEnvironments sets entries from the environments section as environment variables.
+// Existing env vars (e.g. set in shell) always take precedence.
+func (c *MyWantConfig) ApplyEnvironments() {
+	for k, v := range c.Environments {
+		if v != "" && os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
 }
 
 // DefaultConfig returns the default configuration
@@ -303,8 +314,26 @@ func displayConfig(config *MyWantConfig) {
 
 	fmt.Printf("Mock Flight Port:   %d\n", config.MockFlightPort)
 	fmt.Printf("Header Position:    %s\n", config.HeaderPosition)
+
+	if len(config.Environments) > 0 {
+		fmt.Println()
+		fmt.Println("Environments:")
+		for k, v := range config.Environments {
+			masked := maskSecret(v)
+			fmt.Printf("  %s = %s\n", k, masked)
+		}
+	}
+
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("Config file: %s\n", getConfigPath())
+}
+
+// maskSecret masks all but the first 4 characters of a secret value
+func maskSecret(v string) string {
+	if len(v) <= 4 {
+		return "****"
+	}
+	return v[:4] + strings.Repeat("*", len(v)-4)
 }
 
 func init() {

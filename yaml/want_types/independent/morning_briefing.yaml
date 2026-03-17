@@ -1,0 +1,111 @@
+wantType:
+  metadata:
+    name: morning_briefing
+    title: Morning Briefing
+    description: |
+      OPA-driven coordinator that composes a daily morning briefing message and
+      publishes it for the sibling SlackPostWant to post.
+
+      The opa_llm_thinker ThinkAgent evaluates goal (trigger_time, routes) against
+      current (today's date, weather_date, transit_date_N, outgoing_date) and outputs
+      a "post_slack" direction when all prerequisites are met.
+
+      Deploy alongside: {name}-weather, {name}-transit-{N}, {name}-slack
+      Repeats daily — no need to recreate.
+    version: '2.0'
+    category: productivity
+    pattern: independent
+
+  parameters:
+    - name: weather_city
+      description: City name for weather query
+      type: string
+      default: Tokyo
+      required: false
+
+    - name: routes
+      description: |
+        List of transit routes. Each item: name, origin, destination, arrive_by, days.
+      type: array
+      required: false
+
+    - name: opa_llm_planner_command
+      description: Path or name of the opa-llm-planner binary
+      type: string
+      defaultGlobalParameter: opa_llm_planner_command
+      required: false
+
+    - name: policy_dir
+      description: Directory containing OPA .rego policy files
+      type: string
+      defaultGlobalParameter: opa_llm_policy_dir
+      default: "yaml/policies"
+      required: false
+
+    - name: use_llm
+      description: Enable LLM-augmented planning
+      type: boolean
+      default: false
+      required: false
+
+  state:
+    - name: goal
+      description: OPA goal (trigger_time, weather_city, routes) — read by thinker
+      type: object
+      persistent: true
+      initialValue: {}
+      label: goal
+
+    - name: current
+      description: |
+        Current snapshot updated each cycle: today, weather_date, transit_date_N,
+        outgoing_date. Read by the OPA thinker to evaluate policy.
+      type: object
+      persistent: true
+      initialValue: {}
+      label: current
+
+    - name: directions
+      description: Direction list produced by OPA thinker (e.g. ["post_slack"])
+      type: object
+      persistent: true
+      initialValue: []
+      label: plan
+
+    - name: opa_input_hash
+      description: Hash of goal+current used by OPA thinker for change detection
+      type: string
+      persistent: true
+      initialValue: ''
+      label: current
+
+    - name: outgoing_message
+      description: Composed briefing message for sibling SlackPostWant to post
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: outgoing_date
+      description: Date for which outgoing_message was composed (YYYY-MM-DD)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: briefing_status
+      description: Lifecycle status (composing, ready)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  requires:
+    - opa_llm_planning

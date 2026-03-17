@@ -1,0 +1,40 @@
+wants:
+  # ──────────────────────────────────────────────
+  # 朝のブリーフィング
+  # 毎日 07:30 に天気 + 乗換案内を Slack に投稿
+  #
+  # 必要な環境変数:
+  #   GOOGLE_MAPS_API_KEY       - 乗換案内 (必須)
+  #   SLACK_WEBHOOK_URL         - Slack 通知先 (必須)
+  #   OPENWEATHERMAP_API_KEY    - 天気 (省略時は wttr.in を使用)
+  # ──────────────────────────────────────────────
+  - metadata:
+      name: my-morning-briefing
+      type: morning_briefing
+      labels:
+        category: productivity
+    spec:
+      params:
+        time: "07:30"          # 起動時刻 (HH:MM, ローカル時間)
+        weather_city: Tokyo    # 天気取得都市
+
+        routes:
+          # 平日の通勤ルート
+          - name: オフィス(新宿)
+            origin: 渋谷駅
+            destination: 新宿駅
+            arrive_by: "09:00"
+            days: "mon,tue,wed,thu,fri"
+
+          # 木曜の出張ルート
+          - name: 出張(大阪)
+            origin: 東京駅
+            destination: 新大阪駅
+            arrive_by: "11:00"
+            days: "thu"
+
+        # API キーを直接指定する場合はここに書く
+        # (指定しない場合は環境変数から読み込み)
+        # slack_webhook_url: "https://hooks.slack.com/services/..."
+        # google_maps_api_key: "YOUR_KEY"
+        # openweathermap_api_key: "YOUR_KEY"

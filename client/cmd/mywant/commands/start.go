@@ -27,6 +27,9 @@ var StartCmd = &cobra.Command{
 			config = DefaultConfig()
 		}
 
+		// Apply environments section from config (env var takes precedence)
+		config.ApplyEnvironments()
+
 		// Override with command-line flags if provided
 		port, _ := cmd.Flags().GetInt("port")
 		host, _ := cmd.Flags().GetString("host")
