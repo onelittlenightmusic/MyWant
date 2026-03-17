@@ -44,7 +44,7 @@ func (cb *ChainBuilder) StopWant(wantID string) error {
 // This triggers the reconcile loop to re-run the want
 func (cb *ChainBuilder) RestartWant(wantID string) error {
 	// Find and restart the want by calling its RestartWant() method
-	cb.reconcileMutex.RLock()
+	cb.wantsMu.RLock()
 	var targetWant *Want
 	for _, runtime := range cb.wants {
 		if runtime.want.Metadata.ID == wantID {
@@ -52,7 +52,7 @@ func (cb *ChainBuilder) RestartWant(wantID string) error {
 			break
 		}
 	}
-	cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RUnlock()
 
 	if targetWant == nil {
 		return fmt.Errorf("want with ID %s not found", wantID)
@@ -142,8 +142,8 @@ func (cb *ChainBuilder) IsSuspended() bool {
 
 // distributeControlCommand distributes a control command to target want(s) and propagates to child wants if the target is a parent want
 func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 	var targetRuntime *runtimeWant
 	for _, runtime := range cb.wants {
 		if runtime.want.Metadata.ID == cmd.WantID {
@@ -191,8 +191,8 @@ func (cb *ChainBuilder) Start() error {
 
 // IsRunning returns whether the chain has any active wants
 func (cb *ChainBuilder) IsRunning() bool {
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 	return len(cb.wants) > 0
 }
 

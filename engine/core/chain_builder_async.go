@@ -26,16 +26,16 @@ func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, erro
 	}
 
 	// Pre-check: Verify no duplicate names in existing wants
-	cb.reconcileMutex.RLock()
+	cb.wantsMu.RLock()
 	for _, newWant := range wants {
 		for _, rw := range cb.wants {
 			if rw.want.Metadata.Name == newWant.Metadata.Name {
-				cb.reconcileMutex.RUnlock()
+				cb.wantsMu.RUnlock()
 				return nil, fmt.Errorf("want with name '%s' already exists", newWant.Metadata.Name)
 			}
 		}
 	}
-	cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RUnlock()
 
 	if err := cb.AddWantsAsync(wants); err != nil {
 		return nil, err
@@ -50,8 +50,8 @@ func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
 		return true
 	}
 
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 	for _, id := range wantIDs {
 		found := false
 		for _, rw := range cb.wants {
@@ -92,8 +92,8 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 		return true
 	}
 
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 	for _, id := range wantIDs {
 		for _, rw := range cb.wants {
 			if rw.want.Metadata.ID == id {

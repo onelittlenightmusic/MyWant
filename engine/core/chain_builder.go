@@ -180,8 +180,8 @@ func (cb *ChainBuilder) GetConfig() Config {
 
 // GetWants returns all runtime wants in the chain
 func (cb *ChainBuilder) GetWants() []*Want {
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 
 	wants := make([]*Want, 0, len(cb.wants))
 	for _, rw := range cb.wants {

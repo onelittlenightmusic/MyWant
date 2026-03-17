@@ -49,9 +49,9 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 // RetriggerReceiverWant is called when a packet is provided to a receiver
 // This is more reliable because it directly reflects execution state
 func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
-	cb.reconcileMutex.RLock()
+	cb.wantsMu.RLock()
 	runtimeWant, exists := cb.wants[wantName]
-	cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RUnlock()
 
 	if !exists {
 		InfoLog("[RETRIGGER-RECEIVER] WARNING: receiver want '%s' not found\n", wantName)
@@ -85,12 +85,12 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 	cb.completedFlagsMutex.RUnlock()
 
 	// Take snapshot of wants to avoid holding lock during SetStatus
-	cb.reconcileMutex.RLock()
+	cb.wantsMu.RLock()
 	wantSnapshot := make(map[string]*runtimeWant)
 	for name, rw := range cb.wants {
 		wantSnapshot[name] = rw
 	}
-	cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RUnlock()
 	anyWantRetriggered := false
 	for wantID, isCompleted := range completedSnapshot {
 

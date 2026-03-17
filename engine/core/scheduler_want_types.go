@@ -30,12 +30,12 @@ func (s *SchedulerWant) Progress() {
 	}
 
 	// Create a snapshot of wants while holding the lock to avoid concurrent map access
-	s.builder.reconcileMutex.RLock()
+	s.builder.wantsMu.RLock()
 	allWantsSnapshot := make(map[string]*runtimeWant)
 	for name, rw := range s.builder.wants {
 		allWantsSnapshot[name] = rw
 	}
-	s.builder.reconcileMutex.RUnlock()
+	s.builder.wantsMu.RUnlock()
 
 	// Scan each Want for scheduling requirements
 	for name, rw := range allWantsSnapshot {
