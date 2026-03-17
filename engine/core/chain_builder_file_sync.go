@@ -144,23 +144,12 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 }
 
-// GetAllWantStates returns a map of all current want objects across all executions
+// GetAllWantStates returns a map of all current want objects across all executions.
+// Uses wantsMu (not reconcileMutex) so Progress() goroutines are not blocked for
+// the entire duration of reconcileWants().
 func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
-	// Deadlock-resilient: Uses TryRLock to avoid hanging if called recursively during reconciliation
-	if cb.reconcileMutex.TryRLock() {
-		defer cb.reconcileMutex.RUnlock()
-
-		states := make(map[string]*Want)
-		for name, want := range cb.wants {
-			states[name] = want.want
-		}
-		return states
-	}
-
-	// TryRLock failed (write lock held by reconciliation). Block on RLock to get
-	// a consistent snapshot — never iterate cb.wants without holding the lock.
-	cb.reconcileMutex.RLock()
-	defer cb.reconcileMutex.RUnlock()
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
 
 	states := make(map[string]*Want)
 	for name, want := range cb.wants {

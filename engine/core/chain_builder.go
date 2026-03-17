@@ -85,7 +85,8 @@ type ChainBuilder struct {
 	addWantsChan       chan []*Want         // Buffered channel for asynchronous want addition requests (DEPRECATED: use operationChan instead)
 	deleteWantsChan    chan []string        // Buffered channel for asynchronous want deletion requests (DEPRECATED: use operationChan instead)
 	operationChan      chan *WantOperation  // Unified channel for all want/recipe operations (add, delete, suspend, resume, etc.)
-	reconcileMutex     sync.RWMutex         // Protect concurrent access
+	reconcileMutex     sync.RWMutex         // Protect reconciliation state and config
+	wantsMu            sync.RWMutex         // Protect cb.wants map reads/writes (narrower than reconcileMutex)
 	inReconciliation   bool                 // Flag to prevent recursive reconciliation
 	running            bool                 // Execution state
 	lastConfig         Config               // Last known config state
@@ -1093,7 +1094,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			function: nil, // No function since creation failed
 			want:     wantPtr,
 		}
+		cb.wantsMu.Lock()
 		cb.wants[wantConfig.Metadata.Name] = runtimeWant
+		cb.wantsMu.Unlock()
 		return
 	}
 
@@ -1226,6 +1229,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	// Safely add to wants map, avoiding accidental overwrites of existing wants with same name but different ID
 	// Use unique name if necessary, but ideally we should transition cb.wants to use ID as key
+	cb.wantsMu.Lock()
 	if existing, exists := cb.wants[wantConfig.Metadata.Name]; exists {
 		if existing.want.Metadata.ID != wantConfig.Metadata.ID {
 			// Name collision between different wants - use ID-suffixed name as temporary measure
@@ -1238,6 +1242,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	} else {
 		cb.wants[wantConfig.Metadata.Name] = runtimeWant
 	}
+	cb.wantsMu.Unlock()
 
 	// Register want for notification system
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
@@ -1384,7 +1389,9 @@ func (cb *ChainBuilder) deleteWantByID(wantID string) {
 		}
 	}
 	if targetWantName != "" {
+		cb.wantsMu.Lock()
 		delete(cb.wants, targetWantName)
+		cb.wantsMu.Unlock()
 	}
 
 	// Cascade: collect child want IDs owned by this want
