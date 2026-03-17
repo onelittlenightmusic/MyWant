@@ -88,7 +88,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		}
 		seenIDs[want.Metadata.ID] = true
 		configWantMap[want.Metadata.Name] = true
-		if runtimeWant, exists := cb.wants[want.Metadata.Name]; exists {
+		if runtimeWant, exists := cb.wants[want.Metadata.ID]; exists {
 			// Update with runtime data including spec using
 			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
@@ -104,7 +104,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	}
 
 	// Then, add any runtime wants that might not be in config (e.g., dynamically created and completed)
-	for wantName, runtimeWant := range cb.wants {
+	for _, runtimeWant := range cb.wants {
+		wantName := runtimeWant.want.Metadata.Name
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
 
@@ -151,9 +152,10 @@ func (cb *ChainBuilder) GetAllWantStates() map[string]*Want {
 	cb.wantsMu.RLock()
 	defer cb.wantsMu.RUnlock()
 
+	// Returns map keyed by want ID (same key as cb.wants)
 	states := make(map[string]*Want)
-	for name, want := range cb.wants {
-		states[name] = want.want
+	for wantID, want := range cb.wants {
+		states[wantID] = want.want
 	}
 	return states
 }

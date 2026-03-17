@@ -31,12 +31,14 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 
 		// A. Process Explicit StateSubscriptions (Reader side)
 		for _, sub := range want.Spec.StateSubscriptions {
-			// Find provider want ID by name
-			providerRW, ok := cb.wants[sub.WantName]
-			if !ok {
+			// Find provider want ID by name via the name→ID index
+			providerID, nameKnown := cb.wantNameToID[sub.WantName]
+			if !nameKnown {
 				continue
 			}
-			providerID := providerRW.want.Metadata.ID
+			if _, ok := cb.wants[providerID]; !ok {
+				continue
+			}
 			if providerID == "" {
 				continue
 			}
@@ -134,10 +136,10 @@ func (cb *ChainBuilder) correlationPhase() {
 		// labelToUsers index covers Wants referencing dirty via selector.
 		for k, v := range dirty.Metadata.Labels {
 			key := cb.selectorToKey(map[string]string{k: v})
-			for _, userName := range cb.labelToUsers[key] {
-				// userName is a name, we need its ID for consistency.
-				if userRW, ok := cb.wants[userName]; ok {
-					add(userRW.want.Metadata.ID, k+"="+v)
+			for _, userID := range cb.labelToUsers[key] {
+				// userID is the want ID (labelToUsers stores IDs after migration).
+				if _, ok := cb.wants[userID]; ok {
+					add(userID, k+"="+v)
 				}
 			}
 		}

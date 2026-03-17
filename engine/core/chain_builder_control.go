@@ -43,16 +43,14 @@ func (cb *ChainBuilder) StopWant(wantID string) error {
 // RestartWant restarts execution of a specific want by setting its status to Idle
 // This triggers the reconcile loop to re-run the want
 func (cb *ChainBuilder) RestartWant(wantID string) error {
-	// Find and restart the want by calling its RestartWant() method
+	// O(1) lookup since cb.wants is keyed by ID
 	cb.wantsMu.RLock()
-	var targetWant *Want
-	for _, runtime := range cb.wants {
-		if runtime.want.Metadata.ID == wantID {
-			targetWant = runtime.want
-			break
-		}
-	}
+	runtime, exists := cb.wants[wantID]
 	cb.wantsMu.RUnlock()
+	var targetWant *Want
+	if exists {
+		targetWant = runtime.want
+	}
 
 	if targetWant == nil {
 		return fmt.Errorf("want with ID %s not found", wantID)
@@ -144,13 +142,8 @@ func (cb *ChainBuilder) IsSuspended() bool {
 func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 	cb.wantsMu.RLock()
 	defer cb.wantsMu.RUnlock()
-	var targetRuntime *runtimeWant
-	for _, runtime := range cb.wants {
-		if runtime.want.Metadata.ID == cmd.WantID {
-			targetRuntime = runtime
-			break
-		}
-	}
+	// O(1) lookup since cb.wants is keyed by ID
+	targetRuntime := cb.wants[cmd.WantID]
 
 	if targetRuntime == nil {
 		return
@@ -208,15 +201,9 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 
 // DeleteWantByID removes a want from runtime by its ID If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
-	// Phase 1: Identify if parent want exists
+	// Phase 1: Identify if parent want exists (O(1) lookup)
 	cb.reconcileMutex.RLock()
-	var found bool
-	for _, rw := range cb.wants {
-		if rw.want.Metadata.ID == wantID {
-			found = true
-			break
-		}
-	}
+	_, found := cb.wants[wantID]
 	cb.reconcileMutex.RUnlock()
 
 	if !found {

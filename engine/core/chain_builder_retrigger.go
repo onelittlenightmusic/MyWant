@@ -29,18 +29,18 @@ func (cb *ChainBuilder) selectorToKey(selector map[string]string) string {
 func (cb *ChainBuilder) buildLabelToUsersMapping() {
 	cb.labelToUsers = make(map[string][]string)
 
-	for wantName, runtimeWant := range cb.wants {
+	for wantID, runtimeWant := range cb.wants {
 		want := runtimeWant.want
 		spec := want.GetSpec()
 		if spec == nil || spec.Using == nil {
 			continue
 		}
 
-		// For each "using" selector, record this want as a user
+		// For each "using" selector, record this want ID as a user
 		for _, selector := range spec.Using {
 			selectorKey := cb.selectorToKey(selector)
 			if selectorKey != "" {
-				cb.labelToUsers[selectorKey] = append(cb.labelToUsers[selectorKey], wantName)
+				cb.labelToUsers[selectorKey] = append(cb.labelToUsers[selectorKey], wantID)
 			}
 		}
 	}
@@ -50,10 +50,14 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 // This is more reliable because it directly reflects execution state
 func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 	cb.wantsMu.RLock()
-	runtimeWant, exists := cb.wants[wantName]
+	wantID, idExists := cb.wantNameToID[wantName]
+	var runtimeWant *runtimeWant
+	if idExists {
+		runtimeWant = cb.wants[wantID]
+	}
 	cb.wantsMu.RUnlock()
 
-	if !exists {
+	if !idExists || runtimeWant == nil {
 		InfoLog("[RETRIGGER-RECEIVER] WARNING: receiver want '%s' not found\n", wantName)
 		return
 	}
@@ -84,11 +88,11 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 	}
 	cb.completedFlagsMutex.RUnlock()
 
-	// Take snapshot of wants to avoid holding lock during SetStatus
+	// Take snapshot of wants (keyed by ID) to avoid holding lock during SetStatus
 	cb.wantsMu.RLock()
 	wantSnapshot := make(map[string]*runtimeWant)
-	for name, rw := range cb.wants {
-		wantSnapshot[name] = rw
+	for wantID, rw := range cb.wants {
+		wantSnapshot[wantID] = rw
 	}
 	cb.wantsMu.RUnlock()
 	anyWantRetriggered := false
@@ -102,9 +106,9 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 			if len(users) > 0 {
 				InfoLog("[RETRIGGER] Want ID '%s' completed, found %d users to retrigger\n", wantID, len(users))
 
-				for _, userName := range users {
+				for _, userID := range users {
 					// Restart dependent want so it can be re-executed This allows the want to pick up new data from the completed source
-					if runtimeWant, ok := wantSnapshot[userName]; ok {
+					if runtimeWant, ok := wantSnapshot[userID]; ok {
 						runtimeWant.want.RestartWant()
 						anyWantRetriggered = true
 					}
@@ -125,15 +129,9 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 }
 
 func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []string {
-	var runtimeWant *runtimeWant
-	for _, rw := range cb.wants {
-		if rw.want.Metadata.ID == completedWantID {
-			runtimeWant = rw
-			break
-		}
-	}
-
-	if runtimeWant == nil {
+	// O(1) lookup since cb.wants is keyed by ID
+	runtimeWant, exists := cb.wants[completedWantID]
+	if !exists {
 		return []string{}
 	}
 
@@ -143,24 +141,24 @@ func (cb *ChainBuilder) findUsersOfCompletedWant(completedWantID string) []strin
 		return []string{}
 	}
 
-	// For each label in the completed want, find users
-	users := make(map[string]bool) // De-duplicate users
+	// For each label in the completed want, find user IDs
+	users := make(map[string]bool) // De-duplicate user IDs
 
-	// Generate selector keys from completed want's labels and look up users in the pre-computed mapping
+	// Generate selector keys from completed want's labels and look up user IDs in the pre-computed mapping
 	for labelKey, labelValue := range labels {
 		selector := map[string]string{labelKey: labelValue}
 		selectorKey := cb.selectorToKey(selector)
 		if selectorKey != "" {
 			if usersForSelector, exists := cb.labelToUsers[selectorKey]; exists {
-				for _, userName := range usersForSelector {
-					users[userName] = true
+				for _, userID := range usersForSelector {
+					users[userID] = true
 				}
 			}
 		}
 	}
 	userList := make([]string, 0, len(users))
-	for userName := range users {
-		userList = append(userList, userName)
+	for userID := range users {
+		userList = append(userList, userID)
 	}
 	return userList
 }

@@ -8,7 +8,11 @@ func (cb *ChainBuilder) AddWantsAsync(wants []*Want) error {
 		return nil
 	}
 	select {
-	case cb.addWantsChan <- wants:
+	case cb.operationChan <- &WantOperation{
+		Type:       "add",
+		EntityType: "want",
+		Wants:      wants,
+	}:
 		return nil
 	default:
 		return fmt.Errorf("failed to send wants to reconcile loop (channel full)")
@@ -25,14 +29,12 @@ func (cb *ChainBuilder) AddWantsAsyncWithTracking(wants []*Want) ([]string, erro
 		ids[i] = want.Metadata.ID
 	}
 
-	// Pre-check: Verify no duplicate names in existing wants
+	// Pre-check: Verify no duplicate names in existing wants via the name→ID index
 	cb.wantsMu.RLock()
 	for _, newWant := range wants {
-		for _, rw := range cb.wants {
-			if rw.want.Metadata.Name == newWant.Metadata.Name {
-				cb.wantsMu.RUnlock()
-				return nil, fmt.Errorf("want with name '%s' already exists", newWant.Metadata.Name)
-			}
+		if _, nameExists := cb.wantNameToID[newWant.Metadata.Name]; nameExists {
+			cb.wantsMu.RUnlock()
+			return nil, fmt.Errorf("want with name '%s' already exists", newWant.Metadata.Name)
 		}
 	}
 	cb.wantsMu.RUnlock()
@@ -53,14 +55,7 @@ func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
 	cb.wantsMu.RLock()
 	defer cb.wantsMu.RUnlock()
 	for _, id := range wantIDs {
-		found := false
-		for _, rw := range cb.wants {
-			if rw.want.Metadata.ID == id {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if _, exists := cb.wants[id]; !exists {
 			return false
 		}
 	}
@@ -71,7 +66,11 @@ func (cb *ChainBuilder) AreWantsAdded(wantIDs []string) bool {
 // DeleteWantsAsync sends want IDs to be deleted asynchronously through the reconcile loop This is the preferred method for deleting wants to avoid race conditions
 func (cb *ChainBuilder) DeleteWantsAsync(wantIDs []string) error {
 	select {
-	case cb.deleteWantsChan <- wantIDs:
+	case cb.operationChan <- &WantOperation{
+		Type:       "delete",
+		EntityType: "want",
+		IDs:        wantIDs,
+	}:
 		return nil
 	default:
 		return fmt.Errorf("failed to send wants to delete through reconcile loop (channel full)")
@@ -95,11 +94,9 @@ func (cb *ChainBuilder) AreWantsDeleted(wantIDs []string) bool {
 	cb.wantsMu.RLock()
 	defer cb.wantsMu.RUnlock()
 	for _, id := range wantIDs {
-		for _, rw := range cb.wants {
-			if rw.want.Metadata.ID == id {
-				// Found the want, so it's not deleted yet
-				return false
-			}
+		if _, exists := cb.wants[id]; exists {
+			// Found the want, so it's not deleted yet
+			return false
 		}
 	}
 
