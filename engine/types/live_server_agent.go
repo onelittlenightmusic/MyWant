@@ -33,32 +33,32 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 
 	switch phase {
 	case "starting":
-		if existingPID == 0 {
-			pid, err := startLiveServer(want)
+		// Idempotent start: kill any stale process and clear the log before launching.
+		EnsureProcessStopped(want, "server_pid")
+		EnsureLogFileTruncated(want, "server_log_file")
+
+		pid, err := startLiveServer(want)
+		if err != nil {
+			want.DirectLog("[ERROR] Failed to start server: %v", err)
+			return err
+		}
+		want.SetCurrent("server_pid", pid)
+		want.DirectLog("[INFO] Started server with PID %d", pid)
+
+		// If health_check_url is configured, poll for readiness
+		healthCheckURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
+		if healthCheckURL != "" {
+			body, err := waitForHealthCheck(ctx, want, healthCheckURL)
 			if err != nil {
-				want.DirectLog("[ERROR] Failed to start server: %v", err)
+				want.DirectLog("[ERROR] Health check failed: %v", err)
+				if proc, findErr := os.FindProcess(pid); findErr == nil {
+					proc.Signal(syscall.SIGTERM)
+				}
+				want.SetCurrent("server_pid", 0)
 				return err
 			}
-			want.SetCurrent("server_pid", pid)
-			want.DirectLog("[INFO] Started server with PID %d", pid)
-
-			// If health_check_url is configured, poll for readiness
-			healthCheckURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
-			if healthCheckURL != "" {
-				body, err := waitForHealthCheck(ctx, want, healthCheckURL)
-				if err != nil {
-					want.DirectLog("[ERROR] Health check failed: %v", err)
-					if proc, findErr := os.FindProcess(pid); findErr == nil {
-						proc.Signal(syscall.SIGTERM)
-					}
-					want.SetCurrent("server_pid", 0)
-					return err
-				}
-				want.SetCurrent("health_check_response", body)
-				want.DirectLog("[INFO] Health check passed")
-			}
-		} else {
-			want.DirectLog("[INFO] Server already running with PID %d", existingPID)
+			want.SetCurrent("health_check_response", body)
+			want.DirectLog("[INFO] Health check passed")
 		}
 
 	case "stopping":
@@ -107,7 +107,7 @@ func startLiveServer(want *mywant.Want) (int, error) {
 			}
 		}
 
-		logFileHandle, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		logFileHandle, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 		if err != nil {
 			return 0, fmt.Errorf("failed to open log file: %w", err)
 		}
