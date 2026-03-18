@@ -176,6 +176,12 @@ wantType:
     persistent: true
     label: current
     initialValue: ''
+  - name: reservation_detail
+    description: Structured reservation detail returned by agent
+    type: object
+    persistent: true
+    label: current
+    initialValue: null
   - name: thinker.goal_initialized
     description: Whether the condition thinker has initialized the goal
     type: bool

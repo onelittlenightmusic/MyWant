@@ -34,3 +34,9 @@ predefined:
       label: current
       persistent: true
       initialValue: ""
+    - name: agent_result
+      description: Raw result object returned by agent execution (written by DoAgent)
+      type: object
+      label: current
+      persistent: true
+      initialValue: null

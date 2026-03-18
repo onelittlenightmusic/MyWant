@@ -65,6 +65,12 @@ wantType:
     persistent: true
     label: current
     initialValue: ''
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: false
+    label: current
+    initialValue: 0
   - name: total_processed
     description: Count of description packets generated
     type: int

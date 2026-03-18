@@ -134,6 +134,12 @@ wantType:
     label: current
     initialValue: ""
     example: "https://torchy-maxine-condensible.ngrok-free.dev"
+  - name: result_url
+    description: Extracted result URL (default target for result_field)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ""
 
   - name: error_message
     description: Error message if tunnel failed to start
