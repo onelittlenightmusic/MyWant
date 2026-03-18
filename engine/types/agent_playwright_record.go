@@ -175,7 +175,7 @@ func startPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 	// Consume the signal immediately so we don't retry on every cycle if this call fails
 	want.SetPlan("start_recording_requested", false)
 
-	targetURL := want.GetStringParam("target_url", "https://example.com")
+	targetURL := mywant.GetCurrent(want, "target_url", "https://example.com")
 
 	serverPath := resolvePlaywrightServerPath()
 	if serverPath == "" {
@@ -254,8 +254,8 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 	// Consume the signal immediately so we don't retry on every cycle if this call fails
 	want.SetPlan("start_debug_recording_requested", false)
 
-	host := want.GetStringParam("debug_chrome_host", "localhost")
-	port := want.GetStringParam("debug_chrome_port", "9222")
+	host := mywant.GetCurrent(want, "debug_chrome_host", "localhost")
+	port := mywant.GetCurrent(want, "debug_chrome_port", "9222")
 	cdpURL := fmt.Sprintf("http://%s:%s", host, port)
 
 	serverPath := resolvePlaywrightServerPath()
@@ -269,7 +269,7 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 		return err
 	}
 
-	targetURL := want.GetStringParam("target_url", "")
+	targetURL := mywant.GetCurrent(want, "target_url", "")
 	debugToolArgs := map[string]any{"cdp_url": cdpURL}
 	if targetURL != "" {
 		debugToolArgs["target_url"] = targetURL
@@ -375,7 +375,7 @@ func startReplay(ctx context.Context, want *mywant.Want) error {
 	actionsJSON := mywant.GetCurrent(want, "replay_actions", "[]")
 	startURL := mywant.GetCurrent(want, "replay_start_url", "")
 	if startURL == "" {
-		startURL = want.GetStringParam("target_url", "https://example.com")
+		startURL = mywant.GetCurrent(want, "target_url", "https://example.com")
 	}
 
 	var actions []string

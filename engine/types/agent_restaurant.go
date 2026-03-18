@@ -61,12 +61,12 @@ func generateRestaurantSchedule(want *Want) RestaurantSchedule {
 	reservationTime := GenerateRandomTimeWithOptions(baseDate, DinnerTimeRange)
 	durationHours := 2.5
 
-	cuisineType := want.GetStringParam("restaurant_type", "fine dining")
+	cuisineType := GetCurrent(want, "restaurant_type", "fine dining")
 	restaurantName := generateRealisticRestaurantName(cuisineType)
 	restaurantCost := generateRestaurantCost(cuisineType)
-	premiumLevel := want.GetStringParam("premium_level", "premium")
-	serviceTier := want.GetStringParam("service_tier", "premium")
-	partySize := want.GetIntParam("party_size", 2)
+	premiumLevel := GetCurrent(want, "premium_level", "premium")
+	serviceTier := GetCurrent(want, "service_tier", "premium")
+	partySize := GetCurrent(want, "party_size", 2)
 
 	reservationName := fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, cuisineType)
 	schedule := RestaurantSchedule{

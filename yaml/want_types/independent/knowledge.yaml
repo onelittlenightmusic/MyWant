@@ -42,6 +42,30 @@ wantType:
     type: string
     default: "24h"
   state:
+  - name: topic
+    description: Topic being monitored (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
+  - name: output_path
+    description: Output path for the knowledge file (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
+  - name: depth
+    description: Depth of the knowledge synthesis (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'comprehensive'
+  - name: provider
+    description: LLM provider to use for synthesis (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
   - name: last_sync_time
     description: Last time the information was successfully updated
     type: string

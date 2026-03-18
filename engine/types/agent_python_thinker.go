@@ -42,6 +42,10 @@ func (o *PythonThinkerWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
+	// Copy config params → state so the thinker reads from GetCurrent instead of GetStringParam
+	o.SetCurrent("python_script_path", o.GetStringParam("python_script_path", ""))
+	o.SetCurrent("python_script", o.GetStringParam("python_script", ""))
+	o.SetCurrent("python_command", o.GetStringParam("python_command", "python3"))
 }
 
 // IsAchieved always returns false — the thinker runs indefinitely.
@@ -89,9 +93,9 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	// Step 3: Resolve the Python script to execute.
-	scriptPath := want.GetStringParam("python_script_path", "")
-	inlineCode := want.GetStringParam("python_script", "")
+	// Step 3: Resolve the Python script to execute (read from state set by Initialize).
+	scriptPath := GetCurrent(want, "python_script_path", "")
+	inlineCode := GetCurrent(want, "python_script", "")
 	if scriptPath == "" && inlineCode == "" {
 		return pythonThinkerError(want, "neither python_script nor python_script_path is set")
 	}
@@ -136,8 +140,8 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 		}
 	}
 
-	// Step 5: Build and execute the command.
-	pythonCmd := want.GetStringParam("python_command", "python3")
+	// Step 5: Build and execute the command (read from state set by Initialize).
+	pythonCmd := GetCurrent(want, "python_command", "python3")
 	want.DirectLog("[PYTHON-THINKER] Running: %s %s", pythonCmd, scriptPath)
 
 	cmd := exec.CommandContext(ctx, pythonCmd, scriptPath)

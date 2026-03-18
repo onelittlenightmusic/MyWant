@@ -125,5 +125,26 @@ wantType:
     label: current
     initialValue: ""
 
+  - name: python_script_path
+    description: Path to Python script file (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ""
+
+  - name: python_script
+    description: Inline Python source code (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ""
+
+  - name: python_command
+    description: Python interpreter command (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: "python3"
+
   requires:
     - python_thinking

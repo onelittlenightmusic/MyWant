@@ -163,6 +163,11 @@ func (r *RestaurantWant) GetLocals() *RestaurantWantLocals {
 func (r *RestaurantWant) Initialize() {
 	r.BaseTravelWant.Initialize()
 	r.BaseTravelWant.executor = r
+	// Copy config params → state so agents read from GetCurrent instead of GetStringParam/GetIntParam
+	r.SetCurrent("restaurant_type", r.GetStringParam("restaurant_type", "fine dining"))
+	r.SetCurrent("premium_level", r.GetStringParam("premium_level", "premium"))
+	r.SetCurrent("service_tier", r.GetStringParam("service_tier", "premium"))
+	r.SetCurrent("party_size", r.GetIntParam("party_size", 2))
 }
 
 type RestaurantSchedule struct {
@@ -235,7 +240,7 @@ func (r *RestaurantWant) generateSchedule(locals TravelWantLocalsInterface) *Tra
 	dinnerStart := time.Date(baseDate.Year(), baseDate.Month(), baseDate.Day(),
 		18+rand.Intn(3), rand.Intn(60), 0, 0, time.Local)
 	restaurantName := generateRealisticRestaurantName(rl.RestaurantType)
-	partySize := r.GetIntParam("party_size", 2)
+	partySize := GetCurrent(r, "party_size", 2)
 	eventName := fmt.Sprintf("%s - Party of %d at %s restaurant", restaurantName, partySize, rl.RestaurantType)
 	event := TimeSlot{
 		Start: dinnerStart,
@@ -273,6 +278,10 @@ func (h *HotelWant) GetLocals() *HotelWantLocals {
 func (h *HotelWant) Initialize() {
 	h.BaseTravelWant.Initialize()
 	h.BaseTravelWant.executor = h
+	// Copy config params → state so agents read from GetCurrent instead of GetStringParam
+	h.SetCurrent("hotel_type", h.GetStringParam("hotel_type", "luxury"))
+	h.SetCurrent("premium_level", h.GetStringParam("premium_level", "premium"))
+	h.SetCurrent("service_tier", h.GetStringParam("service_tier", "premium"))
 }
 
 type HotelSchedule struct {
@@ -348,6 +357,10 @@ func (b *BuffetWant) GetLocals() *BuffetWantLocals {
 func (b *BuffetWant) Initialize() {
 	b.BaseTravelWant.Initialize()
 	b.BaseTravelWant.executor = b
+	// Copy config params → state so agents read from GetCurrent instead of GetStringParam
+	b.SetCurrent("buffet_type", b.GetStringParam("buffet_type", "international"))
+	b.SetCurrent("premium_level", b.GetStringParam("premium_level", "premium"))
+	b.SetCurrent("service_tier", b.GetStringParam("service_tier", "premium"))
 }
 
 type BuffetSchedule struct {
@@ -451,6 +464,8 @@ func (f *FlightWant) Initialize() {
 	locals := f.GetLocals()
 	locals.monitoringDone = make(chan struct{})
 	locals.FlightPhase = PhaseInitial
+	// Copy config params → state so agents read from GetCurrent instead of Spec.Params
+	f.SetCurrent("server_url", f.GetStringParam("server_url", "http://localhost:8090"))
 }
 
 func (f *FlightWant) IsAchieved() bool {

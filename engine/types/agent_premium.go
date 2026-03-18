@@ -62,11 +62,11 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 	checkInTime := GenerateRandomTimeWithOptions(baseDate, DinnerTimeRange)
 	checkOutTime := checkInTime.Add(time.Duration(GenerateRandomDuration(12.0, 24.0) * float64(time.Hour)))
 
-	hotelType := want.GetStringParam("hotel_type", "luxury")
+	hotelType := GetCurrent(want, "hotel_type", "luxury")
 	hotelName := generateRealisticHotelName(hotelType)
 	hotelCost := generateHotelCost(hotelType)
-	premiumLevel := want.GetStringParam("premium_level", "premium")
-	serviceTier := want.GetStringParam("service_tier", "premium")
+	premiumLevel := GetCurrent(want, "premium_level", "premium")
+	serviceTier := GetCurrent(want, "service_tier", "premium")
 
 	schedule := HotelSchedule{
 		CheckInTime:       checkInTime,

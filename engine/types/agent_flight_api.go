@@ -69,7 +69,7 @@ func executeFlightAction(ctx context.Context, want *Want) error {
 }
 
 func createFlight(ctx context.Context, want *Want) error {
-	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
+	serverURL := GetCurrent(want, "server_url", "http://localhost:8090")
 	params := want.Spec.Params
 	want.SetCurrent("flight_status", "in process")
 	prevFlightID := GetCurrent(want, "_previous_flight_id", "")
@@ -185,7 +185,7 @@ func createFlight(ctx context.Context, want *Want) error {
 
 // cancelFlight cancels a flight reservation via DELETE /api/flights/{id}
 func cancelFlight(ctx context.Context, want *Want) error {
-	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
+	serverURL := GetCurrent(want, "server_url", "http://localhost:8090")
 	flightID := GetCurrent(want, "flight_id", "")
 	if flightID == "" {
 		return fmt.Errorf("no flight_id found in state")

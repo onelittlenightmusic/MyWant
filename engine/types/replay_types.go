@@ -75,6 +75,11 @@ func (r *ReplayWant) Initialize() {
 	r.SetCurrent("recording_active", false)
 	r.SetCurrent("replay_script", "")
 
+	// Copy config params → state so the agent reads from GetCurrent instead of GetStringParam
+	r.SetCurrent("target_url", r.GetStringParam("target_url", "https://example.com"))
+	r.SetCurrent("debug_chrome_host", r.GetStringParam("debug_chrome_host", "localhost"))
+	r.SetCurrent("debug_chrome_port", r.GetStringParam("debug_chrome_port", "9222"))
+
 	typeDef := r.WantTypeDefinition
 	if typeDef == nil || len(typeDef.MonitorCapabilities) == 0 {
 		r.StoreLog("[REPLAY] WARNING: no MonitorCapabilities found in type definition")

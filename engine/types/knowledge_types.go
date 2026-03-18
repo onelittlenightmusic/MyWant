@@ -61,6 +61,12 @@ func (k *KnowledgeWant) Initialize() {
 	// Parse provider
 	locals.Provider = k.GetStringParam("provider", "")
 
+	// Copy params → state so agents read config from GetCurrent instead of Spec.Params
+	k.SetCurrent("topic", locals.Topic)
+	k.SetCurrent("output_path", locals.OutputPath)
+	k.SetCurrent("depth", locals.Depth)
+	k.SetCurrent("provider", locals.Provider)
+
 	// Parse refresh_interval
 	intervalStr := k.GetStringParam("refresh_interval", "24h")
 	interval, err := time.ParseDuration(intervalStr)

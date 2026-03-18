@@ -25,7 +25,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 		return false, fmt.Errorf("no flight_id found in state - flight not created yet")
 	}
 
-	serverURL := want.GetStringParam("server_url", "http://localhost:8090")
+	serverURL := GetCurrent(want, "server_url", "http://localhost:8090")
 	agentName := "flight-monitor-" + flightID
 
 	lastKnownStatus := GetCurrent(want, "status", "unknown")

@@ -112,5 +112,33 @@ wantType:
     label: current
     initialValue: ""
 
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: "opa-llm-planner"
+
+  - name: policy_dir
+    description: Directory containing OPA policy files (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ""
+
+  - name: use_llm
+    description: Whether to use LLM-augmented planning (copied from param by Initialize)
+    type: bool
+    persistent: false
+    label: current
+    initialValue: true
+
+  - name: llm_provider
+    description: LLM provider name (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: "anthropic"
+
   requires:
     - opa_llm_planning

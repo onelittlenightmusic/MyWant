@@ -57,11 +57,17 @@ func fetchTransitLine(ctx context.Context, route briefingRouteConfig, googleKey 
 	return formatTransitLine(route.Name, result)
 }
 
-// parseBriefingRoutes extracts the routes param ([]any from YAML) into []briefingRouteConfig
+// parseBriefingRoutes extracts the routes from state (copied from params by Initialize) into []briefingRouteConfig.
+// Falls back to Spec.Params["routes"] if state is not yet populated (e.g. during Initialize itself).
 func parseBriefingRoutes(want *Want) ([]briefingRouteConfig, error) {
-	raw, ok := want.Spec.Params["routes"]
-	if !ok {
-		return nil, nil
+	raw := GetCurrent[any](want, "routes", nil)
+	if raw == nil {
+		// Fallback for when called during Initialize before state is populated
+		var ok bool
+		raw, ok = want.Spec.Params["routes"]
+		if !ok || raw == nil {
+			return nil, nil
+		}
 	}
 	data, err := json.Marshal(raw)
 	if err != nil {

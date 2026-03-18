@@ -29,8 +29,8 @@ func executeKnowledgeAction(ctx context.Context, want *mywant.Want) error {
 }
 
 func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
-	topic := want.Spec.Params["topic"].(string)
-	provider, _ := want.Spec.Params["provider"].(string)
+	topic := mywant.GetCurrent(want, "topic", "")
+	provider := mywant.GetCurrent(want, "provider", "")
 	want.StoreLog("[KNOWLEDGE-AGENT] Monitoring topic: %s (provider: %s)", topic, provider)
 
 	goose, err := GetGooseManager(ctx)
@@ -69,10 +69,10 @@ func knowledgeMonitor(ctx context.Context, want *mywant.Want) error {
 }
 
 func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
-	topic := want.Spec.Params["topic"].(string)
-	path := want.Spec.Params["output_path"].(string)
-	depth := want.Spec.Params["depth"].(string)
-	provider, _ := want.Spec.Params["provider"].(string)
+	topic := mywant.GetCurrent(want, "topic", "")
+	path := mywant.GetCurrent(want, "output_path", "")
+	depth := mywant.GetCurrent(want, "depth", "comprehensive")
+	provider := mywant.GetCurrent(want, "provider", "")
 
 	updates := mywant.GetCurrent(want, "discovered_updates", []any{})
 	updatesJSON, _ := json.MarshalIndent(updates, "", "  ")

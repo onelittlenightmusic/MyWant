@@ -39,6 +39,13 @@ func (m *MorningBriefingWant) GetLocals() *MorningBriefingLocals {
 // Initialize sets the OPA goal so the thinker can evaluate the policy from the first tick.
 // Trigger timing is handled by the Want's "when" spec — no time param needed here.
 func (m *MorningBriefingWant) Initialize() {
+	// Copy config params → state so Progress() reads from GetCurrent instead of Spec.Params
+	weatherCity := m.GetStringParam("weather_city", "Tokyo")
+	m.SetCurrent("weather_city", weatherCity)
+	if rawRoutes, ok := m.Spec.Params["routes"]; ok && rawRoutes != nil {
+		m.SetCurrent("routes", rawRoutes)
+	}
+
 	routes, _ := parseBriefingRoutes(&m.Want)
 	routeGoals := make([]map[string]any, 0, len(routes))
 	for _, r := range routes {
@@ -51,7 +58,7 @@ func (m *MorningBriefingWant) Initialize() {
 		})
 	}
 	m.SetGoal("goal", map[string]any{
-		"weather_city": m.GetStringParam("weather_city", "Tokyo"),
+		"weather_city": weatherCity,
 		"routes":       routeGoals,
 	})
 	m.StoreLog("[BRIEFING] Initialized with %d route(s)", len(routes))

@@ -49,6 +49,20 @@ wantType:
       required: false
 
   state:
+    - name: routes
+      description: Transit routes config (copied from param by Initialize)
+      type: array
+      persistent: false
+      label: current
+      initialValue: []
+
+    - name: weather_city
+      description: City name for weather query (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: 'Tokyo'
+
     - name: goal
       description: OPA goal (trigger_time, weather_city, routes) — read by thinker
       type: object

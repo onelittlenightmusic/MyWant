@@ -45,7 +45,42 @@ wantType:
     default: '2024-01-01'
     required: false
     example: '2024-12-25'
+  - name: server_url
+    description: URL of the flight booking API server
+    type: string
+    default: 'http://localhost:8090'
+    required: false
+    example: 'http://localhost:8090'
+  - name: from
+    description: Departure city/airport
+    type: string
+    default: 'New York'
+    required: false
+    example: 'New York'
+  - name: to
+    description: Arrival city/airport
+    type: string
+    default: 'Los Angeles'
+    required: false
+    example: 'Los Angeles'
+  - name: flight_number
+    description: Desired flight number
+    type: string
+    default: 'AA123'
+    required: false
+    example: 'AA123'
+  - name: departure_time
+    description: Departure time in RFC3339 format
+    type: string
+    default: ''
+    required: false
   state:
+  - name: server_url
+    description: Flight API server URL (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'http://localhost:8090'
   - name: cost
     description: Reported cost for this booking
     type: float64

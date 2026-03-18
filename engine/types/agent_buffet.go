@@ -62,11 +62,11 @@ func generateBuffetSchedule(want *Want) BuffetSchedule {
 	reservationTime := GenerateRandomTimeWithOptions(baseDate, LunchTimeRange, DinnerTimeRange)
 	durationHours := GenerateRandomDuration(2.0, 4.0)
 
-	buffetType := want.GetStringParam("buffet_type", "international")
+	buffetType := GetCurrent(want, "buffet_type", "international")
 	buffetName := generateRealisticBuffetName(buffetType)
 	buffetCost := generateBuffetCost(buffetType)
-	premiumLevel := want.GetStringParam("premium_level", "premium")
-	serviceTier := want.GetStringParam("service_tier", "premium")
+	premiumLevel := GetCurrent(want, "premium_level", "premium")
+	serviceTier := GetCurrent(want, "service_tier", "premium")
 
 	reservationName := fmt.Sprintf("%s (%s buffet)", buffetName, buffetType)
 	schedule := BuffetSchedule{

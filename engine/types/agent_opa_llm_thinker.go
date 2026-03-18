@@ -41,6 +41,11 @@ func (o *OpaLLMPlannerWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
+	// Copy config params → state so the thinker reads from GetCurrent instead of GetStringParam/GetBoolParam
+	o.SetCurrent("opa_llm_planner_command", o.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
+	o.SetCurrent("policy_dir", o.GetStringParam("policy_dir", ""))
+	o.SetCurrent("use_llm", o.GetBoolParam("use_llm", true))
+	o.SetCurrent("llm_provider", o.GetStringParam("llm_provider", "anthropic"))
 }
 
 // IsAchieved always returns false — the planner runs indefinitely.
@@ -120,18 +125,18 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	// Step 4: Build command arguments from params
-	command := want.GetStringParam("opa_llm_planner_command", "opa-llm-planner")
+	// Step 4: Build command arguments from state (copied from params by Initialize)
+	command := GetCurrent(want, "opa_llm_planner_command", "opa-llm-planner")
 	args := []string{"plan", "--goal", goalPath, "--current", currentPath}
 
-	policyDir := want.GetStringParam("policy_dir", "")
+	policyDir := GetCurrent(want, "policy_dir", "")
 	if policyDir != "" {
 		args = append(args, "--policy", policyDir)
 	}
 
-	useLLM := want.GetBoolParam("use_llm", true)
+	useLLM := GetCurrent(want, "use_llm", true)
 	if useLLM {
-		provider := want.GetStringParam("llm_provider", "anthropic")
+		provider := GetCurrent(want, "llm_provider", "anthropic")
 		args = append(args, "--llm", "--llm-provider", provider)
 	}
 

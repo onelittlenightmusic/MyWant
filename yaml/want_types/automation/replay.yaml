@@ -45,6 +45,27 @@ wantType:
     example: "9222"
 
   state:
+  - name: target_url
+    description: Starting URL for recording/replay (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'https://example.com'
+
+  - name: debug_chrome_host
+    description: Chrome debug host (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'localhost'
+
+  - name: debug_chrome_port
+    description: Chrome debug port (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: '9222'
+
   - name: recording_active
     description: True while a Playwright recording session is in progress
     type: bool

@@ -250,6 +250,12 @@ wantType:
     persistent: true
     label: current
     initialValue: null
+  - name: party_size
+    description: Number of people in the party (copied from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 2
   - name: thinker.goal_initialized
     description: Whether the condition thinker has initialized the goal
     type: bool
