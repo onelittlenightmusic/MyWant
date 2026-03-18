@@ -40,6 +40,18 @@ wantType:
       max: 1000000
     example: 1000
   state:
+  - name: start
+    description: Starting number of range (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 1
+  - name: end
+    description: Ending number of range (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 100
   - name: current_number
     description: The current number being generated
     type: int

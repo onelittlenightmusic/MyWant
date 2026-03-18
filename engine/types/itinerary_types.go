@@ -38,6 +38,8 @@ func (o *ItineraryWant) Initialize() {
 	if current, ok := o.Spec.Params["current"]; ok && current != nil {
 		o.SetCurrent("current", current)
 	}
+	// Promote direction_map param → state so Progress reads from GetCurrent
+	o.SetCurrent("direction_map", o.GetStringParam("direction_map", "{}"))
 }
 
 func (o *ItineraryWant) IsAchieved() bool {
@@ -46,7 +48,7 @@ func (o *ItineraryWant) IsAchieved() bool {
 
 func (o *ItineraryWant) Progress() {
 	locals := o.GetLocals()
-	directionMapStr := o.GetStringParam("direction_map", "{}")
+	directionMapStr := GetCurrent(o, "direction_map", "{}")
 	var directionMap map[string]DirectionConfig
 	json.Unmarshal([]byte(directionMapStr), &directionMap)
 

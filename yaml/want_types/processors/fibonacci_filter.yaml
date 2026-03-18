@@ -39,6 +39,18 @@ wantType:
       max: 1000000
     example: 10000
   state:
+  - name: min_value
+    description: Minimum value to include in filtered sequence (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 0
+  - name: max_value
+    description: Maximum value to include in filtered sequence (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 1000000
   - name: filtered
     description: Array of Fibonacci numbers that passed the filter
     type: '[]int'

@@ -30,6 +30,12 @@ wantType:
       max: 10000
     example: 50
   state:
+  - name: count
+    description: Number of Fibonacci values to generate (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 20
   - name: a
     description: Current Fibonacci number (n-1)
     type: int

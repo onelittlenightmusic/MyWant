@@ -68,6 +68,27 @@ wantType:
     default: 40
 
   state:
+  - name: url_regex
+    description: Regex to extract the forwarding URL from logs (promoted from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
+
+  - name: result_field
+    description: State field name to store the extracted URL (promoted from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'result_url'
+
+  - name: max_retries
+    description: Maximum retries to wait for forwarding URL in log (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 40
+
   - name: server_phase
     description: Current phase of the tunnel lifecycle
     type: string

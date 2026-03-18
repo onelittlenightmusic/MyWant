@@ -97,6 +97,11 @@ func (n *ManagedProcessWant) Initialize() {
 
 	// 4. Optionally wait for a pattern in logs
 	urlRegex := n.GetStringParam("url_regex", "")
+	resultField := n.GetStringParam("result_field", "result_url")
+	// Promote url_regex, result_field and max_retries params → state so IsAchieved/waitForPattern read from GetCurrent
+	n.SetCurrent("url_regex", urlRegex)
+	n.SetCurrent("result_field", resultField)
+	n.SetCurrent("max_retries", n.GetIntParam("max_retries", 40))
 	if urlRegex != "" {
 		n.DirectLog("[%s] Waiting for result URL in %s", n.Metadata.Name, logFile)
 		url := n.waitForPattern(logFile, urlRegex)
@@ -107,7 +112,6 @@ func (n *ManagedProcessWant) Initialize() {
 		locals.ResultUrl = url
 		n.SetCurrent("result_url", url)
 		// Specific field for backward compatibility or UI (can be parameterized)
-		resultField := n.GetStringParam("result_field", "result_url")
 		n.SetCurrent(resultField, url)
 	}
 
@@ -118,7 +122,7 @@ func (n *ManagedProcessWant) Initialize() {
 
 func (n *ManagedProcessWant) IsAchieved() bool {
 	phase := GetCurrent(n, "server_phase", "")
-	urlRegex := n.GetStringParam("url_regex", "")
+	urlRegex := GetCurrent(n, "url_regex", "")
 	if urlRegex != "" {
 		url := GetCurrent(n, "result_url", "")
 		return phase == ProcessPhaseRunning && url != ""
@@ -184,10 +188,10 @@ func (n *ManagedProcessWant) waitForPattern(logFile, pattern string) string {
 		return ""
 	}
 
-	maxRetries := n.GetIntParam("max_retries", 40)
+	maxRetries := GetCurrent(n, "max_retries", 40)
 	interval := 500 * time.Millisecond
 
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		if url := parsePattern(logFile, re); url != "" {
 			return url
 		}

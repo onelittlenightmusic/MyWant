@@ -89,6 +89,13 @@ wantType:
     initialValue: {}
     label: current
 
+  - name: direction_map
+    description: JSON string mapping OPA direction names to want configuration (promoted from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: '{}'
+
 
   - name: directions
     description: Direction list produced by ThinkAgent on each replan

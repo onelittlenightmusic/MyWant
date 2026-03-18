@@ -23,19 +23,20 @@ func (g *FibonacciNumbers) GetLocals() *FibonacciNumbersLocals {
 
 // Initialize resets state before execution begins
 func (g *FibonacciNumbers) Initialize() {
-	// No state reset needed for fibonacci wants
+	// Promote params → state so Progress/IsAchieved read from GetCurrent
+	g.SetCurrent("count", g.GetIntParam("count", 20))
 }
 
 // IsAchieved checks if fibonacci generation is complete
 func (g *FibonacciNumbers) IsAchieved() bool {
 	sentCount := GetCurrent(g, "sent_count", 0)
-	count := g.GetIntParam("count", 20)
+	count := GetCurrent(g, "count", 20)
 	return sentCount >= count
 }
 
 // Progress returns the generalized chain function for the numbers generator
 func (g *FibonacciNumbers) Progress() {
-	count := g.GetIntParam("count", 20)
+	count := GetCurrent(g, "count", 20)
 	a := GetCurrent(g, "a", 0)
 	b := GetCurrent(g, "b", 1)
 	sentCount := GetCurrent(g, "sent_count", 0)
@@ -82,6 +83,9 @@ func (f *FibonacciFilter) Initialize() {
 	if locals.filtered == nil {
 		locals.filtered = make([]int, 0)
 	}
+	// Promote params → state so Progress reads from GetCurrent
+	f.SetCurrent("min_value", f.GetIntParam("min_value", 0))
+	f.SetCurrent("max_value", f.GetIntParam("max_value", 1000000))
 }
 
 // IsAchieved checks if fibonacci filtering is complete
@@ -120,9 +124,9 @@ func (f *FibonacciFilter) Progress() {
 
 	if val, ok := i.(int); ok {
 		totalProcessed++
-		// Filter based on min/max values from parameters
-		minValue := f.GetIntParam("min_value", 0)
-		maxValue := f.GetIntParam("max_value", 1000000)
+		// Filter based on min/max values from state (promoted in Initialize)
+		minValue := GetCurrent(f, "min_value", 0)
+		maxValue := GetCurrent(f, "max_value", 1000000)
 		if val >= minValue && val <= maxValue {
 			locals.filtered = append(locals.filtered, val)
 		}

@@ -27,6 +27,20 @@ wantType:
       label: current
       initialValue: ''
 
+    - name: source_want
+      description: Name of the sibling Want to read the message from (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: message
+      description: Static message text to post (promoted from param by Initialize; used when source_want is empty)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: last_message
       description: Message text that was posted
       type: string

@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	. "mywant/engine/core"
@@ -71,6 +72,7 @@ func (t *TransitWant) Initialize() {
 	t.SetCurrent("destination", locals.Destination)
 	t.SetCurrent("arrive_by", locals.ArriveBy)
 	t.SetCurrent("api_key", t.GetStringParam("api_key", ""))
+	t.SetCurrent("route_name", t.GetStringParam("name", ""))
 
 	t.StoreLog("[TRANSIT] Initialized: %s → %s (arrive by %s)", locals.Origin, locals.Destination, locals.ArriveBy)
 }
@@ -155,9 +157,9 @@ func (t *TransitWant) Progress() {
 // storeExhaustedTransitText marks the route as done with an error message when
 // all retries are exhausted, so the briefing coordinator can proceed without it.
 func (t *TransitWant) storeExhaustedTransitText() {
-	routeName := GetCurrent(t, "route_name", t.GetStringParam("name", ""))
+	routeName := GetCurrent(t, "route_name", "")
 	if routeName == "" {
-		routeName = fmt.Sprintf("%s → %s", t.GetStringParam("origin", "?"), t.GetStringParam("destination", "?"))
+		routeName = fmt.Sprintf("%s → %s", GetCurrent(t, "origin", "?"), GetCurrent(t, "destination", "?"))
 	}
 	today := time.Now().Format("2006-01-02")
 	t.SetCurrent("transit_text", fmt.Sprintf("  • %s: 取得失敗（リトライ上限）", routeName))
@@ -170,7 +172,7 @@ func (t *TransitWant) storeExhaustedTransitText() {
 // storeTransitText formats the transit result and stores transit_text / transit_date
 // in this Want's own state so sibling coordinator Wants can read it directly.
 func (t *TransitWant) storeTransitText() {
-	routeName := GetCurrent(t, "route_name", t.GetStringParam("name", "route"))
+	routeName := GetCurrent(t, "route_name", "route")
 	resultJSON := GetCurrent(t, "transit_result", "")
 	if resultJSON == "" {
 		return
@@ -204,13 +206,7 @@ func weekdayShort() string {
 }
 
 func isTodayInDays(days []string) bool {
-	today := weekdayShort()
-	for _, d := range days {
-		if d == today {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(days, weekdayShort())
 }
 
 func splitCSV(s string) []string {

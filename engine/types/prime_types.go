@@ -26,21 +26,23 @@ func (g *PrimeNumbers) GetLocals() *PrimeNumbersLocals {
 
 // Initialize resets state before execution begins
 func (g *PrimeNumbers) Initialize() {
-	// No state reset needed for prime wants
+	// Promote params → state so Progress/IsAchieved read from GetCurrent
+	g.SetCurrent("start", g.GetIntParam("start", 1))
+	g.SetCurrent("end", g.GetIntParam("end", 100))
 }
 
 // IsAchieved checks if prime number generation is complete
 func (g *PrimeNumbers) IsAchieved() bool {
-	start := g.GetIntParam("start", 1)
-	end := g.GetIntParam("end", 100)
+	start := GetCurrent(g, "start", 1)
+	end := GetCurrent(g, "end", 100)
 	currentNumber := GetCurrent(g, "current_number", start-1)
 	return currentNumber >= end
 }
 
 // Progress returns the generalized chain function for the numbers generator
 func (g *PrimeNumbers) Progress() {
-	start := g.GetIntParam("start", 1)
-	end := g.GetIntParam("end", 100)
+	start := GetCurrent(g, "start", 1)
+	end := GetCurrent(g, "end", 100)
 	currentNumber := GetCurrent(g, "current_number", start-1) // Start from start-1 so first iteration sends start
 
 	currentNumber += 1
@@ -53,13 +55,8 @@ func (g *PrimeNumbers) Progress() {
 		totalCount = 1
 	}
 	currentProgress := currentNumber - start + 1
-	if currentProgress < 0 {
-		currentProgress = 0
-	}
-	achievingPercentage := int(float64(currentProgress) * 100 / float64(totalCount))
-	if achievingPercentage > 100 {
-		achievingPercentage = 100
-	}
+	currentProgress = max(currentProgress, 0)
+	achievingPercentage := min(int(float64(currentProgress)*100/float64(totalCount)), 100)
 
 	g.SetCurrent("current_number", currentNumber)
 	g.SetCurrent("achieving_percentage", achievingPercentage)

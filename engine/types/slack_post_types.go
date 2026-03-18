@@ -27,8 +27,10 @@ func (s *SlackPostWant) GetLocals() *SlackPostLocals {
 }
 
 func (s *SlackPostWant) Initialize() {
-	// Promote params to state so the agent reads exclusively from state.
+	// Promote params to state so Progress/agent reads exclusively from state.
 	s.SetCurrent("slack_webhook_url", s.GetStringParam("slack_webhook_url", ""))
+	s.SetCurrent("source_want", s.GetStringParam("source_want", ""))
+	s.SetCurrent("message", s.GetStringParam("message", ""))
 }
 
 // IsAchieved returns true when a message has been posted today.
@@ -66,7 +68,7 @@ func (s *SlackPostWant) Progress() {
 // resolveMessage returns the message to post, or "" if not yet available.
 // It prefers reading from a sibling source_want; falls back to the message param.
 func (s *SlackPostWant) resolveMessage() string {
-	sourceWantName := s.GetStringParam("source_want", "")
+	sourceWantName := GetCurrent(s, "source_want", "")
 	if sourceWantName != "" {
 		cb := GetGlobalChainBuilder()
 		if cb == nil {
@@ -86,5 +88,5 @@ func (s *SlackPostWant) resolveMessage() string {
 	}
 
 	// Fallback: static message param
-	return s.GetStringParam("message", "")
+	return GetCurrent(s, "message", "")
 }
