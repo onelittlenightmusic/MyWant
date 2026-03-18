@@ -92,6 +92,13 @@ wantType:
     initialValue: 10
     example: 10
 
+  - name: gmail_result
+    description: Structured email results from Gmail search
+    type: object
+    persistent: true
+    label: current
+    initialValue: null
+
   - name: final_result
     description: Final result from the Gmail operation
     type: string
@@ -99,6 +106,37 @@ wantType:
     label: current
     initialValue: ''
     example: "Found 3 emails from boss@company.com"
+
+  - name: mcp_env
+    description: Environment variables for MCP server process
+    type: object
+    persistent: false
+    label: internal
+    initialValue: null
+  - name: mcp_server_name
+    description: MCP server name identifier
+    type: string
+    persistent: false
+    label: internal
+    initialValue: ''
+  - name: mcp_command
+    description: Command to launch the MCP server
+    type: string
+    persistent: false
+    label: internal
+    initialValue: ''
+  - name: mcp_args
+    description: Arguments for the MCP server command
+    type: object
+    persistent: false
+    label: internal
+    initialValue: null
+  - name: mcp_native
+    description: Whether to use native MCP server mode
+    type: bool
+    persistent: false
+    label: internal
+    initialValue: false
 
   constraints:
   - description: Prompt parameter is required

@@ -74,7 +74,7 @@ func (e *EvidenceWant) Progress() {
 	
 	e.SetCurrent("evidence", evidence)
 	e.SetCurrent("evidence_type", locals.EvidenceType)
-	e.SetGoal("approval_id", locals.ApprovalID)
+	e.SetCurrent("approval_id", locals.ApprovalID)
 	e.SetCurrent("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
 	e.SetCurrent("total_processed", 1)
 	e.SetCurrent("achieving_percentage", 100)
@@ -149,7 +149,7 @@ func (d *DescriptionWant) Progress() {
 	}
 	
 	d.SetCurrent("description_format", locals.DescriptionFormat)
-	d.SetGoal("approval_id", locals.ApprovalID)
+	d.SetCurrent("approval_id", locals.ApprovalID)
 	d.SetCurrent("description", description)
 	d.SetCurrent("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
 	d.SetCurrent("total_processed", 1)
