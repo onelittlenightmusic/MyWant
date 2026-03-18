@@ -1578,7 +1578,7 @@ func (n *Want) SetGoal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
 		n.storeState(key, value)
 	} else {
-		n.StoreLog("[FAILED] SetGoal(%q) dropped: key not labeled as 'goal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		WarnLog("[WARN] SetGoal(%q) dropped on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.labelViolationCount++
 	}
 }
@@ -1594,7 +1594,7 @@ func (n *Want) SetCurrent(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
 		n.storeState(key, value)
 	} else {
-		n.StoreLog("[FAILED] SetCurrent(%q) dropped: key not labeled as 'current' in StateLabels (type=%s)", key, n.Metadata.Type)
+		WarnLog("[WARN] SetCurrent(%q) dropped on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.labelViolationCount++
 	}
 }
@@ -1659,7 +1659,7 @@ func (n *Want) SetPlan(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
 		n.storeState(key, value)
 	} else {
-		n.StoreLog("[FAILED] SetPlan(%q) dropped: key not labeled as 'plan' in StateLabels (type=%s)", key, n.Metadata.Type)
+		WarnLog("[WARN] SetPlan(%q) dropped on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.labelViolationCount++
 	}
 }
@@ -1681,7 +1681,7 @@ func (n *Want) SetInternal(key string, value any) {
 	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
 		n.storeState(key, value)
 	} else {
-		n.StoreLog("[FAILED] SetInternal(%q) dropped: key not labeled as 'internal' in StateLabels (type=%s)", key, n.Metadata.Type)
+		WarnLog("[WARN] SetInternal(%q) dropped on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.labelViolationCount++
 	}
 }

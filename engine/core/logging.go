@@ -8,6 +8,9 @@ import (
 func InfoLog(format string, v ...any) {
 	log.Printf(format, v...)
 }
+func WarnLog(format string, v ...any) {
+	log.Printf("[WARN] "+format, v...)
+}
 func ErrorLog(format string, v ...any) {
 	log.Printf("[ERROR] "+format, v...)
 }
