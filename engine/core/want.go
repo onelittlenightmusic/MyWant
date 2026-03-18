@@ -482,12 +482,12 @@ func (n *Want) EndProgressCycle() {
 	}
 
 	// Check for label violations accumulated during this cycle.
-	// Skip cycle 1 to allow initialization (SetGoal in Initialize()) before labels are fully wired.
-	if n.labelViolationCount > 0 && n.execCycleCount > 1 {
+	// StateLabels are populated before Initialize() is called, so all cycles are enforced.
+	if n.labelViolationCount > 0 {
 		violations := n.labelViolationCount
 		n.labelViolationCount = 0
 		n.inExecCycle = false
-		_ = n.SetModuleError("LabelViolation", fmt.Sprintf("%d label violation(s) in cycle %d - check logs for [FAILED] entries", violations, n.execCycleCount))
+		_ = n.SetModuleError("LabelViolation", fmt.Sprintf("%d label violation(s) in cycle %d — undeclared state key(s) written; check [WARN] logs", violations, n.execCycleCount))
 		return
 	}
 	n.labelViolationCount = 0
