@@ -20,6 +20,13 @@ wantType:
       required: false
 
   state:
+    - name: slack_webhook_url
+      description: Slack Incoming Webhook URL (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: last_message
       description: Message text that was posted
       type: string

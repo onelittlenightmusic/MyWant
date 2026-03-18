@@ -21,6 +21,20 @@ wantType:
       required: false
 
   state:
+    - name: weather_city
+      description: City name for weather query (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: openweathermap_api_key
+      description: OpenWeatherMap API key (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: weather_text
       description: Current weather summary text
       type: string

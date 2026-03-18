@@ -52,6 +52,34 @@ wantType:
       required: false
 
   state:
+    - name: origin
+      description: Departure location (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: destination
+      description: Arrival location (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: arrive_by
+      description: Target arrival time HH:MM (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: api_key
+      description: Google Maps API key (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: transit_status
       description: Current status (pending, querying, done, failed)
       type: string

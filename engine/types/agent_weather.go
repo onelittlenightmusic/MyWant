@@ -34,8 +34,8 @@ type owmResponse struct {
 
 // executeWeatherFetch is the DoAgent entry point for weather queries
 func executeWeatherFetch(ctx context.Context, want *Want) error {
-	city := want.GetStringParam("weather_city", "Tokyo")
-	apiKey := want.GetStringParam("openweathermap_api_key", "")
+	city := GetCurrent(want, "weather_city", "Tokyo")
+	apiKey := GetCurrent(want, "openweathermap_api_key", "")
 	if apiKey == "" {
 		apiKey = os.Getenv("OPENWEATHERMAP_API_KEY")
 	}

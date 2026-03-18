@@ -92,7 +92,7 @@ type TransitRouteResult struct {
 
 // executeTransitQuery calls Google Maps Directions API and stores the result
 func executeTransitQuery(ctx context.Context, want *Want) error {
-	apiKey := want.GetStringParam("api_key", "")
+	apiKey := GetCurrent(want, "api_key", "")
 	if apiKey == "" {
 		apiKey = os.Getenv("GOOGLE_MAPS_API_KEY")
 	}
@@ -100,10 +100,10 @@ func executeTransitQuery(ctx context.Context, want *Want) error {
 		return fmt.Errorf("google maps api_key not provided and GOOGLE_MAPS_API_KEY env var not set")
 	}
 
-	origin := want.GetStringParam("origin", "")
-	destination := want.GetStringParam("destination", "")
-	arriveBy := want.GetStringParam("arrive_by", "09:00")
-	routeName := want.GetStringParam("name", fmt.Sprintf("%s → %s", origin, destination))
+	origin := GetCurrent(want, "origin", "")
+	destination := GetCurrent(want, "destination", "")
+	arriveBy := GetCurrent(want, "arrive_by", "09:00")
+	routeName := GetCurrent(want, "route_name", fmt.Sprintf("%s → %s", origin, destination))
 
 	if origin == "" || destination == "" {
 		return fmt.Errorf("origin and destination are required")

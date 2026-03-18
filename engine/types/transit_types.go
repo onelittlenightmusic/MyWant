@@ -66,6 +66,12 @@ func (t *TransitWant) Initialize() {
 		t.SetCurrent("transit_status", "pending")
 	}
 
+	// Promote params to state so the agent reads exclusively from state.
+	t.SetCurrent("origin", locals.Origin)
+	t.SetCurrent("destination", locals.Destination)
+	t.SetCurrent("arrive_by", locals.ArriveBy)
+	t.SetCurrent("api_key", t.GetStringParam("api_key", ""))
+
 	t.StoreLog("[TRANSIT] Initialized: %s → %s (arrive by %s)", locals.Origin, locals.Destination, locals.ArriveBy)
 }
 

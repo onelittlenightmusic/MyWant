@@ -23,6 +23,9 @@ func (w *WeatherWant) GetLocals() *WeatherLocals {
 }
 
 func (w *WeatherWant) Initialize() {
+	// Promote params to state so the agent reads exclusively from state.
+	w.SetCurrent("weather_city", w.GetStringParam("weather_city", "Tokyo"))
+	w.SetCurrent("openweathermap_api_key", w.GetStringParam("openweathermap_api_key", ""))
 	// Clear weather_date on each restart so Progress() re-fetches.
 	w.SetCurrent("weather_date", "")
 }

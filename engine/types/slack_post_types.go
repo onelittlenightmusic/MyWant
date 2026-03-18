@@ -26,7 +26,10 @@ func (s *SlackPostWant) GetLocals() *SlackPostLocals {
 	return CheckLocalsInitialized[SlackPostLocals](&s.Want)
 }
 
-func (s *SlackPostWant) Initialize() {}
+func (s *SlackPostWant) Initialize() {
+	// Promote params to state so the agent reads exclusively from state.
+	s.SetCurrent("slack_webhook_url", s.GetStringParam("slack_webhook_url", ""))
+}
 
 // IsAchieved returns true when a message has been posted today.
 func (s *SlackPostWant) IsAchieved() bool {

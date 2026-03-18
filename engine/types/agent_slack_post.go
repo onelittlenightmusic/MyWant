@@ -22,7 +22,7 @@ func init() {
 
 // executeSlackPost reads composed state and posts the briefing to Slack
 func executeSlackPost(ctx context.Context, want *Want) error {
-	slackURL := want.GetStringParam("slack_webhook_url", "")
+	slackURL := GetCurrent(want, "slack_webhook_url", "")
 	if slackURL == "" {
 		slackURL = os.Getenv("SLACK_WEBHOOK_URL")
 	}
@@ -30,12 +30,9 @@ func executeSlackPost(ctx context.Context, want *Want) error {
 		return fmt.Errorf("slack_webhook_url not provided and SLACK_WEBHOOK_URL env var not set")
 	}
 
-	// Prefer message from params (set by parent want), fall back to state
-	msg := want.GetStringParam("message", "")
-	if msg == "" {
-		message, _ := want.GetCurrent("last_message")
-		msg, _ = message.(string)
-	}
+	// Read message from state (set by SlackPostWant.Progress via outgoing_message)
+	message, _ := want.GetCurrent("last_message")
+	msg, _ := message.(string)
 	if msg == "" {
 		return fmt.Errorf("no message to post (set 'message' param or 'last_message' state)")
 	}
