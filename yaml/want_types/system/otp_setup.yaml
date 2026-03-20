@@ -168,6 +168,13 @@ wantType:
       label: current
       initialValue: false
 
+    - name: build_config_written
+      description: True once build-config.json has been written for GTFS feeds (or no GTFS needed)
+      type: bool
+      persistent: true
+      label: current
+      initialValue: false
+
     - name: graph_built
       description: True once OTP graph.obj has been built successfully
       type: bool

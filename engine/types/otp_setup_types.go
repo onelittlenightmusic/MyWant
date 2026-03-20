@@ -1,8 +1,11 @@
 package types
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	. "mywant/engine/core"
@@ -35,15 +38,41 @@ func (o *OtpSetupWant) GetLocals() *OtpSetupLocals {
 }
 
 func (o *OtpSetupWant) Initialize() {
-	o.StoreState("osm_downloaded", false)
-	o.StoreState("graph_built", false)
+	dataDir := o.GetStringParam("data_dir", "/tmp/otp-data")
+
+	// Idempotent checks: skip steps whose outputs already exist on disk.
+	osmExists := fileExists(filepath.Join(dataDir, o.GetStringParam("osm_filename", "map.osm.pbf")))
+	graphExists := fileExists(filepath.Join(dataDir, "graph.obj"))
+
+	o.StoreState("osm_downloaded", osmExists)
+	o.StoreState("graph_built", graphExists)
 	o.StoreState("server_running", false)
-	// If no GTFS data is configured, mark gtfs_downloaded=true so OPA
-	// treats it as already satisfied and does not dispatch download_gtfs.
-	if o.GetStringParam("gtfs_url", "") == "" && o.GetStringParam("gtfs_feeds", "") == "" {
-		o.StoreState("gtfs_downloaded", true)
+
+	// If no GTFS data is configured, mark gtfs_downloaded and build_config_written=true
+	// so OPA treats them as already satisfied.
+	hasGTFS := o.GetStringParam("gtfs_url", "") != "" || o.GetStringParam("gtfs_feeds", "") != ""
+	if hasGTFS {
+		// Check each GTFS file exists; only mark downloaded if all are present.
+		allGTFSExist := true
+		for _, f := range o.resolveGTFSFeeds() {
+			if !fileExists(filepath.Join(dataDir, f.Filename)) {
+				allGTFSExist = false
+				break
+			}
+		}
+		o.StoreState("gtfs_downloaded", allGTFSExist)
+		// build-config.json is always rewritten when GTFS is present and graph needs building.
+		o.StoreState("build_config_written", graphExists || fileExists(filepath.Join(dataDir, "build-config.json")))
 	} else {
-		o.StoreState("gtfs_downloaded", false)
+		o.StoreState("gtfs_downloaded", true)
+		o.StoreState("build_config_written", true)
+	}
+
+	if osmExists {
+		o.StoreLog("[OTP] OSM file already exists — skipping download")
+	}
+	if graphExists {
+		o.StoreLog("[OTP] graph.obj already exists — skipping build")
 	}
 
 	// Promote OPA planner params → state so ThinkingAgent can read via GetCurrent.
@@ -154,9 +183,9 @@ func (o *OtpSetupWant) buildDirectionMap() string {
 		},
 	}
 
-	// Add GTFS download step when one or more feeds are configured.
-	// Multiple feeds are downloaded sequentially inside a single container.
+	// Add GTFS download + build-config.json steps when one or more feeds are configured.
 	if feeds := o.resolveGTFSFeeds(); len(feeds) > 0 {
+		// download_gtfs: download all feeds sequentially, idempotent.
 		var cmds []string
 		for _, f := range feeds {
 			cmds = append(cmds, fmt.Sprintf(
@@ -176,10 +205,40 @@ func (o *OtpSetupWant) buildDirectionMap() string {
 			},
 			"sets": map[string]any{"gtfs_downloaded": true},
 		}
+
+		// write_build_config: write build-config.json so OTP recognises the GTFS feeds.
+		// OTP 2.x does not auto-detect GTFS zips; explicit transitFeeds config is required.
+		// We base64-encode the JSON to avoid escaping issues when passing through shell.
+		var feedEntries []string
+		for _, f := range feeds {
+			feedEntries = append(feedEntries, fmt.Sprintf(`{"type": "gtfs", "source": "%s"}`, f.Filename))
+		}
+		buildConfigJSON := fmt.Sprintf(`{"transitFeeds": [%s]}`, strings.Join(feedEntries, ", "))
+		b64Config := base64Encode(buildConfigJSON)
+		dm["write_build_config"] = map[string]any{
+			"type": "docker_run",
+			"params": map[string]any{
+				"image":          "alpine:latest",
+				"container_name": "otp-write-build-config",
+				"volumes":        downloadVolume,
+				"command_args":   fmt.Sprintf("[\"sh\", \"-c\", \"echo %s | base64 -d > /data/build-config.json && echo 'build-config.json written'\"]", b64Config),
+				"wait_for_exit":  true,
+			},
+			"sets": map[string]any{"build_config_written": true},
+		}
 	}
 
 	b, _ := json.Marshal(dm)
 	return string(b)
+}
+
+func base64Encode(s string) string {
+	return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // IsAchieved returns true once the OTP server is up and healthy.
@@ -211,9 +270,10 @@ func (o *OtpSetupWant) Progress() {
 	o.SetCurrent("achieving_percentage", o.CalculateAchievingPercentage())
 
 	o.SetCurrent("current", map[string]any{
-		"osm_downloaded":  GetState[bool](&o.Want, "osm_downloaded", false),
-		"gtfs_downloaded": GetState[bool](&o.Want, "gtfs_downloaded", false),
-		"graph_built":     GetState[bool](&o.Want, "graph_built", false),
-		"server_running":  GetState[bool](&o.Want, "server_running", false),
+		"osm_downloaded":       GetState[bool](&o.Want, "osm_downloaded", false),
+		"gtfs_downloaded":      GetState[bool](&o.Want, "gtfs_downloaded", false),
+		"build_config_written": GetState[bool](&o.Want, "build_config_written", false),
+		"graph_built":          GetState[bool](&o.Want, "graph_built", false),
+		"server_running":       GetState[bool](&o.Want, "server_running", false),
 	})
 }

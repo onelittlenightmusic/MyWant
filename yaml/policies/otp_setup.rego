@@ -2,17 +2,19 @@ package planner
 
 # OTP Setup Policy
 #
-# Orchestrates the full OpenTripPlanner setup with optional parallel GTFS download:
-#   1a. download_osm   — download OSM PBF data (idempotent, skips if file exists)
-#   1b. download_gtfs  — download GTFS zip (only dispatched when gtfs_downloaded=false)
-#   2.  build_graph    — build OTP graph; waits for osm_downloaded AND gtfs_downloaded
-#   3.  start_server   — start OTP routing server
+# Orchestrates the full OpenTripPlanner setup:
+#   1a. download_osm        — download OSM PBF data (idempotent)
+#   1b. download_gtfs       — download GTFS feeds (parallel with OSM, skipped if no feeds)
+#   1c. write_build_config  — write build-config.json (after GTFS downloaded, skipped if no feeds)
+#   2.  build_graph         — build OTP graph (waits for OSM + GTFS + build config)
+#   3.  start_server        — start OTP routing server
 #
-# input.current flags (set via direction_map "sets" when each child Want achieves):
-#   osm_downloaded   - true once OSM data is downloaded
-#   gtfs_downloaded  - true once GTFS data is downloaded (pre-set to true if no gtfs_url)
-#   graph_built      - true once OTP graph.obj has been built
-#   server_running   - true once OTP server is up and healthy
+# input.current flags:
+#   osm_downloaded        - true once OSM data is downloaded
+#   gtfs_downloaded       - true once GTFS data is downloaded (pre-set to true if no feeds)
+#   build_config_written  - true once build-config.json is written (pre-set to true if no feeds)
+#   graph_built           - true once OTP graph.obj has been built
+#   server_running        - true once OTP server is up and healthy
 
 import future.keywords.if
 
@@ -20,10 +22,11 @@ import future.keywords.if
 
 already_done if input.current.server_running
 
-# Both data sources ready (gtfs_downloaded is pre-set to true when no GTFS URL is configured)
-data_ready if {
+# Both data sources and build config ready
+ready_to_build if {
     input.current.osm_downloaded
     input.current.gtfs_downloaded
+    input.current.build_config_written
 }
 
 # ─── Step 1a: Download OSM ───────────────────────────────────────────────────
@@ -40,11 +43,19 @@ _download_actions["download_gtfs"] {
     not input.current.gtfs_downloaded
 }
 
+# ─── Step 1c: Write build-config.json (after GTFS downloaded) ────────────────
+
+_config_actions["write_build_config"] {
+    not already_done
+    input.current.gtfs_downloaded
+    not input.current.build_config_written
+}
+
 # ─── Step 2: Build Graph ─────────────────────────────────────────────────────
 
 _build_actions["build_graph"] {
     not already_done
-    data_ready
+    ready_to_build
     not input.current.graph_built
 }
 
@@ -59,5 +70,5 @@ _serve_actions["start_server"] {
 # ─── Aggregate ────────────────────────────────────────────────────────────────
 
 missing[action] {
-    action := (_download_actions | _build_actions | _serve_actions)[_]
+    action := (_download_actions | _config_actions | _build_actions | _serve_actions)[_]
 }
