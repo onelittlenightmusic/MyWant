@@ -20,6 +20,7 @@ wantType:
       type: string
       required: false
 
+
   state:
     - name: weather_city
       description: City name for weather query (copied from param by Initialize)

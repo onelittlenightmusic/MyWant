@@ -1,18 +1,16 @@
 agents:
-  # AgentTransitAPI - Queries Google Maps Directions API for transit routes
+  # AgentTransitAPI - Queries OpenTripPlanner 2.x GraphQL API for transit routes
   - name: agent_transit_api
     runtime: localGo
     type: do
-    description: Queries Google Maps Directions API to find optimal transit route for a given arrival time
+    description: Queries OpenTripPlanner 2.x GraphQL API (/otp/gtfs/v1) to find optimal transit route for a given arrival time. Geocodes place names via Nominatim (OpenStreetMap).
     version: '1.0'
     capabilities:
       - transit_api_agency
     uses: []
     role: action
     configuration:
-      api_key: ""  # Falls back to GOOGLE_MAPS_API_KEY env var
-      language: ja
-      mode: transit
+      otp_url: "http://localhost:8082"  # Falls back to OTP_URL env var
     actions:
       - name: query_transit
         description: Queries transit directions and recommends departure time
@@ -29,9 +27,9 @@ agents:
             type: string
             description: Target arrival time in HH:MM format (local time)
             example: "09:00"
-          api_key:
+          otp_url:
             type: string
-            description: Google Maps API key (overrides GOOGLE_MAPS_API_KEY env var)
+            description: OpenTripPlanner server base URL (overrides OTP_URL env var, default http://localhost:8082)
             required: false
         state_updates:
           - name: transit_status

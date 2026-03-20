@@ -4,8 +4,9 @@ wantType:
     title: Transit Route Lookup
     description: |
       Looks up the optimal transit route for a given origin, destination, and
-      target arrival time using Google Maps Directions API.
+      target arrival time using OpenTripPlanner (OTP 2.x GraphQL API).
 
+      Origin and destination are geocoded via Nominatim (OpenStreetMap).
       Recommends the latest possible departure time to arrive on schedule.
       Runs only on configured days (default: weekdays). Re-queries daily.
     version: '1.0'
@@ -46,10 +47,13 @@ wantType:
       required: false
       example: オフィス
 
-    - name: api_key
-      description: Google Maps API key. Falls back to GOOGLE_MAPS_API_KEY environment variable.
+    - name: otp_url
+      description: OpenTripPlanner server base URL (e.g. http://localhost:8082). Falls back to OTP_URL env var.
       type: string
       required: false
+      default: "http://localhost:8082"
+      defaultGlobalParameter: otp_url
+
 
   state:
     - name: origin
@@ -73,8 +77,8 @@ wantType:
       label: current
       initialValue: ''
 
-    - name: api_key
-      description: Google Maps API key (copied from param by Initialize)
+    - name: otp_url
+      description: OpenTripPlanner server base URL (promoted from param by Initialize)
       type: string
       persistent: false
       label: current
@@ -188,14 +192,14 @@ wantType:
   agents:
     - name: agent_transit_api
       role: action
-      description: Queries Google Maps Directions API for transit route recommendations
+      description: Queries OpenTripPlanner 2.x GraphQL API for transit route recommendations
 
   requires:
     - transit_api_agency
 
   examples:
-    - name: Daily Office Commute
-      description: Look up optimal departure time for weekday commute
+    - name: Daily Office Commute (OTP)
+      description: Look up optimal departure time for weekday commute using local OTP server
       want:
         metadata:
           name: office-commute
@@ -206,18 +210,20 @@ wantType:
             origin: 渋谷駅
             destination: 新宿駅
             arrive_by: "09:00"
-            days: "mon,tue,wed,thu,fri"
+            days: "mon,tue,wed,thu,fri,sat,sun"
+            otp_url: "http://localhost:8082"
 
-    - name: Thursday Business Trip
-      description: Look up Shinkansen route for weekly business trip
+    - name: Tokyo to Shinjuku
+      description: Single-trip route lookup from Tokyo Station to Shinjuku
       want:
         metadata:
-          name: osaka-trip
+          name: tokyo-shinjuku
           type: transit
         spec:
           params:
-            name: 出張(大阪)
+            name: 東京→新宿
             origin: 東京駅
-            destination: 新大阪駅
-            arrive_by: "11:00"
-            days: "thu"
+            destination: 新宿駅
+            arrive_by: "10:00"
+            days: "mon,tue,wed,thu,fri,sat,sun"
+            otp_url: "http://localhost:8082"

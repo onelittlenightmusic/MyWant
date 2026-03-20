@@ -32,8 +32,9 @@
 
 **Quick Start:**
 ```sh
-make release                                        # Build CLI
-./bin/mywant start -D [--port 8080]                     # Start server
+make restart-all                                    # ⚠️ ALWAYS use this to rebuild & restart (builds CLI + frontend + starts server)
+make release                                        # Build CLI only (no restart)
+./bin/mywant start -D [--port 8080]                     # Start server (after manual build)
 ./bin/mywant start --worker -D                          # Agent service
 ./bin/mywant start --dev                                # Dev mode
 ./bin/mywant wants create -f yaml/config/config-travel.yaml
@@ -67,7 +68,7 @@ make run-queue-system-recipe # Pipeline demo
 make run-qnet-recipe         # Multi-stream demo
 ```
 
-**Note:** `make restart-all` builds and starts the correct server (`./bin/mywant` via `engine/server`).
+**Note:** Always use `make restart-all` for rebuilding and restarting — it builds `./bin/mywant` (engine/server), the frontend, and starts both the main server and mock flight server. Never use `make release` + manual start as a substitute when doing a full rebuild.
 
 ## Key Patterns
 

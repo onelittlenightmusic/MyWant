@@ -1,0 +1,35 @@
+wants:
+  # Step 1: Build the OTP graph from GTFS + OSM data (one-shot task, exits when done)
+  - metadata:
+      name: otp-builder
+      type: docker_run
+      labels:
+        service: otp
+        role: builder
+    spec:
+      params:
+        image: "docker.io/opentripplanner/opentripplanner:latest"
+        container_name: otp-builder
+        volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+        env: '{"JAVA_OPTIONS": "-Xmx6G"}'
+        command_args: '["--build", "--save"]'
+        wait_for_exit: true
+
+  # Step 2: Run the OTP routing server (persistent, stopped when Want is deleted)
+  - metadata:
+      name: otp-server
+      type: docker_run
+      labels:
+        service: otp
+        role: server
+    spec:
+      params:
+        image: "docker.io/opentripplanner/opentripplanner:latest"
+        container_name: otp-server
+        ports: '["8080:8080"]'
+        volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+        env: '{"JAVA_OPTIONS": "-Xmx4G"}'
+        command_args: '["--load", "--serve"]'
+        health_check_url: "http://localhost:8080/otp/routers"
+        health_check_interval: "5s"
+        health_check_max_retries: 120

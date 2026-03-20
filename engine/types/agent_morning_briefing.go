@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -37,24 +36,6 @@ func formatTransitLine(routeName string, r *TransitRouteResult) string {
 	return fmt.Sprintf("  • %s: %s発%s → %s着 (%d分/%s)",
 		routeName, r.RecommendedDeparture, vehicleStr,
 		r.EstimatedArrival, r.DurationMinutes, transferStr)
-}
-
-// fetchTransitLine queries Google Maps for a single route and returns a formatted line.
-// Returns empty string if the route should be skipped (no API key, error, etc.)
-func fetchTransitLine(ctx context.Context, route briefingRouteConfig, googleKey string) string {
-	if googleKey == "" {
-		return fmt.Sprintf("  • %s: API キー未設定", route.Name)
-	}
-	arrivalUnix, err := parseArriveBy(route.ArriveBy)
-	if err != nil {
-		return fmt.Sprintf("  • %s: 時刻パースエラー(%v)", route.Name, err)
-	}
-	result, err := callDirectionsAPI(ctx, route.Origin, route.Destination, arrivalUnix, googleKey)
-	if err != nil {
-		InfoLog("[TRANSIT] callDirectionsAPI error for %s: %v", route.Name, err)
-		return fmt.Sprintf("  • %s: 取得失敗(%v)", route.Name, err)
-	}
-	return formatTransitLine(route.Name, result)
 }
 
 // parseBriefingRoutes extracts the routes from state (copied from params by Initialize) into []briefingRouteConfig.

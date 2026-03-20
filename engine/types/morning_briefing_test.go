@@ -253,29 +253,28 @@ func TestParseBriefingRoutes_NoRoutes(t *testing.T) {
 	}
 }
 
-// ─── parseDirectionsResult ────────────────────────────────────────────────────
+// ─── parseOTPResult ───────────────────────────────────────────────────────────
 
-func TestParseDirectionsResult_Direct(t *testing.T) {
-	leg := directionsLeg{
-		DepartureTime: directionsTime{Text: "8:31 AM", Value: 1000},
-		ArrivalTime:   directionsTime{Text: "9:00 AM", Value: 2740},
-		Duration:      directionsDur{Value: 1740, Text: "29 mins"},
-		Steps: []directionsStep{
+func TestParseOTPResult_Direct(t *testing.T) {
+	baseMs := int64(1704851460000) // 2024-01-10 08:31:00 JST
+	it := otpItinerary{
+		Duration:            1740, // 29 min
+		StartTime:           baseMs,
+		EndTime:             baseMs + 1740*1000,
+		NumberOfTransfers:   0,
+		Legs: []otpLeg{
+			{Mode: "WALK", TransitLeg: false},
 			{
-				TravelMode: "WALKING",
-			},
-			{
-				TravelMode: "TRANSIT",
-				TransitDetails: &transitDetails{
-					Line:          transitLine{ShortName: "山手線"},
-					DepartureStop: transitStop{Name: "渋谷"},
-					ArrivalStop:   transitStop{Name: "新宿"},
-				},
+				Mode:       "RAIL",
+				TransitLeg: true,
+				Route:      &otpRoute{ShortName: "山手線"},
+				From:       otpPlace{Name: "渋谷"},
+				To:         otpPlace{Name: "新宿"},
 			},
 		},
 	}
 
-	result := parseDirectionsResult(leg)
+	result := parseOTPResult(it)
 	if result.DurationMinutes != 29 {
 		t.Errorf("duration: got %d, want 29", result.DurationMinutes)
 	}
@@ -290,23 +289,31 @@ func TestParseDirectionsResult_Direct(t *testing.T) {
 	}
 }
 
-func TestParseDirectionsResult_WithTransfer(t *testing.T) {
-	leg := directionsLeg{
-		Duration: directionsDur{Value: 5400},
-		Steps: []directionsStep{
-			{TravelMode: "TRANSIT", TransitDetails: &transitDetails{
-				Line:          transitLine{ShortName: "東海道線"},
-				DepartureStop: transitStop{Name: "品川"},
-			}},
-			{TravelMode: "WALKING"},
-			{TravelMode: "TRANSIT", TransitDetails: &transitDetails{
-				Line:          transitLine{ShortName: "新幹線"},
-				DepartureStop: transitStop{Name: "東京"},
-			}},
+func TestParseOTPResult_WithTransfer(t *testing.T) {
+	baseMs := int64(1704851460000)
+	it := otpItinerary{
+		Duration:            5400, // 90 min
+		StartTime:           baseMs,
+		EndTime:             baseMs + 5400*1000,
+		NumberOfTransfers:   1,
+		Legs: []otpLeg{
+			{
+				Mode:       "RAIL",
+				TransitLeg: true,
+				Route:      &otpRoute{ShortName: "東海道線"},
+				From:       otpPlace{Name: "品川"},
+			},
+			{Mode: "WALK", TransitLeg: false},
+			{
+				Mode:       "RAIL",
+				TransitLeg: true,
+				Route:      &otpRoute{ShortName: "新幹線"},
+				From:       otpPlace{Name: "東京"},
+			},
 		},
 	}
 
-	result := parseDirectionsResult(leg)
+	result := parseOTPResult(it)
 	if result.Transfers != 1 {
 		t.Errorf("transfers: got %d, want 1", result.Transfers)
 	}
@@ -315,12 +322,12 @@ func TestParseDirectionsResult_WithTransfer(t *testing.T) {
 	}
 }
 
-// ─── Google Maps API integration (skipped without key) ───────────────────────
+// ─── OTP integration (skipped without running OTP instance) ──────────────────
 
-func TestCallDirectionsAPI_Integration(t *testing.T) {
-	apiKey := os.Getenv("GOOGLE_MAPS_API_KEY")
-	if apiKey == "" {
-		t.Skip("GOOGLE_MAPS_API_KEY not set, skipping integration test")
+func TestCallOTPPlanAPI_Integration(t *testing.T) {
+	otpURL := os.Getenv("OTP_URL")
+	if otpURL == "" {
+		t.Skip("OTP_URL not set, skipping integration test")
 	}
 
 	unix, err := parseArriveBy("09:00")
@@ -328,11 +335,19 @@ func TestCallDirectionsAPI_Integration(t *testing.T) {
 		t.Fatalf("parseArriveBy: %v", err)
 	}
 
-	result, err := callDirectionsAPI(context.Background(), "渋谷駅", "新宿駅", unix, apiKey)
+	from, err := geocodeLocation(context.Background(), "渋谷駅")
 	if err != nil {
-		t.Fatalf("callDirectionsAPI: %v", err)
+		t.Fatalf("geocodeLocation origin: %v", err)
+	}
+	to, err := geocodeLocation(context.Background(), "新宿駅")
+	if err != nil {
+		t.Fatalf("geocodeLocation destination: %v", err)
 	}
 
+	result, err := callOTPPlanAPI(context.Background(), otpURL, from, to, unix)
+	if err != nil {
+		t.Fatalf("callOTPPlanAPI: %v", err)
+	}
 	if result.DurationMinutes <= 0 {
 		t.Error("expected positive duration")
 	}

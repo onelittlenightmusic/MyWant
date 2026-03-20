@@ -1,0 +1,15 @@
+wants:
+  - metadata:
+      name: my-otp
+      type: otp_setup
+    spec:
+      params:
+        # data_dir はグローバルパラメータ otp_data_dir から自動取得 (~/.mywant/parameters.yaml)
+        osm_url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+        osm_filename: "map.osm.pbf"
+        # 複数GTFSフィード（認証不要の公開データ）
+        # 都営バス + 都営地下鉄（浅草線・三田線・新宿線・大江戸線・荒川線・日暮里舎人ライナー）
+        gtfs_feeds: '[{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]'
+        build_memory: "-Xmx6G"
+        server_memory: "-Xmx4G"
+        server_port: "8082"

@@ -2,70 +2,47 @@ package planner
 
 # Morning Briefing Policy
 #
-# Trigger timing is controlled by the Want's "when" spec (e.g. at: "07:30", every: "day").
-# This policy only decides whether the message should be composed given the current state.
+# Trigger timing and daily reset are controlled by the Want's "when" spec.
+# This policy controls the full fetch-and-post flow:
+#   1. fetch_weather  — fetch today's weather
+#   2. fetch_transit  — fetch today's transit route
+#   3. post_slack     — compose and post the briefing (only after 1+2 are done)
 #
-# input.goal:
-#   weather_city  - city name for weather query
-#   routes        - array of {name, origin, destination, arrive_by, days}
-#
-# input.current (updated each cycle by MorningBriefingWant.Progress):
-#   today          - "YYYY-MM-DD" of today
-#   outgoing_date  - "YYYY-MM-DD" when the message was already composed
-#   weather_date   - "YYYY-MM-DD" when weather was last fetched
-#   transit_date_N - "YYYY-MM-DD" when transit route N was last fetched
+# input.current flags (reset on each `when`-triggered restart via Initialize):
+#   weather_done   - true once weather child Want has achieved
+#   transit_done   - true once transit child Want has achieved
+#   briefing_done  - true once post_slack child Want has achieved (via Sets)
 
 import future.keywords.if
-import future.keywords.in
-
-# ── Weekday helpers ───────────────────────────────────────────────────────────
-
-now_ns := time.now_ns()
-now_weekday := time.weekday([now_ns, "Asia/Tokyo"])
-weekday_map := {"Sunday": "sun", "Monday": "mon", "Tuesday": "tue", "Wednesday": "wed", "Thursday": "thu", "Friday": "fri", "Saturday": "sat"}
-today_wd := weekday_map[now_weekday]
 
 # ── Conditions ────────────────────────────────────────────────────────────────
 
-already_composed_today if input.current.outgoing_date == input.current.today
+already_done if input.current.briefing_done
 
-weather_fetched_today if input.current.weather_date == input.current.today
+# ─── Weather ──────────────────────────────────────────────────────────────────
 
-transit_fetched_today(i) if {
-    key := sprintf("transit_date_%d", [i])
-    object.get(input.current, key, "") == input.current.today
+_weather_actions["fetch_weather"] {
+    not already_done
+    not input.current.weather_done
 }
 
-route_is_today(i) if {
-    route := input.goal.routes[i]
-    days := split(route.days, ",")
-    d := days[_]
-    trim_space(d) == today_wd
+# ─── Transit ──────────────────────────────────────────────────────────────────
+
+_transit_actions["fetch_transit"] {
+    not already_done
+    not input.current.transit_done
 }
 
-route_is_today(i) if {
-    route := input.goal.routes[i]
-    not route.days
-    today_wd in ["mon", "tue", "wed", "thu", "fri"]
+# ─── Slack ────────────────────────────────────────────────────────────────────
+
+_slack_actions["post_slack"] {
+    not already_done
+    input.current.weather_done
+    input.current.transit_done
 }
 
-all_transit_ready if {
-    count([i |
-        route := input.goal.routes[i]
-        route_is_today(i)
-        not transit_fetched_today(i)
-    ]) == 0
-}
+# ─── Aggregate ────────────────────────────────────────────────────────────────
 
-all_transit_ready if {
-    not input.goal.routes
-}
-
-# ── Actions ───────────────────────────────────────────────────────────────────
-
-missing[action] if {
-    not already_composed_today
-    weather_fetched_today
-    all_transit_ready
-    action := "post_slack"
+missing[action] {
+    action := (_weather_actions | _transit_actions | _slack_actions)[_]
 }

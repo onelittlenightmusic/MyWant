@@ -42,11 +42,17 @@ func (w *WeatherWant) CalculateAchievingPercentage() float64 {
 	return 10
 }
 
-// Progress runs the weather agent; result stays in this Want's own state.
+// Progress runs the weather agent and propagates results to the parent coordinator.
 func (w *WeatherWant) Progress() {
 	w.SetCurrent("achieving_percentage", w.CalculateAchievingPercentage())
 
 	if w.IsAchieved() {
+		if text := GetCurrent(w, "weather_text", ""); text != "" {
+			w.MergeParentState(map[string]any{
+				"weather_done": true,
+				"weather_text": text,
+			})
+		}
 		return
 	}
 

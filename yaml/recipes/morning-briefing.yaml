@@ -4,20 +4,18 @@ recipe:
     description: "毎朝指定時刻に天気・乗換案内をSlackに投稿する朝のブリーフィング"
     custom_type: "morning briefing"
     category: "productivity"
-    version: "2.0.0"
+    version: "3.0.0"
 
   parameters:
-    weather_city: Tokyo
     slack_webhook_url: ""
     google_maps_api_key: ""
 
   parameter_descriptions:
-    weather_city: "天気を取得する都市名"
     slack_webhook_url: "Slack Incoming Webhook URL"
     google_maps_api_key: "Google Maps API キー (交通情報用)"
 
   wants:
-    # ① コーディネーター: 30秒ごとに再起動し、天気・交通が揃ったらメッセージ合成
+    # コーディネーター: when で毎朝リセット、OPA + DispatchThinker が全フローを制御
     - metadata:
         name: my-morning-briefing
         type: morning_briefing
@@ -25,49 +23,27 @@ recipe:
           category: productivity
       spec:
         when:
-          - every: "30 seconds"
+          - at: "07:30"
         params:
-          weather_city: Tokyo
-          routes:
-            - name: オフィス(新宿)
-              origin: 渋谷駅
-              destination: 新宿駅
-              arrive_by: "09:00"
-              days: "mon,tue,wed,thu,fri"
-
-    # ② 天気取得 Want
-    - metadata:
-        name: my-morning-briefing-weather
-        type: weather
-        labels:
-          category: productivity
-      spec:
-        when:
-          - every: "30 seconds"
-        params:
-          weather_city: Tokyo
-
-    # ③ 交通情報 Want (ルート0: オフィス)
-    - metadata:
-        name: my-morning-briefing-transit-0
-        type: transit
-        labels:
-          category: productivity
-      spec:
-        params:
-          name: オフィス(新宿)
-          origin: 渋谷駅
-          destination: 新宿駅
-          arrive_by: "09:00"
-          days: "mon,tue,wed,thu,fri"
-
-    # ④ Slack 投稿 Want
-    - metadata:
-        name: my-morning-briefing-slack
-        type: slack_post
-        labels:
-          category: productivity
-      spec:
-        params:
-          source_want: my-morning-briefing
-          slack_webhook_url: ""
+          direction_map: >-
+            {
+              "fetch_weather": {
+                "type": "weather",
+                "params": {"weather_city": "Tokyo"}
+              },
+              "fetch_transit": {
+                "type": "transit",
+                "params": {
+                  "name": "オフィス(新宿)",
+                  "origin": "渋谷駅",
+                  "destination": "新宿駅",
+                  "arrive_by": "09:00",
+                  "days": "mon,tue,wed,thu,fri"
+                }
+              },
+              "post_slack": {
+                "type": "slack_post",
+                "params": {"source_want": "my-morning-briefing"},
+                "sets": {"briefing_done": true}
+              }
+            }

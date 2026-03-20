@@ -98,6 +98,33 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 		const doneMarker = "DONE"
 		cb := GetGlobalChainBuilder()
 
+		// 3.5. Reconcile: recover tracking state from existing child wants (e.g. after server restart).
+		// For each direction not yet tracked, scan child wants to find any already dispatched/achieved.
+		for _, direction := range desiredDirections {
+			if v, already := dispatched[direction]; already && v != "" {
+				continue // Already tracked
+			}
+			for _, child := range cb.GetWants() {
+				if child.Metadata.Labels["direction"] == direction && w.isOwnerOf(child) {
+					if child.Status == WantStatusAchieved {
+						// Already done - apply sets and mark complete
+						if cfg, ok := directionMap[direction]; ok && len(cfg.Sets) > 0 {
+							for k, v := range cfg.Sets {
+								w.SetCurrent(k, v)
+							}
+						}
+						completedIDs[direction] = child.Metadata.ID
+						dispatched[direction] = doneMarker
+						w.StoreLog("[%s] Reconciled completed direction '%s' (want: %s)", DispatchThinkerName, direction, child.Metadata.ID)
+					} else {
+						// In-progress - resume tracking
+						dispatched[direction] = child.Metadata.ID
+						w.StoreLog("[%s] Reconciled in-progress direction '%s' (want: %s)", DispatchThinkerName, direction, child.Metadata.ID)
+					}
+					break
+				}
+			}
+		}
 		// 4. Resolve IDs and check completion
 		for direction, wantID := range dispatched {
 			if wantID == doneMarker { continue }
@@ -133,11 +160,10 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 										for k, v := range m { sets[k] = v }
 									}
 								}
-								// Apply updates
+								// Apply updates via labeled state methods (GCP rule: no direct storeState)
 								for k, v := range cfg.Sets {
 									sets[k] = v
-									// Also write directly to parent state for convenience
-									w.storeState(k, v) 
+									w.SetCurrent(k, v)
 								}
 								w.storeState("sets", sets)
 							}

@@ -200,7 +200,14 @@ Modes:
 					exResp, err := c.GetWantTypeExamples(wantType)
 					if err == nil {
 						if examples, ok := (*exResp)["examples"].([]any); ok && len(examples) > 0 {
-							exampleBytes, _ := json.Marshal(examples[0])
+							// Each example has {name, description, want: {...}} structure
+							wantData := examples[0]
+							if exObj, ok := examples[0].(map[string]any); ok {
+								if nested, ok := exObj["want"]; ok {
+									wantData = nested
+								}
+							}
+							exampleBytes, _ := json.Marshal(wantData)
 							var want client.Want
 							if err := json.Unmarshal(exampleBytes, &want); err == nil {
 								config = client.Config{Wants: []*client.Want{&want}}
@@ -499,7 +506,13 @@ func runInteractiveCreateWant(cmd *cobra.Command) {
 			params = make(map[string]any)
 		} else {
 			if examples, ok := (*exResp)["examples"].([]any); ok && len(examples) > 0 {
-				exampleBytes, _ := json.Marshal(examples[0])
+				wantData := examples[0]
+				if exObj, ok := examples[0].(map[string]any); ok {
+					if nested, ok := exObj["want"]; ok {
+						wantData = nested
+					}
+				}
+				exampleBytes, _ := json.Marshal(wantData)
 				var exampleWant client.Want
 				if err := json.Unmarshal(exampleBytes, &exampleWant); err == nil {
 					params = exampleWant.Spec.Params

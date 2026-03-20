@@ -1,0 +1,246 @@
+wantType:
+  metadata:
+    name: docker_run
+    title: Docker Container
+    description: |
+      Manages a Docker container whose lifecycle is tied to the Want's lifecycle.
+
+      Two modes:
+        - Server mode (default): starts the container, achieves when running
+          (with optional HTTP health check). Stops and removes the container
+          when the Want is deleted.
+        - Task mode (wait_for_exit: true): runs the container, waits for it to
+          exit with code 0, then achieves. Useful for one-shot jobs such as
+          building an OpenTripPlanner graph.
+
+      The container is named via container_name (defaults to "mywant-<want-name>")
+      and is automatically cleaned up on delete.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: docker_phase
+
+  parameters:
+    - name: image
+      description: Docker image to run (e.g. "docker.io/opentripplanner/opentripplanner:latest")
+      type: string
+      required: true
+
+    - name: container_name
+      description: Name for the container. Defaults to "mywant-<want-name>".
+      type: string
+      required: false
+
+    - name: ports
+      description: Port mappings as a JSON array (e.g. '["8080:8080"]')
+      type: string
+      required: false
+      default: "[]"
+
+    - name: volumes
+      description: Volume mounts as a JSON array (e.g. '["/host/path:/container/path"]')
+      type: string
+      required: false
+      default: "[]"
+
+    - name: env
+      description: 'Environment variables as a JSON object (e.g. {"JAVA_OPTIONS": "-Xmx4G"})'
+      type: string
+      required: false
+      default: "{}"
+
+    - name: command_args
+      description: Arguments passed to the container after the image name (e.g. '["--load", "--serve"]')
+      type: string
+      required: false
+      default: "[]"
+
+    - name: wait_for_exit
+      description: If true, waits for the container to exit (task mode). If false (default), container runs as a server.
+      type: bool
+      required: false
+      default: false
+
+    - name: health_check_url
+      description: HTTP URL to poll for server readiness (server mode only). Achieved once URL returns 2xx.
+      type: string
+      required: false
+
+    - name: health_check_interval
+      description: Interval between health check attempts (e.g. "5s")
+      type: string
+      required: false
+      default: "5s"
+
+    - name: health_check_max_retries
+      description: Maximum number of health check attempts before failing
+      type: int
+      required: false
+      default: 60
+
+  state:
+    - name: docker_image
+      description: Docker image (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: docker_container_name
+      description: Container name (derived from param or want name)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_ports
+      description: Port mappings JSON array (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_volumes
+      description: Volume mounts JSON array (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_env
+      description: Environment variables JSON object (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '{}'
+
+    - name: docker_command_args
+      description: Container command args JSON array (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_wait_for_exit
+      description: If true, agent waits for container to exit (task mode)
+      type: bool
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: docker_container_id
+      description: Short container ID returned by docker run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_phase
+      description: Container lifecycle phase (starting | running | done | failed | stopped | exited)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_container_status
+      description: Live container status from docker inspect (running | exited | dead | ...)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_exit_code
+      description: Exit code when container finishes (task mode or unexpected exit)
+      type: int
+      persistent: true
+      label: current
+      initialValue: -1
+
+    - name: docker_logs
+      description: Last 30 lines of container logs (captured on unexpected exit)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_error
+      description: Error message if container failed to start or exited unexpectedly
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+    - name: server_health_check_url
+      description: Health check URL for server mode containers
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: server_health_check_interval
+      description: Health check polling interval (e.g. 5s)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: server_health_check_max_retries
+      description: Maximum health check retries before failure
+      type: int
+      persistent: false
+      label: current
+      initialValue: 0
+
+  requires:
+    - docker_management
+
+  agents:
+    - name: docker_manager
+      role: action
+      description: DoAgent that starts and manages the Docker container lifecycle
+
+  constraints:
+    - description: Docker must be installed and the daemon must be running
+      validation: docker info must succeed
+
+  examples:
+    - name: otp-builder
+      description: Build an OpenTripPlanner graph (one-shot task, exits when done)
+      want:
+        metadata:
+          name: otp-builder
+          type: docker_run
+        spec:
+          params:
+            image: "docker.io/opentripplanner/opentripplanner:latest"
+            container_name: otp-builder
+            volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+            env: '{"JAVA_OPTIONS": "-Xmx6G"}'
+            command_args: '["--build", "--save"]'
+            wait_for_exit: true
+
+    - name: otp-server
+      description: Run OpenTripPlanner as a persistent routing server
+      want:
+        metadata:
+          name: otp-server
+          type: docker_run
+        spec:
+          params:
+            image: "docker.io/opentripplanner/opentripplanner:latest"
+            container_name: otp-server
+            ports: '["8080:8080"]'
+            volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+            env: '{"JAVA_OPTIONS": "-Xmx4G"}'
+            command_args: '["--load", "--serve"]'
+            health_check_url: "http://localhost:8080/otp/routers"
+            health_check_interval: "5s"
+            health_check_max_retries: 120

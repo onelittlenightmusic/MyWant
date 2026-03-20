@@ -71,7 +71,7 @@ func (t *TransitWant) Initialize() {
 	t.SetCurrent("origin", locals.Origin)
 	t.SetCurrent("destination", locals.Destination)
 	t.SetCurrent("arrive_by", locals.ArriveBy)
-	t.SetCurrent("api_key", t.GetStringParam("api_key", ""))
+	t.SetCurrent("otp_url", t.GetStringParam("otp_url", "http://localhost:8082"))
 	t.SetCurrent("route_name", t.GetStringParam("name", ""))
 
 	t.StoreLog("[TRANSIT] Initialized: %s → %s (arrive by %s)", locals.Origin, locals.Destination, locals.ArriveBy)
@@ -120,8 +120,14 @@ func (t *TransitWant) Progress() {
 	}
 
 	if t.IsAchieved() {
-		// Store formatted result in own state for coordinator Wants to read
+		// Store formatted result in own state and propagate to parent coordinator.
 		t.storeTransitText()
+		if text := GetCurrent(t, "transit_text", ""); text != "" {
+			t.MergeParentState(map[string]any{
+				"transit_done": true,
+				"transit_text": text,
+			})
+		}
 		return
 	}
 

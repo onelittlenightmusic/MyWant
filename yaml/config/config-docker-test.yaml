@@ -1,0 +1,8 @@
+wants:
+  - metadata:
+      name: test-docker
+      type: docker_run
+    spec:
+      params:
+        image: "hello-world"
+        wait_for_exit: true

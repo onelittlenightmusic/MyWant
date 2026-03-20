@@ -1,0 +1,47 @@
+recipe:
+  metadata:
+    name: "OTP Setup"
+    description: "OpenTripPlannerをDockerで一括セットアップ (OSMダウンロード → グラフビルド → サーバー起動)"
+    custom_type: "otp setup"
+    category: "infrastructure"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "otp"
+
+  parameter_descriptions:
+    prefix: "Wantの名前プレフィックス"
+
+  example:
+    wants:
+      - metadata:
+          name: "otp-tokyo"
+          type: otp_setup
+          labels:
+            recipe: "OTP Setup"
+        spec:
+          params:
+            osm_url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+            osm_filename: "map.osm.pbf"
+            build_memory: "-Xmx6G"
+            server_memory: "-Xmx4G"
+            server_port: "8082"
+
+  wants:
+    - metadata:
+        name: "{{prefix}}-setup"
+        type: otp_setup
+        labels:
+          category: infrastructure
+      spec:
+        params:
+          # data_dir はグローバルパラメータ otp_data_dir から自動取得 (~/.mywant/parameters.yaml)
+          # 必要に応じて以下のコメントを外して上書き:
+          # data_dir: /opt/otp-data
+          osm_url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+          osm_filename: "map.osm.pbf"
+          gtfs_url: "https://your-transit-agency.example/gtfs.zip"
+          gtfs_filename: "gtfs.zip"
+          build_memory: "-Xmx6G"
+          server_memory: "-Xmx4G"
+          server_port: "8082"
