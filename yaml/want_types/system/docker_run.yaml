@@ -220,9 +220,9 @@ wantType:
           type: docker_run
         spec:
           params:
-            image: "docker.io/opentripplanner/opentripplanner:latest"
+            image: "docker.io/opentripplanner/opentripplanner:2.6.0"
             container_name: otp-builder
-            volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+            volumes: '["/opt/otp-data:/var/opentripplanner"]'
             env: '{"JAVA_OPTIONS": "-Xmx6G"}'
             command_args: '["--build", "--save"]'
             wait_for_exit: true
@@ -235,12 +235,12 @@ wantType:
           type: docker_run
         spec:
           params:
-            image: "docker.io/opentripplanner/opentripplanner:latest"
+            image: "docker.io/opentripplanner/opentripplanner:2.6.0"
             container_name: otp-server
-            ports: '["8080:8080"]'
-            volumes: '["/path/to/otp-data:/var/opentripplanner"]'
+            ports: '["8082:8080"]'
+            volumes: '["/opt/otp-data:/var/opentripplanner"]'
             env: '{"JAVA_OPTIONS": "-Xmx4G"}'
             command_args: '["--load", "--serve"]'
-            health_check_url: "http://localhost:8080/otp/routers"
+            health_check_url: "http://localhost:8082/otp"
             health_check_interval: "5s"
             health_check_max_retries: 120
