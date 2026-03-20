@@ -1,0 +1,235 @@
+wantType:
+  metadata:
+    name: ensure_file
+    title: Ensure File Exists
+    description: |
+      Ensures a file exists at data_dir/filename.
+      If the file is missing, creates it using the configured method.
+
+      Methods (set via `method` param or global parameter `ensure_file_method`):
+        - "curl" (default): download via Go net/http — no docker needed
+        - "docker_wget":    download via docker alpine/wget
+        - "docker_build":  run a one-shot docker container to produce the file
+
+      Prerequisites (filenames relative to data_dir) can be declared.
+      Initialize() returns early until all prerequisites exist, then proceeds.
+      IsAchieved returns true as soon as the file is present on disk.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: ensure_file_phase
+
+  parameters:
+    - name: filename
+      description: Target filename to ensure exists inside data_dir
+      type: string
+      required: true
+
+    - name: data_dir
+      description: Directory where the file will be stored
+      type: string
+      defaultGlobalParameter: otp_data_dir
+      required: false
+
+    - name: method
+      description: |
+        How to create the file if missing:
+          "curl"         — Go net/http download (default, no docker)
+          "docker_wget"  — docker alpine/wget download
+          "docker_build" — one-shot docker container (e.g. OTP graph builder)
+      type: string
+      defaultGlobalParameter: ensure_file_method
+      required: false
+      default: "curl"
+
+    - name: url
+      description: Download URL (required for curl and docker_wget methods)
+      type: string
+      required: false
+
+    - name: prerequisites
+      description: |
+        JSON array of filenames (relative to data_dir) that must exist before
+        running. Initialize() waits until all are present.
+        Example: '["map.osm.pbf", "build-config.json", "gtfs.zip"]'
+      type: string
+      required: false
+
+    - name: docker_image
+      description: Docker image to run (required for docker_build method)
+      type: string
+      required: false
+
+    - name: docker_container_name
+      description: Container name for docker methods (default derived from want name)
+      type: string
+      required: false
+
+    - name: docker_command_args
+      description: Command args passed to the docker container (docker_build method)
+      type: string
+      required: false
+      default: "[]"
+
+    - name: docker_volumes
+      description: |
+        Volume mounts JSON array (docker methods).
+        Default for docker_build: ["<data_dir>:/var/opentripplanner"]
+        Default for docker_wget:  ["<data_dir>:/data"]
+      type: string
+      required: false
+
+    - name: docker_env
+      description: Environment variables JSON object for docker methods
+      type: string
+      required: false
+      default: "{}"
+
+  state:
+    - name: ensure_file_phase
+      description: Phase (starting | done | failed)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: ensure_file_error
+      description: Error message if the operation failed
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: ensure_file_path
+      description: Full path to the file
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_image
+      description: Docker image (set by Initialize for docker methods)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: docker_container_name
+      description: Container name (set by Initialize for docker methods)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_volumes
+      description: Volume mounts JSON array (set by Initialize for docker methods)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_env
+      description: Environment variables JSON object (set by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '{}'
+
+    - name: docker_command_args
+      description: Container command args JSON array (set by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_wait_for_exit
+      description: Always true for ensure_file docker methods
+      type: bool
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: docker_ports
+      description: Port mappings (always empty for ensure_file)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_container_id
+      description: Container ID returned by docker run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_exit_code
+      description: Exit code of the docker container
+      type: int
+      persistent: true
+      label: current
+      initialValue: -1
+
+    - name: docker_error
+      description: Docker error message
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  requires:
+    - docker_management
+
+  agents:
+    - name: docker_manager
+      role: action
+      description: DoAgent used for docker_wget and docker_build methods
+
+  examples:
+    - name: download-osm
+      description: Download Tokyo OSM PBF file (curl, no docker)
+      want:
+        metadata:
+          name: tokyo-osm
+          type: ensure_file
+        spec:
+          params:
+            filename: "map.osm.pbf"
+            url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+            method: "curl"
+
+    - name: download-gtfs
+      description: Download Toei Bus GTFS (curl, no docker)
+      want:
+        metadata:
+          name: toei-bus-gtfs
+          type: ensure_file
+        spec:
+          params:
+            filename: "toei-bus.zip"
+            url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
+            method: "curl"
+
+    - name: build-otp-graph
+      description: Build OTP routing graph (docker_build, skips if graph.obj exists)
+      want:
+        metadata:
+          name: otp-graph
+          type: ensure_file
+        spec:
+          params:
+            filename: "graph.obj"
+            method: "docker_build"
+            docker_image: "docker.io/opentripplanner/opentripplanner:2.6.0"
+            docker_container_name: "otp-builder"
+            docker_command_args: '["--build", "--save"]'
+            docker_env: '{"JAVA_OPTIONS": "-Xmx6G"}'
+            prerequisites: '["map.osm.pbf", "build-config.json"]'
