@@ -1,0 +1,173 @@
+wantType:
+  metadata:
+    name: otp_server
+    title: OTP Server
+    description: |
+      Runs the OTP routing server as a persistent Docker container.
+      Achieved once the server responds to health checks on /otp/routers.
+      The container is stopped and removed when the Want is deleted.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: docker_phase
+
+  parameters:
+    - name: data_dir
+      description: Host directory containing graph.obj (mounted into the OTP container)
+      type: string
+      defaultGlobalParameter: otp_data_dir
+      required: false
+
+    - name: server_memory
+      description: JVM heap size for the OTP server (e.g. -Xmx4G)
+      type: string
+      required: false
+      default: "-Xmx4G"
+
+    - name: server_port
+      description: Host port to expose the OTP HTTP API on
+      type: string
+      required: false
+      default: "8080"
+
+  state:
+    - name: docker_image
+      description: Docker image used for the server
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: docker_container_name
+      description: Name of the server container
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_volumes
+      description: Volume mounts JSON array
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_env
+      description: Environment variables JSON object (JAVA_OPTIONS)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '{}'
+
+    - name: docker_command_args
+      description: Container command args JSON array
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_wait_for_exit
+      description: Always false — server runs indefinitely
+      type: bool
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: docker_ports
+      description: Port mappings JSON array
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_container_id
+      description: Short container ID returned by docker run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_phase
+      description: Container lifecycle phase (starting | running | failed | exited | stopped)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_container_status
+      description: Live container status from docker inspect
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_exit_code
+      description: Exit code if container exits unexpectedly
+      type: int
+      persistent: true
+      label: current
+      initialValue: -1
+
+    - name: docker_logs
+      description: Last 30 lines of container logs (captured on unexpected exit)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_error
+      description: Error message if the server failed to start
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: server_health_check_url
+      description: Health check URL polled during startup
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: server_health_check_interval
+      description: Health check polling interval (e.g. 5s)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: server_health_check_max_retries
+      description: Maximum health check retries before failure
+      type: int
+      persistent: false
+      label: current
+      initialValue: 0
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  requires:
+    - docker_management
+
+  agents:
+    - name: docker_manager
+      role: action
+      description: DoAgent that starts and manages the OTP server container
+
+  examples:
+    - name: tokyo-otp-server
+      description: Run OTP routing server for Tokyo (port 8082)
+      want:
+        metadata:
+          name: otp-server
+          type: otp_server
+        spec:
+          params:
+            data_dir: "/opt/otp-data"
+            server_memory: "-Xmx4G"
+            server_port: "8082"

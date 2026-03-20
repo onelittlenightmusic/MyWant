@@ -1,0 +1,116 @@
+recipe:
+  metadata:
+    name: "OTP Pipeline"
+    description: |
+      OpenTripPlannerを段階的にセットアップするパイプライン。
+      OSM/GTFSデータのダウンロード → build-config.json生成 → グラフビルド → サーバー起動
+      の順に自動実行する。各ステップは独立したWantで管理され、ファイルの存在で冪等性を保証する。
+    custom_type: "otp pipeline"
+    category: "infrastructure"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "otp"
+
+  parameter_descriptions:
+    prefix: "Wantの名前プレフィックス"
+
+  example:
+    wants:
+      - metadata:
+          name: "my-otp-osm"
+          type: otp_osm_data
+        spec:
+          params:
+            data_dir: "/opt/otp-data"
+            osm_url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+
+  wants:
+    # ── Step 1a: Download OSM data ─────────────────────────────────────────────
+    - metadata:
+        name: "{{prefix}}-osm"
+        type: otp_osm_data
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-prerequisite
+          otp-step: osm
+      spec:
+        params:
+          # data_dir は otp_data_dir グローバルパラメータから自動取得
+          osm_url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+          osm_filename: "map.osm.pbf"
+
+    # ── Step 1b: Download GTFS feed 1 (Toei Bus) ──────────────────────────────
+    - metadata:
+        name: "{{prefix}}-gtfs-toei-bus"
+        type: otp_gtfs_file
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-prerequisite
+          otp-step: gtfs
+      spec:
+        params:
+          url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
+          filename: "toei-bus.zip"
+
+    # ── Step 1c: Download GTFS feed 2 (Toei Train) ────────────────────────────
+    - metadata:
+        name: "{{prefix}}-gtfs-toei-train"
+        type: otp_gtfs_file
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-prerequisite
+          otp-step: gtfs
+      spec:
+        params:
+          url: "https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
+          filename: "toei-train.zip"
+
+    # ── Step 1d: Write build-config.json ──────────────────────────────────────
+    - metadata:
+        name: "{{prefix}}-build-config"
+        type: otp_build_config
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-prerequisite
+          otp-step: build-config
+      spec:
+        params:
+          gtfs_feeds: '[{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]'
+
+    # ── Step 2: Build OTP routing graph ───────────────────────────────────────
+    # Waits for all Step 1 wants (otp-prerequisite) to achieve before building.
+    - metadata:
+        name: "{{prefix}}-graph"
+        type: otp_graph
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-graph
+      spec:
+        using:
+          - role: otp-prerequisite
+        params:
+          osm_filename: "map.osm.pbf"
+          build_memory: "-Xmx6G"
+          gtfs_feeds: '[{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]'
+
+    # ── Step 3: Start OTP server ───────────────────────────────────────────────
+    # Waits for graph to be built before starting.
+    - metadata:
+        name: "{{prefix}}-server"
+        type: otp_server
+        labels:
+          category: infrastructure
+          otp-pipeline: "{{prefix}}"
+          role: otp-server
+      spec:
+        using:
+          - role: otp-graph
+        params:
+          server_memory: "-Xmx4G"
+          server_port: "8082"

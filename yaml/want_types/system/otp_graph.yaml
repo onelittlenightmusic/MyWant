@@ -1,0 +1,162 @@
+wantType:
+  metadata:
+    name: otp_graph
+    title: OTP Graph Builder
+    description: |
+      Ensures graph.obj exists in data_dir.
+      Builds the OTP routing graph via Docker (opentripplanner:2.6.0 --build --save) if missing.
+      IsAchieved returns true as soon as graph.obj is present on disk.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: docker_phase
+
+  parameters:
+    - name: data_dir
+      description: Host directory containing OSM/GTFS data and where graph.obj will be written
+      type: string
+      defaultGlobalParameter: otp_data_dir
+      required: false
+
+    - name: osm_filename
+      description: Filename of the OSM PBF file inside data_dir (prerequisite check)
+      type: string
+      required: false
+      default: "map.osm.pbf"
+
+    - name: gtfs_feeds
+      description: |
+        JSON array of GTFS feeds. Each entry: {"url": "...", "filename": "..."}.
+        Used to verify all GTFS zips exist before starting the build.
+      type: string
+      required: false
+
+    - name: gtfs_url
+      description: (Legacy) Single GTFS feed URL. Used only if gtfs_feeds is not set.
+      type: string
+      required: false
+
+    - name: gtfs_filename
+      description: (Legacy) Single GTFS zip filename. Used with gtfs_url.
+      type: string
+      required: false
+      default: "gtfs.zip"
+
+    - name: build_memory
+      description: JVM heap size for the graph build step (e.g. -Xmx6G)
+      type: string
+      required: false
+      default: "-Xmx6G"
+
+  state:
+    - name: docker_image
+      description: Docker image used for the build
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: docker_container_name
+      description: Name of the builder container
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_volumes
+      description: Volume mounts JSON array
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_env
+      description: Environment variables JSON object (JAVA_OPTIONS)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '{}'
+
+    - name: docker_command_args
+      description: Container command args JSON array
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_wait_for_exit
+      description: Always true — builder exits when done
+      type: bool
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: docker_ports
+      description: Port mappings (empty for builder)
+      type: string
+      persistent: false
+      label: current
+      initialValue: '[]'
+
+    - name: docker_container_id
+      description: Short container ID returned by docker run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_phase
+      description: Container lifecycle phase (starting | done | failed)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: docker_exit_code
+      description: Exit code of the builder container
+      type: int
+      persistent: true
+      label: current
+      initialValue: -1
+
+    - name: docker_error
+      description: Error message if the build failed
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: graph_path
+      description: Full path to the built graph.obj file
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  requires:
+    - docker_management
+
+  agents:
+    - name: docker_manager
+      role: action
+      description: DoAgent that runs the OTP builder container
+
+  examples:
+    - name: tokyo-graph
+      description: Build OTP routing graph from Tokyo OSM + GTFS data
+      want:
+        metadata:
+          name: otp-graph
+          type: otp_graph
+        spec:
+          params:
+            data_dir: "/opt/otp-data"
+            build_memory: "-Xmx6G"
