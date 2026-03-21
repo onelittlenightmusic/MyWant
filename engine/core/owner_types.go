@@ -612,12 +612,13 @@ drained:
 			if evidenceMap == nil {
 				evidenceMap = map[string]any{"status": approvalStatus}
 			}
-			approvalData := &ApprovalData{
-				ApprovalID:  approvalID,
-				Evidence:    evidenceMap,
-				Description: finalResultDescription,
-				Timestamp:   time.Now(),
-			}
+			approvalData := NewDataObjectFrom("approval_result", map[string]any{
+				"approval_id":  approvalID,
+				"description":  finalResultDescription,
+				"status":       approvalStatus,
+				"evidence":     evidenceMap,
+				"completed_at": time.Now().Format(time.RFC3339),
+			})
 			t.Provide(approvalData)
 			t.ProvideDone()
 			time.Sleep(10 * time.Millisecond)

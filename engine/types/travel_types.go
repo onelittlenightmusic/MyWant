@@ -138,7 +138,7 @@ func (b *BaseTravelWant) Progress() {
 			var scheduleMap map[string]any
 			json.Unmarshal(scheduleJSON, &scheduleMap)
 			out := NewDataObjectFrom("travel_schedule", scheduleMap)
-			b.ProvideTyped(out)
+			b.Provide(out)
 			b.ProvideDone()
 		}
 	} else {

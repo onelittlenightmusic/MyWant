@@ -159,7 +159,7 @@ func (g *Numbers) Progress() {
 	out := mywant.NewDataObject("queue_packet")
 	out.Set("num", locals.currentCount)
 	out.Set("time", locals.currentTime)
-	g.ProvideTyped(out)
+	g.Provide(out)
 
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
@@ -278,7 +278,7 @@ func (q *Queue) Progress() {
 	out := mywant.NewDataObject("queue_packet")
 	out.Set("num", num)
 	out.Set("time", finishTime)
-	q.ProvideTyped(out)
+	q.Provide(out)
 }
 
 // flushBatch commits all accumulated statistics to state
@@ -405,7 +405,7 @@ func (c *Combiner) Progress() {
 	}
 
 	processed++
-	c.ProvideTyped(obj)
+	c.Provide(obj)
 
 	c.SetCurrent("processed", processed)
 }

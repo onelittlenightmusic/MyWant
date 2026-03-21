@@ -49,7 +49,7 @@ func (g *PrimeNumbers) Progress() {
 
 	out := NewDataObject("number_value")
 	out.Set("value", currentNumber)
-	g.ProvideTyped(out)
+	g.Provide(out)
 
 	// Calculate achieving percentage
 	totalCount := end - start + 1

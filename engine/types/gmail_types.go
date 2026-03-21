@@ -216,7 +216,7 @@ func (g *GmailWant) Progress() {
 		// Provide result to output channels
 		out := NewDataObject("email_list")
 		out.Set("emails", emails)
-		g.ProvideTyped(out)
+		g.Provide(out)
 		g.ProvideDone()
 	}
 }

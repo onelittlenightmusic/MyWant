@@ -1918,8 +1918,9 @@ func serializeLabels(labels map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-// Provide sends a data packet to PubSub topic for subscribers
-func (n *Want) Provide(payload any) {
+// provideRaw sends a raw data packet to PubSub topic for subscribers.
+// Internal use only — callers should use Provide(*DataObject) instead.
+func (n *Want) provideRaw(payload any) {
 	cb := GetGlobalChainBuilder()
 
 	n.metadataMutex.RLock()
@@ -2664,20 +2665,20 @@ func (n *Want) UseForeverTyped(typeName string) (int, *DataObject, bool, bool) {
 	return idx, obj, done, ok
 }
 
-// ProvideTyped validates the DataObject against its schema and calls Provide().
+// Provide validates the DataObject against its schema and sends it downstream.
 // Validation errors are logged as warnings but do not block sending.
-func (n *Want) ProvideTyped(obj *DataObject) {
+func (n *Want) Provide(obj *DataObject) {
 	if obj == nil {
-		n.Provide(nil)
+		n.provideRaw(nil)
 		return
 	}
 	loader := GetGlobalDataTypeLoader()
 	if loader != nil && obj.TypeName() != "" {
 		if err := loader.Validate(obj.TypeName(), obj.ToMap()); err != nil {
-			WarnLog("[ProvideTyped] Validation warning for type %q: %v", obj.TypeName(), err)
+			WarnLog("[Provide] Validation warning for type %q: %v", obj.TypeName(), err)
 		}
 	}
-	n.Provide(obj.ToMap())
+	n.provideRaw(obj.ToMap())
 }
 
 // IncrementIntStateValue safely increments an integer state value

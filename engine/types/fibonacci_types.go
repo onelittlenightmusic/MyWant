@@ -44,7 +44,7 @@ func (g *FibonacciNumbers) Progress() {
 	sentCount += 1
 	out := NewDataObject("number_value")
 	out.Set("value", a)
-	g.ProvideTyped(out)
+	g.Provide(out)
 
 	// Calculate achieving percentage
 	achievingPercentage := int(float64(sentCount) * 100 / float64(count))

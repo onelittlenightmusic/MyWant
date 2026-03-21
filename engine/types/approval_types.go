@@ -80,7 +80,7 @@ func (e *EvidenceWant) Progress() {
 	out.Set("content", evidence)
 	out.Set("evidence_type", locals.EvidenceType)
 	out.Set("provided_at", providedAt)
-	e.ProvideTyped(out)
+	e.Provide(out)
 	e.ProvideDone()
 
 	// Mark evidence as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target
@@ -153,7 +153,7 @@ func (d *DescriptionWant) Progress() {
 	dout := NewDataObject("description_data")
 	dout.Set("text", description)
 	dout.Set("provided_at", providedAt)
-	d.ProvideTyped(dout)
+	d.Provide(dout)
 	d.ProvideDone()
 
 	// Mark description as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target

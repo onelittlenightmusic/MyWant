@@ -300,7 +300,7 @@ func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 	out.Set("reaction_id", locals.ReactionQueueId)
 	out.Set("reaction_type", locals.ReactionType)
 	out.Set("source_want", r.Metadata.Name)
-	r.ProvideTyped(out)
+	r.Provide(out)
 	locals.ReactionPacketEmitted = true
 }
 

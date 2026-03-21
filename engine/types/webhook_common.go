@@ -111,7 +111,7 @@ func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 				msgMap = map[string]any{"raw": latestMsg}
 			}
 			out := NewDataObjectFrom("webhook_message", msgMap)
-			want.ProvideTyped(out)
+			want.Provide(out)
 		}
 
 		locals.LastProcessedCount = currentCount
