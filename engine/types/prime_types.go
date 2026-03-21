@@ -47,7 +47,9 @@ func (g *PrimeNumbers) Progress() {
 
 	currentNumber += 1
 
-	g.Provide(currentNumber)
+	out := NewDataObject("number_value")
+	out.Set("value", currentNumber)
+	g.ProvideTyped(out)
 
 	// Calculate achieving percentage
 	totalCount := end - start + 1
@@ -115,7 +117,7 @@ func (f *PrimeSequence) Progress() {
 	locals.foundPrimes = GetCurrent(f, "foundPrimes", []int{})
 
 	// Try to receive one packet - wait forever until packet or DONE signal arrives
-	_, i, done, ok := f.UseForever()
+	_, obj, done, ok := f.UseForeverTyped("number_value")
 	if !ok {
 		// Channel closed or error
 		return
@@ -133,43 +135,42 @@ func (f *PrimeSequence) Progress() {
 		return
 	}
 
-	if val, ok := i.(int); ok {
-		totalProcessed++
-		isPrime := true
+	val := GetTyped(obj, "value", 0)
+	totalProcessed++
+	isPrime := true
 
-		// Special cases: 1 is not prime, 2 is prime
-		if val < 2 {
-			isPrime = false
-		} else if val == 2 {
-			isPrime = true
-		} else {
-			for _, prime := range locals.foundPrimes {
-				if prime*prime > val {
-					break // No need to check beyond sqrt(val)
-				}
-				if val%prime == 0 {
-					isPrime = false
-					break
-				}
+	// Special cases: 1 is not prime, 2 is prime
+	if val < 2 {
+		isPrime = false
+	} else if val == 2 {
+		isPrime = true
+	} else {
+		for _, prime := range locals.foundPrimes {
+			if prime*prime > val {
+				break // No need to check beyond sqrt(val)
+			}
+			if val%prime == 0 {
+				isPrime = false
+				break
 			}
 		}
-
-		// If it's prime, add to memoized primes
-		if isPrime {
-			locals.foundPrimes = append(locals.foundPrimes, val)
-		}
-
-		// Calculate achieving percentage based on processed count
-		// Since we don't know the total, use 50% while processing
-		achievingPercentage := 50
-
-		// Update state for this packet
-		f.SetCurrent("total_processed", totalProcessed)
-		f.SetCurrent("last_number_processed", val)
-		f.SetCurrent("foundPrimes", locals.foundPrimes)
-		f.SetCurrent("primeCount", len(locals.foundPrimes))
-		f.SetCurrent("achieving_percentage", achievingPercentage)
 	}
+
+	// If it's prime, add to memoized primes
+	if isPrime {
+		locals.foundPrimes = append(locals.foundPrimes, val)
+	}
+
+	// Calculate achieving percentage based on processed count
+	// Since we don't know the total, use 50% while processing
+	achievingPercentage := 50
+
+	// Update state for this packet
+	f.SetCurrent("total_processed", totalProcessed)
+	f.SetCurrent("last_number_processed", val)
+	f.SetCurrent("foundPrimes", locals.foundPrimes)
+	f.SetCurrent("primeCount", len(locals.foundPrimes))
+	f.SetCurrent("achieving_percentage", achievingPercentage)
 
 	// Yield control - will be called again for next packet
 }

@@ -65,24 +65,22 @@ func (e *EvidenceWant) Progress() {
 
 	evidence := fmt.Sprintf("Evidence of type '%s' for approval %s", locals.EvidenceType, locals.ApprovalID)
 
-	evidenceData := &ApprovalData{
-		ApprovalID:  locals.ApprovalID,
-		Evidence:    evidence,
-		Description: "Supporting evidence for approval process",
-		Timestamp:   time.Now(),
-	}
-	
+	providedAt := time.Now().Format(time.RFC3339)
 	e.SetCurrent("evidence", evidence)
 	e.SetCurrent("evidence_type", locals.EvidenceType)
 	e.SetCurrent("approval_id", locals.ApprovalID)
-	e.SetCurrent("evidence_provided_at", evidenceData.Timestamp.Format(time.RFC3339))
+	e.SetCurrent("evidence_provided_at", providedAt)
 	e.SetCurrent("total_processed", 1)
 	e.SetCurrent("achieving_percentage", 100)
 
 	e.StoreLog("📦 Evidence %s provided for approval %s to %d coordinator(s)", locals.EvidenceType, locals.ApprovalID, e.GetOutCount())
 
-	// Broadcast evidence to all output channels using Provide
-	e.Provide(evidenceData)
+	// Broadcast evidence to all output channels using ProvideTyped
+	out := NewDataObject("evidence_data")
+	out.Set("content", evidence)
+	out.Set("evidence_type", locals.EvidenceType)
+	out.Set("provided_at", providedAt)
+	e.ProvideTyped(out)
 	e.ProvideDone()
 
 	// Mark evidence as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target
@@ -141,24 +139,21 @@ func (d *DescriptionWant) Progress() {
 
 	description := fmt.Sprintf(locals.DescriptionFormat, locals.ApprovalID)
 
-	descriptionData := &ApprovalData{
-		ApprovalID:  locals.ApprovalID,
-		Evidence:    nil,
-		Description: description,
-		Timestamp:   time.Now(),
-	}
-	
+	providedAt := time.Now().Format(time.RFC3339)
 	d.SetCurrent("description_format", locals.DescriptionFormat)
 	d.SetCurrent("approval_id", locals.ApprovalID)
 	d.SetCurrent("description", description)
-	d.SetCurrent("description_provided_at", descriptionData.Timestamp.Format(time.RFC3339))
+	d.SetCurrent("description_provided_at", providedAt)
 	d.SetCurrent("total_processed", 1)
 	d.SetCurrent("achieving_percentage", 100)
 
 	d.StoreLog("📦 Description provided: %s to %d coordinator(s)", description, d.GetOutCount())
 
-	// Broadcast description to all output channels using Provide
-	d.Provide(descriptionData)
+	// Broadcast description to all output channels using ProvideTyped
+	dout := NewDataObject("description_data")
+	dout.Set("text", description)
+	dout.Set("provided_at", providedAt)
+	d.ProvideTyped(dout)
 	d.ProvideDone()
 
 	// Mark description as achieved to complete the want and emit OwnerCompletionEvent if owned by a Target

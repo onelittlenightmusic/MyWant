@@ -1,0 +1,9 @@
+title: number_value
+description: "A single integer value passed through a pipeline (fibonacci, prime, etc.)"
+type: object
+properties:
+  value:
+    type: integer
+    description: "The integer value"
+required:
+  - value

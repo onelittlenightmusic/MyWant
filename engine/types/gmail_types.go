@@ -214,7 +214,9 @@ func (g *GmailWant) Progress() {
 		g.StoreLog("📦 Gmail search completed for '%s': found %d emails", locals.Prompt, len(emails))
 
 		// Provide result to output channels
-		g.Provide(emails)
+		out := NewDataObject("email_list")
+		out.Set("emails", emails)
+		g.ProvideTyped(out)
 		g.ProvideDone()
 	}
 }

@@ -134,7 +134,11 @@ func (b *BaseTravelWant) Progress() {
 		b.SetCurrent("completed", true)
 		b.SetCurrent("final_result", b.executor.formatResult(schedule))
 		if connectionAvailable {
-			b.Provide(schedule)
+			scheduleJSON, _ := json.Marshal(schedule)
+			var scheduleMap map[string]any
+			json.Unmarshal(scheduleJSON, &scheduleMap)
+			out := NewDataObjectFrom("travel_schedule", scheduleMap)
+			b.ProvideTyped(out)
 			b.ProvideDone()
 		}
 	} else {

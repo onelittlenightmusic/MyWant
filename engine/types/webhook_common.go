@@ -104,7 +104,14 @@ func ProgressWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals) {
 		want.StoreLog("%s %d new message(s) received (total: %d)", cfg.LogPrefix, newCount, currentCount)
 
 		if latestMsg, ok := want.GetCurrent(cfg.LatestMessageKey()); ok && latestMsg != nil {
-			want.Provide(latestMsg)
+			var msgMap map[string]any
+			if m, ok2 := latestMsg.(map[string]any); ok2 {
+				msgMap = m
+			} else {
+				msgMap = map[string]any{"raw": latestMsg}
+			}
+			out := NewDataObjectFrom("webhook_message", msgMap)
+			want.ProvideTyped(out)
 		}
 
 		locals.LastProcessedCount = currentCount

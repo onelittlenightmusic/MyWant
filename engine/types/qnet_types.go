@@ -233,9 +233,9 @@ func (q *Queue) Progress() {
 	if done {
 		q.StoreLog("[QUEUE-EXEC] Received DONE signal")
 	} else if obj != nil {
-		num := obj.Get("num", 0).(int)
+		num := mywant.GetTyped(obj, "num", 0)
 		if num%locals.batchUpdateInterval == 0 || num <= 5 {
-			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", num, obj.Get("time", 0.0))
+			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", num, mywant.GetTyped(obj, "time", 0.0))
 		}
 	}
 
@@ -255,8 +255,8 @@ func (q *Queue) Progress() {
 		return
 	}
 
-	num := obj.Get("num", 0).(int)
-	arrivalTime := obj.Get("time", 0.0).(float64)
+	num := mywant.GetTyped(obj, "num", 0)
+	arrivalTime := mywant.GetTyped(obj, "time", 0.0)
 	startServiceTime := math.Max(arrivalTime, locals.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
 	serviceTime := q.GetFloatParam("service_time", locals.ServiceTime)

@@ -59,6 +59,27 @@ func (d *DataObject) TypeName() string {
 	return d.typeName
 }
 
+// GetTyped retrieves a typed value from a DataObject, eliminating manual type assertions.
+// T is inferred from defaultVal. Returns defaultVal if key is absent or type doesn't match.
+//
+// Example:
+//
+//	reactionType := mywant.GetTyped(obj, "reaction_type", "internal")  // string inferred
+//	num := mywant.GetTyped(obj, "num", 0)                              // int inferred
+func GetTyped[T any](d *DataObject, key string, defaultVal T) T {
+	if d == nil || d.data == nil {
+		return defaultVal
+	}
+	val, ok := d.data[key]
+	if !ok {
+		return defaultVal
+	}
+	if v, ok := val.(T); ok {
+		return v
+	}
+	return defaultVal
+}
+
 // ToMap returns a copy of the internal data map.
 func (d *DataObject) ToMap() map[string]any {
 	if d == nil || d.data == nil {

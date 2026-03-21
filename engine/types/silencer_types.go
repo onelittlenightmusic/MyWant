@@ -81,10 +81,10 @@ func (s *SilencerWant) processPacket(obj *DataObject) {
 		return
 	}
 
-	reactionType := obj.Get("reaction_type", "internal").(string)
+	reactionType := GetTyped(obj, "reaction_type", "internal")
 
-	reactionID, ok := obj.Get("reaction_id", "").(string)
-	if !ok || reactionID == "" {
+	reactionID := GetTyped(obj, "reaction_id", "")
+	if reactionID == "" {
 		s.StoreLog("[SILENCER] ERROR: Missing or invalid reaction_id in packet")
 		return
 	}

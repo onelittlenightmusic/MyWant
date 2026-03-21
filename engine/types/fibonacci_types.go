@@ -42,7 +42,9 @@ func (g *FibonacciNumbers) Progress() {
 	sentCount := GetCurrent(g, "sent_count", 0)
 
 	sentCount += 1
-	g.Provide(a)
+	out := NewDataObject("number_value")
+	out.Set("value", a)
+	g.ProvideTyped(out)
 
 	// Calculate achieving percentage
 	achievingPercentage := int(float64(sentCount) * 100 / float64(count))
@@ -105,7 +107,7 @@ func (f *FibonacciFilter) Progress() {
 	locals.filtered = GetCurrent(f, "filtered", []int{})
 
 	// Try to receive one packet - wait forever until packet or DONE signal arrives
-	_, i, done, ok := f.UseForever()
+	_, obj, done, ok := f.UseForeverTyped("number_value")
 	if !ok {
 		// Channel closed or error
 		return
@@ -122,26 +124,25 @@ func (f *FibonacciFilter) Progress() {
 		return
 	}
 
-	if val, ok := i.(int); ok {
-		totalProcessed++
-		// Filter based on min/max values from state (promoted in Initialize)
-		minValue := GetCurrent(f, "min_value", 0)
-		maxValue := GetCurrent(f, "max_value", 1000000)
-		if val >= minValue && val <= maxValue {
-			locals.filtered = append(locals.filtered, val)
-		}
-
-		// Calculate achieving percentage based on processed count
-		// Since we don't know the total, use 50% while processing
-		achievingPercentage := 50
-
-		// Update state for this packet
-		f.SetCurrent("total_processed", totalProcessed)
-		f.SetCurrent("filtered", locals.filtered)
-		f.SetCurrent("count", len(locals.filtered))
-		f.SetCurrent("last_number_processed", val)
-		f.SetCurrent("achieving_percentage", achievingPercentage)
+	val := GetTyped(obj, "value", 0)
+	totalProcessed++
+	// Filter based on min/max values from state (promoted in Initialize)
+	minValue := GetCurrent(f, "min_value", 0)
+	maxValue := GetCurrent(f, "max_value", 1000000)
+	if val >= minValue && val <= maxValue {
+		locals.filtered = append(locals.filtered, val)
 	}
+
+	// Calculate achieving percentage based on processed count
+	// Since we don't know the total, use 50% while processing
+	achievingPercentage := 50
+
+	// Update state for this packet
+	f.SetCurrent("total_processed", totalProcessed)
+	f.SetCurrent("filtered", locals.filtered)
+	f.SetCurrent("count", len(locals.filtered))
+	f.SetCurrent("last_number_processed", val)
+	f.SetCurrent("achieving_percentage", achievingPercentage)
 
 	// Yield control - will be called again for next packet
 }
