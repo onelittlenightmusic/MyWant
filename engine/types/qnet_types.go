@@ -156,7 +156,10 @@ func (g *Numbers) Progress() {
 		g.SetCurrent("achieving_percentage", achievingPercentage)
 	}
 
-	g.Provide(QueuePacket{Num: locals.currentCount, Time: locals.currentTime})
+	out := mywant.NewDataObject("queue_packet")
+	out.Set("num", locals.currentCount)
+	out.Set("time", locals.currentTime)
+	g.ProvideTyped(out)
 
 	// Check if this was the last packet
 	if locals.currentCount >= paramCount {
@@ -221,7 +224,7 @@ func (q *Queue) Progress() {
 		locals.ServiceTime = q.GetFloatParam("service_time", 1.0)
 	}
 
-	_, i, done, ok := q.Use(100) // Use 100ms timeout instead of forever
+	_, obj, done, ok := q.UseTyped("queue_packet", 100)
 	if !ok {
 		// No packet received (timeout) - skip this cycle
 		return
@@ -229,10 +232,10 @@ func (q *Queue) Progress() {
 
 	if done {
 		q.StoreLog("[QUEUE-EXEC] Received DONE signal")
-	} else if i != nil {
-		packet := i.(QueuePacket)
-		if packet.Num%locals.batchUpdateInterval == 0 || packet.Num <= 5 {
-			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", packet.Num, packet.Time)
+	} else if obj != nil {
+		num := obj.Get("num", 0).(int)
+		if num%locals.batchUpdateInterval == 0 || num <= 5 {
+			q.StoreLog("[QUEUE-EXEC] Received packet #%d, time=%.2f", num, obj.Get("time", 0.0))
 		}
 	}
 
@@ -252,8 +255,8 @@ func (q *Queue) Progress() {
 		return
 	}
 
-	packet := i.(QueuePacket)
-	arrivalTime := packet.Time
+	num := obj.Get("num", 0).(int)
+	arrivalTime := obj.Get("time", 0.0).(float64)
 	startServiceTime := math.Max(arrivalTime, locals.serverFreeTime)
 	waitTime := startServiceTime - arrivalTime
 	serviceTime := q.GetFloatParam("service_time", locals.ServiceTime)
@@ -272,7 +275,10 @@ func (q *Queue) Progress() {
 		locals.lastBatchCount = locals.processedCount
 	}
 
-	q.Provide(QueuePacket{Num: packet.Num, Time: finishTime})
+	out := mywant.NewDataObject("queue_packet")
+	out.Set("num", num)
+	out.Set("time", finishTime)
+	q.ProvideTyped(out)
 }
 
 // flushBatch commits all accumulated statistics to state
@@ -382,7 +388,7 @@ func (c *Combiner) Progress() {
 	}
 
 	// Receive from any input channel (wait for data from any source)
-	_, i, done, ok := c.UseForever()
+	_, obj, done, ok := c.UseForeverTyped("queue_packet")
 	if !ok {
 		return
 	}
@@ -398,9 +404,8 @@ func (c *Combiner) Progress() {
 		return
 	}
 
-	packet := i.(QueuePacket)
 	processed++
-	c.Provide(packet)
+	c.ProvideTyped(obj)
 
 	c.SetCurrent("processed", processed)
 }

@@ -296,11 +296,11 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
 	if !locals.RequireReaction || locals.ReactionPacketEmitted { return }
 	if locals.ReactionQueueId == "" { return }
-	r.Provide(map[string]any{
-		"reaction_id":   locals.ReactionQueueId,
-		"reaction_type": locals.ReactionType,
-		"source_want":   r.Metadata.Name,
-	})
+	out := NewDataObject("reaction_request")
+	out.Set("reaction_id", locals.ReactionQueueId)
+	out.Set("reaction_type", locals.ReactionType)
+	out.Set("source_want", r.Metadata.Name)
+	r.ProvideTyped(out)
 	locals.ReactionPacketEmitted = true
 }
 

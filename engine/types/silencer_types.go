@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	. "mywant/engine/core"
 )
 
@@ -59,7 +58,7 @@ func (s *SilencerWant) Progress() {
 	// Try to get a packet from input channels
 	// Use blocking wait (infinite) for stream processing
 	// Processor wants should continuously wait for packets from stream
-	_, data, done, ok := s.UseForever()
+	_, obj, done, ok := s.UseForeverTyped("reaction_request")
 	if !ok {
 		return
 	}
@@ -72,31 +71,19 @@ func (s *SilencerWant) Progress() {
 	}
 
 	// Process the received packet
-	s.processPacket(data)
+	s.processPacket(obj)
 }
 
 // processPacket handles the reaction request data
-func (s *SilencerWant) processPacket(data any) {
-	packet, ok := data.(map[string]any)
-	if !ok {
-		// Try to decode if it's a JSON string
-		if str, ok := data.(string); ok {
-			if err := json.Unmarshal([]byte(str), &packet); err != nil {
-				s.StoreLog("[SILENCER] ERROR: Failed to parse packet string: %v", err)
-				return
-			}
-		} else {
-			s.StoreLog("[SILENCER] ERROR: Invalid packet format: %T", data)
-			return
-		}
+func (s *SilencerWant) processPacket(obj *DataObject) {
+	if obj == nil {
+		s.StoreLog("[SILENCER] ERROR: nil packet received")
+		return
 	}
 
-	reactionType := "internal"
-	if rt, ok := packet["reaction_type"].(string); ok {
-		reactionType = rt
-	}
+	reactionType := obj.Get("reaction_type", "internal").(string)
 
-	reactionID, ok := packet["reaction_id"].(string)
+	reactionID, ok := obj.Get("reaction_id", "").(string)
 	if !ok || reactionID == "" {
 		s.StoreLog("[SILENCER] ERROR: Missing or invalid reaction_id in packet")
 		return
