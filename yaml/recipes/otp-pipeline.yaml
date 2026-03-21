@@ -2,122 +2,183 @@ recipe:
   metadata:
     name: "OTP Pipeline"
     description: |
-      OpenTripPlannerを段階的にセットアップするパイプライン。
-      OSM/GTFSダウンロード → build-config.json生成 → グラフビルド → サーバー起動
-      の順に自動実行する。
+      OPA Regoポリシーで依存関係を管理するOpenTripPlannerセットアップパイプライン。
 
-      ダウンロード方法は ensure_file_method グローバルパラメータで切り替え可能:
-        - "curl"        : Go net/http で直接DL (デフォルト、docker不要)
-        - "docker_wget" : docker alpine/wget を使用
+      ファイルダウンロード・設定生成はレシピに静的wantとして定義し並行実行。
+      build_graph と start_server の dispatch のみ Rego が制御する。
+      provider_state_map により静的wantの達成がRegoから参照可能なstateに反映される:
+        1. ensure_osm / ensure_gtfs_* / build_config (静的、並行) → osm_done等を更新
+        2. build_graph  (Regoがosm_done/gtfs_done/build_config_doneを確認してから推奨)
+        3. start_server (Regoがgraph_doneを確認してから推奨)
 
-      グラフビルドは常に docker_build (docker必須)。
+      GTFSフィード追加時は wants に ensure_gtfs_<name> を追加し、
+      provider_state_map と state に対応エントリを追加するだけでよい。
+
+      グローバルパラメータ:
+        otp_data_dir          : データディレクトリ (ensure_file, otp_build_config, otp_serverが参照)
+        opa_llm_planner_command: opa-llm-planner バイナリパス
     custom_type: "otp pipeline"
     category: "infrastructure"
-    version: "2.0.0"
+    version: "5.0.0"
 
   parameters:
     prefix: "otp"
+    policy_dir: "yaml/policies/otp"
+    use_llm: false
 
-  parameter_descriptions:
-    prefix: "Wantの名前プレフィックス"
+    direction_map: >-
+      {
+        "build_graph": {
+          "type": "ensure_file",
+          "params": {
+            "filename": "graph.obj",
+            "method": "docker_build",
+            "docker_image": "docker.io/opentripplanner/opentripplanner:2.6.0",
+            "docker_container_name": "otp-builder",
+            "docker_command_args": "[\"--build\", \"--save\"]",
+            "docker_env": "{\"JAVA_OPTIONS\": \"-Xmx6G\"}"
+          },
+          "using": [{"role": "otp_provider"}],
+          "sets": {"graph_done": true}
+        },
+        "start_server": {
+          "type": "otp_server",
+          "params": {"server_memory": "-Xmx4G", "server_port": "8082"},
+          "using": [{"direction": "build_graph"}],
+          "sets": {"server_running": true}
+        }
+      }
 
-  example:
-    wants:
-      - metadata:
-          name: "my-otp-osm"
-          type: ensure_file
-        spec:
-          params:
-            filename: "map.osm.pbf"
-            url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+    # 静的wantの達成をRegoが参照できるstateフラグにマッピング
+    # キー: 子wantのname (recipe内のmetadata.name)
+    # 値: 親wantのcurrent stateに書き込むフラグ名
+    provider_state_map: >-
+      {
+        "ensure-osm":          "osm_done",
+        "ensure-gtfs-toei-bus": "gtfs_toei_bus_done",
+        "ensure-gtfs-toei-train": "gtfs_toei_train_done",
+        "build-config":        "build_config_done"
+      }
+
+  state:
+    # ── Goal ──────────────────────────────────────────────────────────────────
+    - name: otp_ready
+      description: OTPパイプラインの完了目標
+      type: bool
+      persistent: true
+      initialValue: true
+      label: goal
+
+    # ── Current: Regoがall_providers_doneを計算するためのキーリスト ──────────
+    - name: provider_keys
+      description: provider_state_mapのstateフラグ名リスト（Regoがeveryでチェック）
+      type: object
+      persistent: false
+      initialValue: []
+      label: current
+
+    # ── Current: 個別プロバイダー達成フラグ（モニタリング・可視化用） ─────────
+    - name: osm_done
+      description: OSMファイルダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: gtfs_toei_bus_done
+      description: 都営バスGTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: gtfs_toei_train_done
+      description: 都営電車GTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: build_config_done
+      description: build-config.json生成完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    # ── Current: ビルド・起動 ─────────────────────────────────────────────────
+    - name: graph_done
+      description: graph.objビルド完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: server_running
+      description: OTPサーバー起動完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    # ── Planner state ─────────────────────────────────────────────────────────
+    - name: directions
+      description: Regoが出力した次のアクション一覧
+      type: object
+      persistent: true
+      initialValue: []
+      label: current
 
   wants:
-    # ── Step 1a: OSM data ──────────────────────────────────────────────────
+    # ── 静的ダウンロード・設定生成（並行実行） ────────────────────────────────
     - metadata:
-        name: "{{prefix}}-osm"
+        name: "ensure-osm"
         type: ensure_file
         labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-prerequisite
-          otp-step: osm
+          role: otp_provider
       spec:
         params:
           filename: "map.osm.pbf"
           url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
 
-    # ── Step 1b: GTFS - Toei Bus ───────────────────────────────────────────
     - metadata:
-        name: "{{prefix}}-gtfs-toei-bus"
+        name: "ensure-gtfs-toei-bus"
         type: ensure_file
         labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-prerequisite
-          otp-step: gtfs
+          role: otp_provider
       spec:
         params:
           filename: "toei-bus.zip"
           url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
 
-    # ── Step 1c: GTFS - Toei Train ─────────────────────────────────────────
     - metadata:
-        name: "{{prefix}}-gtfs-toei-train"
+        name: "ensure-gtfs-toei-train"
         type: ensure_file
         labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-prerequisite
-          otp-step: gtfs
+          role: otp_provider
       spec:
         params:
           filename: "toei-train.zip"
           url: "https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
 
-    # ── Step 1d: build-config.json ─────────────────────────────────────────
     - metadata:
-        name: "{{prefix}}-build-config"
+        name: "build-config"
         type: otp_build_config
         labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-prerequisite
-          otp-step: build-config
+          role: otp_provider
       spec:
         params:
-          gtfs_feeds: '[{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]'
+          gtfs_feeds: >-
+            [{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},
+             {"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]
 
-    # ── Step 2: Build OTP graph ────────────────────────────────────────────
+    # ── Regoプランナー ────────────────────────────────────────────────────────
     - metadata:
-        name: "{{prefix}}-graph"
-        type: ensure_file
+        type: itinerary
         labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-graph
+          role: planner
       spec:
-        using:
-          - role: otp-prerequisite
         params:
-          filename: "graph.obj"
-          method: "docker_build"
-          docker_image: "docker.io/opentripplanner/opentripplanner:2.6.0"
-          docker_container_name: "otp-builder"
-          docker_command_args: '["--build", "--save"]'
-          docker_env: '{"JAVA_OPTIONS": "-Xmx6G"}'
-          prerequisites: '["map.osm.pbf", "build-config.json", "toei-bus.zip", "toei-train.zip"]'
-
-    # ── Step 3: Start OTP server ───────────────────────────────────────────
-    - metadata:
-        name: "{{prefix}}-server"
-        type: otp_server
-        labels:
-          category: infrastructure
-          otp-pipeline: "{{prefix}}"
-          role: otp-server
-      spec:
-        using:
-          - role: otp-graph
-        params:
-          server_memory: "-Xmx4G"
-          server_port: "8082"
+          policy_dir: policy_dir
+          direction_map: direction_map
+          use_llm: use_llm

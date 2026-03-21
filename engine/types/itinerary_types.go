@@ -40,6 +40,11 @@ func (o *ItineraryWant) Initialize() {
 	}
 	// Promote direction_map param → state so Progress reads from GetCurrent
 	o.SetCurrent("direction_map", o.GetStringParam("direction_map", "{}"))
+	// Promote OPA config params → state so opa_llm_thinker can read them
+	o.SetCurrent("opa_llm_planner_command", o.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
+	o.SetCurrent("policy_dir", o.GetStringParam("policy_dir", ""))
+	o.SetCurrent("use_llm", o.GetBoolParam("use_llm", true))
+	o.SetCurrent("llm_provider", o.GetStringParam("llm_provider", "anthropic"))
 }
 
 func (o *ItineraryWant) IsAchieved() bool {

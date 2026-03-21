@@ -328,6 +328,19 @@ func (t *Target) Initialize() {
 		}
 	}
 
+	// Ensure direction_map and provider_state_map are accessible in Spec.Params for dispatch_thinker.
+	// When deployed from a minimal config (no explicit params), these live in RecipeParams.
+	if t.Spec.Params == nil {
+		t.Spec.Params = make(map[string]any)
+	}
+	for _, key := range []string{"direction_map", "provider_state_map"} {
+		if _, has := t.Spec.Params[key]; !has {
+			if v, ok := t.RecipeParams[key]; ok && v != nil {
+				t.Spec.Params[key] = v
+			}
+		}
+	}
+
 	// Start DispatchThinkerAgent to handle child want dispatch requests from Itinerary
 	// Target is allowed to register this system agent in code.
 	dispatchThinkerID := DispatchThinkerName + "-" + t.Metadata.ID

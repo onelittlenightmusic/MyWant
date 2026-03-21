@@ -1,0 +1,4 @@
+wants:
+  - metadata:
+      name: otp-pipeline
+      type: "otp pipeline"
