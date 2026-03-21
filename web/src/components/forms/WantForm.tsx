@@ -535,13 +535,13 @@ export const WantForm: React.FC<WantFormProps> = ({
                       setUsing([]);
                       setWhen([]);
                     }}
-                    className="w-full flex items-center justify-between p-4 bg-white border-2 border-blue-300 rounded-lg hover:border-blue-400 transition-colors group"
+                    className="w-full flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-600 rounded-lg hover:border-blue-400 dark:hover:border-blue-500 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       <Bot className="w-5 h-5 text-blue-500" />
                       <div className="text-left">
-                        <h4 className="font-medium text-gray-900">{selectedRecommendation.title}</h4>
-                        <p className="text-xs text-gray-600 mt-1">{selectedRecommendation.approach}</p>
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100">{selectedRecommendation.title}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{selectedRecommendation.approach}</p>
                       </div>
                     </div>
                     <span className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-100 text-blue-700 transition-colors">

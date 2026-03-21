@@ -93,9 +93,9 @@ export const CommitInput = React.forwardRef<CommitInputHandle, CommitInputProps>
         onBlur={handleBlur}
         className={classNames(
           'w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 transition-colors text-sm',
-          hasChanges 
-            ? 'bg-yellow-50 border-yellow-400 focus:ring-yellow-400' 
-            : 'bg-white border-gray-300 focus:ring-blue-500 focus:border-transparent',
+          hasChanges
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-400 dark:border-yellow-600 focus:ring-yellow-400 text-gray-900 dark:text-gray-100'
+            : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-transparent text-gray-900 dark:text-gray-100',
           className
         )}
       />
