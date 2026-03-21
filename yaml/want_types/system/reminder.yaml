@@ -475,6 +475,7 @@ wantType:
     users:
     - name: reaction_requests
       type: want
+      data_type: reaction_request
       description: Stream of reaction requests {reaction_id, reaction_type}
 
   requires:

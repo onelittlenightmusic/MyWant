@@ -185,9 +185,11 @@ wantType:
     providers:
     - name: input
       type: want
+      data_type: queue_packet
       description: Items to queue for processing
       required: true
     users:
     - name: output
       type: want
+      data_type: queue_packet
       description: Processed items (after service_time delay)

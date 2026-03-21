@@ -47,6 +47,13 @@ func New(config Config) *Worker {
 		log.Printf("[WORKER] Warning: Failed to load agents: %v\n", err)
 	}
 
+	// Load data type definitions (JSON Schema)
+	dataTypeLoader := mywant.NewDataTypeLoader()
+	if err := dataTypeLoader.LoadFromDir(mywant.DataTypesDir); err != nil {
+		log.Printf("[WORKER] Warning: Failed to load data types: %v\n", err)
+	}
+	mywant.SetGlobalDataTypeLoader(dataTypeLoader)
+
 	worker := &Worker{
 		config:        config,
 		agentRegistry: agentRegistry,

@@ -37,6 +37,9 @@ const (
 	// WantTypesDir contains want type definition files
 	WantTypesDir = "yaml/want_types"
 
+	// DataTypesDir contains data type definition files (JSON Schema format)
+	DataTypesDir = "yaml/data"
+
 	// SpecDir contains OpenAPI specification files
 	SpecDir = "yaml/spec"
 

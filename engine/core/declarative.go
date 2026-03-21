@@ -214,6 +214,7 @@ type ConnectivityMetadata struct {
 type ConnectionSpec struct {
 	Name        string `json:"name" yaml:"name"`
 	Type        string `json:"type" yaml:"type"`
+	DataType    string `json:"data_type,omitempty" yaml:"data_type,omitempty"`
 	Description string `json:"description" yaml:"description"`
 	Required    bool   `json:"required" yaml:"required"`
 	Multiple    bool   `json:"multiple" yaml:"multiple"`

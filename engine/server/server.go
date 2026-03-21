@@ -77,6 +77,14 @@ func New(config Config) *Server {
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}
+
+	// Load data type definitions (JSON Schema)
+	dataTypeLoader := mywant.NewDataTypeLoader()
+	if err := dataTypeLoader.LoadFromDir(mywant.DataTypesDir); err != nil {
+		log.Printf("[WARN] Failed to load data types: %v", err)
+	}
+	mywant.SetGlobalDataTypeLoader(dataTypeLoader)
+
 	globalBuilder := mywant.NewChainBuilderWithPaths(config.ConfigPath, config.MemoryPath)
 
 	// Load initial configuration from memory file if it exists (persistence)

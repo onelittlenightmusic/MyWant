@@ -93,6 +93,7 @@ wantType:
     outputs:
     - name: teams_messages
       type: event
+      data_type: webhook_message
       description: Incoming Teams messages forwarded to downstream wants
 
   agents:

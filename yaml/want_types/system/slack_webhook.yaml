@@ -92,6 +92,7 @@ wantType:
     outputs:
     - name: slack_messages
       type: event
+      data_type: webhook_message
       description: Incoming Slack messages forwarded to downstream wants
 
   agents:

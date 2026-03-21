@@ -130,4 +130,5 @@ wantType:
     users:
     - name: numbers
       type: want
+      data_type: queue_packet
       description: Stream of generated numbers

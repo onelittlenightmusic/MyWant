@@ -93,6 +93,7 @@ type ConnectivityDef struct {
 type ChannelDef struct {
 	Name        string `json:"name" yaml:"name"`
 	Type        string `json:"type" yaml:"type"` // want, agent, state, event
+	DataType    string `json:"data_type,omitempty" yaml:"data_type,omitempty"`
 	Description string `json:"description" yaml:"description"`
 	Required    bool   `json:"required,omitempty" yaml:"required,omitempty"`
 	Multiple    bool   `json:"multiple,omitempty" yaml:"multiple,omitempty"`

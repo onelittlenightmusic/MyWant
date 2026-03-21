@@ -142,10 +142,12 @@ wantType:
     providers:
     - name: upstream_streams
       type: want
+      data_type: queue_packet
       description: Multiple input streams to combine
       required: true
       multiple: true
     users:
     - name: combined_stream
       type: want
+      data_type: queue_packet
       description: Single output stream with all packets

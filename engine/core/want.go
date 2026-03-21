@@ -2626,6 +2626,60 @@ func (n *Want) UseForever() (int, any, bool, bool) {
 	return n.Use(-1)
 }
 
+// UseTyped calls Use() and auto-parses the result into a *DataObject.
+// typeName specifies the expected data type (must be loaded in DataTypeLoader).
+// If typeName is empty or DataTypeLoader is unavailable, wraps raw data in a generic DataObject.
+func (n *Want) UseTyped(typeName string, timeoutMilliseconds int) (int, *DataObject, bool, bool) {
+	idx, raw, done, ok := n.Use(timeoutMilliseconds)
+	if !ok || done {
+		return idx, nil, done, ok
+	}
+	loader := GetGlobalDataTypeLoader()
+	if loader == nil || typeName == "" {
+		return idx, wrapRaw(raw), done, ok
+	}
+	obj, err := loader.Parse(typeName, raw)
+	if err != nil {
+		WarnLog("[UseTyped] Failed to parse data as type %q: %v", typeName, err)
+		return idx, wrapRaw(raw), done, ok
+	}
+	return idx, obj, done, ok
+}
+
+// UseForeverTyped calls UseForever() and auto-parses the result into a *DataObject.
+func (n *Want) UseForeverTyped(typeName string) (int, *DataObject, bool, bool) {
+	idx, raw, done, ok := n.UseForever()
+	if !ok || done {
+		return idx, nil, done, ok
+	}
+	loader := GetGlobalDataTypeLoader()
+	if loader == nil || typeName == "" {
+		return idx, wrapRaw(raw), done, ok
+	}
+	obj, err := loader.Parse(typeName, raw)
+	if err != nil {
+		WarnLog("[UseForeverTyped] Failed to parse data as type %q: %v", typeName, err)
+		return idx, wrapRaw(raw), done, ok
+	}
+	return idx, obj, done, ok
+}
+
+// ProvideTyped validates the DataObject against its schema and calls Provide().
+// Validation errors are logged as warnings but do not block sending.
+func (n *Want) ProvideTyped(obj *DataObject) {
+	if obj == nil {
+		n.Provide(nil)
+		return
+	}
+	loader := GetGlobalDataTypeLoader()
+	if loader != nil && obj.TypeName() != "" {
+		if err := loader.Validate(obj.TypeName(), obj.ToMap()); err != nil {
+			WarnLog("[ProvideTyped] Validation warning for type %q: %v", obj.TypeName(), err)
+		}
+	}
+	n.Provide(obj.ToMap())
+}
+
 // IncrementIntStateValue safely increments an integer state value
 // If the state doesn't exist, starts from defaultStart value
 // Returns the new value after increment
