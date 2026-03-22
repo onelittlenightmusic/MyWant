@@ -359,11 +359,16 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 
 // namespaceWantConnections adds owner namespace to labels and using selectors to isolate child wants
 func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix string) {
-	// Namespace all labels with owner prefix
+	// Namespace all labels with owner prefix.
+	// Labels starting with "__" are system/identity labels and must NOT be namespaced.
 	if want.Metadata.Labels != nil {
 		namespacedLabels := make(map[string]string)
 		for key, value := range want.Metadata.Labels {
-			namespacedLabels[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
+			if len(key) >= 2 && key[:2] == "__" {
+				namespacedLabels[key] = value
+			} else {
+				namespacedLabels[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
+			}
 		}
 		want.Metadata.Labels = namespacedLabels
 	}
