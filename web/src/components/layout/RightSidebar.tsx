@@ -14,6 +14,7 @@ interface RightSidebarProps {
   backgroundStyle?: React.CSSProperties;
   headerActions?: React.ReactNode;
   overflowHidden?: boolean;
+  instant?: boolean;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -26,7 +27,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   className,
   backgroundStyle,
   headerActions,
-  overflowHidden = false
+  overflowHidden = false,
+  instant = false
 }) => {
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
@@ -51,9 +53,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       {isOpen && (
         <div
           className={classNames(
-            "fixed inset-0 bg-gray-600 bg-opacity-50 transition-opacity z-40 lg:hidden",
+            "fixed inset-x-0 bottom-0 bg-gray-600 bg-opacity-50 transition-opacity z-40 lg:hidden",
             isAnyDragging ? "pointer-events-none opacity-0" : "bg-opacity-50"
           )}
+          style={{
+            top: isBottom ? 'env(safe-area-inset-top, 0px)' : 'calc(env(safe-area-inset-top, 0px) + var(--header-height, 0px))',
+          }}
           onClick={onClose}
         />
       )}
@@ -62,13 +67,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform transition-transform duration-300 ease-in-out z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
+          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
+          instant ? '' : 'transition-transform duration-100 ease-in-out',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
         )}
         style={{
-          top: 'env(safe-area-inset-top, 0px)',
-          bottom: 'env(safe-area-inset-bottom, 0px)',
+          top: isBottom ? 'env(safe-area-inset-top, 0px)' : 'calc(env(safe-area-inset-top, 0px) + var(--header-height, 0px))',
+          bottom: isBottom ? 'calc(env(safe-area-inset-bottom, 0px) + var(--header-height, 0px))' : 'env(safe-area-inset-bottom, 0px)',
           height: 'auto'
         }}
       >

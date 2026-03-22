@@ -83,8 +83,8 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
   const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
-    // All sections collapsed by default
-    return new Set(['parameters', 'labels', 'dependencies', 'scheduling']);
+    // Parameters open by default, others collapsed
+    return new Set(['labels', 'dependencies', 'scheduling']);
   });
 
   // Recommendation mode state
@@ -623,38 +623,6 @@ export const WantForm: React.FC<WantFormProps> = ({
             {/* Show fields only when a want type or recipe is selected */}
             {selectedTypeId && (
               <>
-                {/* Want Name with Auto-generation */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
-                    Want Name *
-                  </label>
-                  <div className="space-y-2">
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Tab') {
-                          e.preventDefault();
-                          handleFieldTab();
-                        } else {
-                          handleArrowKeyNavigation(e);
-                        }
-                      }}
-                      className="focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
-                      placeholder="Auto-generated or enter custom name"
-                      required
-                    />
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
-                      {!isValidWantName(name) && name.trim() && (
-                        <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 {/* Parameters Section */}
                 <ParametersSection
                   ref={paramsSectionRef}
@@ -720,6 +688,38 @@ export const WantForm: React.FC<WantFormProps> = ({
                     <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>
                   </div>
                 )}
+
+                {/* Want Name with Auto-generation (at bottom) */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+                    Want Name *
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Tab') {
+                          e.preventDefault();
+                          handleFieldTab();
+                        } else {
+                          handleArrowKeyNavigation(e);
+                        }
+                      }}
+                      className="focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                      placeholder="Auto-generated or enter custom name"
+                      required
+                    />
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
+                      {!isValidWantName(name) && name.trim() && (
+                        <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </>

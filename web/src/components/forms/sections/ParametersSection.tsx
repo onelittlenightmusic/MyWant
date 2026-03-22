@@ -339,6 +339,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                             }}
                             className="flex-1 w-full"
                             placeholder={param.description || 'Enter value'}
+                            multiline={inputType === 'text'}
                           />
                         )}
                       </div>
@@ -400,6 +401,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                       }}
                       className="flex-1"
                       placeholder="Enter value"
+                      multiline
                     />
                     <button
                       type="button"

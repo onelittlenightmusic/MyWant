@@ -78,6 +78,19 @@ export const Header: React.FC<HeaderProps> = ({
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Set CSS variable for header height so sidebars can offset accordingly
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      document.documentElement.style.setProperty('--header-height', `${el.offsetHeight}px`);
+    });
+    observer.observe(el);
+    document.documentElement.style.setProperty('--header-height', `${el.offsetHeight}px`);
+    return () => observer.disconnect();
+  }, []);
 
   // Hide provider select and mobile bubble when clicking outside
   useEffect(() => {
@@ -129,6 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
     <header
+      ref={headerRef}
       className={classNames(
         "bg-white dark:bg-gray-900 px-3 sm:px-6 py-2 sm:py-4 fixed left-0 right-0 z-40",
         isBottom ? "bottom-0 border-t border-gray-200 dark:border-gray-700" : "border-b border-gray-200 dark:border-gray-700",

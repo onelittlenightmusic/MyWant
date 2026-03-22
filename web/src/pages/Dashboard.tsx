@@ -801,6 +801,7 @@ export const Dashboard: React.FC = () => {
         titleIconClassName={showGlobalState ? 'text-green-500' : (!isSelectMode && selectedWant ? 'text-pink-500' : undefined)}
         backgroundStyle={!showGlobalState && !isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
         headerActions={!showGlobalState && !isSelectMode && selectedWant ? headerActions : undefined}
+        instant
       >
         {showGlobalState ? (
           <GlobalStateSidebar />
