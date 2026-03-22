@@ -1,0 +1,23 @@
+# やりたいこと
+
+- とにかく最初にやりたいことをwantに記載しておき、そのタイミングではwantを実現できなかったとしても、reachingのままwaitしておき、achievementが増えてunlockされるcapabilityが増えてくると、自然とwantが実行できるようになる、というゲームの感じをこのmywantで実現したい。
+- やりたいことはまず自然言語で書いておいていい。ただの思いつきメモ。
+- その思いつきメモを徐々にブレークダウンしていく。そこはThinkerの仕事。
+- 最初の思いつきメモ(whim)をemptyの代わりに作りたい. whimはemptyのrecipeにデフォルトでwantというstate fieldを追加したもの。 
+- 全てのrecipeにデフォルトで登録するstate fieldにwantというフィールドを追加したい。
+- フロントエンドでは、+bottleのアイコンのクリックイベントをemptyレシピの代わりにwhimを追加するショートカットとしたい。
+- emptyレシピは排除してwhimで置き換えたい。
+
+---
+- 上記までは成功。
+
+
+----
+- whimのparameter "want"に記載したものに対して、アイディアを書き込み、その後にrobotからサジェスチョンをして子Wantを足していくというのをやりたい。その時にThinkerを一度追加しておき、そのThinkerとやりとりをしながら、Wantを追加させたい。
+- 現在Draftの仕組みがすでにあるが、そのDraftを子Wantとして利用するようなイメージ。
+- 最初にThinker子Wantを追加する。ThinkerはSiblingを追加する権利を有する。それはDispatchと同じ。
+- ThinkerはDraftと同じようにアイディアの候補がいくつか表示される。（これはすでにある実装）
+- アイディアを選択すると、Siblingが必要に応じて追加される。
+- 既存のDraftとは異なり、Thinkerはずっと消えない。
+- 新たなアイディアを親のwant parameterに追記することができる。
+- ThinkerはInteract bubbleのようにインタラクティブにやりとりをすることができる。履歴も保持している。

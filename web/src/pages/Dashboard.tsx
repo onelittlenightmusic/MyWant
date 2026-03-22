@@ -228,7 +228,7 @@ export const Dashboard: React.FC = () => {
   const [initialFormTypeId, setInitialFormTypeId] = useState<string | undefined>(undefined);
   const [initialFormItemType, setInitialFormItemType] = useState<'want-type' | 'recipe'>('want-type');
   const handleCreateWant = (parentWant?: Want) => { setInitialFormTypeId(undefined); setInitialFormItemType('want-type'); setOwnerWant(parentWant || null); setEditingWant(null); sidebar.openForm(); };
-  const handleCreateTargetWant = () => { setInitialFormTypeId('empty-target'); setInitialFormItemType('recipe'); setOwnerWant(null); setEditingWant(null); sidebar.openForm(); };
+  const handleCreateTargetWant = () => { setInitialFormTypeId('whim-target'); setInitialFormItemType('recipe'); setOwnerWant(null); setEditingWant(null); sidebar.openForm(); };
   const handleEditWant = (w: Want) => { setEditingWant(w); sidebar.openForm(); };
 
   const handleViewWant = (want: Want | { id: string; parentId?: string }) => {

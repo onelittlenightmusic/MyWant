@@ -40,3 +40,9 @@ predefined:
       label: current
       persistent: true
       initialValue: null
+    - name: want
+      description: やりたいことの自然言語メモ
+      type: string
+      label: goal
+      persistent: true
+      initialValue: ""

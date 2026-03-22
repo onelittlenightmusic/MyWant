@@ -1,0 +1,14 @@
+recipe:
+  metadata:
+    name: whim
+    custom_type: whim-target
+    description: "Whim - 思いつきメモ。やりたいことを自然言語で書いておく場所。"
+    version: "1.0.0"
+
+  parameters:
+    want: ""
+
+  parameter_descriptions:
+    want: "やりたいことの自然言語メモ"
+
+  wants: []

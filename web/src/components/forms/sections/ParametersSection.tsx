@@ -304,7 +304,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                     <div key={param.name} className="space-y-0.5 sm:space-y-1">
                       <div className="flex flex-col sm:flex-row gap-1 sm:gap-2 items-start sm:items-center">
                         <div className="w-full sm:w-32 flex-shrink-0">
-                          <label className="block text-xs sm:text-sm font-medium text-gray-700 pt-1 sm:pt-2">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 pt-1 sm:pt-2">
                             {param.name}
                             {param.required && <span className="text-red-600 ml-1">*</span>}
                           </label>
@@ -343,7 +343,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                         )}
                       </div>
                       {param.description && (
-                        <p className="text-[10px] sm:text-xs text-gray-600 sm:ml-32">{param.description}</p>
+                        <p className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400 sm:ml-32">{param.description}</p>
                       )}
                     </div>
                   );
@@ -374,7 +374,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
                 {Object.entries(parameters).map(([key, value], index) => (
                   <div key={key} className="flex gap-2 items-start">
                     <div className="w-32 flex-shrink-0">
-                      <label className="block text-sm font-medium text-gray-700 pt-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 pt-2">
                         {key}
                       </label>
                     </div>
