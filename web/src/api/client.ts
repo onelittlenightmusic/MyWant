@@ -39,6 +39,8 @@ import {
   InteractMessageResponse,
   InteractDeployRequest,
   InteractDeployResponse,
+  Recommendation,
+  ConversationMessage,
 } from '@/types/interact';
 import {
   CreateDraftWantData,
@@ -481,6 +483,30 @@ class MyWantApiClient {
 
   async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number }> {
     const response = await this.client.put<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', { parameters });
+    return response.data;
+  }
+
+  // Whim Thinker
+  async sendWhimThinkerMessage(
+    thinkerWantId: string,
+    message: string
+  ): Promise<{ recommendations: Recommendation[]; conversation_history: ConversationMessage[]; timestamp: string }> {
+    const response = await this.client.post(
+      `/api/v1/whim-thinker/${thinkerWantId}/message`,
+      { message },
+      { timeout: 300000 }
+    );
+    return response.data;
+  }
+
+  async deployWhimThinkerRecommendation(
+    thinkerWantId: string,
+    recommendationId: string
+  ): Promise<{ want_ids: string[]; status: string; message: string; timestamp: string }> {
+    const response = await this.client.post(
+      `/api/v1/whim-thinker/${thinkerWantId}/deploy`,
+      { recommendation_id: recommendationId }
+    );
     return response.data;
   }
 

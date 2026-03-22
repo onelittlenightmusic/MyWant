@@ -11,4 +11,10 @@ recipe:
   parameter_descriptions:
     want: "やりたいことの自然言語メモ"
 
-  wants: []
+  wants:
+    - metadata:
+        type: whim_thinker
+        labels:
+          __whim_thinker: "true"
+      spec:
+        params: {}

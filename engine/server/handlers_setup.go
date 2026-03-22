@@ -123,6 +123,13 @@ func (s *Server) setupRoutes() {
 	interact.HandleFunc("/{id}/deploy", s.interactDeploy).Methods("POST")
 	interact.HandleFunc("/{id}/deploy", s.handleOptions).Methods("OPTIONS")
 
+	// Whim Thinker endpoints
+	whimThinker := api.PathPrefix("/whim-thinker").Subrouter()
+	whimThinker.HandleFunc("/{id}/message", s.whimThinkerMessage).Methods("POST")
+	whimThinker.HandleFunc("/{id}/message", s.handleOptions).Methods("OPTIONS")
+	whimThinker.HandleFunc("/{id}/deploy", s.whimThinkerDeploy).Methods("POST")
+	whimThinker.HandleFunc("/{id}/deploy", s.handleOptions).Methods("OPTIONS")
+
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 

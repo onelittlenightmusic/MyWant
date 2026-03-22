@@ -21,3 +21,6 @@
 - 既存のDraftとは異なり、Thinkerはずっと消えない。
 - 新たなアイディアを親のwant parameterに追記することができる。
 - ThinkerはInteract bubbleのようにインタラクティブにやりとりをすることができる。履歴も保持している。
+
+
+---
