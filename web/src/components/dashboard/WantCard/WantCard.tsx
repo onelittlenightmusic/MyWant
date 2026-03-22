@@ -6,8 +6,6 @@ import { classNames, suppressDragImage } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
 import styles from '../WantCard.module.css';
-import { isWhimThinkerWant } from '@/types/whimThinker';
-import { WhimThinkerBubble } from '@/components/interact/WhimThinkerBubble';
 
 import { ProgressBars } from './parts/ProgressBars';
 import { CorrelationOverlay } from './parts/CorrelationOverlay';
@@ -359,22 +357,6 @@ export const WantCard: React.FC<WantCardProps> = ({
             onSuspend={onSuspend} onResume={onResume}
             onShowReactionConfirmation={onShowReactionConfirmation}
           />
-          {/* WhimThinker bubble: show inline when a whim_thinker child is present */}
-          {(() => {
-            const thinkerChild = children?.find(isWhimThinkerWant);
-            const thinkerWantId = thinkerChild?.metadata?.id || thinkerChild?.id;
-            const wantParam = want.state?.current?.want as string | undefined;
-            if (!thinkerWantId) return null;
-            return (
-              <div className="px-2 pb-2" onClick={(e) => e.stopPropagation()}>
-                <WhimThinkerBubble
-                  thinkerWantId={thinkerWantId}
-                  initialMessage={wantParam}
-                  onDeployed={() => {}}
-                />
-              </div>
-            );
-          })()}
         </div>
 
         {(hasChildren || isRecipeBased) && !displayIsExpanded && (
