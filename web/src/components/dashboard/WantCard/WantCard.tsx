@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart, Play, Pause, Settings, Trash2 } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from '../WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
@@ -74,7 +75,8 @@ export const WantCard: React.FC<WantCardProps> = ({
   stackCount = 0,
 }) => {
   const wantId = want.metadata?.id || want.id;
-  const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId } = useWantStore();
+  const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId, startWant, stopWant } = useWantStore();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
 
@@ -101,6 +103,35 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragOverWant, setIsDragOverWant] = useState(false);
+
+  // Long-press for context menu
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressPos = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isBeingProcessed || isSelectMode) return;
+    const touch = e.touches[0];
+    longPressPos.current = { x: touch.clientX, y: touch.clientY };
+    longPressTimer.current = setTimeout(() => {
+      if (longPressPos.current) {
+        setContextMenu(longPressPos.current);
+      }
+    }, 500);
+  };
+
+  const handleTouchMove = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -135,6 +166,26 @@ export const WantCard: React.FC<WantCardProps> = ({
       setShowAnimation(false);
     }
   }, [displayIsExpanded]);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isBeingProcessed || isSelectMode) return;
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClose = () => setContextMenu(null);
+    document.addEventListener('click', handleClose);
+    document.addEventListener('contextmenu', handleClose);
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('click', handleClose);
+      document.removeEventListener('contextmenu', handleClose);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [contextMenu]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isBeingProcessed) return;
@@ -295,6 +346,10 @@ export const WantCard: React.FC<WantCardProps> = ({
         onDragStart={handleDragStart}
         onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}
+        onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -442,6 +497,54 @@ export const WantCard: React.FC<WantCardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Right-click context menu */}
+      {contextMenu && createPortal(
+        <div
+          className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px]"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Start */}
+          {(want.status === 'stopped' || want.status === 'created' || want.status === 'failed' || want.status === 'achieved' || want.status === 'terminated') && (
+            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => { startWant(wantId || ''); setContextMenu(null); }}>
+              <Play className="w-3.5 h-3.5 text-green-500" /> Start
+            </button>
+          )}
+          {/* Resume */}
+          {want.status === 'suspended' && (
+            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => { onResume?.(want); setContextMenu(null); }}>
+              <Play className="w-3.5 h-3.5 text-green-500" /> Resume
+            </button>
+          )}
+          {/* Suspend */}
+          {(want.status === 'reaching' || want.status === 'waiting_user_action') && (
+            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => { onSuspend?.(want); setContextMenu(null); }}>
+              <Pause className="w-3.5 h-3.5 text-yellow-500" /> Suspend
+            </button>
+          )}
+          {/* Stop */}
+          {(want.status === 'reaching' || want.status === 'waiting_user_action' || want.status === 'suspended') && (
+            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              onClick={() => { stopWant(wantId || ''); setContextMenu(null); }}>
+              <Square className="w-3.5 h-3.5 text-red-500" fill="currentColor" /> Stop
+            </button>
+          )}
+          <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            onClick={() => { onEdit(want); setContextMenu(null); }}>
+            <Settings className="w-3.5 h-3.5 text-blue-500" /> Edit Settings
+          </button>
+          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            onClick={() => { onDelete(want); setContextMenu(null); }}>
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

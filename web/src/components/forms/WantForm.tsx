@@ -86,6 +86,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     // Parameters open by default, others collapsed
     return new Set(['labels', 'dependencies', 'scheduling']);
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Recommendation mode state
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
@@ -266,6 +267,12 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (editingWant) {
       setIsEditing(true);
       wantObjectToForm(editingWant);
+      // Auto-show advanced if editing want has labels, deps, or scheduling
+      const hasAdvanced =
+        Object.keys(editingWant.metadata?.labels || {}).length > 0 ||
+        (editingWant.spec?.using || []).length > 0 ||
+        (editingWant.spec?.when || []).length > 0;
+      setShowAdvanced(hasAdvanced);
       setYamlContent(stringifyYaml({
         metadata: editingWant.metadata,
         spec: editingWant.spec
@@ -304,6 +311,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setValidationError(null);
     setApiError(null);
     setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
+    setShowAdvanced(false);
   };
 
   // Close example menu on outside click
@@ -337,9 +345,12 @@ export const WantForm: React.FC<WantFormProps> = ({
 
     if (selectedWantType && !isEditing && type === selectedWantType.metadata.name) {
       // Get the first example if available, use parameter examples otherwise
+      let hasParams = false;
       if (selectedWantType.examples && selectedWantType.examples.length > 0) {
         const firstExample = selectedWantType.examples[0];
-        setParams(firstExample.want?.spec?.params || {});
+        const exampleParams = firstExample.want?.spec?.params || {};
+        setParams(exampleParams);
+        hasParams = Object.keys(exampleParams).length > 0;
       } else if (selectedWantType.parameters && selectedWantType.parameters.length > 0) {
         // Fallback: use parameter examples
         const paramsFromExamples: Record<string, unknown> = {};
@@ -351,8 +362,17 @@ export const WantForm: React.FC<WantFormProps> = ({
           }
         });
         setParams(paramsFromExamples);
+        hasParams = Object.keys(paramsFromExamples).length > 0;
       } else {
         setParams({});
+      }
+      // B: Auto-expand parameters section if type has params
+      if (hasParams) {
+        setCollapsedSections(prev => {
+          const updated = new Set(prev);
+          updated.delete('parameters');
+          return updated;
+        });
       }
     }
   }, [selectedWantType, isEditing, type, selectedItemType]);
@@ -362,8 +382,15 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (selectedItemType === 'recipe' && !isEditing && type) {
       const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === type);
       if (selectedRecipe && selectedRecipe.recipe?.parameters) {
-        // Use recipe parameters directly as editable parameters
         setParams(selectedRecipe.recipe.parameters);
+        // B: Auto-expand parameters if recipe has params
+        if (Object.keys(selectedRecipe.recipe.parameters).length > 0) {
+          setCollapsedSections(prev => {
+            const updated = new Set(prev);
+            updated.delete('parameters');
+            return updated;
+          });
+        }
       } else {
         setParams({});
       }
@@ -638,47 +665,66 @@ export const WantForm: React.FC<WantFormProps> = ({
                   }}
                 />
 
-                {/* Scheduling Section */}
-                <SchedulingSection
-                  ref={schedulingSectionRef}
-                  schedules={when}
-                  onChange={setWhen}
-                  isCollapsed={collapsedSections.has('scheduling')}
-                  onToggleCollapse={() => toggleSection('scheduling')}
-                  navigationCallbacks={{
-                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                    onTab: handleFieldTab,
-                  }}
-                />
+                {/* C: Advanced Settings Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                    Advanced (scheduling · labels · dependencies)
+                  </span>
+                  {(Object.keys(labels).length > 0 || using.length > 0 || when.length > 0) && (
+                    <span className="text-blue-500 dark:text-blue-400 font-bold text-base leading-none">·</span>
+                  )}
+                </button>
 
-                {/* Labels Section */}
-                <LabelsSection
-                  ref={labelsSectionRef}
-                  labels={labels}
-                  onChange={setLabels}
-                  isCollapsed={collapsedSections.has('labels')}
-                  onToggleCollapse={() => toggleSection('labels')}
-                  navigationCallbacks={{
-                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                    onTab: handleFieldTab,
-                  }}
-                />
+                {showAdvanced && (
+                  <>
+                    {/* Scheduling Section */}
+                    <SchedulingSection
+                      ref={schedulingSectionRef}
+                      schedules={when}
+                      onChange={setWhen}
+                      isCollapsed={collapsedSections.has('scheduling')}
+                      onToggleCollapse={() => toggleSection('scheduling')}
+                      navigationCallbacks={{
+                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                        onTab: handleFieldTab,
+                      }}
+                    />
 
-                {/* Dependencies Section */}
-                <DependenciesSection
-                  ref={dependenciesSectionRef}
-                  dependencies={using}
-                  onChange={setUsing}
-                  isCollapsed={collapsedSections.has('dependencies')}
-                  onToggleCollapse={() => toggleSection('dependencies')}
-                  navigationCallbacks={{
-                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                    onTab: handleFieldTab,
-                  }}
-                />
+                    {/* Labels Section */}
+                    <LabelsSection
+                      ref={labelsSectionRef}
+                      labels={labels}
+                      onChange={setLabels}
+                      isCollapsed={collapsedSections.has('labels')}
+                      onToggleCollapse={() => toggleSection('labels')}
+                      navigationCallbacks={{
+                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                        onTab: handleFieldTab,
+                      }}
+                    />
+
+                    {/* Dependencies Section */}
+                    <DependenciesSection
+                      ref={dependenciesSectionRef}
+                      dependencies={using}
+                      onChange={setUsing}
+                      isCollapsed={collapsedSections.has('dependencies')}
+                      onToggleCollapse={() => toggleSection('dependencies')}
+                      navigationCallbacks={{
+                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                        onTab: handleFieldTab,
+                      }}
+                    />
+                  </>
+                )}
 
                 {/* Owner Section */}
                 {ownerWant && (

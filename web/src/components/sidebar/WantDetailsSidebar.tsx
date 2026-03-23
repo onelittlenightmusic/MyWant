@@ -8,6 +8,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
+import { useConfigStore } from '@/stores/configStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
 import { updateWantParameters, updateWantScheduling, updateWantLabels, updateWantDependencies } from '@/utils/wantUtils';
@@ -452,6 +453,9 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const prevTabId = tabs[prevTabIndex]?.id;
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
   return (
     <>
     <div className="h-full flex flex-col relative overflow-hidden">
@@ -459,7 +463,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       <div className="h-full flex flex-col relative z-10">
       {/* Control Panel Buttons - Icon Only, Minimal Height */}
       {want && (
-        <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-1 sm:py-2">
+        <div className={classNames(
+          'flex-shrink-0 px-4 py-1 sm:py-2',
+          isBottom ? 'order-last border-t border-gray-200 dark:border-gray-700' : 'border-b border-gray-200 dark:border-gray-700'
+        )}>
           <WantControlButtons
             onStart={handleStartClick}
             onStop={handleStopClick}
@@ -478,7 +485,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       )}
 
       {/* Tab navigation */}
-      <div className="border-b border-gray-200 dark:border-gray-700 px-3 sm:px-8 py-2 sm:py-4">
+      <div className={classNames(
+        'px-3 sm:px-8 py-2 sm:py-4',
+        isBottom ? 'order-last border-t border-gray-200 dark:border-gray-700' : 'border-b border-gray-200 dark:border-gray-700'
+      )}>
         <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-hidden">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -502,7 +512,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
+      <div className={classNames('flex-1 overflow-y-auto overflow-x-hidden relative', isBottom ? 'order-first' : '')}>
         {loading && !selectedWantDetails ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -658,6 +668,18 @@ const SettingsTab: React.FC<{
   const [localUpdateLoading, setLocalUpdateLoading] = useState(false);
   const [localUpdateError, setLocalUpdateError] = useState<string | null>(null);
 
+  // F: Inline name editing
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(want.metadata?.name || '');
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // G: Saved indicator
+  const [savedIndicator, setSavedIndicator] = useState(false);
+  const showSaved = useCallback(() => {
+    setSavedIndicator(true);
+    setTimeout(() => setSavedIndicator(false), 1500);
+  }, []);
+
   // Section collapsed states
   const [isParametersCollapsed, setIsParametersCollapsed] = useState(true);
   const [isLabelsCollapsed, setIsLabelsCollapsed] = useState(true);
@@ -693,6 +715,7 @@ const SettingsTab: React.FC<{
     try {
       await updateWantParameters(want.metadata.id, want, newParams, updateWant);
       onWantUpdate?.();
+      showSaved();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update parameters');
       setParams(oldParams); // Revert on error
@@ -712,6 +735,7 @@ const SettingsTab: React.FC<{
     try {
       await updateWantLabels(want.metadata.id, oldLabels, newLabels);
       onWantUpdate?.();
+      showSaved();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update labels');
       setLabels(oldLabels); // Revert on error
@@ -731,6 +755,7 @@ const SettingsTab: React.FC<{
     try {
       await updateWantDependencies(want.metadata.id, oldUsing, newUsing);
       onWantUpdate?.();
+      showSaved();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update dependencies');
       setUsing(oldUsing); // Revert on error
@@ -750,6 +775,7 @@ const SettingsTab: React.FC<{
     try {
       await updateWantScheduling(want.metadata.id, want, newWhen, updateWant);
       onWantUpdate?.();
+      showSaved();
     } catch (error) {
       setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update scheduling');
       setWhen(oldWhen); // Revert on error
@@ -806,12 +832,18 @@ const SettingsTab: React.FC<{
     setIsLabelsCollapsed(true);
     setIsDependenciesCollapsed(true);
     setIsSchedulingCollapsed(true);
+    setIsEditingName(false);
+    setEditedName(want.metadata?.name || '');
   }, [want.metadata?.id]);
 
   return (
     <div className="h-full flex flex-col">
-      {/* Config/Overview Toggle */}
-      <div className="flex-shrink-0 px-8 py-4 flex justify-end">
+      {/* Config/Overview Toggle + G: Saved indicator */}
+      <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between">
+        <div className={`flex items-center gap-1 text-xs text-green-600 dark:text-green-400 transition-opacity duration-300 ${savedIndicator ? 'opacity-100' : 'opacity-0'}`}>
+          <Check className="w-3 h-3" />
+          <span>Saved</span>
+        </div>
         <FormYamlToggle
           mode={configMode}
           onModeChange={onConfigModeChange}
@@ -826,9 +858,46 @@ const SettingsTab: React.FC<{
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Metadata</h4>
               <div className="space-y-2 sm:space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Name:</span>
-                  <span className="font-medium text-xs sm:text-sm">{want.metadata?.name || 'N/A'}</span>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm flex-shrink-0">Name:</span>
+                  {isEditingName ? (
+                    <input
+                      ref={nameInputRef}
+                      type="text"
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      onBlur={async () => {
+                        const trimmed = editedName.trim();
+                        if (trimmed && trimmed !== want.metadata?.name && want.metadata?.id) {
+                          try {
+                            await updateWant(want.metadata.id, {
+                              metadata: { ...want.metadata, name: trimmed },
+                              spec: want.spec
+                            });
+                            onWantUpdate?.();
+                            showSaved();
+                          } catch {
+                            setEditedName(want.metadata?.name || '');
+                          }
+                        }
+                        setIsEditingName(false);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') nameInputRef.current?.blur();
+                        if (e.key === 'Escape') { setEditedName(want.metadata?.name || ''); setIsEditingName(false); }
+                      }}
+                      autoFocus
+                      className="font-medium text-xs sm:text-sm bg-white dark:bg-gray-800 border border-blue-400 dark:border-blue-500 rounded px-1.5 py-0.5 text-right min-w-0 flex-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  ) : (
+                    <span
+                      onClick={() => { setEditedName(want.metadata?.name || ''); setIsEditingName(true); }}
+                      className="font-medium text-xs sm:text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded px-1.5 py-0.5 -mr-1.5 transition-colors truncate"
+                      title="Click to edit"
+                    >
+                      {want.metadata?.name || 'N/A'}
+                    </span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm">Type:</span>

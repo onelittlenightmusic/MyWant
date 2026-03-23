@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
 import { BrowserFrame } from '@/components/replay/BrowserFrame';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
+import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
 
 const HeartInBottle: React.FC<{ className?: string }> = ({ className }) => (
@@ -51,6 +52,12 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const wantName = want.metadata?.name || want.metadata?.id || 'Unnamed Want';
   const wantType = want.metadata?.type || 'unknown';
   const labels = want.metadata?.labels || {};
+
+  // Inline name editing (item 2)
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(wantName);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const { updateWant } = useWantStore();
   const createdAt = want.stats?.created_at;
   const startedAt = want.stats?.started_at;
   const completedAt = want.stats?.completed_at;
@@ -390,9 +397,42 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               )}
               {wantType}
             </h3>
-            <p className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}>
-              {truncateText(wantName, sizes.textTruncate)}
-            </p>
+            {isEditingName ? (
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={async () => {
+                  const trimmed = editedName.trim();
+                  const id = want.metadata?.id || want.id;
+                  if (trimmed && trimmed !== wantName && id) {
+                    try {
+                      await updateWant(id, { metadata: { ...want.metadata, name: trimmed }, spec: want.spec });
+                    } catch {
+                      setEditedName(wantName);
+                    }
+                  }
+                  setIsEditingName(false);
+                }}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') nameInputRef.current?.blur();
+                  if (e.key === 'Escape') { setEditedName(wantName); setIsEditingName(false); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+                className={`${sizes.typeClass} text-gray-700 dark:text-gray-200 mt-1 bg-white dark:bg-gray-800 border border-blue-400 rounded px-1 py-0 w-full focus:outline-none focus:ring-1 focus:ring-blue-500`}
+              />
+            ) : (
+              <p
+                className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}
+                onDoubleClick={(e) => { e.stopPropagation(); setEditedName(wantName); setIsEditingName(true); }}
+                title="Double-click to edit name"
+              >
+                {truncateText(wantName, sizes.textTruncate)}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
