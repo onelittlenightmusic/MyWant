@@ -13,7 +13,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isBottom = config?.header_position === 'bottom';
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex">
       <div
         className={classNames(
           "flex-1 flex flex-col relative min-w-0",

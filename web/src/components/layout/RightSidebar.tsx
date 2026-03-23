@@ -67,7 +67,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 shadow-xl transform z-40 border-l border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden',
+          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 transform z-40 flex flex-col overflow-hidden',
           instant ? '' : 'transition-transform duration-100 ease-in-out',
           isOpen ? 'translate-x-0' : 'translate-x-full',
           className || ''
@@ -75,7 +75,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         style={{
           top: isBottom ? 'env(safe-area-inset-top, 0px)' : 'calc(env(safe-area-inset-top, 0px) + var(--header-height, 0px))',
           bottom: isBottom ? 'calc(env(safe-area-inset-bottom, 0px) + var(--header-height, 0px))' : 'env(safe-area-inset-bottom, 0px)',
-          height: 'auto'
+          height: 'auto',
+          boxShadow: '-4px 0 12px rgba(0,0,0,0.06)'
         }}
       >
         {/* Background image - covers entire sidebar */}
@@ -103,7 +104,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
         {/* Header */}
         <div className={classNames(
-          "flex-shrink-0 bg-white dark:bg-gray-900 px-4 sm:px-8 py-3 sm:py-6 flex items-center justify-between z-20 gap-4 relative",
+          "flex-shrink-0 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between z-20 gap-4 relative",
           isBottom ? "order-last border-t border-gray-200 dark:border-gray-700" : "border-b border-gray-200 dark:border-gray-700"
         )} style={isBottom ? { paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' } : {}}>
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -131,7 +132,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         </div>
 
         {/* Content */}
-        <div className={`flex-1 h-full px-4 sm:px-8 py-4 sm:py-6 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={`flex-1 h-full px-0 py-0 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {children}
         </div>
       </div>

@@ -343,7 +343,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
           <button
             type="button"
             onClick={() => setSelectedCategory(null)}
-            className={`px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors ${
+            className={`px-1.5 sm:px-2 py-0.5 sm:py-1 text-[0.65rem] sm:text-xs rounded-full font-medium transition-colors ${
               selectedCategory === null
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -356,7 +356,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               key={category}
               type="button"
               onClick={() => setSelectedCategory(category)}
-              className={`inline-flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full font-medium transition-colors capitalize ${
+              className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 text-[0.65rem] sm:text-xs rounded-full font-medium transition-colors capitalize ${
                 selectedCategory === category
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'

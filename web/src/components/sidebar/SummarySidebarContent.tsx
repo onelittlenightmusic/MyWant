@@ -137,7 +137,7 @@ export const SummarySidebarContent: React.FC<SummarySidebarContentProps> = ({
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
                   className={classNames(
-                    'px-3 py-1.5 rounded-full text-sm font-medium border transition-all cursor-grab active:cursor-grabbing select-none',
+                    'px-2 py-1 rounded-full text-xs font-medium border transition-all cursor-grab active:cursor-grabbing select-none',
                     selectedLabel?.key === key && selectedLabel?.value === value
                       ? 'bg-blue-500 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
                       : 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200 hover:shadow-sm dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/50'
