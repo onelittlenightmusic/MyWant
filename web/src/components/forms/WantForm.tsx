@@ -669,7 +669,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAdvanced(v => !v)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <span className="flex items-center gap-1.5">
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
@@ -728,7 +728,7 @@ export const WantForm: React.FC<WantFormProps> = ({
 
                 {/* Owner Section */}
                 {ownerWant && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20">
                     <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
                     <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
                     <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>

@@ -75,11 +75,11 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   const getHeaderColorClasses = (scheme: ColorScheme): string => {
     switch (scheme) {
       case 'blue':
-        return 'bg-blue-50 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800 dark:hover:bg-blue-900/30';
+        return 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30';
       case 'amber':
-        return 'bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-800 dark:hover:bg-amber-900/30';
+        return 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30';
       case 'green':
-        return 'bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-800 dark:hover:bg-green-900/30';
+        return 'bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30';
     }
   };
 
@@ -230,7 +230,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         onKeyDown={handleHeaderKeyDown}
         className={`
           focusable-section-header
-          w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2
+          w-full text-left px-3 py-2 rounded-lg
           transition-all duration-200 focus:outline-none
           relative
           ${getHeaderColorClasses(colorScheme)}
@@ -259,7 +259,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
             </span>
 
             {/* Section Title */}
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {title}
             </h3>
 
@@ -322,14 +322,13 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
               type="button"
               onClick={onAddItem}
               className={`
-                px-3 sm:px-4 py-1.5 sm:py-2 text-sm font-medium rounded-lg
-                border-2 border-dashed transition-colors
-                focus:outline-none focus:ring-2
+                px-2 py-1 text-xs font-medium rounded transition-colors
+                focus:outline-none
                 ${colorScheme === 'blue'
-                  ? 'border-blue-300 text-blue-600 hover:bg-blue-50 focus:ring-blue-300 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20'
+                  ? 'text-blue-600 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30'
                   : colorScheme === 'amber'
-                  ? 'border-amber-300 text-amber-600 hover:bg-amber-50 focus:ring-amber-300 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-900/20'
-                  : 'border-green-300 text-green-600 hover:bg-green-50 focus:ring-green-300 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20'}
+                  ? 'text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30'
+                  : 'text-green-600 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-900/30'}
               `}
               aria-label={`Add new ${title.toLowerCase()} item (or press 'a' on header)`}
             >

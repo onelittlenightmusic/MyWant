@@ -188,7 +188,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
         <button
           type="button"
           onClick={handleCancel}
-          className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="px-3 py-1.5 text-gray-500 dark:text-gray-400 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
         >
           Cancel
         </button>

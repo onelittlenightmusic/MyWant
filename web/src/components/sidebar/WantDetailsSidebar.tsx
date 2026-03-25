@@ -305,7 +305,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [autoRefresh, wantId, fetchWantDetails, fetchWantResults]);
 
-
   // Register header action handlers with the sidebar
   useEffect(() => {
     if (onRegisterHeaderActions) {
@@ -409,6 +408,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [wantId]);
 
+  // Must be before early return to keep hook order consistent
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
   if (!want) {
     if (summaryProps) {
       return (
@@ -452,9 +455,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Get previous tab ID for simultaneous animation
   const prevTabId = tabs[prevTabIndex]?.id;
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
-
-  const config = useConfigStore(state => state.config);
-  const isBottom = config?.header_position === 'bottom';
 
   return (
     <>

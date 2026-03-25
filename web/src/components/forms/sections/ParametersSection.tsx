@@ -206,9 +206,9 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
         onKeyDown={handleHeaderKeyDown}
         className={`
           focusable-section-header
-          w-full text-left px-3 sm:px-4 py-2 sm:py-3 rounded-lg border-2
+          w-full text-left px-3 py-2 rounded-lg
           transition-all duration-200 focus:outline-none
-          relative bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30
+          relative bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30
 
           before:absolute before:left-0 before:top-0
           before:bottom-0 before:w-1 before:rounded-l-md
@@ -220,40 +220,32 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {/* Collapse/Expand Icon */}
             {isCollapsed ? (
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
+              <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             ) : (
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
+              <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             )}
-
-            {/* Section Icon */}
-            <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-200" />
-
-            {/* Section Title */}
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
+            <Settings className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Parameters
             </h3>
-
-            {/* Parameter Count Badge */}
             {Object.keys(parameters).length > 0 && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+              <span className="px-1.5 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                 {Object.keys(parameters).length}
               </span>
             )}
           </div>
 
-          {/* Collapsed Summary */}
           {isCollapsed && Object.entries(parameters).length > 0 && (
-            <div className="flex flex-wrap gap-2 ml-4">
+            <div className="flex flex-wrap gap-1.5 ml-4">
               {Object.entries(parameters).slice(0, 3).map(([key, value]) => (
-                <span key={key} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-full">
+                <span key={key} className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
                   {key}: {String(value)}
                 </span>
               ))}
               {Object.entries(parameters).length > 3 && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  +{Object.entries(parameters).length - 3} more
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  +{Object.entries(parameters).length - 3}
                 </span>
               )}
             </div>
@@ -353,11 +345,11 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
 
               {/* Show Optional Parameters Toggle */}
               {parameterDefinitions.some(param => !param.required) && (
-                <div className="pt-2 border-t border-gray-200">
+                <div className="pt-2">
                   <button
                     type="button"
                     onClick={() => setShowOptionalParams(!showOptionalParams)}
-                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-300 rounded px-2 py-1"
+                    className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs flex items-center gap-1 focus:outline-none rounded px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform ${showOptionalParams ? '' : '-rotate-90'}`} />
                     {showOptionalParams ? 'Hide' : 'Show'} Optional Parameters ({parameterDefinitions.filter(p => !p.required).length})
