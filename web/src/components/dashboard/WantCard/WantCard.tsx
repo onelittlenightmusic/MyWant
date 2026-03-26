@@ -124,7 +124,6 @@ export const WantCard: React.FC<WantCardProps> = ({
     longPressTimer.current = setTimeout(() => {
       if (longPressPos.current) {
         setQuickActionsWantId(wantId || null);
-        onView(want);
         longPressTimer.current = null;
       }
     }, 600); // 600ms for long press
