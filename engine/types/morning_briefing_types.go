@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[MorningBriefingWant, MorningBriefingLocals]("morning_briefing")
+	RegisterWantImplementation[MorningBriefingWant, MorningBriefingLocals]("briefing")
 }
 
 // MorningBriefingLocals holds no runtime locals; all state is managed via labeled state fields.
@@ -30,6 +30,7 @@ func (m *MorningBriefingWant) GetLocals() *MorningBriefingLocals {
 }
 
 // Initialize resets daily flags each time `when` triggers a restart.
+// Also copies OPA config params to current state so opaLLMThinkerThink reads them correctly.
 func (m *MorningBriefingWant) Initialize() {
 	m.StoreState("weather_done", false)
 	m.StoreState("transit_done", false)
@@ -37,6 +38,11 @@ func (m *MorningBriefingWant) Initialize() {
 	m.StoreState("weather_text", "")
 	m.StoreState("transit_text", "")
 	m.SetCurrent("outgoing_message", "")
+	// Copy OPA thinker config params → current state (opaLLMThinkerThink reads via GetCurrent)
+	m.SetCurrent("use_llm", m.GetBoolParam("use_llm", false))
+	m.SetCurrent("opa_llm_planner_command", m.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
+	m.SetCurrent("policy_dir", m.GetStringParam("policy_dir", ""))
+	m.SetCurrent("llm_provider", m.GetStringParam("llm_provider", "anthropic"))
 	m.StoreLog("[BRIEFING] Initialized — daily flags reset")
 }
 

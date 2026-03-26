@@ -10,13 +10,17 @@ wants:
   # ──────────────────────────────────────────────
   - metadata:
       name: my-morning-briefing
-      type: morning_briefing
+      type: briefing
       labels:
         category: productivity
     spec:
+      when:
+        - at: "07:30"
+          every: "1 day"
       params:
         time: "07:30"          # 起動時刻 (HH:MM, ローカル時間)
         weather_city: Tokyo    # 天気取得都市
+        use_llm: false         # OPA: LLM モード無効 (API KEY 不要)
 
         routes:
           # 平日の通勤ルート

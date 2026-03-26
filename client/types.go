@@ -47,6 +47,13 @@ type Metadata struct {
 type WantSpec struct {
 	Params map[string]any      `json:"params"`
 	Using  []map[string]string `json:"using,omitempty"`
+	When   []WhenSpec          `json:"when,omitempty"`
+}
+
+// WhenSpec defines a scheduled execution time for a Want
+type WhenSpec struct {
+	At    string `json:"at,omitempty"`
+	Every string `json:"every,omitempty"`
 }
 
 // CreateWantResponse represents the response from creating a want
