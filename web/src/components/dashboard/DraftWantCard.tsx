@@ -4,6 +4,8 @@ import { Want } from '@/types/want';
 import { WantCardContent } from './WantCardContent';
 import { classNames } from '@/utils/helpers';
 
+import { Trash2 } from 'lucide-react';
+
 interface DraftWantCardProps {
   draft: DraftWant;
   selected: boolean;
@@ -84,8 +86,19 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
           want={pseudoWant}
           isChild={false}
           onView={() => onClick()}
-          onDelete={() => onDelete()}
         />
+        
+        {/* Draft delete button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all z-20"
+          title="Delete Draft"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Draft-specific status information at the bottom area - pushing it to the bottom */}

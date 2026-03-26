@@ -494,21 +494,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             >
               <StatusBadge status={want.status} size={sizes.statusSize} />
             </button>
-
-            {/* Delete Button - Common mechanism for all cards */}
-            {onDelete && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(want);
-                }}
-                className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-all ml-1"
-                title="Delete"
-              >
-                <Trash2 className={sizes.iconSize} />
-              </button>
-            )}
-
           </div>
         </div>
       </div>

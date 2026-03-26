@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart, Play, Pause, Settings, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from '../WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
@@ -14,6 +13,7 @@ import { StackLayers } from './parts/StackLayers';
 import { VersionBadge } from './parts/VersionBadge';
 import { getStatusHexColor } from './parts/StatusColor';
 import { ChildWantCard } from './ChildWantCard';
+import { QuickActionsOverlay } from './parts/QuickActionsOverlay';
 
 interface WantCardProps {
   want: Want;
@@ -75,8 +75,18 @@ export const WantCard: React.FC<WantCardProps> = ({
   stackCount = 0,
 }) => {
   const wantId = want.metadata?.id || want.id;
-  const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId, startWant, stopWant } = useWantStore();
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const { 
+    setDraggingWant, 
+    setIsOverTarget, 
+    highlightedLabel, 
+    blinkingWantId, 
+    startWant, 
+    stopWant,
+    quickActionsWantId,
+    setQuickActionsWantId
+  } = useWantStore();
+  
+  const showQuickActions = quickActionsWantId === wantId;
   const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
 
@@ -104,33 +114,65 @@ export const WantCard: React.FC<WantCardProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragOverWant, setIsDragOverWant] = useState(false);
 
-  // Long-press for context menu
+  // Long-press for overlay
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressPos = useRef<{ x: number; y: number } | null>(null);
+
+  const startLongPress = (x: number, y: number) => {
+    if (isBeingProcessed || isSelectMode) return;
+    longPressPos.current = { x, y };
+    longPressTimer.current = setTimeout(() => {
+      if (longPressPos.current) {
+        setQuickActionsWantId(wantId || null);
+        onView(want);
+        longPressTimer.current = null;
+      }
+    }, 600); // 600ms for long press
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressPos.current = null;
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only left click starts long press
+    if (e.button !== 0) return;
+    startLongPress(e.clientX, e.clientY);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (longPressPos.current) {
+      const dist = Math.sqrt(
+        Math.pow(e.clientX - longPressPos.current.x, 2) +
+        Math.pow(e.clientY - longPressPos.current.y, 2)
+      );
+      if (dist > 10) cancelLongPress();
+    }
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (isBeingProcessed || isSelectMode) return;
     const touch = e.touches[0];
-    longPressPos.current = { x: touch.clientX, y: touch.clientY };
-    longPressTimer.current = setTimeout(() => {
-      if (longPressPos.current) {
-        setContextMenu(longPressPos.current);
-      }
-    }, 500);
+    startLongPress(touch.clientX, touch.clientY);
   };
 
-  const handleTouchMove = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (longPressPos.current) {
+      const touch = e.touches[0];
+      const dist = Math.sqrt(
+        Math.pow(touch.clientX - longPressPos.current.x, 2) +
+        Math.pow(touch.clientY - longPressPos.current.y, 2)
+      );
+      if (dist > 10) cancelLongPress();
     }
   };
 
   const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    cancelLongPress();
   };
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -170,22 +212,9 @@ export const WantCard: React.FC<WantCardProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     if (isBeingProcessed || isSelectMode) return;
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
+    setQuickActionsWantId(wantId || null);
+    onView(want);
   };
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handleClose = () => setContextMenu(null);
-    document.addEventListener('click', handleClose);
-    document.addEventListener('contextmenu', handleClose);
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('click', handleClose);
-      document.removeEventListener('contextmenu', handleClose);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [contextMenu]);
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isBeingProcessed) return;
@@ -347,6 +376,19 @@ export const WantCard: React.FC<WantCardProps> = ({
         onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}
         onContextMenu={handleContextMenu}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={cancelLongPress}
+        onMouseLeave={() => {
+          cancelLongPress();
+          if (showQuickActions) setQuickActionsWantId(null);
+        }}
+        onBlur={(e) => {
+          const relatedTarget = e.relatedTarget as Node;
+          if (showQuickActions && (!relatedTarget || !cardRef.current?.contains(relatedTarget))) {
+            setQuickActionsWantId(null);
+          }
+        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -404,7 +446,10 @@ export const WantCard: React.FC<WantCardProps> = ({
 
         <VersionBadge version={version} />
 
-        <div className="relative z-10">
+        <div
+          className="relative z-10 transition-all duration-150"
+          style={showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
+        >
           <WantCardContent
             want={want} isChild={false} hasChildren={!!hasChildren}
             onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults}
@@ -413,6 +458,24 @@ export const WantCard: React.FC<WantCardProps> = ({
             onShowReactionConfirmation={onShowReactionConfirmation}
           />
         </div>
+
+        {showQuickActions && (
+          <QuickActionsOverlay
+            want={want}
+            onClose={() => setQuickActionsWantId(null)}
+            onView={() => onView(want)}
+            onStart={() => startWant(wantId || '')}
+            onStop={() => stopWant(wantId || '')}
+            onSuspend={() => onSuspend?.(want)}
+            onResume={() => onResume?.(want)}
+            onRestart={async () => {
+              await stopWant(wantId || '');
+              setTimeout(() => startWant(wantId || ''), 300);
+            }}
+            onEdit={() => onEdit(want)}
+            onDelete={() => onDelete(want)}
+          />
+        )}
 
         {(hasChildren || isRecipeBased) && !displayIsExpanded && (
           <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700">
@@ -499,52 +562,6 @@ export const WantCard: React.FC<WantCardProps> = ({
       </div>
 
       {/* Right-click context menu */}
-      {contextMenu && createPortal(
-        <div
-          className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px]"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Start */}
-          {(want.status === 'stopped' || want.status === 'created' || want.status === 'failed' || want.status === 'achieved' || want.status === 'terminated') && (
-            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => { startWant(wantId || ''); setContextMenu(null); }}>
-              <Play className="w-3.5 h-3.5 text-green-500" /> Start
-            </button>
-          )}
-          {/* Resume */}
-          {want.status === 'suspended' && (
-            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => { onResume?.(want); setContextMenu(null); }}>
-              <Play className="w-3.5 h-3.5 text-green-500" /> Resume
-            </button>
-          )}
-          {/* Suspend */}
-          {(want.status === 'reaching' || want.status === 'waiting_user_action') && (
-            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => { onSuspend?.(want); setContextMenu(null); }}>
-              <Pause className="w-3.5 h-3.5 text-yellow-500" /> Suspend
-            </button>
-          )}
-          {/* Stop */}
-          {(want.status === 'reaching' || want.status === 'waiting_user_action' || want.status === 'suspended') && (
-            <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => { stopWant(wantId || ''); setContextMenu(null); }}>
-              <Square className="w-3.5 h-3.5 text-red-500" fill="currentColor" /> Stop
-            </button>
-          )}
-          <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
-          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            onClick={() => { onEdit(want); setContextMenu(null); }}>
-            <Settings className="w-3.5 h-3.5 text-blue-500" /> Edit Settings
-          </button>
-          <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            onClick={() => { onDelete(want); setContextMenu(null); }}>
-            <Trash2 className="w-3.5 h-3.5" /> Delete
-          </button>
-        </div>,
-        document.body
-      )}
     </div>
   );
 };

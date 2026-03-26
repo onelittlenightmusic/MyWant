@@ -267,6 +267,16 @@ export const WantForm: React.FC<WantFormProps> = ({
     if (editingWant) {
       setIsEditing(true);
       wantObjectToForm(editingWant);
+      
+      // Initialize selector state from want type/recipe
+      const wType = editingWant.metadata?.type || '';
+      if (wType) {
+        // Try to determine if it's a recipe or want-type
+        const isRecipe = recipes.some(r => r.recipe?.metadata?.custom_type === wType);
+        setSelectedTypeId(wType);
+        setSelectedItemType(isRecipe ? 'recipe' : 'want-type');
+      }
+
       // Auto-show advanced if editing want has labels, deps, or scheduling
       const hasAdvanced =
         Object.keys(editingWant.metadata?.labels || {}).length > 0 ||
@@ -278,7 +288,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         spec: editingWant.spec
       }));
     }
-  }, [editingWant]);
+  }, [editingWant, recipes]);
 
   const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
     setCollapsedSections(prev => {
@@ -632,7 +642,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   }}
                   onClear={() => {
                     setSelectedTypeId(null);
-                    setSelectedItemType(null);
+                    setSelectedItemType('want-type');
                     setType('');
                     setName('');
                   }}
