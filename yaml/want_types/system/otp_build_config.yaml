@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: otp_build_config
-    title: OTP Build Config
+    name: otp_config
+    title: OTP Config Built
     description: |
       Ensures build-config.json exists in data_dir with the correct transitFeeds entries
       for all configured GTFS files. Written directly from Go — no Docker needed.

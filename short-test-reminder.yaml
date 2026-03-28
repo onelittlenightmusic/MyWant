@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: short-reminder
+      type: reminder
+    spec:
+      params:
+        message: "Short Webhook Test"
+        duration_from_now: "5 seconds"
+        require_reaction: true

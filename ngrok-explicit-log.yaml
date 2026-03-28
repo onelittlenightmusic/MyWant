@@ -1,0 +1,8 @@
+wants:
+  - metadata:
+      name: ngrok-explicit-log
+      type: ngrok
+    spec:
+      params:
+        port: "8080"
+        log_file: "/Users/hiroyukiosaki/ngrok-test.log"

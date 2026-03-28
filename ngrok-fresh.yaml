@@ -1,0 +1,7 @@
+wants:
+  - metadata:
+      name: ngrok-fresh
+      type: ngrok
+    spec:
+      params:
+        port: "8080"

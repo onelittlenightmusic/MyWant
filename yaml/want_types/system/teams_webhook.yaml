@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: teams webhook
-    title: Teams Webhook
+    name: teams_notify
+    title: Teams Notified
     description: |
       Receives messages from Microsoft Teams Outgoing Webhooks via HTTP POST.
 

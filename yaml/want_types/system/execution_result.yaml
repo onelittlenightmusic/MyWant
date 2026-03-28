@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: execution_result
-    title: Execution Result
+    name: command
+    title: Command Executed
     description: 'Standard want type representing the result of a command execution.'
     version: '1.0'
     category: system

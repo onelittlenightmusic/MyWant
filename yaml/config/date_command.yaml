@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: date_command
-      type: execution_result
+      type: command
     spec:
       params:
         command: "date"

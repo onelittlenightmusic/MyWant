@@ -29,7 +29,7 @@ recipe:
     direction_map: >-
       {
         "build_graph": {
-          "type": "ensure_file",
+          "type": "file_exists",
           "params": {
             "filename": "graph.obj",
             "method": "docker_build",
@@ -54,10 +54,11 @@ recipe:
     # 値: 親wantのcurrent stateに書き込むフラグ名
     provider_state_map: >-
       {
-        "ensure-osm":          "osm_done",
-        "ensure-gtfs-toei-bus": "gtfs_toei_bus_done",
-        "ensure-gtfs-toei-train": "gtfs_toei_train_done",
-        "build-config":        "build_config_done"
+        "ensure-osm":               "osm_done",
+        "ensure-gtfs-toei-bus":     "gtfs_toei_bus_done",
+        "ensure-gtfs-toei-train":   "gtfs_toei_train_done",
+        "ensure-gtfs-tokyo-metro":  "gtfs_tokyo_metro_done",
+        "build-config":             "build_config_done"
       }
 
   state:
@@ -99,6 +100,13 @@ recipe:
       initialValue: false
       label: current
 
+    - name: gtfs_tokyo_metro_done
+      description: 東京メトロGTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
     - name: build_config_done
       description: build-config.json生成完了フラグ
       type: bool
@@ -133,7 +141,7 @@ recipe:
     # ── 静的ダウンロード・設定生成（並行実行） ────────────────────────────────
     - metadata:
         name: "ensure-osm"
-        type: ensure_file
+        type: file_exists
         labels:
           role: otp_provider
       spec:
@@ -143,7 +151,7 @@ recipe:
 
     - metadata:
         name: "ensure-gtfs-toei-bus"
-        type: ensure_file
+        type: file_exists
         labels:
           role: otp_provider
       spec:
@@ -153,7 +161,7 @@ recipe:
 
     - metadata:
         name: "ensure-gtfs-toei-train"
-        type: ensure_file
+        type: file_exists
         labels:
           role: otp_provider
       spec:
@@ -162,15 +170,26 @@ recipe:
           url: "https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
 
     - metadata:
+        name: "ensure-gtfs-tokyo-metro"
+        type: file_exists
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          filename: "tokyo-metro.zip"
+          url: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}"
+
+    - metadata:
         name: "build-config"
-        type: otp_build_config
+        type: otp_config
         labels:
           role: otp_provider
       spec:
         params:
           gtfs_feeds: >-
             [{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},
-             {"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"}]
+             {"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"},
+             {"url":"https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}","filename":"tokyo-metro.zip"}]
 
     # ── Regoプランナー ────────────────────────────────────────────────────────
     - metadata:

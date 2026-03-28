@@ -18,7 +18,7 @@ recipe:
     # コーディネーター: when で毎朝リセット、OPA + DispatchThinker が全フローを制御
     - metadata:
         name: my-morning-briefing
-        type: morning_briefing
+        type: briefing
         labels:
           category: productivity
       spec:

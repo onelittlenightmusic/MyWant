@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: gmail-search-unread
-      type: gmail_dynamic
+      type: email_dynamic
       labels:
         category: test
     spec:

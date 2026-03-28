@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: budget
-    title: Budget Tracker
+    title: Budget Tracked
     description: Tracks and aggregates costs reported by child wants against a budget limit.
     version: '1.0'
     category: travel

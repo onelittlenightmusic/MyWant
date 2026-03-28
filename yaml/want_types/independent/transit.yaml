@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: transit
-    title: Transit Route Lookup
+    title: Transit Route Found
     description: |
       Looks up the optimal transit route for a given origin, destination, and
       target arrival time using OpenTripPlanner (OTP 2.x GraphQL API).

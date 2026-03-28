@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: weather
-    title: Weather
+    title: Weather Fetched
     description: Fetches weather information for a city and propagates result to parent want.
     version: '1.0'
     category: utility

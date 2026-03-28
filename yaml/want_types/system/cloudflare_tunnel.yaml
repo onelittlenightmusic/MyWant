@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: cloudflare_tunnel
-    title: Cloudflare Tunnel
+    name: cloudflare
+    title: Cloudflare Tunnel Running
     description: |
       Manages a Cloudflare Tunnel (cloudflared) lifecycle to expose a local service via a public URL.
 

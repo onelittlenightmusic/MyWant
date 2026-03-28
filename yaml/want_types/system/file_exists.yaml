@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: ensure_file
-    title: Ensure File Exists
+    name: file_exists
+    title: File Exists
     description: |
       Ensures a file exists at data_dir/filename.
       If the file is missing, creates it using the configured method.
@@ -108,6 +108,13 @@ wantType:
       label: current
       initialValue: ''
 
+    - name: docker_phase
+      description: Docker lifecycle phase (starting | running | done | stopped | failed)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: docker_image
       description: Docker image (set by Initialize for docker methods)
       type: string
@@ -199,7 +206,7 @@ wantType:
       want:
         metadata:
           name: tokyo-osm
-          type: ensure_file
+          type: file_exists
         spec:
           params:
             filename: "map.osm.pbf"
@@ -211,7 +218,7 @@ wantType:
       want:
         metadata:
           name: toei-bus-gtfs
-          type: ensure_file
+          type: file_exists
         spec:
           params:
             filename: "toei-bus.zip"
@@ -223,7 +230,7 @@ wantType:
       want:
         metadata:
           name: otp-graph
-          type: ensure_file
+          type: file_exists
         spec:
           params:
             filename: "graph.obj"

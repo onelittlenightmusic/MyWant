@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: fresh knowledge
-    title: Fresh knowledge
+    name: knowledge
+    title: Knowledge Fetched
     description: 'Maintains a Markdown file with the latest information on a specific topic.
       Automatically searches for updates and synthesizes them into the document.
       Essentially Ansible for knowledge - ensuring your notes reflect the latest reality.

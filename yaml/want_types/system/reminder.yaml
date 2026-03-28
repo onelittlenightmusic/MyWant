@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: reminder
-    title: Reminder
+    title: Reminder Set
     description: |
       Sends a reminder notification at a scheduled time with optional user reaction.
 

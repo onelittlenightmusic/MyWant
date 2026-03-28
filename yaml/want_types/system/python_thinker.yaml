@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: python_thinker
-    title: Python Thinker
+    name: python
+    title: Thought by Python
     description: |
       Executes a Python script as a think agent on each tick.
 

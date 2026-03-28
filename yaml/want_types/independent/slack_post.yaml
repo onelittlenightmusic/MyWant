@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: slack_post
-    title: Slack Post
+    title: Slack Posted
     description: Posts a message to Slack via Incoming Webhook. Receives the message as a param from parent want.
     version: '1.0'
     category: utility

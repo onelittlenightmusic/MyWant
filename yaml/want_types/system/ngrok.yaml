@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: ngrok
-    title: Ngrok Tunnel
+    title: Ngrok Tunnel Running
     description: |
       Manages an ngrok tunnel lifecycle to expose a local service via a public URL.
 

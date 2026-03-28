@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: agentic-ai-foundation-tracker
-      type: fresh knowledge
+      type: knowledge
     spec:
       params:
         topic: "Agentic AI Foundation latest news, organization updates, and roadmap"

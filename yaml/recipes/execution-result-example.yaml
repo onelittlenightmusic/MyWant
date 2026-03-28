@@ -20,7 +20,7 @@ recipe:
     # Example 1: Simple echo command
     - metadata:
         name: simple_echo
-        type: execution_result
+        type: command
       spec:
         params:
           command: simple_command
@@ -29,7 +29,7 @@ recipe:
     # Example 2: List files
     - metadata:
         name: list_files
-        type: execution_result
+        type: command
       spec:
         params:
           command: list_files_command
@@ -38,7 +38,7 @@ recipe:
     # Example 3: Date command - executes every 10 seconds
     - metadata:
         name: get_date
-        type: execution_result
+        type: command
       spec:
         params:
           command: date_command
@@ -49,7 +49,7 @@ recipe:
     # Example 4: Command that fails
     - metadata:
         name: failing_command
-        type: execution_result
+        type: command
       spec:
         params:
           command: fail_command
@@ -66,7 +66,7 @@ recipe:
     wants:
       - metadata:
           name: example_echo
-          type: execution_result
+          type: command
         spec:
           params:
             command: "echo 'ExecutionResult Want Type Test'"

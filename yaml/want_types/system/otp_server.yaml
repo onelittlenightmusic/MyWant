@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: otp_server
-    title: OTP Server
+    title: OTP Server Running
     description: |
       Runs the OTP routing server as a persistent Docker container.
       Achieved once the server responds to health checks on /otp/routers.

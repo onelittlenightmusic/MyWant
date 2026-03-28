@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: "teams-inbox"
-      type: teams webhook
+      type: teams_notify
       labels:
         category: communication
         source: teams

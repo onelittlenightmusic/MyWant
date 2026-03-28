@@ -1,0 +1,9 @@
+wants:
+  - metadata:
+      name: webhook-test-reminder
+      type: reminder
+    spec:
+      params:
+        message: "Manual Webhook Verification"
+        duration_from_now: "1 hour"
+        require_reaction: true

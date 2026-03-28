@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: gmail
-    title: Gmail
+    title: Email Found
     description: |
       Executes Gmail operations using natural language prompts.
 

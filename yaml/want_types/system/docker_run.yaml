@@ -1,7 +1,7 @@
 wantType:
   metadata:
     name: docker_run
-    title: Docker Container
+    title: Docker Container Runs
     description: |
       Manages a Docker container whose lifecycle is tied to the Want's lifecycle.
 

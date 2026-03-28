@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: opa_llm_planner
-    title: OPA LLM Planner
+    name: plan
+    title: Plan Ready
     description: |
       Plans actions using OPA (Open Policy Agent) policy engine combined with LLM reasoning.
 

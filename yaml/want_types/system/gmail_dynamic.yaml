@@ -1,7 +1,7 @@
 wantType:
   metadata:
-    name: gmail_dynamic
-    title: Gmail Dynamic
+    name: email_dynamic
+    title: Email Found Dynamically
     description: |
       A self-evolving Gmail want that discovers tools and generates its own
       parsing logic into a WASM plugin.

@@ -1,0 +1,7 @@
+metadata:
+  name: ngrok-test
+  type: ngrok
+spec:
+  params:
+    port: "8080"
+    protocol: "http"

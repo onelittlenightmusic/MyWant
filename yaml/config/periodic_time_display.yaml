@@ -1,7 +1,7 @@
 wants:
   - metadata:
       name: periodic_time_display
-      type: execution_result
+      type: command
       labels:
         role: timer
     spec:
