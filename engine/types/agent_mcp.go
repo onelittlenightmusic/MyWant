@@ -3,6 +3,7 @@ package types
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -105,6 +106,13 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 	g.mu.Lock(); defer g.mu.Unlock()
 	if !g.running { return nil, fmt.Errorf("Goose manager is not running") }
 	prompt := g.buildPrompt(operation, params)
+	// For interact_recommend, use claude --print directly to avoid goose session conflicts
+	if operation == "interact_recommend" {
+		output, err := runClaudeDirect(ctx, prompt)
+		if err == nil {
+			return parseGooseResponse(output)
+		}
+	}
 	preferredProvider := ""; if p, ok := params["provider"].(string); ok && p != "" { preferredProvider = p }
 	if preferredProvider == "" { preferredProvider = os.Getenv("MYWANT_GOOSE_PROVIDER") }
 	args := []string{"run", "-i", "-"}; if preferredProvider != "" { args = append(args, "--provider", preferredProvider) }
@@ -115,6 +123,22 @@ func (g *GooseManager) ExecuteViaGoose(ctx context.Context, operation string, pa
 		fullOutput, _ = g.runGooseWithArgs(fallbackArgs, prompt)
 	}
 	return parseGooseResponse(fullOutput)
+}
+
+// runClaudeDirect calls claude --print directly with the prompt, bypassing goose
+func runClaudeDirect(ctx context.Context, prompt string) (string, error) {
+	claudeCmd := os.Getenv("CLAUDE_CODE_COMMAND")
+	if claudeCmd == "" {
+		claudeCmd = "claude"
+	}
+	cmd := exec.CommandContext(ctx, claudeCmd, "--print")
+	cmd.Env = os.Environ()
+	cmd.Stdin = strings.NewReader(prompt)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func (g *GooseManager) runGooseWithArgs(args []string, prompt string) (string, error) {
@@ -129,12 +153,108 @@ func (g *GooseManager) runGooseWithArgs(args []string, prompt string) (string, e
 }
 
 func (g *GooseManager) buildPrompt(operation string, params map[string]interface{}) string {
+	if operation == "interact_recommend" {
+		return buildInteractRecommendPrompt(params)
+	}
 	return fmt.Sprintf("Execute operation %s with %v", operation, params)
 }
 
+func buildInteractRecommendPrompt(params map[string]interface{}) string {
+	message, _ := params["message"].(string)
+	historyJSON, _ := params["conversation_history"].(string)
+
+	return fmt.Sprintf(`You are a MyWant configuration assistant. MyWant is a declarative workflow system where users define "wants" (goals) using YAML.
+
+Available want types include: gmail, morning_briefing, reminder, hotel, flight, restaurant, weather, transit, knowledge, slack_post, budget, itinerary, execution_result, docker_run, opa_llm_planner, python_thinker, teams_webhook, slack_webhook, ngrok, cloudflare_tunnel.
+
+Conversation history: %s
+
+User's request: %s
+
+Based on the user's request, generate 1-3 want configuration recommendations. You MUST respond with ONLY valid JSON in exactly this format (no markdown, no explanation, just JSON):
+
+{
+  "recommendations": [
+    {
+      "id": "rec-1",
+      "title": "Short descriptive title",
+      "approach": "custom",
+      "description": "Why this configuration fits the user's need",
+      "config": {
+        "wants": [
+          {
+            "name": "my_want_name",
+            "type": "want_type_here",
+            "spec": {
+              "params": {}
+            }
+          }
+        ]
+      },
+      "metadata": {
+        "want_count": 1,
+        "want_types_used": ["want_type_here"],
+        "complexity": "low",
+        "pros_cons": {
+          "pros": ["benefit 1"],
+          "cons": ["limitation 1"]
+        }
+      }
+    }
+  ]
+}`, historyJSON, message)
+}
+
 func parseGooseResponse(output string) (interface{}, error) {
+	// Try to extract JSON from markdown code blocks first
+	extracted := extractJSONFromOutput(output)
+	if extracted != "" {
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(extracted), &result); err == nil {
+			return result, nil
+		}
+	}
 	return map[string]interface{}{"text": output}, nil
 }
+
+func extractJSONFromOutput(output string) string {
+	// Try ```json ... ``` block
+	if idx := strings.Index(output, "```json"); idx >= 0 {
+		start := idx + len("```json")
+		if end := strings.Index(output[start:], "```"); end >= 0 {
+			return strings.TrimSpace(output[start : start+end])
+		}
+	}
+	// Try ``` ... ``` block containing JSON
+	if idx := strings.Index(output, "```"); idx >= 0 {
+		start := idx + 3
+		if end := strings.Index(output[start:], "```"); end >= 0 {
+			candidate := strings.TrimSpace(output[start : start+end])
+			if strings.HasPrefix(candidate, "{") {
+				return candidate
+			}
+		}
+	}
+	// Try bare JSON object (find first { to last })
+	start := strings.Index(output, "{")
+	if start >= 0 {
+		// Find matching closing brace
+		depth := 0
+		for i := start; i < len(output); i++ {
+			switch output[i] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return output[start : i+1]
+				}
+			}
+		}
+	}
+	return ""
+}
+
 
 func (g *GooseManager) Close() error {
 	g.mu.Lock(); defer g.mu.Unlock(); g.running = false; return nil

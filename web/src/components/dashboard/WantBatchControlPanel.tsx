@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { XCircle } from 'lucide-react';
 import { WantControlButtons } from './WantControlButtons';
+import { ConfirmationBubble } from '@/components/notifications';
 
 interface WantBatchControlPanelProps {
   selectedCount: number;
@@ -9,6 +10,10 @@ interface WantBatchControlPanelProps {
   onBatchDelete: () => void;
   onBatchCancel: () => void;
   loading?: boolean;
+  confirmationVisible?: boolean;
+  confirmationTitle?: string;
+  onConfirmAction?: () => void;
+  onCancelAction?: () => void;
 }
 
 export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
@@ -17,7 +22,11 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
   onBatchStop,
   onBatchDelete,
   onBatchCancel,
-  loading = false
+  loading = false,
+  confirmationVisible = false,
+  confirmationTitle = 'Confirm',
+  onConfirmAction,
+  onCancelAction,
 }) => {
   // Keyboard shortcuts
   useEffect(() => {
@@ -81,7 +90,7 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-2 relative overflow-hidden">
           <WantControlButtons
             onStart={onBatchStart}
             onStop={onBatchStop}
@@ -89,7 +98,16 @@ export const WantBatchControlPanel: React.FC<WantBatchControlPanelProps> = ({
             canStart={selectedCount > 0}
             canStop={selectedCount > 0}
             canDelete={selectedCount > 0}
-            canSuspend={false} 
+            canSuspend={false}
+            loading={loading}
+          />
+          <ConfirmationBubble
+            isVisible={confirmationVisible}
+            onConfirm={onConfirmAction || (() => {})}
+            onCancel={onCancelAction || (() => {})}
+            onDismiss={onCancelAction || (() => {})}
+            title={confirmationTitle}
+            layout="header-overlay"
             loading={loading}
           />
         </div>

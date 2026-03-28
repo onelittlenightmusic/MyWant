@@ -17,6 +17,7 @@ interface DetailsSidebarProps {
   defaultTab?: string;
   children: React.ReactNode;
   headerContent?: React.ReactNode;
+  headerOverlay?: React.ReactNode;
   onTabChange?: (tabId: string) => void;
 }
 
@@ -28,6 +29,7 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
   defaultTab,
   children,
   headerContent,
+  headerOverlay,
   onTabChange
 }) => {
   const config = useConfigStore(state => state.config);
@@ -49,7 +51,7 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className={classNames(
-        "px-4 sm:px-6 py-3 sm:py-4",
+        "px-4 sm:px-6 py-3 sm:py-4 relative overflow-hidden",
         isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
       )}>
         {/* Badge and Title */}
@@ -71,6 +73,9 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
             {headerContent}
           </div>
         )}
+
+        {/* Header overlay (e.g. ConfirmationBubble with layout="header-overlay") */}
+        {headerOverlay}
 
         {/* Tab navigation */}
         <div className="mt-3 sm:mt-4">

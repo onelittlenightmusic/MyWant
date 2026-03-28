@@ -1182,6 +1182,17 @@ func (n *Want) MergeParentState(updates map[string]any) {
 	parent.MergeState(updates)
 }
 
+// ProposeDispatch writes a fully-resolved list of DispatchRequests to the parent
+// Target's "desired_dispatch" state. The parent's DispatchExecutor reconciles this
+// list against existing children and calls AddChildWant idempotently.
+// Overwrites (not appends) so that OPA replanning that removes directions is respected.
+func (n *Want) ProposeDispatch(requests []DispatchRequest) {
+	if requests == nil {
+		requests = []DispatchRequest{}
+	}
+	n.StoreParentState("desired_dispatch", requests)
+}
+
 // SuggestParent suggests a set of directions to the parent want (or global state).
 // This is typically used by planning wants (like Itinerary) to request the
 // parent's DispatchThinker to realize new child wants.

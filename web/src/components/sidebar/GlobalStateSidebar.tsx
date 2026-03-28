@@ -366,10 +366,19 @@ export const GlobalStateSidebar: React.FC = () => {
     : undefined;
 
   return (
-    <>
-      <DetailsSidebar
+    <DetailsSidebar
         title="Memo"
         subtitle={subtitleText}
+        headerOverlay={
+          <ConfirmationBubble
+            isVisible={showClearConfirmation}
+            onConfirm={handleClearGlobalState}
+            onCancel={() => setShowClearConfirmation(false)}
+            onDismiss={() => setShowClearConfirmation(false)}
+            title="Clear Memo"
+            layout="header-overlay"
+          />
+        }
         badge={
           <div className="flex items-center justify-between w-full">
             <StickyNote className="h-5 w-5 text-green-500" />
@@ -414,17 +423,6 @@ export const GlobalStateSidebar: React.FC = () => {
 
           {activeTab === 'settings' && <SettingsTab />}
         </div>
-      </DetailsSidebar>
-
-      <ConfirmationBubble
-        isVisible={showClearConfirmation}
-        onConfirm={handleClearGlobalState}
-        onCancel={() => setShowClearConfirmation(false)}
-        onDismiss={() => setShowClearConfirmation(false)}
-        title="Clear Memo"
-        message="Are you sure you want to clear all memo data? This action cannot be undone."
-        layout="dashboard-right"
-      />
-    </>
+    </DetailsSidebar>
   );
 };

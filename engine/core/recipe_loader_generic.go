@@ -197,10 +197,13 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 			want := recipeWant.ConvertToWant()
 			DebugLog("[RECIPE-LOADER] Converted recipe want %d (type: %s) to Want struct\n", i+1, want.Metadata.Type)
 
-			// Generate name if missing
+			// Generate or prefix name to ensure uniqueness across deployments
 			if want.Metadata.Name == "" {
 				want.Metadata.Name = fmt.Sprintf("%s-%s-%d", prefix, want.Metadata.Type, i+1)
 				DebugLog("[RECIPE-LOADER] Generated want name: %s\n", want.Metadata.Name)
+			} else {
+				want.Metadata.Name = fmt.Sprintf("%s-%s", prefix, want.Metadata.Name)
+				DebugLog("[RECIPE-LOADER] Prefixed want name: %s\n", want.Metadata.Name)
 			}
 
 			// Generate ID if missing

@@ -328,33 +328,24 @@ func (t *Target) Initialize() {
 		}
 	}
 
-	// Ensure direction_map and provider_state_map are accessible in Spec.Params for dispatch_thinker.
-	// When deployed from a minimal config (no explicit params), these live in RecipeParams.
+	// Ensure provider_state_map is accessible in Spec.Params for dispatch_thinker.
+	// direction_map is now owned by the child planner want (itinerary/briefing),
+	// not by the Target itself.
 	if t.Spec.Params == nil {
 		t.Spec.Params = make(map[string]any)
 	}
-	for _, key := range []string{"direction_map", "provider_state_map"} {
-		if _, has := t.Spec.Params[key]; !has {
-			if v, ok := t.RecipeParams[key]; ok && v != nil {
-				t.Spec.Params[key] = v
-			}
+	if _, has := t.Spec.Params["provider_state_map"]; !has {
+		if v, ok := t.RecipeParams["provider_state_map"]; ok && v != nil {
+			t.Spec.Params["provider_state_map"] = v
 		}
 	}
 
-	// Start DispatchThinkerAgent to handle child want dispatch requests from Itinerary
-	// Target is allowed to register this system agent in code.
+	// Start DispatchExecutor to handle child want dispatch requests
 	dispatchThinkerID := DispatchThinkerName + "-" + t.Metadata.ID
 	if _, running := t.GetBackgroundAgent(dispatchThinkerID); !running {
 		agent := NewDispatchThinker(dispatchThinkerID)
 		if err := t.AddBackgroundAgent(agent); err != nil {
 			t.StoreLog("ERROR: Failed to start DispatchThinkerAgent: %v", err)
-		}
-	}
-
-	// Initialize directions state if direction_map is present to prevent premature achievement
-	if dm, hasMap := t.Spec.Params["direction_map"]; hasMap && dm != nil {
-		if _, exists := t.getState("directions"); !exists {
-			t.storeState("directions", []string{})
 		}
 	}
 }
@@ -771,6 +762,13 @@ func (t *Target) computeTemplateResult() {
 				// Also store by exact want name for recipes that specify exact names
 				if want.Metadata.Name != "" {
 					childWantsByName[want.Metadata.Name] = want
+					// Also store by short name (without target prefix) so recipe result lookups
+					// still work after want names are prefixed with the target name
+					targetPrefix := t.Metadata.Name + "-"
+					if strings.HasPrefix(want.Metadata.Name, targetPrefix) {
+						shortName := strings.TrimPrefix(want.Metadata.Name, targetPrefix)
+						childWantsByName[shortName] = want
+					}
 				}
 				break
 			}

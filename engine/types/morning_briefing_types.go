@@ -65,8 +65,6 @@ func (m *MorningBriefingWant) CalculateAchievingPercentage() float64 {
 func (m *MorningBriefingWant) Progress() {
 	m.SetCurrent("achieving_percentage", m.CalculateAchievingPercentage())
 
-	// Sync completion flags (written by child Wants via MergeParentState and DispatchThinker Sets)
-	// into the current snapshot so the OPA thinker can evaluate the policy.
 	currentSnapshot := map[string]any{
 		"weather_done":  GetState[bool](&m.Want, "weather_done", false),
 		"transit_done":  GetState[bool](&m.Want, "transit_done", false),
@@ -74,7 +72,9 @@ func (m *MorningBriefingWant) Progress() {
 	}
 	m.SetCurrent("current", currentSnapshot)
 
-	// Compose outgoing_message when both fetch steps are done, before post_slack is dispatched.
+	// Interpret OPA directions and propose dispatch to parent Target
+	InterpretDirections(&m.Want)
+
 	weatherDone, _ := currentSnapshot["weather_done"].(bool)
 	transitDone, _ := currentSnapshot["transit_done"].(bool)
 	if weatherDone && transitDone && GetCurrent(m, "outgoing_message", "") == "" {
