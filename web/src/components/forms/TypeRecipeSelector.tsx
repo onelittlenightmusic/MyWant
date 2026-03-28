@@ -249,10 +249,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
               onArrowDown();
             }
           }}
-          className={`focusable-section-header w-full border-2 rounded-lg p-3 sm:p-4 relative overflow-hidden focus:outline-none focus:ring-2 ${
+          className={`focusable-section-header w-full border rounded-lg p-3 sm:p-4 relative overflow-hidden focus:outline-none ${
             selectedItem.type === 'want-type'
-              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 focus:ring-blue-500'
-              : 'border-green-500 bg-green-50 dark:bg-green-900/20 focus:ring-green-500'
+              ? 'border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20'
+              : 'border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20'
           } ${backgroundStyle.className}`}
           style={backgroundStyle.style}
         >
@@ -422,9 +422,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
                       selectedId === item.id
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        ? 'border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30'
                         : isFocused
-                        ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-300'
+                        ? 'border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     } ${backgroundStyle.className}`}
                     style={backgroundStyle.style}
@@ -503,9 +503,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     }}
                     className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
                       selectedId === item.id
-                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                        ? 'border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30'
                         : isFocused
-                        ? 'border-green-400 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-300'
+                        ? 'border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     } ${backgroundStyle.className}`}
                     style={backgroundStyle.style}

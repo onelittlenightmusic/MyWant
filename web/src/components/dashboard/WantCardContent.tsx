@@ -379,8 +379,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   return (
     <>
-      {/* Header */}
-      <div className="mb-2 sm:mb-4">
+      {/* Header — semi-transparent band over background image */}
+      <div className={`mb-2 sm:mb-4 bg-white/60 dark:bg-gray-900/70 backdrop-blur-[2px] ${isChild ? '-mx-2 sm:-mx-4 px-2 sm:px-4 -mt-2 sm:-mt-4 pt-1.5 sm:pt-2 pb-1.5' : '-mx-3 sm:-mx-6 px-3 sm:px-6 -mt-3 sm:-mt-6 pt-2 sm:pt-3 pb-2'}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3

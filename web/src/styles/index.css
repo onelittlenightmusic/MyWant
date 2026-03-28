@@ -12,14 +12,14 @@
     box-shadow: none !important;
     outline: none !important;
     border-color: rgb(209 213 219) !important; /* gray-300 — unchanged */
-    background-color: rgb(239 246 255) !important; /* blue-50 */
+    background-color: rgb(219 234 254) !important; /* blue-100 */
     transition: background-color 0.1s ease;
   }
   .dark input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,
   .dark textarea:focus,
   .dark select:focus {
     border-color: rgb(75 85 99) !important; /* gray-600 */
-    background-color: rgb(30 58 138 / 0.15) !important; /* blue-900/15 */
+    background-color: rgb(30 58 138 / 0.30) !important; /* blue-900/30 */
   }
 
   /* Remove focus ring from buttons and other interactive controls */
