@@ -83,6 +83,12 @@ wantType:
     persistent: true
     initialValue: false
     label: current
+  - name: _cancel_requested
+    description: Internal flag set by itinerary to request cancellation
+    type: bool
+    persistent: true
+    initialValue: false
+    label: internal
   - name: total_processed
     description: Count of successful buffet reservations
     type: int

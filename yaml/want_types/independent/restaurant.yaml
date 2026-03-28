@@ -105,6 +105,12 @@ wantType:
     persistent: true
     initialValue: false
     label: current
+  - name: _cancel_requested
+    description: Internal flag set by itinerary to request cancellation
+    type: bool
+    persistent: true
+    initialValue: false
+    label: internal
   - name: completed
     description: Whether reservation has been completed
     type: bool
