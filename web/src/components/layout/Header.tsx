@@ -372,29 +372,34 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {!hideCreateButton && (
-            <Tooltip label={createButtonLabel ?? 'Add Want'} shortcut="a">
+            <div className="flex h-9 sm:h-10 overflow-hidden rounded-md focus-within:outline-none">
               <button
                 onClick={onCreateWant}
-                className="inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 focus:ring-offset-2 text-white font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
+                className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-primary-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
               >
                 <span className="relative inline-flex flex-shrink-0">
-                  <Heart className="h-4 w-4" />
-                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
+                  <Heart className="h-4 w-4 text-white" />
+                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
                 </span>
+                <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Want</span>
               </button>
-            </Tooltip>
-          )}
 
-          {!hideCreateButton && onCreateTargetWant && (
-            <button
-              onClick={onCreateTargetWant}
-              className="inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500 focus:ring-offset-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2"
-            >
-              <span className="relative inline-flex flex-shrink-0">
-                <span className="text-sm leading-none">🫙</span>
-                <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-gray-500 dark:text-gray-400" style={{ strokeWidth: 3 }} />
-              </span>
-            </button>
+              {onCreateTargetWant && (
+                <>
+                  <div className="w-px bg-white/20 self-stretch" />
+                  <button
+                    onClick={onCreateTargetWant}
+                    className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-indigo-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
+                  >
+                    <span className="relative inline-flex flex-shrink-0">
+                      <span className="text-sm leading-none">🫙</span>
+                      <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
+                    </span>
+                    <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Whim</span>
+                  </button>
+                </>
+              )}
+            </div>
           )}
         </div>
       </div>
