@@ -3,6 +3,33 @@
 @tailwind utilities;
 
 @layer base {
+  /* Focus: no border ring — use background highlight instead */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,
+  textarea:focus,
+  select:focus {
+    --tw-ring-shadow: 0 0 0 0 transparent !important;
+    --tw-ring-offset-shadow: 0 0 0 0 transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    border-color: rgb(209 213 219) !important; /* gray-300 — unchanged */
+    background-color: rgb(239 246 255) !important; /* blue-50 */
+    transition: background-color 0.1s ease;
+  }
+  .dark input:not([type=checkbox]):not([type=radio]):not([type=range]):focus,
+  .dark textarea:focus,
+  .dark select:focus {
+    border-color: rgb(75 85 99) !important; /* gray-600 */
+    background-color: rgb(30 58 138 / 0.15) !important; /* blue-900/15 */
+  }
+
+  /* Remove focus ring from buttons and other interactive controls */
+  button:focus-visible,
+  [role=button]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
   :root {
     --progress-bg-light: rgba(255, 255, 255, 0.5);
     --progress-bg-dark: rgba(0, 0, 0, 0.2);
@@ -53,7 +80,7 @@
   }
 
   .input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-base sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100;
+    @apply block w-full rounded-md border-gray-300 shadow-sm text-base sm:text-sm dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100;
   }
 
   /* Target all inputs to prevent iOS zoom */

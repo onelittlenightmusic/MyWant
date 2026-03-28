@@ -23,12 +23,12 @@ export default {
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'fade-in': 'fadeIn 0.3s ease-out forwards',
-        'slide-in': 'slideIn 0.3s ease-out forwards',
-        'slide-in-right': 'slideInRight 0.3s ease-out forwards',
-        'slide-in-left': 'slideInLeft 0.3s ease-out forwards',
-        'slide-out-left': 'slideOutLeft 0.3s ease-in forwards',
-        'slide-out-right': 'slideOutRight 0.3s ease-in forwards',
+        'fade-in': 'fadeIn 0.1s ease-out forwards',
+        'slide-in': 'slideIn 0.1s ease-out forwards',
+        'slide-in-right': 'slideInRight 0.1s ease-out forwards',
+        'slide-in-left': 'slideInLeft 0.1s ease-out forwards',
+        'slide-out-left': 'slideOutLeft 0.1s ease-in forwards',
+        'slide-out-right': 'slideOutRight 0.1s ease-in forwards',
       },
       keyframes: {
         fadeIn: {

@@ -67,9 +67,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
       <div
         data-sidebar="true"
         className={classNames(
-          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 transform z-40 flex flex-col overflow-hidden',
-          instant ? '' : 'transition-transform duration-100 ease-in-out',
-          isOpen ? 'translate-x-0' : 'translate-x-full',
+          'fixed right-0 w-full sm:w-[480px] bg-white dark:bg-gray-900 z-40 flex flex-col overflow-hidden',
+          instant ? (isOpen ? '' : 'hidden') : ('transform transition-transform duration-100 ease-in-out ' + (isOpen ? 'translate-x-0' : 'translate-x-full')),
           className || ''
         )}
         style={{
