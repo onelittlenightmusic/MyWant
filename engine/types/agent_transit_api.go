@@ -205,7 +205,7 @@ func callOTPPlanAPI(ctx context.Context, otpURL, fromLatLon, toLatLon string, ar
   plan(
     from: {lat: %s, lon: %s}
     to: {lat: %s, lon: %s}
-    numItineraries: 1
+    numItineraries: 5
     arriveBy: true
     date: "%s"
     time: "%s"
@@ -255,7 +255,22 @@ func callOTPPlanAPI(ctx context.Context, otpURL, fromLatLon, toLatLon string, ar
 		return nil, fmt.Errorf("no itineraries found from %q to %q", fromLatLon, toLatLon)
 	}
 
-	return parseOTPResult(gr.Data.Plan.Itineraries[0]), nil
+	// Prefer the shortest itinerary that includes at least one transit leg.
+	// OTP sometimes returns a walk-only option first with arriveBy=true.
+	best := gr.Data.Plan.Itineraries[0]
+	for _, itin := range gr.Data.Plan.Itineraries {
+		hasTransit := false
+		for _, leg := range itin.Legs {
+			if leg.TransitLeg {
+				hasTransit = true
+				break
+			}
+		}
+		if hasTransit && itin.Duration < best.Duration {
+			best = itin
+		}
+	}
+	return parseOTPResult(best), nil
 }
 
 // splitLatLon splits a "lat,lon" string into two separate strings.

@@ -56,4 +56,4 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 }
 
 // webhookTypes is the list of want types that represent webhook endpoints.
-var webhookTypes = []string{"teams webhook", "slack webhook"}
+var webhookTypes = []string{"teams_notify", "slack_notify"}

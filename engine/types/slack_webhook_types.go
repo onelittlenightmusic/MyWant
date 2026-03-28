@@ -12,7 +12,7 @@ var slackWebhookConfig = WebhookWantConfig{
 }
 
 func init() {
-	RegisterWantImplementation[SlackWebhookWant, SlackWebhookLocals]("slack webhook")
+	RegisterWantImplementation[SlackWebhookWant, SlackWebhookLocals]("slack_notify")
 }
 
 // SlackWebhookLocals holds type-specific local state for SlackWebhookWant

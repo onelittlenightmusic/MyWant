@@ -12,10 +12,10 @@ import (
 	. "mywant/engine/core"
 )
 
-const pythonThinkerAgentName = "python_thinker"
+const pythonThinkerAgentName = "python"
 
 func init() {
-	RegisterWantImplementation[PythonThinkerWant, PythonThinkerLocals]("python_thinker")
+	RegisterWantImplementation[PythonThinkerWant, PythonThinkerLocals]("python")
 	RegisterThinkAgentType(pythonThinkerAgentName, []Capability{
 		{Name: "python_thinking", Gives: []string{"python_thinking"}, Description: "Runs a Python script as a think agent each tick"},
 	}, pythonThinkerThink)

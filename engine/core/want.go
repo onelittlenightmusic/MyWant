@@ -709,6 +709,13 @@ func (n *Want) StartProgressionLoop(
 				n.progressable.Progress()
 				n.EndProgressCycle()
 
+				// Dynamic dispatch coordinators (direction_map) keep monitoring after
+				// achievement so they can detect deleted child wants and re-dispatch.
+				if _, hasDirMap := n.Spec.Params["direction_map"]; hasDirMap {
+					time.Sleep(GlobalExecutionInterval)
+					continue
+				}
+
 				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)
 				n.FlushThinkingAgents(context.Background())
 				// Stop all background agents when want is achieved

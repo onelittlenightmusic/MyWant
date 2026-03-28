@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[OtpBuildConfigWant, OtpBuildConfigLocals]("otp_build_config")
+	RegisterWantImplementation[OtpBuildConfigWant, OtpBuildConfigLocals]("otp_config")
 }
 
 type OtpBuildConfigLocals struct{}

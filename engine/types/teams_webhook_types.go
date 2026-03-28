@@ -12,7 +12,7 @@ var teamsWebhookConfig = WebhookWantConfig{
 }
 
 func init() {
-	RegisterWantImplementation[TeamsWebhookWant, TeamsWebhookLocals]("teams webhook")
+	RegisterWantImplementation[TeamsWebhookWant, TeamsWebhookLocals]("teams_notify")
 }
 
 // TeamsWebhookLocals holds type-specific local state for TeamsWebhookWant

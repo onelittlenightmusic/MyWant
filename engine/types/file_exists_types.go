@@ -13,12 +13,12 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[EnsureFileWant, EnsureFileLocals]("ensure_file")
+	RegisterWantImplementation[FileExistsWant, FileExistsLocals]("file_exists")
 }
 
-type EnsureFileLocals struct{}
+type FileExistsLocals struct{}
 
-// EnsureFileWant ensures a file exists at data_dir/filename.
+// FileExistsWant ensures a file exists at data_dir/filename.
 // If the file is missing it creates it using the configured method:
 //
 //   - "curl" (default): download via Go net/http — no docker needed
@@ -29,21 +29,21 @@ type EnsureFileLocals struct{}
 // Prerequisites (filenames relative to data_dir) can be declared; Initialize()
 // returns early until all prerequisites exist, relying on the using-retrigger
 // mechanism to be called again once upstream Wants achieve.
-type EnsureFileWant struct {
+type FileExistsWant struct {
 	Want
 }
 
-func (f *EnsureFileWant) GetLocals() *EnsureFileLocals {
-	return CheckLocalsInitialized[EnsureFileLocals](&f.Want)
+func (f *FileExistsWant) GetLocals() *FileExistsLocals {
+	return CheckLocalsInitialized[FileExistsLocals](&f.Want)
 }
 
-func (f *EnsureFileWant) targetPath() string {
+func (f *FileExistsWant) targetPath() string {
 	dataDir := f.GetStringParam("data_dir", "/tmp/ensure-file")
 	filename := f.GetStringParam("filename", "")
 	return filepath.Join(dataDir, filename)
 }
 
-func (f *EnsureFileWant) Initialize() {
+func (f *FileExistsWant) Initialize() {
 	filename := f.GetStringParam("filename", "")
 	if filename == "" {
 		f.SetCurrent("ensure_file_phase", "failed")
@@ -93,9 +93,15 @@ func (f *EnsureFileWant) Initialize() {
 	}
 }
 
+// expandEnvVars replaces ${VAR} and $VAR patterns in s with os.Getenv values.
+func expandEnvVars(s string) string {
+	return os.Expand(s, os.Getenv)
+}
+
 // runCurl downloads a file using Go's net/http — no docker required.
-func (f *EnsureFileWant) runCurl(target string) {
-	url := f.GetStringParam("url", "")
+// The url param supports ${ENV_VAR} substitution (e.g. ?acl:consumerKey=${OPDT_ACCESS_TOKEN}).
+func (f *FileExistsWant) runCurl(target string) {
+	url := expandEnvVars(f.GetStringParam("url", ""))
 	if url == "" {
 		f.SetCurrent("ensure_file_phase", "failed")
 		f.SetCurrent("ensure_file_error", "url parameter is required for curl method")
@@ -145,7 +151,7 @@ func (f *EnsureFileWant) runCurl(target string) {
 }
 
 // runDockerWget downloads a file via docker alpine/wget.
-func (f *EnsureFileWant) runDockerWget(dataDir, filename string) {
+func (f *FileExistsWant) runDockerWget(dataDir, filename string) {
 	url := f.GetStringParam("url", "")
 	if url == "" {
 		f.SetCurrent("ensure_file_phase", "failed")
@@ -164,6 +170,7 @@ func (f *EnsureFileWant) runDockerWget(dataDir, filename string) {
 	f.SetCurrent("docker_wait_for_exit", true)
 	f.SetCurrent("docker_ports", "[]")
 	f.SetCurrent("docker_env", "{}")
+	f.SetCurrent("docker_phase", "starting")
 
 	f.StoreLog("[ENSURE-FILE] Downloading %s → %s (docker wget)", url, filepath.Join(dataDir, filename))
 	if err := f.ExecuteAgents(); err != nil {
@@ -181,7 +188,7 @@ func (f *EnsureFileWant) runDockerWget(dataDir, filename string) {
 }
 
 // runDockerBuild runs a one-shot docker container to produce the target file.
-func (f *EnsureFileWant) runDockerBuild(dataDir string) {
+func (f *FileExistsWant) runDockerBuild(dataDir string) {
 	image := f.GetStringParam("docker_image", "")
 	if image == "" {
 		f.SetCurrent("ensure_file_phase", "failed")
@@ -204,6 +211,7 @@ func (f *EnsureFileWant) runDockerBuild(dataDir string) {
 	f.SetCurrent("docker_env", env)
 	f.SetCurrent("docker_wait_for_exit", true)
 	f.SetCurrent("docker_ports", "[]")
+	f.SetCurrent("docker_phase", "starting")
 
 	f.StoreLog("[ENSURE-FILE] Building via docker image=%s args=%s", image, cmdArgs)
 	if err := f.ExecuteAgents(); err != nil {
@@ -220,7 +228,7 @@ func (f *EnsureFileWant) runDockerBuild(dataDir string) {
 	f.StoreLog("[ENSURE-FILE] Build complete: %s", f.GetStringParam("filename", ""))
 }
 
-func (f *EnsureFileWant) parsePrerequisites() []string {
+func (f *FileExistsWant) parsePrerequisites() []string {
 	s := f.GetStringParam("prerequisites", "")
 	if s == "" {
 		return nil
@@ -232,11 +240,11 @@ func (f *EnsureFileWant) parsePrerequisites() []string {
 	return prereqs
 }
 
-func (f *EnsureFileWant) IsAchieved() bool {
+func (f *FileExistsWant) IsAchieved() bool {
 	return fileExists(f.targetPath())
 }
 
-func (f *EnsureFileWant) CalculateAchievingPercentage() float64 {
+func (f *FileExistsWant) CalculateAchievingPercentage() float64 {
 	if f.IsAchieved() {
 		return 100
 	}
@@ -247,6 +255,6 @@ func (f *EnsureFileWant) CalculateAchievingPercentage() float64 {
 	return 5
 }
 
-func (f *EnsureFileWant) Progress() {
+func (f *FileExistsWant) Progress() {
 	f.SetCurrent("achieving_percentage", f.CalculateAchievingPercentage())
 }

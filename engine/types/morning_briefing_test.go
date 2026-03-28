@@ -204,7 +204,7 @@ func TestComposeBriefingMessage_NoTransit(t *testing.T) {
 
 func TestParseBriefingRoutes(t *testing.T) {
 	want := &Want{
-		Metadata: Metadata{Name: "test", Type: "morning_briefing"},
+		Metadata: Metadata{Name: "test", Type: "briefing"},
 		Spec: WantSpec{
 			Params: map[string]any{
 				"routes": []any{
@@ -241,7 +241,7 @@ func TestParseBriefingRoutes(t *testing.T) {
 
 func TestParseBriefingRoutes_NoRoutes(t *testing.T) {
 	want := &Want{
-		Metadata: Metadata{Name: "test", Type: "morning_briefing"},
+		Metadata: Metadata{Name: "test", Type: "briefing"},
 		Spec:     WantSpec{Params: map[string]any{}},
 	}
 	routes, err := parseBriefingRoutes(want)

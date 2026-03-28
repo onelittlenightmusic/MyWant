@@ -41,6 +41,10 @@ func (o *OtpServerWant) Initialize() {
 		o.StoreLog("[OTP-SERVER] Waiting for graph.obj: %s", graphPath)
 		return
 	}
+
+	// Remove any stopped container with the same name to avoid "name already in use" errors.
+	exec.Command("docker", "rm", "-f", "otp-server").Run() //nolint:errcheck
+
 	serverMem := o.GetStringParam("server_memory", "-Xmx4G")
 	serverPort := o.GetStringParam("server_port", "8080")
 
@@ -101,6 +105,13 @@ func (o *OtpServerWant) CalculateAchievingPercentage() float64 {
 
 func (o *OtpServerWant) Progress() {
 	o.SetCurrent("achieving_percentage", o.CalculateAchievingPercentage())
+
+	// If docker_phase is empty, Initialize() returned early (graph.obj wasn't ready).
+	// Re-try initialization now — graph.obj may have appeared since then.
+	if GetCurrent(o, "docker_phase", "") == "" {
+		o.Initialize()
+		return
+	}
 
 	if GetCurrent(o, "docker_phase", "") != "running" {
 		return

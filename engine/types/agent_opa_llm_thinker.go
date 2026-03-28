@@ -13,7 +13,7 @@ import (
 const opaLLMThinkerAgentName = "opa_llm_thinker"
 
 func init() {
-	RegisterWantImplementation[OpaLLMPlannerWant, OpaLLMPlannerLocals]("opa_llm_planner")
+	RegisterWantImplementation[OpaLLMPlannerWant, OpaLLMPlannerLocals]("plan")
 	RegisterThinkAgentType(opaLLMThinkerAgentName, []Capability{
 		{Name: "opa_llm_planning", Gives: []string{"opa_llm_planning"}, Description: "Plans actions using OPA policy engine and LLM reasoning"},
 	}, opaLLMThinkerThink)
@@ -63,10 +63,15 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// sees its contents directly (e.g. input.goal.trip.X, input.current.hotel_cost).
 	// All other labeled fields (costs, opa_input_hash, …) are kept as named keys
 	// so OPA can still access them as input.current.costs etc.
-	// Build goal: prefer parent's goal-labeled fields; fall back to own.
+	// Build goal: use own goal if it has a structured "goal" blob; otherwise fall
+	// back to parent's goal-labeled fields. The predefined "want" text memo field
+	// is labeled LabelGoal on every want, so checking len(parentGoal)>0 alone would
+	// always override a child's own structured goal with the parent's empty memo.
 	goalAll := want.GetAllGoal()
-	if parentGoal := want.GetParentAllGoal(); len(parentGoal) > 0 {
-		goalAll = parentGoal
+	if _, ownHasGoalBlob := goalAll["goal"]; !ownHasGoalBlob {
+		if parentGoal := want.GetParentAllGoal(); len(parentGoal) > 0 {
+			goalAll = parentGoal
+		}
 	}
 	goalRaw := mergeOPAInput(goalAll, "goal")
 	if len(goalRaw) == 0 {

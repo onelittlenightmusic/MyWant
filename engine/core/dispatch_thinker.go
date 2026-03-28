@@ -181,6 +181,62 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 				}
 			}
 		}
+		// 3.6. If a DONE direction's child want was deleted from the system,
+		// reset the DONE marker and its sets flags so the Rego planner can re-suggest it.
+		for direction, wantID := range dispatched {
+			if wantID != doneMarker {
+				continue
+			}
+			completedID, hasCompleted := completedIDs[direction]
+			if !hasCompleted || completedID == "" {
+				continue
+			}
+			stillExists := false
+			for _, child := range cb.GetWants() {
+				if child.Metadata.ID == completedID {
+					stillExists = true
+					break
+				}
+			}
+			if !stillExists {
+				delete(dispatched, direction)
+				delete(completedIDs, direction)
+				if cfg, ok := directionMap[direction]; ok {
+					for k, v := range cfg.Sets {
+						if b, ok := v.(bool); ok && b {
+							w.SetCurrent(k, false)
+						}
+					}
+				}
+				w.SetStatus(WantStatusReaching)
+				w.StoreLog("[%s] Direction '%s' want was deleted — resetting for re-dispatch", DispatchThinkerName, direction)
+			} else {
+				// Want still exists but verify it is still actually achieved (e.g. file deleted).
+				for _, child := range cb.GetWants() {
+					if child.Metadata.ID != completedID {
+						continue
+					}
+					if child.progressable == nil {
+						break
+					}
+					if !child.progressable.IsAchieved() {
+						delete(dispatched, direction)
+						delete(completedIDs, direction)
+						if cfg, ok := directionMap[direction]; ok {
+							for k, v := range cfg.Sets {
+								if b, ok := v.(bool); ok && b {
+									w.SetCurrent(k, false)
+								}
+							}
+						}
+						w.SetStatus(WantStatusReaching)
+						w.StoreLog("[%s] Direction '%s' want is no longer achieved — resetting for re-dispatch", DispatchThinkerName, direction)
+					}
+					break
+				}
+			}
+		}
+
 		// 4. Resolve IDs and check completion
 		for direction, wantID := range dispatched {
 			if wantID == doneMarker { continue }

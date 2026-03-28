@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("execution_result")
+	RegisterWantImplementation[ExecutionResultWant, ExecutionResultWantLocals]("command")
 	RegisterDoAgent("execution_command", executeCommand)
 }
 
