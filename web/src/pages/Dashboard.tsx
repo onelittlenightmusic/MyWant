@@ -28,9 +28,9 @@ import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { GlobalStateSidebar } from '@/components/sidebar/GlobalStateSidebar';
 import { SummarySidebarContent } from '@/components/sidebar/SummarySidebarContent';
-import { WantBatchControlPanel } from '@/components/dashboard/WantBatchControlPanel';
+import { BatchActionBar } from '@/components/dashboard/BatchActionBar';
+import { HeaderOverlay } from '@/components/layout/HeaderOverlay';
 import { Toast } from '@/components/notifications';
-import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 import { SaveAsRecipeModal } from '@/components/modals/SaveAsRecipeModal';
 
@@ -170,13 +170,13 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => { if (error) { const t = setTimeout(() => clearError(), 5000); return () => clearTimeout(t); } }, [error, clearError]);
 
-  const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); sidebar.closeBatch(); setIsSelectMode(false); } else { setIsSelectMode(true); } };
+  const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); } else { setIsSelectMode(true); } };
   const handleSelectWant = (id: string) => {
     setLastSelectedWantId(id);
     setSelectedWantIds(prev => {
       const s = new Set(prev);
-      if (s.has(id)) { s.delete(id); if (s.size === 0) sidebar.closeBatch(); } 
-      else { s.add(id); if (s.size === 1) sidebar.openBatch(); }
+      if (s.has(id)) { s.delete(id); }
+      else { s.add(id); }
       return s;
     });
   };
@@ -199,10 +199,9 @@ export const Dashboard: React.FC = () => {
       } else if (batchAction === 'delete') {
         await deleteWants(ids);
         showNotification(`Deleted ${ids.length} wants`);
-        setSelectedWantIds(new Set());
-        sidebar.closeBatch();
       }
       setShowBatchConfirmation(false); setBatchAction(null);
+      setSelectedWantIds(new Set()); setIsSelectMode(false);
     } catch (e) { console.error(e); showNotification(`Failed to ${batchAction} some wants`); }
     finally { setIsBatchProcessing(false); }
   };
@@ -593,7 +592,7 @@ export const Dashboard: React.FC = () => {
     else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
     else if (sidebar.showSummary) sidebar.closeSummary();
     else if (sidebar.showForm) sidebar.closeForm();
-    else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); setIsSelectMode(false); }
+    else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
   useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode });
 
@@ -736,6 +735,37 @@ export const Dashboard: React.FC = () => {
           return !prev;
         })}
       />
+      <HeaderOverlay
+        isVisible={isSelectMode || showReactionConfirmation || showDeleteDraftConfirmation}
+        confirmationVisible={showBatchConfirmation || showReactionConfirmation || showDeleteDraftConfirmation}
+        confirmationTitle={
+          showBatchConfirmation ? `Batch ${batchAction}`
+          : showDeleteDraftConfirmation ? 'Delete Draft'
+          : 'Confirm'
+        }
+        onConfirmAction={
+          showBatchConfirmation ? handleBatchConfirm
+          : showDeleteDraftConfirmation ? handleDeleteDraftConfirm
+          : handleReactionConfirm
+        }
+        onCancelAction={
+          showBatchConfirmation ? handleBatchCancel
+          : showDeleteDraftConfirmation ? handleDeleteDraftCancel
+          : handleReactionCancel
+        }
+        loading={isBatchProcessing || isSubmittingReaction}
+      >
+        {isSelectMode && (
+          <BatchActionBar
+            selectedCount={selectedWantIds.size}
+            onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }}
+            onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }}
+            onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }}
+            onExit={handleToggleSelectMode}
+            loading={isBatchProcessing}
+          />
+        )}
+      </HeaderOverlay>
       <main
         className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0 relative"
         onDragEnter={handleGlobalDragEnter}
@@ -743,41 +773,6 @@ export const Dashboard: React.FC = () => {
         onDragLeave={handleGlobalDragLeave}
         onDrop={handleGlobalDrop}
       >
-        {/* Confirmation Notification - Dashboard Right Layout */}
-        {(showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
-          <ConfirmationBubble
-            message={
-              showDeleteDraftConfirmation
-                ? (deleteDraftState ? `Delete draft: ${deleteDraftState.message}` : null)
-                : showBatchConfirmation
-                ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
-                : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
-            }
-            isVisible={showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
-            onDismiss={() => {
-              setShowReactionConfirmation(false);
-              setShowBatchConfirmation(false);
-              setShowDeleteDraftConfirmation(false);
-            }}
-            onConfirm={
-              showDeleteDraftConfirmation
-                ? handleDeleteDraftConfirm
-                : showBatchConfirmation
-                ? handleBatchConfirm
-                : handleReactionConfirm
-            }
-            onCancel={
-              showDeleteDraftConfirmation
-                ? handleDeleteDraftCancel
-                : showBatchConfirmation
-                ? handleBatchCancel
-                : handleReactionCancel
-            }
-            loading={isSubmittingReaction || isBatchProcessing}
-            title={showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
-            layout="dashboard-right"
-          />
-        )}
         <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
           <div className="p-3 sm:p-6 pb-24 flex flex-col h-full min-h-full">
             <React.Fragment>
@@ -792,31 +787,21 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
       <RightSidebar
-        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showBatch || showGlobalState}
+        isOpen={sidebar.showSummary || !!selectedWant || showGlobalState}
         onClose={() => {
           if (showGlobalState) { setShowGlobalState(false); return; }
           if (sidebar.showSummary) sidebar.closeSummary();
-          else if (isSelectMode) { sidebar.closeBatch(); setSelectedWantIds(new Set()); }
           else { sidebar.clearSelection(); }
         }}
-        title={showGlobalState ? 'Memo' : (isSelectMode ? 'Batch Actions' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary'))}
-        titleIcon={showGlobalState ? StickyNote : (!isSelectMode && selectedWant ? Heart : undefined)}
-        titleIconClassName={showGlobalState ? 'text-green-500' : (!isSelectMode && selectedWant ? 'text-pink-500' : undefined)}
-        backgroundStyle={!showGlobalState && !isSelectMode && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
-        headerActions={!showGlobalState && !isSelectMode && selectedWant ? headerActions : undefined}
+        title={showGlobalState ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
+        titleIcon={showGlobalState ? StickyNote : (selectedWant ? Heart : undefined)}
+        titleIconClassName={showGlobalState ? 'text-green-500' : (selectedWant ? 'text-pink-500' : undefined)}
+        backgroundStyle={!showGlobalState && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
+        headerActions={!showGlobalState && selectedWant ? headerActions : undefined}
         instant
       >
         {showGlobalState ? (
           <GlobalStateSidebar />
-        ) : isSelectMode ? (
-          <WantBatchControlPanel
-            selectedCount={selectedWantIds.size}
-            onBatchStart={() => { setBatchAction('start'); setShowBatchConfirmation(true); }}
-            onBatchStop={() => { setBatchAction('stop'); setShowBatchConfirmation(true); }}
-            onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }}
-            onBatchCancel={handleToggleSelectMode}
-            loading={isBatchProcessing}
-          />
         ) : (
           <WantDetailsSidebar
             want={selectedWant}
