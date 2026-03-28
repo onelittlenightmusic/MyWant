@@ -15,6 +15,7 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
   loading = false,
   title = 'Please confirm',
   layout = 'bottom-center',
+  danger = false,
   children
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
@@ -109,6 +110,43 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
     loading: isLoading || loading,
     enabled: true
   });
+
+  const isHeaderOverlay = layout === 'header-overlay';
+
+  if (isHeaderOverlay) {
+    if (!isVisible) return null;
+    return (
+      <div className="absolute inset-0 z-50 overflow-hidden animate-fade-in">
+        {/* Backdrop */}
+        <div className="absolute inset-0 bg-black/60" onClick={handleCancel} />
+        {/* 2-column grid buttons */}
+        <div className="relative z-10 h-full grid grid-cols-2 pointer-events-none">
+          <div className="pointer-events-auto h-full w-full">
+            <button
+              onClick={handleCancel}
+              disabled={isLoading || loading}
+              className="flex flex-col items-center justify-center gap-1 w-full h-full bg-gray-700/90 hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150"
+            >
+              <X className="w-5 h-5 text-white" />
+              <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter">Cancel</span>
+            </button>
+          </div>
+          <div className="pointer-events-auto h-full w-full">
+            <button
+              onClick={handleConfirm}
+              disabled={isLoading || loading}
+              className={`flex flex-col items-center justify-center gap-1 w-full h-full hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150 ${danger ? 'bg-rose-700/90' : 'bg-green-600/90'}`}
+            >
+              {isLoading || loading
+                ? <LoadingSpinner size="sm" color="white" className="h-5 w-5" />
+                : <Check className="w-5 h-5 text-white" />}
+              <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter">Confirm</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!displayMessage) {
     return null;

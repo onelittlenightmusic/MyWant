@@ -8,6 +8,7 @@ interface HeaderOverlayProps {
   children?: React.ReactNode;
   confirmationVisible?: boolean;
   confirmationTitle?: string;
+  confirmationDanger?: boolean;
   onConfirmAction?: () => void;
   onCancelAction?: () => void;
   loading?: boolean;
@@ -18,6 +19,7 @@ export const HeaderOverlay: React.FC<HeaderOverlayProps> = ({
   children,
   confirmationVisible = false,
   confirmationTitle = 'Confirm',
+  confirmationDanger = false,
   onConfirmAction,
   onCancelAction,
   loading = false,
@@ -54,6 +56,7 @@ export const HeaderOverlay: React.FC<HeaderOverlayProps> = ({
         onDismiss={onCancelAction || (() => {})}
         title={confirmationTitle}
         layout="header-overlay"
+        danger={confirmationDanger}
         loading={loading}
       />
     </div>

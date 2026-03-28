@@ -743,6 +743,10 @@ export const Dashboard: React.FC = () => {
           : showDeleteDraftConfirmation ? 'Delete Draft'
           : 'Confirm'
         }
+        confirmationDanger={
+          (showBatchConfirmation && batchAction === 'delete') ||
+          showDeleteDraftConfirmation
+        }
         onConfirmAction={
           showBatchConfirmation ? handleBatchConfirm
           : showDeleteDraftConfirmation ? handleDeleteDraftConfirm

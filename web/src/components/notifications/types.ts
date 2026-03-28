@@ -4,7 +4,7 @@ export type NotificationSeverity = 'success' | 'info' | 'warning' | 'error';
 export interface BaseNotificationProps {
   isVisible: boolean;
   onDismiss: () => void;
-  message: string | null;
+  message?: string | null;
   title?: string;
   severity?: NotificationSeverity;
 }
@@ -17,6 +17,7 @@ export interface ConfirmationProps extends BaseNotificationProps {
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
   loading?: boolean;
-  layout?: 'bottom-center' | 'inline-header' | 'dashboard-right';
+  layout?: 'bottom-center' | 'inline-header' | 'dashboard-right' | 'header-overlay';
+  danger?: boolean;
   children?: React.ReactNode;
 }
