@@ -40,7 +40,7 @@ const GridButton: React.FC<GridButtonProps> = ({ icon, label, onClick, colorClas
     disabled={disabled}
     title={label}
     className={classNames(
-      'flex flex-col items-center justify-center gap-1 py-2 rounded-md transition-all duration-150',
+      'flex flex-col items-center justify-center gap-1 w-full h-full transition-all duration-150',
       disabled
         ? 'bg-gray-400/20 dark:bg-gray-700/30 cursor-not-allowed grayscale opacity-40'
         : `${colorClass} hover:brightness-110 active:opacity-80`
@@ -72,7 +72,7 @@ export const WantControlButtons: React.FC<WantControlButtonsProps> = ({
 
   return (
     <div
-      className={classNames('grid gap-1', className)}
+      className={classNames('grid h-full', className)}
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
     >
       {/* Start / Resume */}

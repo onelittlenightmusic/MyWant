@@ -461,10 +461,10 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     <div className="h-full flex flex-col relative overflow-hidden">
       {/* Content container */}
       <div className="h-full flex flex-col relative z-10">
-      {/* Control Panel Buttons - Icon Only, Minimal Height */}
+      {/* Control Panel Buttons */}
       {want && (
         <div className={classNames(
-          'flex-shrink-0 px-4 py-1 sm:py-2',
+          'flex-shrink-0 h-14 relative overflow-hidden',
           isBottom ? 'order-last border-t border-gray-200 dark:border-gray-700' : 'border-b border-gray-200 dark:border-gray-700'
         )}>
           <WantControlButtons
@@ -480,6 +480,15 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             canSaveRecipe={canSaveRecipe}
             isSuspended={isSuspended}
             loading={loading}
+          />
+          <ConfirmationBubble
+            isVisible={showClearStateConfirmation}
+            onConfirm={handleClearState}
+            onCancel={() => setShowClearStateConfirmation(false)}
+            onDismiss={() => setShowClearStateConfirmation(false)}
+            title="Clear State"
+            message="Clear all state data? This cannot be undone."
+            layout="header-overlay"
           />
         </div>
       )}
@@ -622,15 +631,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
     </div>
 
-      <ConfirmationBubble
-        isVisible={showClearStateConfirmation}
-        onConfirm={handleClearState}
-        onCancel={() => setShowClearStateConfirmation(false)}
-        onDismiss={() => setShowClearStateConfirmation(false)}
-        title="Clear State"
-        message="Are you sure you want to clear all state data for this want? This action cannot be undone."
-        layout="dashboard-right"
-      />
     </>
   );
 };
