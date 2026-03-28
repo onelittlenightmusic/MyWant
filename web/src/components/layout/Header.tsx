@@ -276,130 +276,145 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
 
-        <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {/* Robot toggle for mobile - only shown when onInteractSubmit is present */}
+        {/* Right: full-height flush button grid */}
+        <div className="flex items-stretch self-stretch -my-2 sm:-my-4 flex-shrink-0 overflow-hidden">
+
+          {/* Robot - mobile only */}
           {onInteractSubmit && (
             <Tooltip label="Speak to Agent">
               <button
                 onClick={handleRobotClick}
                 className={classNames(
-                  "lg:hidden p-1.5 sm:p-2 rounded-full transition-colors bg-blue-600 shadow-md",
-                  showBubbleOnMobile ? "ring-2 ring-blue-400" : ""
+                  'lg:hidden flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
+                  showBubbleOnMobile
+                    ? 'bg-blue-600/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <Bot className="h-5 w-5 text-white" />
+                <Bot className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Ask</span>
               </button>
             </Tooltip>
           )}
 
-          {/* Minimap toggle button - only shown on mobile (lg:hidden) */}
+          {/* Minimap - mobile only */}
           {onMinimapToggle && (
             <Tooltip label={showMinimap ? 'Hide Minimap' : 'Minimap'}>
               <button
                 onClick={onMinimapToggle}
                 className={classNames(
-                  "lg:hidden p-1.5 sm:p-2 rounded-md transition-colors",
-                  showMinimap ? "text-blue-600 bg-blue-50 dark:bg-blue-900/30" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  'lg:hidden flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
+                  showMinimap
+                    ? 'bg-blue-500/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <Map className="h-5 w-5" />
+                <Map className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Map</span>
               </button>
             </Tooltip>
           )}
 
-          {/* Global State toggle button - left of Radar */}
+          {/* Memo */}
           {onGlobalStateToggle && (
             <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g">
               <button
                 onClick={onGlobalStateToggle}
                 className={classNames(
-                  "p-1.5 sm:p-2 rounded-md transition-colors",
+                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showGlobalState
-                    ? "text-green-600 bg-green-50 dark:bg-green-900/30 ring-2 ring-green-400 dark:ring-green-500"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? 'bg-green-600/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <StickyNote className="h-5 w-5" />
+                <StickyNote className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Memo</span>
               </button>
             </Tooltip>
           )}
 
-          {/* Correlation Radar toggle button */}
+          {/* Radar */}
           {onRadarModeToggle && (
             <Tooltip label={showRadarMode ? 'Radar ON' : 'Correlation Radar'} shortcut="x">
               <button
                 onClick={onRadarModeToggle}
                 className={classNames(
-                  "p-1.5 sm:p-2 rounded-md transition-colors",
+                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showRadarMode
-                    ? "text-orange-600 bg-orange-50 dark:bg-orange-900/30 ring-2 ring-orange-400 dark:ring-orange-500"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? 'bg-orange-500/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 )}
               >
-                <Radar className="h-5 w-5" />
+                <Radar className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Radar</span>
               </button>
             </Tooltip>
           )}
 
+          {/* Select */}
           {onToggleSelectMode && (
             <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
               <button
                 onClick={onToggleSelectMode}
-                className={`inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={classNames(
+                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showSelectMode
-                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
-                }`}
+                    ? 'bg-blue-600/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                )}
               >
-                <ListChecks className="h-4 w-4 flex-shrink-0" />
+                <ListChecks className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Select</span>
               </button>
             </Tooltip>
           )}
 
+          {/* Summary */}
           {onSummaryToggle && (
             <Tooltip label={showSummary ? 'Hide Summary' : 'Summary'} shortcut="s">
               <button
                 onClick={onSummaryToggle}
-                className={`inline-flex items-center px-1.5 py-1.5 sm:px-3 sm:py-2 font-medium rounded-full transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={classNames(
+                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showSummary
-                    ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 focus:ring-blue-500 dark:bg-blue-900/30 dark:text-blue-300'
-                    : 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-primary-500'
-                }`}
+                    ? 'bg-slate-600/90 text-white hover:brightness-110'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                )}
               >
-                <BarChart3 className="h-4 w-4 flex-shrink-0" />
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Stats</span>
               </button>
             </Tooltip>
           )}
 
+          {/* Add Want / Add Whim — separated by a thin line */}
           {!hideCreateButton && (
-            <div className="flex h-9 sm:h-10 overflow-hidden rounded-md focus-within:outline-none">
+            <>
+              <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
               <button
                 onClick={onCreateWant}
-                className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-primary-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
+                className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-primary-600/90 text-white hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
               >
                 <span className="relative inline-flex flex-shrink-0">
-                  <Heart className="h-4 w-4 text-white" />
-                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
+                  <Heart className="h-4 w-4" />
+                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
                 </span>
-                <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Want</span>
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Want</span>
               </button>
 
               {onCreateTargetWant && (
-                <>
-                  <div className="w-px bg-white/20 self-stretch" />
-                  <button
-                    onClick={onCreateTargetWant}
-                    className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-indigo-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
-                  >
-                    <span className="relative inline-flex flex-shrink-0">
-                      <span className="text-sm leading-none">🫙</span>
-                      <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
-                    </span>
-                    <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Whim</span>
-                  </button>
-                </>
+                <button
+                  onClick={onCreateTargetWant}
+                  className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-indigo-600/90 text-white hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
+                >
+                  <span className="relative inline-flex flex-shrink-0">
+                    <span className="text-sm leading-none">🫙</span>
+                    <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
+                  </span>
+                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Whim</span>
+                </button>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
