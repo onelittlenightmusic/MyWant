@@ -56,4 +56,12 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 }
 
 // webhookTypes is the list of want types that represent webhook endpoints.
-var webhookTypes = []string{"teams_notify", "slack_notify"}
+var webhookTypes = []string{"teams_notify", "slack_notify", "claude_code_thread"}
+
+// ccStateCfg holds state key names for Claude Code webhook messages.
+var ccStateCfg = webhookStateConfig{
+	LatestMessageKey: "cc_latest_message",
+	MessagesKey:      "cc_messages",
+	MessageCountKey:  "cc_message_count",
+	LogPrefix:        "[CC-WEBHOOK]",
+}

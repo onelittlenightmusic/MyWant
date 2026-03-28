@@ -81,6 +81,20 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Claude Code webhook: store as structured message in FIFO buffer
+	if want.Metadata.Type == "claude_code_thread" {
+		text, _ := payload["text"].(string)
+		sender, _ := payload["sender"].(string)
+		storeWebhookMessage(want, webhookMessage{
+			Sender:    sender,
+			Text:      text,
+			Timestamp: time.Now().Format(time.RFC3339),
+		}, ccStateCfg)
+		log.Printf("[CC-WEBHOOK] Received request for want %s: %s\n", wantID, text)
+		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
+		return
+	}
+
 	// Generic webhook: store payload as-is
 	mywant.StoreStateMulti(want, map[string]any{
 		"webhook_payload":     payload,

@@ -1,0 +1,386 @@
+wantType:
+  metadata:
+    name: claude_code_thread
+    title: Claude Code Thread Watcher
+    description: |
+      Monitors a Claude Code conversation session and sends requests on trigger conditions.
+
+      Uses three agents cooperatively:
+      - MonitorAgent: Observes session file, writes facts to Current
+      - ThinkAgent: Reads Current, makes decisions, writes to Plan
+      - DoAgent: Executes Claude CLI requests
+
+      Supports trigger conditions: pattern (regex match), waiting (waiting for input),
+      complete (task complete), idle (session inactive).
+
+      Idempotency is ensured via external file-based logs in ~/.mywant/claude_code_requests/,
+      allowing safe recovery after server restarts.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  parameters:
+  - name: session_id
+    description: Claude Code session ID to monitor
+    type: string
+    required: true
+    example: "abc123def456"
+
+  - name: watch_pattern
+    description: Regex pattern to match in session output
+    type: string
+    required: false
+    default: ""
+    example: "LGTM|approved|done"
+
+  - name: trigger_on
+    description: |
+      Condition that triggers a request:
+      - pattern: regex match (requires watch_pattern)
+      - waiting: session is waiting for user input
+      - complete: assistant has completed a task
+      - idle: session is inactive
+      - webhook: triggered by incoming webhook message (POST /api/v1/webhooks/{want-name})
+    type: string
+    required: false
+    default: "pattern"
+    validation:
+      enum:
+      - pattern
+      - waiting
+      - complete
+      - idle
+      - webhook
+
+  - name: auto_request
+    description: |
+      Prompt to send to Claude Code when trigger fires.
+      When trigger_on is "webhook", this is optional — the webhook message text is used instead.
+    type: string
+    required: false
+    example: "Please proceed with the next step."
+
+  - name: webhook_secret
+    description: HMAC secret for webhook signature verification (optional)
+    type: string
+    required: false
+    default: ""
+
+  - name: max_requests
+    description: Maximum number of requests to send before completing
+    type: int
+    required: false
+    default: 3
+
+  - name: timeout_seconds
+    description: Timeout in seconds waiting for Claude Code response
+    type: int
+    required: false
+    default: 300
+
+  state:
+  - name: phase
+    description: Current phase of the want (monitoring, trigger_ready, requesting, awaiting_response, response_received, achieved, error)
+    type: string
+    persistent: true
+    initialValue: monitoring
+    label: current
+
+  - name: session_id
+    description: Claude Code session ID being monitored
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: trigger_on
+    description: Trigger condition type
+    type: string
+    persistent: true
+    initialValue: "pattern"
+    label: goal
+
+  - name: watch_pattern
+    description: Regex pattern for trigger detection
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: auto_request
+    description: Prompt template to send on trigger
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: max_requests
+    description: Maximum number of requests
+    type: int
+    persistent: true
+    initialValue: 3
+    label: goal
+
+  - name: current_session_state
+    description: Observed session state from MonitorAgent (idle, waiting_for_input, waiting_for_response, task_complete)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_output
+    description: Most recent output from the Claude Code session
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_role
+    description: Role of the most recent session entry (user, assistant)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_timestamp
+    description: Timestamp of the most recent session entry
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: pattern_matched
+    description: Whether the watch_pattern was matched in session output
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  - name: matched_content
+    description: The content that matched the watch_pattern
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: has_new_response
+    description: Whether a new assistant response was detected after last request
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  - name: latest_response_content
+    description: Content of the latest assistant response
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: request_count
+    description: Number of requests sent so far
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: last_request_at
+    description: Unix timestamp of the last request sent
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: last_response_raw
+    description: Raw response from the last Claude CLI execution
+    type: object
+    persistent: false
+    initialValue: {}
+    label: current
+
+  - name: last_error
+    description: Last error message
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: session_read_error
+    description: Error from MonitorAgent when reading session file
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: pending_request_id
+    description: Idempotency key for the pending request
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: last_poll_at
+    description: Unix timestamp of last MonitorAgent poll
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: session_entry_count
+    description: Total number of entries in the session file
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: timeout_seconds
+    description: Response timeout in seconds
+    type: int
+    persistent: true
+    initialValue: 300
+    label: current
+
+  - name: next_action
+    description: ThinkAgent's proposed next action (send_request, process_response, handle_timeout, retry)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: plan
+
+  # Webhook state (populated by HTTP handler + PollWebhook monitor)
+  - name: webhook_url
+    description: Webhook endpoint URL for receiving external requests (auto-set on init)
+    type: string
+    persistent: true
+    initialValue: ""
+    label: current
+
+  - name: cc_webhook_status
+    description: Webhook status (active, stopped, error)
+    type: string
+    persistent: true
+    initialValue: "active"
+    label: current
+
+  - name: cc_latest_message
+    description: Latest webhook message {sender, text, timestamp}
+    type: object
+    persistent: false
+    initialValue: {}
+    label: current
+
+  - name: cc_messages
+    description: FIFO buffer of last 20 webhook messages
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_message_count
+    description: Total webhook messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: webhook_auto_request
+    description: Dynamic prompt from webhook message (overrides auto_request for next send)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: cc_webhook_processed
+    description: Number of webhook messages already processed by ThinkAgent
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  constraints:
+  - description: session_id is required
+    validation: session_id must not be empty
+
+  - description: auto_request is required unless trigger_on is webhook
+    validation: auto_request must not be empty when trigger_on is not webhook
+
+  - description: trigger_on must be one of pattern, waiting, complete, idle, webhook
+    validation: trigger_on must be a valid trigger type
+
+  - description: watch_pattern is required when trigger_on is pattern
+    validation: watch_pattern must not be empty when trigger_on is pattern
+
+  examples:
+  - name: Watch for LGTM Pattern
+    description: Monitor a Claude Code session for approval keywords and send follow-up
+    expectedBehavior: |
+      TIMELINE:
+      1. MonitorAgent polls session file every 3 seconds
+      2. Detects "LGTM" in assistant output
+      3. ThinkAgent proposes send_request
+      4. Want.Progress() transitions to trigger_ready → requesting
+      5. DoAgent sends auto_request to Claude Code
+      6. MonitorAgent detects new response
+      7. ThinkAgent proposes process_response
+      8. Cycle repeats up to max_requests times
+    want:
+      metadata:
+        name: code_review_watcher
+        type: claude_code_thread
+      spec:
+        params:
+          session_id: "abc123def456"
+          watch_pattern: "LGTM|approved|looks good"
+          trigger_on: "pattern"
+          auto_request: "Great, please proceed with the implementation."
+          max_requests: 3
+          timeout_seconds: 300
+
+  - name: Auto-reply When Waiting
+    description: Detect when Claude Code is waiting for input and auto-reply
+    expectedBehavior: |
+      TIMELINE:
+      1. MonitorAgent detects session_state = waiting_for_input
+      2. ThinkAgent proposes send_request
+      3. DoAgent sends the auto_request prompt
+      4. Repeats until max_requests reached
+    want:
+      metadata:
+        name: auto_responder
+        type: claude_code_thread
+      spec:
+        params:
+          session_id: "def789ghi012"
+          trigger_on: "waiting"
+          auto_request: "Yes, please continue with the current approach."
+          max_requests: 5
+
+  - name: Webhook-Driven Requests
+    description: Receive prompts via webhook and send them to Claude Code
+    expectedBehavior: |
+      USAGE:
+      curl -X POST http://localhost:8080/api/v1/webhooks/cc_webhook_worker \
+        -H "Content-Type: application/json" \
+        -d '{"text": "テストを全件実行して結果を報告してください", "sender": "ci-bot"}'
+
+      TIMELINE:
+      1. Webhook HTTP handler stores message in cc_latest_message / cc_messages
+      2. Webhook MonitorAgent (PollWebhook) trims buffer, health-checks
+      3. ThinkAgent detects new cc_message_count, sets webhook_auto_request
+      4. ThinkAgent proposes send_request (trigger_on: webhook)
+      5. DoAgent uses webhook_auto_request (priority over static auto_request)
+      6. Cycle repeats for each webhook message, up to max_requests
+    want:
+      metadata:
+        name: cc_webhook_worker
+        type: claude_code_thread
+      spec:
+        params:
+          session_id: "abc123def456"
+          trigger_on: "webhook"
+          max_requests: 10
+
+  requires:
+    - claude_code_session_monitoring
+    - claude_code_watching
+    - claude_code_requesting
