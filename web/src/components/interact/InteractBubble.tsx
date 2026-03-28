@@ -97,12 +97,12 @@ export const InteractBubble: React.FC<InteractBubbleProps> = ({
       {/* Speech Bubble */}
       <div className={classNames(
         'relative flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-2xl shadow-lg',
-        'border-2 transition-all duration-200',
-        isThinking ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20' : 'border-blue-500 dark:border-blue-600'
+        'border transition-all duration-200',
+        isThinking ? 'border-gray-300 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-600'
       )}>
         {/* Triangle pointer (left side) */}
         <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-[7px]">
-          <div className="w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-blue-500" />
+          <div className="w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-r-[8px] border-r-gray-300 dark:border-r-gray-600" />
           <div className="absolute top-[1px] left-[2px] w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-r-[6px] border-r-white dark:border-r-gray-800" />
         </div>
 

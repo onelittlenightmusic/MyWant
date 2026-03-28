@@ -228,6 +228,7 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
           <WantCardContent
             want={child}
             isChild={true}
+            isFocused={!!isChildSelected && !isSelectMode}
             onView={onView}
             onViewAgents={onViewAgents}
             onViewResults={onViewResults}

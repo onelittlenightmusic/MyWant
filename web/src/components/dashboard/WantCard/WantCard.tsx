@@ -372,7 +372,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
         >
           <WantCardContent
-            want={want} isChild={false} hasChildren={!!hasChildren}
+            want={want} isChild={false} hasChildren={!!hasChildren} isFocused={selected}
             onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults}
             onEdit={onEdit} onDelete={onDelete}
             onSuspend={onSuspend} onResume={onResume}
