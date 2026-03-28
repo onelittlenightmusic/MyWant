@@ -11,6 +11,13 @@ import { ProgressBars } from './parts/ProgressBars';
 import { CorrelationOverlay } from './parts/CorrelationOverlay';
 import { StackLayers } from './parts/StackLayers';
 import { VersionBadge } from './parts/VersionBadge';
+import { QuickActionsOverlay } from './parts/QuickActionsOverlay';
+import { DeleteConfirmOverlay } from './parts/DeleteConfirmOverlay';
+import { FocusTriangle } from './parts/FocusTriangle';
+import { useLongPress } from './hooks/useLongPress';
+import { useCardOverlay } from './hooks/useCardOverlay';
+import { dropLabelOnWant } from './hooks/labelDrop';
+import { CARD_BORDER_BASE, CARD_FOCUS_BASE } from './hooks/cardStyles';
 
 interface ChildWantCardProps {
   child: Want;
@@ -23,6 +30,10 @@ interface ChildWantCardProps {
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
   onViewResults?: (want: Want) => void;
+  onEdit?: (want: Want) => void;
+  onDelete?: (want: Want) => void;
+  onSuspend?: (want: Want) => void;
+  onResume?: (want: Want) => void;
   onWantDropped?: (draggedId: string, targetId: string) => void;
   onLabelDropped?: (wantId: string) => void;
 }
@@ -38,11 +49,18 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
   onView,
   onViewAgents,
   onViewResults,
+  onEdit,
+  onDelete,
+  onSuspend,
+  onResume,
   onWantDropped,
   onLabelDropped,
 }) => {
   const childId = child.metadata?.id || child.id || '';
-  const { draggingWant, setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId } = useWantStore();
+  const { draggingWant, setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId, startWant, stopWant } = useWantStore();
+
+  const longPress = useLongPress(childId || null, { disabled: isBeingProcessed || isSelectMode });
+  const overlay = useCardOverlay(childId || null);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragOverWant, setIsDragOverWant] = useState(false);
@@ -72,6 +90,14 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
     onView(child);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (isBeingProcessed || isSelectMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    overlay.setQuickActionsWantId(childId || null);
+    onView(child);
+  };
+
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
     suppressDragImage(e);
@@ -88,7 +114,7 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
     const isWantDrag = !!draggingWant || e.dataTransfer.types.includes('application/mywant-id');
     const isTemplateDrag = e.dataTransfer.types.includes('application/mywant-template');
 
-    if (isTemplateDrag) return; 
+    if (isTemplateDrag) return;
 
     if (isWantDrag) {
       e.preventDefault();
@@ -130,24 +156,12 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
       return;
     }
 
-    try {
-      const labelData = e.dataTransfer.getData('application/json');
-      if (!labelData) return;
-      const { key, value } = JSON.parse(labelData);
-      fetch(`/api/v1/wants/${childId}/labels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value }),
-      }).then(response => {
-        if (response.ok && onLabelDropped) onLabelDropped(childId);
-      }).catch(error => console.error('Error dropping label on child:', error));
-    } catch (error) {
-      console.error('Error dropping label on child:', error);
-    }
+    dropLabelOnWant(childId, e, onLabelDropped);
   };
 
   return (
     <div className="relative" style={{ isolation: 'isolate' }}>
+      <FocusTriangle visible={!!isChildSelected} />
       <StackLayers stackCount={childStackCount} isChild />
       <div
         data-keyboard-nav-selected={isChildSelected}
@@ -156,9 +170,20 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
         draggable={!isBeingProcessed}
         onDragStart={handleDragStart}
         onDragEnd={(e) => { e.stopPropagation(); setDraggingWant(null); }}
+        onContextMenu={handleContextMenu}
+        onMouseDown={longPress.onMouseDown}
+        onMouseMove={longPress.onMouseMove}
+        onMouseUp={longPress.onMouseUp}
+        onMouseLeave={() => {
+          longPress.cancel();
+          if (overlay.showQuickActions) overlay.closeQuickActions();
+        }}
+        onTouchStart={longPress.onTouchStart}
+        onTouchMove={longPress.onTouchMove}
+        onTouchEnd={longPress.onTouchEnd}
         className={classNames(
-          'relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset min-h-[7rem]',
-          isChildSelected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300',
+          `relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer ${CARD_FOCUS_BASE} min-h-[7rem]`,
+          `${CARD_BORDER_BASE} hover:border-gray-300`,
           (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
           isHighlighted && styles.highlighted,
           isBlinking && styles.minimapBlink,
@@ -196,7 +221,10 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
           </div>
         )}
 
-        <div className="p-2 sm:p-4 w-full h-full relative z-10">
+        <div
+          className="p-2 sm:p-4 w-full h-full relative z-10 transition-all duration-150"
+          style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
+        >
           <WantCardContent
             want={child}
             isChild={true}
@@ -205,6 +233,31 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
             onViewResults={onViewResults}
           />
         </div>
+
+        {overlay.showQuickActions && !overlay.showDeleteOverlay && (
+          <QuickActionsOverlay
+            want={child}
+            onClose={overlay.closeQuickActions}
+            onView={() => onView(child)}
+            onStart={() => startWant(childId)}
+            onStop={() => stopWant(childId)}
+            onSuspend={() => onSuspend?.(child)}
+            onResume={() => onResume?.(child)}
+            onRestart={async () => {
+              await stopWant(childId);
+              setTimeout(() => startWant(childId), 300);
+            }}
+            onEdit={() => onEdit?.(child)}
+            onDelete={overlay.openDeleteConfirm}
+          />
+        )}
+
+        {overlay.showDeleteOverlay && (
+          <DeleteConfirmOverlay
+            onConfirm={() => { overlay.confirmDelete(); onDelete?.(child); }}
+            onCancel={overlay.closeDeleteConfirm}
+          />
+        )}
       </div>
     </div>
   );

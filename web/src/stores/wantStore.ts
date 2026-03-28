@@ -23,6 +23,7 @@ interface WantStore {
   highlightedLabel: { key: string; value: string } | null;
   blinkingWantId: string | null;
   quickActionsWantId: string | null;
+  deleteConfirmWantId: string | null;
   isInitialLoad: boolean; // Track if this is the first load
 
   // Actions
@@ -50,6 +51,7 @@ interface WantStore {
   setHighlightedLabel: (label: { key: string; value: string } | null) => void;
   setBlinkingWantId: (wantId: string | null) => void;
   setQuickActionsWantId: (wantId: string | null) => void;
+  setDeleteConfirmWantId: (wantId: string | null) => void;
   reorderWant: (id: string, previousWantId?: string, nextWantId?: string) => Promise<void>;
 }
 
@@ -68,6 +70,7 @@ export const useWantStore = create<WantStore>()(
     highlightedLabel: null,
     blinkingWantId: null,
     quickActionsWantId: null,
+    deleteConfirmWantId: null,
     isInitialLoad: true,
 
     // Actions
@@ -75,6 +78,7 @@ export const useWantStore = create<WantStore>()(
     setDraggingTemplate: (template: DraggingTemplate | null) => set({ draggingTemplate: template }),
     setIsOverTarget: (isOver: boolean) => set({ isOverTarget: isOver }),
     setQuickActionsWantId: (wantId: string | null) => set({ quickActionsWantId: wantId }),
+    setDeleteConfirmWantId: (wantId: string | null) => set({ deleteConfirmWantId: wantId }),
     setHighlightedLabel: (label: { key: string; value: string } | null) => {
       set({ highlightedLabel: label });
       // Automatically clear after a short delay so the animation can be re-triggered

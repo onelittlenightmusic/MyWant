@@ -116,6 +116,29 @@
   justify-content: center;
 }
 
+/* Quick Actions Overlay animations */
+@keyframes quickActionsIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes quickActionBtnIn {
+  from {
+    opacity: 0;
+    transform: scale(0.75);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 /* Added Dark Mode Styles */
 /* Applying dark mode styles to elements when the 'dark' class is present on an ancestor */
 .dark .minimapBlink {

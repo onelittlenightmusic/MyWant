@@ -14,6 +14,12 @@ import { VersionBadge } from './parts/VersionBadge';
 import { getStatusHexColor } from './parts/StatusColor';
 import { ChildWantCard } from './ChildWantCard';
 import { QuickActionsOverlay } from './parts/QuickActionsOverlay';
+import { DeleteConfirmOverlay } from './parts/DeleteConfirmOverlay';
+import { FocusTriangle } from './parts/FocusTriangle';
+import { useLongPress } from './hooks/useLongPress';
+import { useCardOverlay } from './hooks/useCardOverlay';
+import { dropLabelOnWant } from './hooks/labelDrop';
+import { CARD_BORDER_BASE, CARD_FOCUS_BASE } from './hooks/cardStyles';
 
 interface WantCardProps {
   want: Want;
@@ -75,18 +81,11 @@ export const WantCard: React.FC<WantCardProps> = ({
   stackCount = 0,
 }) => {
   const wantId = want.metadata?.id || want.id;
-  const { 
-    setDraggingWant, 
-    setIsOverTarget, 
-    highlightedLabel, 
-    blinkingWantId, 
-    startWant, 
-    stopWant,
-    quickActionsWantId,
-    setQuickActionsWantId
-  } = useWantStore();
-  
-  const showQuickActions = quickActionsWantId === wantId;
+  const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId, startWant, stopWant } = useWantStore();
+
+  const longPress = useLongPress(wantId || null, { disabled: isBeingProcessed || isSelectMode });
+  const overlay = useCardOverlay(wantId || null);
+
   const isExpanded = expandedParents?.has(wantId || '') ?? false;
   const hasChildren = children && children.length > 0;
 
@@ -114,65 +113,6 @@ export const WantCard: React.FC<WantCardProps> = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragOverWant, setIsDragOverWant] = useState(false);
 
-  // Long-press for overlay
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressPos = useRef<{ x: number; y: number } | null>(null);
-
-  const startLongPress = (x: number, y: number) => {
-    if (isBeingProcessed || isSelectMode) return;
-    longPressPos.current = { x, y };
-    longPressTimer.current = setTimeout(() => {
-      if (longPressPos.current) {
-        setQuickActionsWantId(wantId || null);
-        longPressTimer.current = null;
-      }
-    }, 600); // 600ms for long press
-  };
-
-  const cancelLongPress = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-    longPressPos.current = null;
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Only left click starts long press
-    if (e.button !== 0) return;
-    startLongPress(e.clientX, e.clientY);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (longPressPos.current) {
-      const dist = Math.sqrt(
-        Math.pow(e.clientX - longPressPos.current.x, 2) +
-        Math.pow(e.clientY - longPressPos.current.y, 2)
-      );
-      if (dist > 10) cancelLongPress();
-    }
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (isBeingProcessed || isSelectMode) return;
-    const touch = e.touches[0];
-    startLongPress(touch.clientX, touch.clientY);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (longPressPos.current) {
-      const touch = e.touches[0];
-      const dist = Math.sqrt(
-        Math.pow(touch.clientX - longPressPos.current.x, 2) +
-        Math.pow(touch.clientY - longPressPos.current.y, 2)
-      );
-      if (dist > 10) cancelLongPress();
-    }
-  };
-
-  const handleTouchEnd = () => {
-    cancelLongPress();
-  };
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -211,16 +151,14 @@ export const WantCard: React.FC<WantCardProps> = ({
   const handleContextMenu = (e: React.MouseEvent) => {
     if (isBeingProcessed || isSelectMode) return;
     e.preventDefault();
-    setQuickActionsWantId(wantId || null);
+    overlay.setQuickActionsWantId(wantId || null);
     onView(want);
   };
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isBeingProcessed) return;
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="button"]')) {
-      return;
-    }
+    if (target.closest('button') || target.closest('[role="button"]')) return;
     let element = target as HTMLElement | null;
     while (element && element !== e.currentTarget) {
       if (element.className && element.className.includes('group/menu')) {
@@ -275,9 +213,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         position = x < rect.width / 2 ? 'before' : 'after';
       }
 
-      if (onReorderDragOver) {
-        onReorderDragOver(index, position);
-      }
+      if (onReorderDragOver) onReorderDragOver(index, position);
 
       if (position === 'inside') {
         e.dataTransfer.dropEffect = 'move';
@@ -315,9 +251,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     setIsOverTarget(false);
     setDraggingWant(null);
 
-    if (onReorderDragOver) {
-      onReorderDragOver(index, null);
-    }
+    if (onReorderDragOver) onReorderDragOver(index, null);
 
     const draggedWantId = e.dataTransfer.getData('application/mywant-id');
     const tWantId = want.metadata?.id || want.id;
@@ -344,20 +278,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       onReorderDrop(draggedWantId, index, x < rect.width / 2 ? 'before' : 'after');
     }
 
-    try {
-      const labelData = e.dataTransfer.getData('application/json');
-      if (!labelData) return;
-      const { key, value } = JSON.parse(labelData);
-      fetch(`/api/v1/wants/${tWantId}/labels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value })
-      }).then(response => {
-        if (response.ok && onLabelDropped) onLabelDropped(tWantId);
-      }).catch(error => console.error('Error dropping label:', error));
-    } catch (error) {
-      console.error('Error dropping label:', error);
-    }
+    dropLabelOnWant(tWantId, e, onLabelDropped);
   };
 
   const parentBackgroundStyle = getBackgroundStyle(want.metadata?.type, false);
@@ -367,6 +288,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   return (
     <div className="relative h-full" style={{ isolation: 'isolate' }}>
+      <FocusTriangle visible={selected} />
       <StackLayers stackCount={stackCount} />
       <div
         ref={cardRef}
@@ -375,22 +297,22 @@ export const WantCard: React.FC<WantCardProps> = ({
         onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}
         onContextMenu={handleContextMenu}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={cancelLongPress}
+        onMouseDown={longPress.onMouseDown}
+        onMouseMove={longPress.onMouseMove}
+        onMouseUp={longPress.onMouseUp}
         onMouseLeave={() => {
-          cancelLongPress();
-          if (showQuickActions) setQuickActionsWantId(null);
+          longPress.cancel();
+          if (overlay.showQuickActions) overlay.closeQuickActions();
         }}
         onBlur={(e) => {
           const relatedTarget = e.relatedTarget as Node;
-          if (showQuickActions && (!relatedTarget || !cardRef.current?.contains(relatedTarget))) {
-            setQuickActionsWantId(null);
+          if (overlay.showQuickActions && (!relatedTarget || !cardRef.current?.contains(relatedTarget))) {
+            overlay.closeQuickActions();
           }
         }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={longPress.onTouchStart}
+        onTouchMove={longPress.onTouchMove}
+        onTouchEnd={longPress.onTouchEnd}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -399,8 +321,8 @@ export const WantCard: React.FC<WantCardProps> = ({
         data-keyboard-nav-id={wantId}
         data-is-target={isTargetWant}
         className={classNames(
-          'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset',
-          selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
+          `card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col ${CARD_FOCUS_BASE}`,
+          CARD_BORDER_BASE,
           (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
           isHighlighted && styles.highlighted,
           isBlinking && styles.minimapBlink,
@@ -447,7 +369,7 @@ export const WantCard: React.FC<WantCardProps> = ({
 
         <div
           className="relative z-10 transition-all duration-150"
-          style={showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
+          style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
         >
           <WantCardContent
             want={want} isChild={false} hasChildren={!!hasChildren}
@@ -458,10 +380,10 @@ export const WantCard: React.FC<WantCardProps> = ({
           />
         </div>
 
-        {showQuickActions && (
+        {overlay.showQuickActions && !overlay.showDeleteOverlay && (
           <QuickActionsOverlay
             want={want}
-            onClose={() => setQuickActionsWantId(null)}
+            onClose={overlay.closeQuickActions}
             onView={() => onView(want)}
             onStart={() => startWant(wantId || '')}
             onStop={() => stopWant(wantId || '')}
@@ -472,7 +394,14 @@ export const WantCard: React.FC<WantCardProps> = ({
               setTimeout(() => startWant(wantId || ''), 300);
             }}
             onEdit={() => onEdit(want)}
-            onDelete={() => onDelete(want)}
+            onDelete={overlay.openDeleteConfirm}
+          />
+        )}
+
+        {overlay.showDeleteOverlay && (
+          <DeleteConfirmOverlay
+            onConfirm={() => { overlay.confirmDelete(); onDelete(want); }}
+            onCancel={overlay.closeDeleteConfirm}
           />
         )}
 
@@ -536,6 +465,10 @@ export const WantCard: React.FC<WantCardProps> = ({
                       onView={onView}
                       onViewAgents={onViewAgents}
                       onViewResults={onViewResults}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onSuspend={onSuspend}
+                      onResume={onResume}
                       onWantDropped={onWantDropped}
                       onLabelDropped={onLabelDropped}
                     />

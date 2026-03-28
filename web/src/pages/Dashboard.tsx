@@ -363,6 +363,16 @@ export const Dashboard: React.FC = () => {
 
   const handleShowDeleteConfirmation = (want: Want) => { setDeleteWantState(want); setShowDeleteConfirmation(true); };
 
+  const handleDirectDeleteWant = async (want: Want) => {
+    try {
+      setIsDeletingWant(true);
+      const id = want.metadata?.id || want.id;
+      if (!id) return;
+      await deleteWant(id);
+      if (selectedWant && (selectedWant.metadata?.id === id || selectedWant.id === id)) sidebar.clearSelection();
+    } catch (e) {} finally { setIsDeletingWant(false); }
+  };
+
   const handleReactionConfirm = async () => {
     if (!reactionWantState || !reactionAction) return;
     setIsSubmittingReaction(true);
@@ -734,44 +744,37 @@ export const Dashboard: React.FC = () => {
         onDrop={handleGlobalDrop}
       >
         {/* Confirmation Notification - Dashboard Right Layout */}
-        {(showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
+        {(showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation) && (
           <ConfirmationBubble
             message={
-              showDeleteConfirmation
-                ? (deleteWantState ? `Delete: ${deleteWantState.metadata?.name || deleteWantState.metadata?.id || deleteWantState.id}` : null)
-                : showDeleteDraftConfirmation
+              showDeleteDraftConfirmation
                 ? (deleteDraftState ? `Delete draft: ${deleteDraftState.message}` : null)
                 : showBatchConfirmation
                 ? `${batchAction === 'delete' ? 'Delete' : batchAction === 'start' ? 'Start' : 'Stop'} ${selectedWantIds.size} wants?`
                 : (reactionWantState ? `${reactionAction === 'approve' ? 'Approve' : 'Deny'}: ${reactionWantState.metadata?.name || reactionWantState.metadata?.id || reactionWantState.id}` : null)
             }
-            isVisible={showDeleteConfirmation || showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
+            isVisible={showReactionConfirmation || showBatchConfirmation || showDeleteDraftConfirmation}
             onDismiss={() => {
-              setShowDeleteConfirmation(false);
               setShowReactionConfirmation(false);
               setShowBatchConfirmation(false);
               setShowDeleteDraftConfirmation(false);
             }}
             onConfirm={
-              showDeleteConfirmation
-                ? handleDeleteWantConfirm
-                : showDeleteDraftConfirmation
+              showDeleteDraftConfirmation
                 ? handleDeleteDraftConfirm
                 : showBatchConfirmation
                 ? handleBatchConfirm
                 : handleReactionConfirm
             }
             onCancel={
-              showDeleteConfirmation
-                ? handleDeleteWantCancel
-                : showDeleteDraftConfirmation
+              showDeleteDraftConfirmation
                 ? handleDeleteDraftCancel
                 : showBatchConfirmation
                 ? handleBatchCancel
                 : handleReactionCancel
             }
-            loading={isDeletingWant || isSubmittingReaction || isBatchProcessing}
-            title={showDeleteConfirmation ? "Delete Want" : showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
+            loading={isSubmittingReaction || isBatchProcessing}
+            title={showDeleteDraftConfirmation ? "Delete Draft" : showBatchConfirmation ? `Batch ${batchAction}` : "Confirm"}
             layout="dashboard-right"
           />
         )}
@@ -781,7 +784,7 @@ export const Dashboard: React.FC = () => {
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">
                 <WantGrid
-                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleShowDeleteConfirmation} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
+                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
                 />
               </div>
             </React.Fragment>
@@ -826,7 +829,7 @@ export const Dashboard: React.FC = () => {
             onStop={() => stopWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
             onSuspend={() => suspendWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
             onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
-            onDelete={() => handleShowDeleteConfirmation(selectedWant!)}
+            onDelete={() => { const id = selectedWant?.metadata?.id || selectedWant?.id; if (id) useWantStore.getState().setDeleteConfirmWantId(id); }}
             onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)}
             seriesWants={seriesWants}
             summaryProps={{
