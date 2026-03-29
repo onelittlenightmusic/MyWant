@@ -142,14 +142,14 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         {/* Header */}
         <div
           className={classNames(
-            'flex-shrink-0 bg-white dark:bg-gray-900 px-4 py-2 flex items-stretch justify-between z-20 gap-4 relative',
+            'flex-shrink-0 bg-white dark:bg-gray-900 flex items-stretch justify-between z-20 relative',
             isBottom
               ? 'order-last border-t border-gray-200 dark:border-gray-700'
               : 'border-b border-gray-200 dark:border-gray-700'
           )}
-          style={isBottom ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' } : {}}
+          style={isBottom ? { paddingBottom: 'env(safe-area-inset-bottom)' } : {}}
         >
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-1 min-w-0 px-4 py-2">
             {title && (
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate flex items-center gap-2">
                 {TitleIcon && <TitleIcon className={classNames('h-5 w-5 flex-shrink-0', titleIconClassName || '')} />}
@@ -159,7 +159,6 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           </div>
           <div className="flex items-stretch gap-0 flex-shrink-0">
             {headerActions && <div className="flex items-stretch gap-0">{headerActions}</div>}
-            <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch my-2 mx-2" />
             <button
               onClick={onClose}
               className="flex flex-col items-center justify-center gap-1 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 flex-shrink-0 focus:outline-none"

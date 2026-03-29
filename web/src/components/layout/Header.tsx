@@ -154,10 +154,21 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Hamburger menu button — opens on hover */}
           <div className="relative" onMouseEnter={() => setMenuOpen(true)} onMouseLeave={handleMenuMouseLeave}>
             <button
-              className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}
+              className={menuOpen
+                ? "flex flex-col items-center justify-center gap-1 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 focus:outline-none"
+                : "p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              }
               aria-label="Toggle menu"
             >
-              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {menuOpen ? (
+                <>
+                  <X className="h-5 w-5" />
+                  <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Close</span>
+                </>
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </button>
 
             {/* Dropdown menu */}

@@ -338,7 +338,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Category Filter - Toggle Buttons */}
-      {categories.length > 0 && (
+      {showSearch && categories.length > 0 && (
         <div className="flex flex-wrap gap-2 flex-shrink-0">
           <button
             type="button"
@@ -501,7 +501,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
+                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center ${
                       selectedId === item.id
                         ? 'border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30'
                         : isFocused

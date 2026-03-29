@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown } from 'lucide-react';
+import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, SlidersHorizontal } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -501,16 +501,32 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
+  const [showFilter, setShowFilter] = useState(false);
 
   const headerAction = (
     <div className="flex items-stretch gap-0">
-      <div className="flex items-center px-2">
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={() => setShowFilter(v => !v)}
+          className={classNames(
+            "flex flex-col items-center justify-center gap-1 px-3 h-full transition-all duration-150 focus:outline-none",
+            showFilter
+              ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+              : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+          )}
+          title="Toggle search/filter"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Filter</span>
+        </button>
+      )}
+      <div className="flex items-center h-full px-2">
         <FormYamlToggle
           mode={editMode}
           onModeChange={setEditMode}
         />
       </div>
-      <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch my-2 mx-2" />
       <button
         ref={addButtonRef}
         type="submit"
@@ -643,7 +659,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                   wantTypes={userFacingWantTypes}
                   recipes={recipes}
                   selectedId={selectedTypeId}
-                  showSearch={true}
+                  showSearch={showFilter}
                   onSelect={(id, itemType) => {
                     setSelectedTypeId(id);
                     setSelectedItemType(itemType);
