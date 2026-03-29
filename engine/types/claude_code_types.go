@@ -55,14 +55,25 @@ func (w *ClaudeCodeThreadWant) Initialize() {
 	}
 
 	locals := w.GetLocals()
-	// session_id is optional: if empty, DoAgent creates a new session on first trigger
+	// session_id: param takes priority; if empty, preserve existing goal value
+	// (DoAgent may have created a session in a previous run/before restart).
 	locals.SessionID = w.GetStringParam("session_id", "")
+	if locals.SessionID == "" {
+		locals.SessionID = GetGoal(&w.Want, "session_id", "")
+	}
 
 	locals.TriggerOn = w.GetStringParam("trigger_on", "pattern")
 	locals.MaxReqs = w.GetIntParam("max_requests", 3)
 	locals.TimeoutSec = w.GetIntParam("timeout_seconds", 300)
-	locals.ReqCount = 0
 	locals.WorkingDir = w.GetStringParam("working_dir", "")
+
+	// Preserve request_count across restarts; only reset on truly fresh start
+	existingCount := GetCurrent(&w.Want, "request_count", -1)
+	if existingCount < 0 {
+		locals.ReqCount = 0
+	} else {
+		locals.ReqCount = existingCount
+	}
 
 	// Goal: what we're watching for
 	w.SetGoal("session_id", locals.SessionID)
