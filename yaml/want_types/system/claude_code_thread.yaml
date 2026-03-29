@@ -305,8 +305,7 @@ wantType:
     label: current
 
   constraints:
-  - description: session_id is required
-    validation: session_id must not be empty
+  - description: session_id is optional — if omitted, a new Claude Code session is created on first message
 
   - description: auto_request is required unless trigger_on is webhook
     validation: auto_request must not be empty when trigger_on is not webhook

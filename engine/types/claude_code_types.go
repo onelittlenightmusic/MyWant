@@ -54,11 +54,8 @@ func (w *ClaudeCodeThreadWant) Initialize() {
 	}
 
 	locals := w.GetLocals()
+	// session_id is optional: if empty, DoAgent creates a new session on first trigger
 	locals.SessionID = w.GetStringParam("session_id", "")
-	if locals.SessionID == "" {
-		w.SetConfigError("session_id", "Missing required parameter 'session_id'")
-		return
-	}
 
 	locals.TriggerOn = w.GetStringParam("trigger_on", "pattern")
 	locals.MaxReqs = w.GetIntParam("max_requests", 3)

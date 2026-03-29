@@ -54,7 +54,9 @@ func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
 		sessionID = GetGoal(want, "session_id", "")
 	}
 	if sessionID == "" {
-		return false, fmt.Errorf("no session_id configured")
+		// No session yet — DoAgent will create one on first trigger. Just wait.
+		want.SetCurrent("current_session_state", "waiting_for_first_message")
+		return false, nil
 	}
 
 	phase := GetCurrent(want, "phase", CCPhaseMonitoring)
@@ -65,10 +67,12 @@ func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
 	// Read session entries from Claude Code session directory
 	entries, err := readClaudeSessionEntries(sessionID)
 	if err != nil {
-		want.StoreLog("[CC_MONITOR] Error reading session: %v", err)
+		// Session file not found yet (e.g. just created) — not a fatal error, retry next poll.
 		want.SetCurrent("session_read_error", err.Error())
+		want.SetCurrent("current_session_state", "waiting_for_session")
 		return false, nil
 	}
+	want.SetCurrent("session_read_error", "")
 
 	// Classify session state
 	sessionState := classifyClaudeSessionState(entries)
