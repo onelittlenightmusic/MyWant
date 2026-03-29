@@ -134,22 +134,31 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 
 	switch phase {
 	case CCPhaseMonitoring:
-		// Check trigger conditions from MonitorAgent's observations
-		triggerOn := GetGoal(want, "trigger_on", "pattern")
-		triggered := false
+		// Webhook messages always trigger immediately, regardless of trigger_on setting.
+		// This allows manual requests to coexist with autonomous pattern/waiting triggers.
+		webhookTriggered := GetCurrent(want, "webhook_auto_request", "") != ""
 
+		// Check autonomous trigger conditions from MonitorAgent's observations
+		triggerOn := GetGoal(want, "trigger_on", "pattern")
+		autonomousTriggered := false
 		switch triggerOn {
 		case "pattern":
-			triggered = GetCurrent(want, "pattern_matched", false)
+			autonomousTriggered = GetCurrent(want, "pattern_matched", false)
 		case "waiting":
-			triggered = GetCurrent(want, "current_session_state", "") == "waiting_for_input"
+			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "waiting_for_input"
 		case "complete":
-			triggered = GetCurrent(want, "current_session_state", "") == "task_complete"
+			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "task_complete"
 		case "idle":
-			triggered = GetCurrent(want, "current_session_state", "") == "idle"
+			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "idle"
 		case "webhook":
-			// Trigger on webhook message arrival
-			triggered = GetCurrent(want, "webhook_auto_request", "") != ""
+			// webhook-only mode: autonomous trigger is same as webhook trigger
+			autonomousTriggered = webhookTriggered
+		}
+
+		triggered := webhookTriggered || autonomousTriggered
+		triggerLabel := triggerOn
+		if webhookTriggered {
+			triggerLabel = "webhook"
 		}
 
 		if !triggered {
@@ -169,7 +178,7 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 			return nil
 		}
 
-		want.DirectLog("[CC_THINK] Trigger detected (%s), proposing send_request", triggerOn)
+		want.DirectLog("[CC_THINK] Trigger detected (%s), proposing send_request", triggerLabel)
 		want.SetCurrent("pending_request_id", requestID)
 		want.SetPlan("next_action", "send_request")
 
