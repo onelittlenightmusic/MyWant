@@ -29,6 +29,7 @@ interface WantCardProps {
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
   onViewResults?: (want: Want) => void;
+  onViewChat?: (want: Want) => void;
   onEdit: (want: Want) => void;
   onDelete: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -59,6 +60,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   onView,
   onViewAgents,
   onViewResults,
+  onViewChat,
   onEdit,
   onDelete,
   onSuspend,
@@ -372,8 +374,8 @@ export const WantCard: React.FC<WantCardProps> = ({
           style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
         >
           <WantCardContent
-            want={want} isChild={false} hasChildren={!!hasChildren} isFocused={selected}
-            onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults}
+            want={want} isChild={false} hasChildren={!!hasChildren} isFocused={selected} isSelectMode={isSelectMode}
+            onView={onView} onViewAgents={onViewAgents} onViewResults={onViewResults} onViewChat={onViewChat}
             onEdit={onEdit} onDelete={onDelete}
             onSuspend={onSuspend} onResume={onResume}
             onShowReactionConfirmation={onShowReactionConfirmation}
@@ -465,6 +467,7 @@ export const WantCard: React.FC<WantCardProps> = ({
                       onView={onView}
                       onViewAgents={onViewAgents}
                       onViewResults={onViewResults}
+                      onViewChat={onViewChat}
                       onEdit={onEdit}
                       onDelete={onDelete}
                       onSuspend={onSuspend}

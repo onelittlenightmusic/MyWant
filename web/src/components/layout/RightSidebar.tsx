@@ -65,12 +65,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     ? {
         left: 0,
         right: 0,
-        bottom: 0,
+        ...(isBottom ? { bottom: 0, top: 'auto' } : { top: 0, bottom: 'auto' }),
         height: '70vh',
-        transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
+        transform: isOpen ? 'translateY(0)' : (isBottom ? 'translateY(100%)' : 'translateY(-100%)'),
         transition: 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
-        borderRadius: '12px 12px 0 0',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
+        borderRadius: isBottom ? '12px 12px 0 0' : '0 0 12px 12px',
+        boxShadow: isBottom ? '0 -4px 20px rgba(0,0,0,0.15)' : '0 4px 20px rgba(0,0,0,0.15)',
       }
     : {
         right: 0,
@@ -130,7 +130,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         )}
 
         {/* Drag handle — mobile sheet only */}
-        {isMobileSheet && (
+        {isMobileSheet && isBottom && (
           <div
             className="flex-shrink-0 flex justify-center pt-2 pb-1 cursor-pointer"
             onClick={onClose}
@@ -142,12 +142,12 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         {/* Header */}
         <div
           className={classNames(
-            'flex-shrink-0 bg-white dark:bg-gray-900 px-4 py-3 flex items-center justify-between z-20 gap-4 relative',
-            !isMobileSheet && isBottom
+            'flex-shrink-0 bg-white dark:bg-gray-900 px-4 py-2 flex items-stretch justify-between z-20 gap-4 relative',
+            isBottom
               ? 'order-last border-t border-gray-200 dark:border-gray-700'
               : 'border-b border-gray-200 dark:border-gray-700'
           )}
-          style={!isMobileSheet && isBottom ? { paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' } : {}}
+          style={isBottom ? { paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' } : {}}
         >
           <div className="flex items-center gap-3 flex-1 min-w-0">
             {title && (
@@ -157,17 +157,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
               </h2>
             )}
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
+          <div className="flex items-stretch gap-0 flex-shrink-0">
+            {headerActions && <div className="flex items-stretch gap-0">{headerActions}</div>}
+            <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch my-2 mx-2" />
             <button
               onClick={onClose}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
+              className="flex flex-col items-center justify-center gap-1 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 flex-shrink-0 focus:outline-none"
               title="Close sidebar"
             >
               <X className="h-5 w-5" />
+              <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Close</span>
             </button>
           </div>
         </div>
+
+        {/* Drag handle — mobile sheet only (Bottom handle if top sheet) */}
+        {isMobileSheet && !isBottom && (
+          <div
+            className="flex-shrink-0 flex justify-center pt-1 pb-2 cursor-pointer"
+            onClick={onClose}
+          >
+            <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
+          </div>
+        )}
 
         {/* Content */}
         <div className={`flex-1 h-full px-0 py-0 relative z-10 ${overflowHidden ? 'overflow-hidden' : 'overflow-y-auto'}`}>

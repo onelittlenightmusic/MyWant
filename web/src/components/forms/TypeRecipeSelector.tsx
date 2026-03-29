@@ -370,7 +370,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 sm:p-4 bg-white dark:bg-gray-950 min-h-0">
+      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-950 min-h-0">
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
@@ -420,7 +420,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left p-2 sm:p-3 rounded-lg border transition-colors relative overflow-hidden h-[52px] flex items-center ${
+                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center ${
                       selectedId === item.id
                         ? 'border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30'
                         : isFocused

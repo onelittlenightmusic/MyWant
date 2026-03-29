@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check } from 'lucide-react';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check, MessageSquare } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -27,9 +27,11 @@ interface WantCardContentProps {
   isChild?: boolean;
   hasChildren?: boolean;
   isFocused?: boolean;
+  isSelectMode?: boolean;
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
   onViewResults?: (want: Want) => void;
+  onViewChat?: (want: Want) => void;
   onEdit?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -42,9 +44,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   isChild = false,
   hasChildren = false,
   isFocused = false,
+  isSelectMode = false,
   onView,
   onViewAgents,
   onViewResults,
+  onViewChat,
   onEdit,
   onDelete,
   onSuspend,
@@ -63,6 +67,9 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const createdAt = want.stats?.created_at;
   const startedAt = want.stats?.started_at;
   const completedAt = want.stats?.completed_at;
+
+  // Interaction check
+  const isInteractive = want.state?.current?.interactive === true;
 
   // Reminder-specific state
   const isReminder = want.metadata?.type === 'reminder';
@@ -438,16 +445,40 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
+            {/* Chat indicator - clickable */}
+            {isInteractive && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isSelectMode) return;
+                  if (onViewChat) {
+                    onViewChat(want);
+                  }
+                }}
+                className={classNames(
+                  "flex items-center p-1 rounded-md transition-colors",
+                  isSelectMode ? "cursor-default" : "hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                )}
+                title="Click to chat with agent"
+              >
+                <MessageSquare className={`${sizes.iconSize} text-blue-600 dark:text-blue-400`} />
+              </button>
+            )}
+
             {/* Agent indicator - clickable */}
             {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isSelectMode) return;
                   if (onViewAgents) {
                     onViewAgents(want);
                   }
                 }}
-                className="flex items-center space-x-1 p-1 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"
+                className={classNames(
+                  "flex items-center space-x-1 p-1 rounded-md transition-colors",
+                  isSelectMode ? "cursor-default" : "hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"
+                )}
                 title="Click to view agent details"
               >
                 <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`} />
@@ -470,6 +501,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isSelectMode) return;
                   onView(want);
                 }}
                 className={classNames(
@@ -489,9 +521,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                if (isSelectMode) return;
                 onView(want);
               }}
-              className="hover:opacity-80 transition-opacity"
+              className={isSelectMode ? "cursor-default" : "hover:opacity-80 transition-opacity"}
               title="Click to view details"
             >
               <StatusBadge status={want.status} size={sizes.statusSize} />

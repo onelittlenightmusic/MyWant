@@ -55,7 +55,7 @@ export const Dashboard: React.FC = () => {
   const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
   const [reactionAction, setReactionAction] = useState<'approve' | 'deny' | null>(null);
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents'>('results');
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents' | 'chat'>('results');
   const [sidebarTabVersion, setSidebarTabVersion] = useState(0);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
@@ -242,6 +242,7 @@ export const Dashboard: React.FC = () => {
 
   const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
   const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
+  const handleViewChat = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('chat'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
 
   const handleDraftClick = (draft: DraftWant) => {
     setActiveDraftId(draft.id);
@@ -783,7 +784,7 @@ export const Dashboard: React.FC = () => {
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">
                 <WantGrid
-                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
+                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
                 />
               </div>
             </React.Fragment>

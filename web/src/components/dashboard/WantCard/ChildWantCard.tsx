@@ -30,6 +30,7 @@ interface ChildWantCardProps {
   onView: (want: Want) => void;
   onViewAgents?: (want: Want) => void;
   onViewResults?: (want: Want) => void;
+  onViewChat?: (want: Want) => void;
   onEdit?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSuspend?: (want: Want) => void;
@@ -49,6 +50,7 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
   onView,
   onViewAgents,
   onViewResults,
+  onViewChat,
   onEdit,
   onDelete,
   onSuspend,
@@ -229,9 +231,11 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
             want={child}
             isChild={true}
             isFocused={!!isChildSelected && !isSelectMode}
+            isSelectMode={isSelectMode}
             onView={onView}
             onViewAgents={onViewAgents}
             onViewResults={onViewResults}
+            onViewChat={onViewChat}
           />
         </div>
 

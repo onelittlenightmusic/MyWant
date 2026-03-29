@@ -33,3 +33,25 @@
 - 既存のDraftとは異なり、Thinkerはずっと消えない。
 - 新たなアイディアを親のwant parameterに追記することができる。
 - ThinkerはInteract bubbleのようにインタラクティブにやりとりをすることができる。履歴も保持している。
+
+---
+
+iPhone表示の際のサイドバーが下から上がってくるようになったのは良い。
+この下から上がってくるのはLayoutがbottomの時だけにする。
+逆にBottomの時には上から下に下げる。
+そのレイアウト変更に加えて、サイドバー内の"new want"やadd wantボタンなどのサイドバー内のヘッダの位置を統一的にbottom時には下、top時には上にしたい。一貫性が生まれるはず。
+
+---
+
+add wantサイドバー内のadd wantボタン、closeボタン(x)をheaderOverlayやwant card overlay controlなどと同じスタイルにしたい。
+
+---
+
+インタラクティブなWant（current.Interactive=true）のwant cardには、Agentアイコンの左にChatアイコンを入れたい。クリックした時にはwant detailのチャットタブを開くようにしたい。
+
+---
+
+マルチセレクトモードでは、カードの選択のみとし、AgentやChatなどのタブを開くアクションなどはできないようにしたい。
+
+---
+

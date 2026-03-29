@@ -503,31 +503,50 @@ export const WantForm: React.FC<WantFormProps> = ({
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
 
   const headerAction = (
-    <div className="flex items-center gap-3">
-      <FormYamlToggle
-        mode={editMode}
-        onModeChange={setEditMode}
-      />
+    <div className="flex items-stretch gap-0">
+      <div className="flex items-center px-2">
+        <FormYamlToggle
+          mode={editMode}
+          onModeChange={setEditMode}
+        />
+      </div>
+      <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch my-2 mx-2" />
       <button
         ref={addButtonRef}
         type="submit"
         disabled={isSubmitting || (!isEditing && !isTypeSelected)}
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
-        className={`flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 text-sm rounded-full hover:bg-blue-700 focus:outline-none focus-glow disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
-          shouldGlowButton ? '' : ''
-        }`}
-        style={shouldGlowButton ? { height: '2.4rem' } : { height: '2rem' }}
+        className={classNames(
+          "flex flex-col items-center justify-center gap-1 px-4 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
+          isSubmitting || (!isEditing && !isTypeSelected)
+            ? "bg-gray-400/30 cursor-not-allowed grayscale opacity-50"
+            : isEditing
+              ? "bg-indigo-600/90 text-white hover:brightness-110 active:opacity-80"
+              : isRecommendationMode
+                ? "bg-purple-600/90 text-white hover:brightness-110 active:opacity-80"
+                : "bg-green-600/90 text-white hover:brightness-110 active:opacity-80"
+        )}
       >
         {isSubmitting ? (
           <LoadingSpinner size="sm" />
         ) : (
           <>
-            <span className="relative inline-flex flex-shrink-0">
-              <Heart className="w-3.5 h-3.5" />
-              <Plus className="w-2 h-2 absolute -top-1 -right-1" style={{ strokeWidth: 3 }} />
+            <div className="w-5 h-5 flex items-center justify-center">
+              {isEditing ? (
+                <Save className="w-5 h-5" />
+              ) : isRecommendationMode ? (
+                <Plus className="w-5 h-5" />
+              ) : (
+                <span className="relative inline-flex flex-shrink-0">
+                  <Heart className="w-4 h-4" />
+                  <Plus className="w-2.5 h-2.5 absolute -top-1 -right-1" style={{ strokeWidth: 3 }} />
+                </span>
+              )}
+            </div>
+            <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">
+              {isRecommendationMode ? 'Deploy' : (isEditing ? 'Update' : 'Add')}
             </span>
-            {isRecommendationMode ? 'Deploy' : (isEditing ? 'Update' : 'Add')}
           </>
         )}
       </button>

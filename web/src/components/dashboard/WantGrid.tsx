@@ -26,6 +26,7 @@ interface WantGridProps {
   onViewWant: (want: Want) => void;
   onViewAgentsWant?: (want: Want) => void;
   onViewResultsWant?: (want: Want) => void;
+  onViewChatWant?: (want: Want) => void;
   onEditWant: (want: Want) => void;
   onDeleteWant: (want: Want) => void;
   onSuspendWant?: (want: Want) => void;
@@ -56,6 +57,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
   onViewWant,
   onViewAgentsWant,
   onViewResultsWant,
+  onViewChatWant,
   onEditWant,
   onDeleteWant,
   onSuspendWant,
@@ -300,7 +302,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
             <WantCard
               want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
               onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
-              onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onEdit={onEditWant} onDelete={onDeleteWant}
+              onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onViewChat={onViewChatWant} onEdit={onEditWant} onDelete={onDeleteWant}
               onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
               onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
               onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
