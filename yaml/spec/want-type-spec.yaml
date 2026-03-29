@@ -241,6 +241,10 @@ components:
         persistent:
           type: boolean
           description: Whether state persists across restarts
+        label:
+          type: string
+          description: State label (goal, current, plan, internal)
+          enum: [goal, current, plan, internal]
         initialValue:
           description: Initial value
         example:

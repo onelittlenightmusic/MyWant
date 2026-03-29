@@ -76,10 +76,10 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
 			cb.RegisterWantType(wantType, createGenericFactory(wantType))
 		}
-	} else if len(def.InlineAgents) > 0 || def.OnInitialize != nil || def.OnDelete != nil || def.AchievedWhen != nil {
-		// YAML-only type: has inline agents, lifecycle hooks, or declarative achievement condition.
-		// Register (or re-register) ScriptableWant factory and wire up inline agents.
-		// Always re-register to support hot-reload.
+	} else {
+		// YAML-only type: no Go implementation found.
+		// Use ScriptableWant factory for all cases — inline agents, lifecycle hooks,
+		// declarative achievement conditions, or passive containers with no behavior.
 		registerInlineAgents(def, cb.agentRegistry)
 		cb.RegisterWantType(wantType, createScriptableFactory(def))
 	}
