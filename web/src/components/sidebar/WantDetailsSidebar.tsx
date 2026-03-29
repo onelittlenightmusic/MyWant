@@ -665,6 +665,12 @@ interface CCMessage {
   timestamp: string;
 }
 
+interface CCResponse {
+  text: string;
+  timestamp: string;
+  subtype?: string;
+}
+
 const ChatTab: React.FC<{ want: Want }> = ({ want }) => {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -673,23 +679,25 @@ const ChatTab: React.FC<{ want: Want }> = ({ want }) => {
 
   const phase = want.state?.current?.phase as string | undefined;
   const ccMessages = (want.state?.current?.cc_messages as CCMessage[] | undefined) ?? [];
-  const latestResponse = want.state?.current?.latest_response_content as string | undefined;
+  const ccResponses = (want.state?.current?.cc_responses as CCResponse[] | undefined) ?? [];
   const lastResponseRaw = want.state?.current?.last_response_raw as Record<string, unknown> | undefined;
   const wantName = want.metadata?.name;
 
-  // Build merged conversation thread: user messages + latest assistant response at end
-  const conversationItems: Array<{ role: 'user' | 'assistant'; text: string; timestamp?: string }> =
-    ccMessages
-      .filter(m => m.text)
-      .map(m => ({ role: 'user' as const, text: m.text, timestamp: m.timestamp }));
-  if (latestResponse) {
-    conversationItems.push({ role: 'assistant', text: latestResponse });
+  // Interleave user messages and assistant responses by index:
+  // [user[0], response[0], user[1], response[1], ...]
+  const conversationItems: Array<{ role: 'user' | 'assistant'; text: string; timestamp?: string }> = [];
+  const len = Math.max(ccMessages.length, ccResponses.length);
+  for (let i = 0; i < len; i++) {
+    const msg = ccMessages[i];
+    const res = ccResponses[i];
+    if (msg?.text) conversationItems.push({ role: 'user', text: msg.text, timestamp: msg.timestamp });
+    if (res?.text) conversationItems.push({ role: 'assistant', text: res.text, timestamp: res.timestamp });
   }
 
   // Scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [ccMessages.length, latestResponse]);
+  }, [conversationItems.length]);
 
   const handleSend = async () => {
     if (!inputText.trim() || !wantName || sending) return;
@@ -723,7 +731,7 @@ const ChatTab: React.FC<{ want: Want }> = ({ want }) => {
     : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
   );
 
-  const responseSubtype = lastResponseRaw?.subtype as string | undefined;
+  const responseSubtype = (ccResponses[ccResponses.length - 1]?.subtype) ?? (lastResponseRaw?.subtype as string | undefined);
 
   return (
     <div className="flex flex-col h-full">

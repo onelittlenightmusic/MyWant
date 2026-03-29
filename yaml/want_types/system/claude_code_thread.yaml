@@ -296,6 +296,13 @@ wantType:
     initialValue: 0
     label: current
 
+  - name: cc_responses
+    description: FIFO buffer of last 20 Claude responses (paired with cc_messages for chat display)
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
   - name: webhook_auto_request
     description: Dynamic prompt from webhook message (overrides auto_request for next send)
     type: string

@@ -287,6 +287,19 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		if sid, ok := response["session_id"].(string); ok && sid != "" {
 			want.SetGoal("session_id", sid)
 		}
+		// Append response to cc_responses ring buffer (FIFO, max 20) for chat display
+		if result, ok := response["result"].(string); ok && result != "" {
+			responses := GetCurrent(want, "cc_responses", []any{})
+			responses = append(responses, map[string]any{
+				"text":      result,
+				"timestamp": time.Now().Format(time.RFC3339),
+				"subtype":   response["subtype"],
+			})
+			if len(responses) > 20 {
+				responses = responses[len(responses)-20:]
+			}
+			want.SetCurrent("cc_responses", responses)
+		}
 	}
 
 	// Mark sent in idempotency log
