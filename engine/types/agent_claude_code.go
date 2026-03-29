@@ -53,8 +53,8 @@ func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
 		// Also try goal (set by Initialize)
 		sessionID = GetGoal(want, "session_id", "")
 	}
-	if sessionID == "" || !isValidSessionID(sessionID) {
-		// No valid session yet — DoAgent will create one on first trigger. Just wait.
+	if sessionID == "" {
+		// No session yet — DoAgent will create one on first trigger. Just wait.
 		want.SetCurrent("current_session_state", "waiting_for_first_message")
 		return false, nil
 	}
@@ -248,7 +248,7 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 
 	// Build and execute Claude CLI command
 	args := []string{"--print", "--output-format", "json"}
-	if isValidSessionID(sessionID) {
+	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
 	args = append(args, autoRequest)
@@ -496,14 +496,6 @@ func hasNewAssistantResponse(entries []sessionEntry, afterTimestamp int64) bool 
 		}
 	}
 	return false
-}
-
-// isValidSessionID returns true if s looks like a UUID (8-4-4-4-12 hex).
-// Claude Code requires session IDs to be in UUID format for --resume.
-var uuidRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-
-func isValidSessionID(s string) bool {
-	return uuidRe.MatchString(strings.ToLower(s))
 }
 
 // getLatestAssistantContent returns the content of the most recent assistant message.
