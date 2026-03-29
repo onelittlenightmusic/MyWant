@@ -15,8 +15,6 @@ import (
 
 func init() {
 	RegisterWantImplementation[ManagedProcessWant, ManagedProcessLocals]("managed_process")
-	RegisterWantImplementation[ManagedProcessWant, ManagedProcessLocals]("ngrok")
-	RegisterWantImplementation[ManagedProcessWant, ManagedProcessLocals]("cloudflare")
 }
 
 // ManagedProcessPhase constants
