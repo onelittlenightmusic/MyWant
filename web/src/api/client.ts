@@ -474,6 +474,15 @@ class MyWantApiClient {
     await this.client.delete(`/api/v1/states/${id}`);
   }
 
+  // Webhook messaging
+  async sendWebhookMessage(wantName: string, text: string, sender?: string): Promise<{ status: string }> {
+    const response = await this.client.post<{ status: string }>(
+      `/api/v1/webhooks/${wantName}`,
+      { text, sender: sender ?? 'user' }
+    );
+    return response.data;
+  }
+
   // Global Parameters
   async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number }> {
     return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters');

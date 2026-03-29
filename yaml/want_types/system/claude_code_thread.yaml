@@ -297,6 +297,13 @@ wantType:
     initialValue: 0
     label: current
 
+  - name: interactive
+    description: Whether this want supports interactive chat (enables Chat tab in UI)
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
   constraints:
   - description: session_id is required
     validation: session_id must not be empty

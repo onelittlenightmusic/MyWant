@@ -75,6 +75,7 @@ func (w *ClaudeCodeThreadWant) Initialize() {
 	// Current: phase and operational state
 	w.SetCurrent("phase", CCPhaseMonitoring)
 	w.SetCurrent("request_count", 0)
+	w.SetCurrent("interactive", true)
 
 	// Webhook: register endpoint and start webhook monitor
 	InitializeWebhook(&w.Want, ccWebhookConfig, &locals.WebhookLocals)

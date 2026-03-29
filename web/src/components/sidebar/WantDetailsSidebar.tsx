@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History, Eraser } from 'lucide-react';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History, Eraser, MessageSquare, Send } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -34,7 +34,7 @@ import {
 
 interface WantDetailsSidebarProps {
   want: Want | null;
-  initialTab?: 'settings' | 'results' | 'logs' | 'agents' | 'versions';
+  initialTab?: 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat';
   initialTabVersion?: number;
   seriesWants?: Want[]; // All wants in the same series (for Versions tab)
   onWantUpdate?: () => void;
@@ -71,7 +71,7 @@ interface WantDetailsSidebarProps {
   };
 }
 
-type TabType = 'settings' | 'results' | 'logs' | 'agents' | 'versions';
+type TabType = 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat';
 
 // Unified section container styling for all metadata/state sections
 const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden p-3 sm:p-4';
@@ -293,6 +293,13 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     }
   }, [selectedWantDetails?.status, autoRefresh]);
 
+  // Auto-enable refresh when Chat tab is active (need live updates for conversation)
+  useEffect(() => {
+    if (activeTab === 'chat' && !autoRefresh) {
+      setAutoRefresh(true);
+    }
+  }, [activeTab, autoRefresh]);
+
   // Auto refresh setup (only refresh specific want details, not the whole list)
   useEffect(() => {
     if (autoRefresh && wantId) {
@@ -431,12 +438,14 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   }
 
   const hasMultipleVersions = seriesWants.length > 1;
+  const isInteractiveWant = wantDetails?.state?.current?.interactive === true;
   const tabs = [
     { id: 'results' as TabType, label: 'Results', icon: Database },
     { id: 'settings' as TabType, label: 'Settings', icon: Settings },
     { id: 'logs' as TabType, label: 'Logs', icon: FileText },
     { id: 'agents' as TabType, label: 'Agents', icon: Bot },
     ...(hasMultipleVersions ? [{ id: 'versions' as TabType, label: 'Versions', icon: History }] : []),
+    ...(isInteractiveWant ? [{ id: 'chat' as TabType, label: 'Chat', icon: MessageSquare }] : []),
   ];
 
   // Get current tab index
@@ -574,6 +583,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 <VersionsTab seriesWants={seriesWants} currentWantId={wantId} />
               </div>
             )}
+            {showPrevTab && prevTabId === 'chat' && (
+              <div className={classNames('absolute inset-0 overflow-hidden pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
+                <ChatTab want={wantDetails} />
+              </div>
+            )}
 
             {/* Current tab - animate in */}
             {activeTab === 'settings' && (
@@ -625,6 +639,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
                 <VersionsTab seriesWants={seriesWants} currentWantId={wantId} />
               </div>
             )}
+
+            {activeTab === 'chat' && (
+              <div className={classNames('relative z-10 h-full', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+                <ChatTab want={wantDetails} />
+              </div>
+            )}
           </>
         )}
       </div>
@@ -632,6 +652,152 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     </div>
 
     </>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// ChatTab component
+// ---------------------------------------------------------------------------
+
+interface CCMessage {
+  sender: string;
+  text: string;
+  timestamp: string;
+}
+
+const ChatTab: React.FC<{ want: Want }> = ({ want }) => {
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const phase = want.state?.current?.phase as string | undefined;
+  const ccMessages = (want.state?.current?.cc_messages as CCMessage[] | undefined) ?? [];
+  const latestResponse = want.state?.current?.latest_response_content as string | undefined;
+  const lastResponseRaw = want.state?.current?.last_response_raw as Record<string, unknown> | undefined;
+  const wantName = want.metadata?.name;
+
+  // Build merged conversation thread: user messages + latest assistant response at end
+  const conversationItems: Array<{ role: 'user' | 'assistant'; text: string; timestamp?: string }> =
+    ccMessages
+      .filter(m => m.text)
+      .map(m => ({ role: 'user' as const, text: m.text, timestamp: m.timestamp }));
+  if (latestResponse) {
+    conversationItems.push({ role: 'assistant', text: latestResponse });
+  }
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [ccMessages.length, latestResponse]);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || !wantName || sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await apiClient.sendWebhookMessage(wantName, inputText.trim(), 'user');
+      setInputText('');
+    } catch (err: unknown) {
+      setSendError(err instanceof Error ? err.message : 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const phaseBadgeClass = classNames(
+    'text-xs px-2 py-0.5 rounded-full font-medium',
+    phase === 'monitoring'        ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+    : phase === 'requesting'      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+    : phase === 'awaiting_response' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 animate-pulse'
+    : phase === 'response_received' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+    : phase === 'achieved'        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
+    : phase === 'error'           ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+  );
+
+  const responseSubtype = lastResponseRaw?.subtype as string | undefined;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Phase indicator */}
+      <div className="flex-shrink-0 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400">Phase:</span>
+        {phase && <span className={phaseBadgeClass}>{phase}</span>}
+        {responseSubtype && (
+          <span className={classNames(
+            'text-xs px-2 py-0.5 rounded-full font-medium ml-auto',
+            responseSubtype === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+            : responseSubtype === 'error' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+            : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+          )}>
+            {responseSubtype}
+          </span>
+        )}
+      </div>
+
+      {/* Message thread */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
+        {conversationItems.length === 0 ? (
+          <div className="text-center py-12">
+            <MessageSquare className="h-10 w-10 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">No messages yet</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Send a message below</p>
+          </div>
+        ) : (
+          conversationItems.map((item, i) => (
+            <div key={i} className={classNames('flex', item.role === 'user' ? 'justify-end' : 'justify-start')}>
+              <div className={classNames(
+                'max-w-[80%] rounded-lg px-3 py-2 text-sm',
+                item.role === 'user'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+              )}>
+                <p className="whitespace-pre-wrap break-words">{item.text}</p>
+                {item.timestamp && (
+                  <p className={classNames(
+                    'text-xs mt-1',
+                    item.role === 'user' ? 'text-blue-200' : 'text-gray-400 dark:text-gray-500'
+                  )}>
+                    {formatRelativeTime(item.timestamp)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input area */}
+      <div className="flex-shrink-0 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+        {sendError && <p className="text-xs text-red-500 mb-2">{sendError}</p>}
+        <div className="flex gap-2 items-end">
+          <textarea
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Send a message... (Enter to send, Shift+Enter for newline)"
+            rows={2}
+            className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 placeholder-gray-400 dark:placeholder-gray-500"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!inputText.trim() || sending || !wantName}
+            className="flex-shrink-0 p-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white disabled:text-gray-400 dark:disabled:text-gray-500 transition-colors"
+          >
+            {sending ? <LoadingSpinner size="sm" /> : <Send className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 };
 
