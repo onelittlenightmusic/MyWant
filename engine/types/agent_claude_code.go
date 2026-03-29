@@ -242,6 +242,10 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 
 	want.StoreLog("[CC_DO] Executing: claude %s", strings.Join(args[:len(args)-1], " "))
 
+	// Set last_request_at before executing so MonitorAgent can detect responses
+	// that arrive during execution (timestamps will be >= this value).
+	want.SetCurrent("last_request_at", time.Now().Unix())
+
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Env = os.Environ()
 
@@ -265,7 +269,7 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		want.SetCurrent("last_response_raw", response)
 		// Extract session_id from response if available for subsequent requests
 		if sid, ok := response["session_id"].(string); ok && sid != "" {
-			want.SetCurrent("session_id", sid)
+			want.SetGoal("session_id", sid)
 		}
 	}
 
@@ -274,7 +278,6 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		writeClaudeRequestLog(sessionID, requestID, "sent")
 	}
 
-	want.SetCurrent("last_request_at", time.Now().Unix())
 	want.StoreLog("[CC_DO] Request sent successfully")
 	return nil
 }
