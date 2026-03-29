@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -26,6 +27,8 @@ type WantTypeDefinition struct {
 	MonitorCapabilities []MonitorCapabilityDef `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
 	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
 	Agents              []AgentDef             `json:"agents" yaml:"agents"`
+	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`   // executable inline agent definitions
+	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`   // declarative achievement condition
 	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
 	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
 	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`
@@ -275,7 +278,55 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		return fmt.Errorf("no valid want type definitions could be loaded")
 	}
 
+	// Load user-local custom types from ~/.mywant/custom-types/ (best-effort, non-fatal).
+	w.loadUserCustomTypes()
+
 	return nil
+}
+
+// loadUserCustomTypes loads YAML files from ~/.mywant/custom-types/.
+// Errors are logged as warnings and do not abort startup.
+// Must be called with w.mu already held.
+func (w *WantTypeLoader) loadUserCustomTypes() {
+	dir := UserCustomTypesDir()
+	if dir == "" {
+		return
+	}
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return
+	}
+
+	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			// Skip hidden directories (e.g. .git)
+			if strings.HasPrefix(info.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+
+		def, err := w.loadWantTypeFromFile(path)
+		if err != nil {
+			msg := fmt.Sprintf("Warning: failed to load user custom type %s: %v", path, err)
+			log.Printf("%s\n", msg)
+			w.loadWarnings = append(w.loadWarnings, msg)
+			return nil
+		}
+		w.mergePredefinedState(def)
+		w.definitions[def.Metadata.Name] = def
+		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
+		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
+		w.validCategories[def.Metadata.Category] = true
+		log.Printf("[WantTypeLoader] Loaded user custom type: %s (from %s)\n", def.Metadata.Name, path)
+		return nil
+	})
 }
 
 // loadWantTypeFromFile loads a single want type YAML file
@@ -424,6 +475,48 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 
 	return nil
 }
+// RegisterDefinition adds or replaces a want type definition at runtime without loading from file.
+// Used by the hot-reload API to register new types dynamically.
+func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.definitions[def.Metadata.Name] = def
+}
+
+// ParseDefinitionFromYAML parses and validates a WantTypeDefinition from raw YAML bytes.
+// Returns the parsed definition or an error if validation fails.
+func (w *WantTypeLoader) ParseDefinitionFromYAML(data []byte) (*WantTypeDefinition, error) {
+	var wrapper WantTypeWrapper
+	if err := yaml.Unmarshal(data, &wrapper); err != nil {
+		return nil, fmt.Errorf("invalid YAML: %w", err)
+	}
+	def := &wrapper.WantType
+	w.mergePredefinedState(def)
+	if err := w.validateDefinition(def); err != nil {
+		return nil, err
+	}
+	return def, nil
+}
+
+// UnregisterDefinition removes a YAML-only want type definition at runtime.
+// Returns an error if the type does not exist, is system-registered, or is Go-backed.
+func (w *WantTypeLoader) UnregisterDefinition(name string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	def, ok := w.definitions[name]
+	if !ok {
+		return fmt.Errorf("want type %q not found", name)
+	}
+	if def.Metadata.SystemType {
+		return fmt.Errorf("want type %q is a system type and cannot be deleted", name)
+	}
+	if len(def.InlineAgents) == 0 {
+		return fmt.Errorf("want type %q is backed by Go code and cannot be deleted via API", name)
+	}
+	delete(w.definitions, name)
+	return nil
+}
+
 func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {
 	w.mu.RLock()
 	defer w.mu.RUnlock()

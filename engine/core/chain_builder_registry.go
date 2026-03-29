@@ -7,6 +7,17 @@ func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
 	cb.registry[wantType] = factory
 }
 
+// UnregisterWantType removes a YAML-only want type from the live registry.
+func (cb *ChainBuilder) UnregisterWantType(wantType string) {
+	delete(cb.registry, wantType)
+	if cb.wantTypeDefinitions != nil {
+		delete(cb.wantTypeDefinitions, wantType)
+	}
+	if cb.connectivityRegistry != nil {
+		delete(cb.connectivityRegistry, wantType)
+	}
+}
+
 // RegisterWantTypeFromYAML registers a want type and loads connectivity metadata from YAML
 func (cb *ChainBuilder) RegisterWantTypeFromYAML(wantType string, factory WantFactory, yamlDefPath string) error {
 	// Load YAML definition
@@ -65,6 +76,13 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
 			cb.RegisterWantType(wantType, createGenericFactory(wantType))
 		}
+	} else if len(def.InlineAgents) > 0 {
+		// YAML-only type with inline agent scripts — register (or re-register) ScriptableWant
+		// factory and wire up all inline agent functions so Requires resolution works.
+		// Always re-register to support hot-reload: a second call with updated YAML replaces
+		// the old factory and re-registers inline agents into the live registry.
+		registerInlineAgents(def, cb.agentRegistry)
+		cb.RegisterWantType(wantType, createScriptableFactory(def))
 	}
 
 	// Store connectivity metadata for later use during want creation

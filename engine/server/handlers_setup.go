@@ -82,8 +82,11 @@ func (s *Server) setupRoutes() {
 	// Want Type endpoints
 	wantTypes := api.PathPrefix("/want-types").Subrouter()
 	wantTypes.HandleFunc("", s.listWantTypes).Methods("GET")
+	wantTypes.HandleFunc("", s.registerWantType).Methods("POST")
 	wantTypes.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 	wantTypes.HandleFunc("/{name}", s.getWantType).Methods("GET")
+	wantTypes.HandleFunc("/{name}", s.updateWantType).Methods("PUT")
+	wantTypes.HandleFunc("/{name}", s.deleteWantType).Methods("DELETE")
 	wantTypes.HandleFunc("/{name}", s.handleOptions).Methods("OPTIONS")
 	wantTypes.HandleFunc("/{name}/examples", s.getWantTypeExamples).Methods("GET")
 	wantTypes.HandleFunc("/{name}/examples", s.handleOptions).Methods("OPTIONS")

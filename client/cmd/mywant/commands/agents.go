@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mywant/client"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -253,6 +254,102 @@ var getTypeCmd = &cobra.Command{
 	},
 }
 
+var registerTypeCmd = &cobra.Command{
+	Use:     "create",
+	Aliases: []string{"c", "add"},
+	Short:   "Create a new YAML-only want type (hot-reload)",
+	Long: `Create a new want type from a YAML file without restarting the server.
+The type is immediately available for use and persisted to yaml/want_types/custom/.
+
+Example:
+  mywant types create -f yaml/want_types/custom/my_type.yaml`,
+	Run: func(cmd *cobra.Command, args []string) {
+		filePath, _ := cmd.Flags().GetString("file")
+		if filePath == "" {
+			fmt.Println("Error: --file (-f) is required")
+			os.Exit(1)
+		}
+
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			fmt.Printf("Error reading file %s: %v\n", filePath, err)
+			os.Exit(1)
+		}
+
+		c := client.NewClient(viper.GetString("server"))
+		result, err := c.RegisterWantType(data)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		name, _ := result["name"].(string)
+		fmt.Printf("Created want type %q from %s\n", name, filepath.Base(filePath))
+	},
+}
+
+var updateTypeCmd = &cobra.Command{
+	Use:     "update [name]",
+	Aliases: []string{"u"},
+	Short:   "Update an existing YAML-only want type (hot-reload)",
+	Long: `Replace an existing YAML-only want type definition without restarting the server.
+The name in the YAML must match the name argument.
+
+Example:
+  mywant types update my_type -f yaml/want_types/custom/my_type.yaml`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeTypeNames,
+	Run: func(cmd *cobra.Command, args []string) {
+		name := args[0]
+		filePath, _ := cmd.Flags().GetString("file")
+		if filePath == "" {
+			fmt.Println("Error: --file (-f) is required")
+			os.Exit(1)
+		}
+
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			fmt.Printf("Error reading file %s: %v\n", filePath, err)
+			os.Exit(1)
+		}
+
+		c := client.NewClient(viper.GetString("server"))
+		result, err := c.UpdateWantType(name, data)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		updatedName, _ := result["name"].(string)
+		fmt.Printf("Updated want type %q from %s\n", updatedName, filepath.Base(filePath))
+	},
+}
+
+var deleteTypeCmd = &cobra.Command{
+	Use:               "delete [name]",
+	Aliases:           []string{"d", "rm"},
+	Short:             "Delete a YAML-only want type (hot-reload)",
+	Long: `Remove a YAML-only want type from the server without restarting.
+The persisted YAML file in yaml/want_types/custom/ is also deleted.
+Go-backed types cannot be deleted via this command.
+
+Example:
+  mywant types delete my_type`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeTypeNames,
+	Run: func(cmd *cobra.Command, args []string) {
+		name := args[0]
+		c := client.NewClient(viper.GetString("server"))
+		result, err := c.DeleteWantType(name)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		msg, _ := result["message"].(string)
+		fmt.Printf("Deleted want type %q: %s\n", name, msg)
+	},
+}
+
 func init() {
 	AgentsCmd.AddCommand(listAgentsCmd)
 	AgentsCmd.AddCommand(getAgentCmd)
@@ -264,4 +361,9 @@ func init() {
 
 	TypesCmd.AddCommand(listTypesCmd)
 	TypesCmd.AddCommand(getTypeCmd)
+	registerTypeCmd.Flags().StringP("file", "f", "", "Path to want type YAML file")
+	updateTypeCmd.Flags().StringP("file", "f", "", "Path to want type YAML file")
+	TypesCmd.AddCommand(registerTypeCmd)
+	TypesCmd.AddCommand(updateTypeCmd)
+	TypesCmd.AddCommand(deleteTypeCmd)
 }

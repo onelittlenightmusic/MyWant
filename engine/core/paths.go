@@ -15,6 +15,16 @@ func UserRecipesDir() string {
 	return filepath.Join(home, ".mywant", "recipes")
 }
 
+// UserCustomTypesDir returns the path to the user's custom want type directory (~/.mywant/custom-types).
+// YAML files placed here are loaded at startup and are available for hot-reload registration.
+func UserCustomTypesDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".mywant", "custom-types")
+}
+
 // YAML directory structure constants
 // These constants define the paths to all YAML configuration files
 // ensuring consistency across the application.
