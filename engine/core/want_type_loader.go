@@ -27,8 +27,10 @@ type WantTypeDefinition struct {
 	MonitorCapabilities []MonitorCapabilityDef `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
 	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
 	Agents              []AgentDef             `json:"agents" yaml:"agents"`
-	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`   // executable inline agent definitions
-	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`   // declarative achievement condition
+	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`     // executable inline agent definitions
+	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // declarative achievement condition
+	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"`     // actions to run when want is initialized
+	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`             // actions to run when want is deleted
 	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
 	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
 	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`

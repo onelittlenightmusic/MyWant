@@ -76,11 +76,10 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
 			cb.RegisterWantType(wantType, createGenericFactory(wantType))
 		}
-	} else if len(def.InlineAgents) > 0 {
-		// YAML-only type with inline agent scripts — register (or re-register) ScriptableWant
-		// factory and wire up all inline agent functions so Requires resolution works.
-		// Always re-register to support hot-reload: a second call with updated YAML replaces
-		// the old factory and re-registers inline agents into the live registry.
+	} else if len(def.InlineAgents) > 0 || def.OnInitialize != nil || def.OnDelete != nil || def.AchievedWhen != nil {
+		// YAML-only type: has inline agents, lifecycle hooks, or declarative achievement condition.
+		// Register (or re-register) ScriptableWant factory and wire up inline agents.
+		// Always re-register to support hot-reload.
 		registerInlineAgents(def, cb.agentRegistry)
 		cb.RegisterWantType(wantType, createScriptableFactory(def))
 	}

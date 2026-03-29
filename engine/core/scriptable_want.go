@@ -16,8 +16,8 @@ type ScriptableWant struct {
 // ScriptableLocals holds no runtime locals; state is managed entirely via Want state.
 type ScriptableLocals struct{}
 
-// Initialize copies all parameters to state using their declared labels.
-// Parameters matching a goal-labeled state field go to SetGoal; others to SetCurrent.
+// Initialize copies all parameters to state using their declared labels,
+// then executes the onInitialize lifecycle hook if defined.
 func (s *ScriptableWant) Initialize() {
 	if s.WantTypeDefinition == nil {
 		return
@@ -35,10 +35,45 @@ func (s *ScriptableWant) Initialize() {
 		case "plan":
 			s.SetPlan(k, v)
 		default:
-			// Treat current-labeled and unrecognised params as current.
 			if _, isStateDefined := labels[k]; isStateDefined {
 				s.SetCurrent(k, v)
 			}
+		}
+	}
+
+	if s.WantTypeDefinition.OnInitialize != nil {
+		s.execLifecycleHook(s.WantTypeDefinition.OnInitialize)
+	}
+}
+
+// OnDelete executes the onDelete lifecycle hook if defined.
+func (s *ScriptableWant) OnDelete() {
+	if s.WantTypeDefinition == nil || s.WantTypeDefinition.OnDelete == nil {
+		return
+	}
+	s.execLifecycleHook(s.WantTypeDefinition.OnDelete)
+}
+
+// execLifecycleHook applies state changes declared in a lifecycle hook and
+// optionally calls ExecuteAgents.
+func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
+	for stateKey, paramKey := range hook.Params {
+		if v, ok := s.Spec.Params[paramKey]; ok {
+			s.SetCurrent(stateKey, fmt.Sprintf("%v", v))
+		}
+	}
+	for k, v := range hook.Current {
+		s.SetCurrent(k, v)
+	}
+	for k, v := range hook.Plan {
+		s.SetPlan(k, v)
+	}
+	for k, v := range hook.Goal {
+		s.SetGoal(k, v)
+	}
+	if hook.ExecuteAgents {
+		if err := s.ExecuteAgents(); err != nil {
+			s.DirectLog("[ScriptableWant] ExecuteAgents error in lifecycle hook: %v", err)
 		}
 	}
 }

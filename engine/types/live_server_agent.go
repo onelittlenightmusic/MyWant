@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -24,26 +26,34 @@ func init() {
 func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 	want.DirectLog("[AGENT] manageLiveServer called for want %s", want.Metadata.Name)
 
-	phase := mywant.GetCurrent(want, "server_phase", "")
-	if phase == "" {
-		want.DirectLog("[AGENT] No server_phase set, returning")
+	plan := mywant.GetPlan(want, "process_plan", "")
+	if plan == "" {
+		want.DirectLog("[AGENT] No process_plan set, returning")
 		return nil
 	}
 
-	existingPID := mywant.GetCurrent(want, "server_pid", 0)
+	existingPID := mywant.GetCurrent(want, "process_pid", 0)
 
-	switch phase {
-	case "starting":
+	switch plan {
+	case "start":
+		// Auto-generate log file path if not set, so URL extraction can work.
+		logFile := mywant.GetCurrent(want, "process_log_file", "")
+		if logFile == "" {
+			logFile = fmt.Sprintf("/tmp/managed-process-%s.log", want.Metadata.Name)
+			want.SetCurrent("process_log_file", logFile)
+		}
+
 		// Idempotent start: kill any stale process and clear the log before launching.
-		EnsureProcessStopped(want, "server_pid")
-		EnsureLogFileTruncated(want, "server_log_file")
+		EnsureProcessStopped(want, "process_pid")
+		EnsureLogFileTruncated(want, "process_log_file")
 
 		pid, err := startLiveServer(want)
 		if err != nil {
 			want.DirectLog("[ERROR] Failed to start server: %v", err)
+			want.SetCurrent("process_status", "failed")
 			return err
 		}
-		want.SetCurrent("server_pid", pid)
+		want.SetCurrent("process_pid", pid)
 		want.DirectLog("[INFO] Started server with PID %d", pid)
 
 		// If health_check_url is configured, poll for readiness
@@ -55,21 +65,39 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 				if proc, findErr := os.FindProcess(pid); findErr == nil {
 					proc.Signal(syscall.SIGTERM)
 				}
-				want.SetCurrent("server_pid", 0)
+				want.SetCurrent("process_pid", 0)
+				want.SetCurrent("process_status", "failed")
 				return err
 			}
 			want.SetCurrent("health_check_response", body)
 			want.DirectLog("[INFO] Health check passed")
 		}
 
-	case "stopping":
+		// If url_regex is configured, poll the log file for a URL pattern.
+		urlRegex := getConfigString(want, "url_regex", "url_regex", "")
+		if urlRegex != "" {
+			maxRetries := getConfigInt(want, "max_retries", "max_retries", 30)
+			url := waitForPattern(ctx, want, logFile, urlRegex, maxRetries)
+			if url == "" {
+				want.SetCurrent("process_status", "failed")
+				want.SetCurrent("error_message", fmt.Sprintf("timed out waiting for URL pattern in %s", logFile))
+				return fmt.Errorf("timed out waiting for URL pattern in %s", logFile)
+			}
+			resultField := getConfigString(want, "result_field", "result_field", "server_url")
+			want.SetCurrent(resultField, url)
+			want.DirectLog("[INFO] Captured URL: %s → %s", url, resultField)
+		}
+		want.SetCurrent("process_status", "running")
+
+	case "stop":
 		if existingPID != 0 {
 			err := stopLiveServer(existingPID, want)
 			if err != nil {
 				want.DirectLog("[WARN] Failed to stop server PID %d: %v", existingPID, err)
 			} else {
 				want.DirectLog("[INFO] Stopped server PID %d", existingPID)
-				want.SetCurrent("server_pid", 0)
+				want.SetCurrent("process_pid", 0)
+				want.SetCurrent("process_status", "stopped")
 				want.SetCurrent("health_check_response", "")
 			}
 		}
@@ -80,12 +108,12 @@ func manageLiveServer(ctx context.Context, want *mywant.Want) error {
 
 // startLiveServer starts a server process using command and args from state (fallback: params)
 func startLiveServer(want *mywant.Want) (int, error) {
-	command := getConfigString(want, "server_command", "command", "")
+	command := getConfigString(want, "process_command", "command", "")
 	if command == "" {
 		return 0, fmt.Errorf("command parameter is required")
 	}
 	args := getConfigArgs(want)
-	logFile := getConfigString(want, "server_log_file", "log_file", "")
+	logFile := getConfigString(want, "process_log_file", "log_file", "")
 
 	// Binary lookup: LookPath first, then os.Stat fallback
 	binPath, err := exec.LookPath(command)
@@ -198,8 +226,8 @@ func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) 
 
 // getConfigArgs reads args from state (JSON string) first, then falls back to params.
 func getConfigArgs(want *mywant.Want) []string {
-	if v := mywant.GetCurrent(want, "server_args", ""); v != "" {
-		want.DirectLog("[DEBUG] Unmarshalling server_args: %q", v)
+	if v := mywant.GetCurrent(want, "process_args", ""); v != "" {
+		want.DirectLog("[DEBUG] Unmarshalling process_args: %q", v)
 		// Stored as JSON array string
 		var args []string
 		if err := json.Unmarshal([]byte(v), &args); err == nil {
@@ -291,4 +319,43 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 
 	want.DirectLog("[INFO] Sent termination signal to server PID %d", pid)
 	return nil
+}
+
+// waitForPattern polls logFile until the regex matches, returning the first capture group.
+func waitForPattern(ctx context.Context, want *mywant.Want, logFile, pattern string, maxRetries int) string {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		want.DirectLog("[ERROR] Invalid url_regex: %v", err)
+		return ""
+	}
+	interval := 500 * time.Millisecond
+	for i := range maxRetries {
+		select {
+		case <-ctx.Done():
+			return ""
+		default:
+		}
+		if url := scanPattern(logFile, re); url != "" {
+			return url
+		}
+		want.DirectLog("[DEBUG] Waiting for URL pattern (attempt %d/%d)...", i+1, maxRetries)
+		time.Sleep(interval)
+	}
+	return ""
+}
+
+// scanPattern scans logFile line by line and returns the first regex capture group match.
+func scanPattern(logFile string, re *regexp.Regexp) string {
+	f, err := os.Open(logFile)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if m := re.FindStringSubmatch(scanner.Text()); len(m) > 1 {
+			return m[1]
+		}
+	}
+	return ""
 }
