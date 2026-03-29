@@ -37,6 +37,8 @@ wantType:
       type: string
       default: ""
 
+  finalResultField: server_url
+
   requires:
     - live_server_management
 
