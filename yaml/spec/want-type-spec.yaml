@@ -63,6 +63,30 @@ components:
         finalResultField:
           type: string
           description: Default state key for final_result
+        achievedWhen:
+          description: Declarative achievement condition (replaces Go IsAchieved())
+          type: object
+          properties:
+            field:
+              type: string
+            operator:
+              type: string
+              enum: ["==", "!=", ">", ">=", "<", "<="]
+            value: {}
+          required: [field, operator, value]
+          additionalProperties: false
+        onInitialize:
+          description: Actions to execute when the want is initialized
+          $ref: '#/components/schemas/LifecycleHookDef'
+        onDelete:
+          description: Actions to execute when the want is deleted
+          $ref: '#/components/schemas/LifecycleHookDef'
+        inlineAgents:
+          type: array
+          description: Inline agent definitions with embedded scripts
+          items:
+            $ref: '#/components/schemas/InlineAgentDef'
+          default: []
         agents:
           type: array
           description: Agent definitions
@@ -337,6 +361,54 @@ components:
       type: object
       description: Deprecated usage limit specification (use connect instead)
       additionalProperties: true
+
+    # Lifecycle hook definition
+    LifecycleHookDef:
+      type: object
+      description: Actions executed at a want lifecycle event (onInitialize, onDelete)
+      properties:
+        params:
+          type: object
+          description: Copy want params into current state (key=stateField, value=paramName)
+          additionalProperties:
+            type: string
+        current:
+          type: object
+          description: Set current state fields to literal values
+          additionalProperties: true
+        plan:
+          type: object
+          description: Set plan state fields to literal values
+          additionalProperties: true
+        goal:
+          type: object
+          description: Set goal state fields to literal values
+          additionalProperties: true
+        executeAgents:
+          type: boolean
+          description: Call ExecuteAgents() after applying state changes
+      additionalProperties: false
+
+    # Inline agent definition
+    InlineAgentDef:
+      type: object
+      description: Executable agent with inline script embedded in a YAML want type
+      required: [name, type, runtime, script]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [think, do, monitor]
+        runtime:
+          type: string
+          enum: [shell, python, rego]
+        script:
+          type: string
+        interval:
+          type: integer
+          description: Execution interval in seconds (0 = default)
+      additionalProperties: false
 
     # Agent definition
     AgentDef:
