@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -253,6 +254,14 @@ func getArgsParam(want *mywant.Want) []string {
 		return args
 	case []string:
 		return v
+	case string:
+		// JSON array string e.g. `'["http","8080"]'`
+		var parsed []string
+		if err := json.Unmarshal([]byte(v), &parsed); err == nil {
+			return parsed
+		}
+		// fallback: space-separated
+		return strings.Fields(v)
 	}
 	return nil
 }

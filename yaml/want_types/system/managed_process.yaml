@@ -1,0 +1,115 @@
+wantType:
+  metadata:
+    name: managed_process
+    title: Managed Process
+    description: |
+      Manages an external process lifecycle (start/stop/health check).
+      Starts a command in the background, optionally waits for a URL pattern in logs,
+      and stores the extracted URL in state.
+    version: "1.0"
+    category: system
+    pattern: independent
+    system_type: true
+
+  parameters:
+    - name: command
+      description: Path or name of the executable to run
+      type: string
+      required: true
+    - name: args
+      description: CLI arguments as a JSON array string
+      type: string
+      default: "[]"
+    - name: url_regex
+      description: Regex pattern to extract a URL from process output
+      type: string
+      default: ""
+    - name: result_field
+      description: State field name to store the extracted URL
+      type: string
+      default: "server_url"
+    - name: max_retries
+      description: Max polling retries waiting for the URL pattern
+      type: int
+      default: 30
+    - name: log_file
+      description: Path to capture process stdout/stderr (auto-generated if empty)
+      type: string
+      default: ""
+
+  requires:
+    - live_server_management
+
+  state:
+    - name: server_pid
+      description: PID of the running process
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: server_url
+      description: Extracted URL from process output
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: server_phase
+      description: Lifecycle phase (starting, running, stopping, stopped)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: server_log_file
+      description: Path to the process log file
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: server_command
+      description: Resolved command path
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: server_args
+      description: Resolved args as JSON array string
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: url_regex
+      description: Regex used to extract URL from logs
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: result_field
+      description: State field name where extracted URL is stored
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: max_retries
+      description: Max polling retries for URL detection
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+    - name: result_url
+      description: Raw extracted URL before storing to result_field
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: error_message
+      description: Error message if process failed to start
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: achieving_percentage
+      description: Progress percentage toward goal
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
