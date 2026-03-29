@@ -38,12 +38,12 @@ export const HeaderOverlay: React.FC<HeaderOverlayProps> = ({
         animation: 'quickActionsIn 150ms ease-out forwards',
       }}
     >
-      {/* Dark backdrop */}
-      <div className="absolute inset-0 bg-black/80" />
+      {/* Backdrop: Dark in light mode, whitish in dark mode */}
+      <div className="absolute inset-0 bg-black/80 dark:bg-white/90" />
 
-      {/* Action bar content */}
+      {/* Action bar content: Black text only in dark mode */}
       {children && (
-        <div className="relative z-10 h-full">
+        <div className="relative z-10 h-full dark:text-black">
           {children}
         </div>
       )}

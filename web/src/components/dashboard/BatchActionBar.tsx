@@ -26,8 +26,8 @@ const ActionCell: React.FC<ActionCellProps> = ({ icon, label, onClick, colorClas
       animationDelay: `${delay}ms`,
     }}
   >
-    <div className="w-5 h-5 flex items-center justify-center">{icon}</div>
-    <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">{label}</span>
+    <div className="w-5 h-5 flex items-center justify-center text-white dark:text-black">{icon}</div>
+    <span className="text-white dark:text-black text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">{label}</span>
   </button>
 );
 
@@ -70,9 +70,9 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
     <div className="h-full flex items-stretch">
       {/* Left: selection count */}
       <div className="flex items-center px-3 sm:px-6 min-w-[72px] sm:min-w-[96px]">
-        <span className="text-white text-sm font-semibold tabular-nums">
+        <span className="text-white dark:text-black text-sm font-semibold tabular-nums">
           {selectedCount}
-          <span className="text-white/60 text-xs ml-1 hidden sm:inline">selected</span>
+          <span className="text-white/60 dark:text-black/60 text-xs ml-1 hidden sm:inline">selected</span>
         </span>
       </div>
 
@@ -80,25 +80,25 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
       <div className="flex flex-1 items-stretch justify-center">
         <div className="flex h-full">
           <ActionCell
-            icon={<Play className="w-5 h-5 text-white" fill="currentColor" />}
+            icon={<Play className="w-5 h-5" fill="currentColor" />}
             label="Start"
             onClick={onBatchStart}
             colorClass="bg-green-600/90"
             disabled={!hasSelection || loading}
             delay={0}
           />
-          <div className="w-px bg-white/15 self-stretch" />
+          <div className="w-px bg-white/15 dark:bg-black/15 self-stretch" />
           <ActionCell
-            icon={<Square className="w-5 h-5 text-white" fill="currentColor" />}
+            icon={<Square className="w-5 h-5" fill="currentColor" />}
             label="Stop"
             onClick={onBatchStop}
             colorClass="bg-red-600/90"
             disabled={!hasSelection || loading}
             delay={30}
           />
-          <div className="w-px bg-white/15 self-stretch" />
+          <div className="w-px bg-white/15 dark:bg-black/15 self-stretch" />
           <ActionCell
-            icon={<Trash2 className="w-5 h-5 text-white" />}
+            icon={<Trash2 className="w-5 h-5" />}
             label="Delete"
             onClick={onBatchDelete}
             colorClass="bg-rose-700/90"
@@ -112,7 +112,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
       <div className="flex items-center px-3 sm:px-6 min-w-[72px] sm:min-w-[96px] justify-end">
         <button
           onClick={onExit}
-          className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded text-white/70 hover:text-white hover:bg-white/10 dark:text-black/70 dark:hover:text-black dark:hover:bg-black/10 transition-colors"
         >
           <X className="w-5 h-5" />
           <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Exit</span>
