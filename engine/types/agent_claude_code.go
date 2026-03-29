@@ -86,6 +86,14 @@ func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
 		want.SetCurrent("latest_timestamp", latest.Timestamp)
 	}
 
+	// Backfill chat history after restart: if cc_messages is empty but session has
+	// entries, populate cc_messages + cc_responses from the last N exchange pairs.
+	const backfillPairs = 5
+	existingMessages := GetCurrent(want, "cc_messages", []any{})
+	if len(existingMessages) == 0 && len(entries) > 0 {
+		backfillChatHistory(want, entries, backfillPairs)
+	}
+
 	// Pattern matching
 	watchPattern := GetGoal(want, "watch_pattern", "")
 	if watchPattern != "" {
@@ -509,6 +517,60 @@ func hasNewAssistantResponse(entries []sessionEntry, afterTimestamp int64) bool 
 		}
 	}
 	return false
+}
+
+// backfillChatHistory populates cc_messages and cc_responses from the last N
+// user/assistant exchange pairs in the session file. Called once after restart
+// when cc_messages is empty but the session already has history.
+func backfillChatHistory(want *Want, entries []sessionEntry, maxPairs int) {
+	type pair struct {
+		user      sessionEntry
+		assistant sessionEntry
+	}
+	var pairs []pair
+	i := len(entries) - 1
+	for i >= 0 && len(pairs) < maxPairs {
+		for i >= 0 && entries[i].Role != "assistant" {
+			i--
+		}
+		if i < 0 {
+			break
+		}
+		asst := entries[i]
+		i--
+		for i >= 0 && entries[i].Role != "user" {
+			i--
+		}
+		if i < 0 {
+			break
+		}
+		pairs = append(pairs, pair{user: entries[i], assistant: asst})
+		i--
+	}
+	if len(pairs) == 0 {
+		return
+	}
+	// Reverse so oldest pair is first
+	for l, r := 0, len(pairs)-1; l < r; l, r = l+1, r-1 {
+		pairs[l], pairs[r] = pairs[r], pairs[l]
+	}
+	msgs := make([]any, 0, len(pairs))
+	resps := make([]any, 0, len(pairs))
+	for _, p := range pairs {
+		msgs = append(msgs, map[string]any{
+			"sender":    "user",
+			"text":      p.user.Content,
+			"timestamp": p.user.Timestamp,
+		})
+		resps = append(resps, map[string]any{
+			"text":      p.assistant.Content,
+			"timestamp": p.assistant.Timestamp,
+			"subtype":   "success",
+		})
+	}
+	want.SetCurrent("cc_messages", msgs)
+	want.SetCurrent("cc_responses", resps)
+	want.DirectLog("[CC_MONITOR] Backfilled %d exchange pair(s) from session history", len(pairs))
 }
 
 // getLatestAssistantContent returns the content of the most recent assistant message.
