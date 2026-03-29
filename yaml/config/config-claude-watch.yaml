@@ -3,7 +3,6 @@ wants:
     type: claude_code_thread
     spec:
       params:
-        session_id: "YOUR_SESSION_ID_HERE"
         watch_pattern: "LGTM|approved|done|completed"
         trigger_on: "pattern"
         auto_request: |

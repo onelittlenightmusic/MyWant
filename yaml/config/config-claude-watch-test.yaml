@@ -4,7 +4,6 @@ wants:
       type: claude_code_thread
     spec:
       params:
-        session_id: "a68bfd69-3f8b-42a7-96a9-463d96652df3"
         trigger_on: "webhook"
         max_requests: 3
         timeout_seconds: 120

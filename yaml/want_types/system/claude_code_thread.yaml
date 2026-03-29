@@ -21,10 +21,10 @@ wantType:
 
   parameters:
   - name: session_id
-    description: Claude Code session ID to monitor
+    description: Claude Code session ID to resume (optional — omit to create a new session on first message)
     type: string
-    required: true
-    example: "abc123def456"
+    required: false
+    default: ""
 
   - name: watch_pattern
     description: Regex pattern to match in session output
@@ -348,7 +348,6 @@ wantType:
         type: claude_code_thread
       spec:
         params:
-          session_id: "abc123def456"
           watch_pattern: "LGTM|approved|looks good"
           trigger_on: "pattern"
           auto_request: "Great, please proceed with the implementation."
@@ -369,7 +368,6 @@ wantType:
         type: claude_code_thread
       spec:
         params:
-          session_id: "def789ghi012"
           trigger_on: "waiting"
           auto_request: "Yes, please continue with the current approach."
           max_requests: 5
@@ -395,7 +393,6 @@ wantType:
         type: claude_code_thread
       spec:
         params:
-          session_id: "abc123def456"
           trigger_on: "webhook"
           max_requests: 10
 
