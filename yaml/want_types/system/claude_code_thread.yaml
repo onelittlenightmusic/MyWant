@@ -78,6 +78,12 @@ wantType:
     required: false
     default: 300
 
+  - name: working_dir
+    description: Working directory for Claude Code sessions (defaults to mywant server's cwd if omitted)
+    type: string
+    required: false
+    default: ""
+
   state:
   - name: phase
     description: Current phase of the want (monitoring, trigger_ready, requesting, awaiting_response, response_received, achieved, error)
@@ -119,6 +125,13 @@ wantType:
     type: int
     persistent: true
     initialValue: 3
+    label: goal
+
+  - name: working_dir
+    description: Working directory for Claude Code sessions
+    type: string
+    persistent: true
+    initialValue: ""
     label: goal
 
   - name: current_session_state

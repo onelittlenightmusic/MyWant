@@ -35,6 +35,7 @@ type ClaudeCodeThreadLocals struct {
 	MaxReqs    int    `mywant:"internal,max_requests"`
 	ReqCount   int    `mywant:"internal,request_count"`
 	TimeoutSec int    `mywant:"internal,timeout_seconds"`
+	WorkingDir string `mywant:"internal,working_dir"`
 }
 
 // ClaudeCodeThreadWant monitors Claude Code sessions and sends requests on trigger.
@@ -61,6 +62,7 @@ func (w *ClaudeCodeThreadWant) Initialize() {
 	locals.MaxReqs = w.GetIntParam("max_requests", 3)
 	locals.TimeoutSec = w.GetIntParam("timeout_seconds", 300)
 	locals.ReqCount = 0
+	locals.WorkingDir = w.GetStringParam("working_dir", "")
 
 	// Goal: what we're watching for
 	w.SetGoal("session_id", locals.SessionID)
@@ -68,6 +70,7 @@ func (w *ClaudeCodeThreadWant) Initialize() {
 	w.SetGoal("watch_pattern", w.GetStringParam("watch_pattern", ""))
 	w.SetGoal("auto_request", w.GetStringParam("auto_request", ""))
 	w.SetGoal("max_requests", locals.MaxReqs)
+	w.SetGoal("working_dir", locals.WorkingDir)
 
 	// Current: phase and operational state
 	w.SetCurrent("phase", CCPhaseMonitoring)

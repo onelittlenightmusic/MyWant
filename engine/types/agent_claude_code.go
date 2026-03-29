@@ -261,6 +261,9 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Env = os.Environ()
+	if workingDir := GetGoal(want, "working_dir", ""); workingDir != "" {
+		cmd.Dir = workingDir
+	}
 
 	out, err := cmd.Output()
 	if err != nil {
