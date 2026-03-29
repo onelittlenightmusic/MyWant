@@ -3,10 +3,12 @@ package mywant
 import (
 	"context"
 	"fmt"
-	"github.com/getkin/kin-openapi/openapi3"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
+	"gopkg.in/yaml.v3"
 )
 
 // RecipeWant represents a want in recipe format (aligned with Want structure)
@@ -305,7 +307,13 @@ func (grl *GenericRecipeLoader) ListRecipes() ([]string, error) {
 		if err != nil {
 			return err
 		}
-
+		if info.IsDir() {
+			// Skip hidden directories (e.g. .git)
+			if strings.HasPrefix(info.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if filepath.Ext(path) == ".yaml" || filepath.Ext(path) == ".yml" {
 			relPath, err := filepath.Rel(grl.recipeDir, path)
 			if err != nil {
