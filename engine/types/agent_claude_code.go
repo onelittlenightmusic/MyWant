@@ -292,10 +292,8 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 	} else {
 		want.SetCurrent("last_response_raw", response)
 		// Extract session_id from response if available for subsequent requests.
-		// UpdateParameter writes to spec.params so it survives server restarts
-		// (state is ephemeral but spec.params is persisted in state.yaml).
+		// SetGoal persists to state.yaml via MarshalYAML and survives restarts.
 		if sid, ok := response["session_id"].(string); ok && sid != "" {
-			want.UpdateParameter("session_id", sid)
 			want.SetGoal("session_id", sid)
 		}
 		// Append response to cc_responses ring buffer (FIFO, max 20) for chat display

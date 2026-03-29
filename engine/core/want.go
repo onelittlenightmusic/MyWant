@@ -17,6 +17,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // TransportPacket wraps data sent over channels to include termination signals
@@ -359,6 +361,44 @@ func (n *Want) UnmarshalJSON(data []byte) error {
 	}
 	for key, value := range aux.State {
 		n.State.Store(key, value)
+	}
+	return nil
+}
+
+// MarshalYAML handles custom YAML marshalling for the Want struct.
+// Mirrors MarshalJSON: includes State (goal/current/plan) so it is
+// persisted to state.yaml and survives server restarts.
+func (n *Want) MarshalYAML() (interface{}, error) {
+	type Alias Want
+	stateMap := make(map[string]any)
+	n.State.Range(func(key, value any) bool {
+		stateMap[key.(string)] = value
+		return true
+	})
+	return &struct {
+		State map[string]any `yaml:"state,omitempty"`
+		*Alias `yaml:",inline"`
+	}{
+		State: stateMap,
+		Alias: (*Alias)(n),
+	}, nil
+}
+
+// UnmarshalYAML handles custom YAML unmarshalling for the Want struct.
+// Mirrors UnmarshalJSON: restores State from state.yaml on startup.
+func (n *Want) UnmarshalYAML(value *yaml.Node) error {
+	type Alias Want
+	aux := &struct {
+		State map[string]any `yaml:"state"`
+		*Alias `yaml:",inline"`
+	}{
+		Alias: (*Alias)(n),
+	}
+	if err := value.Decode(aux); err != nil {
+		return err
+	}
+	for key, val := range aux.State {
+		n.State.Store(key, val)
 	}
 	return nil
 }
