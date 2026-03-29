@@ -59,12 +59,19 @@ func InitializeWebhook(want *Want, cfg WebhookWantConfig, locals *WebhookLocals)
 
 	locals.WebhookSecret = want.GetStringParam(cfg.SecretParamName, "")
 	locals.ChannelFilter = want.GetStringParam("channel_filter", "")
-	locals.LastProcessedCount = 0
-	
+
+	// Preserve existing message count and history across restarts so that
+	// cc_webhook_processed (persisted) stays in sync with cc_message_count.
+	// On first run both are 0; on restart we keep the saved count.
+	existingCount := GetCurrent(want, cfg.MessageCountKey(), 0)
+	locals.LastProcessedCount = existingCount
+	if existingCount == 0 {
+		want.SetCurrent(cfg.MessagesKey(), []any{})
+		want.SetCurrent(cfg.MessageCountKey(), 0)
+	}
+
 	want.SetCurrent("webhook_url", fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name))
 	want.SetCurrent(cfg.StatusKey(), "active")
-	want.SetCurrent(cfg.MessagesKey(), []any{})
-	want.SetCurrent(cfg.MessageCountKey(), 0)
 
 	want.StoreLog("%s Webhook URL: POST /api/v1/webhooks/%s", cfg.LogPrefix, want.Metadata.Name)
 
