@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, SlidersHorizontal } from 'lucide-react';
+import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, Search } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -517,7 +517,7 @@ export const WantForm: React.FC<WantFormProps> = ({
           )}
           title="Toggle search/filter"
         >
-          <SlidersHorizontal className="w-4 h-4" />
+          <Search className="w-4 h-4" />
           <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Filter</span>
         </button>
       )}

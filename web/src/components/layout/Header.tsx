@@ -109,8 +109,13 @@ export const Header: React.FC<HeaderProps> = ({
     }
   }, [showProviderSelect, showBubbleOnMobile]);
 
+  const menuJustClosedRef = useRef(false);
+
   // Close hamburger menu when mouse leaves the menu area
   const handleMenuMouseLeave = () => setMenuOpen(false);
+  const handleMenuMouseEnter = () => {
+    if (!menuJustClosedRef.current) setMenuOpen(true);
+  };
 
   const handleRobotClick = () => {
     if (window.innerWidth < 1024) {
@@ -135,6 +140,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Dismiss keyboard on iOS when closing the menu
   const closeMenu = () => {
+    menuJustClosedRef.current = true;
+    setTimeout(() => { menuJustClosedRef.current = false; }, 400);
     (document.activeElement as HTMLElement)?.blur();
     setMenuOpen(false);
   };
@@ -152,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center justify-between gap-1 sm:gap-4">
         <div className="flex items-center space-x-2 min-w-0" ref={menuRef}>
           {/* Hamburger menu button — opens on hover */}
-          <div className="relative" onMouseEnter={() => setMenuOpen(true)} onMouseLeave={handleMenuMouseLeave}>
+          <div className="relative" onMouseEnter={handleMenuMouseEnter} onMouseLeave={handleMenuMouseLeave}>
             <button
               onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}
               className={menuOpen
