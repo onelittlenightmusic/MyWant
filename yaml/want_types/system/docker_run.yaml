@@ -19,7 +19,33 @@ wantType:
     category: system
     pattern: independent
 
-  finalResultField: docker_phase
+  finalResultField: docker_container_id
+
+  onInitialize:
+    params:
+      docker_image: image
+      docker_container_name: container_name
+      docker_ports: ports
+      docker_volumes: volumes
+      docker_env: env
+      docker_command_args: command_args
+      docker_wait_for_exit: wait_for_exit
+      health_check_url: health_check_url
+      server_health_check_interval: health_check_interval
+      server_health_check_max_retries: health_check_max_retries
+    plan:
+      docker_plan: "start"
+    executeAgents: true
+
+  onDelete:
+    plan:
+      docker_plan: "stop"
+    executeAgents: true
+
+  achievedWhen:
+    field: docker_phase
+    operator: "=="
+    value: "running"
 
   parameters:
     - name: image
@@ -134,6 +160,13 @@ wantType:
       type: string
       persistent: true
       label: current
+      initialValue: ''
+
+    - name: docker_plan
+      description: Lifecycle control directive (start | stop). Written by onInitialize/onDelete hooks.
+      type: string
+      persistent: false
+      label: plan
       initialValue: ''
 
     - name: docker_phase
