@@ -103,6 +103,21 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.SetCurrent("launch_status", "running")
+
+	// Optional: extract a URL from the log using url_regex → store in result_field
+	urlRegex := mywant.GetCurrent(want, "url_regex", "")
+	if urlRegex != "" {
+		maxRetries := mywant.GetCurrent(want, "max_retries", 30)
+		resultField := mywant.GetCurrent(want, "result_field", "server_url")
+		want.DirectLog("[LAUNCH] Waiting for URL pattern in log (max %d retries)...", maxRetries)
+		if url := waitForPattern(ctx, want, logFile, urlRegex, maxRetries); url != "" {
+			want.DirectLog("[LAUNCH] Captured URL: %s → %s", url, resultField)
+			want.SetCurrent(resultField, url)
+		} else {
+			want.DirectLog("[LAUNCH] Warning: url_regex did not match within %d retries", maxRetries)
+		}
+	}
+
 	return nil
 }
 
