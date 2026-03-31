@@ -45,6 +45,24 @@ wantType:
       - /bin/zsh
     example: /bin/bash
 
+  - name: runtime
+    description: Execution runtime (shell or ansible)
+    type: string
+    default: shell
+    required: false
+    validation:
+      enum:
+      - shell
+      - ansible
+    example: ansible
+
+  - name: scriptFile
+    description: Path to Ansible playbook file (required when runtime is ansible)
+    type: string
+    default: ''
+    required: false
+    example: yaml/scripts/my_playbook.yaml
+
   state:
   - name: completed
     description: Whether command execution has completed
@@ -181,6 +199,8 @@ wantType:
       timeout: timeout
       working_directory: working_directory
       shell: shell
+      runtime: runtime
+      scriptFile: scriptFile
 
   agents:
   - name: execution_command

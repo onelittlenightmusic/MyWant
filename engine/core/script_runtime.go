@@ -110,6 +110,11 @@ func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
 	}
 }
 
+// NewAnsibleRuntime returns an AnsibleRuntime for use outside this package.
+func NewAnsibleRuntime() ScriptRuntime {
+	return &ansibleRuntime{}
+}
+
 // resolveRuntime returns the ScriptRuntime for the given runtime name.
 func resolveRuntime(runtime string) ScriptRuntime {
 	switch runtime {

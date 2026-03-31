@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"time"
 
@@ -15,7 +16,15 @@ func init() {
 }
 
 // executeCommand performs the actual command execution and writes results directly to want state.
+// When runtime=="ansible" and scriptFile is set, delegates to ansibleRuntime instead of shell.
 func executeCommand(ctx context.Context, want *mywant.Want) error {
+	runtime := mywant.GetCurrent(want, "runtime", "shell")
+	scriptFile := mywant.GetCurrent(want, "scriptFile", "")
+
+	if runtime == "ansible" {
+		return executeCommandAnsible(want, scriptFile)
+	}
+
 	// Read parameters from want state using generic GetCurrent
 	commandStr := mywant.GetCurrent(want, "command", "")
 	shellStr := mywant.GetCurrent(want, "shell", "/bin/bash")
@@ -86,4 +95,46 @@ func executeCommand(ctx context.Context, want *mywant.Want) error {
 	}
 
 	return nil // Return nil even on command failure (agent executed successfully)
+}
+
+// executeCommandAnsible runs an Ansible playbook via ansibleRuntime and maps the
+// current_updates output back to the standard execution_result state fields.
+// The playbook should write {"current_updates": {"completed": true, "stdout": "...", ...}}
+// to the file at $MYWANT_OUTPUT_FILE.
+func executeCommandAnsible(want *mywant.Want, scriptFile string) error {
+	if scriptFile == "" {
+		want.SetCurrent("completed", false)
+		want.SetCurrent("status", "failed")
+		want.SetCurrent("error_message", "runtime=ansible requires scriptFile parameter")
+		return nil
+	}
+
+	playbook, err := os.ReadFile(scriptFile)
+	if err != nil {
+		want.SetCurrent("completed", false)
+		want.SetCurrent("status", "failed")
+		want.SetCurrent("error_message", fmt.Sprintf("scriptFile read error: %v", err))
+		return nil
+	}
+
+	want.SetCurrent("achieving_percentage", 50)
+	want.StoreLog("Starting Ansible playbook execution: %s", scriptFile)
+
+	runtime := mywant.NewAnsibleRuntime()
+	if err := runtime.ExecuteDo(want, string(playbook)); err != nil {
+		want.SetCurrent("completed", false)
+		want.SetCurrent("status", "failed")
+		want.SetCurrent("error_message", err.Error())
+		return nil
+	}
+
+	// If the playbook did not set completed, default to true (playbook ran without error).
+	if mywant.GetCurrent(want, "completed", false) != true {
+		want.SetCurrent("completed", true)
+	}
+	if mywant.GetCurrent(want, "status", "") == "" || mywant.GetCurrent(want, "status", "") == "pending" {
+		want.SetCurrent("status", "completed")
+	}
+	want.SetCurrent("achieving_percentage", 100)
+	return nil
 }
