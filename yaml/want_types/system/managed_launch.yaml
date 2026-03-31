@@ -228,13 +228,21 @@ wantType:
       label: current
       initialValue: 0
 
+  # docker_compose lifecycle is handled by the Ansible inline agent below.
+  # process lifecycle is handled by the Go launch_manager agent.
+  inlineAgents:
+    - name: docker_compose_lifecycle
+      type: do
+      runtime: ansible
+      scriptFile: yaml/scripts/docker_compose_lifecycle.yaml
+
   requires:
     - launch_management
 
   agents:
     - name: launch_manager
       role: action
-      description: Unified agent managing process and docker_compose lifecycles
+      description: Handles process lifecycle. docker_compose is delegated to Ansible inline agent.
 
   examples:
     - name: local-process-server

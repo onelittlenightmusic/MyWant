@@ -1,0 +1,80 @@
+---
+# docker_compose_lifecycle.yaml — Manage a Docker Compose stack lifecycle.
+#
+# Reads state from $MYWANT_CURRENT_FILE and plan from $MYWANT_PLAN_FILE.
+# Writes {"current_updates": {...}} to $MYWANT_OUTPUT_FILE.
+#
+# Handles:
+#   launch_plan: start — docker compose up -d (idempotent via community.docker)
+#                        + optional health check via ansible.builtin.uri
+#   launch_plan: stop  — docker compose down
+#
+# Requires: ansible-galaxy collection install community.docker
+#
+# launch_env_* current-state keys are auto-expanded to real env vars by the
+# Ansible runtime, so compose file ${VAR} substitutions work transparently.
+- hosts: localhost
+  gather_facts: false
+  vars:
+    state:       "{{ lookup('file', lookup('env', 'MYWANT_CURRENT_FILE')) | from_json }}"
+    plan:        "{{ lookup('file', lookup('env', 'MYWANT_PLAN_FILE'))    | from_json }}"
+    launch_plan: "{{ plan.launch_plan | default('') }}"
+    compose_file: "{{ state.launch_compose_file | default('') }}"
+    health_url:  "{{ state.server_health_check_url | default('') }}"
+    max_retries: "{{ state.server_health_check_max_retries | default(60) | int }}"
+    output_file: "{{ lookup('env', 'MYWANT_OUTPUT_FILE') }}"
+
+  tasks:
+    # This agent only handles docker_compose type.
+    - name: Skip — not docker_compose type
+      ansible.builtin.meta: end_play
+      when: state.launch_type | default('process') != 'docker_compose'
+
+    - name: Skip — no compose file configured
+      ansible.builtin.meta: end_play
+      when: compose_file == ''
+
+    # ── Start ─────────────────────────────────────────────────────────────────
+    # community.docker.docker_compose_v2 is truly idempotent: it reconciles
+    # actual container state and only restarts services whose config changed.
+    - name: Start Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_file | dirname }}"
+        files:
+          - "{{ compose_file | basename }}"
+        state: present
+        remove_orphans: true
+      when: launch_plan == 'start'
+
+    - name: Wait for health check
+      ansible.builtin.uri:
+        url: "{{ health_url }}"
+        status_code: 200
+      register: health_result
+      until: health_result.status == 200
+      retries: "{{ max_retries }}"
+      delay: 5
+      when:
+        - launch_plan == 'start'
+        - health_url != ''
+
+    - name: Report running
+      ansible.builtin.copy:
+        content: '{"current_updates": {"launch_status": "running", "achieving_percentage": 100}}'
+        dest: "{{ output_file }}"
+      when: launch_plan == 'start'
+
+    # ── Stop ──────────────────────────────────────────────────────────────────
+    - name: Stop Docker Compose stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ compose_file | dirname }}"
+        files:
+          - "{{ compose_file | basename }}"
+        state: absent
+      when: launch_plan == 'stop'
+
+    - name: Report stopped
+      ansible.builtin.copy:
+        content: '{"current_updates": {"launch_status": "stopped", "achieving_percentage": 0}}'
+        dest: "{{ output_file }}"
+      when: launch_plan == 'stop'

@@ -198,5 +198,5 @@ wantType:
   inlineAgents:
     - name: ensure_file_agent
       type: do
-      runtime: shell
-      scriptFile: yaml/scripts/ensure_file.sh
+      runtime: ansible
+      scriptFile: yaml/scripts/ensure_file.yaml

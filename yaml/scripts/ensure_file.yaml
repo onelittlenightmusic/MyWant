@@ -1,0 +1,98 @@
+---
+# ensure_file.yaml — Ensure a file exists in data_dir.
+#
+# Reads state from $MYWANT_CURRENT_FILE.
+# Writes {"current_updates": {...}} to $MYWANT_OUTPUT_FILE on completion.
+#
+# Supported methods:
+#   curl (default) — idempotent download via ansible.builtin.get_url
+#   docker_wget    — docker run alpine/wget; skipped if target already exists
+#   docker_build   — docker run with volumes/env/args; skipped if target exists
+- hosts: localhost
+  gather_facts: false
+  vars:
+    state:      "{{ lookup('file', lookup('env', 'MYWANT_CURRENT_FILE')) | from_json }}"
+    method:     "{{ state.method     | default('curl') }}"
+    data_dir:   "{{ state.data_dir   | default('/tmp/ensure-file') }}"
+    filename:   "{{ state.filename }}"
+    target:     "{{ data_dir }}/{{ filename }}"
+    prereqs:    "{{ (state.prerequisites | default('[]')) | from_json }}"
+    output_file: "{{ lookup('env', 'MYWANT_OUTPUT_FILE') }}"
+
+  tasks:
+    - name: Skip — already done
+      ansible.builtin.meta: end_play
+      when: state.ensure_file_phase | default('') == 'done'
+
+    # ── Prerequisites ────────────────────────────────────────────────────────
+    - name: Stat prerequisite files
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/{{ item }}"
+      register: prereq_stat
+      loop: "{{ prereqs }}"
+
+    - name: Report waiting and abort if prerequisites not met
+      block:
+        - ansible.builtin.copy:
+            content: '{"current_updates": {"ensure_file_phase": "waiting", "achieving_percentage": 5}}'
+            dest: "{{ output_file }}"
+        - ansible.builtin.meta: end_play
+      when:
+        - prereqs | length > 0
+        - prereq_stat.results | selectattr('stat.exists', 'equalto', false) | list | length > 0
+
+    # ── Prepare ───────────────────────────────────────────────────────────────
+    - name: Ensure data directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}"
+        state: directory
+        mode: '0755'
+
+    # ── Download: curl ────────────────────────────────────────────────────────
+    # get_url is fully idempotent — skips if file already exists and checksum matches.
+    - name: Download file (curl / get_url)
+      ansible.builtin.get_url:
+        url: "{{ state.url }}"
+        dest: "{{ target }}"
+        mode: '0644'
+        headers:
+          User-Agent: "mywant-ensure-file/2.0"
+      when: method == 'curl'
+
+    # ── Download: docker_wget ─────────────────────────────────────────────────
+    # `creates:` makes this idempotent — docker only runs if target is absent.
+    - name: Download file (docker_wget)
+      ansible.builtin.shell:
+        cmd: "docker run --rm -v '{{ data_dir }}:/data' alpine sh -c \"wget -O /data/{{ filename }} '{{ state.url }}'\""
+        creates: "{{ target }}"
+      when: method == 'docker_wget'
+
+    # ── Build: docker_build ───────────────────────────────────────────────────
+    - name: Resolve docker_build volumes
+      ansible.builtin.set_fact:
+        _volumes: "{{ (state.docker_volumes | default('[]')) | from_json }}"
+      when: method == 'docker_build'
+
+    - name: Build file via docker container
+      ansible.builtin.shell:
+        cmd: >-
+          docker run --rm
+          {{ (_volumes | length > 0) | ternary(
+               _volumes | map('regex_replace', '^(.*)$', '-v \1') | join(' '),
+               '-v ' + data_dir + ':/var/opentripplanner') }}
+          {{ (state.docker_env | default('{}')) | from_json | dict2items
+             | map(attribute='key') | zip(
+               (state.docker_env | default('{}')) | from_json | dict2items | map(attribute='value') | list)
+             | map('join', '=') | map('regex_replace', '^(.*)$', '-e \1') | join(' ') }}
+          {{ state.docker_image }}
+          {{ (state.docker_command_args | default('[]')) | from_json | join(' ') }}
+        creates: "{{ target }}"
+      when: method == 'docker_build'
+
+    # ── Report success ────────────────────────────────────────────────────────
+    - name: Write success output
+      ansible.builtin.copy:
+        content: >-
+          {"current_updates": {"ensure_file_phase": "done",
+          "ensure_file_path": "{{ target }}", "achieving_percentage": 100}}
+        dest: "{{ output_file }}"

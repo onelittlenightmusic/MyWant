@@ -117,6 +117,8 @@ func resolveRuntime(runtime string) ScriptRuntime {
 		return &pythonRuntime{}
 	case "rego":
 		return &regoRuntime{}
+	case "ansible":
+		return &ansibleRuntime{}
 	default: // "shell" and anything else
 		return &shellRuntime{}
 	}

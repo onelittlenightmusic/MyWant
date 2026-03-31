@@ -47,7 +47,7 @@ func manageLaunch(ctx context.Context, want *mywant.Want) error {
 func launchStart(ctx context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return launchDockerComposeStart(ctx, want)
+		return nil // delegated to Ansible docker_compose_lifecycle inline agent
 	default: // "process" and any other process-based type
 		return launchProcessStart(ctx, want)
 	}
@@ -56,7 +56,7 @@ func launchStart(ctx context.Context, want *mywant.Want, launchType string) erro
 func launchStop(ctx context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return launchDockerComposeStop(ctx, want)
+		return nil // delegated to Ansible docker_compose_lifecycle inline agent
 	default: // "process"
 		return launchProcessStop(want)
 	}
@@ -65,7 +65,7 @@ func launchStop(ctx context.Context, want *mywant.Want, launchType string) error
 func launchPoll(_ context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return launchDockerComposePoll(want)
+		return nil // delegated to Ansible docker_compose_lifecycle inline agent
 	default: // "process" and any other process-based type
 		return launchProcessPoll(want)
 	}
