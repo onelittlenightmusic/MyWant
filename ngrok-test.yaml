@@ -1,7 +1,10 @@
 metadata:
   name: ngrok-test
-  type: ngrok
+  type: managed_launch
 spec:
   params:
-    port: "8080"
-    protocol: "http"
+    launcher: process
+    command: ngrok
+    args: '["http", "8080"]'
+    url_regex: 'Forwarding\s+(https://[^\s]+)'
+    result_field: tunnel_url

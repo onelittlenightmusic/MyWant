@@ -3,8 +3,14 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"regexp"
 	"time"
 )
+
+// interpolateRe matches ${varName} placeholders in lifecycle hook values.
+var interpolateRe = regexp.MustCompile(`\$\{([^}]+)\}`)
 
 // ScriptableWant is a generic Progressable that executes YAML-defined inline agents.
 // It is used automatically when a WantTypeDefinition contains InlineAgents but has
@@ -56,26 +62,53 @@ func (s *ScriptableWant) OnDelete() {
 
 // execLifecycleHook applies state changes declared in a lifecycle hook and
 // optionally calls ExecuteAgents.
+//
+// String values in current/plan/goal support ${varName} interpolation.
+// Variables are resolved from current state after params have been copied,
+// and also directly from spec params as a fallback.
 func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
+	// Apply params first so they are available for interpolation below.
 	for stateKey, paramKey := range hook.Params {
 		if v, ok := s.Spec.Params[paramKey]; ok {
 			s.SetCurrent(stateKey, fmt.Sprintf("%v", v))
 		}
 	}
 	for k, v := range hook.Current {
-		s.SetCurrent(k, v)
+		s.SetCurrent(k, s.interpolate(fmt.Sprintf("%v", v)))
 	}
 	for k, v := range hook.Plan {
-		s.SetPlan(k, v)
+		s.SetPlan(k, s.interpolate(fmt.Sprintf("%v", v)))
 	}
 	for k, v := range hook.Goal {
-		s.SetGoal(k, v)
+		s.SetGoal(k, s.interpolate(fmt.Sprintf("%v", v)))
+	}
+	if len(hook.MergeParent) > 0 {
+		resolved := make(map[string]any, len(hook.MergeParent))
+		for k, v := range hook.MergeParent {
+			resolved[k] = s.interpolate(fmt.Sprintf("%v", v))
+		}
+		s.MergeParentState(resolved)
 	}
 	if hook.ExecuteAgents {
 		if err := s.ExecuteAgents(); err != nil {
 			s.DirectLog("[ScriptableWant] ExecuteAgents error in lifecycle hook: %v", err)
 		}
 	}
+}
+
+// interpolate replaces ${varName} placeholders with values from current state,
+// falling back to spec params if the state key is not set.
+func (s *ScriptableWant) interpolate(tmpl string) string {
+	return interpolateRe.ReplaceAllStringFunc(tmpl, func(m string) string {
+		key := m[2 : len(m)-1] // strip ${ and }
+		if v := GetCurrent[any](&s.Want, key, nil); v != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		if pv, ok := s.Spec.Params[key]; ok {
+			return fmt.Sprintf("%v", pv)
+		}
+		return m // keep placeholder if not resolved
+	})
 }
 
 // IsAchieved evaluates the declarative AchievedWhen condition if defined,
@@ -90,15 +123,32 @@ func (s *ScriptableWant) IsAchieved() bool {
 }
 
 // Progress calls ExecuteAgents for any do-type inline agents.
+// When the want is already achieved, executes the onAchieved lifecycle hook instead.
 // Think and Monitor agents are started automatically by StartBackgroundAgents().
 func (s *ScriptableWant) Progress() {
+	if s.IsAchieved() {
+		if s.WantTypeDefinition != nil && s.WantTypeDefinition.OnAchieved != nil {
+			s.execLifecycleHook(s.WantTypeDefinition.OnAchieved)
+		}
+		return
+	}
 	if err := s.ExecuteAgents(); err != nil {
 		s.DirectLog("[ScriptableWant] ExecuteAgents error: %v", err)
 	}
 }
 
+// resolveSpecialValue expands built-in special values in achievedWhen.value.
+// Currently supports "$today" → current date as "YYYY-MM-DD".
+func resolveSpecialValue(v any) any {
+	if s, ok := v.(string); ok && s == "$today" {
+		return time.Now().Format("2006-01-02")
+	}
+	return v
+}
+
 // evaluateAchievedWhen compares actual (from state) against expected using the operator.
 func evaluateAchievedWhen(actual any, operator string, expected any) bool {
+	expected = resolveSpecialValue(expected)
 	// Convert to float64 for numeric comparisons.
 	af, aOK := toFloat64(actual)
 	ef, eOK := toFloat64(expected)
@@ -161,14 +211,33 @@ func createScriptableFactory(def *WantTypeDefinition) WantFactory {
 //
 // It also appends generated capability names to def.Requires so that
 // StartBackgroundAgents() and ExecuteAgents() can resolve them automatically.
+// resolveScript returns the script content for an InlineAgentDef.
+// If ScriptFile is set, the file is read from disk; otherwise Script is returned directly.
+func resolveScript(ia InlineAgentDef) (string, error) {
+	if ia.ScriptFile != "" {
+		b, err := os.ReadFile(ia.ScriptFile)
+		if err != nil {
+			return "", fmt.Errorf("scriptFile %q: %w", ia.ScriptFile, err)
+		}
+		return string(b), nil
+	}
+	return ia.Script, nil
+}
+
 func registerInlineAgents(def *WantTypeDefinition, registry *AgentRegistry) {
 	for _, ia := range def.InlineAgents {
 		// Capability name is scoped to the want type to avoid collisions.
 		capName := def.Metadata.Name + "__" + ia.Name
 		runtime := resolveRuntime(ia.Runtime)
 
+		script, err := resolveScript(ia)
+		if err != nil {
+			log.Printf("[WARN] registerInlineAgents: %v", err)
+			continue
+		}
+
 		// Capture loop variables for use in closures.
-		agentScript := ia.Script
+		agentScript := script
 		agentRuntime := runtime
 		capabilityName := capName
 

@@ -1,8 +1,8 @@
 wants:
   - metadata:
       name: test-docker
-      type: docker_run
+      type: managed_launch
     spec:
       params:
-        image: "hello-world"
-        wait_for_exit: true
+        launcher: docker_compose
+        compose_file: /tmp/mywant-hello-world-compose.yaml

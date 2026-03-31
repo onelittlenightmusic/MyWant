@@ -10,7 +10,11 @@ import (
 	mywant "mywant/engine/core"
 )
 
-// executeCommand performs the actual command execution
+func init() {
+	mywant.RegisterDoAgent("execution_command", executeCommand)
+}
+
+// executeCommand performs the actual command execution and writes results directly to want state.
 func executeCommand(ctx context.Context, want *mywant.Want) error {
 	// Read parameters from want state using generic GetCurrent
 	commandStr := mywant.GetCurrent(want, "command", "")
@@ -60,23 +64,24 @@ func executeCommand(ctx context.Context, want *mywant.Want) error {
 		}
 	}
 
-	// Build execution result
-	result := map[string]any{
-		"exit_code":         exitCode,
-		"stdout":            stdout.String(),
-		"stderr":            stderr.String(),
-		"execution_time_ms": executionTimeMs,
-		"started_at":        startedAt,
-		"completed_at":      completedAt,
-		"success":           exitCode == 0,
-	}
-
-	// Store result in standard agent_result key
-	want.SetCurrent("agent_result", result)
+	// Write results directly to want state.
+	want.SetCurrent("exit_code", exitCode)
+	want.SetCurrent("stdout", stdout.String())
+	want.SetCurrent("stderr", stderr.String())
+	want.SetCurrent("execution_time_ms", executionTimeMs)
+	want.SetCurrent("started_at", startedAt)
+	want.SetCurrent("completed_at", completedAt)
+	want.SetCurrent("final_result", stdout.String())
 
 	if exitCode == 0 {
+		want.SetCurrent("completed", true)
+		want.SetCurrent("status", "completed")
+		want.SetCurrent("achieving_percentage", 100)
 		want.StoreLog("Command executed successfully in %dms", executionTimeMs)
 	} else {
+		want.SetCurrent("completed", false)
+		want.SetCurrent("status", "failed")
+		want.SetCurrent("error_message", fmt.Sprintf("Exit code: %d", exitCode))
 		want.StoreLog("Command failed with exit code %d", exitCode)
 	}
 

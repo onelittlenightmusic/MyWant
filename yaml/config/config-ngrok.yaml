@@ -1,9 +1,13 @@
 wants:
   - metadata:
       name: ngrok-tunnel
-      type: ngrok
+      type: managed_launch
       labels:
         service: tunnel
     spec:
       params:
-        port: "8080"
+        launcher: process
+        command: ngrok
+        args: '["http", "8080"]'
+        url_regex: 'Forwarding\s+(https://[^\s]+)'
+        result_field: tunnel_url

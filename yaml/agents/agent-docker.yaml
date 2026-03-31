@@ -1,7 +1,0 @@
-agents:
-  - name: docker_manager
-    runtime: localGo
-    type: do
-    capabilities:
-      - docker_management
-    description: "Manages Docker container lifecycle (start/stop/wait). Runs docker run -d, optionally waits for container exit (task mode), and cleans up on stop."

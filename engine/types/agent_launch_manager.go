@@ -1,0 +1,255 @@
+package types
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	mywant "mywant/engine/core"
+)
+
+func init() {
+	mywant.RegisterDoAgent("launch_manager", manageLaunch)
+}
+
+// manageLaunch dispatches to the appropriate lifecycle implementation.
+//
+// It supports two plan keys:
+//   - launch_plan ("start"|"stop") + launch_type ("process"|"docker_compose") — managed_launch
+//   - docker_plan  ("start"|"stop") — docker_run (legacy docker_management)
+func manageLaunch(ctx context.Context, want *mywant.Want) error {
+	if plan := mywant.GetPlan(want, "launch_plan", ""); plan != "" {
+		launchType := mywant.GetCurrent(want, "launch_type", "process")
+		status := mywant.GetCurrent(want, "launch_status", "")
+		switch plan {
+		case "start":
+			if status == "running" {
+				return launchPoll(ctx, want, launchType)
+			}
+			return launchStart(ctx, want, launchType)
+		case "stop":
+			return launchStop(ctx, want, launchType)
+		}
+		return nil
+	}
+
+	// Legacy: docker_run (docker_plan → docker_phase)
+	if plan := mywant.GetPlan(want, "docker_plan", ""); plan != "" {
+		return manageDocker(ctx, want)
+	}
+
+	return nil
+}
+
+func launchStart(ctx context.Context, want *mywant.Want, launchType string) error {
+	switch launchType {
+	case "docker_compose":
+		return launchDockerComposeStart(ctx, want)
+	default: // "process" and any other process-based type
+		return launchProcessStart(ctx, want)
+	}
+}
+
+func launchStop(ctx context.Context, want *mywant.Want, launchType string) error {
+	switch launchType {
+	case "docker_compose":
+		return launchDockerComposeStop(ctx, want)
+	default: // "process"
+		return launchProcessStop(want)
+	}
+}
+
+func launchPoll(_ context.Context, want *mywant.Want, launchType string) error {
+	switch launchType {
+	case "docker_compose":
+		return launchDockerComposePoll(want)
+	default: // "process" and any other process-based type
+		return launchProcessPoll(want)
+	}
+}
+
+// --- Process implementation (delegates to live_server helpers) ---
+
+func launchProcessStart(ctx context.Context, want *mywant.Want) error {
+	logFile := mywant.GetCurrent(want, "process_log_file", "")
+	if logFile == "" {
+		logFile = fmt.Sprintf("/tmp/managed-launch-%s.log", want.Metadata.Name)
+		want.SetCurrent("process_log_file", logFile)
+	}
+
+	EnsureProcessStopped(want, "process_pid")
+	EnsureLogFileTruncated(want, "process_log_file")
+
+	pid, err := startLiveServer(want)
+	if err != nil {
+		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("launch_error", err.Error())
+		return err
+	}
+	want.SetCurrent("process_pid", pid)
+	want.DirectLog("[LAUNCH] Started process PID %d", pid)
+
+	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
+	if healthURL != "" {
+		if _, err := waitForHealthCheck(ctx, want, healthURL); err != nil {
+			want.SetCurrent("launch_status", "failed")
+			want.SetCurrent("launch_error", fmt.Sprintf("health check failed: %v", err))
+			launchProcessStop(want) //nolint:errcheck
+			return err
+		}
+	}
+
+	want.SetCurrent("launch_status", "running")
+	return nil
+}
+
+func launchProcessStop(want *mywant.Want) error {
+	pid := mywant.GetCurrent(want, "process_pid", 0)
+	if pid == 0 {
+		want.SetCurrent("launch_status", "stopped")
+		return nil
+	}
+	if err := stopLiveServer(pid, want); err != nil {
+		want.DirectLog("[LAUNCH] Failed to stop process PID %d: %v", pid, err)
+	}
+	want.SetCurrent("process_pid", 0)
+	want.SetCurrent("launch_status", "stopped")
+	return nil
+}
+
+func launchProcessPoll(want *mywant.Want) error {
+	pid := mywant.GetCurrent(want, "process_pid", 0)
+	if pid == 0 {
+		return nil
+	}
+	if !isProcessAlive(pid) {
+		want.SetCurrent("launch_status", "exited")
+		want.SetCurrent("launch_error", fmt.Sprintf("process PID %d exited unexpectedly", pid))
+		want.DirectLog("[LAUNCH] Process PID %d exited unexpectedly", pid)
+	}
+	return nil
+}
+
+// --- Docker Compose implementation ---
+
+func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
+	composeFile := mywant.GetCurrent(want, "launch_compose_file", "")
+	if composeFile == "" {
+		err := fmt.Errorf("launch_compose_file not set")
+		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("launch_error", err.Error())
+		return err
+	}
+
+	want.DirectLog("[LAUNCH] Running: docker compose -f %s up -d", composeFile)
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", composeFile, "up", "-d", "--remove-orphans")
+	cmd.Env = composeEnv(want)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := fmt.Sprintf("docker compose up failed: %v\n%s", err, string(out))
+		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("launch_error", msg)
+		return fmt.Errorf("%s", msg)
+	}
+	want.DirectLog("[LAUNCH] docker compose up: %s", strings.TrimSpace(string(out)))
+
+	// Optional health check
+	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
+	if healthURL != "" {
+		if _, err := waitForHealthCheck(ctx, want, healthURL); err != nil {
+			want.SetCurrent("launch_status", "failed")
+			want.SetCurrent("launch_error", fmt.Sprintf("health check failed: %v", err))
+			launchDockerComposeStop(ctx, want) //nolint:errcheck
+			return err
+		}
+	}
+
+	want.SetCurrent("launch_status", "running")
+	return nil
+}
+
+func launchDockerComposeStop(ctx context.Context, want *mywant.Want) error {
+	composeFile := mywant.GetCurrent(want, "launch_compose_file", "")
+	if composeFile == "" {
+		want.SetCurrent("launch_status", "stopped")
+		return nil
+	}
+
+	want.DirectLog("[LAUNCH] Running: docker compose -f %s down", composeFile)
+	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", composeFile, "down")
+	cmd.Env = composeEnv(want)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		want.DirectLog("[LAUNCH] docker compose down warning: %v\n%s", err, string(out))
+	} else {
+		want.DirectLog("[LAUNCH] docker compose down: %s", strings.TrimSpace(string(out)))
+	}
+	want.SetCurrent("launch_status", "stopped")
+	return nil
+}
+
+func launchDockerComposePoll(want *mywant.Want) error {
+	composeFile := mywant.GetCurrent(want, "launch_compose_file", "")
+	if composeFile == "" {
+		return nil
+	}
+
+	// Check if at least one service is still running
+	out, err := exec.Command("docker", "compose", "-f", composeFile, "ps", "--services", "--filter", "status=running").Output()
+	if err != nil {
+		return nil // docker not available or compose file gone
+	}
+
+	running := strings.TrimSpace(string(out))
+	if running == "" {
+		// All services stopped
+		logs := composeRecentLogs(composeFile, 30)
+		want.SetCurrent("launch_status", "exited")
+		want.SetCurrent("launch_error", "all compose services stopped unexpectedly")
+		want.DirectLog("[LAUNCH] All compose services stopped unexpectedly. Last logs:\n%s", logs)
+	}
+	return nil
+}
+
+// composeEnv returns the environment for docker compose commands.
+// It starts from the current process environment and appends variables from two sources:
+//  1. State keys with the "launch_env_" prefix — e.g. launch_env_OTP_DATA_DIR → OTP_DATA_DIR=value
+//  2. The launch_env state field as a JSON object — e.g. {"OTP_DATA_DIR": "/opt/otp"}
+func composeEnv(want *mywant.Want) []string {
+	env := os.Environ()
+
+	// Source 1: launch_env_* prefix keys (YAML-friendly, set via onInitialize.current)
+	all := want.GetAllCurrent()
+	for k, v := range all {
+		if strings.HasPrefix(k, "launch_env_") {
+			varName := strings.TrimPrefix(k, "launch_env_")
+			env = append(env, fmt.Sprintf("%s=%s", varName, fmt.Sprintf("%v", v)))
+		}
+	}
+
+	// Source 2: launch_env JSON object (Go-code-friendly)
+	if raw := mywant.GetCurrent(want, "launch_env", ""); raw != "" {
+		var vars map[string]string
+		if err := json.Unmarshal([]byte(raw), &vars); err != nil {
+			want.DirectLog("[LAUNCH] Warning: could not parse launch_env JSON: %v", err)
+		} else {
+			for k, v := range vars {
+				env = append(env, fmt.Sprintf("%s=%s", k, v))
+			}
+		}
+	}
+
+	return env
+}
+
+// composeRecentLogs returns the last n lines from all compose services.
+func composeRecentLogs(composeFile string, lines int) string {
+	out, err := exec.Command("docker", "compose", "-f", composeFile, "logs", "--tail", fmt.Sprintf("%d", lines)).CombinedOutput()
+	if err != nil && len(out) == 0 {
+		return fmt.Sprintf("(failed to get compose logs: %v)", err)
+	}
+	return strings.TrimSpace(string(out))
+}

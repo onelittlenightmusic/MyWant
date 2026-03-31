@@ -4,21 +4,23 @@ wantType:
     title: File Exists
     description: |
       Ensures a file exists at data_dir/filename.
-      If the file is missing, creates it using the configured method.
-
-      Methods (set via `method` param or global parameter `ensure_file_method`):
-        - "curl" (default): download via Go net/http — no docker needed
+      If the file is missing, creates it using the configured method:
+        - "curl" (default): download with curl
         - "docker_wget":    download via docker alpine/wget
         - "docker_build":  run a one-shot docker container to produce the file
 
       Prerequisites (filenames relative to data_dir) can be declared.
-      Initialize() returns early until all prerequisites exist, then proceeds.
-      IsAchieved returns true as soon as the file is present on disk.
-    version: '1.0'
+      The agent waits until all prerequisites exist before proceeding.
+    version: '2.0'
     category: system
     pattern: independent
 
   finalResultField: ensure_file_phase
+
+  achievedWhen:
+    field: ensure_file_phase
+    operator: "=="
+    value: "done"
 
   parameters:
     - name: filename
@@ -33,48 +35,42 @@ wantType:
       required: false
 
     - name: method
-      description: |
-        How to create the file if missing:
-          "curl"         — Go net/http download (default, no docker)
-          "docker_wget"  — docker alpine/wget download
-          "docker_build" — one-shot docker container (e.g. OTP graph builder)
+      description: '"curl" | "docker_wget" | "docker_build"'
       type: string
       defaultGlobalParameter: ensure_file_method
       required: false
       default: "curl"
 
     - name: url
-      description: Download URL (required for curl and docker_wget methods)
+      description: Download URL (curl and docker_wget methods)
       type: string
       required: false
 
     - name: prerequisites
-      description: |
-        JSON array of filenames (relative to data_dir) that must exist before
-        running. Initialize() waits until all are present.
-        Example: '["map.osm.pbf", "build-config.json", "gtfs.zip"]'
+      description: JSON array of filenames that must exist first (e.g. '["map.osm.pbf"]')
       type: string
       required: false
+      default: "[]"
 
     - name: docker_image
-      description: Docker image to run (required for docker_build method)
+      description: Docker image (docker_build method)
       type: string
       required: false
 
     - name: docker_container_name
-      description: Container name for docker methods (default derived from want name)
+      description: Container name (docker methods, auto-generated if empty)
       type: string
       required: false
 
     - name: docker_command_args
-      description: Command args passed to the docker container (docker_build method)
+      description: Command args JSON array passed to the container
       type: string
       required: false
       default: "[]"
 
     - name: docker_volumes
       description: |
-        Volume mounts JSON array (docker methods).
+        Volume mounts JSON array.
         Default for docker_build: ["<data_dir>:/var/opentripplanner"]
         Default for docker_wget:  ["<data_dir>:/data"]
       type: string
@@ -94,6 +90,13 @@ wantType:
       label: current
       initialValue: ''
 
+    - name: ensure_file_path
+      description: Resolved absolute path of the target file
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
     - name: ensure_file_error
       description: Error message if the operation failed
       type: string
@@ -101,142 +104,99 @@ wantType:
       label: current
       initialValue: ''
 
-    - name: ensure_file_path
-      description: Full path to the file
-      type: string
-      persistent: true
-      label: current
-      initialValue: ''
-
-    - name: docker_phase
-      description: Docker lifecycle phase (starting | running | done | stopped | failed)
+    - name: filename
       type: string
       persistent: false
       label: current
+      description: Target filename (copied from param)
       initialValue: ''
+
+    - name: data_dir
+      type: string
+      persistent: false
+      label: current
+      description: Target directory (copied from param)
+      initialValue: ''
+
+    - name: method
+      type: string
+      persistent: false
+      label: current
+      description: Download method (copied from param)
+      initialValue: 'curl'
+
+    - name: url
+      type: string
+      persistent: false
+      label: current
+      description: Download URL (copied from param)
+      initialValue: ''
+
+    - name: prerequisites
+      type: string
+      persistent: false
+      label: current
+      description: Prerequisites JSON array
+      initialValue: '[]'
 
     - name: docker_image
-      description: Docker image (set by Initialize for docker methods)
       type: string
       persistent: false
       label: current
+      description: Docker image for docker methods
       initialValue: ''
 
     - name: docker_container_name
-      description: Container name (set by Initialize for docker methods)
-      type: string
-      persistent: true
-      label: current
-      initialValue: ''
-
-    - name: docker_volumes
-      description: Volume mounts JSON array (set by Initialize for docker methods)
       type: string
       persistent: false
       label: current
+      description: Container name for docker methods
+      initialValue: ''
+
+    - name: docker_command_args
+      type: string
+      persistent: false
+      label: current
+      description: Docker command args JSON array
+      initialValue: '[]'
+
+    - name: docker_volumes
+      type: string
+      persistent: false
+      label: current
+      description: Docker volume mounts JSON array
       initialValue: '[]'
 
     - name: docker_env
-      description: Environment variables JSON object (set by Initialize)
       type: string
       persistent: false
       label: current
+      description: Docker env vars JSON object
       initialValue: '{}'
 
-    - name: docker_command_args
-      description: Container command args JSON array (set by Initialize)
-      type: string
-      persistent: false
-      label: current
-      initialValue: '[]'
-
-    - name: docker_wait_for_exit
-      description: Always true for ensure_file docker methods
-      type: bool
-      persistent: false
-      label: current
-      initialValue: false
-
-    - name: docker_ports
-      description: Port mappings (always empty for ensure_file)
-      type: string
-      persistent: false
-      label: current
-      initialValue: '[]'
-
-    - name: docker_container_id
-      description: Container ID returned by docker run
-      type: string
-      persistent: true
-      label: current
-      initialValue: ''
-
-    - name: docker_exit_code
-      description: Exit code of the docker container
-      type: int
-      persistent: true
-      label: current
-      initialValue: -1
-
-    - name: docker_error
-      description: Docker error message
-      type: string
-      persistent: true
-      label: current
-      initialValue: ''
-
     - name: achieving_percentage
-      description: Progress percentage
       type: int
       persistent: true
       label: current
+      description: Progress percentage
       initialValue: 0
 
-  requires:
-    - docker_management
+  onInitialize:
+    params:
+      filename: filename
+      data_dir: data_dir
+      method: method
+      url: url
+      prerequisites: prerequisites
+      docker_image: docker_image
+      docker_container_name: docker_container_name
+      docker_command_args: docker_command_args
+      docker_volumes: docker_volumes
+      docker_env: docker_env
+    executeAgents: true
 
-  agents:
-    - name: docker_manager
-      role: action
-      description: DoAgent used for docker_wget and docker_build methods
-
-  examples:
-    - name: download-osm
-      description: Download Tokyo OSM PBF file (curl, no docker)
-      want:
-        metadata:
-          name: tokyo-osm
-          type: file_exists
-        spec:
-          params:
-            filename: "map.osm.pbf"
-            url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
-            method: "curl"
-
-    - name: download-gtfs
-      description: Download Toei Bus GTFS (curl, no docker)
-      want:
-        metadata:
-          name: toei-bus-gtfs
-          type: file_exists
-        spec:
-          params:
-            filename: "toei-bus.zip"
-            url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
-            method: "curl"
-
-    - name: build-otp-graph
-      description: Build OTP routing graph (docker_build, skips if graph.obj exists)
-      want:
-        metadata:
-          name: otp-graph
-          type: file_exists
-        spec:
-          params:
-            filename: "graph.obj"
-            method: "docker_build"
-            docker_image: "docker.io/opentripplanner/opentripplanner:2.6.0"
-            docker_container_name: "otp-builder"
-            docker_command_args: '["--build", "--save"]'
-            docker_env: '{"JAVA_OPTIONS": "-Xmx6G"}'
-            prerequisites: '["map.osm.pbf", "build-config.json"]'
+  inlineAgents:
+    - name: ensure_file_agent
+      type: do
+      runtime: shell
+      scriptFile: yaml/scripts/ensure_file.sh

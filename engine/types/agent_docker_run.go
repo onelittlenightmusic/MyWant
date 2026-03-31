@@ -11,10 +11,6 @@ import (
 	mywant "mywant/engine/core"
 )
 
-func init() {
-	mywant.RegisterDoAgent("docker_manager", manageDocker)
-}
-
 // manageDocker is the DoAgent entry point for Docker container lifecycle management.
 //
 // It supports two control patterns:

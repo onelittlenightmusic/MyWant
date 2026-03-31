@@ -1,8 +1,12 @@
 wants:
   - metadata:
       name: ngrok-explicit-log
-      type: ngrok
+      type: managed_launch
     spec:
       params:
-        port: "8080"
+        launcher: process
+        command: ngrok
+        args: '["http", "8080"]'
         log_file: "/Users/hiroyukiosaki/ngrok-test.log"
+        url_regex: 'Forwarding\s+(https://[^\s]+)'
+        result_field: tunnel_url

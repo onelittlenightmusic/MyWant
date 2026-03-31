@@ -7,6 +7,20 @@ import (
 	mywant "mywant/engine/core"
 )
 
+// isProcessAlive returns true if a process with the given PID is still running.
+func isProcessAlive(pid int) bool {
+	if pid == 0 {
+		return false
+	}
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	// On Unix, Signal(0) checks if the process exists without sending a signal
+	err = process.Signal(os.Signal(nil))
+	return err == nil
+}
+
 // IdempotentStart ensures an agent can be safely re-invoked by cleaning up any
 // resources left over from a previous (possibly crashed) execution before
 // proceeding with a fresh start.

@@ -1,0 +1,75 @@
+wantType:
+  metadata:
+    name: weather
+    title: Weather Fetched
+    description: |
+      Fetches today's weather for a city and stores the result in state.
+      Uses wttr.in (no API key) or OpenWeatherMap if an API key is provided.
+      Achieved once weather has been fetched for today's date.
+    version: '2.0'
+    category: system
+    pattern: independent
+
+  finalResultField: weather_text
+
+  achievedWhen:
+    field: weather_date
+    operator: "=="
+    value: "$today"
+
+  parameters:
+    - name: weather_city
+      description: City name to fetch weather for (e.g. Tokyo)
+      type: string
+      required: false
+      default: "Tokyo"
+
+    - name: openweathermap_api_key
+      description: OpenWeatherMap API key. Falls back to OPENWEATHERMAP_API_KEY env var. If absent, uses wttr.in.
+      type: string
+      required: false
+      default: ""
+
+  state:
+    - name: weather_city
+      description: City name (copied from param)
+      type: string
+      persistent: false
+      label: current
+      initialValue: 'Tokyo'
+
+    - name: openweathermap_api_key
+      description: OpenWeatherMap API key (copied from param)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: weather_text
+      description: One-line weather summary
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: weather_date
+      description: Date when weather was last fetched (YYYY-MM-DD)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+  onInitialize:
+    params:
+      weather_city: weather_city
+      openweathermap_api_key: openweathermap_api_key
+    current:
+      weather_date: ''
+
+  onAchieved:
+    mergeParent:
+      weather_done: true
+      weather_text: "${weather_text}"
+
+  requires:
+    - weather_agency

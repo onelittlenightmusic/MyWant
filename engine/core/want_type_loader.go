@@ -31,6 +31,7 @@ type WantTypeDefinition struct {
 	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // declarative achievement condition
 	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"`     // actions to run when want is initialized
 	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`             // actions to run when want is deleted
+	OnAchieved          *LifecycleHookDef      `json:"onAchieved,omitempty" yaml:"onAchieved,omitempty"`         // actions to run each Progress() tick while achieved
 	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
 	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
 	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`

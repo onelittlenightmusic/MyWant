@@ -1,5 +1,11 @@
-name: cloudflare-tunnel
-type: cloudflare
-spec:
-  params:
-    port: "8080"
+wants:
+  - metadata:
+      name: cloudflare-tunnel
+      type: managed_launch
+    spec:
+      params:
+        launcher: process
+        command: cloudflared
+        args: '["tunnel", "--url", "http://localhost:8080"]'
+        url_regex: '(https://[a-z0-9-]+\.trycloudflare\.com)'
+        result_field: tunnel_url
