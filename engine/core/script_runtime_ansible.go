@@ -47,7 +47,12 @@ func (a *ansibleRuntime) ExecuteMonitor(want *Want, script string) (bool, error)
 func (a *ansibleRuntime) run(want *Want, playbook, label string, apply func(*scriptOutput)) error {
 	// Fail early if ansible-playbook is not available.
 	if _, err := exec.LookPath("ansible-playbook"); err != nil {
-		return scriptErr(want, label, "ansible-playbook not found in PATH; install Ansible to use runtime: ansible")
+		return scriptErr(want, label,
+			"ansible-playbook not found in PATH.\n"+
+				"  Install Ansible and required collections:\n"+
+				"    pip install ansible\n"+
+				"    ansible-galaxy collection install community.docker\n"+
+				"  Then restart the mywant server.")
 	}
 
 	tmpDir, err := os.MkdirTemp("", "ansible-runtime-*")

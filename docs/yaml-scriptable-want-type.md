@@ -162,11 +162,60 @@ wantType:
 
 ### `inlineAgents[].runtime`
 
-| 値 | 実行方式 | 対応 type |
-|---|---------|---------|
-| `rego` | 埋め込み OPA ライブラリで評価 | `think` のみ |
-| `shell` | `/bin/bash -c <script>` | `do`, `monitor` |
-| `python` | `python3 <tmpfile>` | `think`, `do`, `monitor` |
+| 値 | 実行方式 | 対応 type | 依存 |
+|---|---------|---------|------|
+| `rego` | 埋め込み OPA ライブラリで評価 | `think` のみ | なし (Go 組み込み) |
+| `shell` | `/bin/bash -c <script>` | `do`, `monitor` | bash |
+| `python` | `python3 <tmpfile>` | `think`, `do`, `monitor` | python3 |
+| `ansible` | `ansible-playbook --inventory localhost, --connection local` | `do`, `monitor` | 下記参照 |
+
+#### `runtime: ansible` の事前準備
+
+```bash
+pip install ansible
+ansible-galaxy collection install community.docker  # docker_compose を使う場合
+```
+
+Ansible が見つからない場合、Want は以下のエラーで失敗します:
+
+```
+ansible-playbook not found in PATH.
+  Install Ansible and required collections:
+    pip install ansible
+    ansible-galaxy collection install community.docker
+  Then restart the mywant server.
+```
+
+#### Ansible スクリプトの I/O コントラクト
+
+Ansible playbook は他のランタイムと同じ環境変数でステートファイルを受け取る。
+出力は stdout ではなく `$MYWANT_OUTPUT_FILE` に JSON を書き込む:
+
+```yaml
+- name: Write output
+  ansible.builtin.copy:
+    content: '{"current_updates": {"my_field": "value"}}'
+    dest: "{{ lookup('env', 'MYWANT_OUTPUT_FILE') }}"
+```
+
+`$MYWANT_OUTPUT_FILE` が書き込まれない場合は state 更新なし (playbook 成功扱い)。
+
+`launch_env_*` 形式の current state キーは自動的に実環境変数に展開される
+(例: `launch_env_OTP_DATA_DIR` → `OTP_DATA_DIR=value`)。
+docker-compose ファイルの `${VAR}` 置換がそのまま機能する。
+
+### `inlineAgents[].scriptFile`
+
+`script:` の代わりに外部ファイルを参照できる。長いスクリプトの可読性向上に有効。
+パスはサーバの起動ディレクトリからの相対パス、または絶対パス。
+
+```yaml
+inlineAgents:
+  - name: my_agent
+    type: do
+    runtime: shell
+    scriptFile: yaml/scripts/my_script.sh   # script: の代わりに指定
+```
 
 ### `achievedWhen`
 
@@ -177,6 +226,45 @@ achievedWhen:
   field: my_state_field   # current-label の state key
   operator: ">="          # ==, !=, >, >=, <, <=
   value: 100
+```
+
+#### 特殊値
+
+| 値 | 解決内容 |
+|---|---------|
+| `"$today"` | 実行時の日付 `YYYY-MM-DD` に動的解決 |
+
+```yaml
+# 例: 今日の天気データが取得済みなら達成
+achievedWhen:
+  field: weather_date
+  operator: "=="
+  value: "$today"
+```
+
+### `onAchieved`
+
+`IsAchieved()` が true を返した Progress() ティックで実行されるライフサイクルフック。
+`onInitialize` / `onDelete` と同じ構造。達成済みのとき `ExecuteAgents()` は呼ばれない。
+
+```yaml
+onAchieved:
+  mergeParent:               # 親 Want に state を伝播
+    weather_done: true
+    weather_text: "${weather_text}"   # ${varName} で current state から補間
+```
+
+### `LifecycleHookDef.mergeParent`
+
+`onInitialize` / `onDelete` / `onAchieved` いずれのフックでも使用可能。
+指定したキーと値を `MergeParentState()` で親 Want に伝播する。
+値は `${varName}` プレースホルダで current state から補間できる。
+
+```yaml
+onAchieved:
+  mergeParent:
+    task_done: true
+    task_result: "${result_field}"
 ```
 
 ---
@@ -366,3 +454,15 @@ wants:
 
 5. **Python コマンド**: デフォルトは `python3`。`MYWANT_PYTHON_CMD` 環境変数または
    サーバ設定で変更できる（将来実装予定）。
+
+6. **Ansible runtime の前提条件**: `runtime: ansible` を使う Want type をデプロイする前に
+   以下をインストールすること。未インストールの場合、Want は即座に `module_error` 状態になる。
+   ```bash
+   pip install ansible
+   ansible-galaxy collection install community.docker  # docker_compose 操作時
+   ```
+   インストール後はサーバの再起動が必要。
+
+7. **Ansible の出力プロトコル**: shell/python ランタイムと異なり、Ansible playbook は
+   stdout ではなく `$MYWANT_OUTPUT_FILE` に JSON を書き込む。
+   `ansible.builtin.copy` タスクで書き込むのが定番パターン。
