@@ -90,11 +90,7 @@ func (a *ansibleRuntime) run(want *Want, playbook, label string, apply func(*scr
 	}
 
 	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, "ansible-playbook",
-		"--inventory", "localhost,",
-		"--connection", "local",
-		playbookPath,
-	)
+	cmd := exec.CommandContext(ctx, "ansible-playbook", playbookPath)
 	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer
