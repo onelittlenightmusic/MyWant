@@ -88,3 +88,4 @@ tools/mock/mock-flight-server
 # Demo binaries
 engine/cmd/demos/*/demo_*
 mywant-server
+test_echo_want.yaml
