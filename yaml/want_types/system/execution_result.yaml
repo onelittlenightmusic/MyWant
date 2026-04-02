@@ -72,6 +72,28 @@ wantType:
     initialValue: false
     example: true
 
+  - name: runtime
+    description: Execution runtime (shell or ansible)
+    type: string
+    persistent: true
+    label: current
+    initialValue: shell
+
+  - name: scriptFile
+    description: Path to Ansible playbook file (required when runtime is ansible)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: success
+    description: Whether the command execution was successful
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+    example: true
+
   - name: status
     description: Execution status (pending, running, completed, failed)
     type: string
@@ -172,6 +194,13 @@ wantType:
     label: current
     initialValue: ''
     example: 'Exit code: 1'
+    
+  - name: current_updates
+    description: Raw updates from the execution agent (e.g., Ansible playbook)
+    type: object
+    persistent: false
+    label: current
+    initialValue: {}
 
   - name: agent_result
     description: Raw result from ExecutionAgent
