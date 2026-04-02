@@ -11,4 +11,10 @@ recipe:
   parameter_descriptions:
     want: "やりたいことの自然言語メモ"
 
-  wants: []
+  wants:
+    - metadata:
+        name: whim-goal
+        type: goal
+      spec:
+        params:
+          goal_text: want

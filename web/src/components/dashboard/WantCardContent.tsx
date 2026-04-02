@@ -71,12 +71,22 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   // Interaction check
   const isInteractive = want.state?.current?.interactive === true;
 
-  // Reminder-specific state
-  const isReminder = want.metadata?.type === 'reminder';
-  const reminderPhase = want.state?.current?.reminder_phase as string | undefined;
+  // Reaction support (Reminders, GoalThinker, etc.)
   const queueId = want.state?.current?.reaction_queue_id as string | undefined;
   const requireReaction = want.spec?.params?.require_reaction !== false; // Default to true
-  const shouldShowReactionButtons = isReminder && reminderPhase === 'reaching' && queueId && requireReaction;
+  const isReminder = want.metadata?.type === 'reminder';
+  const isGoal = want.metadata?.type === 'goal';
+  const reminderPhase = want.state?.current?.reminder_phase as string | undefined;
+  const goalPhase = want.state?.current?.phase as string | undefined;
+
+  const isAwaitingApproval =
+    (isReminder && reminderPhase === 'reaching') ||
+    (isGoal && goalPhase === 'awaiting_approval');
+
+  const shouldShowReactionButtons = queueId && requireReaction && isAwaitingApproval;
+
+  const proposedBreakdown = want.state?.current?.proposed_breakdown as any[] | undefined;
+  const proposedResponse = want.state?.current?.proposed_response as string | undefined;
 
   // Replay-specific state
   const isReplay = wantType === 'replay';
@@ -273,7 +283,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     } else {
       // Fallback to local confirmation if handler not provided
       setConfirmationAction('approve');
-      setConfirmationMessage('reminder');
+      setConfirmationMessage(isGoal ? 'Approve the proposed decomposition plan?' : 'Approve this reminder?');
       setShowConfirmation(true);
     }
   };
@@ -285,7 +295,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     } else {
       // Fallback to local confirmation if handler not provided
       setConfirmationAction('deny');
-      setConfirmationMessage('reminder');
+      setConfirmationMessage(isGoal ? 'Reject the proposed decomposition plan?' : 'Reject this reminder?');
       setShowConfirmation(true);
     }
   };
@@ -300,9 +310,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
     setIsSubmittingReaction(true);
     try {
+      const typeLabel = isGoal ? 'decomposition proposal' : 'reminder';
       const requestBody = {
         approved: confirmationAction === 'approve',
-        comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} reminder`
+        comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} ${typeLabel}`
       };
       console.log('[REACTION] Request body:', requestBody);
 
@@ -762,6 +773,29 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               : <Copy className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
             }
           </button>
+        </div>
+      )}
+
+      {/* Goal Breakdown Proposal */}
+      {isGoal && goalPhase === 'awaiting_approval' && proposedBreakdown && proposedBreakdown.length > 0 && (
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">
+          <div className="flex items-center gap-2 mb-2 text-blue-700 dark:text-blue-300">
+            <Bot className="h-4 w-4" />
+            <span className="text-xs font-semibold">AI Decomposition Proposal</span>
+          </div>
+          {proposedResponse && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mb-2 italic">"{proposedResponse}"</p>
+          )}
+          <ul className="space-y-1.5">
+            {proposedBreakdown.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-xs text-gray-700 dark:text-gray-300">
+                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">[{item.type}]</span> {item.description}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

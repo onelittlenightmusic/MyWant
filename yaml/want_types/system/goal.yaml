@@ -1,0 +1,111 @@
+wantType:
+  metadata:
+    name: goal
+    title: Goal
+    description: |
+      Represents a user's high-level goal that gets automatically decomposed into
+      concrete sub-wants by the GoalThinker ThinkAgent.
+
+      The agent calls a Python LLM script to break down the goal text into a set of
+      actionable sub-wants (knowledge, reminder, or nested goal). The user reviews
+      the proposed breakdown via a reaction queue before the child wants are spawned.
+
+      After approval, the agent monitors cc_messages for follow-up conversation that
+      may trigger a replan (re_planning phase). Each replan produces a new proposed
+      breakdown subject to user approval.
+
+      Phases:
+        decomposing       → Python script runs, breakdown produced, queue created
+        awaiting_approval → User approves or rejects via reaction queue
+        monitoring        → Child wants running, watching for cc_message_count changes
+        re_planning       → New breakdown produced based on conversation, queue created
+    version: '1.0'
+    category: system
+    pattern: coordinator
+
+  parameters:
+  - name: goal_text
+    description: The user's goal expressed in natural language
+    type: string
+    required: true
+    example: "Plan a weekend trip to Kyoto"
+
+  state:
+  - name: goal_text
+    description: The user's goal text (copied from param by Initialize)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: goal
+
+  - name: phase
+    description: |
+      Current lifecycle phase of the goal want:
+        decomposing, awaiting_approval, monitoring, re_planning
+    type: string
+    persistent: true
+    initialValue: decomposing
+    label: current
+
+  - name: proposed_breakdown
+    description: List of proposed sub-want items pending user approval
+    type: object
+    persistent: true
+    initialValue: []
+    label: current
+
+  - name: proposed_response
+    description: Brief explanation from the AI about the proposed breakdown
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: reaction_queue_id
+    description: ID of the reaction queue created for user approval
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: interactive
+    description: Whether this want supports interactive chat (enables Chat tab in UI)
+    type: bool
+    persistent: false
+    initialValue: true
+    label: current
+
+  - name: cc_messages
+    description: FIFO buffer of last 20 incoming chat messages
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_responses
+    description: FIFO buffer of last 20 AI responses (paired with cc_messages)
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_message_count
+    description: Total number of chat messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  examples:
+  - name: Weekend Trip Planning
+    description: Decompose a travel planning goal into actionable sub-wants
+    want:
+      metadata:
+        name: kyoto-trip-goal
+        type: goal
+      spec:
+        params:
+          goal_text: "Plan a weekend trip to Kyoto next month"
+
+  requires:
+    - goal_thinking

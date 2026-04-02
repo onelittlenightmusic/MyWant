@@ -379,7 +379,10 @@ export const Dashboard: React.FC = () => {
     try {
       const qid = reactionWantState.state?.current?.reaction_queue_id as string | undefined;
       if (!qid) return;
-      const r = await fetch(`/api/v1/reactions/${qid}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: reactionAction === 'approve', comment: `User ${reactionAction === 'approve' ? 'approved' : 'denied'} reminder` }) });
+      const isGoal = reactionWantState.metadata?.type === 'goal';
+      const typeLabel = isGoal ? 'decomposition proposal' : 'reminder';
+      const comment = `User ${reactionAction === 'approve' ? 'approved' : 'denied'} ${typeLabel}`;
+      const r = await fetch(`/api/v1/reactions/${qid}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approved: reactionAction === 'approve', comment }) });
       if (!r.ok) throw new Error(`Failed: ${r.statusText}`);
       setShowReactionConfirmation(false); setReactionWantState(null); setReactionAction(null);
     } catch (e) {} finally { setIsSubmittingReaction(false); }
