@@ -5,33 +5,7 @@ goal_thinker.py - Goal decomposition and replanning tool for MyWant.
 Reads JSON from stdin, calls Anthropic LLM (or falls back to a static response),
 and writes the result as JSON to stdout.
 
-Input format (phase=decompose):
-  {
-    "phase": "decompose",
-    "goal_text": "string"
-  }
-
-Input format (phase=replan):
-  {
-    "phase": "replan",
-    "goal_text": "string",
-    "conversation_history": [...],
-    "cc_responses": [...],
-    "modification_request": "string"
-  }
-
-Output format:
-  {
-    "breakdown": [
-      {
-        "name": "kebab-case-name",
-        "type": "goal|knowledge|reminder",
-        "description": "what this achieves",
-        "params": {}
-      }
-    ],
-    "response_text": "explanation"
-  }
+Input format includes system capabilities discovered via MCP.
 """
 
 import sys
@@ -42,7 +16,6 @@ import os
 def fallback_breakdown(goal_text: str, modification_request: str = "") -> dict:
     """Return a fixed breakdown when LLM is not available."""
     name_base = goal_text[:30].lower().replace(" ", "-").replace("、", "-").replace("。", "")
-    # Remove non-alphanumeric/dash characters
     import re
     name_base = re.sub(r"[^a-z0-9\-]", "", name_base)
     name_base = name_base.strip("-") or "goal-item"
@@ -79,37 +52,53 @@ def fallback_breakdown(goal_text: str, modification_request: str = "") -> dict:
     }
 
 
-def decompose_with_llm(client, goal_text: str) -> dict:
-    """Use Anthropic LLM to decompose a goal into sub-wants."""
-    prompt = f"""You are a goal decomposition assistant for a productivity system called MyWant.
+def format_capabilities(available_capabilities: list) -> str:
+    """Format the available capabilities list for the prompt."""
+    if not available_capabilities:
+        return "No special capabilities available. Use knowledge and reminder want types."
+    lines = ["Unlocked capabilities (can influence which want types to choose):"]
+    for cap in available_capabilities:
+        lines.append(f"  - {cap}")
+    return "\n".join(lines)
 
-Your task is to break down the following user goal into actionable sub-wants.
+
+def decompose_with_llm(client, goal_text: str, available_capabilities: list) -> dict:
+    """Use Anthropic LLM to decompose a goal into sub-wants."""
+    cap_text = format_capabilities(available_capabilities)
+
+    prompt = f"""You are a goal decomposition assistant for a productivity system called MyWant.
+Your task is to break down a high-level goal into actionable sub-wants.
+
+AVAILABLE CAPABILITIES:
+{cap_text}
+
+AVAILABLE WANT TYPES: goal, knowledge, reminder (use specific types when capabilities match)
 
 User goal: {goal_text}
 
 Each sub-want must have:
 - name: a kebab-case identifier (e.g., "research-destinations", "book-flight")
-- type: one of "goal" (complex sub-goal), "knowledge" (information gathering), "reminder" (scheduled notification)
+- type: MUST be one of the available want types listed above.
 - description: clear description of what this achieves
-- params: object with type-specific parameters
-  - For "knowledge" type: {{"want": "description of what to learn"}}
-  - For "reminder" type: {{"message": "reminder text", "duration_from_now": "1 hours", "require_reaction": false}}
-  - For "goal" type: {{"goal_text": "the sub-goal text"}}
+- params: object with type-specific parameters.
 
-Respond ONLY with a valid JSON object in this exact format:
+STRATEGY:
+1. Prefer specific want types if they match the goal (e.g., "flight" for travel).
+2. If a specific type is not yet available but seems needed, use "knowledge" to research it.
+3. If the goal is too big, use "goal" to create a sub-goal.
+
+Respond ONLY with a valid JSON object:
 {{
   "breakdown": [
     {{
       "name": "kebab-case-name",
-      "type": "goal|knowledge|reminder",
+      "type": "want-type",
       "description": "what this achieves",
       "params": {{}}
     }}
   ],
   "response_text": "Brief explanation of the breakdown"
-}}
-
-Keep the breakdown to 2-5 items. Focus on concrete, actionable steps."""
+}}"""
 
     message = client.messages.create(
         model="claude-3-5-haiku-20241022",
@@ -118,7 +107,6 @@ Keep the breakdown to 2-5 items. Focus on concrete, actionable steps."""
     )
 
     content = message.content[0].text.strip()
-    # Extract JSON from response (may have markdown code blocks)
     if "```json" in content:
         content = content.split("```json")[1].split("```")[0].strip()
     elif "```" in content:
@@ -133,12 +121,14 @@ def replan_with_llm(
     conversation_history: list,
     cc_responses: list,
     modification_request: str,
+    available_capabilities: list,
 ) -> dict:
     """Use Anthropic LLM to replan based on conversation history."""
+    cap_text = format_capabilities(available_capabilities)
     history_text = ""
     if conversation_history:
         history_items = []
-        for i, msg in enumerate(conversation_history[-10:]):  # Last 10 messages
+        for i, msg in enumerate(conversation_history[-10:]):
             if isinstance(msg, dict):
                 sender = msg.get("sender", "user")
                 text = msg.get("text", "")
@@ -146,40 +136,20 @@ def replan_with_llm(
         if history_items:
             history_text = "\n".join(history_items)
 
-    prompt = f"""You are a goal decomposition assistant for a productivity system called MyWant.
+    prompt = f"""You are a goal decomposition assistant for MyWant.
+Original goal: {goal_text}
 
-The user originally had this goal: {goal_text}
+AVAILABLE CAPABILITIES:
+{cap_text}
+
+AVAILABLE WANT TYPES: goal, knowledge, reminder (use specific types when capabilities match)
 
 Conversation history:
 {history_text if history_text else "(no previous messages)"}
 
-The user now wants to modify the plan with this request: {modification_request}
+The user now wants to modify the plan: {modification_request}
 
-Please provide an updated breakdown of sub-wants that reflects the user's modification request.
-
-Each sub-want must have:
-- name: a kebab-case identifier (e.g., "research-destinations", "book-flight")
-- type: one of "goal" (complex sub-goal), "knowledge" (information gathering), "reminder" (scheduled notification)
-- description: clear description of what this achieves
-- params: object with type-specific parameters
-  - For "knowledge" type: {{"want": "description of what to learn"}}
-  - For "reminder" type: {{"message": "reminder text", "duration_from_now": "1 hours", "require_reaction": false}}
-  - For "goal" type: {{"goal_text": "the sub-goal text"}}
-
-Respond ONLY with a valid JSON object in this exact format:
-{{
-  "breakdown": [
-    {{
-      "name": "kebab-case-name",
-      "type": "goal|knowledge|reminder",
-      "description": "what this achieves",
-      "params": {{}}
-    }}
-  ],
-  "response_text": "Brief explanation of what changed and why"
-}}
-
-Keep the breakdown to 2-5 items."""
+Provide an updated breakdown of sub-wants. Respond ONLY with valid JSON."""
 
     message = client.messages.create(
         model="claude-3-5-haiku-20241022",
@@ -188,7 +158,6 @@ Keep the breakdown to 2-5 items."""
     )
 
     content = message.content[0].text.strip()
-    # Extract JSON from response (may have markdown code blocks)
     if "```json" in content:
         content = content.split("```json")[1].split("```")[0].strip()
     elif "```" in content:
@@ -198,7 +167,6 @@ Keep the breakdown to 2-5 items."""
 
 
 def main():
-    # Read input from stdin
     try:
         raw_input = sys.stdin.read()
         input_data = json.loads(raw_input)
@@ -208,26 +176,23 @@ def main():
 
     phase = input_data.get("phase", "decompose")
     goal_text = input_data.get("goal_text", "")
+    available_capabilities = input_data.get("available_capabilities", [])
 
-    # Try to use Anthropic LLM if available
     use_llm = False
     client = None
     try:
-        import anthropic  # noqa: F401
-
+        import anthropic
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         if api_key:
             client = anthropic.Anthropic(api_key=api_key)
             use_llm = True
-        else:
-            sys.stderr.write("[goal_thinker] ANTHROPIC_API_KEY not set, using fallback\n")
     except ImportError:
-        sys.stderr.write("[goal_thinker] anthropic package not installed, using fallback\n")
+        pass
 
     try:
         if phase == "decompose":
             if use_llm and client:
-                result = decompose_with_llm(client, goal_text)
+                result = decompose_with_llm(client, goal_text, available_capabilities)
             else:
                 result = fallback_breakdown(goal_text)
 
@@ -243,24 +208,16 @@ def main():
                     conversation_history,
                     cc_responses,
                     modification_request,
+                    available_capabilities,
                 )
             else:
                 result = fallback_breakdown(goal_text, modification_request)
-
         else:
-            sys.stderr.write(f"[goal_thinker] Unknown phase: {phase}\n")
             result = fallback_breakdown(goal_text)
 
     except Exception as e:
-        sys.stderr.write(f"[goal_thinker] LLM call failed: {e}, using fallback\n")
-        modification_request = input_data.get("modification_request", "")
-        result = fallback_breakdown(goal_text, modification_request)
-
-    # Ensure breakdown is a list
-    if "breakdown" not in result or not isinstance(result["breakdown"], list):
-        result["breakdown"] = []
-    if "response_text" not in result:
-        result["response_text"] = "Goal breakdown complete."
+        sys.stderr.write(f"[goal_thinker] LLM call failed: {e}\n")
+        result = fallback_breakdown(goal_text)
 
     print(json.dumps(result))
 

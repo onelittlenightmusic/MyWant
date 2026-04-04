@@ -68,9 +68,10 @@ func (s *ScriptableWant) OnDelete() {
 // and also directly from spec params as a fallback.
 func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
 	// Apply params first so they are available for interpolation below.
+	// Interpolate env vars / state refs in param values at copy time.
 	for stateKey, paramKey := range hook.Params {
 		if v, ok := s.Spec.Params[paramKey]; ok {
-			s.SetCurrent(stateKey, fmt.Sprintf("%v", v))
+			s.SetCurrent(stateKey, s.interpolate(fmt.Sprintf("%v", v)))
 		}
 	}
 	for k, v := range hook.Current {
@@ -97,7 +98,7 @@ func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
 }
 
 // interpolate replaces ${varName} placeholders with values from current state,
-// falling back to spec params if the state key is not set.
+// falling back to spec params, then environment variables.
 func (s *ScriptableWant) interpolate(tmpl string) string {
 	return interpolateRe.ReplaceAllStringFunc(tmpl, func(m string) string {
 		key := m[2 : len(m)-1] // strip ${ and }
@@ -106,6 +107,9 @@ func (s *ScriptableWant) interpolate(tmpl string) string {
 		}
 		if pv, ok := s.Spec.Params[key]; ok {
 			return fmt.Sprintf("%v", pv)
+		}
+		if ev := os.Getenv(key); ev != "" {
+			return ev
 		}
 		return m // keep placeholder if not resolved
 	})

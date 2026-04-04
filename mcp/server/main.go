@@ -49,6 +49,16 @@ func (s *MCPServer) getRecipe(ctx context.Context, recipeID string) (interface{}
 	return s.doGet(url)
 }
 
+func (s *MCPServer) listAchievements(ctx context.Context) (interface{}, error) {
+	url := fmt.Sprintf("%s/api/v1/achievements", s.apiBaseURL)
+	return s.doGet(url)
+}
+
+func (s *MCPServer) listCapabilities(ctx context.Context) (interface{}, error) {
+	url := fmt.Sprintf("%s/api/v1/capabilities", s.apiBaseURL)
+	return s.doGet(url)
+}
+
 func (s *MCPServer) doGet(url string) (interface{}, error) {
 	resp, err := s.httpClient.Get(url)
 	if err != nil {
@@ -178,6 +188,30 @@ func main() {
 		RecipeID string `json:"recipe_id" jsonschema:"ID of the recipe"`
 	}) (*mcp.CallToolResult, struct{}, error) {
 		result, err := myWantServer.getRecipe(ctx, input.RecipeID)
+		if err != nil {
+			return ErrorResult(err.Error()), struct{}{}, nil
+		}
+		return SuccessResult(formatToolResult(result)), struct{}{}, nil
+	})
+
+	// Register list_achievements tool
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_achievements",
+		Description: "List all earned and available achievements (titles/medals) for agents",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input struct{}) (*mcp.CallToolResult, struct{}, error) {
+		result, err := myWantServer.listAchievements(ctx)
+		if err != nil {
+			return ErrorResult(err.Error()), struct{}{}, nil
+		}
+		return SuccessResult(formatToolResult(result)), struct{}{}, nil
+	})
+
+	// Register list_capabilities tool
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_capabilities",
+		Description: "List all active capabilities currently available in the system",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, input struct{}) (*mcp.CallToolResult, struct{}, error) {
+		result, err := myWantServer.listCapabilities(ctx)
 		if err != nil {
 			return ErrorResult(err.Error()), struct{}{}, nil
 		}

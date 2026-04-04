@@ -27,8 +27,48 @@ wantType:
   - name: goal_text
     description: The user's goal expressed in natural language
     type: string
-    required: true
+    required: false
     example: "Plan a weekend trip to Kyoto"
+
+  - name: initial_breakdown
+    description: |
+      Static breakdown provided as a list, bypassing LLM decomposition.
+      Each item: {name, type, description, params, using (optional)}.
+      When provided, goal_text is optional.
+    type: object
+    required: false
+
+  - name: auto_approve
+    description: |
+      When true, skip the reaction queue approval step and commit the breakdown directly.
+      Intended for automated/infrastructure use cases where no user interaction is needed.
+    type: bool
+    default: false
+    required: false
+
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary
+    type: string
+    defaultGlobalParameter: opa_llm_planner_command
+    required: false
+
+  - name: policy_dir
+    description: Directory containing OPA .rego policy files for goal planning
+    type: string
+    default: "yaml/policies/goal"
+    required: false
+
+  - name: use_llm
+    description: Enable LLM-augmented planning
+    type: bool
+    defaultGlobalParameter: opa_llm_use_llm
+    required: false
+
+  - name: llm_provider
+    description: LLM provider name (e.g. anthropic)
+    type: string
+    defaultGlobalParameter: llm_provider
+    required: false
 
   state:
   - name: goal_text
@@ -96,6 +136,76 @@ wantType:
     initialValue: 0
     label: current
 
+  - name: targets
+    description: Approved breakdown items stored as goal state for OPA planning
+    type: object
+    persistent: true
+    initialValue: []
+    label: goal
+
+  - name: directions
+    description: Direction list produced by OPA ThinkAgent on each replan
+    type: object
+    persistent: true
+    initialValue: []
+    label: plan
+
+  - name: opa_input_hash
+    description: Hash of goal+current used by OPA thinker for change detection
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: direction_map_json
+    description: JSON string of direction_map built from approved breakdown
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: auto_approve
+    description: When true, skip reaction queue and commit breakdown directly (copied from param)
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  - name: initial_breakdown
+    description: Static breakdown list provided as param, bypassing LLM decomposition
+    type: object
+    persistent: false
+    initialValue: null
+    label: current
+
+  - name: opa_llm_planner_command
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'opa-llm-planner'
+    label: current
+
+  - name: policy_dir
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'yaml/policies/goal'
+    label: current
+
+  - name: use_llm
+    description: Copied from param by Initialize
+    type: bool
+    persistent: false
+    initialValue: true
+    label: current
+
+  - name: llm_provider
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'anthropic'
+    label: current
+
   examples:
   - name: Weekend Trip Planning
     description: Decompose a travel planning goal into actionable sub-wants
@@ -109,3 +219,4 @@ wantType:
 
   requires:
     - goal_thinking
+    - opa_llm_planning

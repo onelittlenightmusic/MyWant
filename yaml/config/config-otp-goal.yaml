@@ -1,0 +1,81 @@
+wants:
+  - metadata:
+      name: otp-pipeline-goal
+      type: goal
+      labels:
+        category: infrastructure
+    spec:
+      params:
+        goal_text: "OpenTripPlannerをセットアップしてルート検索サーバを起動する"
+        auto_approve: true
+        policy_dir: "yaml/policies/goal"
+        use_llm: false
+
+        # 静的 breakdown: LLM を使わず固定の子Want ツリーを定義
+        # using により依存順序を DispatchThinker が保証する
+        initial_breakdown:
+          # ── フェーズ1: データ取得・設定生成（並行実行） ──────────────────
+          - name: ensure-osm
+            type: file_exists
+            description: "Tokyo OSM データのダウンロード"
+            params:
+              filename: "map.osm.pbf"
+              url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+
+          - name: ensure-gtfs-toei-bus
+            type: file_exists
+            description: "都営バス GTFS のダウンロード"
+            params:
+              filename: "toei-bus.zip"
+              url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
+
+          - name: ensure-gtfs-toei-train
+            type: file_exists
+            description: "都営電車 GTFS のダウンロード"
+            params:
+              filename: "toei-train.zip"
+              url: "https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
+
+          - name: ensure-gtfs-tokyo-metro
+            type: file_exists
+            description: "東京メトロ GTFS のダウンロード"
+            params:
+              filename: "tokyo-metro.zip"
+              url: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}"
+
+          - name: build-config
+            type: otp_config
+            description: "build-config.json の生成"
+            params:
+              gtfs_feeds: >-
+                [{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},
+                 {"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"},
+                 {"url":"https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}","filename":"tokyo-metro.zip"}]
+
+          # ── フェーズ2: グラフビルド（全データ揃ってから） ──────────────
+          - name: build-graph
+            type: file_exists
+            description: "graph.obj のビルド（全プロバイダー完了後）"
+            params:
+              filename: "graph.obj"
+              method: "docker_build"
+              docker_image: "docker.io/opentripplanner/opentripplanner:2.6.0"
+              docker_container_name: "otp-builder"
+              docker_command_args: '["--build", "--save"]'
+              docker_env: '{"JAVA_OPTIONS": "-Xmx6G"}'
+            using:
+              - direction: "ensure-osm"
+              - direction: "ensure-gtfs-toei-bus"
+              - direction: "ensure-gtfs-toei-train"
+              - direction: "ensure-gtfs-tokyo-metro"
+              - direction: "build-config"
+
+          # ── フェーズ3: サーバ起動（グラフ完成後） ────────────────────────
+          - name: start-server
+            type: otp_server
+            description: "OTP ルート検索サーバの起動（graph.obj 完成後）"
+            params:
+              server_memory: "-Xmx4G"
+              server_port: "8082"
+            using:
+              - direction: "build-graph"

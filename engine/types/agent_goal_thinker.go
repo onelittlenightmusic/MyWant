@@ -46,24 +46,32 @@ func goalThinkerThink(ctx context.Context, want *Want) error {
 
 // goalThinkerDecompose calls the Python script to break down the goal_text into sub-wants.
 func goalThinkerDecompose(ctx context.Context, want *Want) error {
+	// Avoid re-running if already proposed (breakdown present but not yet approved)
+	existingBreakdown := GetCurrent(want, "proposed_breakdown", []any{})
+	if len(existingBreakdown) > 0 {
+		return nil
+	}
+
+	// Static breakdown: skip LLM if initial_breakdown param was provided
+	if raw, ok := want.GetCurrent("initial_breakdown"); ok {
+		if breakdown, ok := raw.([]any); ok && len(breakdown) > 0 {
+			want.DirectLog("[GOAL-THINKER] Using static initial_breakdown (%d items)", len(breakdown))
+			return goalThinkerProposeBreakdown(ctx, want, breakdown, "")
+		}
+	}
+
 	goalText := GetGoal(want, "goal_text", "")
 	if goalText == "" {
 		want.DirectLog("[GOAL-THINKER] goal_text is empty, skipping decompose")
 		return nil
 	}
 
-	// Avoid re-running if already in progress (guarded by proposed_breakdown presence)
-	existingBreakdown := GetCurrent(want, "proposed_breakdown", []any{})
-	if len(existingBreakdown) > 0 {
-		// Already decomposed but didn't transition — skip re-running
-		return nil
-	}
-
 	want.DirectLog("[GOAL-THINKER] Decomposing goal: %s", goalText)
 
 	result, err := callGoalThinkerScript(ctx, map[string]any{
-		"phase":     "decompose",
-		"goal_text": goalText,
+		"phase":                  "decompose",
+		"goal_text":              goalText,
+		"available_capabilities": computeAvailableCapabilities(),
 	})
 	if err != nil {
 		want.DirectLog("[GOAL-THINKER] Script error during decompose: %v", err)
@@ -72,12 +80,22 @@ func goalThinkerDecompose(ctx context.Context, want *Want) error {
 
 	breakdown, _ := result["breakdown"].([]any)
 	responseText, _ := result["response_text"].(string)
-
-	want.SetCurrent("proposed_breakdown", breakdown)
-	want.SetCurrent("proposed_response", responseText)
 	want.DirectLog("[GOAL-THINKER] Decomposed into %d items: %s", len(breakdown), responseText)
 
-	// Create reaction queue for user approval
+	return goalThinkerProposeBreakdown(ctx, want, breakdown, responseText)
+}
+
+// goalThinkerProposeBreakdown sets the proposed breakdown and either auto-approves
+// (when auto_approve=true) or creates a reaction queue for user approval.
+func goalThinkerProposeBreakdown(ctx context.Context, want *Want, breakdown []any, responseText string) error {
+	want.SetCurrent("proposed_breakdown", breakdown)
+	want.SetCurrent("proposed_response", responseText)
+
+	if autoApprove, _ := want.GetCurrent("auto_approve"); autoApprove == true {
+		want.DirectLog("[GOAL-THINKER] auto_approve=true, committing breakdown directly")
+		return goalThinkerCommitApproval(want, breakdown)
+	}
+
 	httpClient := want.GetHTTPClient()
 	if httpClient == nil {
 		want.DirectLog("[GOAL-THINKER] No HTTP client available")
@@ -93,7 +111,33 @@ func goalThinkerDecompose(ctx context.Context, want *Want) error {
 	want.SetCurrent("phase", "awaiting_approval")
 	want.SetStatus(WantStatusWaitingUserAction)
 	want.DirectLog("[GOAL-THINKER] Reaction queue created: %s, transitioning to awaiting_approval", queueID)
+	return nil
+}
 
+// goalThinkerCommitApproval applies an approved breakdown: builds direction_map,
+// stores targets as goal state, and transitions to the monitoring phase.
+func goalThinkerCommitApproval(want *Want, breakdown []any) error {
+	want.SetGoal("targets", breakdown)
+
+	dm := buildGoalDirectionMap(breakdown)
+	if existingJSON, ok := want.GetCurrent("direction_map_json"); ok {
+		if existingStr, ok := existingJSON.(string); ok && existingStr != "" {
+			existingDM := make(map[string]DirectionConfig)
+			if err := json.Unmarshal([]byte(existingStr), &existingDM); err == nil {
+				for k, v := range dm {
+					existingDM[k] = v
+				}
+				dm = existingDM
+			}
+		}
+	}
+	dmJSON, _ := json.Marshal(dm)
+	want.SetCurrent("direction_map_json", string(dmJSON))
+
+	currentCount := toInt(GetCurrent(want, "cc_message_count", 0))
+	want.StoreState("_last_cc_message_count", currentCount)
+	want.SetCurrent("phase", "monitoring")
+	want.DirectLog("[GOAL-THINKER] Committed breakdown (%d items), transitioning to monitoring", len(breakdown))
 	return nil
 }
 
@@ -143,24 +187,9 @@ func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 	want.SetStatus(WantStatusReaching)
 
 	if reaction.Approved {
-		want.DirectLog("[GOAL-THINKER] User approved breakdown — spawning child wants")
-
+		want.DirectLog("[GOAL-THINKER] User approved breakdown")
 		breakdown := GetCurrent(want, "proposed_breakdown", []any{})
-		for _, item := range breakdown {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if err := spawnChildWantFromBreakdownItem(want, itemMap); err != nil {
-				want.DirectLog("[GOAL-THINKER] Failed to spawn child want: %v", err)
-			}
-		}
-
-		// Track the last cc_message_count for change detection
-		currentCount := toInt(GetCurrent(want, "cc_message_count", 0))
-		want.StoreState("_last_cc_message_count", currentCount)
-		want.SetCurrent("phase", "monitoring")
-		want.DirectLog("[GOAL-THINKER] Transitioned to monitoring phase")
+		return goalThinkerCommitApproval(want, breakdown)
 	} else {
 		want.DirectLog("[GOAL-THINKER] User rejected breakdown — returning to decomposing")
 		want.SetCurrent("phase", "decomposing")
@@ -171,19 +200,27 @@ func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// goalThinkerMonitor watches cc_message_count for changes that trigger a replan.
+// goalThinkerMonitor watches for cc_message_count changes that trigger a replan.
+// Achievement/capability changes are detected automatically by the OPA planner
+// via computeAvailableCapabilities() in the hash-based change detection.
 func goalThinkerMonitor(ctx context.Context, want *Want) error {
-	lastCount := GetState[int](want, "_last_cc_message_count", 0)
+	// Check for new chat messages
+	lastCount := toInt(GetCurrent(want, "_last_cc_message_count", 0))
 	currentCount := toInt(GetCurrent(want, "cc_message_count", 0))
 
 	if currentCount > lastCount {
 		want.StoreState("_last_cc_message_count", currentCount)
 		want.DirectLog("[GOAL-THINKER] cc_message_count changed (%d → %d), triggering replan", lastCount, currentCount)
-		want.SetCurrent("proposed_breakdown", []any{})
-		want.SetCurrent("proposed_response", "")
-		want.SetCurrent("phase", "re_planning")
+		return triggerReplan(want)
 	}
 
+	return nil
+}
+
+func triggerReplan(want *Want) error {
+	want.SetCurrent("proposed_breakdown", []any{})
+	want.SetCurrent("proposed_response", "")
+	want.SetCurrent("phase", "re_planning")
 	return nil
 }
 
@@ -206,11 +243,12 @@ func goalThinkerReplan(ctx context.Context, want *Want) error {
 	want.DirectLog("[GOAL-THINKER] Replanning with modification_request: %s", modificationRequest)
 
 	result, err := callGoalThinkerScript(ctx, map[string]any{
-		"phase":                "replan",
-		"goal_text":            goalText,
-		"conversation_history": ccMessages,
-		"cc_responses":         ccResponses,
-		"modification_request": modificationRequest,
+		"phase":                  "replan",
+		"goal_text":              goalText,
+		"conversation_history":   ccMessages,
+		"cc_responses":           ccResponses,
+		"modification_request":   modificationRequest,
+		"available_capabilities": computeAvailableCapabilities(),
 	})
 	if err != nil {
 		want.DirectLog("[GOAL-THINKER] Script error during replan: %v", err)
@@ -281,6 +319,58 @@ func spawnChildWantFromBreakdownItem(parent *Want, item map[string]any) error {
 	child.Spec.Params = params
 
 	return parent.AddChildWant(child)
+}
+
+// buildGoalDirectionMap constructs a DirectionConfig map from the approved breakdown items.
+// Each breakdown item becomes a direction entry with a Sets field that marks completion.
+// Optional fields in breakdown items:
+//   - "using": []map[string]string — dependency selectors passed to DispatchThinker
+//   - "labels": map[string]string — extra labels added to the spawned child want
+func buildGoalDirectionMap(breakdown []any) map[string]DirectionConfig {
+	dm := make(map[string]DirectionConfig)
+	for _, item := range breakdown {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := m["name"].(string)
+		wantType, _ := m["type"].(string)
+		params, _ := m["params"].(map[string]any)
+		description, _ := m["description"].(string)
+		if name == "" || wantType == "" {
+			continue
+		}
+		if params == nil {
+			params = map[string]any{}
+		}
+		if description != "" {
+			params["want"] = description
+		}
+
+		// Extract optional "using" field: [{direction: "..."}, {role: "..."}, ...]
+		var using []map[string]string
+		if rawUsing, ok := m["using"].([]any); ok {
+			for _, u := range rawUsing {
+				if uMap, ok := u.(map[string]any); ok {
+					entry := make(map[string]string, len(uMap))
+					for k, v := range uMap {
+						if s, ok := v.(string); ok {
+							entry[k] = s
+						}
+					}
+					using = append(using, entry)
+				}
+			}
+		}
+
+		dm[name] = DirectionConfig{
+			Type:   wantType,
+			Params: params,
+			Sets:   map[string]any{name + "_done": true},
+			Using:  using,
+		}
+	}
+	return dm
 }
 
 // callGoalThinkerScript runs tools/goal_thinker.py with the given input and returns the parsed output.

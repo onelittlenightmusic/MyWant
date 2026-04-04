@@ -104,6 +104,63 @@ func InterpretDirections(w *Want) {
 	w.ProposeDispatch(requests)
 }
 
+// InterpretDirectionsCoordinator is like InterpretDirections but writes desired_dispatch
+// to the want's OWN state instead of the parent's state.
+// Use this from coordinator wants (like GoalWant) that are themselves the dispatch target,
+// not a planner child that reports up to a parent coordinator.
+func InterpretDirectionsCoordinator(w *Want) {
+	var directions []string
+	if raw, ok := w.getState("directions"); ok {
+		switch v := raw.(type) {
+		case []string:
+			directions = v
+		case []any:
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					directions = append(directions, s)
+				}
+			}
+		}
+	}
+
+	directionMap := make(map[string]DirectionConfig)
+	if rawMap, ok := w.Spec.Params["direction_map"]; ok {
+		switch v := rawMap.(type) {
+		case string:
+			json.Unmarshal([]byte(v), &directionMap)
+		case map[string]any:
+			b, _ := json.Marshal(v)
+			json.Unmarshal(b, &directionMap)
+		}
+	}
+
+	if len(directionMap) == 0 {
+		return
+	}
+
+	requests := make([]DispatchRequest, 0, len(directions))
+	for _, dir := range directions {
+		cfg, ok := directionMap[dir]
+		if !ok {
+			continue
+		}
+		requests = append(requests, DispatchRequest{
+			Direction:   dir,
+			RequesterID: w.Metadata.ID,
+			Type:        cfg.Type,
+			Params:      cfg.Params,
+			Sets:        cfg.Sets,
+			CostField:   cfg.CostField,
+			Using:       cfg.Using,
+		})
+	}
+	// Write directly to own state so the DispatchThinker running on this coordinator can read it.
+	if requests == nil {
+		requests = []DispatchRequest{}
+	}
+	w.storeState("desired_dispatch", requests)
+}
+
 // matchesLabels returns true if all selector key=value pairs are present in labels.
 func matchesLabels(labels, selector map[string]string) bool {
 	for k, v := range selector {
@@ -231,7 +288,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 					if child.Status == WantStatusAchieved {
 						if len(req.Sets) > 0 {
 							for k, v := range req.Sets {
-								w.SetCurrent(k, v)
+								w.storeState(k, v) // bypass schema validation: Sets keys are user-defined
 							}
 						}
 						completedIDs[direction] = child.Metadata.ID
@@ -268,7 +325,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 				if req, ok := requestByDirection[direction]; ok {
 					for k, v := range req.Sets {
 						if b, ok := v.(bool); ok && b {
-							w.SetCurrent(k, false)
+							w.storeState(k, false) // bypass schema validation: Sets keys are user-defined
 						}
 					}
 				}
@@ -288,7 +345,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 						if req, ok := requestByDirection[direction]; ok {
 							for k, v := range req.Sets {
 								if b, ok := v.(bool); ok && b {
-									w.SetCurrent(k, false)
+									w.storeState(k, false) // bypass schema validation: Sets keys are user-defined
 								}
 							}
 						}
@@ -337,7 +394,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 								}
 								for k, v := range req.Sets {
 									sets[k] = v
-									w.SetCurrent(k, v)
+									w.storeState(k, v) // bypass schema validation: Sets keys are user-defined
 								}
 								w.storeState("sets", sets)
 							}
