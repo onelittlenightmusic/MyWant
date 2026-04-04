@@ -149,9 +149,9 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           )}
           style={isBottom ? { paddingBottom: 'env(safe-area-inset-bottom)' } : {}}
         >
-          <div className="flex items-center gap-3 flex-1 min-w-0 px-4 py-2">
+          <div className="flex items-center gap-3 flex-1 min-w-0 px-3 sm:px-6 py-2 sm:py-4">
             {title && (
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate flex items-center gap-2">
+              <h2 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate flex items-center gap-2">
                 {TitleIcon && <TitleIcon className={classNames('h-5 w-5 flex-shrink-0', titleIconClassName || '')} />}
                 {title}
               </h2>

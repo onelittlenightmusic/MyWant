@@ -510,7 +510,7 @@ export const WantForm: React.FC<WantFormProps> = ({
           type="button"
           onClick={() => setShowFilter(v => !v)}
           className={classNames(
-            "flex flex-col items-center justify-center gap-1 px-3 h-full transition-all duration-150 focus:outline-none",
+            "flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none",
             showFilter
               ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
               : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -518,7 +518,7 @@ export const WantForm: React.FC<WantFormProps> = ({
           title="Toggle search/filter"
         >
           <Search className="w-4 h-4" />
-          <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Filter</span>
+          <span className="text-[9px] font-bold uppercase tracking-tighter hidden sm:block">Filter</span>
         </button>
       )}
       <div className="flex items-center h-full px-2">
@@ -534,7 +534,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
         className={classNames(
-          "flex flex-col items-center justify-center gap-1 px-4 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
+          "flex flex-col items-center justify-center gap-0.5 px-4 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
           isSubmitting || (!isEditing && !isTypeSelected)
             ? "bg-gray-400/30 cursor-not-allowed grayscale opacity-50"
             : isEditing
@@ -560,7 +560,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                 </span>
               )}
             </div>
-            <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">
+            <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">
               {isRecommendationMode ? 'Deploy' : (isEditing ? 'Update' : 'Add')}
             </span>
           </>
