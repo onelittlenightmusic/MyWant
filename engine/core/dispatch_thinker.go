@@ -145,7 +145,10 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 					}
 				}
 				for _, child := range cb.GetWants() {
-					if child.Metadata.Name == childName && w.isOwnerOf(child) {
+					// Match by exact name OR prefixed name (owner_types.go forces prefix = parent want name)
+					prefixedName := fmt.Sprintf("%s-%s", w.Metadata.Name, childName)
+					nameMatch := child.Metadata.Name == childName || child.Metadata.Name == prefixedName
+					if nameMatch && w.isOwnerOf(child) {
 						if child.Status == WantStatusAchieved {
 							w.SetCurrent(stateKey, true)
 							w.StoreLog("[%s] Provider '%s' achieved → %s=true", DispatchThinkerName, childName, stateKey)
