@@ -102,7 +102,7 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
       </div>
 
       {/* Draft-specific status information at the bottom area - pushing it to the bottom */}
-      <div className="relative z-10 mt-auto border-t border-gray-100 pt-4">
+      <div className="relative z-10 mt-auto border-t border-gray-100 px-3 sm:px-6 py-4">
           {draft.isThinking ? (
             <div className="flex items-center gap-2">
               <div className="flex gap-1">

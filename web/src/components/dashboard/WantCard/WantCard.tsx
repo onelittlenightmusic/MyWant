@@ -309,7 +309,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         data-keyboard-nav-id={wantId}
         data-is-target={isTargetWant}
         className={classNames(
-          `card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[6rem] sm:min-h-[8rem] flex flex-col ${CARD_FOCUS_BASE}`,
+          `card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[6rem] sm:min-h-[10rem] flex flex-col ${CARD_FOCUS_BASE}`,
           CARD_BORDER_BASE,
           (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
           isHighlighted && styles.highlighted,

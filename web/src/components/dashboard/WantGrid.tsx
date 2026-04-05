@@ -416,7 +416,7 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
             handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
           }
         }}
-        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[8rem] sm:min-h-[12.5rem]"
+        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[6rem] sm:min-h-[10rem]"
       >
         <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
           <span className="relative inline-flex flex-shrink-0">

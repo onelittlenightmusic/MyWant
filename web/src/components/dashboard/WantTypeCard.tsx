@@ -92,7 +92,7 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantType.name}
       className={classNames(
-        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[8rem] sm:min-h-[12.5rem]',
+        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[8rem] sm:min-h-[10rem]',
         selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
         className || ''
       )}

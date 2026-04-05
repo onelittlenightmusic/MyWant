@@ -400,7 +400,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   return (
     <>
       {/* Header — semi-transparent band over background image */}
-      <div className={`mb-2 sm:mb-4 backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? '-mx-2 sm:-mx-4 px-2 sm:px-4 -mt-2 sm:-mt-4 pt-1.5 sm:pt-2 pb-1.5' : '-mx-3 sm:-mx-6 px-3 sm:px-6 -mt-3 sm:-mt-6 pt-2 sm:pt-3 pb-2'}`}>
+      <div className={`mb-2 sm:mb-4 backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
@@ -543,6 +543,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </div>
         </div>
       </div>
+
+      <div className={isChild ? "px-2 sm:px-4 pb-2" : "px-3 sm:px-6 pb-3"}>
 
 
       {/* Timeline - only for parent cards - DISABLED to keep consistent height */}
@@ -837,6 +839,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </p>
         </div>
       )}
+
+      </div>
 
       {/* Confirmation Message Notification */}
       <ConfirmationBubble
