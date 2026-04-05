@@ -75,7 +75,7 @@ export const ChildWantsBar: React.FC<ChildWantsBarProps> = ({
             No child wants yet
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {childWants.map((child, index) => {
               const childId = child.metadata?.id || child.id;
               const isSelected = selectedWant?.metadata?.id === childId || selectedWant?.id === childId;

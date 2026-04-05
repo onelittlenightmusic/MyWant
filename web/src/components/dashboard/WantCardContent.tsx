@@ -847,6 +847,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         onCancel={handleReactionCancel}
         loading={isSubmittingReaction}
         title="Confirm"
+        layout="header-overlay"
       />
 
       {/* Floating Replay Bubble - portal, no backdrop, anchored near card */}

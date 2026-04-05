@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
@@ -86,6 +86,20 @@ export const WantGrid: React.FC<WantGridProps> = ({
 }) => {
   const { reorderWant, draggingWant } = useWantStore();
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+
+  // Detect responsive column count to place bubble after the correct row
+  const getColumns = () => {
+    if (typeof window === 'undefined') return 1;
+    if (window.matchMedia('(min-width: 1024px)').matches) return 3;
+    if (window.matchMedia('(min-width: 640px)').matches) return 2;
+    return 1;
+  };
+  const [gridColumns, setGridColumns] = useState(getColumns);
+  useEffect(() => {
+    const update = () => setGridColumns(getColumns());
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   // Clear drag indicator when dragging stops
   React.useEffect(() => {
@@ -283,86 +297,96 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
   return (
     <div 
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6" 
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6"
       id="want-grid-container"
       onDragOver={handleGridDragOver}
       onDragLeave={handleGridDragLeave}
     >
-      {filteredWants.map((want, index) => {
-        const wantId = want.metadata?.id || want.id;
-        const isExpanded = expandedParents?.has(wantId || '') ?? false;
-        const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
-
-        const isBubbleExpanded = expandedChain.length > 0 && expandedChain[0]?.metadata?.id === wantId;
-        const bubbleChildWants = isBubbleExpanded
-          ? (allWants.length > 0 ? allWants : want.children || []).filter(w =>
-              w.metadata?.ownerReferences?.some(ref => ref.id === wantId)
+      {(() => {
+        // Find bubble parent index to determine which row to insert bubble after
+        const bubbleParentIndex = expandedChain.length > 0
+          ? filteredWants.findIndex(w => (w.metadata?.id || w.id) === (expandedChain[0]?.metadata?.id || expandedChain[0]?.id))
+          : -1;
+        const bubbleParentWant = bubbleParentIndex >= 0 ? filteredWants[bubbleParentIndex] : null;
+        const bubbleRowEndIndex = bubbleParentIndex >= 0
+          ? Math.min(Math.floor(bubbleParentIndex / gridColumns) * gridColumns + gridColumns - 1, filteredWants.length - 1)
+          : -1;
+        const bubbleChildWants = bubbleParentWant
+          ? (allWants.length > 0 ? allWants : bubbleParentWant.children || []).filter(w =>
+              w.metadata?.ownerReferences?.some(ref => ref.id === (bubbleParentWant.metadata?.id || bubbleParentWant.id))
             )
           : [];
 
-        return (
-          <React.Fragment key={wantId || `want-${index}`}>
-            <div
-              data-want-id={wantId}
-              data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-              className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
-            >
-              {/* Drop Indicator Before */}
-              {dragOverGap === index && (
-                <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-left-[14px]")}>
-                  <div className={styles.plusIconContainer}>
-                    <Plus size={14} />
+        return filteredWants.map((want, index) => {
+          const wantId = want.metadata?.id || want.id;
+          const isExpanded = expandedParents?.has(wantId || '') ?? false;
+          const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
+
+          return (
+            <React.Fragment key={wantId || `want-${index}`}>
+              <div
+                data-want-id={wantId}
+                data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
+                className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
+              >
+                {/* Drop Indicator Before */}
+                {dragOverGap === index && (
+                  <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-left-[14px]")}>
+                    <div className={styles.plusIconContainer}>
+                      <Plus size={14} />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <WantCard
-                want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
-                onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
-                onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onViewChat={onViewChatWant} onEdit={onEditWant} onDelete={onDeleteWant}
-                onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
-                onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
-                onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
-                isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
-                onCreateWant={onCreateWant}
-                correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
-                correlationHighlights={correlationHighlights}
-                stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
-              />
+                <WantCard
+                  want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
+                  onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
+                  onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onViewChat={onViewChatWant} onEdit={onEditWant} onDelete={onDeleteWant}
+                  onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
+                  onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
+                  onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
+                  isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
+                  onCreateWant={onCreateWant}
+                  correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
+                  correlationHighlights={correlationHighlights}
+                  stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
+                />
 
-              {/* Drop Indicator After (only for the last item) */}
-              {index === filteredWants.length - 1 && dragOverGap === index + 1 && (
-                <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-right-[14px]")}>
-                  <div className={styles.plusIconContainer}>
-                    <Plus size={14} />
+                {/* Drop Indicator After (only for the last item) */}
+                {index === filteredWants.length - 1 && dragOverGap === index + 1 && (
+                  <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-right-[14px]")}>
+                    <div className={styles.plusIconContainer}>
+                      <Plus size={14} />
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            {/* Inline children bubble - injected as col-span-full after the parent card */}
-            {isBubbleExpanded && (
-              <WantChildrenBubble
-                parentWant={want}
-                childWants={bubbleChildWants}
-                allWants={allWants.length > 0 ? allWants : []}
-                expandedChain={expandedChain.slice(1)}
-                selectedWant={selectedWant}
-                onChildClick={onBubbleChildClick || onViewWant}
-                onViewAgents={onViewAgentsWant}
-                onViewResults={onViewResultsWant}
-                onViewChat={onViewChatWant}
-                onEditWant={onEditWant}
-                onDeleteWant={onDeleteWant}
-                onSuspendWant={onSuspendWant}
-                onResumeWant={onResumeWant}
-                onShowReactionConfirmation={onShowReactionConfirmation}
-                onClose={onBubbleClose || (() => {})}
-              />
-            )}
-          </React.Fragment>
-        );
-      })}
+              {/* Inline children bubble - inserted after the last card in the parent's row */}
+              {index === bubbleRowEndIndex && bubbleParentWant && (
+                <WantChildrenBubble
+                  parentWant={bubbleParentWant}
+                  childWants={bubbleChildWants}
+                  allWants={allWants.length > 0 ? allWants : []}
+                  expandedChain={expandedChain.slice(1)}
+                  selectedWant={selectedWant}
+                  onChildClick={onBubbleChildClick || onViewWant}
+                  onViewAgents={onViewAgentsWant}
+                  onViewResults={onViewResultsWant}
+                  onViewChat={onViewChatWant}
+                  onEditWant={onEditWant}
+                  onDeleteWant={onDeleteWant}
+                  onSuspendWant={onSuspendWant}
+                  onResumeWant={onResumeWant}
+                  onShowReactionConfirmation={onShowReactionConfirmation}
+                  onClose={onBubbleClose || (() => {})}
+                  parentIndex={bubbleParentIndex}
+                />
+              )}
+            </React.Fragment>
+          );
+        });
+      })()}
 
       {drafts.map((draft) => (
         <div
