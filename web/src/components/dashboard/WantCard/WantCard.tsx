@@ -393,24 +393,27 @@ export const WantCard: React.FC<WantCardProps> = ({
           />
         )}
 
-      </div>
-
-      {/* Child want count + status dots */}
-      {hasChildren && !isBubbleOpen && (
-        <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700 px-3 py-1.5 flex items-center gap-2">
-          <span className="text-blue-600 dark:text-blue-400 font-medium text-xs">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
-          <div className="flex items-center gap-1">
-            {children!.map((child, idx) => (
-              <div
-                key={idx}
-                className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`}
-                style={{ backgroundColor: getStatusHexColor(child.status) }}
-                title={child.status}
-              />
-            ))}
+        {/* Child want count + status dots */}
+        {hasChildren && (
+          <div className={classNames(
+            "relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700 px-3 py-1.5 flex items-center gap-2",
+            isBubbleOpen && "invisible"
+          )}>
+            <span className="text-blue-600 dark:text-blue-400 font-medium text-xs">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-1">
+              {children!.map((child, idx) => (
+                <div
+                  key={idx}
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`}
+                  style={{ backgroundColor: getStatusHexColor(child.status) }}
+                  title={child.status}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
 
       {/* Right-click context menu */}
     </div>
