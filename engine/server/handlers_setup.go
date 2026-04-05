@@ -78,6 +78,8 @@ func (s *Server) setupRoutes() {
 	recipes.HandleFunc("/{id}", s.getRecipe).Methods("GET")
 	recipes.HandleFunc("/{id}", s.updateRecipe).Methods("PUT")
 	recipes.HandleFunc("/{id}", s.deleteRecipe).Methods("DELETE")
+	recipes.HandleFunc("/{id}/examples", s.getRecipeExamples).Methods("GET")
+	recipes.HandleFunc("/{id}/examples", s.handleOptions).Methods("OPTIONS")
 
 	// Want Type endpoints
 	wantTypes := api.PathPrefix("/want-types").Subrouter()

@@ -158,6 +158,33 @@ export default function RecipePage() {
     }
   };
 
+  const handleDeployRecipeExampleDef = async (recipe: GenericRecipe, exampleParams: Record<string, any>) => {
+    try {
+      const customType = recipe.recipe.metadata.custom_type || 'unknown';
+      const recipeFileName = customType.toLowerCase().replace(/\s+/g, '-');
+      await createWant({
+        metadata: {
+          name: recipeFileName,
+          type: customType,
+          labels: {},
+        },
+        spec: {
+          recipe: `yaml/recipes/${recipeFileName}.yaml`,
+          params: { ...(recipe.recipe.parameters || {}), ...exampleParams },
+        },
+      });
+      setNotification({
+        message: `Recipe example deployed successfully!`,
+        type: 'success',
+      });
+    } catch (err) {
+      setNotification({
+        message: `Failed to deploy: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        type: 'error',
+      });
+    }
+  };
+
   // Keyboard navigation
   const currentRecipeIndex = selectedRecipe
     ? filteredRecipes.findIndex(r => r.recipe.metadata.name === selectedRecipe.recipe.metadata.name)
@@ -267,6 +294,7 @@ export default function RecipePage() {
             recipe={selectedRecipe}
             onDeploy={handleDeployRecipe}
             onDeployExample={handleDeployRecipeExample}
+            onDeployExampleDef={handleDeployRecipeExampleDef}
             onEdit={handleEditRecipe}
             onDelete={handleDeleteRecipe}
             onDeploySuccess={(message) => setNotification({ message, type: 'success' })}

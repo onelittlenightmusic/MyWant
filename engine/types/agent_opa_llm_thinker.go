@@ -68,9 +68,26 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// is labeled LabelGoal on every want, so checking len(parentGoal)>0 alone would
 	// always override a child's own structured goal with the parent's empty memo.
 	goalAll := want.GetAllGoal()
-	if _, ownHasGoalBlob := goalAll["goal"]; !ownHasGoalBlob {
-		if parentGoal := want.GetParentAllGoal(); len(parentGoal) > 0 {
-			goalAll = parentGoal
+	// Fall back to parent's goal state only when the want's own goal is truly empty
+	// (nothing beyond the base "want" memo field with an empty value).
+	// GoalWant stores goal_text/targets as separate goal-labeled fields (no "goal" blob),
+	// so the old check for a "goal" key was insufficient and caused parent override.
+	ownHasContent := false
+	for k, v := range goalAll {
+		if k != "want" {
+			ownHasContent = true
+			break
+		}
+		if str, ok := v.(string); ok && str != "" {
+			ownHasContent = true
+			break
+		}
+	}
+	if !ownHasContent {
+		if _, ownHasGoalBlob := goalAll["goal"]; !ownHasGoalBlob {
+			if parentGoal := want.GetParentAllGoal(); len(parentGoal) > 0 {
+				goalAll = parentGoal
+			}
 		}
 	}
 	goalRaw := mergeOPAInput(goalAll, "goal")
@@ -110,7 +127,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// Step 3: Write inputs to temp files
 	goalBytes, _ := json.Marshal(goalRaw)
 	currentBytes, _ := json.Marshal(currentRaw)
-	
+
 	tmpDir, err := os.MkdirTemp("", "opa-llm-thinker-*")
 	if err != nil {
 		want.DirectLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)

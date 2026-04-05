@@ -1,0 +1,92 @@
+wants:
+  # ──────────────────────────────────────────────────────────────────────────────
+  # 朝のルーティン自動化ゴール
+  #
+  # whim.md のトップダウン分解ビジョンのデモ:
+  #   1. goal want が initial_breakdown を静的に分解して即座にデプロイ
+  #   2. 子ゴール (exercise-habit-goal) は use_llm:true でさらに LLM 分解
+  #   3. チャット画面で「〇〇も追加して」と話しかけると re_planning が走り
+  #      新しい子 Want が追加される（Progressive Refinement）
+  #
+  # 階層構造:
+  #   morning-routine-goal (goal)
+  #   ├── morning-briefing  (briefing) ─ 天気・交通→Slack
+  #   ├── wake-reminder     (reminder) ─ 起床リマインダー
+  #   ├── habits-reminder   (reminder) ─ 習慣チェック
+  #   └── exercise-habit-goal (goal)   ─ 運動習慣 (LLMで詳細化)
+  #       ├── stretch-reminder
+  #       ├── jogging-tracker
+  #       └── ... (LLM が分解・ユーザーが承認)
+  #
+  # 必要な環境変数（morning-briefing 使用時）:
+  #   SLACK_WEBHOOK_URL         - Slack 通知先
+  #   GOOGLE_MAPS_API_KEY       - 乗換案内
+  #   ANTHROPIC_API_KEY         - exercise-habit-goal の LLM 分解
+  # ──────────────────────────────────────────────────────────────────────────────
+  - metadata:
+      name: morning-routine-goal
+      type: goal
+      labels:
+        category: productivity
+    spec:
+      params:
+        goal_text: "充実した朝のルーティンを自動化して、毎日を気持ちよくスタートできる習慣を作る"
+
+        # デモ用: 承認スキップ（本番では false にしてチャット画面で承認フローを体験）
+        auto_approve: true
+
+        # 初期分解はstatic。チャットでの replan では use_llm: true が効く
+        use_llm: false
+        policy_dir: "yaml/policies/goal"
+
+        initial_breakdown:
+          # ── フェーズ1: 毎朝の情報収集 ───────────────────────────────────────
+          - name: morning-briefing
+            type: briefing
+            description: "毎朝7:30に天気・交通情報をSlackに通知する"
+            params:
+              time: "07:30"
+              weather_city: Tokyo
+              use_llm: false
+              routes:
+                - name: オフィス
+                  origin: 渋谷駅
+                  destination: 新宿駅
+                  arrive_by: "09:00"
+                  days: "mon,tue,wed,thu,fri"
+
+          # ── フェーズ2: 習慣リマインダー ─────────────────────────────────────
+          # デモ用に duration_from_now を短く設定
+          # 本番では when: [{at: "06:50", every: "1 day"}] に変更
+          - name: wake-reminder
+            type: reminder
+            description: "起床リマインダー: 朝のルーティンを開始する合図"
+            params:
+              message: "おはようございます！朝のルーティンを始めましょう 🌅"
+              duration_from_now: "10 seconds"
+
+          - name: habits-reminder
+            type: reminder
+            description: "習慣チェックリマインダー: 今日のマイクロ習慣を確認"
+            params:
+              message: |
+                今日の朝習慣チェック ✅
+                □ 水を1杯飲む
+                □ 今日の優先タスクを3つ決める
+                □ 5分間の深呼吸
+              duration_from_now: "30 seconds"
+
+          # ── フェーズ3: 運動習慣サブゴール (Progressive Refinement のデモ) ──
+          # このサブゴール自体が goal タイプ → LLM がさらに詳細化する
+          # auto_approve: false → チャット画面で承認フローを体験できる
+          - name: exercise-habit-goal
+            type: goal
+            description: "毎日継続できる運動習慣を設計・管理するサブゴール"
+            params:
+              goal_text: |
+                毎日無理なく継続できる運動習慣を作る。
+                朝のストレッチ・軽いジョギング・体幹トレーニングなど、
+                5〜20分でできる習慣を組み合わせてリマインダーとして設定する。
+              auto_approve: false
+              use_llm: true
+              policy_dir: "yaml/policies/goal"

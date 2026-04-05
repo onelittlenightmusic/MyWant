@@ -43,6 +43,7 @@ export const Dashboard: React.FC = () => {
   } = useWantStore();
 
   const sidebar = useRightSidebarExclusivity<Want>();
+  const [expandedChain, setExpandedChain] = useState<Want[]>([]);
   const [editingWant, setEditingWant] = useState<Want | null>(null);
   const [lastSelectedWantId, setLastSelectedWantId] = useState<string | null>(null);
   const [deleteWantState, setDeleteWantState] = useState<Want | null>(null);
@@ -93,6 +94,7 @@ export const Dashboard: React.FC = () => {
   const [showRecommendationForm, setShowRecommendationForm] = useState(false);
   const [gooseProvider, setGooseProvider] = useState<string>('claude-code');
   const hasThinkingDraft = drafts.some(d => d.isThinking);
+  const [isInteractSubmitting, setIsInteractSubmitting] = useState(false);
 
   const showNotification = (message: string) => { setNotificationMessage(message); setIsNotificationVisible(true); };
   const dismissNotification = () => { setIsNotificationVisible(false); setNotificationMessage(null); };
@@ -237,7 +239,40 @@ export const Dashboard: React.FC = () => {
       setSidebarInitialTab('results');
       const wantId = wantToView.metadata?.id || wantToView.id;
       if (wantId) setLastSelectedWantId(wantId);
+      // Set expanded chain: expand bubble if this want has children
+      const hasChildren = wants.some(w =>
+        w.metadata?.ownerReferences?.some(ref => ref.id === (wantToView.metadata?.id || wantToView.id))
+      );
+      if (hasChildren) {
+        setExpandedChain([wantToView]);
+      } else {
+        setExpandedChain([]);
+      }
     }
+  };
+
+  // Called from WantChildrenBubble when a child want is clicked
+  const handleBubbleChildClick = (want: Want) => {
+    sidebar.selectItem(want);
+    setSidebarInitialTab('results');
+    const wantId = want.metadata?.id || want.id;
+    if (wantId) setLastSelectedWantId(wantId);
+    // Check if this child has children and extend/trim chain accordingly
+    const hasChildren = wants.some(w =>
+      w.metadata?.ownerReferences?.some(ref => ref.id === wantId)
+    );
+    if (hasChildren) {
+      // Append to expandedChain if not already at the end
+      setExpandedChain(prev => {
+        const existingIdx = prev.findIndex(w => (w.metadata?.id || w.id) === wantId);
+        if (existingIdx !== -1) {
+          // Already in chain — trim to this point (collapse deeper)
+          return prev.slice(0, existingIdx + 1);
+        }
+        return [...prev, want];
+      });
+    }
+    // If no children, keep the chain as-is (parent bubble stays open)
   };
 
   const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
@@ -290,24 +325,17 @@ export const Dashboard: React.FC = () => {
   const handleDraftDelete = (draft: DraftWant) => { setDeleteDraftState(draft); setShowDeleteDraftConfirmation(true); };
 
   const handleInteractSubmit = async (message: string) => {
-    let sid: string;
-    try { const s = await apiClient.createInteractSession(); sid = s.session_id; } 
-    catch (e) { showNotification('Failed to create session'); return; }
-    let did: string;
-    try { const r = await apiClient.createDraftWant({ sessionId: sid, message, isThinking: true }); did = r.id; } 
-    catch (e) { showNotification('Failed to create draft'); return; }
-    setActiveDraftId(did); await fetchWants();
+    setIsInteractSubmitting(true);
     try {
-      const r = await apiClient.sendInteractMessage(sid, { message, context: { provider: gooseProvider } });
-      if (!r || !Array.isArray(r.recommendations) || r.recommendations.length === 0) {
-        await apiClient.updateDraftWant(did, { isThinking: false }); await fetchWants(); return;
-      }
-      await apiClient.updateDraftWant(did, { recommendations: r.recommendations, isThinking: false });
-      await fetchWants(); setRecommendations(r.recommendations); setShowRecommendationForm(true); setEditingWant(null); sidebar.openForm();
+      await apiClient.createWant({
+        metadata: { name: `whim-${Date.now()}`, type: 'whim-target', labels: { category: 'whim' } },
+        spec: { recipe: 'yaml/recipes/whim.yaml', params: { want: message } }
+      });
+      await fetchWants();
     } catch (e: any) {
       showNotification(`Failed: ${e.message}`);
-      try { await apiClient.updateDraftWant(did, { error: e.message, isThinking: false }); await fetchWants(); } catch (e2) {}
-      setRecommendations([]); setShowRecommendationForm(false);
+    } finally {
+      setIsInteractSubmitting(false);
     }
   };
 
@@ -591,14 +619,14 @@ export const Dashboard: React.FC = () => {
   useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm && filteredWants.length > 0 });
 
   const handleEscapeKey = () => {
-    // Otherwise, handle other escape scenarios
     if (showBatchConfirmation) setShowBatchConfirmation(false);
+    else if (expandedChain.length > 0) setExpandedChain([]);
     else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
     else if (sidebar.showSummary) sidebar.closeSummary();
     else if (sidebar.showForm) sidebar.closeForm();
     else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
-  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode });
+  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode || expandedChain.length > 0 });
 
   // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
   // Use capture phase to catch the event before other handlers
@@ -726,7 +754,7 @@ export const Dashboard: React.FC = () => {
         showSelectMode={isSelectMode}
         onToggleSelectMode={handleToggleSelectMode}
         onInteractSubmit={handleInteractSubmit}
-        isInteractThinking={hasThinkingDraft}
+        isInteractThinking={isInteractSubmitting}
         gooseProvider={gooseProvider}
         onProviderChange={setGooseProvider}
         showMinimap={minimapOpen}
@@ -782,12 +810,16 @@ export const Dashboard: React.FC = () => {
         onDrop={handleGlobalDrop}
       >
         <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
-          <div className="p-3 sm:p-6 pb-24 flex flex-col h-full min-h-full">
+          <div className="p-3 sm:p-6 flex flex-col h-full min-h-full pb-24">
             <React.Fragment>
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">
                 <WantGrid
                   wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
+                  expandedChain={expandedChain}
+                  allWants={regularWants}
+                  onBubbleChildClick={handleBubbleChildClick}
+                  onBubbleClose={() => setExpandedChain([])}
                 />
               </div>
             </React.Fragment>
@@ -799,7 +831,7 @@ export const Dashboard: React.FC = () => {
         onClose={() => {
           if (showGlobalState) { setShowGlobalState(false); return; }
           if (sidebar.showSummary) sidebar.closeSummary();
-          else { sidebar.clearSelection(); }
+          else { sidebar.clearSelection(); setExpandedChain([]); }
         }}
         title={showGlobalState ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
         titleIcon={showGlobalState ? StickyNote : (selectedWant ? Heart : undefined)}

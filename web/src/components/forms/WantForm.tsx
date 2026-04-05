@@ -843,45 +843,72 @@ export const WantForm: React.FC<WantFormProps> = ({
           <ErrorDisplay error={error} />
         )}
 
-        {/* Example loader button - bottom right, shown when want type with examples is selected */}
-        {selectedTypeId && selectedItemType === 'want-type' && editMode === 'form' &&
-          selectedWantType?.examples && selectedWantType.examples.length > 0 && (
-          <div className="sticky bottom-2 flex justify-end pointer-events-none">
-            <div ref={exampleMenuRef} className="relative pointer-events-auto">
-              {showExampleMenu && (
-                <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[220px] max-h-64 overflow-y-auto">
-                  <p className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
-                    Load Example
-                  </p>
-                  {selectedWantType.examples.map((example, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        setParams(example.want?.spec?.params || {});
-                        setShowExampleMenu(false);
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    >
-                      <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
-                      {example.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowExampleMenu(v => !v)}
-                className="p-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                title="Load example"
-              >
-                <FolderOpen className="w-4 h-4" />
-              </button>
+        {/* Example loader button - bottom right, shown when want type or recipe with examples is selected */}
+        {(() => {
+          const recipeExamples = selectedItemType === 'recipe'
+            ? (recipes.find(r => r.recipe?.metadata?.custom_type === type)?.recipe?.examples ?? [])
+            : [];
+          const wantTypeExamples = selectedItemType === 'want-type'
+            ? (selectedWantType?.examples ?? [])
+            : [];
+          const hasAnyExamples = recipeExamples.length > 0 || wantTypeExamples.length > 0;
+
+          if (!selectedTypeId || editMode !== 'form' || !hasAnyExamples) return null;
+
+          return (
+            <div className="sticky bottom-2 flex justify-end pointer-events-none">
+              <div ref={exampleMenuRef} className="relative pointer-events-auto">
+                {showExampleMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[220px] max-h-64 overflow-y-auto">
+                    <p className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
+                      Load Example
+                    </p>
+                    {wantTypeExamples.map((example, i) => (
+                      <button
+                        key={`wt-${i}`}
+                        type="button"
+                        onClick={() => {
+                          setParams(example.want?.spec?.params || {});
+                          setShowExampleMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
+                        {example.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
+                        )}
+                      </button>
+                    ))}
+                    {recipeExamples.map((example, i) => (
+                      <button
+                        key={`re-${i}`}
+                        type="button"
+                        onClick={() => {
+                          setParams(prev => ({ ...prev, ...example.params }));
+                          setShowExampleMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
+                        {example.description && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowExampleMenu(v => !v)}
+                  className="p-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+                  title="Load example"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </form>
     </RightSidebar>
   );

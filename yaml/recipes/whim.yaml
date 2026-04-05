@@ -11,6 +11,19 @@ recipe:
   parameter_descriptions:
     want: "やりたいことの自然言語メモ"
 
+  examples:
+    - name: 朝のルーティン自動化
+      description: 充実した朝のルーティンを自動化するゴールを設定。LLMがknowledge・reminderに自動分解する。
+      params:
+        want: "充実した朝のルーティンを自動化して、毎日を気持ちよくスタートできる習慣を作る"
+      expectedBehavior: GoalThinkerがClaudeを使ってknowledge/reminderのサブwantに分解し、承認後にデプロイされる
+
+    - name: 読書習慣づくり
+      description: 毎日少しずつ本を読む習慣を作るためのゴール。
+      params:
+        want: "毎日30分の読書習慣を身につけたい"
+      expectedBehavior: 読書リマインダーや関連するknowledgeが自動生成される
+
   wants:
     - metadata:
         name: whim-goal

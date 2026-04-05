@@ -18,7 +18,20 @@ func (g *GoalWant) GetLocals() *GoalLocals {
 }
 
 // Initialize sets up the initial state from params.
+// On restart (phase already advanced beyond decomposing), preserve progress.
 func (g *GoalWant) Initialize() {
+	existingPhase := GetCurrent(&g.Want, "phase", "")
+	if existingPhase == "monitoring" || existingPhase == "awaiting_approval" || existingPhase == "re_planning" {
+		// Restore non-persistent config fields that Initialize normally sets.
+		g.SetCurrent("interactive", true)
+		g.SetCurrent("opa_llm_planner_command", g.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
+		g.SetCurrent("policy_dir", g.GetStringParam("policy_dir", "yaml/policies/goal"))
+		g.SetCurrent("use_llm", g.GetBoolParam("use_llm", true))
+		g.SetCurrent("llm_provider", g.GetStringParam("llm_provider", "anthropic"))
+		g.SetCurrent("auto_approve", g.GetBoolParam("auto_approve", false))
+		return
+	}
+
 	g.SetGoal("goal_text", g.GetStringParam("goal_text", ""))
 	g.SetCurrent("interactive", true)
 	g.SetCurrent("phase", "decomposing")
@@ -61,16 +74,6 @@ func (g *GoalWant) Progress() {
 	phase := GetCurrent(&g.Want, "phase", "decomposing")
 	if phase != "monitoring" {
 		return
-	}
-
-	// Sync direction_map_json from current state into Spec.Params for InterpretDirections
-	if dmJSON, ok := g.GetCurrent("direction_map_json"); ok {
-		if dmStr, ok := dmJSON.(string); ok && dmStr != "" {
-			if g.Spec.Params == nil {
-				g.Spec.Params = make(map[string]any)
-			}
-			g.Spec.Params["direction_map"] = dmStr
-		}
 	}
 
 	InterpretDirectionsCoordinator(&g.Want)

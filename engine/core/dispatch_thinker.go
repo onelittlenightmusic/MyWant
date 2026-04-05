@@ -123,14 +123,23 @@ func InterpretDirectionsCoordinator(w *Want) {
 		}
 	}
 
+	// Read direction_map from state (direction_map_json) or Spec.Params["direction_map"].
+	// GoalWant stores it in state to avoid concurrent map writes on Spec.Params.
 	directionMap := make(map[string]DirectionConfig)
-	if rawMap, ok := w.Spec.Params["direction_map"]; ok {
-		switch v := rawMap.(type) {
-		case string:
-			json.Unmarshal([]byte(v), &directionMap)
-		case map[string]any:
-			b, _ := json.Marshal(v)
-			json.Unmarshal(b, &directionMap)
+	if raw, ok := w.getState("direction_map_json"); ok {
+		if s, ok := raw.(string); ok && s != "" {
+			json.Unmarshal([]byte(s), &directionMap)
+		}
+	}
+	if len(directionMap) == 0 {
+		if rawMap, ok := w.Spec.Params["direction_map"]; ok {
+			switch v := rawMap.(type) {
+			case string:
+				json.Unmarshal([]byte(v), &directionMap)
+			case map[string]any:
+				b, _ := json.Marshal(v)
+				json.Unmarshal(b, &directionMap)
+			}
 		}
 	}
 

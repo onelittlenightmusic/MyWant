@@ -672,6 +672,21 @@ func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
 	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
 }
 
+func (s *Server) getRecipeExamples(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	recipe, ok := s.recipeRegistry.GetRecipe(id)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Recipe not found", "")
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"id":       id,
+		"name":     recipe.Recipe.Metadata.Name,
+		"examples": recipe.Recipe.Examples,
+	})
+}
+
 func (s *Server) getWantTypeExamples(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.URL.Path, "/")
 	name := parts[len(parts)-2]

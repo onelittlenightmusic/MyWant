@@ -51,6 +51,13 @@ export interface RecipeExample {
   wants: RecipeWant[];
 }
 
+export interface RecipeExampleDef {
+  name: string;
+  description: string;
+  params: Record<string, any>;
+  expectedBehavior?: string;
+}
+
 export interface ParameterDescription {
   description: string;
 }
@@ -62,6 +69,7 @@ export interface RecipeContent {
   wants: RecipeWant[];
   result?: RecipeResultSpec[];
   example?: RecipeExample;
+  examples?: RecipeExampleDef[];
   state?: StateDef[];
 }
 

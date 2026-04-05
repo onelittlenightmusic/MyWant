@@ -2,7 +2,7 @@
 """
 goal_thinker.py - Goal decomposition and replanning tool for MyWant.
 
-Reads JSON from stdin, calls Anthropic LLM (or falls back to a static response),
+Reads JSON from stdin, calls LLM via Claude CLI (or falls back to a static response),
 and writes the result as JSON to stdout.
 
 Input format includes system capabilities discovered via MCP.
@@ -11,6 +11,8 @@ Input format includes system capabilities discovered via MCP.
 import sys
 import json
 import os
+import subprocess
+import shutil
 
 
 def fallback_breakdown(goal_text: str, modification_request: str = "") -> dict:
@@ -31,7 +33,8 @@ def fallback_breakdown(goal_text: str, modification_request: str = "") -> dict:
                 "type": "knowledge",
                 "description": f"Research and gather information about: {description}",
                 "params": {
-                    "want": description,
+                    "topic": description,
+                    "output_path": f"knowledge/{name_base}.md",
                 },
             },
             {
@@ -62,8 +65,35 @@ def format_capabilities(available_capabilities: list) -> str:
     return "\n".join(lines)
 
 
-def decompose_with_llm(client, goal_text: str, available_capabilities: list) -> dict:
-    """Use Anthropic LLM to decompose a goal into sub-wants."""
+def call_claude_cli(prompt: str) -> str:
+    """Call Claude CLI in print mode and return the response text."""
+    claude_path = shutil.which("claude")
+    if not claude_path:
+        raise RuntimeError("claude CLI not found in PATH")
+
+    result = subprocess.run(
+        [claude_path, "-p", "--output-format", "text"],
+        input=prompt,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"claude CLI failed (rc={result.returncode}): {result.stderr}")
+    return result.stdout.strip()
+
+
+def parse_json_response(content: str) -> dict:
+    """Extract JSON from LLM response, handling markdown code fences."""
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0].strip()
+    return json.loads(content)
+
+
+def decompose_with_llm(goal_text: str, available_capabilities: list) -> dict:
+    """Use Claude CLI to decompose a goal into sub-wants."""
     cap_text = format_capabilities(available_capabilities)
 
     prompt = f"""You are a goal decomposition assistant for a productivity system called MyWant.
@@ -72,20 +102,24 @@ Your task is to break down a high-level goal into actionable sub-wants.
 AVAILABLE CAPABILITIES:
 {cap_text}
 
-AVAILABLE WANT TYPES: goal, knowledge, reminder (use specific types when capabilities match)
+AVAILABLE WANT TYPES: knowledge, reminder (use specific types when capabilities match)
+
+IMPORTANT: Do NOT use type "goal". Break down the goal into concrete, actionable items using only knowledge and reminder types.
 
 User goal: {goal_text}
 
 Each sub-want must have:
-- name: a kebab-case identifier (e.g., "research-destinations", "book-flight")
-- type: MUST be one of the available want types listed above.
+- name: a kebab-case identifier (e.g., "research-destinations", "morning-stretch-reminder")
+- type: MUST be one of: knowledge, reminder (NEVER use "goal")
 - description: clear description of what this achieves
 - params: object with type-specific parameters.
+  - For "reminder" type: params MUST include "message" (string) and "duration_from_now" (e.g., "30 seconds", "1 hours").
+  - For "knowledge" type: params MUST include "topic" (string) and "output_path" (string, e.g., "knowledge/topic-name.md").
 
 STRATEGY:
 1. Prefer specific want types if they match the goal (e.g., "flight" for travel).
 2. If a specific type is not yet available but seems needed, use "knowledge" to research it.
-3. If the goal is too big, use "goal" to create a sub-goal.
+3. Break big goals into multiple small, concrete knowledge/reminder items instead of nesting sub-goals.
 
 Respond ONLY with a valid JSON object:
 {{
@@ -100,30 +134,18 @@ Respond ONLY with a valid JSON object:
   "response_text": "Brief explanation of the breakdown"
 }}"""
 
-    message = client.messages.create(
-        model="claude-3-5-haiku-20241022",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    content = message.content[0].text.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0].strip()
-
-    return json.loads(content)
+    content = call_claude_cli(prompt)
+    return parse_json_response(content)
 
 
 def replan_with_llm(
-    client,
     goal_text: str,
     conversation_history: list,
     cc_responses: list,
     modification_request: str,
     available_capabilities: list,
 ) -> dict:
-    """Use Anthropic LLM to replan based on conversation history."""
+    """Use Claude CLI to replan based on conversation history."""
     cap_text = format_capabilities(available_capabilities)
     history_text = ""
     if conversation_history:
@@ -142,28 +164,28 @@ Original goal: {goal_text}
 AVAILABLE CAPABILITIES:
 {cap_text}
 
-AVAILABLE WANT TYPES: goal, knowledge, reminder (use specific types when capabilities match)
+AVAILABLE WANT TYPES: knowledge, reminder (NEVER use "goal" type)
 
 Conversation history:
 {history_text if history_text else "(no previous messages)"}
 
 The user now wants to modify the plan: {modification_request}
 
-Provide an updated breakdown of sub-wants. Respond ONLY with valid JSON."""
+Provide an updated breakdown of sub-wants. Respond ONLY with valid JSON:
+{{
+  "breakdown": [
+    {{
+      "name": "kebab-case-name",
+      "type": "want-type",
+      "description": "what this achieves",
+      "params": {{}}
+    }}
+  ],
+  "response_text": "Brief explanation of the updated breakdown"
+}}"""
 
-    message = client.messages.create(
-        model="claude-3-5-haiku-20241022",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    content = message.content[0].text.strip()
-    if "```json" in content:
-        content = content.split("```json")[1].split("```")[0].strip()
-    elif "```" in content:
-        content = content.split("```")[1].split("```")[0].strip()
-
-    return json.loads(content)
+    content = call_claude_cli(prompt)
+    return parse_json_response(content)
 
 
 def main():
@@ -178,21 +200,13 @@ def main():
     goal_text = input_data.get("goal_text", "")
     available_capabilities = input_data.get("available_capabilities", [])
 
-    use_llm = False
-    client = None
-    try:
-        import anthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if api_key:
-            client = anthropic.Anthropic(api_key=api_key)
-            use_llm = True
-    except ImportError:
-        pass
+    # Check if Claude CLI is available
+    use_llm = shutil.which("claude") is not None
 
     try:
         if phase == "decompose":
-            if use_llm and client:
-                result = decompose_with_llm(client, goal_text, available_capabilities)
+            if use_llm:
+                result = decompose_with_llm(goal_text, available_capabilities)
             else:
                 result = fallback_breakdown(goal_text)
 
@@ -201,9 +215,8 @@ def main():
             cc_responses = input_data.get("cc_responses", [])
             modification_request = input_data.get("modification_request", "")
 
-            if use_llm and client:
+            if use_llm:
                 result = replan_with_llm(
-                    client,
                     goal_text,
                     conversation_history,
                     cc_responses,

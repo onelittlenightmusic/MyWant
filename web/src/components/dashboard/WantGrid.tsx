@@ -4,6 +4,7 @@ import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
 import { WantCard } from './WantCard';
 import { DraftWantCard } from './DraftWantCard';
+import { WantChildrenBubble } from './WantChildrenBubble';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { classNames } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
@@ -42,6 +43,11 @@ interface WantGridProps {
   selectedWantIds?: Set<string>;
   onSelectWant?: (wantId: string) => void;
   correlationHighlights?: Map<string, number>; // wantID -> rate, populated when radar mode is active
+  // Inline children bubble
+  expandedChain?: Want[];
+  allWants?: Want[];
+  onBubbleChildClick?: (want: Want) => void;
+  onBubbleClose?: () => void;
 }
 
 export const WantGrid: React.FC<WantGridProps> = ({
@@ -72,7 +78,11 @@ export const WantGrid: React.FC<WantGridProps> = ({
   isSelectMode = false,
   selectedWantIds = new Set(),
   onSelectWant,
-  correlationHighlights = new Map()
+  correlationHighlights = new Map(),
+  expandedChain = [],
+  allWants = [],
+  onBubbleChildClick,
+  onBubbleClose,
 }) => {
   const { reorderWant, draggingWant } = useWantStore();
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
@@ -283,45 +293,74 @@ export const WantGrid: React.FC<WantGridProps> = ({
         const isExpanded = expandedParents?.has(wantId || '') ?? false;
         const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
 
+        const isBubbleExpanded = expandedChain.length > 0 && expandedChain[0]?.metadata?.id === wantId;
+        const bubbleChildWants = isBubbleExpanded
+          ? (allWants.length > 0 ? allWants : want.children || []).filter(w =>
+              w.metadata?.ownerReferences?.some(ref => ref.id === wantId)
+            )
+          : [];
+
         return (
-          <div
-            key={wantId || `want-${index}`}
-            data-want-id={wantId}
-            data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-            className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
-          >
-            {/* Drop Indicator Before */}
-            {dragOverGap === index && (
-              <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-left-[14px]")}>
-                <div className={styles.plusIconContainer}>
-                  <Plus size={14} />
+          <React.Fragment key={wantId || `want-${index}`}>
+            <div
+              data-want-id={wantId}
+              data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
+              className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
+            >
+              {/* Drop Indicator Before */}
+              {dragOverGap === index && (
+                <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-left-[14px]")}>
+                  <div className={styles.plusIconContainer}>
+                    <Plus size={14} />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <WantCard
-              want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
-              onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
-              onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onViewChat={onViewChatWant} onEdit={onEditWant} onDelete={onDeleteWant}
-              onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
-              onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
-              onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
-              isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
-              onCreateWant={onCreateWant}
-              correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
-              correlationHighlights={correlationHighlights}
-              stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
-            />
+              <WantCard
+                want={want} children={want.children} selected={!!isSelected} selectedWant={selectedWant}
+                onView={(w) => isSelectMode && onSelectWant ? onSelectWant(w.metadata?.id || w.id || '') : onViewWant(w)}
+                onViewAgents={onViewAgentsWant} onViewResults={onViewResultsWant} onViewChat={onViewChatWant} onEdit={onEditWant} onDelete={onDeleteWant}
+                onSuspend={onSuspendWant} onResume={onResumeWant} expandedParents={expandedParents} onToggleExpand={onToggleExpand}
+                onLabelDropped={onLabelDropped} onWantDropped={onWantDropped} onShowReactionConfirmation={onShowReactionConfirmation}
+                onReorderDragOver={handleReorderDragOver} onReorderDrop={handleReorderDrop} index={index}
+                isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} isBeingProcessed={want.status === 'deleting' || want.status === 'initializing'}
+                onCreateWant={onCreateWant}
+                correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
+                correlationHighlights={correlationHighlights}
+                stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
+              />
 
-            {/* Drop Indicator After (only for the last item) */}
-            {index === filteredWants.length - 1 && dragOverGap === index + 1 && (
-              <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-right-[14px]")}>
-                <div className={styles.plusIconContainer}>
-                  <Plus size={14} />
+              {/* Drop Indicator After (only for the last item) */}
+              {index === filteredWants.length - 1 && dragOverGap === index + 1 && (
+                <div className={classNames(styles.dropIndicator, styles.dropIndicatorVertical, "-right-[14px]")}>
+                  <div className={styles.plusIconContainer}>
+                    <Plus size={14} />
+                  </div>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {/* Inline children bubble - injected as col-span-full after the parent card */}
+            {isBubbleExpanded && (
+              <WantChildrenBubble
+                parentWant={want}
+                childWants={bubbleChildWants}
+                allWants={allWants.length > 0 ? allWants : []}
+                expandedChain={expandedChain.slice(1)}
+                selectedWant={selectedWant}
+                onChildClick={onBubbleChildClick || onViewWant}
+                onViewAgents={onViewAgentsWant}
+                onViewResults={onViewResultsWant}
+                onViewChat={onViewChatWant}
+                onEditWant={onEditWant}
+                onDeleteWant={onDeleteWant}
+                onSuspendWant={onSuspendWant}
+                onResumeWant={onResumeWant}
+                onShowReactionConfirmation={onShowReactionConfirmation}
+                onClose={onBubbleClose || (() => {})}
+              />
             )}
-          </div>
+          </React.Fragment>
         );
       })}
 

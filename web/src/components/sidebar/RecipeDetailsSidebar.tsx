@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2, Zap } from 'lucide-react';
+import { BookOpen, Settings, List, FileText, Play, Edit2, Download, Trash2, Zap, Lightbulb } from 'lucide-react';
+import { RecipeExampleDef } from '@/types/recipe';
 import { GenericRecipe } from '@/types/recipe';
 import { classNames, truncateText } from '@/utils/helpers';
 import { getBackgroundImage } from '@/utils/backgroundStyles';
@@ -17,6 +18,7 @@ interface RecipeDetailsSidebarProps {
   recipe: GenericRecipe | null;
   onDeploy?: (recipe: GenericRecipe) => Promise<void>;
   onDeployExample?: (recipe: GenericRecipe) => Promise<void>;
+  onDeployExampleDef?: (recipe: GenericRecipe, params: Record<string, any>) => Promise<void>;
   onEdit?: (recipe: GenericRecipe) => void;
   onDelete?: (recipe: GenericRecipe) => void;
   onDeploySuccess?: (message: string) => void;
@@ -24,12 +26,13 @@ interface RecipeDetailsSidebarProps {
   loading?: boolean;
 }
 
-type TabType = 'overview' | 'parameters' | 'wants' | 'results';
+type TabType = 'overview' | 'parameters' | 'wants' | 'results' | 'examples';
 
 export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
   recipe,
   onDeploy,
   onDeployExample,
+  onDeployExampleDef,
   onEdit,
   onDelete,
   onDeploySuccess,
@@ -39,12 +42,20 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [deploying, setDeploying] = useState(false);
 
-  const tabs = React.useMemo(() => [
-    { id: 'overview' as TabType, label: 'Overview', icon: FileText },
-    { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
-    { id: 'wants' as TabType, label: 'Wants', icon: List },
-    { id: 'results' as TabType, label: 'Results', icon: BookOpen }
-  ], []);
+  const hasExamples = (recipe?.recipe.examples?.length ?? 0) > 0;
+
+  const tabs = React.useMemo(() => {
+    const baseTabs = [
+      { id: 'overview' as TabType, label: 'Overview', icon: FileText },
+      { id: 'parameters' as TabType, label: 'Parameters', icon: Settings },
+      { id: 'wants' as TabType, label: 'Wants', icon: List },
+      { id: 'results' as TabType, label: 'Results', icon: BookOpen },
+    ];
+    if ((recipe?.recipe.examples?.length ?? 0) > 0) {
+      baseTabs.push({ id: 'examples' as TabType, label: 'Examples', icon: Lightbulb });
+    }
+    return baseTabs;
+  }, [recipe?.recipe.examples]);
 
   // Tab switching shortcut
   React.useEffect(() => {
@@ -274,6 +285,16 @@ export const RecipeDetailsSidebar: React.FC<RecipeDetailsSidebarProps> = ({
         {activeTab === 'parameters' && <ParametersTab recipe={recipe} />}
         {activeTab === 'wants' && <WantsTab recipe={recipe} />}
         {activeTab === 'results' && <ResultsTab recipe={recipe} />}
+        {activeTab === 'examples' && (
+          <ExamplesTab
+            recipe={recipe}
+            deploying={deploying}
+            setDeploying={setDeploying}
+            onDeployExampleDef={onDeployExampleDef}
+            onDeploySuccess={onDeploySuccess}
+            onDeployError={onDeployError}
+          />
+        )}
       </div>
     </div>
   );
@@ -502,6 +523,91 @@ const ResultsTab: React.FC<{ recipe: GenericRecipe }> = ({ recipe }) => (
     )}
   </TabContent>
 );
+
+interface ExamplesTabProps {
+  recipe: GenericRecipe;
+  deploying: boolean;
+  setDeploying: (v: boolean) => void;
+  onDeployExampleDef?: (recipe: GenericRecipe, params: Record<string, any>) => Promise<void>;
+  onDeploySuccess?: (message: string) => void;
+  onDeployError?: (error: string) => void;
+}
+
+const ExamplesTab: React.FC<ExamplesTabProps> = ({
+  recipe,
+  deploying,
+  setDeploying,
+  onDeployExampleDef,
+  onDeploySuccess,
+  onDeployError,
+}) => {
+  const examples = recipe.recipe.examples ?? [];
+
+  const handleDeploy = async (example: RecipeExampleDef) => {
+    if (!onDeployExampleDef || deploying) return;
+    setDeploying(true);
+    try {
+      await onDeployExampleDef(recipe, example.params ?? {});
+      onDeploySuccess?.(`"${example.name}" deployed successfully!`);
+    } catch (err) {
+      onDeployError?.(err instanceof Error ? err.message : 'Deploy failed');
+    } finally {
+      setDeploying(false);
+    }
+  };
+
+  if (examples.length === 0) {
+    return <EmptyState icon={Lightbulb} message="No examples defined for this recipe" />;
+  }
+
+  return (
+    <TabContent>
+      <div className="space-y-4">
+        {examples.map((example, index) => (
+          <TabSection key={index} title={example.name}>
+            <div className="space-y-3">
+              {example.description && (
+                <p className="text-sm text-gray-600">{example.description}</p>
+              )}
+              {example.expectedBehavior && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Expected behavior:</p>
+                  <p className="text-xs text-gray-600 bg-gray-50 p-2 rounded border">{example.expectedBehavior}</p>
+                </div>
+              )}
+              {example.params && Object.keys(example.params).length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Parameters:</p>
+                  <div className="space-y-1">
+                    {Object.entries(example.params).map(([key, value]) => (
+                      <div key={key} className="flex items-start gap-2 text-xs">
+                        <span className="font-mono text-blue-700 font-medium min-w-0 shrink-0">{key}:</span>
+                        <span className="text-gray-700 break-all">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => handleDeploy(example)}
+                disabled={deploying}
+                className={classNames(
+                  'w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-colors',
+                  deploying
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                )}
+              >
+                <Play className="h-3 w-3" />
+                この例で試す
+              </button>
+            </div>
+          </TabSection>
+        ))}
+      </div>
+    </TabContent>
+  );
+};
 
 // Helper functions for recipe deployment and download
 function convertWantsToYAML(wants: any[]): string {
