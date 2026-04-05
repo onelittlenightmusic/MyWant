@@ -50,6 +50,7 @@ interface WantCardProps {
   correlationRate?: number;
   correlationHighlights?: Map<string, number>;
   stackCount?: number;
+  isBubbleOpen?: boolean;
 }
 
 export const WantCard: React.FC<WantCardProps> = ({
@@ -81,6 +82,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   correlationRate,
   correlationHighlights,
   stackCount = 0,
+  isBubbleOpen = false,
 }) => {
   const wantId = want.metadata?.id || want.id;
   const { setDraggingWant, setIsOverTarget, highlightedLabel, blinkingWantId, startWant, stopWant } = useWantStore();
@@ -307,7 +309,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         data-keyboard-nav-id={wantId}
         data-is-target={isTargetWant}
         className={classNames(
-          `card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[8rem] sm:min-h-[12.5rem] flex flex-col ${CARD_FOCUS_BASE}`,
+          `card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 group relative overflow-hidden h-full min-h-[6rem] sm:min-h-[8rem] flex flex-col ${CARD_FOCUS_BASE}`,
           CARD_BORDER_BASE,
           (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
           isHighlighted && styles.highlighted,
@@ -392,6 +394,23 @@ export const WantCard: React.FC<WantCardProps> = ({
         )}
 
       </div>
+
+      {/* Child want count + status dots */}
+      {hasChildren && !isBubbleOpen && (
+        <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700 px-3 py-1.5 flex items-center gap-2">
+          <span className="text-blue-600 dark:text-blue-400 font-medium text-xs">{children!.length} child want{children!.length !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-1">
+            {children!.map((child, idx) => (
+              <div
+                key={idx}
+                className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`}
+                style={{ backgroundColor: getStatusHexColor(child.status) }}
+                title={child.status}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Right-click context menu */}
     </div>

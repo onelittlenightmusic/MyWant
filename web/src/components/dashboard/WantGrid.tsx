@@ -349,6 +349,7 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   correlationRate={correlationHighlights.get(want.metadata?.id || want.id || '')}
                   correlationHighlights={correlationHighlights}
                   stackCount={Math.min((want.metadata?.version ?? 1) - 1, 3)}
+                  isBubbleOpen={bubbleParentIndex >= 0 && (want.metadata?.id || want.id) === (bubbleParentWant?.metadata?.id || bubbleParentWant?.id)}
                 />
 
                 {/* Drop Indicator After (only for the last item) */}
