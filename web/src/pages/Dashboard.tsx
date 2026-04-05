@@ -838,6 +838,7 @@ export const Dashboard: React.FC = () => {
         titleIconClassName={showGlobalState ? 'text-green-500' : (selectedWant ? 'text-pink-500' : undefined)}
         backgroundStyle={!showGlobalState && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
         headerActions={!showGlobalState && selectedWant ? headerActions : undefined}
+        disableBackdropClick={expandedChain.length > 0}
         instant
       >
         {showGlobalState ? (

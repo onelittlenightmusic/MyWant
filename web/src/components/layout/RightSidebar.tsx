@@ -15,6 +15,7 @@ interface RightSidebarProps {
   headerActions?: React.ReactNode;
   overflowHidden?: boolean;
   instant?: boolean;
+  disableBackdropClick?: boolean;
 }
 
 export const RightSidebar: React.FC<RightSidebarProps> = ({
@@ -28,7 +29,8 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   backgroundStyle,
   headerActions,
   overflowHidden = false,
-  instant = false
+  instant = false,
+  disableBackdropClick = false,
 }) => {
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
@@ -97,10 +99,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           className={classNames(
             'fixed z-40 lg:hidden bg-gray-600',
             isMobileSheet ? 'bg-opacity-40' : 'bg-opacity-50',
-            isAnyDragging ? 'pointer-events-none opacity-0' : ''
+            (isAnyDragging || disableBackdropClick) ? 'pointer-events-none opacity-0' : ''
           )}
           style={backdropStyle}
-          onClick={onClose}
+          onClick={disableBackdropClick ? undefined : onClose}
         />
       )}
 
