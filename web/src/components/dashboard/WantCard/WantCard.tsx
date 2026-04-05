@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, CheckSquare, Square, Plus, Heart } from 'lucide-react';
+import { CheckSquare, Square, Plus, Heart } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCardContent } from '../WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
@@ -12,7 +12,7 @@ import { CorrelationOverlay } from './parts/CorrelationOverlay';
 import { StackLayers } from './parts/StackLayers';
 import { VersionBadge } from './parts/VersionBadge';
 import { getStatusHexColor } from './parts/StatusColor';
-import { ChildWantCard } from './ChildWantCard';
+
 import { QuickActionsOverlay } from './parts/QuickActionsOverlay';
 import { DeleteConfirmOverlay } from './parts/DeleteConfirmOverlay';
 import { FocusTriangle } from './parts/FocusTriangle';
@@ -106,11 +106,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const isRecipeBased = want.metadata?.labels?.['recipe-based'] === 'true';
 
-  const [localIsExpanded, setLocalIsExpanded] = useState(false);
-  const displayIsExpanded = expandedParents ? isExpanded : localIsExpanded;
-
-  const expandedContainerRef = useRef<HTMLDivElement>(null);
-  const [showAnimation, setShowAnimation] = useState(false);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [isDragOverWant, setIsDragOverWant] = useState(false);
@@ -138,17 +133,6 @@ export const WantCard: React.FC<WantCardProps> = ({
     }
   }, [selectedWant?.metadata?.id, selectedWant?.id, want.metadata?.id, want.id]);
 
-  useEffect(() => {
-    if (displayIsExpanded && expandedContainerRef.current) {
-      setShowAnimation(false);
-      const timer = requestAnimationFrame(() => {
-        setShowAnimation(true);
-      });
-      return () => cancelAnimationFrame(timer);
-    } else {
-      setShowAnimation(false);
-    }
-  }, [displayIsExpanded]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     if (isBeingProcessed || isSelectMode) return;
@@ -407,93 +391,6 @@ export const WantCard: React.FC<WantCardProps> = ({
           />
         )}
 
-        {(hasChildren || isRecipeBased) && !displayIsExpanded && (
-          <div className="relative z-10 mt-auto border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
-                else setLocalIsExpanded(true);
-              }}
-              className={classNames('flex items-center gap-2 sm:gap-3 w-full pt-3 pb-1 px-1 rounded-b-xl text-sm text-gray-600 dark:text-gray-400 bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/20 transition-colors', isBeingProcessed && 'pointer-events-none')}
-              disabled={isBeingProcessed}
-            >
-              <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
-              <span className="text-blue-600 dark:text-blue-400 font-medium text-xs sm:text-sm">{children?.length ?? 0} child want{(children?.length ?? 0) !== 1 ? 's' : ''}</span>
-              {children && children.length > 0 && (
-                <div className="flex items-center gap-1 sm:gap-1.5" title={`${children.length} child want${children.length !== 1 ? 's' : ''}`}>
-                  {children.map((child, idx) => (
-                    <div key={idx} className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`} style={{ backgroundColor: getStatusHexColor(child.status) }} title={child.status} />
-                  ))}
-                </div>
-              )}
-            </button>
-          </div>
-        )}
-
-        {(hasChildren || isRecipeBased) && displayIsExpanded && (
-          <div ref={expandedContainerRef} className="relative z-10 mt-2 sm:mt-4 border-t border-gray-200 dark:border-gray-700 transition-opacity duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0 } as React.CSSProperties}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (expandedParents && onToggleExpand && wantId) onToggleExpand(wantId);
-                else setLocalIsExpanded(false);
-              }}
-              className={classNames('flex items-center gap-1.5 w-full pt-2 sm:pt-3 pb-2 px-1 mb-1 text-xs sm:text-sm font-medium text-gray-900 dark:text-white bg-black/10 dark:bg-white/10 hover:bg-black/15 dark:hover:bg-white/20 transition-colors', isBeingProcessed && 'pointer-events-none')}
-              disabled={isBeingProcessed}
-            >
-              <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 dark:text-blue-400 flex-shrink-0" strokeWidth={2.5} />
-              Child Wants ({children?.length ?? 0})
-            </button>
-            <div className="pt-1 sm:pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 transition-all duration-300 ease-out" style={{ opacity: showAnimation ? 1 : 0, transform: showAnimation ? 'translateY(0)' : 'translateY(-8px)' } as React.CSSProperties}>
-                {(children ?? []).sort((a, b) => (a.metadata?.id || a.id || '').localeCompare(b.metadata?.id || b.id || '')).map((child) => {
-                  const childId = child.metadata?.id || child.id || '';
-                  const isChildTarget = child.metadata?.type.toLowerCase().includes('target') ||
-                    child.metadata?.type.toLowerCase() === 'owner' ||
-                    child.metadata?.type.toLowerCase().includes('approval');
-                  const childCorrelationRate = correlationHighlights?.get(childId);
-
-                  return (
-                    <ChildWantCard
-                      key={childId || child.id}
-                      child={child}
-                      selectedWant={selectedWant}
-                      correlationRate={childCorrelationRate}
-                      isSelectMode={isSelectMode}
-                      selectedWantIds={selectedWantIds}
-                      isBeingProcessed={isBeingProcessed}
-                      isTarget={isChildTarget}
-                      onView={onView}
-                      onViewAgents={onViewAgents}
-                      onViewResults={onViewResults}
-                      onViewChat={onViewChat}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      onSuspend={onSuspend}
-                      onResume={onResume}
-                      onWantDropped={onWantDropped}
-                      onLabelDropped={onLabelDropped}
-                    />
-                  );
-                })}
-
-                {onCreateWant && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onCreateWant(want); }}
-                    className="flex flex-col items-center justify-center p-3 rounded-md border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group min-h-[6rem]"
-                  >
-                    <span className="relative inline-flex flex-shrink-0 mb-1.5">
-                      <Heart className="w-6 h-6 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
-                      <Plus className="w-3 h-3 absolute -top-1.5 -right-1.5 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
-                    </span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Right-click context menu */}

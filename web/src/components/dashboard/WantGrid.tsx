@@ -319,15 +319,14 @@ export const WantGrid: React.FC<WantGridProps> = ({
 
         return filteredWants.map((want, index) => {
           const wantId = want.metadata?.id || want.id;
-          const isExpanded = expandedParents?.has(wantId || '') ?? false;
-          const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
+const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
 
           return (
             <React.Fragment key={wantId || `want-${index}`}>
               <div
                 data-want-id={wantId}
                 data-keyboard-nav-selected={selectedWant?.metadata?.id === want.metadata?.id}
-                className={classNames('transition-all duration-300 ease-out h-full relative', isExpanded ? 'sm:col-span-2 lg:col-span-3' : '')}
+                className="transition-all duration-300 ease-out h-full relative"
               >
                 {/* Drop Indicator Before */}
                 {dragOverGap === index && (
