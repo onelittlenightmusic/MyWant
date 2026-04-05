@@ -134,7 +134,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         {/* Drag handle — mobile sheet only */}
         {isMobileSheet && isBottom && (
           <div
-            className="flex-shrink-0 flex justify-center pt-2 pb-1 cursor-pointer"
+            className="flex-shrink-0 flex justify-center pt-1.5 pb-1 cursor-pointer"
             onClick={onClose}
           >
             <div className="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />

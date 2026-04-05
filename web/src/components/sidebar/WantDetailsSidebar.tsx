@@ -1016,7 +1016,7 @@ const SettingsTab: React.FC<{
   return (
     <div className="h-full flex flex-col">
       {/* Config/Overview Toggle + G: Saved indicator */}
-      <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between">
+      <div className="flex-shrink-0 px-3 sm:px-8 py-1 sm:py-2 flex items-center justify-between">
         <div className={`flex items-center gap-1 text-xs text-green-600 dark:text-green-400 transition-opacity duration-300 ${savedIndicator ? 'opacity-100' : 'opacity-0'}`}>
           <Check className="w-3 h-3" />
           <span>Saved</span>
@@ -1028,7 +1028,7 @@ const SettingsTab: React.FC<{
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-8 focusable-container">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 pt-0 pb-3 sm:py-4 focusable-container">
         {configMode === 'form' ? (
           <div className="space-y-2">
             {/* Metadata Section */}
@@ -1439,76 +1439,78 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
 
   return (
-    <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
-      {hasAnyState || hasHiddenState ? (
-        <div className="space-y-2">
-          {onClearState && (
-            <div className="flex justify-end mb-1">
-              <button
-                onClick={onClearState}
-                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                title="Clear all state data"
-              >
-                <Eraser className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-          {hasCurrent && (
-            <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Current</h4>
-              <div className="space-y-3 sm:space-y-4">
-                {renderKeyValuePairs(want.state!.current)}
-              </div>
-            </div>
-          )}
-
-          {hasGoal && (
-            <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Goal</h4>
-              <div className="space-y-3 sm:space-y-4">
-                {renderKeyValuePairs(want.state!.goal)}
-              </div>
-            </div>
-          )}
-
-          {hasPlan && (
-            <div className={SECTION_CONTAINER_CLASS}>
-              <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Plan</h4>
-              <div className="space-y-3 sm:space-y-4">
-                {renderKeyValuePairs(want.state!.plan)}
-              </div>
-            </div>
-          )}
-
-          {hasHiddenState && (
-            <>
-              <button
-                onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
-                className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm hover:text-gray-900 dark:hover:text-white py-2 mt-4 transition-colors"
-              >
-                {isHiddenStateExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                )}
-                Hidden State
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({Object.keys(want.hidden_state).length})</span>
-              </button>
-              {isHiddenStateExpanded && (
-                <div className={SECTION_CONTAINER_CLASS}>
-                  <div className="space-y-4">
-                    {renderKeyValuePairs(want.hidden_state)}
-                  </div>
+    <div className="h-full flex flex-col">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 pt-0 pb-3 sm:py-4">
+        {hasAnyState || hasHiddenState ? (
+          <div className="space-y-2">
+            {hasCurrent && (
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Current</h4>
+                <div className="space-y-1 sm:space-y-2">
+                  {renderKeyValuePairs(want.state!.current)}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No state data available</p>
-          <p className="text-xs text-gray-400 mt-2">State will appear here once the want executes</p>
+              </div>
+            )}
+
+            {hasGoal && (
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Goal</h4>
+                <div className="space-y-1 sm:space-y-2">
+                  {renderKeyValuePairs(want.state!.goal)}
+                </div>
+              </div>
+            )}
+
+            {hasPlan && (
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Plan</h4>
+                <div className="space-y-1 sm:space-y-2">
+                  {renderKeyValuePairs(want.state!.plan)}
+                </div>
+              </div>
+            )}
+
+            {hasHiddenState && (
+              <>
+                <button
+                  onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
+                  className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm hover:text-gray-900 dark:hover:text-white py-2 mt-4 transition-colors"
+                >
+                  {isHiddenStateExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                  )}
+                  Hidden State
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({Object.keys(want.hidden_state).length})</span>
+                </button>
+                {isHiddenStateExpanded && (
+                  <div className={SECTION_CONTAINER_CLASS}>
+                    <div className="space-y-1 sm:space-y-2">
+                      {renderKeyValuePairs(want.hidden_state)}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No state data available</p>
+            <p className="text-xs text-gray-400 mt-2">State will appear here once the want executes</p>
+          </div>
+        )}
+      </div>
+      {onClearState && (hasAnyState || hasHiddenState) && (
+        <div className="flex-shrink-0 flex justify-end px-3 sm:px-4 py-1 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={onClearState}
+            className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title="Clear all state data"
+          >
+            <Eraser className="h-4 w-4" />
+          </button>
         </div>
       )}
     </div>
@@ -1538,7 +1540,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
   );
 
   return (
-    <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
+    <div className="px-3 sm:px-4 pt-0 pb-3 sm:py-4 space-y-2">
       {/* Current Agent */}
       {want.current_agent && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4">
@@ -1815,7 +1817,7 @@ const LogsTab: React.FC<{ want: Want; results: any }> = ({ want, results }) => {
   const hasLogs = results?.logs && results.logs.length > 0;
 
   return (
-    <div className="px-3 sm:px-4 py-4 sm:py-8 space-y-2">
+    <div className="px-3 sm:px-4 pt-0 pb-3 sm:py-4 space-y-2">
       {/* Parameter History Section */}
       {hasParameterHistory && (
         <div className={SECTION_CONTAINER_CLASS}>

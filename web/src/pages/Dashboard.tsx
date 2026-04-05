@@ -68,6 +68,7 @@ export const Dashboard: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cardListScrollRef = useRef<HTMLDivElement>(null);
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
@@ -232,13 +233,60 @@ export const Dashboard: React.FC = () => {
   const handleCreateTargetWant = () => { setInitialFormTypeId('whim-target'); setInitialFormItemType('recipe'); setOwnerWant(null); setEditingWant(null); sidebar.openForm(); };
   const handleEditWant = (w: Want) => { setEditingWant(w); sidebar.openForm(); };
 
+  // Walk up the DOM to find the nearest ancestor that actually scrolls.
+  const findScrollableAncestor = (el: Element): Element => {
+    let node: Element | null = el.parentElement;
+    while (node && node !== document.documentElement) {
+      const { overflowY } = window.getComputedStyle(node);
+      if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return document.documentElement;
+  };
+
+  // On mobile (<640px), the bottom sheet covers 70vh — scroll the tapped card to
+  // the center of the remaining visible 30% at the top.
+  const scrollCardIntoMobileView = (wantId: string) => {
+    if (window.innerWidth >= 640) return;
+    // setTimeout lets React flush state updates and the iOS touch cycle settle
+    // before we measure element positions.
+    setTimeout(() => {
+      const element = document.querySelector(`[data-want-id="${wantId}"]`);
+      if (!element) return;
+
+      const scroller = findScrollableAncestor(element);
+      const isDocRoot = scroller === document.documentElement;
+      const cardRect = element.getBoundingClientRect();
+      // scrollerTop: viewport-y of the scroller's top edge (0 for the document root)
+      const scrollerTop = isDocRoot ? 0 : scroller.getBoundingClientRect().top;
+      // Visible area: from scrollerTop to 30% of viewport height (sheet covers bottom 70%)
+      const visibleAreaCenter = (scrollerTop + window.innerHeight * 0.30) / 2;
+      const cardCenterY = cardRect.top + cardRect.height / 2;
+      const delta = cardCenterY - visibleAreaCenter;
+      const currentScroll = isDocRoot ? window.scrollY : scroller.scrollTop;
+      const newScroll = Math.max(0, currentScroll + delta);
+
+      if (isDocRoot) {
+        window.scrollTo({ top: newScroll, behavior: 'smooth' });
+      } else {
+        // Direct assignment is more reliable than scrollTo on iOS
+        scroller.scrollTop = newScroll;
+      }
+    }, 80);
+  };
+
   const handleViewWant = (want: Want | { id: string; parentId?: string }) => {
     const wantToView = 'metadata' in want ? want : wants.find(w => (w.metadata?.id === want.id) || (w.id === want.id));
     if (wantToView) {
       sidebar.selectItem(wantToView);
       setSidebarInitialTab('results');
       const wantId = wantToView.metadata?.id || wantToView.id;
-      if (wantId) setLastSelectedWantId(wantId);
+      if (wantId) {
+        setLastSelectedWantId(wantId);
+        scrollCardIntoMobileView(wantId);
+      }
       // Set expanded chain: expand bubble if this want has children
       const hasChildren = wants.some(w =>
         w.metadata?.ownerReferences?.some(ref => ref.id === (wantToView.metadata?.id || wantToView.id))
@@ -275,9 +323,9 @@ export const Dashboard: React.FC = () => {
     // If no children, keep the chain as-is (parent bubble stays open)
   };
 
-  const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
-  const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
-  const handleViewChat = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('chat'); const wantId = want.metadata?.id || want.id; if (wantId) setLastSelectedWantId(wantId); };
+  const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
+  const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
+  const handleViewChat = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('chat'); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
 
   const handleDraftClick = (draft: DraftWant) => {
     setActiveDraftId(draft.id);
@@ -809,7 +857,7 @@ export const Dashboard: React.FC = () => {
         onDragLeave={handleGlobalDragLeave}
         onDrop={handleGlobalDrop}
       >
-        <div className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
+        <div ref={cardListScrollRef} className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
           <div className="p-3 sm:p-6 flex flex-col h-full min-h-full pb-24">
             <React.Fragment>
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
