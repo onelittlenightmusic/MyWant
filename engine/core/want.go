@@ -656,11 +656,13 @@ func (n *Want) SetStateAtomic(stateData map[string]any) {
 
 // UpdateParameter updates a parameter and propagates the change to children
 func (n *Want) UpdateParameter(paramName string, paramValue any) {
-	// Update the parameter in spec
+	// Update the parameter in spec (protected by metadataMutex to avoid concurrent map writes)
+	n.metadataMutex.Lock()
 	if n.Spec.Params == nil {
 		n.Spec.Params = make(map[string]any)
 	}
 	n.Spec.Params[paramName] = paramValue
+	n.metadataMutex.Unlock()
 
 	n.getHistoryManager().AddParameterEntry(paramName, paramValue)
 
@@ -925,7 +927,7 @@ func (n *Want) StartProgressionLoop(
 
 				// Dynamic dispatch coordinators (direction_map) keep monitoring after
 				// achievement so they can detect deleted child wants and re-dispatch.
-				if _, hasDirMap := n.Spec.Params["direction_map"]; hasDirMap {
+				if _, hasDirMap := n.GetParameter("direction_map"); hasDirMap {
 					time.Sleep(GlobalExecutionInterval)
 					continue
 				}
@@ -2030,6 +2032,8 @@ func convertToType[T any](val any, defaultVal T) T {
 }
 
 func (n *Want) GetParameter(paramName string) (any, bool) {
+	n.metadataMutex.RLock()
+	defer n.metadataMutex.RUnlock()
 	if n.Spec.Params == nil {
 		return nil, false
 	}
@@ -2603,7 +2607,10 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {
-	if value, ok := n.Spec.Params[key]; ok {
+	n.metadataMutex.RLock()
+	value, ok := n.Spec.Params[key]
+	n.metadataMutex.RUnlock()
+	if ok {
 		if intVal, ok := value.(int); ok {
 			return intVal
 		} else if floatVal, ok := value.(float64); ok {
@@ -2613,7 +2620,10 @@ func (n *Want) GetIntParam(key string, defaultValue int) int {
 	return defaultValue
 }
 func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
-	if value, ok := n.Spec.Params[key]; ok {
+	n.metadataMutex.RLock()
+	value, ok := n.Spec.Params[key]
+	n.metadataMutex.RUnlock()
+	if ok {
 		if floatVal, ok := value.(float64); ok {
 			return floatVal
 		} else if intVal, ok := value.(int); ok {
@@ -2623,7 +2633,10 @@ func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	return defaultValue
 }
 func (n *Want) GetStringParam(key string, defaultValue string) string {
-	if value, ok := n.Spec.Params[key]; ok {
+	n.metadataMutex.RLock()
+	value, ok := n.Spec.Params[key]
+	n.metadataMutex.RUnlock()
+	if ok {
 		if strVal, ok := value.(string); ok {
 			return strVal
 		}
@@ -2631,7 +2644,10 @@ func (n *Want) GetStringParam(key string, defaultValue string) string {
 	return defaultValue
 }
 func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
-	if value, ok := n.Spec.Params[key]; ok {
+	n.metadataMutex.RLock()
+	value, ok := n.Spec.Params[key]
+	n.metadataMutex.RUnlock()
+	if ok {
 		if boolVal, ok := value.(bool); ok {
 			return boolVal
 		} else if strVal, ok := value.(string); ok {

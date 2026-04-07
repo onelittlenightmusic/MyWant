@@ -61,7 +61,7 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 func (cb *ChainBuilder) extractApprovalID(want *Want) string {
 	// Try params first
 	approvalID := ""
-	if v, ok := want.Spec.Params["approval_id"]; ok {
+	if v, ok := want.GetParameter("approval_id"); ok {
 		approvalID, _ = v.(string)
 	}
 	if approvalID != "" {

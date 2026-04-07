@@ -181,7 +181,7 @@ func NewUnifiedSubscriptionSystem() *UnifiedSubscriptionSystem {
 		enableLogging:  false, // Disable by default for clean output
 	}
 	uss.SetProcessingMode(EventTypeStateChange, ProcessAsync)
-	uss.SetProcessingMode(EventTypeParameterChange, ProcessAsync)
+	uss.SetProcessingMode(EventTypeParameterChange, ProcessSync)
 	uss.SetProcessingMode(EventTypeOwnerChildState, ProcessAsync)
 
 	// Group B: Sync control (for future use)

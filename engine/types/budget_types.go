@@ -48,6 +48,13 @@ func (b *BudgetWant) Progress() {}
 // be stopped before processing later cost updates (e.g. a hotel booking that
 // arrives after the restaurant has already reported its cost).
 func (b *BudgetWant) IsAchieved() bool {
+	// If this want is dynamically controlled via exposes (e.g. a slider is adjusting
+	// the budget param), never achieve — keep BudgetThinker running so it can pick up
+	// param changes on each tick.
+	if len(b.Spec.Exposes) > 0 {
+		return false
+	}
+
 	costs := GetCurrent(b, "costs", map[string]any{})
 	budgetExceeded := GetCurrent(b, "budget_exceeded", false)
 	if len(costs) == 0 || budgetExceeded {

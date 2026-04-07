@@ -70,7 +70,7 @@ func InterpretDirections(w *Want) {
 	}
 
 	directionMap := make(map[string]DirectionConfig)
-	if rawMap, ok := w.Spec.Params["direction_map"]; ok {
+	if rawMap, ok := w.GetParameter("direction_map"); ok {
 		switch v := rawMap.(type) {
 		case string:
 			json.Unmarshal([]byte(v), &directionMap)
@@ -132,7 +132,7 @@ func InterpretDirectionsCoordinator(w *Want) {
 		}
 	}
 	if len(directionMap) == 0 {
-		if rawMap, ok := w.Spec.Params["direction_map"]; ok {
+		if rawMap, ok := w.GetParameter("direction_map"); ok {
 			switch v := rawMap.(type) {
 			case string:
 				json.Unmarshal([]byte(v), &directionMap)
@@ -185,7 +185,7 @@ func matchesLabels(labels, selector map[string]string) bool {
 func NewDispatchThinker(id string) *ThinkingAgent {
 	return NewThinkingAgent(id, 1*time.Second, DispatchThinkerName, func(ctx context.Context, w *Want) error {
 		// 1. Sync provider_state_map unconditionally (before early return).
-		if rawMap, ok := w.Spec.Params["provider_state_map"]; ok {
+		if rawMap, ok := w.GetParameter("provider_state_map"); ok {
 			providerStateMap := make(map[string]string)
 			switch v := rawMap.(type) {
 			case string:

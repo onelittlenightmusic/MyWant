@@ -331,12 +331,9 @@ func (t *Target) Initialize() {
 	// Ensure provider_state_map is accessible in Spec.Params for dispatch_thinker.
 	// direction_map is now owned by the child planner want (itinerary/briefing),
 	// not by the Target itself.
-	if _, hasProviderStateMap := t.Spec.Params["provider_state_map"]; !hasProviderStateMap {
+	if _, hasProviderStateMap := t.GetParameter("provider_state_map"); !hasProviderStateMap {
 		if v, ok := t.RecipeParams["provider_state_map"]; ok && v != nil {
-			if t.Spec.Params == nil {
-				t.Spec.Params = make(map[string]any)
-			}
-			t.Spec.Params["provider_state_map"] = v
+			t.UpdateParameter("provider_state_map", v)
 		}
 	}
 
@@ -548,7 +545,7 @@ drained:
 		// unless goal_achieved is explicitly true.
 		// For dynamic targets (direction_map present), we also wait until 
 		// directions state is at least initialized.
-		_, hasDirectionMap := t.Spec.Params["direction_map"]
+		_, hasDirectionMap := t.GetParameter("direction_map")
 		
 		if hasDirectionMap && !directionsFound && !goalAchieved {
 			t.storeState("achieving_percentage", 10.0)
@@ -644,13 +641,13 @@ func (t *Target) UpdateParameter(paramName string, paramValue any) {
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue any) {
-	oldVal := t.Spec.Params[paramName]
+	oldVal, _ := t.GetParameter(paramName)
 	t.StoreLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
 		t.Metadata.Name, paramName, oldVal, paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
 func (t *Target) GetParameterValue(paramName string) any {
-	if value, ok := t.Spec.Params[paramName]; ok {
+	if value, ok := t.GetParameter(paramName); ok {
 		return value
 	}
 	return nil

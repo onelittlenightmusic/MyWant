@@ -233,6 +233,32 @@ func sendParameterNotifications(notification StateNotification) {
 	}
 	wantRegistryMutex.RUnlock()
 	for _, childWant := range childWants {
+		// Skip wants whose target_param matches the changed key — they are the
+		// *source* of the change (e.g. a slider propagating its value to the parent).
+		// Restarting the source would reset its value and trigger an infinite loop.
+		if targetParam, ok := childWant.GetParameter("target_param"); ok {
+			if targetParam == notification.StateKey {
+				DebugLog("[PARAMETER CHANGE] %s: skipping restart (source of change via target_param=%s)\n",
+					childWant.Metadata.Name, notification.StateKey)
+				continue
+			}
+		}
+		// Skip wants that receive this param via exposes — the paramExposeHandler
+		// subscription already calls UpdateParameter on them, and their background
+		// ThinkAgent picks up the new value on its next tick. Restarting would
+		// stop the ThinkAgent goroutine unnecessarily.
+		hasExposeForKey := false
+		for _, entry := range childWant.Spec.Exposes {
+			if entry.Param != "" && entry.As == notification.StateKey {
+				hasExposeForKey = true
+				break
+			}
+		}
+		if hasExposeForKey {
+			DebugLog("[PARAMETER CHANGE] %s: skipping restart (receives %s via exposes)\n",
+				childWant.Metadata.Name, notification.StateKey)
+			continue
+		}
 		DebugLog("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
 			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
 		childWant.RestartWant()

@@ -70,7 +70,7 @@ func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
 	// Apply params first so they are available for interpolation below.
 	// Interpolate env vars / state refs in param values at copy time.
 	for stateKey, paramKey := range hook.Params {
-		if v, ok := s.Spec.Params[paramKey]; ok {
+		if v, ok := s.GetParameter(paramKey); ok {
 			s.SetCurrent(stateKey, s.interpolate(fmt.Sprintf("%v", v)))
 		}
 	}
@@ -105,7 +105,7 @@ func (s *ScriptableWant) interpolate(tmpl string) string {
 		if v := GetCurrent[any](&s.Want, key, nil); v != nil {
 			return fmt.Sprintf("%v", v)
 		}
-		if pv, ok := s.Spec.Params[key]; ok {
+		if pv, ok := s.GetParameter(key); ok {
 			return fmt.Sprintf("%v", pv)
 		}
 		if ev := os.Getenv(key); ev != "" {
