@@ -401,7 +401,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         {/* Child want count + status dots */}
         {hasChildren && (!isControl || selected) && (
           <div className={classNames(
-            "absolute bottom-0 left-0 right-0 z-10 border-t border-gray-200/50 dark:border-gray-700/50 px-3 py-1.5 flex items-center gap-2",
+            "absolute bottom-0 left-0 right-0 z-10 border-t border-gray-200/50 dark:border-gray-700/50 px-3 py-1.5 flex items-center justify-end gap-2",
             isBubbleOpen && "invisible"
           )}>
             <span className="text-blue-600 dark:text-blue-400 font-medium text-xs">{children!.length}</span>
