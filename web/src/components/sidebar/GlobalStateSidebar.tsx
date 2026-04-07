@@ -166,33 +166,30 @@ interface ParamRow {
   value: string;
 }
 
-const SettingsTab: React.FC = () => {
+interface SettingsTabProps {
+  parameters: Record<string, unknown>;
+  onUpdate: (parameters: Record<string, unknown>) => Promise<void>;
+  loading?: boolean;
+}
+
+const SettingsTab: React.FC<SettingsTabProps> = ({ parameters, onUpdate, loading }) => {
   const [rows, setRows] = useState<ParamRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchParams = useCallback(async () => {
-    try {
-      const res = await apiClient.getGlobalParameters();
-      const params = res.parameters || {};
+  // Update local rows when parameters prop changes, but only if not currently editing
+  useEffect(() => {
+    if (!isEditing) {
       setRows(
-        Object.entries(params).map(([key, value]) => ({
+        Object.entries(parameters).map(([key, value]) => ({
           key,
           value: typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''),
         }))
       );
-    } catch (e) {
-      console.error('Failed to fetch global parameters:', e);
-    } finally {
-      setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchParams();
-  }, [fetchParams]);
+  }, [parameters, isEditing]);
 
   const handleKeyChange = (index: number, newKey: string) => {
     setRows(prev => prev.map((r, i) => i === index ? { ...r, key: newKey } : r));
@@ -204,29 +201,31 @@ const SettingsTab: React.FC = () => {
 
   const handleAddRow = () => {
     setRows(prev => [...prev, { key: '', value: '' }]);
+    setIsEditing(true);
   };
 
   const handleDeleteRow = (index: number) => {
     setRows(prev => prev.filter((_, i) => i !== index));
+    setIsEditing(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      const parameters: Record<string, unknown> = {};
+      const newParams: Record<string, unknown> = {};
       for (const row of rows) {
         const k = row.key.trim();
         if (!k) continue;
-        // Try to parse as JSON for structured values, otherwise keep as string
         try {
-          parameters[k] = JSON.parse(row.value);
+          newParams[k] = JSON.parse(row.value);
         } catch {
-          parameters[k] = row.value;
+          newParams[k] = row.value;
         }
       }
-      await apiClient.updateGlobalParameters(parameters);
+      await onUpdate(newParams);
       setSaved(true);
+      setIsEditing(false);
       setTimeout(() => setSaved(false), 2000);
     } catch (e: any) {
       setError(e?.message || 'Failed to save parameters');
@@ -235,7 +234,18 @@ const SettingsTab: React.FC = () => {
     }
   };
 
-  if (loading) {
+  const handleCancel = () => {
+    setRows(
+      Object.entries(parameters).map(([key, value]) => ({
+        key,
+        value: typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''),
+      }))
+    );
+    setIsEditing(false);
+    setError(null);
+  };
+
+  if (loading && Object.keys(parameters).length === 0) {
     return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading parameters...</div>;
   }
 
@@ -243,25 +253,46 @@ const SettingsTab: React.FC = () => {
     <div className="space-y-3">
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">Global Parameters</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">Global Parameters</h4>
+            {loading && <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+          </div>
           <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleAddRow}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Add parameter"
-            >
-              <Plus className="h-3 w-3" />
-              Add
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
-              title="Save parameters"
-            >
-              {saved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
-              {saved ? 'Saved' : saving ? 'Saving...' : 'Save'}
-            </button>
+            {!isEditing ? (
+              <>
+                <button
+                  onClick={handleAddRow}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add
+                </button>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <Settings className="h-3 w-3" />
+                  Edit
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+                >
+                  {saved ? <Check className="h-3 w-3" /> : <Save className="h-3 w-3" />}
+                  {saved ? 'Saved' : saving ? 'Saving...' : 'Save'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -280,28 +311,47 @@ const SettingsTab: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {rows.map((row, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={row.key}
-                  onChange={e => handleKeyChange(index, e.target.value)}
-                  placeholder="key"
-                  className="w-2/5 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <input
-                  type="text"
-                  value={row.value}
-                  onChange={e => handleValueChange(index, e.target.value)}
-                  placeholder="value"
-                  className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={() => handleDeleteRow(index)}
-                  className="flex-shrink-0 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+              <div key={index} className="flex items-center gap-2 group/kv">
+                {isEditing ? (
+                  <>
+                    <input
+                      type="text"
+                      value={row.key}
+                      onChange={e => handleKeyChange(index, e.target.value)}
+                      placeholder="key"
+                      className="w-2/5 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input
+                      type="text"
+                      value={row.value}
+                      onChange={e => handleValueChange(index, e.target.value)}
+                      placeholder="value"
+                      className="flex-1 px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => handleDeleteRow(index)}
+                      className="flex-shrink-0 p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex justify-between items-center w-full text-xs sm:text-sm gap-2">
+                    <span className="text-gray-600 dark:text-gray-300 font-normal text-[10px] sm:text-xs whitespace-nowrap flex-shrink-0" title={row.key}>
+                      {row.key.length > 25 ? row.key.slice(0, 25) + '~' : row.key}
+                    </span>
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-gray-400 dark:text-gray-500 text-[10px] sm:text-xs flex-shrink-0">
+                        {'.'.repeat(Math.max(3, 30 - row.key.length - row.value.length))}
+                      </span>
+                      <span className="text-gray-800 dark:text-gray-100 font-semibold text-sm sm:text-base truncate group-hover/kv:whitespace-normal group-hover/kv:break-all group-hover/kv:overflow-visible" title={row.value}>
+                        {row.value}
+                      </span>
+                      <CopyValueButton value={row.value} />
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -327,32 +377,44 @@ const TABS = [
 export const GlobalStateSidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState('results');
   const [globalState, setGlobalState] = useState<Record<string, unknown>>({});
+  const [globalParams, setGlobalParams] = useState<Record<string, unknown>>({});
   const [timestamp, setTimestamp] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [paramsLoading, setParamsLoading] = useState(true);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
-  const fetchGlobalState = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await apiClient.getGlobalState();
-      setGlobalState(res.state || {});
-      setTimestamp(res.timestamp);
+      const [stateRes, paramsRes] = await Promise.all([
+        apiClient.getGlobalState(),
+        apiClient.getGlobalParameters()
+      ]);
+      setGlobalState(stateRes.state || {});
+      setTimestamp(stateRes.timestamp);
+      setGlobalParams(paramsRes.parameters || {});
     } catch (e) {
-      console.error('Failed to fetch global state:', e);
+      console.error('Failed to fetch global data:', e);
     } finally {
       setLoading(false);
+      setParamsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchGlobalState();
-    const interval = setInterval(fetchGlobalState, 3000);
+    fetchData();
+    const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
-  }, [fetchGlobalState]);
+  }, [fetchData]);
+
+  const handleUpdateParameters = async (parameters: Record<string, unknown>) => {
+    await apiClient.updateGlobalParameters(parameters);
+    setGlobalParams(parameters); // Optimistic update
+  };
 
   const handleClearGlobalState = async () => {
     try {
       await apiClient.deleteGlobalState();
-      await fetchGlobalState();
+      setGlobalState({});
     } catch (e) {
       console.error('Failed to clear global state:', e);
     } finally {
@@ -421,7 +483,13 @@ export const GlobalStateSidebar: React.FC = () => {
             )
           )}
 
-          {activeTab === 'settings' && <SettingsTab />}
+          {activeTab === 'settings' && (
+            <SettingsTab
+              parameters={globalParams}
+              onUpdate={handleUpdateParameters}
+              loading={paramsLoading}
+            />
+          )}
         </div>
     </DetailsSidebar>
   );
