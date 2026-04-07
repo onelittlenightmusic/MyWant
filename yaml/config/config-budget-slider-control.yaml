@@ -1,0 +1,19 @@
+wants:
+  - metadata:
+      name: "budget slider demo"
+      type: "budget slider control"
+      labels:
+        role: demo
+    spec:
+      params:
+        prefix: "demo"
+        budget: 5000.0
+        currency: USD
+        restaurant_type: "fine dining"
+        hotel_type: "luxury"
+        restaurant_cost: 300.0
+        hotel_cost: 800.0
+        budget_min: 1000.0
+        budget_max: 15000.0
+        budget_step: 500.0
+      recipe: budget-slider-control
