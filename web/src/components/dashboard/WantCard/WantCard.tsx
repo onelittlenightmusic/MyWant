@@ -107,6 +107,7 @@ export const WantCard: React.FC<WantCardProps> = ({
     hasChildren;
 
   const isRecipeBased = want.metadata?.labels?.['recipe-based'] === 'true';
+  const isControl = want.metadata?.labels?.['user-control'] === 'true';
 
 
   const [isDragOver, setIsDragOver] = useState(false);
@@ -281,7 +282,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       <StackLayers stackCount={stackCount} />
       <div
         ref={cardRef}
-        draggable={!isSelectMode && !isBeingProcessed && !sliderActive}
+        draggable={!isSelectMode && !isBeingProcessed && !sliderActive && !isControl}
         onDragStart={handleDragStart}
         onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}
@@ -316,15 +317,17 @@ export const WantCard: React.FC<WantCardProps> = ({
           isHighlighted && styles.highlighted,
           isBlinking && styles.minimapBlink,
           isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed',
+          isControl && styles.controlCardBorder,
+          isControl && !selected && styles.controlCardBorderHidden,
           parentBackgroundStyle.className,
           className || ''
         )}
-        style={{ ...parentBackgroundStyle.style }}
+        style={isControl && !selected ? {} : { ...parentBackgroundStyle.style }}
       >
-        <ProgressBars achievingPercentage={achievingPercentage} />
-        <CorrelationOverlay rate={correlationRate} />
+        {(!isControl || selected) && <ProgressBars achievingPercentage={achievingPercentage} />}
+        {(!isControl || selected) && <CorrelationOverlay rate={correlationRate} />}
 
-        {replayScreenshotUrl && (
+        {replayScreenshotUrl && (!isControl || selected) && (
           <div
             className="absolute inset-0 z-0 pointer-events-none rounded-[inherit]"
             style={{
@@ -354,7 +357,7 @@ export const WantCard: React.FC<WantCardProps> = ({
           </div>
         )}
 
-        <VersionBadge version={version} />
+        {(!isControl || selected) && <VersionBadge version={version} />}
 
         <div
           className="relative z-10 transition-all duration-150"
@@ -396,7 +399,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         )}
 
         {/* Child want count + status dots */}
-        {hasChildren && (
+        {hasChildren && (!isControl || selected) && (
           <div className={classNames(
             "absolute bottom-0 left-0 right-0 z-10 border-t border-gray-200/50 dark:border-gray-700/50 px-3 py-1.5 flex items-center gap-2",
             isBubbleOpen && "invisible"

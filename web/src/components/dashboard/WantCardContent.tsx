@@ -431,11 +431,17 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     textTruncate: 25
   };
 
+  const isControl = labels['user-control'] === 'true';
+
   return (
     <>
       {/* Header — semi-transparent band over background image */}
-      <div className={`mb-2 sm:mb-4 backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
-        <div className="flex items-start justify-between">
+      <div className={classNames(
+        styles.controlCardHeader,
+        isControl && !isFocused ? styles.controlCardHeaderHidden : styles.controlCardHeaderVisible
+      )}>
+        <div className={`mb-2 sm:mb-4 backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
+          <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
               className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}
@@ -577,6 +583,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           </div>
         </div>
       </div>
+    </div>
 
       <div className={isChild ? "px-2 sm:px-4 pb-2" : "px-3 sm:px-6 pb-3"}>
 
@@ -614,7 +621,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         </div>
       )}
       {/* Error indicator */}
-      {hasError && (
+      {hasError && (!isControl || isFocused) && (
         <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
           <div className="flex items-start">
             <AlertTriangle className={`${sizes.errorIconSize} text-red-600 dark:text-red-400 mt-0.5 mr-2 flex-shrink-0`} />
@@ -635,7 +642,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       {/* Results summary */}
-      {want.results && Object.keys(want.results).length > 0 && (
+      {want.results && Object.keys(want.results).length > 0 && (!isControl || isFocused) && (
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <p className={`${sizes.errorTextSize} text-gray-600 dark:text-gray-400`}>
             Results: {Object.keys(want.results).length} item{Object.keys(want.results).length !== 1 ? 's' : ''}
@@ -646,7 +653,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {/* Slider type: range slider to control parent parameter */}
       {isSlider && (
         <div
-          className={`${isChild ? "mt-2" : "mt-4"} space-y-1`}
+          className={`${(isChild || (isControl && !isFocused)) ? "mt-2" : "mt-4"} space-y-1`}
           onPointerEnter={() => onSliderActiveChange?.(true)}
           onPointerLeave={() => onSliderActiveChange?.(false)}
           onMouseDown={(e) => e.stopPropagation()}
