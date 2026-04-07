@@ -37,6 +37,7 @@ interface WantCardContentProps {
   onSuspend?: (want: Want) => void;
   onResume?: (want: Want) => void;
   onShowReactionConfirmation?: (want: Want, action: 'approve' | 'deny') => void;
+  onSliderActiveChange?: (active: boolean) => void;
 }
 
 export const WantCardContent: React.FC<WantCardContentProps> = ({
@@ -53,7 +54,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   onDelete,
   onSuspend,
   onResume,
-  onShowReactionConfirmation
+  onShowReactionConfirmation,
+  onSliderActiveChange
 }) => {
   const wantName = want.metadata?.name || want.metadata?.id || 'Unnamed Want';
   const wantType = want.metadata?.type || 'unknown';
@@ -645,7 +647,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       {isSlider && (
         <div
           className={`${isChild ? "mt-2" : "mt-4"} space-y-1`}
-          data-no-card-drag
+          onPointerEnter={() => onSliderActiveChange?.(true)}
+          onPointerLeave={() => onSliderActiveChange?.(false)}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           onTouchMove={(e) => e.stopPropagation()}

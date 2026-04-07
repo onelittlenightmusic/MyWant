@@ -113,7 +113,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   const [isDragOverWant, setIsDragOverWant] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
-  const pointerDownOnSlider = useRef(false);
+  const [sliderActive, setSliderActive] = useState(false);
 
   useEffect(() => {
     const wId = want.metadata?.id || want.id;
@@ -161,11 +161,6 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const handleDragStart = (e: React.DragEvent) => {
     if (isSelectMode || isBeingProcessed) return;
-    // Suppress card drag when pointer originated on slider or interactive controls
-    if (pointerDownOnSlider.current) {
-      e.preventDefault();
-      return;
-    }
     suppressDragImage(e);
     const id = want.metadata?.id || want.id;
     if (!id) return;
@@ -286,18 +281,14 @@ export const WantCard: React.FC<WantCardProps> = ({
       <StackLayers stackCount={stackCount} />
       <div
         ref={cardRef}
-        draggable={!isSelectMode && !isBeingProcessed}
+        draggable={!isSelectMode && !isBeingProcessed && !sliderActive}
         onDragStart={handleDragStart}
-        onDragEnd={() => { setDraggingWant(null); pointerDownOnSlider.current = false; }}
+        onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}
         onContextMenu={handleContextMenu}
-        onMouseDown={(e) => {
-          const t = e.target as HTMLElement;
-          pointerDownOnSlider.current = !!(t.closest('input[type="range"]') || t.closest('[data-no-card-drag]'));
-          if (!pointerDownOnSlider.current) longPress.onMouseDown(e);
-        }}
+        onMouseDown={longPress.onMouseDown}
         onMouseMove={longPress.onMouseMove}
-        onMouseUp={() => { pointerDownOnSlider.current = false; longPress.onMouseUp(); }}
+        onMouseUp={longPress.onMouseUp}
         onMouseLeave={() => {
           longPress.cancel();
           if (overlay.showQuickActions) overlay.closeQuickActions();
@@ -375,6 +366,7 @@ export const WantCard: React.FC<WantCardProps> = ({
             onEdit={onEdit} onDelete={onDelete}
             onSuspend={onSuspend} onResume={onResume}
             onShowReactionConfirmation={onShowReactionConfirmation}
+            onSliderActiveChange={setSliderActive}
           />
         </div>
 
