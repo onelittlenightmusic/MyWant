@@ -80,9 +80,9 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 
 	// Collect recipe parameters (excluding target-specific ones)
 	target.RecipeParams = make(map[string]any)
-	for key, value := range spec.Params {
-		if !targetSpecificParams[key] {
-			target.RecipeParams[key] = value
+	for k, v := range spec.Params {
+		if !targetSpecificParams[k] {
+			target.RecipeParams[k] = v
 		}
 	}
 
@@ -331,11 +331,11 @@ func (t *Target) Initialize() {
 	// Ensure provider_state_map is accessible in Spec.Params for dispatch_thinker.
 	// direction_map is now owned by the child planner want (itinerary/briefing),
 	// not by the Target itself.
-	if t.Spec.Params == nil {
-		t.Spec.Params = make(map[string]any)
-	}
-	if _, has := t.Spec.Params["provider_state_map"]; !has {
+	if _, hasProviderStateMap := t.Spec.Params["provider_state_map"]; !hasProviderStateMap {
 		if v, ok := t.RecipeParams["provider_state_map"]; ok && v != nil {
+			if t.Spec.Params == nil {
+				t.Spec.Params = make(map[string]any)
+			}
 			t.Spec.Params["provider_state_map"] = v
 		}
 	}
@@ -644,8 +644,9 @@ func (t *Target) UpdateParameter(paramName string, paramValue any) {
 
 // ChangeParameter provides a convenient API to change target parameters at runtime
 func (t *Target) ChangeParameter(paramName string, paramValue any) {
+	oldVal := t.Spec.Params[paramName]
 	t.StoreLog("[TARGET] 🔄 Target %s: Changing parameter %s from %v to %v\n",
-		t.Metadata.Name, paramName, t.Spec.Params[paramName], paramValue)
+		t.Metadata.Name, paramName, oldVal, paramValue)
 	t.UpdateParameter(paramName, paramValue)
 }
 func (t *Target) GetParameterValue(paramName string) any {

@@ -1,8 +1,10 @@
 package mywant
 
 import (
+	"context"
 	"os"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -59,6 +61,42 @@ func GetGlobalParameter(key string) (any, bool) {
 	}
 	v, ok := globalParameters[key]
 	return v, ok
+}
+
+// SetGlobalParameter sets a single global parameter, persists it, and emits a ParameterChangeEvent
+// so that any registered wants with matching exposeAs subscriptions receive the update.
+func SetGlobalParameter(key string, value any) error {
+	globalParamsMu.Lock()
+	if globalParameters == nil {
+		globalParameters = make(map[string]any)
+	}
+	globalParameters[key] = value
+	path := globalParamsPath
+	globalParamsMu.Unlock()
+
+	if path != "" {
+		all := GetAllGlobalParameters()
+		data, err := yaml.Marshal(all)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return err
+		}
+	}
+
+	// Emit ParameterChangeEvent so subscribed wants receive the update asynchronously
+	event := &ParameterChangeEvent{
+		BaseEvent: BaseEvent{
+			EventType:  EventTypeParameterChange,
+			SourceName: "__global__",
+			Timestamp:  time.Now(),
+		},
+		ParamName:  key,
+		ParamValue: value,
+	}
+	GetGlobalSubscriptionSystem().Emit(context.Background(), event)
+	return nil
 }
 
 // GetAllGlobalParameters returns a snapshot copy of all parameters.

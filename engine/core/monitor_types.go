@@ -43,14 +43,14 @@ func NewMonitorWant(metadata Metadata, spec WantSpec) *MonitorWant {
 	}
 
 	// Extract alert thresholds from params
-	if thresholds, exists := spec.Params["alert_thresholds"]; exists {
+	if thresholds, exists := spec.GetParam("alert_thresholds"); exists {
 		if threshMap, ok := AsMap(thresholds); ok {
 			monitor.AlertThresholds = threshMap
 		}
 	}
 
 	// Extract alert actions from params
-	if actions, exists := spec.Params["alert_actions"]; exists {
+	if actions, exists := spec.GetParam("alert_actions"); exists {
 		if actionList, ok := AsArray(actions); ok {
 			for _, action := range actionList {
 				if actionStr, ok := AsString(action); ok {

@@ -59,6 +59,13 @@ type StateSubscription struct {
 	BufferSize int      `json:"bufferSize,omitempty" yaml:"bufferSize,omitempty"` // For rate limiting
 }
 
+// ParamEntry represents a single parameter with optional upward exposure
+type ParamEntry struct {
+	Key      string `json:"key" yaml:"key"`
+	Value    any    `json:"value" yaml:"value"`
+	ExposeAs string `json:"exposeAs,omitempty" yaml:"exposeAs,omitempty"`
+}
+
 // NotificationFilter allows filtering received notifications
 type NotificationFilter struct {
 	SourcePattern string   `json:"sourcePattern" yaml:"sourcePattern"`                   // Regex pattern for source names

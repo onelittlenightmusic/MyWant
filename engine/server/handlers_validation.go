@@ -93,9 +93,6 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 				Name: want.Metadata.Name,
 				Type: wantType,
 			},
-			Spec: mywant.WantSpec{
-				Params: make(map[string]any),
-			},
 		}
 
 		_, err := s.globalBuilder.TestCreateWantFunction(testWant)
@@ -235,7 +232,6 @@ func (s *Server) validateWantType(want *mywant.Want) error {
 	}
 	testWant := &mywant.Want{
 		Metadata: mywant.Metadata{Name: want.Metadata.Name, Type: wantType},
-		Spec:     mywant.WantSpec{Params: make(map[string]any)},
 	}
 	_, err := s.globalBuilder.TestCreateWantFunction(testWant)
 	return err
@@ -279,7 +275,7 @@ func (s *Server) validateRequiredParameters(want *mywant.Want) []ValidationError
 	}
 	for _, paramDef := range typeDef.Parameters {
 		if paramDef.Required {
-			if _, exists := want.Spec.Params[paramDef.Name]; !exists {
+			if !want.Spec.HasParam(paramDef.Name) {
 				errors = append(errors, ValidationError{
 					WantName:  want.Metadata.Name,
 					ErrorType: "parameter",

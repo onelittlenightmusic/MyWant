@@ -271,11 +271,11 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (any, error) {
 // mergeWithCustomDefaults merges user spec with custom type defaults
 func (cb *ChainBuilder) mergeWithCustomDefaults(spec WantSpec, config CustomTargetTypeConfig) WantSpec {
 	merged := spec
+
+	// Merge default parameters (user params take precedence)
 	if merged.Params == nil {
 		merged.Params = make(map[string]any)
 	}
-
-	// Merge default parameters (user params take precedence)
 	for key, defaultValue := range config.DefaultParams {
 		if _, exists := merged.Params[key]; !exists {
 			merged.Params[key] = defaultValue

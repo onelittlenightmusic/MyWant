@@ -53,7 +53,6 @@ func main() {
 					},
 				},
 				Spec: mywant.WantSpec{
-					Params: map[string]any{},
 					// Schedule: Execute every 3 seconds (for demo purposes)
 					When: []mywant.WhenSpec{
 						{Every: "3 seconds"},

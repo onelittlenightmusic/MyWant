@@ -60,11 +60,12 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 // extractApprovalID extracts approval_id from want params or labels
 func (cb *ChainBuilder) extractApprovalID(want *Want) string {
 	// Try params first
-	if want.Spec.Params != nil {
-		approvalID := ExtractMapString(want.Spec.Params, "approval_id")
-		if approvalID != "" {
-			return approvalID
-		}
+	approvalID := ""
+	if v, ok := want.Spec.Params["approval_id"]; ok {
+		approvalID, _ = v.(string)
+	}
+	if approvalID != "" {
+		return approvalID
 	}
 
 	// Fall back to labels

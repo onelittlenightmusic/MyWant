@@ -35,10 +35,10 @@ func (o *OpaLLMPlannerWant) GetLocals() *OpaLLMPlannerLocals {
 // Initialize copies goal/current from params to state.
 // Always overwrites because initialValue: {} from YAML is a non-nil empty map.
 func (o *OpaLLMPlannerWant) Initialize() {
-	if goal, ok := o.Spec.Params["goal"]; ok && goal != nil {
+	if goal, ok := o.Spec.GetParam("goal"); ok && goal != nil {
 		o.SetGoal("goal", goal)
 	}
-	if current, ok := o.Spec.Params["current"]; ok && current != nil {
+	if current, ok := o.Spec.GetParam("current"); ok && current != nil {
 		o.SetCurrent("current", current)
 	}
 	// Copy config params → state so the thinker reads from GetCurrent instead of GetStringParam/GetBoolParam

@@ -267,12 +267,10 @@ func (rl *RecipeLoader) instantiateDRYWant(dryWant DRYWantSpec, defaults *DRYRec
 				},
 			},
 		},
-		Spec: WantSpec{
-			Params: resolvedParams,
-			Using:  dryWant.Using,
-		},
 		Status: WantStatusIdle,
 	}
+	want.Spec.Using = dryWant.Using
+	want.Spec.SetParamsFromMap(resolvedParams)
 
 	return want, nil
 }
@@ -317,12 +315,10 @@ func (rl *RecipeLoader) instantiateWantFromTemplate(wantRecipe WantRecipe, param
 				},
 			},
 		},
-		Spec: WantSpec{
-			Params: resolvedParams,
-			Using:  wantRecipe.Spec.Using,
-		},
 		Status: WantStatusIdle,
 	}
+	want.Spec.Using = wantRecipe.Spec.Using
+	want.Spec.SetParamsFromMap(resolvedParams)
 
 	return want, nil
 }

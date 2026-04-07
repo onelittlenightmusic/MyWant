@@ -2,8 +2,34 @@ package mywant
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
+
+// exposeAsHandler handles ParameterChangeEvent from upper scope (global or parent want)
+// and propagates the value to the local param via UpdateParameter.
+type exposeAsHandler struct {
+	want         *Want
+	sourceFilter string // "__global__" for top-level, parent name for child wants
+	exposeAs     string // the key name in the upper scope
+	localKey     string // the local param key in this want
+}
+
+func (h *exposeAsHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:expose:%s→%s", h.want.Metadata.Name, h.exposeAs, h.localKey)
+}
+
+func (h *exposeAsHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	pce, ok := event.(*ParameterChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if pce.GetSourceName() != h.sourceFilter || pce.ParamName != h.exposeAs {
+		return EventResponse{}
+	}
+	h.want.UpdateParameter(h.localKey, pce.ParamValue)
+	return EventResponse{Handled: true}
+}
 
 // Global want registry for notification lookup
 var (
@@ -17,15 +43,43 @@ var (
 // RegisterWant registers a want for notification lookup
 func RegisterWant(want *Want) {
 	wantRegistryMutex.Lock()
-	defer wantRegistryMutex.Unlock()
 	wantRegistry[want.Metadata.Name] = want
+	wantRegistryMutex.Unlock()
+
+	// Subscribe for exposeAs param propagation
+	for localKey, exposeAs := range want.Spec.ParamExposes {
+		parent := want.GetParentWant()
+		var sourceFilter string
+		if parent == nil {
+			sourceFilter = "__global__"
+		} else {
+			sourceFilter = parent.Metadata.Name
+		}
+		handler := &exposeAsHandler{
+			want:         want,
+			sourceFilter: sourceFilter,
+			exposeAs:     exposeAs,
+			localKey:     localKey,
+		}
+		want.GetSubscriptionSystem().Subscribe(EventTypeParameterChange, handler)
+	}
 }
 
 // UnregisterWant removes a want from the registry
 func UnregisterWant(wantName string) {
 	wantRegistryMutex.Lock()
-	defer wantRegistryMutex.Unlock()
+	want := wantRegistry[wantName]
 	delete(wantRegistry, wantName)
+	wantRegistryMutex.Unlock()
+
+	if want == nil {
+		return
+	}
+	// Unsubscribe exposeAs handlers
+	for localKey, exposeAs := range want.Spec.ParamExposes {
+		subscriberName := fmt.Sprintf("%s:expose:%s→%s", wantName, exposeAs, localKey)
+		want.GetSubscriptionSystem().Unsubscribe(EventTypeParameterChange, subscriberName)
+	}
 }
 func findWantByName(wantName string) *Want {
 	wantRegistryMutex.RLock()

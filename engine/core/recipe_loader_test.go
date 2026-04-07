@@ -77,10 +77,12 @@ func TestDRYWantInstantiation(t *testing.T) {
 	}
 
 	// Verify resolved parameters
-	if want.Spec.Params["count"] != 1000 {
+	count, _ := want.Spec.GetParam("count")
+	if count != 1000 {
 		t.Error("Count parameter not properly resolved")
 	}
-	if want.Spec.Params["rate"] != 5.0 {
+	rate, _ := want.Spec.GetParam("rate")
+	if rate != 5.0 {
 		t.Error("Rate parameter not properly resolved")
 	}
 
@@ -130,7 +132,8 @@ func TestRecipeWantCreation(t *testing.T) {
 	if want.Metadata.Type != "queue" {
 		t.Error("Want type not preserved")
 	}
-	if want.Spec.Params["service_time"] != 0.1 {
+	st, _ := want.Spec.GetParam("service_time")
+	if st != 0.1 {
 		t.Error("Parameter not resolved correctly")
 	}
 }

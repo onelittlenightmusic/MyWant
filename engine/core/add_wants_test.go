@@ -29,7 +29,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 			Type: "noop",
 		},
 		Spec: WantSpec{
-			Params: map[string]any{},
+			Params: nil,
 		},
 	}
 
@@ -53,7 +53,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 			Type: "noop",
 		},
 		Spec: WantSpec{
-			Params: map[string]any{},
+			Params: nil,
 		},
 	}
 
@@ -76,7 +76,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 			Type: "noop",
 		},
 		Spec: WantSpec{
-			Params: map[string]any{},
+			Params: nil,
 		},
 	}
 
@@ -100,7 +100,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 			Type: "noop",
 		},
 		Spec: WantSpec{
-			Params: map[string]any{},
+			Params: nil,
 		},
 	}
 	want5 := &Want{
@@ -110,7 +110,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 			Type: "noop",
 		},
 		Spec: WantSpec{
-			Params: map[string]any{},
+			Params: nil,
 		},
 	}
 
@@ -145,7 +145,7 @@ func TestAddWantsAsyncChannelFull(t *testing.T) {
 					Type: "noop",
 				},
 				Spec: WantSpec{
-					Params: map[string]any{},
+					Params: nil,
 				},
 			}
 			results <- cb.AddWantsAsync([]*Want{want})

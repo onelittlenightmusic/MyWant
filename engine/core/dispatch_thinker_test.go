@@ -56,7 +56,7 @@ func TestInterpretDirections(t *testing.T) {
 
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
-		Spec:     WantSpec{Params: map[string]any{}},
+		Spec:     WantSpec{},
 	}
 	child := &Want{
 		Metadata: Metadata{
@@ -150,7 +150,7 @@ func TestDispatchThinkerRealizesDesiredDispatch(t *testing.T) {
 
 	parent := &Want{
 		Metadata: Metadata{ID: "owner-id", Name: "owner", Type: "noop"},
-		Spec:     WantSpec{Params: map[string]any{}},
+		Spec:     WantSpec{},
 	}
 	parent.State.Store("_state_initialized", true)
 
@@ -196,8 +196,9 @@ func TestDispatchThinkerRealizesDesiredDispatch(t *testing.T) {
 	if hotelWant == nil {
 		t.Fatal("Expected DispatchThinker to create a child want of type 'hotel', but none found")
 	}
-	if hotelWant.Spec.Params["hotel_type"] != "luxury" {
-		t.Errorf("Expected hotel_type 'luxury', got '%v'", hotelWant.Spec.Params["hotel_type"])
+	hotelType, _ := hotelWant.Spec.GetParam("hotel_type")
+	if hotelType != "luxury" {
+		t.Errorf("Expected hotel_type 'luxury', got '%v'", hotelType)
 	}
 	if len(hotelWant.Metadata.OwnerReferences) == 0 {
 		t.Fatal("Expected hotel want to have owner reference")
@@ -220,7 +221,7 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id2", Name: "parent2", Type: "noop"},
-		Spec:     WantSpec{Params: map[string]any{}},
+		Spec:     WantSpec{},
 	}
 	child := &Want{
 		Metadata: Metadata{

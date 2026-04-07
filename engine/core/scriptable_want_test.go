@@ -52,7 +52,7 @@ func TestScriptableWantFactory(t *testing.T) {
 	want := &Want{}
 	want.Metadata.Type = "echo_monitor"
 	want.Metadata.Name = "test-echo"
-	want.Spec.Params = map[string]any{"limit": 5}
+	want.Spec.SetParam("limit", 5)
 
 	result, err := cb.TestCreateWantFunction(want)
 	if err != nil {

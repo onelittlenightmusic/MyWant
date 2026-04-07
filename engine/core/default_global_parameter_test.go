@@ -13,7 +13,7 @@ func makeWantWithParams(params map[string]any) *Want {
 		Metadata: Metadata{Name: "test", Type: "test"},
 	}
 	if params != nil {
-		w.Spec.Params = params
+		w.Spec.SetParamsFromMap(params)
 	}
 	return w
 }
@@ -40,7 +40,7 @@ func TestSetWantTypeDefinition_DefaultApplied(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	v, ok := w.Spec.Params["timeout"]
+	v, ok := w.Spec.GetParam("timeout")
 	if !ok {
 		t.Fatal("Expected default to be applied")
 	}
@@ -59,7 +59,7 @@ func TestSetWantTypeDefinition_SpecParamsOverridesDefault(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	v := w.Spec.Params["timeout"]
+	v, _ := w.Spec.GetParam("timeout")
 	if v != 99 {
 		t.Errorf("spec.params should take precedence over default, got %v", v)
 	}
@@ -75,7 +75,7 @@ func TestSetWantTypeDefinition_NoDefaultNoGlobal(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	if _, ok := w.Spec.Params["host"]; ok {
+	if w.Spec.HasParam("host") {
 		t.Error("No default and no global parameter — key should not be set")
 	}
 }
@@ -99,7 +99,7 @@ func TestSetWantTypeDefinition_DefaultGlobalParameter_Used(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	v, ok := w.Spec.Params["host"]
+	v, ok := w.Spec.GetParam("host")
 	if !ok {
 		t.Fatal("Expected global parameter fallback to be applied")
 	}
@@ -125,7 +125,7 @@ func TestSetWantTypeDefinition_DefaultGlobalParameter_MissingKey(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	if _, ok := w.Spec.Params["host"]; ok {
+	if w.Spec.HasParam("host") {
 		t.Error("Global parameter key is absent — should not set param")
 	}
 }
@@ -146,7 +146,7 @@ func TestSetWantTypeDefinition_SpecParamsOverridesDefaultGlobalParameter(t *test
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	v := w.Spec.Params["host"]
+	v, _ := w.Spec.GetParam("host")
 	if v != "explicit-host" {
 		t.Errorf("spec.params should override defaultGlobalParameter, got %v", v)
 	}
@@ -168,7 +168,7 @@ func TestSetWantTypeDefinition_DefaultOverridesDefaultGlobalParameter(t *testing
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	v := w.Spec.Params["host"]
+	v, _ := w.Spec.GetParam("host")
 	if v != "yaml-default-host" {
 		t.Errorf("YAML default should take precedence over defaultGlobalParameter, got %v", v)
 	}
@@ -199,16 +199,16 @@ func TestSetWantTypeDefinition_PriorityOrder_AllThreeSources(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	if got := w.Spec.Params["param_a"]; got != "from-spec" {
+	if got, _ := w.Spec.GetParam("param_a"); got != "from-spec" {
 		t.Errorf("param_a: want 'from-spec', got %v", got)
 	}
-	if got := w.Spec.Params["param_b"]; got != "from-yaml" {
+	if got, _ := w.Spec.GetParam("param_b"); got != "from-yaml" {
 		t.Errorf("param_b: want 'from-yaml', got %v", got)
 	}
-	if got := w.Spec.Params["param_c"]; got != "us-east" {
+	if got, _ := w.Spec.GetParam("param_c"); got != "us-east" {
 		t.Errorf("param_c: want 'us-east', got %v", got)
 	}
-	if _, ok := w.Spec.Params["param_d"]; ok {
+	if w.Spec.HasParam("param_d") {
 		t.Errorf("param_d: should not be set when no source available")
 	}
 }
@@ -226,7 +226,7 @@ func TestSetWantTypeDefinition_DefaultGlobalParameter_NilGlobalParams(t *testing
 	// Should not panic
 	w.SetWantTypeDefinition(typeDef)
 
-	if _, ok := w.Spec.Params["host"]; ok {
+	if w.Spec.HasParam("host") {
 		t.Error("Should not set param when global params are empty")
 	}
 }
@@ -242,10 +242,10 @@ func TestSetWantTypeDefinition_SpecParamsNilInitialized(t *testing.T) {
 	})
 	w.SetWantTypeDefinition(typeDef)
 
-	if w.Spec.Params == nil {
-		t.Fatal("Spec.Params should be initialized")
+	if !w.Spec.HasParam("count") {
+		t.Fatal("Spec.Params should be initialized with count")
 	}
-	if w.Spec.Params["count"] != 5 {
-		t.Errorf("Expected 5, got %v", w.Spec.Params["count"])
+	if v, _ := w.Spec.GetParam("count"); v != 5 {
+		t.Errorf("Expected 5, got %v", v)
 	}
 }

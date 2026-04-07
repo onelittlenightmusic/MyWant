@@ -17,8 +17,8 @@ func main() {
 			},
 			Spec: mywant.WantSpec{
 				Params: map[string]any{
-					"count":         5,
-					"rate":          1.0,
+					"count": 5,
+					"rate": 1.0,
 					"deterministic": true,
 				},
 			},

@@ -23,9 +23,9 @@ func main() {
 				},
 				Spec: mywant.WantSpec{
 					Params: map[string]any{
-						"max_display":  100,
-						"count":        50,
-						"rate":         10.0,
+						"max_display": 100,
+						"count": 50,
+						"rate": 10.0,
 						"service_time": 0.1,
 					},
 				},

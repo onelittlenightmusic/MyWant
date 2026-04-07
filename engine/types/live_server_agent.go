@@ -153,7 +153,7 @@ func getConfigArgs(want *mywant.Want) []string {
 
 // getStringParam gets a string parameter from want params with a default value
 func getStringParam(want *mywant.Want, key, defaultVal string) string {
-	if v, ok := want.Spec.Params[key]; ok {
+	if v, ok := want.Spec.GetParam(key); ok {
 		return fmt.Sprintf("%v", v)
 	}
 	return defaultVal
@@ -161,7 +161,7 @@ func getStringParam(want *mywant.Want, key, defaultVal string) string {
 
 // getIntParam gets an int parameter from want params with a default value
 func getIntParam(want *mywant.Want, key string, defaultVal int) int {
-	v, ok := want.Spec.Params[key]
+	v, ok := want.Spec.GetParam(key)
 	if !ok {
 		return defaultVal
 	}
@@ -181,7 +181,7 @@ func getIntParam(want *mywant.Want, key string, defaultVal int) int {
 
 // getArgsParam extracts the args parameter as []string from a Want
 func getArgsParam(want *mywant.Want) []string {
-	raw, ok := want.Spec.Params["args"]
+	raw, ok := want.Spec.GetParam("args")
 	if !ok {
 		return nil
 	}

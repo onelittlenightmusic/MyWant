@@ -43,7 +43,7 @@ func main() {
 			fullRecipePath := recipeDir + want.Spec.Recipe
 
 			loader := NewGenericRecipeLoader(recipeDir)
-			recipeConfig, err := loader.LoadRecipe(fullRecipePath, want.Spec.Params)
+			recipeConfig, err := loader.LoadRecipe(fullRecipePath, want.Spec.ParamsAsMap())
 			if err != nil {
 				fmt.Printf("Error loading recipe %s: %v\n", want.Spec.Recipe, err)
 				continue

@@ -117,6 +117,7 @@ func newSeriesID() string {
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
 	Params              map[string]any       `json:"params" yaml:"params"`
+	ParamExposes        map[string]string    `json:"paramExposes,omitempty" yaml:"paramExposes,omitempty"`
 	Using               []map[string]string  `json:"using,omitempty" yaml:"using,omitempty"`
 	Recipe              string               `json:"recipe,omitempty" yaml:"recipe,omitempty"`
 	StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
@@ -124,6 +125,174 @@ type WantSpec struct {
 	Requires            []string             `json:"requires,omitempty" yaml:"requires,omitempty"`
 	When                []WhenSpec           `json:"when,omitempty" yaml:"when,omitempty"`
 	FinalResultField    string               `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`
+}
+
+// GetParam returns the value for the given key from Params map
+func (s *WantSpec) GetParam(key string) (any, bool) {
+	v, ok := s.Params[key]
+	return v, ok
+}
+
+// SetParam sets a param value, initializing the map if nil
+func (s *WantSpec) SetParam(key string, val any) {
+	if s.Params == nil {
+		s.Params = make(map[string]any)
+	}
+	s.Params[key] = val
+}
+
+// HasParam returns true if the key exists in Params
+func (s *WantSpec) HasParam(key string) bool {
+	_, ok := s.Params[key]
+	return ok
+}
+
+// ParamsAsMap returns the Params map directly
+func (s *WantSpec) ParamsAsMap() map[string]any {
+	return s.Params
+}
+
+// SetParamsFromMap replaces Params with the given map
+func (s *WantSpec) SetParamsFromMap(m map[string]any) {
+	s.Params = m
+}
+
+// UnmarshalJSON implements json.Unmarshaler to support both old map format and new array format.
+// Params can be a JSON object (legacy) or array of {key,value,exposeAs} entries.
+func (s *WantSpec) UnmarshalJSON(data []byte) error {
+	// Use a struct without Params to avoid duplicate key issue
+	type WantSpecNoParams struct {
+		ParamExposes        map[string]string    `json:"paramExposes,omitempty"`
+		Using               []map[string]string  `json:"using,omitempty"`
+		Recipe              string               `json:"recipe,omitempty"`
+		StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty"`
+		NotificationFilters []NotificationFilter `json:"notificationFilters,omitempty"`
+		Requires            []string             `json:"requires,omitempty"`
+		When                []WhenSpec           `json:"when,omitempty"`
+		FinalResultField    string               `json:"finalResultField,omitempty"`
+	}
+	var raw struct {
+		WantSpecNoParams
+		Params json.RawMessage `json:"params"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	s.ParamExposes = raw.ParamExposes
+	s.Using = raw.Using
+	s.Recipe = raw.Recipe
+	s.StateSubscriptions = raw.StateSubscriptions
+	s.NotificationFilters = raw.NotificationFilters
+	s.Requires = raw.Requires
+	s.When = raw.When
+	s.FinalResultField = raw.FinalResultField
+
+	if raw.Params == nil {
+		return nil
+	}
+
+	// Detect array vs object
+	trimmed := bytes.TrimSpace(raw.Params)
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		// Array format
+		var entries []ParamEntry
+		if err := json.Unmarshal(raw.Params, &entries); err != nil {
+			return err
+		}
+		s.Params = make(map[string]any, len(entries))
+		for _, e := range entries {
+			s.Params[e.Key] = e.Value
+			if e.ExposeAs != "" {
+				if s.ParamExposes == nil {
+					s.ParamExposes = make(map[string]string)
+				}
+				s.ParamExposes[e.Key] = e.ExposeAs
+			}
+		}
+	} else {
+		// Map format
+		var m map[string]any
+		if err := json.Unmarshal(raw.Params, &m); err != nil {
+			return err
+		}
+		s.Params = m
+	}
+	return nil
+}
+
+// UnmarshalYAML implements yaml.Unmarshaler to support both old map format and new array format.
+// Params can be:
+//   - map format (legacy):  params: {key: val}
+//   - array format (new):   params: [{key: k, value: v, exposeAs: z}]
+func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return fmt.Errorf("WantSpec must be a YAML mapping")
+	}
+
+	// Split content into params node vs everything else
+	type restSpec struct {
+		ParamExposes        map[string]string    `yaml:"paramExposes,omitempty"`
+		Using               []map[string]string  `yaml:"using,omitempty"`
+		Recipe              string               `yaml:"recipe,omitempty"`
+		StateSubscriptions  []StateSubscription  `yaml:"stateSubscriptions,omitempty"`
+		NotificationFilters []NotificationFilter `yaml:"notificationFilters,omitempty"`
+		Requires            []string             `yaml:"requires,omitempty"`
+		When                []WhenSpec           `yaml:"when,omitempty"`
+		FinalResultField    string               `yaml:"finalResultField,omitempty"`
+	}
+
+	var paramsNode *yaml.Node
+	var otherContent []*yaml.Node
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		if value.Content[i].Value == "params" {
+			paramsNode = value.Content[i+1]
+		} else {
+			otherContent = append(otherContent, value.Content[i], value.Content[i+1])
+		}
+	}
+
+	otherNode := &yaml.Node{Kind: yaml.MappingNode, Content: otherContent}
+	var rest restSpec
+	if err := otherNode.Decode(&rest); err != nil {
+		return err
+	}
+	s.ParamExposes = rest.ParamExposes
+	s.Using = rest.Using
+	s.Recipe = rest.Recipe
+	s.StateSubscriptions = rest.StateSubscriptions
+	s.NotificationFilters = rest.NotificationFilters
+	s.Requires = rest.Requires
+	s.When = rest.When
+	s.FinalResultField = rest.FinalResultField
+
+	if paramsNode == nil {
+		return nil
+	}
+	if paramsNode.Kind == yaml.SequenceNode {
+		// Array format: [{key: k, value: v, exposeAs: z}]
+		var entries []ParamEntry
+		if err := paramsNode.Decode(&entries); err != nil {
+			return err
+		}
+		s.Params = make(map[string]any, len(entries))
+		for _, e := range entries {
+			s.Params[e.Key] = e.Value
+			if e.ExposeAs != "" {
+				if s.ParamExposes == nil {
+					s.ParamExposes = make(map[string]string)
+				}
+				s.ParamExposes[e.Key] = e.ExposeAs
+			}
+		}
+	} else {
+		// Map format (legacy): {key: val}
+		var m map[string]any
+		if err := paramsNode.Decode(&m); err != nil {
+			return err
+		}
+		s.Params = m
+	}
+	return nil
 }
 
 // WantHistory contains both parameter and state history
