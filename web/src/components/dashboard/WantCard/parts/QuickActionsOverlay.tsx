@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Play, PlayCircle, Square, Trash2, Pause, RotateCcw, Settings, Eye } from 'lucide-react';
+import { Play, PlayCircle, Square, Trash2, Pause, RotateCcw, Settings, X } from 'lucide-react';
 import { Want } from '@/types/want';
 import { classNames } from '@/utils/helpers';
 
@@ -166,10 +166,10 @@ export const QuickActionsOverlay: React.FC<QuickActionsOverlayProps> = ({
         </div>
         <div className="pointer-events-auto h-full w-full">
           <ActionButton
-            icon={<Eye className="w-5 h-5 text-white" />}
-            label="Details"
-            onClick={() => { onView(); onClose(); }}
-            colorClass="bg-slate-600/90"
+            icon={<X className="w-5 h-5 text-white" />}
+            label="閉じる"
+            onClick={() => onClose()}
+            colorClass="bg-gray-600/90"
             delay={90}
           />
         </div>
