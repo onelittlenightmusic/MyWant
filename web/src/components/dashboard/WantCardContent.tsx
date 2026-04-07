@@ -831,9 +831,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
             title="Click to view results"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className={isChild ? "h-3 w-3 shrink-0" : "h-4 w-4 shrink-0"} viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-            </svg>
             <span className="truncate">
               {truncateText(
                 typeof want.state!.final_result === 'string'
