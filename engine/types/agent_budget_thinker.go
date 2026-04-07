@@ -14,11 +14,15 @@ func init() {
 
 func budgetThinkerThink(ctx context.Context, want *Want) error {
 	// ── Phase 0: Initialize Goal ──────────────────────────────────────────
-	budgetVal := GetGoal(want, "budget_limit", 0.0)
+	// Re-read budget param every tick to pick up dynamic changes (e.g. from slider via exposes).
+	budgetVal := want.GetFloatParam("budget", 0.0)
+	if budgetVal == 0 {
+		budgetVal = GetGoal(want, "budget_limit", 0.0)
+	}
 	if budgetVal == 0 {
 		budgetVal = GetState(want, "budget", 5000.0) // Fallback to legacy
-		want.SetGoal("budget_limit", budgetVal)
 	}
+	want.SetGoal("budget_limit", budgetVal)
 
 	cb := GetGlobalChainBuilder()
 	if cb == nil { return nil }
