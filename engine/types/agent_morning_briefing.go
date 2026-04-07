@@ -45,7 +45,7 @@ func parseBriefingRoutes(want *Want) ([]briefingRouteConfig, error) {
 	if raw == nil {
 		// Fallback for when called during Initialize before state is populated
 		var ok bool
-		raw, ok = want.Spec.Params["routes"]
+		raw, ok = want.Spec.GetParam("routes")
 		if !ok || raw == nil {
 			return nil, nil
 		}

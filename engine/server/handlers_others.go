@@ -540,7 +540,7 @@ func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.Wan
 		for key, ref := range childRefs[i] {
 			newParams[key] = ref // string reference → substituted at deploy time
 		}
-		newCW.Spec.Params = newParams
+		newCW.Spec.SetParamsFromMap(newParams)
 		result[i] = newCW
 	}
 

@@ -38,7 +38,7 @@ func (m *mockGooseExecutor) ExecuteViaGoose(ctx context.Context, operation strin
 					"id":   want.Metadata.ID,
 				},
 				"spec": map[string]interface{}{
-					"params": want.Spec.Params,
+					"params": want.Spec.ParamsAsMap(),
 				},
 			}
 		}
@@ -231,7 +231,7 @@ func TestInteractDeploy_Success(t *testing.T) {
 								Type: "qnet queue",
 							},
 							Spec: mywant.WantSpec{
-								Params: map[string]interface{}{
+								Params: map[string]any{
 									"service_time": 0.1,
 								},
 							},
@@ -287,11 +287,11 @@ func TestInteractDeploy_WithModifications(t *testing.T) {
 					Wants: []*mywant.Want{
 						{
 							Metadata: mywant.Metadata{Name: "queue1", Type: "qnet queue"},
-							Spec:     mywant.WantSpec{Params: map[string]interface{}{"service_time": 0.1}},
+							Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.1}},
 						},
 						{
 							Metadata: mywant.Metadata{Name: "queue2", Type: "qnet queue"},
-							Spec:     mywant.WantSpec{Params: map[string]interface{}{"service_time": 0.2}},
+							Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.2}},
 						},
 					},
 				},

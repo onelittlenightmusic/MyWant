@@ -15,9 +15,7 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 		Name: "test-target",
 		Type: "level 1 approval",
 	}
-	spec := mywant.WantSpec{
-		Params: make(map[string]any),
-	}
+	spec := mywant.WantSpec{}
 
 	target := mywant.NewTarget(metadata, spec)
 	target.InitializeSubscriptionSystem()
@@ -25,19 +23,19 @@ func TestTargetAchievingPercentageCalculation(t *testing.T) {
 	// Create child wants
 	child1 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-1", Type: "test"},
-		Spec:     mywant.WantSpec{Params: make(map[string]any)},
+		Spec:     mywant.WantSpec{},
 		Status:   mywant.WantStatusIdle,
 	}
 
 	child2 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-2", Type: "test"},
-		Spec:     mywant.WantSpec{Params: make(map[string]any)},
+		Spec:     mywant.WantSpec{},
 		Status:   mywant.WantStatusIdle,
 	}
 
 	child3 := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-3", Type: "test"},
-		Spec:     mywant.WantSpec{Params: make(map[string]any)},
+		Spec:     mywant.WantSpec{},
 		Status:   mywant.WantStatusIdle,
 	}
 
@@ -102,9 +100,7 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 		Name: "test-target-achieved",
 		Type: "level 1 approval",
 	}
-	spec := mywant.WantSpec{
-		Params: make(map[string]any),
-	}
+	spec := mywant.WantSpec{}
 
 	target := mywant.NewTarget(metadata, spec)
 	target.InitializeSubscriptionSystem()
@@ -112,7 +108,7 @@ func TestTargetAchievedWithFullCompletion(t *testing.T) {
 	// Create single child
 	child := &mywant.Want{
 		Metadata: mywant.Metadata{Name: "child-1", Type: "test"},
-		Spec:     mywant.WantSpec{Params: make(map[string]any)},
+		Spec:     mywant.WantSpec{},
 		Status:   mywant.WantStatusIdle,
 	}
 
@@ -158,9 +154,7 @@ func TestTargetAchievingPercentageEdgeCases(t *testing.T) {
 		Name: "test-target-empty",
 		Type: "level 1 approval",
 	}
-	spec := mywant.WantSpec{
-		Params: make(map[string]any),
-	}
+	spec := mywant.WantSpec{}
 
 	target := mywant.NewTarget(metadata, spec)
 	target.InitializeSubscriptionSystem()
@@ -187,9 +181,7 @@ func TestTargetStateConsistency(t *testing.T) {
 		Name: "test-target-consistency",
 		Type: "level 1 approval",
 	}
-	spec := mywant.WantSpec{
-		Params: make(map[string]any),
-	}
+	spec := mywant.WantSpec{}
 
 	target := mywant.NewTarget(metadata, spec)
 	target.InitializeSubscriptionSystem()
@@ -199,7 +191,7 @@ func TestTargetStateConsistency(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		child := &mywant.Want{
 			Metadata: mywant.Metadata{Name: "child-" + string(rune('0'+i)), Type: "test"},
-			Spec:     mywant.WantSpec{Params: make(map[string]any)},
+			Spec:     mywant.WantSpec{},
 			Status:   mywant.WantStatusIdle,
 		}
 		children = append(children, child)
@@ -244,9 +236,7 @@ func BenchmarkTargetProgressCycle(b *testing.B) {
 		Name: "bench-target",
 		Type: "level 1 approval",
 	}
-	spec := mywant.WantSpec{
-		Params: make(map[string]any),
-	}
+	spec := mywant.WantSpec{}
 
 	target := mywant.NewTarget(metadata, spec)
 	target.InitializeSubscriptionSystem()
@@ -256,7 +246,7 @@ func BenchmarkTargetProgressCycle(b *testing.B) {
 	for i := 1; i <= 10; i++ {
 		child := &mywant.Want{
 			Metadata: mywant.Metadata{Name: "child-bench-" + string(rune('0'+i)), Type: "test"},
-			Spec:     mywant.WantSpec{Params: make(map[string]any)},
+			Spec:     mywant.WantSpec{},
 			Status:   mywant.WantStatusIdle,
 		}
 		children = append(children, child)

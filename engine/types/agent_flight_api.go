@@ -70,7 +70,7 @@ func executeFlightAction(ctx context.Context, want *Want) error {
 
 func createFlight(ctx context.Context, want *Want) error {
 	serverURL := GetCurrent(want, "server_url", "http://localhost:8090")
-	params := want.Spec.Params
+	params := want.Spec.ParamsAsMap()
 	want.SetCurrent("flight_status", "in process")
 	prevFlightID := GetCurrent(want, "_previous_flight_id", "")
 	isRebooking := prevFlightID != ""

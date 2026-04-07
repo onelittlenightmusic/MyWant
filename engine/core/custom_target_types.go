@@ -200,7 +200,9 @@ func RegisterCustomTargetType(registry *CustomTargetTypeRegistry, typeName, desc
 				spec.Params = make(map[string]any)
 			}
 			for key, value := range defaultParams {
-				setDefaultParam(spec.Params, key, value)
+				if _, exists := spec.Params[key]; !exists {
+					spec.Params[key] = value
+				}
 			}
 
 			// Mark as recipe-based

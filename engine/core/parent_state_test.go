@@ -46,7 +46,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 			ID:   "travel-coord-id",
 			Type: "coordinator",
 		},
-		Spec: WantSpec{Params: make(map[string]any)},
+		Spec: WantSpec{},
 	}
 	// Set initial budget on parent
 	parentWant.storeState("budget", 5000.0)
@@ -69,7 +69,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 					{Kind: "Want", ID: "travel-coord-id", Controller: true},
 				},
 			},
-			Spec: WantSpec{Params: make(map[string]any)},
+			Spec: WantSpec{},
 		}
 	}
 
@@ -138,7 +138,7 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 			ID:   "parent-id",
 			Type: "coordinator",
 		},
-		Spec: WantSpec{Params: make(map[string]any)},
+		Spec: WantSpec{},
 	}
 	parentWant.storeState("costs", map[string]any{})
 
@@ -209,7 +209,7 @@ func TestParentStateAccess_Cache(t *testing.T) {
 			ID:   "parent-id",
 			Type: "coordinator",
 		},
-		Spec: WantSpec{Params: make(map[string]any)},
+		Spec: WantSpec{},
 	}
 	parentWant.storeState("value", "original")
 
@@ -261,7 +261,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 			ID:   "coord-e2e-id",
 			Type: "coordinator",
 		},
-		Spec: WantSpec{Params: make(map[string]any)},
+		Spec: WantSpec{},
 	}
 	coordinator.storeState("budget", 5000.0)
 	coordinator.storeState("costs", map[string]any{})
@@ -331,7 +331,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 					{Kind: "Want", ID: "coord-e2e-id", Controller: true},
 				},
 			},
-			WantSpec{Params: make(map[string]any)},
+			WantSpec{},
 			nil,
 			"base",
 		)
@@ -449,7 +449,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 			ID:   "concurrent-coord-id",
 			Type: "coordinator",
 		},
-		Spec: WantSpec{Params: make(map[string]any)},
+		Spec: WantSpec{},
 	}
 	coordinator.storeState("costs", map[string]any{})
 
@@ -476,7 +476,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 						{Kind: "Want", ID: "concurrent-coord-id", Controller: true},
 					},
 				},
-				WantSpec{Params: make(map[string]any)},
+				WantSpec{},
 				nil,
 				"base",
 			)

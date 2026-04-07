@@ -242,7 +242,7 @@ func TestParseBriefingRoutes(t *testing.T) {
 func TestParseBriefingRoutes_NoRoutes(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{Name: "test", Type: "briefing"},
-		Spec:     WantSpec{Params: map[string]any{}},
+		Spec:     WantSpec{},
 	}
 	routes, err := parseBriefingRoutes(want)
 	if err != nil {
@@ -430,7 +430,8 @@ func TestFetchWeatherWttr_MockServer(t *testing.T) {
 func newTransitWant(params map[string]any) *TransitWant {
 	tw := &TransitWant{}
 	tw.Metadata = Metadata{Name: "test-transit", Type: "transit"}
-	tw.Spec = WantSpec{Params: params}
+	tw.Spec = WantSpec{}
+	tw.Spec.SetParamsFromMap(params)
 	tw.Init()
 	tw.Locals = &TransitLocals{}
 	tw.StateLabels = map[string]StateLabel{

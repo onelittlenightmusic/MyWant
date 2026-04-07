@@ -316,7 +316,7 @@ func spawnChildWantFromBreakdownItem(parent *Want, item map[string]any) error {
 	child.Metadata.Labels = map[string]string{
 		"goal_parent": parent.Metadata.Name,
 	}
-	child.Spec.Params = params
+	child.Spec.SetParamsFromMap(params)
 
 	return parent.AddChildWant(child)
 }

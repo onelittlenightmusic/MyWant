@@ -31,10 +31,10 @@ func (o *ItineraryWant) GetLocals() *ItineraryLocals {
 }
 
 func (o *ItineraryWant) Initialize() {
-	if goal, ok := o.Spec.Params["goal"]; ok && goal != nil {
+	if goal, ok := o.Spec.GetParam("goal"); ok && goal != nil {
 		o.SetGoal("goal", goal)
 	}
-	if current, ok := o.Spec.Params["current"]; ok && current != nil {
+	if current, ok := o.Spec.GetParam("current"); ok && current != nil {
 		o.SetCurrent("current", current)
 	}
 	// Promote direction_map param → state so Progress reads from GetCurrent

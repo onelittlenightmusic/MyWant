@@ -1095,7 +1095,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if wantPtr == nil {
 		// Copy History field from config
 		historyField := wantConfig.History
-		if len(historyField.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+		if len(historyField.ParameterHistory) == 0 && len(wantConfig.Spec.Params) > 0 {
 			entry := StateHistoryEntry{
 				WantName:   wantConfig.Metadata.Name,
 				StateValue: wantConfig.Spec.Params,
@@ -1132,7 +1132,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 		// Update history
 		wantPtr.History = wantConfig.History
-		if len(wantPtr.History.ParameterHistory) == 0 && wantConfig.Spec.Params != nil {
+		if len(wantPtr.History.ParameterHistory) == 0 && len(wantConfig.Spec.Params) > 0 {
 			entry := StateHistoryEntry{
 				WantName:   wantConfig.Metadata.Name,
 				StateValue: wantConfig.Spec.Params,

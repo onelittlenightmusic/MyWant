@@ -43,7 +43,7 @@ func (g *GoalWant) Initialize() {
 
 	// Static breakdown: if provided, skip LLM decomposition entirely.
 	// auto_approve: if true, also skip the reaction queue approval step.
-	if ib, ok := g.Spec.Params["initial_breakdown"]; ok && ib != nil {
+	if ib, ok := g.Spec.GetParam("initial_breakdown"); ok && ib != nil {
 		g.SetCurrent("initial_breakdown", ib)
 	}
 	g.SetCurrent("auto_approve", g.GetBoolParam("auto_approve", false))

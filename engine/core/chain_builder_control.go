@@ -106,7 +106,7 @@ func (cb *ChainBuilder) initializeSystemScheduler() {
 			},
 		},
 		Spec: WantSpec{
-			Params: Dict{
+			Params: map[string]any{
 				"scan_interval": 60,
 			},
 		},

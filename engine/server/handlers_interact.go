@@ -208,10 +208,7 @@ func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
 		if req.Modifications.ParameterOverrides != nil {
 			for _, want := range config.Wants {
 				for key, value := range req.Modifications.ParameterOverrides {
-					if want.Spec.Params == nil {
-						want.Spec.Params = make(map[string]interface{})
-					}
-					want.Spec.Params[key] = value
+					want.Spec.SetParam(key, value)
 				}
 			}
 		}
