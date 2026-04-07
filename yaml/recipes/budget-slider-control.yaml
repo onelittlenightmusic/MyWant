@@ -8,7 +8,7 @@ recipe:
 
   parameters:
     prefix: "budget-ctrl"
-    budget: 5000.0
+    initial_budget: 5000.0
     currency: USD
     restaurant_type: "fine dining"
     hotel_type: "luxury"
@@ -20,7 +20,7 @@ recipe:
 
   parameter_descriptions:
     prefix: "Prefix used for naming wants in the generated deployment"
-    budget: "Initial budget amount (also controls slider default position)"
+    initial_budget: "Initial budget amount (also controls slider default position)"
     currency: "Currency code for budget tracking (USD, EUR, JPY)"
     restaurant_type: "Type of restaurant to book"
     hotel_type: "Type of hotel accommodation"
@@ -32,8 +32,9 @@ recipe:
 
   wants:
     # Slider control — user drags this to change the budget limit in real-time.
-    # target_param: budget → calls PropagateParameter("budget", value) each cycle,
-    # which calls coordinator.UpdateParameter("budget", value).
+    # target_param: "budget" is a literal string (not a recipe param reference),
+    # so it is NOT substituted. slider.Progress() calls PropagateParameter("budget", value)
+    # → coordinator.UpdateParameter("budget", value).
     - metadata:
         type: slider
         labels:
@@ -42,7 +43,7 @@ recipe:
       spec:
         params:
           target_param: "budget"
-          default: budget
+          default: initial_budget
           min: budget_min
           max: budget_max
           step: budget_step
@@ -58,7 +59,7 @@ recipe:
           category: finance
       spec:
         params:
-          budget: budget
+          budget: initial_budget
           currency: currency
         exposes:
           - param: budget
