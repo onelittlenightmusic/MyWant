@@ -41,7 +41,7 @@ recipe:
           user-control: "true"
       spec:
         params:
-          target_param: budget
+          target_param: "budget"
           default: budget
           min: budget_min
           max: budget_max
