@@ -435,12 +435,14 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   return (
     <>
-      {/* Header — semi-transparent band over background image */}
+      <div className="flex flex-col h-full">
+      {/* Header — semi-transparent band, aligned to card bottom */}
       <div className={classNames(
+        "order-2 mt-auto",
         styles.controlCardHeader,
         isControl && !isFocused ? styles.controlCardHeaderHidden : styles.controlCardHeaderVisible
       )}>
-        <div className={`mb-2 sm:mb-4 backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
+        <div className={`backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
           <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3
@@ -585,7 +587,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       </div>
     </div>
 
-      <div className={isChild ? "px-2 sm:px-4 pb-2" : "px-3 sm:px-6 pb-3"}>
+      <div className={isChild ? "px-2 sm:px-4 pb-2 pt-2 order-1" : "px-3 sm:px-6 pb-3 pt-3 order-1"}>
 
 
       {/* Timeline - only for parent cards - DISABLED to keep consistent height */}
@@ -823,7 +825,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result && (
-        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-end`}>
+        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-start`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
             className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 max-w-[75%] text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
@@ -917,6 +919,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       </div>
+      </div>{/* end flex container */}
 
       {/* Confirmation Message Notification */}
       <ConfirmationBubble

@@ -360,7 +360,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         {(!isControl || selected) && <VersionBadge version={version} />}
 
         <div
-          className="relative z-10 transition-all duration-150"
+          className="relative z-10 transition-all duration-150 flex-1"
           style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
         >
           <WantCardContent
