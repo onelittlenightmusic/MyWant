@@ -1,0 +1,78 @@
+wantType:
+  metadata:
+    name: slider
+    title: Parameter Slider
+    description: Dynamically controls a parent want's parameter. When the slider's value changes, the specified parent parameter is updated in real-time.
+    version: '1.0'
+    category: system
+    pattern: independent
+  parameters:
+  - name: target_param
+    description: Name of the parent parameter to control
+    type: string
+    required: true
+    example: max_budget
+  - name: default
+    description: Initial slider value
+    type: float64
+    default: 0
+    required: false
+  - name: min
+    description: Minimum slider value
+    type: float64
+    default: 0
+    required: false
+  - name: max
+    description: Maximum slider value
+    type: float64
+    default: 100
+    required: false
+  - name: step
+    description: Step increment
+    type: float64
+    default: 1
+    required: false
+  state:
+  - name: value
+    description: Current slider value
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: min
+    description: Minimum value
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: max
+    description: Maximum value
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 100
+  - name: step
+    description: Step increment
+    type: float64
+    persistent: true
+    label: current
+    initialValue: 1
+  - name: target_param
+    description: Target parent parameter name
+    type: string
+    persistent: true
+    label: current
+  examples:
+  - title: Budget control slider
+    description: Controls the parent's max_budget parameter between 0 and 10000
+    want:
+      metadata:
+        name: budget-slider
+        type: slider
+      spec:
+        params:
+          target_param: max_budget
+          default: 5000
+          min: 0
+          max: 10000
+          step: 100

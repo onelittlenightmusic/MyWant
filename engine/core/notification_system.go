@@ -6,28 +6,67 @@ import (
 	"sync"
 )
 
-// exposeAsHandler handles ParameterChangeEvent from upper scope (global or parent want)
+// paramExposeHandler handles ParameterChangeEvent from upper scope (global or parent want)
 // and propagates the value to the local param via UpdateParameter.
-type exposeAsHandler struct {
+// Used for exposes entries with Param field (top-down propagation).
+type paramExposeHandler struct {
 	want         *Want
 	sourceFilter string // "__global__" for top-level, parent name for child wants
-	exposeAs     string // the key name in the upper scope
-	localKey     string // the local param key in this want
+	upperKey     string // param name in the upper scope (ExposeEntry.As)
+	localKey     string // local param key in this want (ExposeEntry.Param)
 }
 
-func (h *exposeAsHandler) GetSubscriberName() string {
-	return fmt.Sprintf("%s:expose:%s→%s", h.want.Metadata.Name, h.exposeAs, h.localKey)
+func (h *paramExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:param-expose:%s→%s", h.want.Metadata.Name, h.upperKey, h.localKey)
 }
 
-func (h *exposeAsHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+func (h *paramExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
 	pce, ok := event.(*ParameterChangeEvent)
 	if !ok {
 		return EventResponse{}
 	}
-	if pce.GetSourceName() != h.sourceFilter || pce.ParamName != h.exposeAs {
+	if pce.GetSourceName() != h.sourceFilter || pce.ParamName != h.upperKey {
 		return EventResponse{}
 	}
 	h.want.UpdateParameter(h.localKey, pce.ParamValue)
+	return EventResponse{Handled: true}
+}
+
+// currentStateExposeHandler handles StateChangeEvent emitted by this want and
+// propagates the value to the parent want's state as a different key.
+// Used for exposes entries with CurrentState field (bottom-up propagation).
+type currentStateExposeHandler struct {
+	want       *Want
+	localKey   string // state key in this want (ExposeEntry.CurrentState)
+	parentName string // parent want name to push the state to
+	parentKey  string // state key in parent (ExposeEntry.As)
+}
+
+func (h *currentStateExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:state-expose:%s→%s.%s", h.want.Metadata.Name, h.localKey, h.parentName, h.parentKey)
+}
+
+func (h *currentStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	sce, ok := event.(*StateChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if sce.GetSourceName() != h.want.Metadata.Name || sce.StateKey != h.localKey {
+		return EventResponse{}
+	}
+	if h.parentKey == "final_result" {
+		// Special convention: set local final_result and propagate to parent/global via MergeParentState.
+		h.want.StoreState("final_result", sce.StateValue)
+		h.want.MergeParentState(map[string]any{
+			"wants": map[string]any{h.want.Metadata.Name: sce.StateValue},
+		})
+		return EventResponse{Handled: true}
+	}
+	parent := findWantByName(h.parentName)
+	if parent == nil {
+		return EventResponse{}
+	}
+	parent.StoreState(h.parentKey, sce.StateValue)
 	return EventResponse{Handled: true}
 }
 
@@ -40,32 +79,83 @@ var (
 	notificationRing = newRingBuffer[StateNotification](1000)
 )
 
-// RegisterWant registers a want for notification lookup
+// finalResultExposeSubscriberName returns the subscriber name for the auto-generated
+// final_result → parent propagation handler (registered when FinalResultField is set).
+func finalResultExposeSubscriberName(wantName string) string {
+	return fmt.Sprintf("%s:state-expose:final_result→.final_result", wantName)
+}
+
+// getControllerParentName returns the parent want's name from OwnerReferences
+// without calling GetParentWant (which takes reconcileMutex and can deadlock
+// when called from within the reconcile loop).
+func getControllerParentName(want *Want) string {
+	for _, ref := range want.Metadata.OwnerReferences {
+		if ref.Controller && ref.Kind == "Want" {
+			return ref.Name
+		}
+	}
+	return ""
+}
+
+// RegisterWant registers a want for notification lookup and sets up expose subscriptions.
+// NOTE: This is called from addWant inside the reconcile loop while reconcileMutex
+// is held. Must NOT call GetParentWant/FindWantByID (they take reconcileMutex → deadlock).
+// Use getControllerParentName instead.
 func RegisterWant(want *Want) {
 	wantRegistryMutex.Lock()
 	wantRegistry[want.Metadata.Name] = want
 	wantRegistryMutex.Unlock()
 
-	// Subscribe for exposeAs param propagation
-	for localKey, exposeAs := range want.Spec.ParamExposes {
-		parent := want.GetParentWant()
-		var sourceFilter string
-		if parent == nil {
-			sourceFilter = "__global__"
-		} else {
-			sourceFilter = parent.Metadata.Name
+	parentName := getControllerParentName(want)
+
+	// Auto-register handler for FinalResultField shorthand:
+	// When final_result state changes, propagate to parent/global via MergeParentState.
+	// (EndProgressCycle handles the source→final_result copy with dot-notation and zero-value skipping.)
+	if want.Spec.FinalResultField != "" {
+		handler := &currentStateExposeHandler{
+			want:       want,
+			localKey:   "final_result",
+			parentName: parentName,
+			parentKey:  "final_result",
 		}
-		handler := &exposeAsHandler{
-			want:         want,
-			sourceFilter: sourceFilter,
-			exposeAs:     exposeAs,
-			localKey:     localKey,
+		want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+	}
+
+	// Subscribe handlers for each expose entry
+	for _, entry := range want.Spec.Exposes {
+		if entry.Param != "" {
+			// Top-down: receive param from upper scope (global or parent)
+			var sourceFilter string
+			if parentName == "" {
+				sourceFilter = "__global__"
+			} else {
+				sourceFilter = parentName
+			}
+			handler := &paramExposeHandler{
+				want:         want,
+				sourceFilter: sourceFilter,
+				upperKey:     entry.As,
+				localKey:     entry.Param,
+			}
+			want.GetSubscriptionSystem().Subscribe(EventTypeParameterChange, handler)
+		} else if entry.CurrentState != "" {
+			// Bottom-up: push state to parent when local state changes.
+			// "final_result" is handled specially via MergeParentState, so it works for top-level wants too.
+			if parentName == "" && entry.As != "final_result" {
+				continue // no parent to push to (non-final_result entries require a parent)
+			}
+			handler := &currentStateExposeHandler{
+				want:       want,
+				localKey:   entry.CurrentState,
+				parentName: parentName,
+				parentKey:  entry.As,
+			}
+			want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 		}
-		want.GetSubscriptionSystem().Subscribe(EventTypeParameterChange, handler)
 	}
 }
 
-// UnregisterWant removes a want from the registry
+// UnregisterWant removes a want from the registry and cleans up expose subscriptions.
 func UnregisterWant(wantName string) {
 	wantRegistryMutex.Lock()
 	want := wantRegistry[wantName]
@@ -75,10 +165,23 @@ func UnregisterWant(wantName string) {
 	if want == nil {
 		return
 	}
-	// Unsubscribe exposeAs handlers
-	for localKey, exposeAs := range want.Spec.ParamExposes {
-		subscriberName := fmt.Sprintf("%s:expose:%s→%s", wantName, exposeAs, localKey)
-		want.GetSubscriptionSystem().Unsubscribe(EventTypeParameterChange, subscriberName)
+	// Unsubscribe auto-generated FinalResultField handler
+	if want.Spec.FinalResultField != "" {
+		want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, finalResultExposeSubscriberName(wantName))
+	}
+	// Unsubscribe all expose handlers
+	parentName := getControllerParentName(want)
+	for _, entry := range want.Spec.Exposes {
+		if entry.Param != "" {
+			subscriberName := fmt.Sprintf("%s:param-expose:%s→%s", wantName, entry.As, entry.Param)
+			want.GetSubscriptionSystem().Unsubscribe(EventTypeParameterChange, subscriberName)
+		} else if entry.CurrentState != "" {
+			if parentName == "" && entry.As != "final_result" {
+				continue
+			}
+			subscriberName := fmt.Sprintf("%s:state-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.As)
+			want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
+		}
 	}
 }
 func findWantByName(wantName string) *Want {

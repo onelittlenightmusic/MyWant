@@ -113,6 +113,7 @@ export const WantCard: React.FC<WantCardProps> = ({
   const [isDragOverWant, setIsDragOverWant] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const pointerDownOnSlider = useRef(false);
 
   useEffect(() => {
     const wId = want.metadata?.id || want.id;
@@ -160,6 +161,11 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const handleDragStart = (e: React.DragEvent) => {
     if (isSelectMode || isBeingProcessed) return;
+    // Suppress card drag when pointer originated on slider or interactive controls
+    if (pointerDownOnSlider.current) {
+      e.preventDefault();
+      return;
+    }
     suppressDragImage(e);
     const id = want.metadata?.id || want.id;
     if (!id) return;
@@ -282,12 +288,16 @@ export const WantCard: React.FC<WantCardProps> = ({
         ref={cardRef}
         draggable={!isSelectMode && !isBeingProcessed}
         onDragStart={handleDragStart}
-        onDragEnd={() => setDraggingWant(null)}
+        onDragEnd={() => { setDraggingWant(null); pointerDownOnSlider.current = false; }}
         onClick={handleCardClick}
         onContextMenu={handleContextMenu}
-        onMouseDown={longPress.onMouseDown}
+        onMouseDown={(e) => {
+          const t = e.target as HTMLElement;
+          pointerDownOnSlider.current = !!(t.closest('input[type="range"]') || t.closest('[data-no-card-drag]'));
+          if (!pointerDownOnSlider.current) longPress.onMouseDown(e);
+        }}
         onMouseMove={longPress.onMouseMove}
-        onMouseUp={longPress.onMouseUp}
+        onMouseUp={() => { pointerDownOnSlider.current = false; longPress.onMouseUp(); }}
         onMouseLeave={() => {
           longPress.cancel();
           if (overlay.showQuickActions) overlay.closeQuickActions();

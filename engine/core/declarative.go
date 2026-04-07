@@ -59,11 +59,19 @@ type StateSubscription struct {
 	BufferSize int      `json:"bufferSize,omitempty" yaml:"bufferSize,omitempty"` // For rate limiting
 }
 
-// ParamEntry represents a single parameter with optional upward exposure
+// ParamEntry represents a single parameter entry in array format
 type ParamEntry struct {
-	Key      string `json:"key" yaml:"key"`
-	Value    any    `json:"value" yaml:"value"`
-	ExposeAs string `json:"exposeAs,omitempty" yaml:"exposeAs,omitempty"`
+	Key   string `json:"key" yaml:"key"`
+	Value any    `json:"value" yaml:"value"`
+}
+
+// ExposeEntry declares a parameter or state exposure between scope levels.
+// For top-down (param propagation): set Param to the local param key and As to the upper-scope name.
+// For bottom-up (state propagation): set CurrentState to the local state key and As to the upper-scope name.
+type ExposeEntry struct {
+	Param        string `json:"param,omitempty" yaml:"param,omitempty"`               // local param key to receive from upper scope
+	CurrentState string `json:"currentState,omitempty" yaml:"currentState,omitempty"` // local state key to expose to parent
+	As           string `json:"as" yaml:"as"`                                          // name in the upper scope
 }
 
 // NotificationFilter allows filtering received notifications

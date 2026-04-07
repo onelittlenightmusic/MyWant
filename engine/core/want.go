@@ -117,7 +117,7 @@ func newSeriesID() string {
 // WantSpec contains the desired state configuration for a want
 type WantSpec struct {
 	Params              map[string]any       `json:"params" yaml:"params"`
-	ParamExposes        map[string]string    `json:"paramExposes,omitempty" yaml:"paramExposes,omitempty"`
+	Exposes             []ExposeEntry        `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 	Using               []map[string]string  `json:"using,omitempty" yaml:"using,omitempty"`
 	Recipe              string               `json:"recipe,omitempty" yaml:"recipe,omitempty"`
 	StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
@@ -158,11 +158,11 @@ func (s *WantSpec) SetParamsFromMap(m map[string]any) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler to support both old map format and new array format.
-// Params can be a JSON object (legacy) or array of {key,value,exposeAs} entries.
+// Params can be a JSON object (legacy) or array of {key,value} entries.
 func (s *WantSpec) UnmarshalJSON(data []byte) error {
 	// Use a struct without Params to avoid duplicate key issue
 	type WantSpecNoParams struct {
-		ParamExposes        map[string]string    `json:"paramExposes,omitempty"`
+		Exposes             []ExposeEntry        `json:"exposes,omitempty"`
 		Using               []map[string]string  `json:"using,omitempty"`
 		Recipe              string               `json:"recipe,omitempty"`
 		StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty"`
@@ -178,7 +178,7 @@ func (s *WantSpec) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
-	s.ParamExposes = raw.ParamExposes
+	s.Exposes = raw.Exposes
 	s.Using = raw.Using
 	s.Recipe = raw.Recipe
 	s.StateSubscriptions = raw.StateSubscriptions
@@ -194,7 +194,7 @@ func (s *WantSpec) UnmarshalJSON(data []byte) error {
 	// Detect array vs object
 	trimmed := bytes.TrimSpace(raw.Params)
 	if len(trimmed) > 0 && trimmed[0] == '[' {
-		// Array format
+		// Array format: [{key: k, value: v}]
 		var entries []ParamEntry
 		if err := json.Unmarshal(raw.Params, &entries); err != nil {
 			return err
@@ -202,12 +202,6 @@ func (s *WantSpec) UnmarshalJSON(data []byte) error {
 		s.Params = make(map[string]any, len(entries))
 		for _, e := range entries {
 			s.Params[e.Key] = e.Value
-			if e.ExposeAs != "" {
-				if s.ParamExposes == nil {
-					s.ParamExposes = make(map[string]string)
-				}
-				s.ParamExposes[e.Key] = e.ExposeAs
-			}
 		}
 	} else {
 		// Map format
@@ -223,7 +217,15 @@ func (s *WantSpec) UnmarshalJSON(data []byte) error {
 // UnmarshalYAML implements yaml.Unmarshaler to support both old map format and new array format.
 // Params can be:
 //   - map format (legacy):  params: {key: val}
-//   - array format (new):   params: [{key: k, value: v, exposeAs: z}]
+//   - array format (new):   params: [{key: k, value: v}]
+//
+// Exposes is a separate section:
+//
+//	exposes:
+//	  - param: local_key
+//	    as: upper_scope_name
+//	  - currentState: local_state_key
+//	    as: upper_scope_name
 func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("WantSpec must be a YAML mapping")
@@ -231,7 +233,7 @@ func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
 
 	// Split content into params node vs everything else
 	type restSpec struct {
-		ParamExposes        map[string]string    `yaml:"paramExposes,omitempty"`
+		Exposes             []ExposeEntry        `yaml:"exposes,omitempty"`
 		Using               []map[string]string  `yaml:"using,omitempty"`
 		Recipe              string               `yaml:"recipe,omitempty"`
 		StateSubscriptions  []StateSubscription  `yaml:"stateSubscriptions,omitempty"`
@@ -256,7 +258,7 @@ func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
 	if err := otherNode.Decode(&rest); err != nil {
 		return err
 	}
-	s.ParamExposes = rest.ParamExposes
+	s.Exposes = rest.Exposes
 	s.Using = rest.Using
 	s.Recipe = rest.Recipe
 	s.StateSubscriptions = rest.StateSubscriptions
@@ -269,7 +271,7 @@ func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
 		return nil
 	}
 	if paramsNode.Kind == yaml.SequenceNode {
-		// Array format: [{key: k, value: v, exposeAs: z}]
+		// Array format: [{key: k, value: v}]
 		var entries []ParamEntry
 		if err := paramsNode.Decode(&entries); err != nil {
 			return err
@@ -277,12 +279,6 @@ func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
 		s.Params = make(map[string]any, len(entries))
 		for _, e := range entries {
 			s.Params[e.Key] = e.Value
-			if e.ExposeAs != "" {
-				if s.ParamExposes == nil {
-					s.ParamExposes = make(map[string]string)
-				}
-				s.ParamExposes[e.Key] = e.ExposeAs
-			}
 		}
 	} else {
 		// Map format (legacy): {key: val}
@@ -678,6 +674,25 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 	sendParameterNotifications(notification)
 }
 
+// PropagateParameter updates a parameter on the parent want if one exists,
+// otherwise sets it as a global parameter. Skips the update if the value is unchanged.
+func (n *Want) PropagateParameter(paramName string, paramValue any) {
+	parent := n.GetParentWant()
+	if parent != nil {
+		existing, _ := parent.Spec.GetParam(paramName)
+		if existing != nil && existing == paramValue {
+			return
+		}
+		parent.UpdateParameter(paramName, paramValue)
+		return
+	}
+	existing, found := GetGlobalParameter(paramName)
+	if found && existing == paramValue {
+		return
+	}
+	SetGlobalParameter(paramName, paramValue)
+}
+
 // BeginProgressCycle starts a new execution cycle
 func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
@@ -706,11 +721,11 @@ func (n *Want) EndProgressCycle() {
 		n.storeState("achieving_percentage", 100.0)
 	}
 
-	// Auto-override final_result from FinalResultField if configured.
+	// Auto-override final_result from FinalResultField if configured (handles dot-notation and zero-value skipping).
+	// Propagation to parent is handled via the currentStateExposeHandler subscribed in RegisterWant.
 	if field := n.Spec.FinalResultField; field != "" {
 		val, ok := resolveNestedStateField(n, field)
 		if ok && val != nil {
-			// Skip zero values
 			skip := false
 			switch v := val.(type) {
 			case string:
@@ -721,19 +736,9 @@ func (n *Want) EndProgressCycle() {
 				skip = v == 0
 			}
 			if !skip {
-				n.storeState("final_result", val)
+				n.StoreState("final_result", val) // StoreState emits StateChangeEvent → handler propagates to parent
 			}
 		}
-	}
-
-	// Propagate final_result to parent (or global) state by merging into the
-	// "wants" map under the child's name.  Using MergeParentState preserves
-	// results from sibling wants and follows the same parent/global fallback
-	// pattern used by Thinker agents.
-	if finalResult, ok := n.getState("final_result"); ok && finalResult != nil {
-		n.MergeParentState(map[string]any{
-			"wants": map[string]any{n.Metadata.Name: finalResult},
-		})
 	}
 
 	n.inExecCycle = false
@@ -2594,6 +2599,7 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 			}
 		}
 	}
+
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {
