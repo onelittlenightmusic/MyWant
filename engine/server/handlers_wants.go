@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +15,84 @@ import (
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
 )
+
+// computeCollectionHash computes a stable hash over a sorted slice of want hashes.
+func computeCollectionHash(hashes []string) string {
+	sorted := make([]string, len(hashes))
+	copy(sorted, hashes)
+	sort.Strings(sorted)
+	h := sha256.Sum256([]byte(strings.Join(sorted, ":")))
+	return fmt.Sprintf("%x", h)[:16]
+}
+
+// wantHashEntry is a lightweight representation used by the /wants/hashes endpoint.
+type wantHashEntry struct {
+	ID        string `json:"id"`
+	Hash      string `json:"hash"`
+	UpdatedAt int64  `json:"updated_at"`
+}
+
+// listWantHashes returns only the ID+hash for every visible want.
+// Clients can use If-None-Match against the collection ETag to skip the call entirely.
+func (s *Server) listWantHashes(w http.ResponseWriter, r *http.Request) {
+	includeSystemWants := strings.ToLower(r.URL.Query().Get("includeSystemWants")) == "true"
+	includeCancelled := strings.ToLower(r.URL.Query().Get("includeCancelled")) == "true"
+
+	wantsByID := make(map[string]*mywant.Want)
+
+	s.wantsMu.RLock()
+	executions := make([]*WantExecution, 0, len(s.wants))
+	for _, exec := range s.wants {
+		executions = append(executions, exec)
+	}
+	s.wantsMu.RUnlock()
+
+	for _, execution := range executions {
+		if execution.Builder != nil && execution.Builder != s.globalBuilder {
+			for _, want := range execution.Builder.GetAllWantStates() {
+				wantsByID[want.Metadata.ID] = want
+			}
+		}
+	}
+	if s.globalBuilder != nil {
+		for _, want := range s.globalBuilder.GetAllWantStates() {
+			wantsByID[want.Metadata.ID] = want
+		}
+	}
+
+	entries := make([]wantHashEntry, 0, len(wantsByID))
+	rawHashes := make([]string, 0, len(wantsByID))
+	for _, want := range wantsByID {
+		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
+			continue
+		}
+		h := mywant.CalculateWantHash(want)
+		entries = append(entries, wantHashEntry{
+			ID:        want.Metadata.ID,
+			Hash:      h,
+			UpdatedAt: want.Metadata.UpdatedAt,
+		})
+		rawHashes = append(rawHashes, h)
+	}
+
+	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
+	collectionHash := computeCollectionHash(rawHashes)
+
+	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
+	if ifNoneMatch != "" && ifNoneMatch == collectionHash {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	w.Header().Set("ETag", `"`+collectionHash+`"`)
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"collection_hash": collectionHash,
+		"wants":           entries,
+	})
+}
 
 func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	// Read request body
@@ -172,6 +251,23 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Compute collection ETag before building full responses
+	rawHashes := make([]string, 0, len(wantsByID))
+	for _, want := range wantsByID {
+		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
+		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled { continue }
+		if !want.MatchesFilters(filters) { continue }
+		rawHashes = append(rawHashes, mywant.CalculateWantHash(want))
+	}
+	collectionHash := computeCollectionHash(rawHashes)
+	w.Header().Set("ETag", `"`+collectionHash+`"`)
+
+	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
+	if ifNoneMatch != "" && ifNoneMatch == collectionHash {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	allWants := make([]wantAPIResponse, 0, len(wantsByID))
 	for _, want := range wantsByID {
 		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
@@ -270,10 +366,21 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	for _, exec := range s.wants { executions = append(executions, exec) }
 	s.wantsMu.RUnlock()
 
+	serveWantResponse := func(want *mywant.Want) {
+		resp := buildWantAPIResponse(want, includeConnectivity)
+		w.Header().Set("ETag", `"`+resp.Hash+`"`)
+		ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
+		if ifNoneMatch != "" && ifNoneMatch == resp.Hash {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		s.JSONResponse(w, http.StatusOK, resp)
+	}
+
 	for _, execution := range executions {
 		if execution.Builder != nil {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				s.JSONResponse(w, http.StatusOK, buildWantAPIResponse(want, includeConnectivity))
+				serveWantResponse(want)
 				return
 			}
 		}
@@ -287,7 +394,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-			s.JSONResponse(w, http.StatusOK, buildWantAPIResponse(want, includeConnectivity))
+			serveWantResponse(want)
 			return
 		}
 	}

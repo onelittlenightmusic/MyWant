@@ -6,6 +6,7 @@ import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { useUIStore } from '@/stores/uiStore';
 import { usePolling } from '@/hooks/usePolling';
+import { smartPollWants, seedWantETags } from '@/stores/wantHashCache';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
@@ -160,8 +161,20 @@ export const Dashboard: React.FC = () => {
     } catch (e) { console.error('Error fetching labels:', e); }
   };
 
-  useEffect(() => { fetchWants(); fetchLabels(); }, [fetchWants]);
-  usePolling(() => { if (wants.length > 0) fetchWants(); fetchLabels(); }, { interval: 2000, enabled: headerState?.autoRefresh ?? false, immediate: false });
+  useEffect(() => {
+    fetchWants().then(() => {
+      // Seed the ETag cache from the initial full load so that subsequent
+      // smart-polling calls can skip unchanged wants via If-None-Match.
+      seedWantETags(useWantStore.getState().wants);
+    });
+    fetchLabels();
+  }, [fetchWants]);
+
+  // Smart polling: lightweight hash check → partial fetch of changed wants only
+  usePolling(
+    () => { if (wants.length > 0) smartPollWants(); fetchLabels(); },
+    { interval: 2000, enabled: headerState?.autoRefresh ?? false, immediate: false }
+  );
 
   useEffect(() => {
     if (sidebar.selectedItem) {

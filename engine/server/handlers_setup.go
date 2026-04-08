@@ -23,6 +23,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("", s.listWants).Methods("GET")
 	wants.HandleFunc("", s.deleteWants).Methods("DELETE")
 	wants.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/hashes", s.listWantHashes).Methods("GET")
+	wants.HandleFunc("/hashes", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/validate", s.validateWant).Methods("POST")
 	wants.HandleFunc("/validate", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/export", s.exportWants).Methods("POST", "OPTIONS")

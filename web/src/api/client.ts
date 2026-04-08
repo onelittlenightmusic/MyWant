@@ -51,6 +51,17 @@ import {
   AchievementRule, AchievementRuleListResponse, CreateRuleRequest,
 } from '@/types/achievement';
 
+export interface WantHashEntry {
+  id: string;
+  hash: string;
+  updated_at: number;
+}
+
+export interface WantHashesResponse {
+  collection_hash: string;
+  wants: WantHashEntry[];
+}
+
 class MyWantApiClient {
   private client: AxiosInstance;
   private pendingRequests: Map<string, Promise<any>> = new Map();
@@ -175,6 +186,39 @@ class MyWantApiClient {
     const url = options?.includeCancelled ? '/api/v1/wants?includeCancelled=true' : '/api/v1/wants';
     const data = await this.deduplicatedGet<{wants: Want[], execution_id: string, timestamp: string}>(url);
     return data.wants;
+  }
+
+  /**
+   * Fetch only ID+hash for each want. Returns null when If-None-Match matches (304 Not Modified).
+   */
+  async listWantHashes(ifNoneMatch?: string): Promise<WantHashesResponse | null> {
+    const headers: Record<string, string> = {};
+    if (ifNoneMatch) headers['If-None-Match'] = `"${ifNoneMatch}"`;
+
+    const response = await this.client.get<WantHashesResponse>('/api/v1/wants/hashes', {
+      headers,
+      validateStatus: (s) => s === 200 || s === 304,
+    });
+
+    if (response.status === 304) return null;
+    return response.data;
+  }
+
+  /**
+   * Fetch a single want with ETag-based conditional GET. Returns null data on 304.
+   */
+  async getWantConditional(id: string, ifNoneMatch?: string): Promise<{ data: Want | null; etag: string | undefined }> {
+    const headers: Record<string, string> = {};
+    if (ifNoneMatch) headers['If-None-Match'] = `"${ifNoneMatch}"`;
+
+    const response = await this.client.get<Want>(`/api/v1/wants/${id}`, {
+      headers,
+      validateStatus: (s) => s === 200 || s === 304,
+    });
+
+    const etag = (response.headers['etag'] as string | undefined)?.replace(/^"|"$/g, '');
+    if (response.status === 304) return { data: null, etag };
+    return { data: response.data, etag };
   }
 
   async getWant(id: string): Promise<WantDetails> {

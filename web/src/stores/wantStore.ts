@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { Want, WantDetails, WantResults, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { apiClient } from '@/api/client';
+import { smartPollWants, registerWantCacheActions } from '@/stores/wantHashCache';
 
 interface DraggingTemplate {
   id: string;
@@ -53,6 +54,9 @@ interface WantStore {
   setQuickActionsWantId: (wantId: string | null) => void;
   setDeleteConfirmWantId: (wantId: string | null) => void;
   reorderWant: (id: string, previousWantId?: string, nextWantId?: string) => Promise<void>;
+  // Partial-update helpers used by smart polling
+  patchWant: (updated: Want) => void;
+  removeWantById: (id: string) => void;
 }
 
 export const useWantStore = create<WantStore>()(
@@ -96,6 +100,35 @@ export const useWantStore = create<WantStore>()(
         }, 2000);
       }
     },
+
+    // Replace or insert a single want in the list without touching others
+    patchWant: (updated: Want) => set(state => {
+      const updatedId = updated.metadata?.id || '';
+      const idx = state.wants.findIndex(w => (w.metadata?.id || '') === updatedId);
+      if (idx === -1) {
+        // New want: append then sort by orderKey
+        const newWants = [...state.wants, updated].sort((a, b) => {
+          const keyA = a.metadata?.orderKey || a.metadata?.id || '';
+          const keyB = b.metadata?.orderKey || b.metadata?.id || '';
+          return keyA.localeCompare(keyB);
+        });
+        return { wants: newWants };
+      }
+      const newWants = [...state.wants];
+      newWants[idx] = updated;
+      return {
+        wants: newWants,
+        selectedWant: state.selectedWant?.metadata?.id === updatedId ? updated : state.selectedWant,
+        selectedWantDetails: state.selectedWantDetails?.metadata?.id === updatedId ? updated : state.selectedWantDetails,
+      };
+    }),
+
+    removeWantById: (id: string) => set(state => ({
+      wants: state.wants.filter(w => (w.metadata?.id || '') !== id),
+      selectedWant: state.selectedWant?.metadata?.id === id ? null : state.selectedWant,
+      selectedWantDetails: state.selectedWantDetails?.metadata?.id === id ? null : state.selectedWantDetails,
+      selectedWantResults: state.selectedWantDetails?.metadata?.id === id ? null : state.selectedWantResults,
+    })),
 
     reorderWant: async (id: string, previousWantId?: string, nextWantId?: string) => {
       set({ loading: true, error: null });
@@ -505,21 +538,21 @@ export const useWantStore = create<WantStore>()(
   }))
 );
 
-// Auto-refresh wants every 5 seconds
-const startAutoRefresh = () => {
-  setInterval(() => {
-    const store = useWantStore.getState();
-    if (store.wants.length > 0) {
-      store.fetchWants();
-    }
-  }, 5000);
-};
+// Register store actions in the cache module to avoid circular imports
+registerWantCacheActions(
+  (updated) => useWantStore.getState().patchWant(updated),
+  (id) => useWantStore.getState().removeWantById(id)
+);
 
-// Start auto-refresh when store is first used
+// Auto-refresh via smart polling every 5 seconds (background baseline)
 let autoRefreshStarted = false;
 useWantStore.subscribe((state) => {
   if (!autoRefreshStarted && state.wants.length > 0) {
     autoRefreshStarted = true;
-    startAutoRefresh();
+    setInterval(() => {
+      if (useWantStore.getState().wants.length > 0) {
+        smartPollWants();
+      }
+    }, 5000);
   }
 });
