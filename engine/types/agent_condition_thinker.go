@@ -44,7 +44,7 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 		targetBudgetsRaw := GetParentState(want, "target_budgets", map[string]any{})
 		if len(targetBudgetsRaw) > 0 {
 			if tb, found := extractTargetBudget(targetBudgetsRaw, want.Metadata.Name); found {
-				want.SetCurrent("budget_limit", tb)
+				want.SetGoal("budget_limit", tb)
 				want.SetPlan("execute_booking", true)
 				want.SetCurrent("good_to_reserve", true)
 				want.SetCurrent("thinker.plan_set", true)

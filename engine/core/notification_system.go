@@ -259,9 +259,24 @@ func sendParameterNotifications(notification StateNotification) {
 				childWant.Metadata.Name, notification.StateKey)
 			continue
 		}
+		// Skip wants that don't have the changed key bound in their own Spec.Params.
+		// Only restart wants that actually use this parameter — e.g. if "budget"
+		// changes, only restart wants whose params include "budget", not all children.
+		if _, hasBoundParam := childWant.GetParameter(notification.StateKey); !hasBoundParam {
+			DebugLog("[PARAMETER CHANGE] %s: skipping restart (param %s not bound)\n",
+				childWant.Metadata.Name, notification.StateKey)
+			continue
+		}
 		DebugLog("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
 			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
-		childWant.RestartWant()
+		cb := GetGlobalChainBuilder()
+		if cb != nil {
+			if err := cb.RestartWant(childWant.Metadata.ID); err != nil {
+				childWant.RestartWant() // fallback: set idle without reconcile trigger
+			}
+		} else {
+			childWant.RestartWant()
+		}
 	}
 	storeNotificationHistory(notification)
 }

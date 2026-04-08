@@ -81,6 +81,12 @@ wantType:
     persistent: true
     initialValue: ''
     label: goal
+  - name: budget_limit
+    description: Target budget allocated by parent coordinator
+    type: float64
+    persistent: false
+    initialValue: 0.0
+    label: goal
   - name: res_status
     description: Current status of the reservation (GCP)
     type: string
