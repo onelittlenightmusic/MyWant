@@ -173,7 +173,7 @@ export const Dashboard: React.FC = () => {
   // Smart polling: lightweight hash check → partial fetch of changed wants only
   usePolling(
     () => { if (wants.length > 0) smartPollWants(); fetchLabels(); },
-    { interval: 2000, enabled: headerState?.autoRefresh ?? false, immediate: false }
+    { interval: 250, enabled: headerState?.autoRefresh ?? false, immediate: false }
   );
 
   useEffect(() => {
