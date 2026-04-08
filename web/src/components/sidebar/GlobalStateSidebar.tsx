@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { POLLING_INTERVAL_MS } from '@/constants/polling';
@@ -383,16 +383,24 @@ export const GlobalStateSidebar: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [paramsLoading, setParamsLoading] = useState(true);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const stateETagRef = useRef<string | undefined>(undefined);
+  const paramsETagRef = useRef<string | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     try {
-      const [stateRes, paramsRes] = await Promise.all([
-        apiClient.getGlobalState(),
-        apiClient.getGlobalParameters()
+      const [stateResult, paramsResult] = await Promise.all([
+        apiClient.getGlobalStateConditional(stateETagRef.current),
+        apiClient.getGlobalParametersConditional(paramsETagRef.current),
       ]);
-      setGlobalState(stateRes.state || {});
-      setTimestamp(stateRes.timestamp);
-      setGlobalParams(paramsRes.parameters || {});
+      if (stateResult.data !== null) {
+        setGlobalState(stateResult.data.state || {});
+        setTimestamp(stateResult.data.timestamp);
+        stateETagRef.current = stateResult.etag;
+      }
+      if (paramsResult.data !== null) {
+        setGlobalParams(paramsResult.data.parameters || {});
+        paramsETagRef.current = paramsResult.etag;
+      }
     } catch (e) {
       console.error('Failed to fetch global data:', e);
     } finally {

@@ -509,6 +509,18 @@ class MyWantApiClient {
     return this.deduplicatedGet<{ state: Record<string, unknown>; timestamp: string }>('/api/v1/global-state');
   }
 
+  async getGlobalStateConditional(ifNoneMatch?: string): Promise<{ data: { state: Record<string, unknown>; timestamp: string } | null; etag: string | undefined }> {
+    const headers: Record<string, string> = {};
+    if (ifNoneMatch) headers['If-None-Match'] = `"${ifNoneMatch}"`;
+    const response = await this.client.get<{ state: Record<string, unknown>; timestamp: string }>('/api/v1/global-state', {
+      headers,
+      validateStatus: (s) => s === 200 || s === 304,
+    });
+    const etag = (response.headers['etag'] as string | undefined)?.replace(/^"|"$/g, '');
+    if (response.status === 304) return { data: null, etag };
+    return { data: response.data, etag };
+  }
+
   async deleteGlobalState(): Promise<void> {
     await this.client.delete('/api/v1/global-state');
   }
@@ -530,6 +542,18 @@ class MyWantApiClient {
   // Global Parameters
   async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number }> {
     return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters');
+  }
+
+  async getGlobalParametersConditional(ifNoneMatch?: string): Promise<{ data: { parameters: Record<string, unknown>; count: number } | null; etag: string | undefined }> {
+    const headers: Record<string, string> = {};
+    if (ifNoneMatch) headers['If-None-Match'] = `"${ifNoneMatch}"`;
+    const response = await this.client.get<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', {
+      headers,
+      validateStatus: (s) => s === 200 || s === 304,
+    });
+    const etag = (response.headers['etag'] as string | undefined)?.replace(/^"|"$/g, '');
+    if (response.status === 304) return { data: null, etag };
+    return { data: response.data, etag };
   }
 
   async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number }> {

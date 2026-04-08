@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -1011,6 +1012,15 @@ func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // GlobalState
+func hashJSON(v any) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	h := sha256.Sum256(b)
+	return fmt.Sprintf("%x", h)[:16]
+}
+
 func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	var stateMap map[string]any
 	if s.globalBuilder != nil {
@@ -1019,6 +1029,15 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	if stateMap == nil {
 		stateMap = make(map[string]any)
 	}
+
+	etag := hashJSON(stateMap)
+	w.Header().Set("ETag", `"`+etag+`"`)
+	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
+	if ifNoneMatch != "" && ifNoneMatch == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"state":     stateMap,
 		"timestamp": time.Now().Format(time.RFC3339),
@@ -1027,6 +1046,15 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 	params := mywant.GetAllGlobalParameters()
+
+	etag := hashJSON(params)
+	w.Header().Set("ETag", `"`+etag+`"`)
+	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
+	if ifNoneMatch != "" && ifNoneMatch == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters": params,
 		"count":      len(params),
