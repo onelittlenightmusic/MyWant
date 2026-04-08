@@ -337,10 +337,11 @@ export const useWantStore = create<WantStore>()(
         set({ loading: true, error: null });
       }
       try {
-        const result = await apiClient.getWantConditional(id, getWantETag(id));
+        // Only send ETag on re-fetches (polling). On initial load the detail data
+        // is not in memory yet, so a 304 would leave selectedWantDetails null.
+        const result = await apiClient.getWantConditional(id, isInitialLoad ? undefined : getWantETag(id));
         if (result.data === null) {
           // 304: cached detail is still valid — no state change needed
-          if (isInitialLoad) set({ loading: false });
           return;
         }
         if (result.etag) setWantETag(id, result.etag);
