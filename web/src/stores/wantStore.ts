@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { Want, WantDetails, WantResults, CreateWantRequest, UpdateWantRequest } from '@/types/want';
 import { apiClient } from '@/api/client';
-import { smartPollWants, registerWantCacheActions } from '@/stores/wantHashCache';
+import { smartPollWants, registerWantCacheActions, getWantETag, setWantETag } from '@/stores/wantHashCache';
 
 interface DraggingTemplate {
   id: string;
@@ -330,11 +330,14 @@ export const useWantStore = create<WantStore>()(
     fetchWantDetails: async (id: string) => {
       set({ loading: true, error: null });
       try {
-        const details = await apiClient.getWant(id);
-        set({
-          selectedWantDetails: details,
-          loading: false
-        });
+        const result = await apiClient.getWantConditional(id, getWantETag(id));
+        if (result.data === null) {
+          // 304: cached detail is still valid
+          set({ loading: false });
+          return;
+        }
+        if (result.etag) setWantETag(id, result.etag);
+        set({ selectedWantDetails: result.data, loading: false });
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch want details',
@@ -361,16 +364,25 @@ export const useWantStore = create<WantStore>()(
 
     refreshWant: async (id: string) => {
       try {
-        const [want, status] = await Promise.all([
-          apiClient.getWant(id),
+        const [wantResult, status] = await Promise.all([
+          apiClient.getWantConditional(id, getWantETag(id)),
           apiClient.getWantStatus(id)
         ]);
 
-        set(state => ({
-          wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
-          selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
-          selectedWantDetails: { ...want, suspended: status.suspended }
-        }));
+        if (wantResult.data !== null) {
+          if (wantResult.etag) setWantETag(id, wantResult.etag);
+          set(state => ({
+            wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+            selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+            selectedWantDetails: { ...wantResult.data!, suspended: status.suspended }
+          }));
+        } else {
+          // 304: want detail unchanged, just sync status
+          set(state => ({
+            wants: state.wants.map(w => w.id === id ? { ...w, status: status.status } : w),
+            selectedWant: state.selectedWant?.id === id ? { ...state.selectedWant, status: status.status } : state.selectedWant,
+          }));
+        }
       } catch (error) {
         console.error('Failed to refresh want:', error);
       }

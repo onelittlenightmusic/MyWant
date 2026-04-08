@@ -50,6 +50,16 @@ export function seedWantETags(wants: Array<{ metadata?: { id?: string }; hash?: 
   });
 }
 
+/** Read the cached ETag for a single want (used by fetchWantDetails). */
+export function getWantETag(id: string): string | undefined {
+  return wantETags.get(id);
+}
+
+/** Update the cached ETag for a single want after a successful detail fetch. */
+export function setWantETag(id: string, hash: string) {
+  wantETags.set(id, hash);
+}
+
 /**
  * Invalidate the collection ETag (e.g. after create/delete/update mutation)
  * so the next smartPollWants() forces a full re-check.
