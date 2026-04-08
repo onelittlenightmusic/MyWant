@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save } from 'lucide-react';
 import { apiClient } from '@/api/client';
+import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { DetailsSidebar } from './DetailsSidebar';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 
@@ -402,7 +403,7 @@ export const GlobalStateSidebar: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 3000);
+    const interval = setInterval(fetchData, POLLING_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchData]);
 
