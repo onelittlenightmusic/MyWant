@@ -1057,6 +1057,17 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			if wantConfig.Spec.FinalResultField == "" && typeDef.FinalResultField != "" {
 				wantConfig.Spec.FinalResultField = typeDef.FinalResultField
 			}
+			// Apply Labels from want type definition (instance labels take precedence)
+			if len(typeDef.Metadata.Labels) > 0 {
+				if wantConfig.Metadata.Labels == nil {
+					wantConfig.Metadata.Labels = make(map[string]string)
+				}
+				for k, v := range typeDef.Metadata.Labels {
+					if _, exists := wantConfig.Metadata.Labels[k]; !exists {
+						wantConfig.Metadata.Labels[k] = v
+					}
+				}
+			}
 		}
 	}
 

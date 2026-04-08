@@ -6,6 +6,8 @@ wantType:
     version: '1.0'
     category: system
     pattern: independent
+    labels:
+      user-control: "true"
   parameters:
   - name: target_param
     description: Name of the parent parameter to control
