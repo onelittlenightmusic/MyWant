@@ -8,6 +8,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
+import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { useConfigStore } from '@/stores/configStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
@@ -306,7 +307,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       const interval = setInterval(() => {
         fetchWantDetails(wantId);
         fetchWantResults(wantId);
-      }, 2000);
+      }, POLLING_INTERVAL_MS);
 
       return () => clearInterval(interval);
     }

@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
+import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { formatDate, formatDuration, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml } from '@/utils/yaml';
 import { BaseModal } from './BaseModal';
@@ -74,7 +75,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
           fetchWants();
         }
       }
-    }, 3000);
+    }, POLLING_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [isOpen, want, autoRefresh, selectedWantDetails?.status]);

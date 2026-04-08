@@ -7,6 +7,7 @@ import { useRecipeStore } from '@/stores/recipeStore';
 import { useUIStore } from '@/stores/uiStore';
 import { usePolling } from '@/hooks/usePolling';
 import { smartPollWants, seedWantETags } from '@/stores/wantHashCache';
+import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
@@ -173,7 +174,7 @@ export const Dashboard: React.FC = () => {
   // Smart polling: lightweight hash check → partial fetch of changed wants only
   usePolling(
     () => { if (wants.length > 0) smartPollWants(); fetchLabels(); },
-    { interval: 250, enabled: headerState?.autoRefresh ?? false, immediate: false }
+    { interval: POLLING_INTERVAL_MS, enabled: headerState?.autoRefresh ?? false, immediate: false }
   );
 
   useEffect(() => {
