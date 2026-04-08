@@ -328,15 +328,26 @@ export const useWantStore = create<WantStore>()(
     },
 
     fetchWantDetails: async (id: string) => {
-      set({ loading: true, error: null });
+      // Only show global loading spinner on initial load (no cached data yet for this want).
+      // Re-fetches (polling / ETag refresh) must NOT set loading:true — that causes the
+      // control-button flash visible on slow networks even when 304 is returned.
+      const cachedDetails = useWantStore.getState().selectedWantDetails;
+      const isInitialLoad = !cachedDetails || cachedDetails.metadata?.id !== id;
+      if (isInitialLoad) {
+        set({ loading: true, error: null });
+      }
       try {
         const result = await apiClient.getWantConditional(id, getWantETag(id));
         if (result.data === null) {
-          // 304: cached detail is still valid
-          set({ loading: false });
+          // 304: cached detail is still valid — no state change needed
+          if (isInitialLoad) set({ loading: false });
           return;
         }
         if (result.etag) setWantETag(id, result.etag);
+        // Also patch the wants list so the card status updates immediately.
+        // Without this, smartPollWants may skip the want because fetchWantDetails
+        // already advanced wantETags to the new hash, causing the card to show stale status.
+        useWantStore.getState().patchWant(result.data!);
         set({ selectedWantDetails: result.data, loading: false });
       } catch (error) {
         set({
@@ -347,7 +358,11 @@ export const useWantStore = create<WantStore>()(
     },
 
     fetchWantResults: async (id: string) => {
-      set({ loading: true, error: null });
+      // Don't set loading:true on re-fetches to avoid flashing on slow networks.
+      const hasResults = !!useWantStore.getState().selectedWantResults;
+      if (!hasResults) {
+        set({ loading: true, error: null });
+      }
       try {
         const results = await apiClient.getWantResults(id);
         set({
