@@ -88,7 +88,6 @@ export const Dashboard: React.FC = () => {
   // Minimap state
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
-  const [showGlobalState, setShowGlobalState] = useState(false);
 
   const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
   const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
@@ -181,7 +180,7 @@ export const Dashboard: React.FC = () => {
     if (sidebar.selectedItem) {
       const wantId = sidebar.selectedItem.metadata?.id || sidebar.selectedItem.id;
       if (!wants.some(w => (w.metadata?.id === wantId) || (w.id === wantId))) sidebar.clearSelection();
-      else setShowGlobalState(false); // Close global state panel when a want is selected
+      else sidebar.closeMemo(); // Close global state panel when a want is selected
     }
   }, [wants, sidebar.selectedItem]);
 
@@ -240,12 +239,43 @@ export const Dashboard: React.FC = () => {
   };
   const handleDeleteDraftCancel = () => { setShowDeleteDraftConfirmation(false); setDeleteDraftState(null); };
   const handleReactionCancel = () => { setShowReactionConfirmation(false); setReactionWantState(null); setReactionAction(null); };
+  // Form state
   const [ownerWant, setOwnerWant] = useState<Want | null>(null);
   const [initialFormTypeId, setInitialFormTypeId] = useState<string | undefined>(undefined);
   const [initialFormItemType, setInitialFormItemType] = useState<'want-type' | 'recipe'>('want-type');
-  const handleCreateWant = (parentWant?: Want) => { setInitialFormTypeId(undefined); setInitialFormItemType('want-type'); setOwnerWant(parentWant || null); setEditingWant(null); sidebar.openForm(); };
-  const handleCreateTargetWant = () => { setInitialFormTypeId('whim-target'); setInitialFormItemType('recipe'); setOwnerWant(null); setEditingWant(null); sidebar.openForm(); };
-  const handleEditWant = (w: Want) => { setEditingWant(w); sidebar.openForm(); };
+
+  const handleCreateWant = (parentWant?: Want) => {
+    const isSameType = sidebar.showForm && !initialFormTypeId && initialFormItemType === 'want-type' && ownerWant === (parentWant || null);
+    
+    if (isSameType) {
+      sidebar.closeForm();
+    } else {
+      setInitialFormTypeId(undefined);
+      setInitialFormItemType('want-type');
+      setOwnerWant(parentWant || null);
+      setEditingWant(null);
+      sidebar.openForm();
+    }
+  };
+
+  const handleCreateTargetWant = () => {
+    const isSameType = sidebar.showForm && initialFormTypeId === 'whim-target' && initialFormItemType === 'recipe';
+    
+    if (isSameType) {
+      sidebar.closeForm();
+    } else {
+      setInitialFormTypeId('whim-target');
+      setInitialFormItemType('recipe');
+      setOwnerWant(null);
+      setEditingWant(null);
+      sidebar.openForm();
+    }
+  };
+
+  const handleEditWant = (w: Want) => {
+    setEditingWant(w);
+    sidebar.openForm();
+  };
 
   // Walk up the DOM to find the nearest ancestor that actually scrolls.
   const findScrollableAncestor = (el: Element): Element => {
@@ -311,11 +341,19 @@ export const Dashboard: React.FC = () => {
         setLastSelectedWantId(wantId);
         scrollCardIntoMobileView(wantId);
       }
-      // Set expanded chain: expand bubble if this want has children
+      // Set expanded chain: expand bubble if this want is a Target or has children
+      const wantType = wantToView.metadata?.type?.toLowerCase() || '';
       const hasChildren = wants.some(w =>
         w.metadata?.ownerReferences?.some(ref => ref.id === (wantToView.metadata?.id || wantToView.id))
       );
-      if (hasChildren) {
+      const isTargetWant = wantType.includes('target') ||
+        wantType === 'owner' ||
+        wantType.includes('approval') ||
+        wantType.includes('system') ||
+        wantType.includes('travel') ||
+        hasChildren;
+
+      if (isTargetWant) {
         setExpandedChain([wantToView]);
       } else {
         setExpandedChain([]);
@@ -819,12 +857,7 @@ export const Dashboard: React.FC = () => {
         setRadarMode(prev => !prev);
       } else if (e.key === 'g' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
-        setShowGlobalState(prev => {
-          if (!prev) {
-            sidebar.clearSelection();
-          }
-          return !prev;
-        });
+        sidebar.toggleMemo();
       }
     };
 
@@ -885,6 +918,8 @@ export const Dashboard: React.FC = () => {
       <Header
         onCreateWant={handleCreateWant}
         onCreateTargetWant={handleCreateTargetWant}
+        isAddWantActive={sidebar.showForm && !initialFormTypeId && initialFormItemType === 'want-type' && !editingWant}
+        isWhimActive={sidebar.showForm && initialFormTypeId === 'whim-target' && initialFormItemType === 'recipe' && !editingWant}
         showSummary={sidebar.showSummary}
         onSummaryToggle={sidebar.toggleSummary}
         showSelectMode={isSelectMode}
@@ -897,11 +932,8 @@ export const Dashboard: React.FC = () => {
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
         showRadarMode={radarMode}
         onRadarModeToggle={() => setRadarMode(prev => !prev)}
-        showGlobalState={showGlobalState}
-        onGlobalStateToggle={() => setShowGlobalState(prev => {
-          if (!prev) sidebar.clearSelection();
-          return !prev;
-        })}
+        showGlobalState={sidebar.showMemo}
+        onGlobalStateToggle={sidebar.toggleMemo}
       />
       <HeaderOverlay
         isVisible={isSelectMode || showReactionConfirmation || showDeleteDraftConfirmation}
@@ -951,7 +983,7 @@ export const Dashboard: React.FC = () => {
         )}>
           <div className={classNames(
             "p-3 sm:p-6 flex flex-col h-full min-h-full pb-24",
-            (sidebar.showSummary || !!selectedWant || showGlobalState) ? "lg:pb-24 pb-[50vh]" : "pb-24"
+            (sidebar.showSummary || !!selectedWant || sidebar.showMemo) ? "lg:pb-24 pb-[50vh]" : "pb-24"
           )}>
             <React.Fragment>
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
@@ -969,21 +1001,22 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
       <RightSidebar
-        isOpen={sidebar.showSummary || !!selectedWant || showGlobalState}
+        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showMemo}
         onClose={() => {
-          if (showGlobalState) { setShowGlobalState(false); return; }
-          if (sidebar.showSummary) sidebar.closeSummary();
-          else { sidebar.clearSelection(); setExpandedChain([]); }
+          if (sidebar.showMemo) { sidebar.closeMemo(); return; }
+          if (sidebar.showSummary) { sidebar.closeSummary(); return; }
+          sidebar.clearSelection(); 
+          setExpandedChain([]);
         }}
-        title={showGlobalState ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
-        titleIcon={showGlobalState ? StickyNote : (selectedWant ? Heart : undefined)}
-        titleIconClassName={showGlobalState ? 'text-green-500' : (selectedWant ? 'text-pink-500' : undefined)}
-        backgroundStyle={!showGlobalState && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
-        headerActions={!showGlobalState && selectedWant ? headerActions : undefined}
+        title={sidebar.showMemo ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
+        titleIcon={sidebar.showMemo ? StickyNote : (selectedWant ? Heart : undefined)}
+        titleIconClassName={sidebar.showMemo ? 'text-green-500' : (selectedWant ? 'text-pink-500' : undefined)}
+        backgroundStyle={!sidebar.showMemo && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
+        headerActions={!sidebar.showMemo && selectedWant ? headerActions : undefined}
         disableBackdropClick={expandedChain.length > 0}
         instant
       >
-        {showGlobalState ? (
+        {sidebar.showMemo ? (
           <GlobalStateSidebar />
         ) : (
           <WantDetailsSidebar

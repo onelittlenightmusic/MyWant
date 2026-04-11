@@ -365,6 +365,7 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
               {/* Inline children bubble - inserted after the last card in the parent's row */}
               {index === bubbleRowEndIndex && bubbleParentWant && (
                 <WantChildrenBubble
+                  key={`bubble-${bubbleParentWant.metadata?.id || bubbleParentWant.id}`}
                   parentWant={bubbleParentWant}
                   childWants={bubbleChildWants}
                   allWants={allWants.length > 0 ? allWants : []}
@@ -380,8 +381,10 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   onResumeWant={onResumeWant}
                   onShowReactionConfirmation={onShowReactionConfirmation}
                   onClose={onBubbleClose || (() => {})}
+                  onCreateWant={onCreateWant}
+                  onWantDropped={onWantDropped}
                   parentIndex={bubbleParentIndex}
-                />
+                  />
               )}
             </React.Fragment>
           );

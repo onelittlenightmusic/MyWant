@@ -17,7 +17,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, color
     onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}
     disabled={disabled}
     className={classNames(
-      "flex flex-col items-center justify-center gap-1 w-full h-full transition-all duration-150",
+      "flex flex-col items-center justify-center gap-0.5 w-full h-full transition-all duration-150",
       disabled ? "bg-gray-400/30 cursor-not-allowed grayscale opacity-50" : `hover:brightness-110 active:opacity-80 ${colorClass}`
     )}
     style={{ 
@@ -25,10 +25,10 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon, label, onClick, color
       animationDelay: `${delay}ms` 
     }}
   >
-    <div className="w-5 h-5 flex items-center justify-center">
+    <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
       {icon}
     </div>
-    <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter">{label}</span>
+    <span className="text-white text-[9px] font-bold leading-none uppercase tracking-tighter">{label}</span>
   </button>
 );
 
@@ -166,8 +166,8 @@ export const QuickActionsOverlay: React.FC<QuickActionsOverlayProps> = ({
         </div>
         <div className="pointer-events-auto h-full w-full">
           <ActionButton
-            icon={<X className="w-5 h-5 text-white" />}
-            label="閉じる"
+            icon={<X className="w-4 h-4 sm:w-5 sm:h-5 text-white" />}
+            label="Close"
             onClick={() => onClose()}
             colorClass="bg-gray-600/90"
             delay={90}

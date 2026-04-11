@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export type SidebarType = 'summary' | 'details' | 'form' | 'batch' | null;
+export type SidebarType = 'summary' | 'details' | 'form' | 'batch' | 'memo' | null;
 
 export interface UseRightSidebarExclusivityReturn<T> {
   // State
@@ -8,6 +8,7 @@ export interface UseRightSidebarExclusivityReturn<T> {
   selectedItem: T | null;
   showForm: boolean;
   showBatch: boolean;
+  showMemo: boolean;
   activeSidebar: SidebarType;
 
   // Actions
@@ -18,8 +19,12 @@ export interface UseRightSidebarExclusivityReturn<T> {
   clearSelection: () => void;
   openForm: () => void;
   closeForm: () => void;
+  toggleForm: () => void;
   openBatch: () => void;
   closeBatch: () => void;
+  openMemo: () => void;
+  closeMemo: () => void;
+  toggleMemo: () => void;
   closeAll: () => void;
 
   // Header actions (for Details sidebar)
@@ -29,25 +34,7 @@ export interface UseRightSidebarExclusivityReturn<T> {
 
 /**
  * Hook for managing mutually exclusive RightSidebar instances
- * Ensures only one of Summary, Details, Form, or Batch sidebars is visible at a time
- *
- * @template T - Type of item in Details sidebar
- * @returns {UseRightSidebarExclusivityReturn<T>} Sidebar state and control methods
- *
- * @example
- * const sidebar = useRightSidebarExclusivity<Want>();
- *
- * // Open Summary (auto-closes Details, Form, and Batch)
- * sidebar.openSummary();
- *
- * // Select item for Details (auto-closes Summary, Form, and Batch)
- * sidebar.selectItem(want);
- *
- * // Open Form (auto-closes Summary, Details, and Batch)
- * sidebar.openForm();
- *
- * // Open Batch (auto-closes Summary, Details, and Form)
- * sidebar.openBatch();
+ * Ensures only one of Summary, Details, Form, Batch, or Memo sidebars is visible at a time
  */
 export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivityReturn<T> {
   const [activeSidebar, setActiveSidebar] = useState<SidebarType>(null);
@@ -58,10 +45,10 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   const showSummary = activeSidebar === 'summary';
   const showForm = activeSidebar === 'form';
   const showBatch = activeSidebar === 'batch';
+  const showMemo = activeSidebar === 'memo';
 
   /**
    * Open Summary sidebar
-   * Automatically closes Details and Form sidebars
    */
   const openSummary = useCallback(() => {
     setActiveSidebar('summary');
@@ -70,7 +57,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Close Summary sidebar
-   * Only closes if Summary is currently active
    */
   const closeSummary = useCallback(() => {
     if (activeSidebar === 'summary') {
@@ -80,8 +66,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Toggle Summary sidebar
-   * If Summary is open, closes it
-   * If any other sidebar is open or all are closed, opens Summary
    */
   const toggleSummary = useCallback(() => {
     if (activeSidebar === 'summary') {
@@ -94,8 +78,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Select an item to display in Details sidebar
-   * Automatically closes Summary and Form sidebars
-   * Pass null to deselect and close Details sidebar
    */
   const selectItem = useCallback(
     (item: T | null) => {
@@ -113,7 +95,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Clear selected item and close Details sidebar
-   * Only closes Details if it's currently active
    */
   const clearSelection = useCallback(() => {
     setSelectedItem(null);
@@ -123,8 +104,7 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   }, [activeSidebar]);
 
   /**
-   * Open Form sidebar (for Create/Edit operations)
-   * Automatically closes Summary and Details sidebars
+   * Open Form sidebar
    */
   const openForm = useCallback(() => {
     setActiveSidebar('form');
@@ -133,7 +113,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Close Form sidebar
-   * Only closes if Form is currently active
    */
   const closeForm = useCallback(() => {
     if (activeSidebar === 'form') {
@@ -142,8 +121,19 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   }, [activeSidebar]);
 
   /**
-   * Open Batch sidebar (for batch operations)
-   * Automatically closes Summary, Details, and Form sidebars
+   * Toggle Form sidebar
+   */
+  const toggleForm = useCallback(() => {
+    if (activeSidebar === 'form') {
+      setActiveSidebar(null);
+    } else {
+      setActiveSidebar('form');
+      setSelectedItem(null);
+    }
+  }, [activeSidebar]);
+
+  /**
+   * Open Batch sidebar
    */
   const openBatch = useCallback(() => {
     setActiveSidebar('batch');
@@ -152,7 +142,6 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
 
   /**
    * Close Batch sidebar
-   * Only closes if Batch is currently active
    */
   const closeBatch = useCallback(() => {
     if (activeSidebar === 'batch') {
@@ -161,8 +150,36 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
   }, [activeSidebar]);
 
   /**
+   * Open Memo sidebar
+   */
+  const openMemo = useCallback(() => {
+    setActiveSidebar('memo');
+    setSelectedItem(null);
+  }, []);
+
+  /**
+   * Close Memo sidebar
+   */
+  const closeMemo = useCallback(() => {
+    if (activeSidebar === 'memo') {
+      setActiveSidebar(null);
+    }
+  }, [activeSidebar]);
+
+  /**
+   * Toggle Memo sidebar
+   */
+  const toggleMemo = useCallback(() => {
+    if (activeSidebar === 'memo') {
+      setActiveSidebar(null);
+    } else {
+      setActiveSidebar('memo');
+      setSelectedItem(null);
+    }
+  }, [activeSidebar]);
+
+  /**
    * Close all sidebars
-   * Clears both active sidebar and selected item
    */
   const closeAll = useCallback(() => {
     setActiveSidebar(null);
@@ -195,6 +212,7 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     selectedItem,
     showForm,
     showBatch,
+    showMemo,
     activeSidebar,
 
     // Actions
@@ -205,8 +223,12 @@ export function useRightSidebarExclusivity<T = any>(): UseRightSidebarExclusivit
     clearSelection,
     openForm,
     closeForm,
+    toggleForm,
     openBatch,
     closeBatch,
+    openMemo,
+    closeMemo,
+    toggleMemo,
     closeAll,
 
     // Header actions

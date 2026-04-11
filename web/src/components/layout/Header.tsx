@@ -10,6 +10,8 @@ import { Tooltip } from '@/components/ui/Tooltip';
 interface HeaderProps {
   onCreateWant: () => void;
   onCreateTargetWant?: () => void;
+  isAddWantActive?: boolean;
+  isWhimActive?: boolean;
   title?: string;
   createButtonLabel?: string;
   itemCount?: number;
@@ -47,6 +49,8 @@ const advancedItems = [
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
   onCreateTargetWant,
+  isAddWantActive = false,
+  isWhimActive = false,
   title = 'MyWant',
   createButtonLabel = 'Add Want',
   itemCount,
@@ -413,7 +417,12 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
               <button
                 onClick={onCreateWant}
-                className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-primary-600/90 text-white hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
+                className={classNames(
+                  "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
+                  isAddWantActive
+                    ? "bg-primary-600 text-white hover:brightness-110 active:opacity-80"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                )}
               >
                 <span className="relative inline-flex flex-shrink-0">
                   <Heart className="h-4 w-4" />
@@ -425,7 +434,12 @@ export const Header: React.FC<HeaderProps> = ({
               {onCreateTargetWant && (
                 <button
                   onClick={onCreateTargetWant}
-                  className="flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full bg-indigo-600/90 text-white hover:brightness-110 active:opacity-80 transition-all duration-150 focus:outline-none"
+                  className={classNames(
+                    "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
+                    isWhimActive
+                      ? "bg-indigo-600 text-white hover:brightness-110 active:opacity-80"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
                 >
                   <span className="relative inline-flex flex-shrink-0">
                     <span className="text-sm leading-none">🫙</span>
