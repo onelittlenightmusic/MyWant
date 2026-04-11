@@ -282,7 +282,7 @@ export const WantCard: React.FC<WantCardProps> = ({
       <StackLayers stackCount={stackCount} />
       <div
         ref={cardRef}
-        draggable={!isSelectMode && !isBeingProcessed && !sliderActive && !isControl}
+        draggable={!isSelectMode && !isBeingProcessed && !sliderActive && (!isControl || selected)}
         onDragStart={handleDragStart}
         onDragEnd={() => setDraggingWant(null)}
         onClick={handleCardClick}

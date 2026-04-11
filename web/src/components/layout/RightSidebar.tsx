@@ -160,11 +160,11 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             {headerActions && <div className="flex items-stretch gap-0">{headerActions}</div>}
             <button
               onClick={onClose}
-              className="flex flex-col items-center justify-center gap-1 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 flex-shrink-0 focus:outline-none"
+              className="flex flex-col items-center justify-center gap-0.5 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 flex-shrink-0 focus:outline-none"
               title="Close sidebar"
             >
-              <X className="h-5 w-5" />
-              <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Close</span>
+              <X className="h-4 w-4" />
+              <span className="text-[9px] font-bold uppercase tracking-tighter hidden sm:block">Close</span>
             </button>
           </div>
         </div>

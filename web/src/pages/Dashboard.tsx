@@ -294,6 +294,16 @@ export const Dashboard: React.FC = () => {
   const handleViewWant = (want: Want | { id: string; parentId?: string }) => {
     const wantToView = 'metadata' in want ? want : wants.find(w => (w.metadata?.id === want.id) || (w.id === want.id));
     if (wantToView) {
+      const wantToViewId = wantToView.metadata?.id || wantToView.id;
+      const currentSelectedId = selectedWant?.metadata?.id || selectedWant?.id;
+
+      // Toggle logic: If clicking the already selected want, clear selection (unfocus)
+      if (currentSelectedId === wantToViewId) {
+        sidebar.clearSelection();
+        setExpandedChain([]);
+        return;
+      }
+
       sidebar.selectItem(wantToView);
       setSidebarInitialTab('results');
       const wantId = wantToView.metadata?.id || wantToView.id;
@@ -315,9 +325,18 @@ export const Dashboard: React.FC = () => {
 
   // Called from WantChildrenBubble when a child want is clicked
   const handleBubbleChildClick = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    const currentSelectedId = selectedWant?.metadata?.id || selectedWant?.id;
+
+    // Toggle logic
+    if (currentSelectedId === wantId) {
+      sidebar.clearSelection();
+      setExpandedChain([]);
+      return;
+    }
+
     sidebar.selectItem(want);
     setSidebarInitialTab('results');
-    const wantId = want.metadata?.id || want.id;
     if (wantId) setLastSelectedWantId(wantId);
     // Check if this child has children and extend/trim chain accordingly
     const hasChildren = wants.some(w =>
@@ -337,9 +356,27 @@ export const Dashboard: React.FC = () => {
     // If no children, keep the chain as-is (parent bubble stays open)
   };
 
-  const handleViewAgents = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('agents'); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
-  const handleViewResults = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
-  const handleViewChat = (want: Want) => { sidebar.selectItem(want); setSidebarInitialTab('chat'); const wantId = want.metadata?.id || want.id; if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); } };
+  const handleViewAgents = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
+      sidebar.clearSelection(); setExpandedChain([]); return;
+    }
+    sidebar.selectItem(want); setSidebarInitialTab('agents'); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+  };
+  const handleViewResults = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
+      sidebar.clearSelection(); setExpandedChain([]); return;
+    }
+    sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+  };
+  const handleViewChat = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
+      sidebar.clearSelection(); setExpandedChain([]); return;
+    }
+    sidebar.selectItem(want); setSidebarInitialTab('chat'); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+  };
 
   const handleDraftClick = (draft: DraftWant) => {
     setActiveDraftId(draft.id);
@@ -807,7 +844,7 @@ export const Dashboard: React.FC = () => {
         <button
           onClick={() => sidebar.toggleHeaderAction?.('refresh')}
           className={classNames(
-            "flex flex-col items-center justify-center gap-1 px-5 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
+            "flex flex-col items-center justify-center gap-0.5 px-5 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
             headerState.autoRefresh
               ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20"
               : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800"
@@ -820,7 +857,7 @@ export const Dashboard: React.FC = () => {
               <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
             )}
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">
+          <span className="text-[9px] font-bold uppercase tracking-tighter hidden sm:block">
             {headerState.autoRefresh ? 'Live' : 'Reload'}
           </span>
         </button>

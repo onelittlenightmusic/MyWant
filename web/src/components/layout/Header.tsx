@@ -157,25 +157,27 @@ export const Header: React.FC<HeaderProps> = ({
       style={isBottom ? {} : { top: 'env(safe-area-inset-top, 0px)' }}
     >
       <div className="flex items-center justify-between gap-1 sm:gap-4">
-        <div className="flex items-center space-x-2 min-w-0" ref={menuRef}>
+        <div className="flex items-center space-x-2 min-w-0 self-stretch" ref={menuRef}>
           {/* Hamburger menu button — opens on hover */}
-          <div className="relative" onMouseEnter={handleMenuMouseEnter} onMouseLeave={handleMenuMouseLeave}>
+          <div className="relative self-stretch -my-2 sm:-my-4" onMouseEnter={handleMenuMouseEnter} onMouseLeave={handleMenuMouseLeave}>
             <button
               onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}
-              className={menuOpen
-                ? "flex flex-col items-center justify-center gap-1 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 focus:outline-none"
-                : "p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              }
+              className={classNames(
+                "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none min-w-[56px] sm:min-w-[64px]",
+                menuOpen
+                  ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              )}
               aria-label="Toggle menu"
             >
               {menuOpen ? (
-                <>
-                  <X className="h-5 w-5" />
-                  <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Close</span>
-                </>
+                <X className="h-4 w-4" />
               ) : (
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4" />
               )}
+              <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">
+                {menuOpen ? 'Close' : 'Menu'}
+              </span>
             </button>
 
             {/* Dropdown menu */}

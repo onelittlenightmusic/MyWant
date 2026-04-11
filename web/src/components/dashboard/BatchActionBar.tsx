@@ -16,7 +16,7 @@ const ActionCell: React.FC<ActionCellProps> = ({ icon, label, onClick, colorClas
     onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}
     disabled={disabled}
     className={classNames(
-      'flex flex-col items-center justify-center gap-1 h-full px-4 sm:px-6 transition-all duration-150',
+      'flex flex-col items-center justify-center gap-0.5 h-full px-4 sm:px-6 transition-all duration-150',
       disabled
         ? 'bg-gray-400/30 cursor-not-allowed grayscale opacity-50'
         : `hover:brightness-110 active:opacity-80 ${colorClass}`
@@ -26,8 +26,8 @@ const ActionCell: React.FC<ActionCellProps> = ({ icon, label, onClick, colorClas
       animationDelay: `${delay}ms`,
     }}
   >
-    <div className="w-5 h-5 flex items-center justify-center text-white dark:text-black">{icon}</div>
-    <span className="text-white dark:text-black text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">{label}</span>
+    <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-white dark:text-black">{icon}</div>
+    <span className="text-white dark:text-black text-[9px] sm:text-[10px] font-bold leading-none uppercase tracking-tighter hidden sm:block">{label}</span>
   </button>
 );
 
@@ -112,10 +112,10 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
       <div className="flex items-center px-3 sm:px-6 min-w-[72px] sm:min-w-[96px] justify-end">
         <button
           onClick={onExit}
-          className="flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded text-white/70 hover:text-white hover:bg-white/10 dark:text-black/70 dark:hover:text-black dark:hover:bg-black/10 transition-colors"
+          className="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded text-white/70 hover:text-white hover:bg-white/10 dark:text-black/70 dark:hover:text-black dark:hover:bg-black/10 transition-colors"
         >
-          <X className="w-5 h-5" />
-          <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Exit</span>
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Exit</span>
         </button>
       </div>
     </div>
