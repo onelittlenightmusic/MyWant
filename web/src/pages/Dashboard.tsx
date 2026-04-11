@@ -799,10 +799,47 @@ export const Dashboard: React.FC = () => {
 
   const wantBackgroundImage = getWantBackgroundImage(selectedWant?.metadata?.type);
   const headerActions = headerState ? (
-    <div className="flex items-center gap-2">
-      <StatusBadge status={headerState.status} size="sm" />
-      <button onClick={() => sidebar.toggleHeaderAction?.('autoRefresh')} className={`p-2 rounded-md transition-colors ${headerState.autoRefresh ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800'}`} title={headerState.autoRefresh ? 'Disable auto refresh' : 'Enable auto refresh'}><RefreshCw className="h-4 w-4" /></button>
-      <button onClick={() => sidebar.toggleHeaderAction?.('refresh')} disabled={headerState.loading} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-md transition-colors disabled:opacity-50" title="Refresh"><RefreshCw className={classNames('h-4 w-4', headerState.loading && 'animate-spin')} /></button>
+    <div className="flex items-stretch h-full">
+      <div className="flex items-center px-4 border-r border-gray-100 dark:border-gray-800">
+        <StatusBadge status={headerState.status} size="sm" />
+      </div>
+      <div className="flex items-stretch relative">
+        <button
+          onClick={() => sidebar.toggleHeaderAction?.('refresh')}
+          className={classNames(
+            "flex flex-col items-center justify-center gap-1 px-5 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
+            headerState.autoRefresh
+              ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800"
+          )}
+          title={`Reload now${headerState.autoRefresh ? ' (Auto-refresh is ON)' : ''}`}
+        >
+          <div className="relative">
+            <RefreshCw className={classNames("h-5 w-5", (headerState.loading || headerState.autoRefresh) && "animate-spin")} />
+            {headerState.autoRefresh && (
+              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full border-2 border-white dark:border-gray-900 animate-pulse" />
+            )}
+          </div>
+          <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">
+            {headerState.autoRefresh ? 'Live' : 'Reload'}
+          </span>
+        </button>
+        
+        {/* Subtle toggle area for auto-refresh */}
+        <button
+          onClick={() => sidebar.toggleHeaderAction?.('autoRefresh')}
+          className={classNames(
+            "absolute top-0 right-0 bottom-0 w-4 hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex items-center justify-center group",
+            headerState.autoRefresh ? "text-blue-500" : "text-gray-300"
+          )}
+          title={headerState.autoRefresh ? "Disable auto-refresh" : "Enable auto-refresh"}
+        >
+          <div className={classNames(
+            "w-1 h-4 rounded-full transition-colors",
+            headerState.autoRefresh ? "bg-blue-400/50" : "bg-gray-200 dark:bg-gray-800 group-hover:bg-gray-300"
+          )} />
+        </button>
+      </div>
     </div>
   ) : null;
 
@@ -871,8 +908,14 @@ export const Dashboard: React.FC = () => {
         onDragLeave={handleGlobalDragLeave}
         onDrop={handleGlobalDrop}
       >
-        <div ref={cardListScrollRef} className={classNames("flex-1 overflow-y-auto transition-colors duration-200", isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset")}>
-          <div className="p-3 sm:p-6 flex flex-col h-full min-h-full pb-24">
+        <div ref={cardListScrollRef} className={classNames(
+          "flex-1 overflow-y-auto transition-colors duration-200",
+          isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset"
+        )}>
+          <div className={classNames(
+            "p-3 sm:p-6 flex flex-col h-full min-h-full pb-24",
+            (sidebar.showSummary || !!selectedWant || showGlobalState) ? "lg:pb-24 pb-[50vh]" : "pb-24"
+          )}>
             <React.Fragment>
               {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
               <div className="flex-1 flex flex-col">

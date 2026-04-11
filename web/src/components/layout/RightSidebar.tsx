@@ -68,7 +68,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
         left: 0,
         right: 0,
         ...(isBottom ? { bottom: 0, top: 'auto' } : { top: 0, bottom: 'auto' }),
-        height: '70vh',
+        height: '50vh',
         transform: isOpen ? 'translateY(0)' : (isBottom ? 'translateY(100%)' : 'translateY(-100%)'),
         transition: 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
         borderRadius: isBottom ? '12px 12px 0 0' : '0 0 12px 12px',
@@ -93,16 +93,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - now non-blocking to keep background active */}
       {isOpen && (
         <div
           className={classNames(
-            'fixed z-40 lg:hidden bg-gray-600',
-            isMobileSheet ? 'bg-opacity-40' : 'bg-opacity-50',
-            (isAnyDragging || disableBackdropClick) ? 'pointer-events-none opacity-0' : ''
+            'fixed z-40 lg:hidden pointer-events-none opacity-0',
           )}
           style={backdropStyle}
-          onClick={disableBackdropClick ? undefined : onClose}
         />
       )}
 

@@ -48,62 +48,50 @@ export const DetailsSidebar: React.FC<DetailsSidebarProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
+    <div className="h-full flex flex-col relative overflow-hidden">
+      {/* Header overlay (e.g. ConfirmationBubble) */}
+      {headerOverlay}
+
+      {/* Tab navigation - Unified with WantDetailsSidebar style */}
       <div className={classNames(
-        "px-4 sm:px-6 py-3 sm:py-4 relative overflow-hidden",
-        isBottom ? "order-last border-t border-gray-200" : "border-b border-gray-200"
+        'flex border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50',
+        isBottom ? 'order-last border-t' : 'border-b'
       )}>
-        {/* Badge and Title */}
-        <div className="flex items-center space-x-3 mb-2 sm:mb-4">
-          {badge}
-        </div>
-        <div>
-          <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
-          )}
-        </div>
-
-        {/* Additional header content */}
-        {headerContent && (
-          <div className="mt-2 sm:mt-4">
-            {headerContent}
-          </div>
-        )}
-
-        {/* Header overlay (e.g. ConfirmationBubble with layout="header-overlay") */}
-        {headerOverlay}
-
-        {/* Tab navigation */}
-        <div className="mt-3 sm:mt-4">
-          <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={classNames(
-                    'flex-1 flex items-center justify-center space-x-1 px-1 sm:px-2 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-colors min-w-0',
-                    activeTab === tab.id
-                      ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                  <span className="truncate text-[10px] sm:text-xs">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={classNames(
+                'flex-1 flex flex-col items-center justify-center py-1 sm:py-2.5 px-1 sm:px-2 transition-all relative min-w-0',
+                isActive
+                  ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/30'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mb-0 sm:mb-1 flex-shrink-0" />
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center">
+                {tab.label}
+              </span>
+              {/* Active indicator bar - adjacent to content */}
+              {isActive && (
+                <div className={classNames(
+                  "absolute h-0.5 bg-blue-600 dark:bg-blue-400",
+                  isBottom ? "top-0 left-0 right-0" : "bottom-0 left-0 right-0"
+                )} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={classNames(
+        "flex-1 overflow-y-auto overflow-x-hidden relative",
+        isBottom ? "order-first" : ""
+      )}>
         {children}
       </div>
     </div>

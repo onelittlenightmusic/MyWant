@@ -368,10 +368,10 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ parameters, onUpdate, loading
 
 // --- GlobalStateSidebar component ---
 
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 overflow-hidden p-3 sm:p-4';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden p-2 sm:p-4';
 
 const TABS = [
-  { id: 'results', label: 'Results', icon: StickyNote },
+  { id: 'results', label: 'Memo', icon: StickyNote },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -439,7 +439,6 @@ export const GlobalStateSidebar: React.FC = () => {
   return (
     <DetailsSidebar
         title="Memo"
-        subtitle={subtitleText}
         headerOverlay={
           <ConfirmationBubble
             isVisible={showClearConfirmation}
@@ -450,55 +449,63 @@ export const GlobalStateSidebar: React.FC = () => {
             layout="header-overlay"
           />
         }
-        badge={
-          <div className="flex items-center justify-between w-full">
-            <StickyNote className="h-5 w-5 text-green-500" />
-            {activeTab === 'results' && hasState && (
-              <button
-                onClick={() => setShowClearConfirmation(true)}
-                className="p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                title="Clear all memo data"
-              >
-                <Eraser className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        }
         tabs={TABS}
         defaultTab="results"
         onTabChange={setActiveTab}
       >
-        <div className="px-3 sm:px-4 py-4 sm:py-8 h-full overflow-y-auto">
-          {activeTab === 'results' && (
-            loading ? (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading memo...</div>
-            ) : hasState ? (
-              <div className="space-y-2">
-                <div className={SECTION_CONTAINER_CLASS}>
-                  <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Memo</h4>
-                  <div className="space-y-3 sm:space-y-4">
-                    {renderKeyValuePairs(globalState)}
+        <div className="flex flex-col h-full">
+          {/* Action Bar / Status Info */}
+          <div className="flex-shrink-0 px-3 sm:px-6 py-1.5 sm:py-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
+            <span className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium italic">
+              {subtitleText || 'Loading...'}
+            </span>
+            {activeTab === 'results' && hasState && (
+              <button
+                onClick={() => setShowClearConfirmation(true)}
+                className="p-1 sm:p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex items-center gap-1.5 group"
+                title="Clear all memo data"
+              >
+                <Eraser className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="text-[10px] font-bold uppercase tracking-tighter hidden sm:block">Clear</span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 px-3 sm:px-4 pt-0 pb-3 sm:py-4 h-full overflow-y-auto">
+            {activeTab === 'results' && (
+              loading ? (
+                <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  Loading memo...
+                </div>
+              ) : hasState ? (
+                <div className="space-y-2">
+                  <div className={SECTION_CONTAINER_CLASS}>
+                    <h4 className="text-xs sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Memo</h4>
+                    <div className="space-y-0.5 sm:space-y-2">
+                      {renderKeyValuePairs(globalState)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 dark:text-gray-400">No memo data</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                  Memo will appear here once wants store values via StoreGlobalState
-                </p>
-              </div>
-            )
-          )}
+              ) : (
+                <div className="text-center py-12">
+                  <StickyNote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">No memo data</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 px-6">
+                    Memo will appear here once wants store values via StoreGlobalState
+                  </p>
+                </div>
+              )
+            )}
 
-          {activeTab === 'settings' && (
-            <SettingsTab
-              parameters={globalParams}
-              onUpdate={handleUpdateParameters}
-              loading={paramsLoading}
-            />
-          )}
+            {activeTab === 'settings' && (
+              <SettingsTab
+                parameters={globalParams}
+                onUpdate={handleUpdateParameters}
+                loading={paramsLoading}
+              />
+            )}
+          </div>
         </div>
     </DetailsSidebar>
   );

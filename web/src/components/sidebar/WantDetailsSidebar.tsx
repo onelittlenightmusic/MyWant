@@ -75,7 +75,7 @@ interface WantDetailsSidebarProps {
 type TabType = 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat';
 
 // Unified section container styling for all metadata/state sections
-const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden p-3 sm:p-4';
+const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-100 dark:bg-gray-900 overflow-hidden p-2 sm:p-4';
 
 export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
@@ -474,7 +474,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       {/* Control Panel Buttons */}
       {want && (
         <div className={classNames(
-          'flex-shrink-0 h-14 relative overflow-hidden',
+          'flex-shrink-0 h-9 sm:h-14 relative overflow-hidden',
           isBottom ? 'order-last border-t border-gray-200 dark:border-gray-700' : 'border-b border-gray-200 dark:border-gray-700'
         )}>
           <WantControlButtons
@@ -505,29 +505,37 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
       {/* Tab navigation */}
       <div className={classNames(
-        'px-3 sm:px-8 py-2 sm:py-4',
-        isBottom ? 'order-last border-t border-gray-200 dark:border-gray-700' : 'border-b border-gray-200 dark:border-gray-700'
+        'flex border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50',
+        isBottom ? 'border-t' : 'border-b'
       )}>
-        <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 overflow-hidden">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={classNames(
-                  'flex-1 flex items-center justify-center space-x-1 px-2 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap min-w-0',
-                  activeTab === tab.id
-                    ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-300'
-                )}
-              >
-                <Icon className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={classNames(
+                'flex-1 flex flex-col items-center justify-center py-1 sm:py-2.5 px-1 sm:px-2 transition-all relative min-w-0',
+                isActive
+                  ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-gray-800/30'
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mb-0 sm:mb-1 flex-shrink-0" />
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-tighter truncate w-full text-center">
+                {tab.label}
+              </span>
+              {/* Active indicator bar - adjacent to content */}
+              {isActive && (
+                <div className={classNames(
+                  "absolute h-0.5 bg-blue-600 dark:bg-blue-400",
+                  isBottom ? "top-0 left-0 right-0" : "bottom-0 left-0 right-0"
+                )} />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab content */}

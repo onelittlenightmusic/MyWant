@@ -40,16 +40,16 @@ const GridButton: React.FC<GridButtonProps> = ({ icon, label, onClick, colorClas
     disabled={disabled}
     title={label}
     className={classNames(
-      'flex flex-col items-center justify-center gap-1 w-full h-full transition-all duration-150',
+      'flex flex-col items-center justify-center gap-0.5 sm:gap-1 w-full h-full transition-all duration-150',
       disabled
         ? 'bg-gray-400/20 dark:bg-gray-700/30 cursor-not-allowed grayscale opacity-40'
         : `${colorClass} hover:brightness-110 active:opacity-80`
     )}
   >
-    <div className="w-4 h-4 flex items-center justify-center">
+    <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center">
       {icon}
     </div>
-    <span className="text-[10px] font-bold leading-none uppercase tracking-tighter text-white">{label}</span>
+    <span className="text-[9px] sm:text-[10px] font-bold leading-none uppercase tracking-tighter text-white">{label}</span>
   </button>
 );
 
