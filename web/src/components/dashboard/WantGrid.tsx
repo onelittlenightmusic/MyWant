@@ -387,6 +387,7 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   onCreateWant={onCreateWant}
                   onWantDropped={onWantDropped}
                   parentIndex={bubbleParentIndex}
+                  gridColumns={gridColumns}
                   />
               )}
             </React.Fragment>

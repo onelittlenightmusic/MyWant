@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, ChevronRight, Layers, Heart, Plus } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCard } from './WantCard/WantCard';
@@ -28,6 +28,7 @@ interface WantChildrenBubbleProps {
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
   depth?: number;
   parentIndex?: number;
+  gridColumns?: number;
 }
 
 export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
@@ -50,6 +51,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
   onWantDropped,
   depth = 0,
   parentIndex = 0,
+  gridColumns = 1,
 }) => {
   const parentName = parentWant.metadata?.name || parentWant.metadata?.type || 'Want';
   const parentType = parentWant.metadata?.type || 'unknown';
@@ -69,23 +71,9 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
 
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Detect current grid column count based on breakpoints (1 / 2 / 3)
-  const getColumns = () => {
-    if (typeof window === 'undefined') return 1;
-    if (window.matchMedia('(min-width: 1024px)').matches) return 3;
-    if (window.matchMedia('(min-width: 640px)').matches) return 2;
-    return 1;
-  };
-  const [columns, setColumns] = useState(getColumns);
-  useEffect(() => {
-    const update = () => setColumns(getColumns());
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
   // Caret left = center of parent card's column
-  const col = parentIndex % columns;
-  const caretLeft = `calc(${(col / columns) * 100}% + ${(1 / columns / 2) * 100}% - 10px)`;
+  const col = parentIndex % gridColumns;
+  const caretLeft = `calc(${(col / gridColumns) * 100}% + ${(1 / gridColumns / 2) * 100}% - 10px)`;
 
   const handleDragOver = (e: React.DragEvent) => {
     // Check if what is being dragged is a want card
@@ -226,7 +214,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(480px, 100%), 1fr))' }}>
               {childWants.map((child, index) => {
                 const childId = child.metadata?.id || child.id;
                 const isSelected = selectedWant?.metadata?.id === childId || selectedWant?.id === childId;
