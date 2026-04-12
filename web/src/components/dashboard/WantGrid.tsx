@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
@@ -86,19 +86,20 @@ export const WantGrid: React.FC<WantGridProps> = ({
 }) => {
   const { reorderWant, draggingWant } = useWantStore();
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
-  // Detect responsive column count to place bubble after the correct row
+  // Compute column count from actual container width using sidebar width (480px) as the unit.
   const getColumns = () => {
-    if (typeof window === 'undefined') return 1;
-    if (window.matchMedia('(min-width: 1024px)').matches) return 3;
-    if (window.matchMedia('(min-width: 640px)').matches) return 2;
-    return 1;
+    if (!gridRef.current) return 1;
+    return Math.max(1, Math.floor(gridRef.current.offsetWidth / 480));
   };
-  const [gridColumns, setGridColumns] = useState(getColumns);
+  const [gridColumns, setGridColumns] = useState(1);
   useEffect(() => {
     const update = () => setGridColumns(getColumns());
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    update();
+    const ro = new ResizeObserver(update);
+    if (gridRef.current) ro.observe(gridRef.current);
+    return () => ro.disconnect();
   }, []);
 
   // Clear drag indicator when dragging stops
@@ -296,8 +297,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
   }
 
   return (
-    <div 
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6"
+    <div
+      ref={gridRef}
+      className="grid gap-3 sm:gap-4 lg:gap-6"
+      style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(480px, 100%), 1fr))' }}
       id="want-grid-container"
       onDragOver={handleGridDragOver}
       onDragLeave={handleGridDragLeave}
