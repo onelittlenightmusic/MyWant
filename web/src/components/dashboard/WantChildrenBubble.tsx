@@ -7,6 +7,7 @@ import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { ProgressBars } from './WantCard/parts/ProgressBars';
 import { useWantStore } from '@/stores/wantStore';
+import { GRID_COLUMN_WIDTH } from '@/utils/gridUtils';
 
 interface WantChildrenBubbleProps {
   parentWant: Want;
@@ -214,7 +215,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(480px, 100%), 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_COLUMN_WIDTH}px, 100%), 1fr))` }}>
               {childWants.map((child, index) => {
                 const childId = child.metadata?.id || child.id;
                 const isSelected = selectedWant?.metadata?.id === childId || selectedWant?.id === childId;

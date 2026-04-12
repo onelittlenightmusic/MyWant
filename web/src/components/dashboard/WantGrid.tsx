@@ -7,6 +7,7 @@ import { DraftWantCard } from './DraftWantCard';
 import { WantChildrenBubble } from './WantChildrenBubble';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { classNames } from '@/utils/helpers';
+import { computeGridColumns, GRID_COLUMN_WIDTH } from '@/utils/gridUtils';
 import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
 
@@ -88,10 +89,10 @@ export const WantGrid: React.FC<WantGridProps> = ({
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Compute column count from actual container width using sidebar width (480px) as the unit.
+  // Compute column count from actual container width using sidebar width as the unit.
   const getColumns = () => {
     if (!gridRef.current) return 1;
-    return Math.max(1, Math.floor(gridRef.current.offsetWidth / 480));
+    return computeGridColumns(gridRef.current.offsetWidth);
   };
   const [gridColumns, setGridColumns] = useState(1);
   useEffect(() => {
@@ -300,7 +301,7 @@ export const WantGrid: React.FC<WantGridProps> = ({
     <div
       ref={gridRef}
       className="grid gap-3 sm:gap-4 lg:gap-6"
-      style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(480px, 100%), 1fr))' }}
+      style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_COLUMN_WIDTH}px, 100%), 1fr))` }}
       id="want-grid-container"
       onDragOver={handleGridDragOver}
       onDragLeave={handleGridDragLeave}
