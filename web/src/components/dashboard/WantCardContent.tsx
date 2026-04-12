@@ -155,7 +155,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const replayActive = want.state?.current?.replay_active === true;
   const iframeUrl = want.state?.current?.recording_iframe_url as string | undefined;
   const replayIframeUrl = want.state?.current?.replay_iframe_url as string | undefined;
-  const hasFinalResult = Boolean(want.state?.final_result);
+  const hasFinalResult = want.state?.final_result != null && want.state?.final_result !== '';
   const hasReplayActions = Boolean(want.state?.current?.replay_actions && (want.state?.current?.replay_actions as string) !== '[]');
   const debugRecordingError = want.state?.current?.debug_recording_error as string | undefined;
   const replayError = want.state?.current?.replay_error as string | undefined;
@@ -737,7 +737,9 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
            <option value="" disabled>Select an option...</option>
            {choices.map((choice, idx) => {
              const label = typeof choice === 'object' ? 
-               (choice.label || choice.name || choice.room || JSON.stringify(choice)) : 
+               (choice.room && choice.date && choice.time) ? 
+                 `${choice.room} (${choice.date} ${choice.time})` : 
+                 (choice.label || choice.name || choice.room || JSON.stringify(choice)) : 
                String(choice);
              const value = typeof choice === 'object' ? JSON.stringify(choice) : choice;
              return (
@@ -746,6 +748,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                </option>
              );
            })}
+
          </select>
        </div>
       )}
@@ -886,7 +889,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       )}
 
       {/* Final result display */}
-      {want.state?.final_result && (
+      {want.state?.final_result != null && want.state?.final_result !== '' && (
         <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-start`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}

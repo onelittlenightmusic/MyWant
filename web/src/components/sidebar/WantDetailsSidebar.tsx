@@ -1446,12 +1446,42 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
   const hasAnyState = hasCurrent || hasGoal || hasPlan;
   const hasHiddenState = want.hidden_state && Object.keys(want.hidden_state).length > 0;
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
+  const hasFinalResult = want.state?.final_result != null && want.state?.final_result !== '';
+  const [finalResultCopied, setFinalResultCopied] = useState(false);
+  const handleCopyFinalResult = () => {
+    const value = want.state?.final_result;
+    const text = typeof value === 'string' ? value : JSON.stringify(value);
+    navigator.clipboard.writeText(text).then(() => {
+      setFinalResultCopied(true);
+      setTimeout(() => setFinalResultCopied(false), 1500);
+    });
+  };
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto px-3 sm:px-4 pt-0 pb-3 sm:py-4">
-        {hasAnyState || hasHiddenState ? (
+        {hasAnyState || hasHiddenState || hasFinalResult ? (
           <div className="space-y-2">
+            {hasFinalResult && (
+              <div className={SECTION_CONTAINER_CLASS}>
+                <h4 className="text-sm sm:text-base font-medium text-green-600 dark:text-green-400 mb-1 sm:mb-3">Final Result</h4>
+                <div className="group/finalresult relative">
+                  <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all pr-7">
+                    {typeof want.state!.final_result === 'string'
+                      ? want.state!.final_result as string
+                      : JSON.stringify(want.state!.final_result, null, 2)}
+                  </pre>
+                  <button
+                    onClick={handleCopyFinalResult}
+                    className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    title="Copy to clipboard"
+                  >
+                    {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {hasCurrent && (
               <div className={SECTION_CONTAINER_CLASS}>
                 <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Current</h4>
