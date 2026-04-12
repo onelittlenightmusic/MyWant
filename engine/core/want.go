@@ -743,6 +743,27 @@ func (n *Want) EndProgressCycle() {
 		}
 	}
 
+	// fetchFrom expansion: state fields that declare fetchFrom+onFetchData are auto-populated
+	// from a source state field written by an agent (e.g. MonitorMRSAgent writes mrs_raw_output).
+	if n.WantTypeDefinition != nil {
+		for _, sd := range n.WantTypeDefinition.State {
+			if sd.FetchFrom == "" || sd.OnFetchData == "" {
+				continue
+			}
+			source := GetCurrent[any](n, sd.FetchFrom, nil)
+			if source == nil {
+				continue
+			}
+			sourceMap, ok := source.(map[string]any)
+			if !ok {
+				continue
+			}
+			if val := extractJSONPath(sourceMap, sd.OnFetchData); val != nil {
+				n.storeState(sd.Name, val)
+			}
+		}
+	}
+
 	n.inExecCycle = false
 }
 

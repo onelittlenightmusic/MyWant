@@ -80,6 +80,7 @@ type StateDef struct {
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
 	OnFetchData  string `json:"onFetchData,omitempty" yaml:"onFetchData,omitempty"` // JSON path to extract from json_data (e.g. "routes[0].departure")
+	FetchFrom    string `json:"fetchFrom,omitempty" yaml:"fetchFrom,omitempty"`       // state field name to use as JSON source for onFetchData extraction (processed in EndProgressCycle)
 }
 
 // MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.
