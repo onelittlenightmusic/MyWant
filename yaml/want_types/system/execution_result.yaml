@@ -217,11 +217,6 @@ wantType:
     label: current
     initialValue: 0
 
-  achievedWhen:
-    field: completed
-    operator: "=="
-    value: true
-
   onInitialize:
     params:
       command: command
