@@ -13,6 +13,7 @@ import (
 
 	mywant "mywant/engine/core"
 	types "mywant/engine/types"
+	_ "mywant/engine/types"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"

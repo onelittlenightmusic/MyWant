@@ -79,6 +79,7 @@ type StateDef struct {
 	Persistent   bool   `json:"persistent" yaml:"persistent"`
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
+	OnFetchData  string `json:"onFetchData,omitempty" yaml:"onFetchData,omitempty"` // JSON path to extract from json_data (e.g. "routes[0].departure")
 }
 
 // MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.

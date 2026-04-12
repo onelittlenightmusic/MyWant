@@ -682,14 +682,14 @@ func (n *Want) PropagateParameter(paramName string, paramValue any) {
 	parent := n.GetParentWant()
 	if parent != nil {
 		existing, _ := parent.Spec.GetParam(paramName)
-		if existing != nil && existing == paramValue {
+		if existing != nil && reflect.DeepEqual(existing, paramValue) {
 			return
 		}
 		parent.UpdateParameter(paramName, paramValue)
 		return
 	}
 	existing, found := GetGlobalParameter(paramName)
-	if found && existing == paramValue {
+	if found && reflect.DeepEqual(existing, paramValue) {
 		return
 	}
 	SetGlobalParameter(paramName, paramValue)
@@ -1372,12 +1372,49 @@ func (n *Want) AddChildWant(child *Want) error {
 	return n.getParentWant() != nil
 }
 
-func (n *Want) GetParentState(key string) (any, bool) {
+func (n *Want) GetParentState(path string) (any, bool) {
 	parent := n.getParentWant()
 	if parent == nil {
-		return GetGlobalState(key) // fallback to globalState for top-level wants
+		return resolveGlobalPath(path)
 	}
-	return parent.getState(key)
+	// もし path にドットが含まれていたら階層探索、そうでなければ親のステート取得
+	if strings.Contains(path, ".") {
+		return resolveGlobalPath(path)
+	}
+	return parent.getState(path)
+}
+
+func resolveGlobalPath(path string) (any, bool) {
+	parts := strings.Split(path, ".")
+	if len(parts) == 0 {
+		return nil, false
+	}
+
+	// ルート（wants など）を取得
+	val, ok := GetGlobalState(parts[0])
+	if !ok {
+		return nil, false
+	}
+
+	// 階層を辿る
+	current := val
+	for i := 1; i < len(parts); i++ {
+		if m, ok := current.(map[string]any); ok {
+			current, ok = m[parts[i]]
+			if !ok {
+				return nil, false
+			}
+		} else if m, ok := current.(map[any]any); ok {
+			// YAML unmarshalでmap[any]anyになる場合への対応
+			current, ok = m[parts[i]]
+			if !ok {
+				return nil, false
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return current, true
 }
 
 func (n *Want) StoreParentState(key string, value any) {

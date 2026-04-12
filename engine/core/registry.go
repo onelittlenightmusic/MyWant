@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"context"
+	"log"
 	"reflect"
 )
 
@@ -125,6 +126,7 @@ func RegisterAllKnownAgentImplementations(registry *AgentRegistry) {
 // T should be the struct that embeds Want (e.g., ReminderWant).
 // L should be the locals struct (e.g., ReminderLocals).
 func RegisterWantImplementation[T any, L any](typeName string) {
+	log.Printf("[REGISTRY] Registering Go implementation for want type: %s", typeName)
 	typeImplementationRegistry[typeName] = reflect.TypeOf((*T)(nil)).Elem()
 	localsImplementationRegistry[typeName] = reflect.TypeOf((*L)(nil)).Elem()
 }

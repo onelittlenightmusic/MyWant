@@ -1,0 +1,51 @@
+wantType:
+  metadata:
+    name: choice
+    title: Choice Selector
+    description: Allows selecting a value from a list and propagating it to a target parameter.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+  parameters:
+  - name: target_param
+    description: Name of the parent parameter to control
+    type: string
+    required: true
+    example: selected_slot
+  - name: choice_import_field
+    description: Path to the state field to import choices from (e.g., wants.ID.Key)
+    type: string
+    required: true
+  - name: default
+    description: Initial selected value
+    type: string
+    required: false
+  state:
+  - name: choices
+    description: List of available choices (usually populated via onFetchData or internal logic)
+    type: array
+    label: current
+    persistent: true
+    initialValue: []
+  - name: selected
+    description: Currently selected value
+    type: any
+    label: current
+    persistent: true
+  - name: target_param
+    description: Target parent parameter name
+    type: string
+    label: current
+    persistent: true
+  examples:
+  - title: Slot selection choice
+    description: Selects a slot from available times
+    want:
+      metadata:
+        name: slot-choice
+        type: choice
+      spec:
+        params:
+          target_param: selected_slot

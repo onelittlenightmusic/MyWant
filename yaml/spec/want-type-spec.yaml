@@ -249,6 +249,9 @@ components:
           description: Initial value
         example:
           description: Example value
+        onFetchData:
+          type: string
+          description: JSON path to extract from script json_data output (e.g. "routes[0].departure")
       additionalProperties: false
 
     # Connectivity definition

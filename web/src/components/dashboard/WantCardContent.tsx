@@ -100,6 +100,32 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const [localSliderValue, setLocalSliderValue] = useState(sliderValue);
   const sliderDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Choice-specific state
+  const isChoice = wantType === 'choice';
+  const choiceSelected = want.state?.current?.selected;
+  const choices = Array.isArray(want.state?.current?.choices) ? want.state.current.choices : [];
+  const choiceTargetParam = (want.state?.current?.target_param as string) || '';
+  const [localChoiceValue, setLocalChoiceValue] = useState(choiceSelected);
+
+  useEffect(() => {
+    setLocalChoiceValue(choiceSelected);
+  }, [choiceSelected]);
+
+  const handleChoiceChange = async (newValue: any) => {
+    setLocalChoiceValue(newValue);
+    const id = want.metadata?.id;
+    if (!id) return;
+    try {
+      await fetch(`/api/v1/states/${id}/selected`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newValue),
+      });
+    } catch (err) {
+      console.error('[WantCard] choice state update failed:', err);
+    }
+  };
+
   useEffect(() => {
     setLocalSliderValue(sliderValue);
   }, [sliderValue]);
@@ -654,39 +680,75 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Slider type: range slider to control parent parameter */}
       {isSlider && (
-        <div
-          className={`${(isChild || (isControl && !isFocused)) ? "mt-2" : "mt-4"} space-y-1`}
-          onPointerEnter={() => onSliderActiveChange?.(true)}
-          onPointerLeave={() => onSliderActiveChange?.(false)}
-          onMouseDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onTouchMove={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span className="font-medium truncate mr-2" title={sliderTargetParam}>
-              {sliderTargetParam || 'value'}
-            </span>
-            <span className="font-mono tabular-nums text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {localSliderValue}
-            </span>
-          </div>
-          <input
-            type="range"
-            min={sliderMin}
-            max={sliderMax}
-            step={sliderStep}
-            value={localSliderValue}
-            onChange={(e) => handleSliderChange(Number(e.target.value))}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
-            <span>{sliderMin}</span>
-            <span>{sliderMax}</span>
-          </div>
-        </div>
+       <div
+         className={`${(isChild || (isControl && !isFocused)) ? "mt-2" : "mt-4"} space-y-1`}
+         onPointerEnter={() => onSliderActiveChange?.(true)}
+         onPointerLeave={() => onSliderActiveChange?.(false)}
+         onMouseDown={(e) => e.stopPropagation()}
+         onTouchStart={(e) => e.stopPropagation()}
+         onTouchMove={(e) => e.stopPropagation()}
+       >
+         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+           <span className="font-medium truncate mr-2" title={sliderTargetParam}>
+             {sliderTargetParam || 'value'}
+           </span>
+           <span className="font-mono tabular-nums text-sm font-semibold text-gray-800 dark:text-gray-200">
+             {localSliderValue}
+           </span>
+         </div>
+         <input
+           type="range"
+           min={sliderMin}
+           max={sliderMax}
+           step={sliderStep}
+           value={localSliderValue}
+           onChange={(e) => handleSliderChange(Number(e.target.value))}
+           onClick={(e) => e.stopPropagation()}
+           className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+         />
+         <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
+           <span>{sliderMin}</span>
+           <span>{sliderMax}</span>
+         </div>
+       </div>
       )}
 
+      {isChoice && (
+       <div className={`${(isChild || (isControl && !isFocused)) ? "mt-2" : "mt-4"} space-y-1`}>
+         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+           <span className="font-medium truncate mr-2" title={choiceTargetParam}>
+             {choiceTargetParam || 'Selection'}
+           </span>
+         </div>
+         <select
+           value={localChoiceValue === undefined || localChoiceValue === null ? "" : (typeof localChoiceValue === 'object' ? JSON.stringify(localChoiceValue) : String(localChoiceValue))}
+           onChange={(e) => {
+             const val = e.target.value;
+             try {
+               handleChoiceChange(JSON.parse(val));
+             } catch {
+               handleChoiceChange(val);
+             }
+           }}
+           onClick={(e) => e.stopPropagation()}
+           onMouseDown={(e) => e.stopPropagation()}
+           className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+         >
+           <option value="" disabled>Select an option...</option>
+           {choices.map((choice, idx) => {
+             const label = typeof choice === 'object' ? 
+               (choice.label || choice.name || choice.room || JSON.stringify(choice)) : 
+               String(choice);
+             const value = typeof choice === 'object' ? JSON.stringify(choice) : choice;
+             return (
+               <option key={idx} value={value}>
+                 {label}
+               </option>
+             );
+           })}
+         </select>
+       </div>
+      )}
       {/* Replay type: Record / Record in debug buttons (shown when idle, no final result yet) */}
       {isReplay && !recordingActive && !debugRecordingActive && !hasFinalResult && (
         <div className={`flex items-center gap-2 ${isChild ? "mt-2" : "mt-4"}`}>
