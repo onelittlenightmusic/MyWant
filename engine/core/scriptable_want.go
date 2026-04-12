@@ -115,15 +115,33 @@ func (s *ScriptableWant) interpolate(tmpl string) string {
 	})
 }
 
-// IsAchieved evaluates the declarative AchievedWhen condition if defined,
-// otherwise falls back to checking the predefined `achieved` current state field.
+// IsAchieved evaluates the declarative AchievedWhen condition if defined.
+// If AchievedWhen is absent but the want type declares a "status" state field
+// with initialValue "pending", the implicit rule "status != pending" is applied.
+// Otherwise falls back to checking the predefined `achieved` current state field.
 func (s *ScriptableWant) IsAchieved() bool {
 	if s.WantTypeDefinition != nil && s.WantTypeDefinition.AchievedWhen != nil {
 		aw := s.WantTypeDefinition.AchievedWhen
 		actual := GetCurrent[any](&s.Want, aw.Field, nil)
 		return evaluateAchievedWhen(actual, aw.Operator, aw.Value)
 	}
+	if s.WantTypeDefinition != nil && hasStatusPendingField(s.WantTypeDefinition) {
+		return GetCurrent(&s.Want, "status", "") != "pending"
+	}
 	return GetCurrent(&s.Want, "achieved", false)
+}
+
+// hasStatusPendingField reports whether the want type defines a "status" state field
+// whose initialValue is "pending". This is the convention used by MRS-based want types,
+// allowing them to omit an explicit achievedWhen block.
+func hasStatusPendingField(def *WantTypeDefinition) bool {
+	for _, sd := range def.State {
+		if sd.Name == "status" {
+			v, _ := sd.InitialValue.(string)
+			return v == "pending"
+		}
+	}
+	return false
 }
 
 // Progress calls ExecuteAgents for any do-type inline agents.
