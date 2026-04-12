@@ -60,7 +60,7 @@
 
     - name: Report running
       ansible.builtin.copy:
-        content: '{"current_updates": {"launch_status": "running", "achieving_percentage": 100}}'
+        content: '{"current_updates": {"status": "running", "achieving_percentage": 100}}'
         dest: "{{ output_file }}"
       when: launch_plan == 'start'
 
@@ -75,6 +75,6 @@
 
     - name: Report stopped
       ansible.builtin.copy:
-        content: '{"current_updates": {"launch_status": "stopped", "achieving_percentage": 0}}'
+        content: '{"current_updates": {"status": "stopped", "achieving_percentage": 0}}'
         dest: "{{ output_file }}"
       when: launch_plan == 'stop'

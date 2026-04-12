@@ -23,7 +23,7 @@ func init() {
 func manageLaunch(ctx context.Context, want *mywant.Want) error {
 	if plan := mywant.GetPlan(want, "launch_plan", ""); plan != "" {
 		launchType := mywant.GetCurrent(want, "launch_type", "process")
-		status := mywant.GetCurrent(want, "launch_status", "")
+		status := mywant.GetCurrent(want, "status", "")
 		switch plan {
 		case "start":
 			if status == "running" {
@@ -85,7 +85,7 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 
 	pid, err := startLiveServer(want)
 	if err != nil {
-		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("status", "failed")
 		want.SetCurrent("launch_error", err.Error())
 		return err
 	}
@@ -95,14 +95,14 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
 	if healthURL != "" {
 		if _, err := waitForHealthCheck(ctx, want, healthURL); err != nil {
-			want.SetCurrent("launch_status", "failed")
+			want.SetCurrent("status", "failed")
 			want.SetCurrent("launch_error", fmt.Sprintf("health check failed: %v", err))
 			launchProcessStop(want) //nolint:errcheck
 			return err
 		}
 	}
 
-	want.SetCurrent("launch_status", "running")
+	want.SetCurrent("status", "running")
 
 	// Optional: extract a URL from the log using url_regex → store in result_field
 	urlRegex := mywant.GetCurrent(want, "url_regex", "")
@@ -124,14 +124,14 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 func launchProcessStop(want *mywant.Want) error {
 	pid := mywant.GetCurrent(want, "process_pid", 0)
 	if pid == 0 {
-		want.SetCurrent("launch_status", "stopped")
+		want.SetCurrent("status", "stopped")
 		return nil
 	}
 	if err := stopLiveServer(pid, want); err != nil {
 		want.DirectLog("[LAUNCH] Failed to stop process PID %d: %v", pid, err)
 	}
 	want.SetCurrent("process_pid", 0)
-	want.SetCurrent("launch_status", "stopped")
+	want.SetCurrent("status", "stopped")
 	return nil
 }
 
@@ -141,7 +141,7 @@ func launchProcessPoll(want *mywant.Want) error {
 		return nil
 	}
 	if !isProcessAlive(pid) {
-		want.SetCurrent("launch_status", "exited")
+		want.SetCurrent("status", "exited")
 		want.SetCurrent("launch_error", fmt.Sprintf("process PID %d exited unexpectedly", pid))
 		want.DirectLog("[LAUNCH] Process PID %d exited unexpectedly", pid)
 	}
@@ -154,7 +154,7 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 	composeFile := mywant.GetCurrent(want, "launch_compose_file", "")
 	if composeFile == "" {
 		err := fmt.Errorf("launch_compose_file not set")
-		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("status", "failed")
 		want.SetCurrent("launch_error", err.Error())
 		return err
 	}
@@ -165,7 +165,7 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		msg := fmt.Sprintf("docker compose up failed: %v\n%s", err, string(out))
-		want.SetCurrent("launch_status", "failed")
+		want.SetCurrent("status", "failed")
 		want.SetCurrent("launch_error", msg)
 		return fmt.Errorf("%s", msg)
 	}
@@ -175,21 +175,21 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
 	if healthURL != "" {
 		if _, err := waitForHealthCheck(ctx, want, healthURL); err != nil {
-			want.SetCurrent("launch_status", "failed")
+			want.SetCurrent("status", "failed")
 			want.SetCurrent("launch_error", fmt.Sprintf("health check failed: %v", err))
 			launchDockerComposeStop(ctx, want) //nolint:errcheck
 			return err
 		}
 	}
 
-	want.SetCurrent("launch_status", "running")
+	want.SetCurrent("status", "running")
 	return nil
 }
 
 func launchDockerComposeStop(ctx context.Context, want *mywant.Want) error {
 	composeFile := mywant.GetCurrent(want, "launch_compose_file", "")
 	if composeFile == "" {
-		want.SetCurrent("launch_status", "stopped")
+		want.SetCurrent("status", "stopped")
 		return nil
 	}
 
@@ -202,7 +202,7 @@ func launchDockerComposeStop(ctx context.Context, want *mywant.Want) error {
 	} else {
 		want.DirectLog("[LAUNCH] docker compose down: %s", strings.TrimSpace(string(out)))
 	}
-	want.SetCurrent("launch_status", "stopped")
+	want.SetCurrent("status", "stopped")
 	return nil
 }
 
@@ -222,7 +222,7 @@ func launchDockerComposePoll(want *mywant.Want) error {
 	if running == "" {
 		// All services stopped
 		logs := composeRecentLogs(composeFile, 30)
-		want.SetCurrent("launch_status", "exited")
+		want.SetCurrent("status", "exited")
 		want.SetCurrent("launch_error", "all compose services stopped unexpectedly")
 		want.DirectLog("[LAUNCH] All compose services stopped unexpectedly. Last logs:\n%s", logs)
 	}

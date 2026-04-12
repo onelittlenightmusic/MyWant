@@ -17,7 +17,7 @@ wantType:
     category: system
     pattern: independent
 
-  finalResultField: launch_status
+  finalResultField: status
 
   onInitialize:
     params:
@@ -40,11 +40,6 @@ wantType:
     plan:
       launch_plan: "stop"
     executeAgents: true
-
-  achievedWhen:
-    field: launch_status
-    operator: "=="
-    value: "running"
 
   parameters:
     - name: launcher
@@ -123,12 +118,12 @@ wantType:
       label: plan
       initialValue: ''
 
-    - name: launch_status
-      description: Current lifecycle status (running | stopped | failed | exited)
+    - name: status
+      description: Current lifecycle status (pending | running | stopped | failed | exited)
       type: string
       persistent: true
       label: current
-      initialValue: ''
+      initialValue: 'pending'
 
     - name: launch_error
       description: Error message if launch failed or exited unexpectedly
