@@ -1,8 +1,8 @@
 /**
- * Column width reference: matches the want detail sidebar width (480px).
- * A new column is added whenever the container has room for another 480px column.
+ * Column width reference: 80% of the want detail sidebar width (480px → 384px).
+ * A new column is added whenever the container has room for another 384px column.
  */
-export const GRID_COLUMN_WIDTH = 480;
+export const GRID_COLUMN_WIDTH = 384;
 
 /**
  * Computes the number of grid columns that fit in the given container width.
