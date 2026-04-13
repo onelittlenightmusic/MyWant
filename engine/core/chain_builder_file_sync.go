@@ -74,6 +74,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	if cb.memoryPath == "" {
 		return
 	}
+
 	updatedConfig := Config{
 		Wants: make([]*Want, 0),
 	}

@@ -238,19 +238,9 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	}
 	cb.reconcileMutex.RUnlock()
 
-	// Phase 3: Delete children first (with write lock for each deletion)
+	// Phase 3: Delete children recursively (handles grandchildren and deeper via DeleteWantByID)
 	for _, childID := range childrenIDsToDelete {
-		cb.reconcileMutex.Lock()
-		cb.deleteWantByID(childID)
-
-		// Also remove child from config to keep it in sync with cb.wants
-		for i, cfgWant := range cb.config.Wants {
-			if cfgWant.Metadata.ID == childID {
-				cb.config.Wants = append(cb.config.Wants[:i], cb.config.Wants[i+1:]...)
-				break
-			}
-		}
-		cb.reconcileMutex.Unlock()
+		cb.DeleteWantByID(childID) //nolint:errcheck
 	}
 
 	// Phase 4: Delete the parent want (with write lock)

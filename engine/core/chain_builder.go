@@ -1031,9 +1031,17 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Check for duplicate name using the name→ID index
 	if existingID, nameExists := cb.wantNameToID[wantConfig.Metadata.Name]; nameExists {
 		if existingWant, idExists := cb.wants[existingID]; idExists {
-			// Duplicate name detected - reject the new want to protect existing one
+			// Duplicate name detected - reject the new want to protect existing one.
+			// Also remove from cb.config.Wants to prevent ghost accumulation in state.yaml.
 			InfoLog("[WARN] Rejecting want '%s' (ID: %s): name already exists (existing ID: %s)\n",
 				wantConfig.Metadata.Name, wantConfig.Metadata.ID, existingWant.want.Metadata.ID)
+			newWants := make([]*Want, 0, len(cb.config.Wants))
+			for _, cw := range cb.config.Wants {
+				if cw.Metadata.ID != wantConfig.Metadata.ID {
+					newWants = append(newWants, cw)
+				}
+			}
+			cb.config.Wants = newWants
 			return
 		}
 		// Index is stale (ID was removed but name index wasn't cleaned) - clean it up
@@ -1670,6 +1678,16 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	// Also check cb.config.Wants to prevent duplicates accumulating across restarts
 	for _, cw := range cb.config.Wants {
 		if cw.Metadata.ID == want.Metadata.ID {
+			cb.addWant(want)
+			return nil
+		}
+	}
+	// Reuse the existing ID if a same-name entry already exists in config (e.g. restored from
+	// state.yaml). This prevents duplicate same-name entries accumulating across restarts when
+	// parent wants recreate children with fresh IDs on each startup.
+	for _, cw := range cb.config.Wants {
+		if cw.Metadata.Name == want.Metadata.Name {
+			want.Metadata.ID = cw.Metadata.ID
 			cb.addWant(want)
 			return nil
 		}
