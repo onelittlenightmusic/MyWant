@@ -53,7 +53,6 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] %v", err)
-		mrsSetStatus(want, "failed", err.Error())
 		return false, nil
 	}
 
@@ -65,12 +64,10 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, nil)
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
-		mrsSetStatus(want, "failed", err.Error())
 		return false, nil
 	}
 
 	want.SetCurrent("mrs_raw_output", raw)
-	mrsSetStatus(want, "done", "")
 	// Return true (shouldStop) so the PollingAgent goroutine exits immediately after
 	// a successful execution. This prevents a buffered ticker tick (Go ticker channel
 	// size=1) from starting a spurious second execution while the execution loop is
@@ -92,7 +89,6 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
 		want.DirectLog("[MRS-DO] %v", err)
-		mrsSetStatus(want, "failed", err.Error())
 		return nil
 	}
 
@@ -106,12 +102,10 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args)
 	if err != nil {
 		want.DirectLog("[MRS-DO] skill failed: %v", err)
-		mrsSetStatus(want, "failed", err.Error())
 		return nil
 	}
 
 	want.SetCurrent("mrs_raw_output", raw)
-	mrsSetStatus(want, "done", "")
 	return nil
 }
 
@@ -132,16 +126,6 @@ func mrsBuildArgs(want *Want) []string {
 		}
 	}
 	return args
-}
-
-// mrsSetStatus writes to "status" and "error" current state fields if declared.
-func mrsSetStatus(want *Want, status, errMsg string) {
-	if want.StateLabels["status"] == LabelCurrent {
-		want.SetCurrent("status", status)
-	}
-	if errMsg != "" && want.StateLabels["error"] == LabelCurrent {
-		want.SetCurrent("error", errMsg)
-	}
 }
 
 // mrsSkillPath resolves the skill script path from want state.
