@@ -12,24 +12,27 @@ type PollFunc func(ctx context.Context, want *Want) (shouldStop bool, err error)
 // PollingAgent implements BackgroundAgent and provides common functionality for background polling.
 // It handles lifecycle management, ticker synchronization, and Want cycle wrapping.
 type PollingAgent struct {
-	id       string
-	interval time.Duration
-	poll     PollFunc
-	ticker   *time.Ticker
-	done     chan struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
-	want     *Want
-	name     string // Name used for logging and state dumping
+	id        string
+	interval  time.Duration
+	poll      PollFunc
+	ticker    *time.Ticker
+	done      chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
+	want      *Want
+	name      string // Name used for logging and state dumping
+	agentType string // Agent type string recorded in AgentHistoryRing
+	execID    string // Execution ID of the "running" entry recorded at start
 }
 
 // NewPollingAgent creates a new polling agent.
-func NewPollingAgent(id string, interval time.Duration, name string, poll PollFunc) *PollingAgent {
+func NewPollingAgent(id string, interval time.Duration, name string, agentType string, poll PollFunc) *PollingAgent {
 	return &PollingAgent{
-		id:       id,
-		interval: interval,
-		name:     name,
-		poll:     poll,
+		id:        id,
+		interval:  interval,
+		name:      name,
+		agentType: agentType,
+		poll:      poll,
 	}
 }
 
@@ -65,6 +68,7 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 
 				if err != nil {
 					p.want.StoreLog("[%s] Error during polling for %s: %v\n", p.name, w.Metadata.Name, err)
+					p.want.RecordAgentResult(p.execID, p.name, p.agentType, "error", err.Error())
 				}
 
 				if shouldStop {

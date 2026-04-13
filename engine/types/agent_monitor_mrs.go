@@ -53,6 +53,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] %v", err)
+		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
 		return false, nil
 	}
 
@@ -64,6 +65,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, nil)
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
+		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
 		return false, nil
 	}
 
@@ -89,6 +91,7 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
 		want.DirectLog("[MRS-DO] %v", err)
+		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
 		return nil
 	}
 
@@ -102,6 +105,7 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args)
 	if err != nil {
 		want.DirectLog("[MRS-DO] skill failed: %v", err)
+		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
 		return nil
 	}
 

@@ -2395,7 +2395,7 @@ func (n *Want) BuildHistory() WantHistory {
 // AddMonitoringAgent is a helper to easily create and add a polling-based monitoring agent
 // It creates a PollingAgent with the specified logic and registers it
 func (w *Want) AddMonitoringAgent(name string, interval time.Duration, poll PollFunc) error {
-	agent := NewPollingAgent(name, interval, "MonitorAgent", poll)
+	agent := NewPollingAgent(name, interval, name, string(MonitorAgentType), poll)
 	return w.AddBackgroundAgent(agent)
 }
 

@@ -208,18 +208,6 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 
 	n.StoreLog("[PERSISTENT-AGENT] Starting background %s agent: %s", agentType, agentName)
 
-	var bgAgent BackgroundAgent
-	switch a := agent.(type) {
-	case *ThinkAgent:
-		// ThinkAgents use 2s interval by default
-		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
-	case *MonitorAgent:
-		// MonitorAgents now use PollingAgent to support the (bool, error) signature
-		bgAgent = NewPollingAgent(bgID, 5*time.Second, agentName, a.Monitor)
-	default:
-		return fmt.Errorf("agent %s has persistent type %s but is not a persistent agent implementation", agentName, agentType)
-	}
-
 	// Record start in history
 	execID := GenerateUUID()
 	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
@@ -229,6 +217,20 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 		Timestamp:   time.Now(),
 		Status:      "running",
 	})
+
+	var bgAgent BackgroundAgent
+	switch a := agent.(type) {
+	case *ThinkAgent:
+		// ThinkAgents use 2s interval by default
+		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
+	case *MonitorAgent:
+		// MonitorAgents now use PollingAgent to support the (bool, error) signature
+		pa := NewPollingAgent(bgID, 5*time.Second, agentName, string(agentType), a.Monitor)
+		pa.execID = execID
+		bgAgent = pa
+	default:
+		return fmt.Errorf("agent %s has persistent type %s but is not a persistent agent implementation", agentName, agentType)
+	}
 
 	if err := n.AddBackgroundAgent(bgAgent); err != nil {
 		return fmt.Errorf("failed to start persistent agent %s: %w", agentName, err)
@@ -294,14 +296,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		}
 
 		// Append completion event
-		n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
-			ExecutionID: executionID,
-			AgentName:   agentName,
-			AgentType:   string(agent.GetType()),
-			Timestamp:   time.Now(),
-			Status:      finalStatus,
-			Error:       finalError,
-		})
+		n.RecordAgentResult(executionID, agentName, string(agent.GetType()), finalStatus, finalError)
 
 		for i, runningAgent := range n.RunningAgents {
 			if runningAgent == agentName {
@@ -336,6 +331,19 @@ func (n *Want) runDoAgent(agent Agent) error {
 	}
 
 	return agentErr
+}
+
+// RecordAgentResult appends an agent execution result event to AgentHistoryRing.
+// Used by both DoAgent and MonitorAgent (PollingAgent) to record completion or error.
+func (n *Want) RecordAgentResult(execID, agentName, agentType, status, errMsg string) {
+	n.getHistoryManager().AgentHistoryRing.Append(AgentExecution{
+		ExecutionID: execID,
+		AgentName:   agentName,
+		AgentType:   agentType,
+		Timestamp:   time.Now(),
+		Status:      status,
+		Error:       errMsg,
+	})
 }
 
 // StopAllAgents stops all running (synchronous) agents for this want
