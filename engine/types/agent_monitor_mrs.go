@@ -71,7 +71,11 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 
 	want.SetCurrent("mrs_raw_output", raw)
 	mrsSetStatus(want, "done", "")
-	return want.GetStatus() == WantStatusAchieved, nil
+	// Return true (shouldStop) so the PollingAgent goroutine exits immediately after
+	// a successful execution. This prevents a buffered ticker tick (Go ticker channel
+	// size=1) from starting a spurious second execution while the execution loop is
+	// concurrently calling StopAllBackgroundAgents(), which would SIGKILL the script.
+	return true, nil
 }
 
 // doMRSAgentFn executes a Machine-Readable Skill script with optional CLI arguments
