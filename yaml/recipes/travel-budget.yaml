@@ -64,6 +64,22 @@ recipe:
       description: "Map of child want names to their reported costs"
       type: map
       label: current
+    - name: itinerary
+      description: "Map of child want names to their itinerary entries (written by condition_thinker)"
+      type: map
+      label: current
+    - name: wants
+      description: "Map of child want names to their final_result values (written on achievement)"
+      type: map
+      label: current
+    - name: target_budgets
+      description: "Per-want target budgets computed by budget_thinker"
+      type: map
+      label: plan
+    - name: _child_updated
+      description: "Name of the most recently updated child want"
+      type: string
+      label: current
     - name: total_cost
       description: "Total aggregated cost"
       type: float64

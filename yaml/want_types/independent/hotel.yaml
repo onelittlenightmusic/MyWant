@@ -19,6 +19,8 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+    labels:
+      child-role: doer
   finalResultField: reservation_name
   parameters:
   - name: hotel_type
