@@ -29,7 +29,7 @@ recipe:
     - metadata:
         type: budget
         labels:
-          child-role: monitor
+          child-role: thinker
           category: finance
       spec:
         params:
@@ -63,21 +63,31 @@ recipe:
     - name: costs
       description: "Map of child want names to their reported costs"
       type: map
+      label: current
     - name: total_cost
       description: "Total aggregated cost"
       type: float64
+      label: plan
     - name: remaining_budget
       description: "Budget minus total cost"
       type: float64
+      label: plan
     - name: budget_budget_summary
       description: "Budget tracking summary from budget want"
       type: string
+      label: plan
     - name: restaurant_final_result
       description: "Restaurant reservation result"
       type: string
+      label: current
     - name: hotel_final_result
       description: "Hotel booking result"
       type: string
+      label: current
+    - name: desired_dispatch
+      description: "Queue for dynamic want creation"
+      type: object
+      label: plan
 
   finalResultField: budget_budget_summary
 

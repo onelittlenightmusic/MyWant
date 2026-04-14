@@ -75,7 +75,7 @@ recipe:
       type: object
       persistent: true
       initialValue: []
-      label: current
+      label: plan
     - name: hotel_cost
       description: Last reported hotel cost
       type: float64
@@ -117,7 +117,19 @@ recipe:
       type: bool
       persistent: true
       initialValue: false
-      label: current
+      label: plan
+    - name: target_budgets
+      description: Computed per-want budget targets
+      type: object
+      persistent: true
+      initialValue: {}
+      label: plan
+    - name: desired_dispatch
+      description: List of wants to be dispatched
+      type: object
+      persistent: true
+      initialValue: []
+      label: plan
 
   wants:
     - metadata:
@@ -134,7 +146,7 @@ recipe:
     - metadata:
         type: budget
         labels:
-          child-role: monitor
+          child-role: thinker
       spec:
         params:
           budget: 400
