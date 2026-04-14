@@ -384,6 +384,11 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 	if want.Metadata.Labels != nil {
 		namespacedLabels := make(map[string]string)
 		for key, value := range want.Metadata.Labels {
+			// Skip namespacing for reserved/system labels that should be globally consistent
+			if key == "child-role" || key == "category" {
+				namespacedLabels[key] = value
+				continue
+			}
 			namespacedLabels[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
 		}
 		want.Metadata.Labels = namespacedLabels
@@ -395,6 +400,11 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 		for i := range want.Spec.Using {
 			namespacedSelector := make(map[string]string)
 			for key, value := range want.Spec.Using[i] {
+				// Skip namespacing for reserved/system labels
+				if key == "child-role" || key == "category" {
+					namespacedSelector[key] = value
+					continue
+				}
 				namespacedSelector[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
 			}
 			want.Spec.Using[i] = namespacedSelector
