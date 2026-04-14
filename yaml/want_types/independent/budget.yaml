@@ -6,6 +6,8 @@ wantType:
     version: '1.0'
     category: travel
     pattern: independent
+    labels:
+      child-role: thinker
   finalResultField: budget_summary
   parameters:
   - name: budget

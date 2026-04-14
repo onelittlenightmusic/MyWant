@@ -57,9 +57,6 @@ func TestInterpretDirections(t *testing.T) {
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
 		Spec:     WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"desired_dispatch": LabelPlan,
-		},
 	}
 	child := &Want{
 		Metadata: Metadata{
@@ -91,16 +88,13 @@ func TestInterpretDirections(t *testing.T) {
 	rtChild := getRuntimeWant(t, cb, "child-id")
 	rtParent := getRuntimeWant(t, cb, "parent-id")
 
-	// SetStateLabels is called by ChainBuilder during initialization, potentially overwriting
-	// the labels we set on the original Want. Re-apply them on the runtime pointers.
+	// parent is "noop" type which has no YAML state definition for desired_dispatch,
+	// so we must label it explicitly to allow the governance engine to permit writes.
 	if rtParent.StateLabels == nil {
 		rtParent.StateLabels = make(map[string]StateLabel)
 	}
 	rtParent.StateLabels["desired_dispatch"] = LabelPlan
-	if rtChild.Metadata.Labels == nil {
-		rtChild.Metadata.Labels = make(map[string]string)
-	}
-	rtChild.Metadata.Labels["child-role"] = "thinker"
+	// rtChild is "itinerary" type: child-role:thinker is auto-applied from itinerary.yaml
 
 	// Set directions in runtime child's plan state
 	rtChild.storeState("directions", []string{"reserve_hotel", "reserve_dinner"})
@@ -237,9 +231,6 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id2", Name: "parent2", Type: "noop"},
 		Spec:     WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"desired_dispatch": LabelPlan,
-		},
 	}
 	child := &Want{
 		Metadata: Metadata{
@@ -270,16 +261,12 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 	rtChild := getRuntimeWant(t, cb, "child-id2")
 	rtParent := getRuntimeWant(t, cb, "parent-id2")
 
-	// Re-apply governance labels on runtime pointers (ChainBuilder may overwrite StateLabels
-	// via SetStateLabels during initialization).
+	// parent is "noop" type which has no YAML state definition for desired_dispatch.
 	if rtParent.StateLabels == nil {
 		rtParent.StateLabels = make(map[string]StateLabel)
 	}
 	rtParent.StateLabels["desired_dispatch"] = LabelPlan
-	if rtChild.Metadata.Labels == nil {
-		rtChild.Metadata.Labels = make(map[string]string)
-	}
-	rtChild.Metadata.Labels["child-role"] = "thinker"
+	// rtChild is "itinerary" type: child-role:thinker is auto-applied from itinerary.yaml
 
 	// First call: 2 directions
 	rtChild.storeState("directions", []string{"a", "b"})
