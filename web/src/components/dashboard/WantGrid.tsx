@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
 import { DraftWant } from '@/types/draft';
@@ -89,10 +89,18 @@ export const WantGrid: React.FC<WantGridProps> = ({
   const [dragOverGap, setDragOverGap] = useState<number | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Compute column count from actual container width using sidebar width as the unit.
+  // Compute column count from the actual rendered CSS grid track list.
+  // getComputedStyle expands `repeat(auto-fill, ...)` to the real track sizes,
+  // e.g. "384px 384px 384px" for 3 columns — far more reliable than manual math.
   const getColumns = () => {
     if (!gridRef.current) return 1;
-    return computeGridColumns(gridRef.current.offsetWidth);
+    try {
+      const tracks = window.getComputedStyle(gridRef.current).gridTemplateColumns;
+      const cols = tracks.split(' ').filter(Boolean).length;
+      return Math.max(1, cols);
+    } catch {
+      return computeGridColumns(gridRef.current.clientWidth);
+    }
   };
   const [gridColumns, setGridColumns] = useState(1);
   useEffect(() => {
@@ -102,6 +110,24 @@ export const WantGrid: React.FC<WantGridProps> = ({
     if (gridRef.current) ro.observe(gridRef.current);
     return () => ro.disconnect();
   }, []);
+
+  // Measure the parent card's horizontal center relative to the grid, so the bubble
+  // caret can be positioned precisely without depending on the gridColumns state.
+  const [bubbleCaretCenterX, setBubbleCaretCenterX] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!expandedChain || expandedChain.length === 0) {
+      setBubbleCaretCenterX(null);
+      return;
+    }
+    const parentId = expandedChain[0]?.metadata?.id || expandedChain[0]?.id;
+    if (!parentId || !gridRef.current) return;
+    const parentEl = gridRef.current.querySelector(`[data-want-id="${parentId}"]`) as HTMLElement | null;
+    if (parentEl) {
+      const parentRect = parentEl.getBoundingClientRect();
+      const gridRect = gridRef.current.getBoundingClientRect();
+      setBubbleCaretCenterX(parentRect.left - gridRect.left + parentRect.width / 2);
+    }
+  });
 
   // Clear drag indicator when dragging stops
   React.useEffect(() => {
@@ -253,6 +279,39 @@ export const WantGrid: React.FC<WantGridProps> = ({
     onGetFilteredWants?.(filteredWants);
   }, [filteredWants, onGetFilteredWants]);
 
+  // Bubble-related derived values — computed at component level so hooks can reference them.
+  const bubbleParentIndex = expandedChain.length > 0
+    ? filteredWants.findIndex(w => (w.metadata?.id || w.id) === (expandedChain[0]?.metadata?.id || expandedChain[0]?.id))
+    : -1;
+  const bubbleParentWant = bubbleParentIndex >= 0 ? filteredWants[bubbleParentIndex] : null;
+  const bubbleChildWants = useMemo(() => {
+    if (!bubbleParentWant) return [];
+    const parentId = bubbleParentWant.metadata?.id || bubbleParentWant.id;
+    return (allWants.length > 0 ? allWants : bubbleParentWant.children || []).filter(w =>
+      w.metadata?.ownerReferences?.some(ref => ref.id === parentId)
+    );
+  }, [bubbleParentWant, allWants]);
+
+  // bubbleRowEndIndex: the index of the last grid item in the same row as the parent.
+  // Grid items are ordered: filteredWants (0..N-1), drafts (N..N+D-1), Add Want button (N+D).
+  // Computed after every render via useLayoutEffect so it always reflects the real CSS layout
+  // (no dependency on the gridColumns state, which can lag by one render cycle).
+  const [bubbleRowEndIndex, setBubbleRowEndIndex] = useState(-1);
+  useLayoutEffect(() => {
+    if (bubbleParentIndex < 0 || !gridRef.current) {
+      return;
+    }
+    const tracks = window.getComputedStyle(gridRef.current).gridTemplateColumns;
+    const actualCols = Math.max(1, tracks.split(' ').filter(Boolean).length);
+    // Total grid items = filteredWants + drafts + 1 (Add Want button); max index = total - 1
+    const maxIndex = filteredWants.length + drafts.length;
+    const rowEnd = Math.min(
+      Math.floor(bubbleParentIndex / actualCols) * actualCols + actualCols - 1,
+      maxIndex
+    );
+    if (rowEnd !== bubbleRowEndIndex) setBubbleRowEndIndex(rowEnd);
+  });
+
   const hasUserWants = hierarchicalWants.length > 0 || drafts.length > 0;
 
   if (loading && !hasUserWants) {
@@ -307,20 +366,6 @@ export const WantGrid: React.FC<WantGridProps> = ({
       onDragLeave={handleGridDragLeave}
     >
       {(() => {
-        // Find bubble parent index to determine which row to insert bubble after
-        const bubbleParentIndex = expandedChain.length > 0
-          ? filteredWants.findIndex(w => (w.metadata?.id || w.id) === (expandedChain[0]?.metadata?.id || expandedChain[0]?.id))
-          : -1;
-        const bubbleParentWant = bubbleParentIndex >= 0 ? filteredWants[bubbleParentIndex] : null;
-        const bubbleRowEndIndex = bubbleParentIndex >= 0
-          ? Math.min(Math.floor(bubbleParentIndex / gridColumns) * gridColumns + gridColumns - 1, filteredWants.length - 1)
-          : -1;
-        const bubbleChildWants = bubbleParentWant
-          ? (allWants.length > 0 ? allWants : bubbleParentWant.children || []).filter(w =>
-              w.metadata?.ownerReferences?.some(ref => ref.id === (bubbleParentWant.metadata?.id || bubbleParentWant.id))
-            )
-          : [];
-
         return filteredWants.map((want, index) => {
           const wantId = want.metadata?.id || want.id;
 const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : selectedWant?.metadata?.id === want.metadata?.id;
@@ -389,6 +434,7 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   onWantDropped={onWantDropped}
                   parentIndex={bubbleParentIndex}
                   gridColumns={gridColumns}
+                  caretCenterX={bubbleCaretCenterX ?? undefined}
                   />
               )}
             </React.Fragment>
@@ -396,44 +442,100 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
         });
       })()}
 
-      {drafts.map((draft) => (
-        <div
-          key={draft.id}
-          data-draft-id={draft.id}
-          className="h-full"
-        >
-          <DraftWantCard draft={draft} selected={activeDraftId === draft.id} onClick={() => onDraftClick?.(draft)} onDelete={() => onDraftDelete?.(draft)} />
-        </div>
-      ))}
+      {drafts.map((draft, draftIndex) => {
+        const globalIndex = filteredWants.length + draftIndex;
+        return (
+          <React.Fragment key={draft.id}>
+            <div
+              data-draft-id={draft.id}
+              className="h-full"
+            >
+              <DraftWantCard draft={draft} selected={activeDraftId === draft.id} onClick={() => onDraftClick?.(draft)} onDelete={() => onDraftDelete?.(draft)} />
+            </div>
+            {globalIndex === bubbleRowEndIndex && bubbleParentWant && (
+              <WantChildrenBubble
+                key={`bubble-${bubbleParentWant.metadata?.id || bubbleParentWant.id}`}
+                parentWant={bubbleParentWant}
+                childWants={bubbleChildWants}
+                allWants={allWants.length > 0 ? allWants : []}
+                expandedChain={expandedChain.slice(1)}
+                selectedWant={selectedWant}
+                onChildClick={onBubbleChildClick || onViewWant}
+                onViewAgents={onViewAgentsWant}
+                onViewResults={onViewResultsWant}
+                onViewChat={onViewChatWant}
+                onEditWant={onEditWant}
+                onDeleteWant={onDeleteWant}
+                onSuspendWant={onSuspendWant}
+                onResumeWant={onResumeWant}
+                onShowReactionConfirmation={onShowReactionConfirmation}
+                onClose={onBubbleClose || (() => {})}
+                onCreateWant={onCreateWant}
+                onWantDropped={onWantDropped}
+                parentIndex={bubbleParentIndex}
+                gridColumns={gridColumns}
+                caretCenterX={bubbleCaretCenterX ?? undefined}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
 
-      <button
-        onClick={() => onCreateWant?.()}
-        onDragOver={(e) => {
-          const { draggingWant } = useWantStore.getState();
-          if (draggingWant || e.dataTransfer.types.includes('application/mywant-id')) {
+      <React.Fragment>
+        <button
+          onClick={() => onCreateWant?.()}
+          onDragOver={(e) => {
+            const { draggingWant } = useWantStore.getState();
+            if (draggingWant || e.dataTransfer.types.includes('application/mywant-id')) {
+              e.preventDefault();
+              setDragOverGap(filteredWants.length);
+            }
+          }}
+          onDragLeave={() => setDragOverGap(null)}
+          onDrop={(e) => {
             e.preventDefault();
-            setDragOverGap(filteredWants.length);
-          }
-        }}
-        onDragLeave={() => setDragOverGap(null)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOverGap(null);
-          const draggedId = e.dataTransfer.getData('application/mywant-id');
-          if (draggedId) {
-            handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
-          }
-        }}
-        className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[6rem] sm:min-h-[10rem]"
-      >
-        <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
-          <span className="relative inline-flex flex-shrink-0">
-            <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
-            <Plus className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
-          </span>
-        </div>
-        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
-      </button>
+            setDragOverGap(null);
+            const draggedId = e.dataTransfer.getData('application/mywant-id');
+            if (draggedId) {
+              handleReorderDrop(draggedId, filteredWants.length - 1, 'after');
+            }
+          }}
+          className="flex flex-col items-center justify-center p-3 sm:p-8 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group h-full min-h-[6rem] sm:min-h-[10rem]"
+        >
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 rounded-full flex items-center justify-center transition-colors mb-2 sm:mb-3">
+            <span className="relative inline-flex flex-shrink-0">
+              <Heart className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4 absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 text-gray-400 dark:text-gray-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" style={{ strokeWidth: 3 }} />
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors font-medium">Add Want</p>
+        </button>
+        {filteredWants.length + drafts.length === bubbleRowEndIndex && bubbleParentWant && (
+          <WantChildrenBubble
+            key={`bubble-${bubbleParentWant.metadata?.id || bubbleParentWant.id}`}
+            parentWant={bubbleParentWant}
+            childWants={bubbleChildWants}
+            allWants={allWants.length > 0 ? allWants : []}
+            expandedChain={expandedChain.slice(1)}
+            selectedWant={selectedWant}
+            onChildClick={onBubbleChildClick || onViewWant}
+            onViewAgents={onViewAgentsWant}
+            onViewResults={onViewResultsWant}
+            onViewChat={onViewChatWant}
+            onEditWant={onEditWant}
+            onDeleteWant={onDeleteWant}
+            onSuspendWant={onSuspendWant}
+            onResumeWant={onResumeWant}
+            onShowReactionConfirmation={onShowReactionConfirmation}
+            onClose={onBubbleClose || (() => {})}
+            onCreateWant={onCreateWant}
+            onWantDropped={onWantDropped}
+            parentIndex={bubbleParentIndex}
+            gridColumns={gridColumns}
+            caretCenterX={bubbleCaretCenterX ?? undefined}
+          />
+        )}
+      </React.Fragment>
     </div>
   );
 };

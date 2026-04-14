@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, Layers, Heart, Plus } from 'lucide-react';
 import { Want } from '@/types/want';
 import { WantCard } from './WantCard/WantCard';
@@ -7,7 +7,7 @@ import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { ProgressBars } from './WantCard/parts/ProgressBars';
 import { useWantStore } from '@/stores/wantStore';
-import { GRID_COLUMN_WIDTH } from '@/utils/gridUtils';
+import { GRID_COLUMN_WIDTH, computeGridColumns } from '@/utils/gridUtils';
 
 interface WantChildrenBubbleProps {
   parentWant: Want;
@@ -30,6 +30,7 @@ interface WantChildrenBubbleProps {
   depth?: number;
   parentIndex?: number;
   gridColumns?: number;
+  caretCenterX?: number; // measured pixel center of parent card relative to bubble left edge
 }
 
 export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
@@ -53,7 +54,24 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
   depth = 0,
   parentIndex = 0,
   gridColumns = 1,
+  caretCenterX,
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [innerGridColumns, setInnerGridColumns] = useState(1);
+
+  // Calculate columns for the inner grid of this bubble
+  useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        setInnerGridColumns(computeGridColumns(containerRef.current.offsetWidth));
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   const parentName = parentWant.metadata?.name || parentWant.metadata?.type || 'Want';
   const parentType = parentWant.metadata?.type || 'unknown';
 
@@ -72,9 +90,15 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
 
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Caret left = center of parent card's column
+  // Caret left = center of parent card aligned with the caret (28px wide, so -14px to center it).
+  // Prefer the directly measured pixel value (caretCenterX) from WantGrid's useLayoutEffect,
+  // which is layout-accurate regardless of gridColumns state timing.
+  // Fall back to percentage estimate when caretCenterX is not yet available.
   const col = parentIndex % gridColumns;
-  const caretLeft = `calc(${(col / gridColumns) * 100}% + ${(1 / gridColumns / 2) * 100}% - 10px)`;
+  const caretLeftPct = (col / gridColumns) * 100 + (1 / gridColumns / 2) * 100;
+  const caretLeft = caretCenterX !== undefined
+    ? `${caretCenterX - 14}px`
+    : `calc(${caretLeftPct}% - 14px)`;
 
   const handleDragOver = (e: React.DragEvent) => {
     // Check if what is being dragged is a want card
@@ -107,6 +131,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
 
   return (
     <div
+      ref={containerRef}
       className={classNames(
         'col-span-full',
         'relative mt-1 mb-4',
@@ -118,7 +143,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
       {/* Speech bubble caret pointing up — overflow-hidden clips to top triangle only */}
       <div
         className="absolute overflow-hidden z-10 transition-[left] duration-300"
-        style={{ left: `calc(${caretLeft} - 4px)`, top: '-14px', width: '28px', height: '14px' }}
+        style={{ left: caretLeft, top: '-14px', width: '28px', height: '14px' }}
       >
         <div
           className="absolute w-5 h-5 rotate-45 border-l border-t border-blue-200 dark:border-blue-700 bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm"
@@ -215,7 +240,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
               </button>
             </div>
           ) : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_COLUMN_WIDTH}px, 100%), 1fr))` }}>
+            <div className="grid gap-3 sm:gap-4 lg:gap-6" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(${GRID_COLUMN_WIDTH}px, 100%), 1fr))` }}>
               {childWants.map((child, index) => {
                 const childId = child.metadata?.id || child.id;
                 const isSelected = selectedWant?.metadata?.id === childId || selectedWant?.id === childId;
@@ -266,6 +291,7 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
                         onClose={onClose}
                         depth={depth + 1}
                         parentIndex={index}
+                        gridColumns={innerGridColumns}
                       />
                     )}
                   </React.Fragment>
