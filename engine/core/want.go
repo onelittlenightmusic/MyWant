@@ -1444,6 +1444,17 @@ func (n *Want) StoreParentState(key string, value any) {
 		StoreGlobalState(key, value) // fallback to globalState for top-level wants
 		return
 	}
+
+	role := n.GetRole()
+	label := parent.StateLabels[key]
+	engine := &GovernanceEngine{}
+
+	if !engine.CanWriteParentState(role, label) {
+		n.StoreLog("[GOVERNANCE] Write Denied: child %q (role:%s) cannot write to parent %q's key %q (label:%v)\n",
+			n.Metadata.Name, role, parent.Metadata.Name, key, label)
+		return
+	}
+
 	parent.storeState(key, value)
 }
 
@@ -1453,7 +1464,34 @@ func (n *Want) MergeParentState(updates map[string]any) {
 		MergeGlobalState(updates) // fallback to globalState for top-level wants
 		return
 	}
-	parent.MergeState(updates)
+
+	role := n.GetRole()
+	engine := &GovernanceEngine{}
+	authorizedUpdates := make(map[string]any)
+
+	for k, v := range updates {
+		label := parent.StateLabels[k]
+		if engine.CanWriteParentState(role, label) {
+			authorizedUpdates[k] = v
+		} else {
+			n.StoreLog("[GOVERNANCE] Merge Denied: child %q (role:%s) tried to write %q's key %q (label:%v)\n",
+				n.Metadata.Name, role, parent.Metadata.Name, k, label)
+		}
+	}
+
+	if len(authorizedUpdates) > 0 {
+		parent.MergeState(authorizedUpdates)
+	}
+}
+
+// GetRole returns the ChildRole assigned to this want via its labels.
+func (n *Want) GetRole() ChildRole {
+	if n.Metadata.Labels != nil {
+		if role, ok := n.Metadata.Labels["child-role"]; ok {
+			return ChildRole(role)
+		}
+	}
+	return RoleUnknown
 }
 
 // ProposeDispatch writes a fully-resolved list of DispatchRequests to the parent

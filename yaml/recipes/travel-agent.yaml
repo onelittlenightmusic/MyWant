@@ -32,7 +32,7 @@ recipe:
     - metadata:
         type: restaurant
         labels:
-          role: scheduler
+          child-role: doer
           category: dining
       spec:
         params:
@@ -44,7 +44,7 @@ recipe:
     - metadata:
         type: hotel
         labels:
-          role: scheduler
+          child-role: doer
           category: accommodation
       spec:
         params:
@@ -54,7 +54,7 @@ recipe:
     - metadata:
         type: buffet
         labels:
-          role: scheduler
+          child-role: doer
           category: dining
       spec:
         params:

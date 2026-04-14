@@ -123,7 +123,7 @@ recipe:
     - metadata:
         type: itinerary
         labels:
-          role: planner
+          child-role: thinker
       spec:
         params:
           goal: goal
@@ -134,7 +134,7 @@ recipe:
     - metadata:
         type: budget
         labels:
-          role: tracker
+          child-role: monitor
       spec:
         params:
           budget: 400

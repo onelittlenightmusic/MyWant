@@ -28,6 +28,8 @@ recipe:
     - metadata:
         name: whim-goal
         type: goal
+        labels:
+          child-role: thinker
       spec:
         params:
           goal_text: want

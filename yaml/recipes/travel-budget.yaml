@@ -29,7 +29,7 @@ recipe:
     - metadata:
         type: budget
         labels:
-          role: tracker
+          child-role: monitor
           category: finance
       spec:
         params:
@@ -40,7 +40,7 @@ recipe:
     - metadata:
         type: restaurant
         labels:
-          role: scheduler
+          child-role: doer
           category: dining
       spec:
         params:
@@ -51,7 +51,7 @@ recipe:
     - metadata:
         type: hotel
         labels:
-          role: scheduler
+          child-role: doer
           category: accommodation
       spec:
         params:
