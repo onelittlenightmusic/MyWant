@@ -57,12 +57,16 @@ func TestInterpretDirections(t *testing.T) {
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
 		Spec:     WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"desired_dispatch": LabelPlan,
+		},
 	}
 	child := &Want{
 		Metadata: Metadata{
-			ID:   "child-id",
-			Name: "planner",
-			Type: "itinerary",
+			ID:     "child-id",
+			Name:   "planner",
+			Type:   "itinerary",
+			Labels: map[string]string{"child-role": "thinker"},
 			OwnerReferences: []OwnerReference{{
 				Kind:       "Want",
 				ID:         "parent-id",
@@ -86,6 +90,17 @@ func TestInterpretDirections(t *testing.T) {
 	// Use runtime pointers (ChainBuilder may create new *Want instances)
 	rtChild := getRuntimeWant(t, cb, "child-id")
 	rtParent := getRuntimeWant(t, cb, "parent-id")
+
+	// SetStateLabels is called by ChainBuilder during initialization, potentially overwriting
+	// the labels we set on the original Want. Re-apply them on the runtime pointers.
+	if rtParent.StateLabels == nil {
+		rtParent.StateLabels = make(map[string]StateLabel)
+	}
+	rtParent.StateLabels["desired_dispatch"] = LabelPlan
+	if rtChild.Metadata.Labels == nil {
+		rtChild.Metadata.Labels = make(map[string]string)
+	}
+	rtChild.Metadata.Labels["child-role"] = "thinker"
 
 	// Set directions in runtime child's plan state
 	rtChild.storeState("directions", []string{"reserve_hotel", "reserve_dinner"})
@@ -222,12 +237,16 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 	parent := &Want{
 		Metadata: Metadata{ID: "parent-id2", Name: "parent2", Type: "noop"},
 		Spec:     WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"desired_dispatch": LabelPlan,
+		},
 	}
 	child := &Want{
 		Metadata: Metadata{
-			ID:   "child-id2",
-			Name: "planner2",
-			Type: "itinerary",
+			ID:     "child-id2",
+			Name:   "planner2",
+			Type:   "itinerary",
+			Labels: map[string]string{"child-role": "thinker"},
 			OwnerReferences: []OwnerReference{{
 				Kind:       "Want",
 				ID:         "parent-id2",
@@ -250,6 +269,17 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 
 	rtChild := getRuntimeWant(t, cb, "child-id2")
 	rtParent := getRuntimeWant(t, cb, "parent-id2")
+
+	// Re-apply governance labels on runtime pointers (ChainBuilder may overwrite StateLabels
+	// via SetStateLabels during initialization).
+	if rtParent.StateLabels == nil {
+		rtParent.StateLabels = make(map[string]StateLabel)
+	}
+	rtParent.StateLabels["desired_dispatch"] = LabelPlan
+	if rtChild.Metadata.Labels == nil {
+		rtChild.Metadata.Labels = make(map[string]string)
+	}
+	rtChild.Metadata.Labels["child-role"] = "thinker"
 
 	// First call: 2 directions
 	rtChild.storeState("directions", []string{"a", "b"})

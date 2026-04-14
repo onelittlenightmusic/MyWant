@@ -47,6 +47,10 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"costs":  LabelCurrent,
+			"status": LabelCurrent,
+		},
 	}
 	// Set initial budget on parent
 	parentWant.storeState("budget", 5000.0)
@@ -63,8 +67,9 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 	makeChild := func(name string) *Want {
 		return &Want{
 			Metadata: Metadata{
-				Name: name,
-				Type: "test",
+				Name:   name,
+				Type:   "test",
+				Labels: map[string]string{"child-role": "doer"},
 				OwnerReferences: []OwnerReference{
 					{Kind: "Want", ID: "travel-coord-id", Controller: true},
 				},
@@ -139,6 +144,9 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"costs": LabelCurrent,
+		},
 	}
 	parentWant.storeState("costs", map[string]any{})
 
@@ -158,13 +166,14 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 			defer wg.Done()
 			child := &Want{
 				Metadata: Metadata{
-					Name: fmt.Sprintf("child-%d", idx),
-					Type: "test",
+					Name:   fmt.Sprintf("child-%d", idx),
+					Type:   "test",
+					Labels: map[string]string{"child-role": "doer"},
 					OwnerReferences: []OwnerReference{
 						{Kind: "Want", ID: "parent-id", Controller: true},
 					},
 				},
-				}
+			}
 
 			child.MergeParentState(map[string]any{
 				"costs": map[string]any{
@@ -262,6 +271,9 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"costs": LabelCurrent,
+		},
 	}
 	coordinator.storeState("budget", 5000.0)
 	coordinator.storeState("costs", map[string]any{})
@@ -325,8 +337,9 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 	makeChildWant := func(name string) *Want {
 		return NewWantWithLocals(
 			Metadata{
-				Name: name,
-				Type: "test",
+				Name:   name,
+				Type:   "test",
+				Labels: map[string]string{"child-role": "doer"},
 				OwnerReferences: []OwnerReference{
 					{Kind: "Want", ID: "coord-e2e-id", Controller: true},
 				},
@@ -450,6 +463,9 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
+		StateLabels: map[string]StateLabel{
+			"costs": LabelCurrent,
+		},
 	}
 	coordinator.storeState("costs", map[string]any{})
 
@@ -470,8 +486,9 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 
 			childWant := NewWantWithLocals(
 				Metadata{
-					Name: fmt.Sprintf("service-%d", idx),
-					Type: "test",
+					Name:   fmt.Sprintf("service-%d", idx),
+					Type:   "test",
+					Labels: map[string]string{"child-role": "doer"},
 					OwnerReferences: []OwnerReference{
 						{Kind: "Want", ID: "concurrent-coord-id", Controller: true},
 					},
