@@ -2698,6 +2698,16 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 				n.Spec.Params[paramDef.Name] = v
 			}
 		}
+		if paramDef.DefaultGlobalParameterFrom != "" {
+			// Indirect global parameter — read another param's value as the global param key
+			if keyParam, exists := n.Spec.Params[paramDef.DefaultGlobalParameterFrom]; exists {
+				if keyStr, ok := keyParam.(string); ok && keyStr != "" {
+					if v, ok := GetGlobalParameter(keyStr); ok {
+						n.Spec.Params[paramDef.Name] = v
+					}
+				}
+			}
+		}
 	}
 
 }

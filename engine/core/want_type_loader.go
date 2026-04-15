@@ -52,14 +52,15 @@ type WantTypeMetadata struct {
 
 // ParameterDef defines a parameter for want type configuration
 type ParameterDef struct {
-	Name                   string          `json:"name" yaml:"name"`
-	Description            string          `json:"description" yaml:"description"`
-	Type                   string          `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
-	Default                any             `json:"default,omitempty" yaml:"default,omitempty"`
-	DefaultGlobalParameter string          `json:"defaultGlobalParameter,omitempty" yaml:"defaultGlobalParameter,omitempty"` // Global parameter key used as last-resort fallback
-	Required               bool            `json:"required" yaml:"required"`
-	Validation             ValidationRules `json:"validation,omitempty" yaml:"validation,omitempty"`
-	Example                any             `json:"example,omitempty" yaml:"example,omitempty"`
+	Name                       string          `json:"name" yaml:"name"`
+	Description                string          `json:"description" yaml:"description"`
+	Type                       string          `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
+	Default                    any             `json:"default,omitempty" yaml:"default,omitempty"`
+	DefaultGlobalParameter     string          `json:"defaultGlobalParameter,omitempty" yaml:"defaultGlobalParameter,omitempty"`     // Global parameter key used as last-resort fallback
+	DefaultGlobalParameterFrom string          `json:"defaultGlobalParameterFrom,omitempty" yaml:"defaultGlobalParameterFrom,omitempty"` // Read this param's value as the global parameter key
+	Required                   bool            `json:"required" yaml:"required"`
+	Validation                 ValidationRules `json:"validation,omitempty" yaml:"validation,omitempty"`
+	Example                    any             `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 // ValidationRules defines validation constraints for parameters
