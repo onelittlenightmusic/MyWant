@@ -26,6 +26,7 @@ type WantTypeDefinition struct {
 	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements (includes ThinkAgent capabilities)
 	MonitorCapabilities []MonitorCapabilityDef `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
 	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
+	GlobalOverrideFrom  string                 `json:"globalOverrideFrom,omitempty" yaml:"globalOverrideFrom,omitempty"`   // Global param key whose object fields override ALL params (highest priority)
 	Agents              []AgentDef             `json:"agents" yaml:"agents"`
 	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`     // executable inline agent definitions
 	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // declarative achievement condition

@@ -169,7 +169,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     >
       <div className="space-y-6">
         <div className="flex items-center space-x-3 -mt-2">
-          <StatusBadge status={want.status} size="md" />
+          <StatusBadge status={want.status} size="md" showLabel={true} />
           <span className="text-xs font-mono text-gray-400">{want.metadata?.id || want.id}</span>
         </div>
 

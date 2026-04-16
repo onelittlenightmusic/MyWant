@@ -6,48 +6,21 @@ import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useConfigStore } from '@/stores/configStore';
 import styles from './WantCard.module.css';
 
-/**
- * Get solid color for a want status dot (matches WantCard.getStatusColor)
- */
-const getStatusDotColor = (status: WantExecutionStatus): string => {
-  switch (status) {
-    case 'achieved':
-      return '#10b981'; // Green
-    case 'reaching':
-    case 'terminated':
-      return '#9333ea'; // Purple
-    case 'failed':
-    case 'module_error':
-      return '#ef4444'; // Red
-    case 'config_error':
-    case 'stopped':
-    case 'waiting_user_action':
-      return '#f59e0b'; // Amber/Yellow
-    default:
-      return '#d1d5db'; // Gray
-  }
-};
+import { getStatusHexColor } from './WantCard/parts/StatusColor';
 
 /**
  * Get a light overlay color for a want status (used in minimap)
  */
 const getStatusOverlayColor = (status: WantExecutionStatus): string => {
-  switch (status) {
-    case 'achieved':
-      return 'rgba(16, 185, 129, 0.25)';   // Green
-    case 'reaching':
-      return 'rgba(147, 51, 234, 0.25)';   // Purple
-    case 'failed':
-      return 'rgba(239, 68, 68, 0.25)';    // Red
-    case 'config_error':
-    case 'stopped':
-    case 'waiting_user_action':
-      return 'rgba(245, 158, 11, 0.25)';   // Amber/Yellow
-    case 'terminated':
-      return 'rgba(107, 114, 128, 0.25)';  // Gray
-    default:
-      return 'transparent';
+  const hex = getStatusHexColor(status);
+  // Convert hex to rgba for overlay
+  if (hex.startsWith('#')) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.25)`;
   }
+  return 'transparent';
 };
 
 interface WantMinimapProps {
@@ -105,7 +78,7 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, on
     backgroundStyle.className
   );
 
-  const dotColor = getStatusDotColor(want.status);
+  const dotColor = getStatusHexColor(want.status);
   const isPulsing = want.status === 'reaching' || want.status === 'waiting_user_action';
 
   return (

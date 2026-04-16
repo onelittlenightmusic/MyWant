@@ -2,24 +2,35 @@ import { WantExecutionStatus, WantPhase } from '@/types/want';
 
 /**
  * Get color for a want status (Hex code)
+ * Used by StatusBadge, Minimap, and children dots for consistency.
  */
 export const getStatusHexColor = (status: WantExecutionStatus | WantPhase): string => {
   switch (status) {
     case 'achieved':
       return '#10b981'; // Green
+    
     case 'reaching':
-    case 'terminated':
-      return '#9333ea'; // Purple
+    case 'initializing':
+      return '#9333ea'; // Purple (Active)
+    
     case 'failed':
     case 'module_error':
-      return '#ef4444'; // Red
+    case 'deleting':
+      return '#ef4444'; // Red (Error/Destruction)
+    
     case 'config_error':
     case 'stopped':
     case 'waiting_user_action':
-      return '#f59e0b'; // Amber/Yellow
+    case 'suspended':
+      return '#f59e0b'; // Amber/Yellow (Warning/Paused/User)
+    
+    case 'terminated':
     case 'cancelled':
-      return '#9ca3af'; // Gray for cancelled (superseded by rebook)
+      return '#9ca3af'; // Gray (End state but not success)
+    
+    case 'created':
+    case 'pending':
     default:
-      return '#d1d5db'; // Gray for created, initializing, suspended
+      return '#d1d5db'; // Light Gray (Initial)
   }
 };

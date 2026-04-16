@@ -871,7 +871,7 @@ export const Dashboard: React.FC = () => {
   const headerActions = headerState ? (
     <div className="flex items-stretch h-full">
       <div className="flex items-center px-4 border-r border-gray-100 dark:border-gray-800">
-        <StatusBadge status={headerState.status} size="sm" />
+        <StatusBadge status={headerState.status} size="sm" showLabel={true} />
       </div>
       <div className="flex items-stretch relative">
         <button

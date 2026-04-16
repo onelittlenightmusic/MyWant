@@ -428,9 +428,13 @@ type Want struct {
 	labelViolationCount int // incremented on each SetGoal/SetCurrent/SetPlan/SetInternal label mismatch
 
 	// Agent system
-	agentRegistry     *AgentRegistry                `json:"-" yaml:"-"`
-	runningAgents     map[string]context.CancelFunc `json:"-" yaml:"-"`
-	agentStateMutex   sync.RWMutex                  `json:"-" yaml:"-"` // Mutex for runningAgents
+	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`
+	runningAgents   map[string]context.CancelFunc `json:"-" yaml:"-"`
+	agentStateMutex sync.RWMutex                  `json:"-" yaml:"-"` // Mutex for runningAgents
+	// agentRunGuard tracks per-agent execution state for both DoAgents and MonitorAgents.
+	// value "running": agent is currently executing (transient — cleared when done).
+	// value "done":    agent completed successfully and must not run again (permanent until Init).
+	agentRunGuard sync.Map `json:"-" yaml:"-"`
 
 
 	// Background agents for long-running operations
@@ -2408,6 +2412,7 @@ func (n *Want) Init() {
 	n.SetStatus(WantStatusInitializing) // Set to initializing first
 	n.paths.In = []PathInfo{}
 	n.paths.Out = []PathInfo{}
+	n.agentRunGuard = sync.Map{} // Reset on each deployment
 
 	// Initialize system-reserved state fields using StoreState
 	n.storeState(StateFieldActionByAgent, "")
@@ -2415,6 +2420,26 @@ func (n *Want) Init() {
 	n.storeState(StateFieldCompleted, false)
 
 	n.SetStatus(WantStatusIdle) // Transition to idle after initialization
+}
+
+// TryStartAgentRun atomically tries to mark an agent as "running".
+// Returns true (and marks as running) only when the agent is completely idle —
+// i.e. neither currently running nor permanently done.
+// Used by both DoAgent (executeAgent guard) and MonitorAgent (PollingAgent tick guard).
+func (n *Want) TryStartAgentRun(agentName string) bool {
+	_, loaded := n.agentRunGuard.LoadOrStore(agentName, "running")
+	return !loaded
+}
+
+// FinishAgentRun ends an agent's run and updates its guard state.
+// permanent=false: clears the "running" flag so the agent can run again next tick (MonitorAgent).
+// permanent=true:  stores "done" so the agent is never re-executed until Init() (DoAgent success).
+func (n *Want) FinishAgentRun(agentName string, permanent bool) {
+	if permanent {
+		n.agentRunGuard.Store(agentName, "done")
+	} else {
+		n.agentRunGuard.Delete(agentName)
+	}
 }
 
 func (n *Want) getHistoryManager() *HistoryManager {
@@ -2706,6 +2731,30 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 						n.Spec.Params[paramDef.Name] = v
 					}
 				}
+			}
+		}
+	}
+
+	// globalOverrideFrom: if the named global parameter exists and is a JSON object,
+	// its fields are spread into spec.params with the highest priority — overriding
+	// even explicitly provided params. Useful when a single slot object (e.g. selected_slot)
+	// should fully drive all parameters of a want type.
+	if typeDef.GlobalOverrideFrom != "" {
+		if raw, ok := GetGlobalParameter(typeDef.GlobalOverrideFrom); ok {
+			var obj map[string]any
+			switch v := raw.(type) {
+			case map[string]any:
+				obj = v
+			case string:
+				if err := json.Unmarshal([]byte(v), &obj); err != nil {
+					n.DirectLog("[PARAM] globalOverrideFrom: failed to parse %q as JSON: %v", typeDef.GlobalOverrideFrom, err)
+				}
+			}
+			if obj != nil {
+				for k, val := range obj {
+					n.Spec.Params[k] = val
+				}
+				n.DirectLog("[PARAM] globalOverrideFrom: applied %d fields from global param %q", len(obj), typeDef.GlobalOverrideFrom)
 			}
 		}
 	}

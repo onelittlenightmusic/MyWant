@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	. "mywant/engine/core"
@@ -16,9 +15,6 @@ import (
 
 const mrsMonitorAgentName = "monitor_mrs_agent"
 const mrsDoAgentName = "do_mrs_agent"
-
-// mrsRunning tracks wants currently executing a MRS skill to prevent concurrent runs.
-var mrsRunning sync.Map
 
 func init() {
 	RegisterMonitorAgentType(
@@ -37,19 +33,11 @@ func init() {
 // raw JSON output to the "mrs_raw_output" state field. EndProgressCycle then expands
 // any state fields that declare fetchFrom+onFetchData automatically.
 //
-// Concurrent execution is prevented: if the previous run is still in progress the
-// polling tick is skipped silently. This avoids SIGKILL from overlapping executions
-// when the script takes longer than the PollingAgent interval (5s).
+// Concurrent tick protection is now handled by PollingAgent via Want.TryStartAgentRun /
+// FinishAgentRun, so no per-agent sync.Map guard is needed here.
 //
 // Timeout: reads "skill_timeout_seconds" from goal state (default: 120s).
 func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
-	wantID := want.Metadata.ID
-	if _, loaded := mrsRunning.LoadOrStore(wantID, true); loaded {
-		want.DirectLog("[MRS-MONITOR] previous execution still running, skipping tick")
-		return false, nil
-	}
-	defer mrsRunning.Delete(wantID)
-
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] %v", err)

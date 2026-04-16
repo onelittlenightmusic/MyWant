@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check, MessageSquare, Settings } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmationBubble } from '@/components/notifications';
@@ -461,8 +461,13 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
   return (
     <>
-      <div className="flex flex-col h-full">
-      {/* Header — semi-transparent band, aligned to card bottom */}
+      <div className="flex flex-col h-full relative">
+        {/* Status indicator - absolute top right */}
+        {!isSelectMode && (
+          <div className="absolute top-3 right-3 z-20 pointer-events-none">
+            <StatusBadge status={want.status} size="sm" />
+          </div>
+        )}
       <div className={classNames(
         "order-2 mt-auto",
         styles.controlCardHeader,
@@ -560,18 +565,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 <Clock className={sizes.iconSize} />
               </button>
             )}
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isSelectMode) return;
-                onView(want);
-              }}
-              className={isSelectMode ? "cursor-default" : "hover:opacity-80 transition-opacity"}
-              title="Click to view details"
-            >
-              <StatusBadge status={want.status} size={sizes.statusSize} />
-            </button>
           </div>
         </div>
       </div>
@@ -854,7 +847,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result != null && want.state?.final_result !== '' && (
-        <div className={`${isChild ? "mt-2" : "mt-4"} group/finalresult relative flex justify-start`}>
+        <div className={`${isChild ? "mt-4" : "mt-8"} group/finalresult relative flex justify-start`}>
           <button
             onClick={() => onViewResults ? onViewResults(want) : onView(want)}
             className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}

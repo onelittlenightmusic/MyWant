@@ -184,9 +184,14 @@ func (n *Want) executeAgent(agent Agent) error {
 	}
 
 	// B. One-off Agents (Do) - Synchronous execution with result tracking
+	// Skip if this DoAgent is already running or has already succeeded in this deployment cycle.
+	if !n.TryStartAgentRun(agentName) {
+		return nil
+	}
 	n.SetStatus(WantStatusPrepareAgent)
 	if err := n.bootAgent(context.Background(), agent); err != nil {
 		n.SetStatus(WantStatusReaching)
+		n.FinishAgentRun(agentName, false) // Release guard so a retry is possible next cycle.
 		return fmt.Errorf("failed to boot agent %s: %w", agentName, err)
 	}
 	n.SetStatus(WantStatusReaching)
@@ -287,6 +292,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 	var agentErr error
 	var finalStatus string = "achieved"
 	var finalError string
+	succeeded := false
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -294,6 +300,11 @@ func (n *Want) runDoAgent(agent Agent) error {
 			finalStatus = "failed"
 			finalError = fmt.Sprintf("Panic: %v", r)
 		}
+
+		// Always release the run guard, regardless of success, failure, or panic.
+		// On success: mark permanently done so the agent is never re-run until Init().
+		// On failure/panic: release the transient lock so a retry is possible next cycle.
+		n.FinishAgentRun(agentName, succeeded)
 
 		// Append completion event
 		n.RecordAgentResult(executionID, agentName, string(agent.GetType()), finalStatus, finalError)
@@ -328,6 +339,7 @@ func (n *Want) runDoAgent(agent Agent) error {
 		agentErr = err
 	} else {
 		n.storeState("action_by_agent", "DoAgent")
+		succeeded = true
 	}
 
 	return agentErr

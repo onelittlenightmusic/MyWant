@@ -1958,7 +1958,7 @@ const VersionsTab: React.FC<{ seriesWants: Want[]; currentWantId?: string }> = (
                 <span className="ml-2 text-blue-600 dark:text-blue-400">(current)</span>
               )}
             </span>
-            <StatusBadge status={want.status} />
+            <StatusBadge status={want.status} showLabel={true} />
           </div>
           <WantCardContent
             want={want}

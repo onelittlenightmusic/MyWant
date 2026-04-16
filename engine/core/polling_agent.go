@@ -62,9 +62,15 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 				p.want.StoreLog("[%s] Context cancelled, stopping monitoring for %s\n", p.name, w.Metadata.Name)
 				return
 			case <-p.ticker.C:
+				// Skip this tick if the previous execution for this agent is still running.
+				if !p.want.TryStartAgentRun(p.name) {
+					p.want.DirectLog("[%s] previous execution still running, skipping tick", p.name)
+					continue
+				}
 				p.BeginProgressCycle()
 				shouldStop, err := p.poll(p.ctx, p.want)
 				p.EndProgressCycle()
+				p.want.FinishAgentRun(p.name, false) // Always release (transient); panic here crashes goroutine which is acceptable.
 
 				if err != nil {
 					p.want.StoreLog("[%s] Error during polling for %s: %v\n", p.name, w.Metadata.Name, err)
