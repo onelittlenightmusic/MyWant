@@ -185,3 +185,15 @@
   background-color: transparent !important;
   box-shadow: none !important;
 }
+
+.compactSelect {
+  font-size: 70% !important;
+  height: 1.8rem !important;
+  line-height: 1 !important;
+  padding-top: 0.125rem !important;
+  padding-bottom: 0.125rem !important;
+}
+
+.compactSelect option {
+  font-size: 10px !important;
+}

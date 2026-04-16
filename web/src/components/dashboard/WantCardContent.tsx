@@ -446,10 +446,10 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     errorTextSize: 'text-[10px]',
     textTruncate: 20
   } : {
-    titleClass: 'text-xs sm:text-lg font-semibold',
+    titleClass: 'text-[9px] sm:text-[13px] font-semibold',
     typeClass: 'text-[10px] sm:text-sm',
     idClass: 'text-[10px] sm:text-xs',
-    iconSize: 'h-3 w-3 sm:h-4 w-4',
+    iconSize: 'h-2 w-2 sm:h-3 w-3',
     statusSize: 'xs' as const,
     agentDotSize: 'w-1.5 h-1.5 sm:w-2 h-2',
     errorIconSize: 'h-3.5 w-3.5 sm:h-4 w-4',
@@ -476,7 +476,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             >
               {labels['recipe-based'] === 'true' ? (
                 hasChildren ? (
-                  <HeartInBottle className={`${isChild ? 'h-3 w-3 sm:h-3.5 sm:w-3.5' : 'h-3.5 w-3.5 sm:h-5 sm:w-5'} flex-shrink-0 text-pink-500`} />
+                  <HeartInBottle className={`${isChild ? 'h-3 w-3 sm:h-3.5 sm:w-3.5' : 'h-2.5 w-2.5 sm:h-3.5 sm:w-3.5'} flex-shrink-0 text-pink-500`} />
                 ) : (
                   <BottleOnly className={sizes.iconSize} />
                 )
@@ -715,7 +715,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {isChoice && (
        <div className={`${(isChild || (isControl && !isFocused)) ? "mt-2" : "mt-4"} space-y-1`}>
-         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+         <div className="flex items-center justify-between text-[9px] text-gray-500 dark:text-gray-400 mb-1">
            <span className="font-medium truncate mr-2" title={choiceTargetParam}>
              {choiceTargetParam || 'Selection'}
            </span>
@@ -732,7 +732,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
            }}
            onClick={(e) => e.stopPropagation()}
            onMouseDown={(e) => e.stopPropagation()}
-           className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+           className={classNames("w-full appearance-none border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500", styles.compactSelect)}
          >
            <option value="" disabled>Select an option...</option>
            {choices.map((choice, idx) => {
