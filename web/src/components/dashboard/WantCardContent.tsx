@@ -468,8 +468,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         styles.controlCardHeader,
         isControl && !isFocused ? styles.controlCardHeaderHidden : styles.controlCardHeaderVisible
       )}>
-        <div className={`backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 pt-1.5 sm:pt-2 pb-1.5' : 'px-3 sm:px-6 pt-2 sm:pt-3 pb-2'}`}>
-          <div className="flex items-start justify-between">
+        <div className={`backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 py-1' : 'px-3 sm:px-6 py-1'}`}>
+          <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
             <h3
               className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}
@@ -485,42 +485,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
               )}
               {wantType}
             </h3>
-            {isEditingName ? (
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={editedName}
-                onChange={(e) => setEditedName(e.target.value)}
-                onBlur={async () => {
-                  const trimmed = editedName.trim();
-                  const id = want.metadata?.id || want.id;
-                  if (trimmed && trimmed !== wantName && id) {
-                    try {
-                      await updateWant(id, { metadata: { ...want.metadata, name: trimmed }, spec: want.spec });
-                    } catch {
-                      setEditedName(wantName);
-                    }
-                  }
-                  setIsEditingName(false);
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter') nameInputRef.current?.blur();
-                  if (e.key === 'Escape') { setEditedName(wantName); setIsEditingName(false); }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-                className={`${sizes.typeClass} text-gray-700 dark:text-gray-200 mt-1 bg-white dark:bg-gray-800 border border-blue-400 rounded px-1 py-0 w-full focus:outline-none focus:ring-1 focus:ring-blue-500`}
-              />
-            ) : (
-              <p
-                className={`${sizes.typeClass} text-gray-500 dark:text-gray-400 mt-1 truncate`}
-                onDoubleClick={(e) => { e.stopPropagation(); setEditedName(wantName); setIsEditingName(true); }}
-                title="Double-click to edit name"
-              >
-                {truncateText(wantName, sizes.textTruncate)}
-              </p>
-            )}
           </div>
 
           <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
