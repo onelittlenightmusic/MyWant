@@ -417,8 +417,9 @@ type Want struct {
 	Metadata    Metadata                `json:"metadata" yaml:"metadata"`
 	Spec        WantSpec                `json:"spec" yaml:"spec"`
 	Status      WantStatus              `json:"status,omitempty" yaml:"status,omitempty"`
-	State       sync.Map                `json:"-" yaml:"-"`
-	StateLabels map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
+	State           sync.Map              `json:"-" yaml:"-"`
+	stateTimestamps sync.Map              `json:"-" yaml:"-"` // key → time.Time, updated on every StoreState call
+	StateLabels     map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
 	HiddenState map[string]any          `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
 	History     WantHistory             `json:"history" yaml:"-"`
 	Hash        string                  `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
@@ -511,44 +512,8 @@ type Want struct {
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
 }
 
-// MarshalJSON handles custom JSON marshalling for the Want struct.
-func (n *Want) MarshalJSON() ([]byte, error) {
-	type Alias Want
-	stateMap := make(map[string]any)
-	n.State.Range(func(key, value any) bool {
-		stateMap[key.(string)] = value
-		return true
-	})
-	return json.Marshal(&struct {
-		State map[string]any `json:"state,omitempty"`
-		*Alias
-	}{
-		State: stateMap,
-		Alias: (*Alias)(n),
-	})
-}
-
-// UnmarshalJSON handles custom JSON unmarshalling for the Want struct.
-func (n *Want) UnmarshalJSON(data []byte) error {
-	type Alias Want
-	aux := &struct {
-		State map[string]any `json:"state"`
-		*Alias
-	}{
-		Alias: (*Alias)(n),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	for key, value := range aux.State {
-		n.State.Store(key, value)
-	}
-	return nil
-}
-
 // MarshalYAML handles custom YAML marshalling for the Want struct.
-// Mirrors MarshalJSON: includes State (goal/current/plan) so it is
-// persisted to state.yaml and survives server restarts.
+// Includes State so it is persisted to state.yaml and survives server restarts.
 func (n *Want) MarshalYAML() (interface{}, error) {
 	type Alias Want
 	stateMap := make(map[string]any)
@@ -556,12 +521,19 @@ func (n *Want) MarshalYAML() (interface{}, error) {
 		stateMap[key.(string)] = value
 		return true
 	})
+	tsMap := make(map[string]time.Time)
+	n.stateTimestamps.Range(func(key, value any) bool {
+		tsMap[key.(string)] = value.(time.Time)
+		return true
+	})
 	return &struct {
-		State map[string]any `yaml:"state,omitempty"`
-		*Alias `yaml:",inline"`
+		State           map[string]any       `yaml:"state,omitempty"`
+		StateTimestamps map[string]time.Time `yaml:"state_timestamps,omitempty"`
+		*Alias          `yaml:",inline"`
 	}{
-		State: stateMap,
-		Alias: (*Alias)(n),
+		State:           stateMap,
+		StateTimestamps: tsMap,
+		Alias:           (*Alias)(n),
 	}, nil
 }
 
@@ -570,8 +542,9 @@ func (n *Want) MarshalYAML() (interface{}, error) {
 func (n *Want) UnmarshalYAML(value *yaml.Node) error {
 	type Alias Want
 	aux := &struct {
-		State map[string]any `yaml:"state"`
-		*Alias `yaml:",inline"`
+		State           map[string]any       `yaml:"state"`
+		StateTimestamps map[string]time.Time `yaml:"state_timestamps"`
+		*Alias          `yaml:",inline"`
 	}{
 		Alias: (*Alias)(n),
 	}
@@ -580,6 +553,9 @@ func (n *Want) UnmarshalYAML(value *yaml.Node) error {
 	}
 	for key, val := range aux.State {
 		n.State.Store(key, val)
+	}
+	for key, ts := range aux.StateTimestamps {
+		n.stateTimestamps.Store(key, ts)
 	}
 	return nil
 }
@@ -1258,7 +1234,9 @@ func (n *Want) StoreState(key string, value any) {
 		return
 	}
 
+	now := time.Now()
 	n.State.Store(key, value)
+	n.stateTimestamps.Store(key, now)
 	n.getHistoryManager().AddStateEntry(key, value)
 
 	notification := StateNotification{
@@ -1266,9 +1244,28 @@ func (n *Want) StoreState(key string, value any) {
 		StateKey:       key,
 		StateValue:     value,
 		PreviousValue:  previousValue,
-		Timestamp:      time.Now(),
+		Timestamp:      now,
 	}
 	sendStateNotifications(notification)
+}
+
+// GetStateUpdatedAt returns the time when the given state key was last updated.
+// Returns zero time and false if the key has never been set.
+func (n *Want) GetStateUpdatedAt(key string) (time.Time, bool) {
+	if v, ok := n.stateTimestamps.Load(key); ok {
+		return v.(time.Time), true
+	}
+	return time.Time{}, false
+}
+
+// GetStateTimestamps returns a snapshot of all per-key update timestamps.
+func (n *Want) GetStateTimestamps() map[string]time.Time {
+	m := make(map[string]time.Time)
+	n.stateTimestamps.Range(func(key, value any) bool {
+		m[key.(string)] = value.(time.Time)
+		return true
+	})
+	return m
 }
 
 // DeleteState removes a key from the want's state map.
@@ -1587,7 +1584,9 @@ func (n *Want) storeStateMulti(updates map[string]any) {
 			continue
 		}
 
+		now := time.Now()
 		n.State.Store(key, value)
+		n.stateTimestamps.Store(key, now)
 		n.getHistoryManager().AddStateEntry(key, value)
 
 		notification := StateNotification{
@@ -1595,7 +1594,7 @@ func (n *Want) storeStateMulti(updates map[string]any) {
 			StateKey:       key,
 			StateValue:     value,
 			PreviousValue:  previousValue,
-			Timestamp:      time.Now(),
+			Timestamp:      now,
 		}
 		notifications = append(notifications, notification)
 	}

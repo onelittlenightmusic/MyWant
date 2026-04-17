@@ -306,6 +306,7 @@ type wantAPIResponse struct {
 	Spec                 mywant.WantSpec             `json:"spec"`
 	Status               mywant.WantStatus           `json:"status,omitempty"`
 	State                hierarchicalState           `json:"state"`
+	StateTimestamps      map[string]time.Time        `json:"state_timestamps,omitempty"`
 	HiddenState          map[string]any              `json:"hidden_state,omitempty"`
 	History              mywant.WantHistory          `json:"history"`
 	ConnectivityMetadata mywant.ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
@@ -343,13 +344,14 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 	}
 
 	resp := wantAPIResponse{
-		Metadata:    want.Metadata,
-		Spec:        want.Spec,
-		Status:      want.GetStatus(),
-		State:       hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan},
-		HiddenState: want.GetHiddenState(),
-		History:     want.BuildHistory(),
-		Hash:        mywant.CalculateWantHash(want),
+		Metadata:        want.Metadata,
+		Spec:            want.Spec,
+		Status:          want.GetStatus(),
+		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan},
+		StateTimestamps: want.GetStateTimestamps(),
+		HiddenState:     want.GetHiddenState(),
+		History:         want.BuildHistory(),
+		Hash:            mywant.CalculateWantHash(want),
 	}
 	if includeConnectivity {
 		resp.ConnectivityMetadata = want.ConnectivityMetadata

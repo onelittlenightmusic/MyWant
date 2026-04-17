@@ -1439,7 +1439,21 @@ const renderKeyValuePairs = (obj: any, depth: number = 0): React.ReactNode[] => 
   return items;
 };
 
+// Sort an object's entries by state_timestamps descending (most recently updated first).
+// Keys without a timestamp are placed at the end in their original order.
+const sortByTimestamp = (obj: Record<string, unknown>, timestamps?: Record<string, string>): Record<string, unknown> => {
+  if (!timestamps) return obj;
+  const entries = Object.entries(obj);
+  entries.sort(([aKey], [bKey]) => {
+    const aTs = timestamps[aKey] ? new Date(timestamps[aKey]).getTime() : 0;
+    const bTs = timestamps[bKey] ? new Date(timestamps[bKey]).getTime() : 0;
+    return bTs - aTs;
+  });
+  return Object.fromEntries(entries);
+};
+
 const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want, onClearState }) => {
+  const ts = want.state_timestamps;
   const hasCurrent = want.state?.current && Object.keys(want.state.current).length > 0;
   const hasGoal = want.state?.goal && Object.keys(want.state.goal).length > 0;
   const hasPlan = want.state?.plan && Object.keys(want.state.plan).length > 0;
@@ -1486,7 +1500,7 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
               <div className={SECTION_CONTAINER_CLASS}>
                 <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Current</h4>
                 <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(want.state!.current)}
+                  {renderKeyValuePairs(sortByTimestamp(want.state!.current as Record<string, unknown>, ts))}
                 </div>
               </div>
             )}
@@ -1495,7 +1509,7 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
               <div className={SECTION_CONTAINER_CLASS}>
                 <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Goal</h4>
                 <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(want.state!.goal)}
+                  {renderKeyValuePairs(sortByTimestamp(want.state!.goal as Record<string, unknown>, ts))}
                 </div>
               </div>
             )}
@@ -1504,7 +1518,7 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
               <div className={SECTION_CONTAINER_CLASS}>
                 <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Plan</h4>
                 <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(want.state!.plan)}
+                  {renderKeyValuePairs(sortByTimestamp(want.state!.plan as Record<string, unknown>, ts))}
                 </div>
               </div>
             )}

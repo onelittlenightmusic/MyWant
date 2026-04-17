@@ -11,6 +11,7 @@ export interface Want {
   spec: WantSpec;
   status: WantExecutionStatus;
   state?: WantState; // Hierarchical state grouped by label
+  state_timestamps?: Record<string, string>; // ISO timestamp per state key (last updated at)
   hidden_state?: Record<string, unknown>; // Internal framework fields
   stats?: WantStats;
   history?: WantHistory;
