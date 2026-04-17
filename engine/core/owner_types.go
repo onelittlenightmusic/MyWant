@@ -122,8 +122,8 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
-	// GUARD: If target is already achieved, no need to process further completion events
-	if tcs.target.GetStatus() == WantStatusAchieved {
+	// GUARD: If target is already achieved (with or without warnings), no need to process further completion events
+	if IsAchievedStatus(tcs.target.GetStatus()) {
 		return EventResponse{Handled: true}
 	}
 
@@ -166,7 +166,7 @@ func (t *Target) checkAllChildrenComplete() bool {
 	// For targets with children (recipe or dynamic), check both sync.Map AND actual Status
 	for _, child := range t.childWants {
 		val, inMap := t.completedChildren.Load(child.Metadata.Name)
-		completed := (inMap && val.(bool)) || child.Status == WantStatusAchieved
+		completed := (inMap && val.(bool)) || IsAchievedStatus(child.Status)
 		if !completed {
 			return false
 		}
@@ -347,9 +347,9 @@ func (t *Target) Initialize() {
 	}
 }
 
-// IsAchieved reports true only after Progress() has set Status to Achieved.
+// IsAchieved reports true after Progress() has set Status to Achieved (with or without warnings).
 func (t *Target) IsAchieved() bool {
-	return t.GetStatus() == WantStatusAchieved
+	return IsAchievedStatus(t.GetStatus())
 }
 
 // DisownChild removes a want from this target's tracking
@@ -373,7 +373,7 @@ func (t *Target) DisownChild(wantID string) {
 		t.childCount = len(t.childWants)
 		t.storeState("child_count", t.childCount)
 
-		if t.Status == WantStatusAchieved {
+		if IsAchievedStatus(t.Status) {
 			// If we were achieved but lost a child (or now have none), re-evaluate or reset
 			// For now, simple reset to reaching to allow re-evaluation in next Progress()
 			t.SetStatus(WantStatusReaching)
@@ -401,7 +401,7 @@ func (t *Target) AdoptChild(want *Want) {
 		t.StoreLog("[TARGET] Adopted dynamic child: %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 
 		// If the newly adopted child is already achieved, mark it as completed
-		if want.Status == WantStatusAchieved {
+		if IsAchievedStatus(want.Status) {
 			t.completedChildren.Store(want.Metadata.Name, true)
 		}
 
@@ -420,8 +420,8 @@ func (t *Target) AdoptChild(want *Want) {
 //     EndProgressCycle() flushes pendingStateChanges → State after each return.
 //  3. When all children are achieved, finalize and set Status = Achieved.
 func (t *Target) Progress() {
-	// Guard: already achieved
-	if t.Status == WantStatusAchieved {
+	// Guard: already achieved (with or without warnings)
+	if IsAchievedStatus(t.Status) {
 		t.storeState("achieving_percentage", 100.0)
 		return
 	}
@@ -524,7 +524,7 @@ drained:
 		achievedCount := 0
 		for _, child := range t.childWants {
 			val, inMap := t.completedChildren.Load(child.Metadata.Name)
-			completed := (inMap && val.(bool)) || child.Status == WantStatusAchieved
+			completed := (inMap && val.(bool)) || IsAchievedStatus(child.Status)
 			if completed {
 				achievedCount++
 				if !inMap || !val.(bool) {
@@ -575,7 +575,9 @@ drained:
 	}
 
 	if allComplete {
-		t.SetStatus(WantStatusAchieved)
+		// Propagate warning status: if any child achieved with warnings, so does this target.
+		finalStatus := t.resolveAchievedStatus()
+		t.SetStatus(finalStatus)
 
 		// Send completion packet to parent/upstream wants (only once)
 		alreadySent, _ := t.GetStateBool("completion_packet_sent", false)
@@ -618,8 +620,19 @@ drained:
 
 		// Signal a status change to self to trigger immediate re-save and event emission
 		// This ensures frontend and dependent wants see the latest aggregated results
-		t.SetStatus(WantStatusAchieved)
+		t.SetStatus(finalStatus)
 	}
+}
+
+// resolveAchievedStatus returns WantStatusAchievedWithWarning if any child finished with
+// warnings, otherwise WantStatusAchieved.  This propagates governance/label warnings upward.
+func (t *Target) resolveAchievedStatus() WantStatus {
+	for _, child := range t.childWants {
+		if child.Status == WantStatusAchievedWithWarning || child.Status == WantStatusReachingWithWarning {
+			return WantStatusAchievedWithWarning
+		}
+	}
+	return WantStatusAchieved
 }
 
 // UpdateParameter updates a parameter and pushes it to child wants

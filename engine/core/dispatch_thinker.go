@@ -215,7 +215,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 					prefixedName := fmt.Sprintf("%s-%s", w.Metadata.Name, childName)
 					nameMatch := child.Metadata.Name == childName || child.Metadata.Name == prefixedName
 					if nameMatch && w.isOwnerOf(child) {
-						if child.Status == WantStatusAchieved {
+						if IsAchievedStatus(child.Status) {
 							w.SetCurrent(stateKey, true)
 							w.StoreLog("[%s] Provider '%s' achieved → %s=true", DispatchThinkerName, childName, stateKey)
 						}
@@ -294,7 +294,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 			namespacedDir := fmt.Sprintf("%s:%s", w.Metadata.Name, direction)
 			for _, child := range cb.GetWants() {
 				if child.Metadata.Labels["direction"] == namespacedDir && w.isOwnerOf(child) {
-					if child.Status == WantStatusAchieved {
+					if IsAchievedStatus(child.Status) {
 						if len(req.Sets) > 0 {
 							for k, v := range req.Sets {
 								w.storeState(k, v) // bypass schema validation: Sets keys are user-defined
@@ -386,7 +386,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 
 			for _, child := range cb.GetWants() {
 				if child.Metadata.ID == wantID {
-					if child.Status == WantStatusAchieved {
+					if IsAchievedStatus(child.Status) {
 						completedIDs[direction] = wantID
 						dispatched[direction] = doneMarker
 						w.StoreLog("[%s] Direction '%s' completed", DispatchThinkerName, direction)
@@ -502,7 +502,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 						}
 						if matchesLabels(sibling.Metadata.Labels, selector) {
 							found = true
-							if sibling.Status != WantStatusAchieved {
+							if !IsAchievedStatus(sibling.Status) {
 								allReady = false
 							}
 						}

@@ -51,8 +51,8 @@ export const StatsOverview: React.FC<StatsOverviewProps> = ({ wants, loading, la
 
   const stats = {
     total: wants.length,
-    running: wants.filter(w => w.status === 'reaching').length,
-    completed: wants.filter(w => w.status === 'achieved').length,
+    running: wants.filter(w => w.status === 'reaching' || w.status === 'reaching_with_warning').length,
+    completed: wants.filter(w => w.status === 'achieved' || w.status === 'achieved_with_warning').length,
     failed: wants.filter(w => w.status === 'failed').length,
   };
 

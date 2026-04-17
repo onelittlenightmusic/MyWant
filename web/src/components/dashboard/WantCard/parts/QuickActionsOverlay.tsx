@@ -66,8 +66,8 @@ export const QuickActionsOverlay: React.FC<QuickActionsOverlayProps> = ({
   }, [onClose]);
 
   // Status checks
-  const isRunning = status === 'reaching' || status === 'waiting_user_action';
-  const isStopped = status === 'stopped' || status === 'created' || status === 'failed' || status === 'achieved' || status === 'terminated';
+  const isRunning = status === 'reaching' || status === 'reaching_with_warning' || status === 'waiting_user_action';
+  const isStopped = status === 'stopped' || status === 'created' || status === 'failed' || status === 'achieved' || status === 'achieved_with_warning' || status === 'terminated';
   const isSuspended = status === 'suspended';
 
   // Toggle buttons

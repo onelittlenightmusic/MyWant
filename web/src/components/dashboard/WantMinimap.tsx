@@ -79,7 +79,7 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, on
   );
 
   const dotColor = getStatusHexColor(want.status);
-  const isPulsing = want.status === 'reaching' || want.status === 'waiting_user_action';
+  const isPulsing = want.status === 'reaching' || want.status === 'reaching_with_warning' || want.status === 'waiting_user_action';
 
   return (
     <div

@@ -169,7 +169,7 @@ func (cb *ChainBuilder) MarkWantCompleted(wantID string, status WantStatus) {
 	cb.completedFlagsMutex.Lock()
 	defer cb.completedFlagsMutex.Unlock()
 
-	isCompleted := (status == WantStatusAchieved)
+	isCompleted := IsAchievedStatus(status)
 	cb.wantCompletedFlags[wantID] = isCompleted
 	log.Printf("[WANT-COMPLETED] Want ID '%s' notified completion with status=%s\n", wantID, status)
 }
@@ -179,7 +179,7 @@ func (cb *ChainBuilder) UpdateCompletedFlag(wantID string, status WantStatus) {
 	cb.completedFlagsMutex.Lock()
 	defer cb.completedFlagsMutex.Unlock()
 
-	isCompleted := (status == WantStatusAchieved)
+	isCompleted := IsAchievedStatus(status)
 	cb.wantCompletedFlags[wantID] = isCompleted
 	log.Printf("[UPDATE-COMPLETED-FLAG] Want ID '%s' status=%s, isCompleted=%v\n", wantID, status, isCompleted)
 }

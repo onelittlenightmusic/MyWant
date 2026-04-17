@@ -148,9 +148,9 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const wantDetails = selectedWantDetails || want;
 
   // Control panel logic (use wantDetails for status since it includes updated state from polling)
-  const isRunning = wantDetails?.status === 'reaching';
+  const isRunning = wantDetails?.status === 'reaching' || wantDetails?.status === 'reaching_with_warning';
   const isSuspended = wantDetails?.status === 'suspended';
-  const isCompleted = wantDetails?.status === 'achieved';
+  const isCompleted = wantDetails?.status === 'achieved' || wantDetails?.status === 'achieved_with_warning';
   const isStopped = wantDetails?.status === 'stopped' || wantDetails?.status === 'created' || wantDetails?.status === 'terminated';
   const isFailed = wantDetails?.status === 'failed' || wantDetails?.status === 'module_error' || wantDetails?.status === 'config_error';
 
@@ -288,7 +288,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Auto-enable refresh for running wants (but don't auto-disable - let user control it)
   // Only depends on status, not want object, to avoid infinite loops from polling
   useEffect(() => {
-    if (selectedWantDetails?.status === 'reaching' && !autoRefresh) {
+    if ((selectedWantDetails?.status === 'reaching' || selectedWantDetails?.status === 'reaching_with_warning') && !autoRefresh) {
       // Auto-enable only if currently disabled
       setAutoRefresh(true);
     }
@@ -1564,7 +1564,7 @@ const AgentsTab: React.FC<{ want: Want }> = ({ want }) => {
 
   const statusDot = (status: string) => classNames(
     'w-2 h-2 rounded-full flex-shrink-0',
-    status === 'achieved'   && 'bg-green-500',
+    (status === 'achieved' || status === 'achieved_with_warning')   && 'bg-green-500',
     status === 'failed'     && 'bg-red-500',
     status === 'running'    && 'bg-blue-500 animate-pulse',
     status === 'terminated' && 'bg-gray-500',

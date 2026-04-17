@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { WantExecutionStatus, WantPhase } from '@/types/want';
 import { classNames } from '@/utils/helpers';
 import { getStatusHexColor } from '@/components/dashboard/WantCard/parts/StatusColor';
@@ -10,6 +11,8 @@ interface StatusBadgeProps {
   className?: string;
 }
 
+const WARNING_STATUSES: (WantExecutionStatus | WantPhase)[] = ['reaching_with_warning', 'achieved_with_warning'];
+
 export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
   size = 'md',
@@ -17,12 +20,20 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   className
 }) => {
   const hexColor = getStatusHexColor(status);
+  const hasWarning = WARNING_STATUSES.includes(status);
 
   const dotSizeClasses = {
     xs: 'w-1.5 h-1.5',
     sm: 'w-2 h-2',
     md: 'w-2.5 h-2.5',
     lg: 'w-3 h-3'
+  };
+
+  const warningSizeClasses = {
+    xs: 'w-2 h-2',
+    sm: 'w-2.5 h-2.5',
+    md: 'w-3 h-3',
+    lg: 'w-3.5 h-3.5'
   };
 
   const textSizeClasses = {
@@ -41,6 +52,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         )}
         style={{ backgroundColor: hexColor }}
       />
+      {hasWarning && (
+        <AlertTriangle
+          className={classNames('flex-shrink-0 text-orange-400', warningSizeClasses[size])}
+          strokeWidth={2.5}
+        />
+      )}
       {showLabel && (
         <span className={classNames('font-medium capitalize text-gray-700 dark:text-gray-300', textSizeClasses[size])}>
           {status}

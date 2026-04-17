@@ -94,7 +94,7 @@ export interface ConfigMetadata {
   labels?: Record<string, string>;
 }
 
-export type WantExecutionStatus = 'created' | 'initializing' | 'reaching' | 'suspended' | 'achieved' | 'failed' | 'stopped' | 'terminated' | 'deleting' | 'config_error' | 'module_error' | 'waiting_user_action' | 'cancelled';
+export type WantExecutionStatus = 'created' | 'initializing' | 'reaching' | 'reaching_with_warning' | 'suspended' | 'achieved' | 'achieved_with_warning' | 'failed' | 'stopped' | 'terminated' | 'deleting' | 'config_error' | 'module_error' | 'waiting_user_action' | 'cancelled';
 
 export type WantPhase = 'pending' | 'initializing' | 'reaching' | 'achieved' | 'failed' | 'stopped' | 'terminated' | 'config_error' | 'module_error' | 'waiting_user_action';
 

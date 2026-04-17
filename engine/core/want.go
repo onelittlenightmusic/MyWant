@@ -309,20 +309,32 @@ type LogHistoryEntry struct {
 type WantStatus string
 
 const (
-	WantStatusIdle              WantStatus = "idle"
-	WantStatusInitializing      WantStatus = "initializing"
-	WantStatusReaching          WantStatus = "reaching"
-	WantStatusSuspended         WantStatus = "suspended"
-	WantStatusAchieved          WantStatus = "achieved"
-	WantStatusCancelled         WantStatus = "cancelled"           // Superseded by a rebook; no longer the active booking
-	WantStatusFailed            WantStatus = "failed"
-	WantStatusTerminated        WantStatus = "terminated"
-	WantStatusDeleting          WantStatus = "deleting"
-	WantStatusConfigError       WantStatus = "config_error"        // Invalid input values or spec configuration
-	WantStatusModuleError       WantStatus = "module_error"        // Want type implementation error (GetState failure, cast failure, etc.)
-	WantStatusPrepareAgent      WantStatus = "prepare_agent"       // Preparing agent runtime
-	WantStatusWaitingUserAction WantStatus = "waiting_user_action" // Waiting for user action (e.g., reaction approval)
+	WantStatusIdle                WantStatus = "idle"
+	WantStatusInitializing        WantStatus = "initializing"
+	WantStatusReaching            WantStatus = "reaching"
+	WantStatusReachingWithWarning WantStatus = "reaching_with_warning" // Running but governance/label access violations were logged
+	WantStatusSuspended           WantStatus = "suspended"
+	WantStatusAchieved            WantStatus = "achieved"
+	WantStatusAchievedWithWarning WantStatus = "achieved_with_warning" // Achieved but governance/label access violations were logged
+	WantStatusCancelled           WantStatus = "cancelled"             // Superseded by a rebook; no longer the active booking
+	WantStatusFailed              WantStatus = "failed"
+	WantStatusTerminated          WantStatus = "terminated"
+	WantStatusDeleting            WantStatus = "deleting"
+	WantStatusConfigError         WantStatus = "config_error"        // Invalid input values or spec configuration
+	WantStatusModuleError         WantStatus = "module_error"        // Want type implementation error (GetState failure, cast failure, etc.)
+	WantStatusPrepareAgent        WantStatus = "prepare_agent"       // Preparing agent runtime
+	WantStatusWaitingUserAction   WantStatus = "waiting_user_action" // Waiting for user action (e.g., reaction approval)
 )
+
+// IsAchievedStatus returns true if the status represents a completed/achieved state (with or without warnings).
+func IsAchievedStatus(s WantStatus) bool {
+	return s == WantStatusAchieved || s == WantStatusAchievedWithWarning
+}
+
+// IsReachingStatus returns true if the status represents an actively running state (with or without warnings).
+func IsReachingStatus(s WantStatus) bool {
+	return s == WantStatusReaching || s == WantStatusReachingWithWarning
+}
 
 // ControlTrigger represents a control command sent to a Want
 type ControlTrigger string
@@ -423,9 +435,9 @@ type Want struct {
 	RunningAgents []string `json:"running_agents,omitempty" yaml:"running_agents,omitempty"`
 
 	// Internal fields for execution tracking
-	execCycleCount      int
-	inExecCycle         bool
-	labelViolationCount int // incremented on each SetGoal/SetCurrent/SetPlan/SetInternal label mismatch
+	execCycleCount           int
+	inExecCycle              bool
+	governanceViolationCount int // incremented on each state access policy violation (label mismatch or role/label governance denial)
 
 	// Agent system
 	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`
@@ -603,8 +615,8 @@ func (n *Want) SetStatus(status WantStatus) {
 		}
 		n.GetSubscriptionSystem().Emit(context.Background(), event)
 
-		// Automatically notify ChainBuilder when want reaches achieved status This enables receiver wants (like Coordinators) to self-notify completion
-		if status == WantStatusAchieved {
+		// Automatically notify ChainBuilder when want reaches achieved status (with or without warnings).
+		if IsAchievedStatus(status) {
 			// CRITICAL: When want achieves, always set achieving_percentage to 100%
 			// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 			// MergeState adds to pendingStateChanges which can be overwritten by later StoreState calls
@@ -711,20 +723,41 @@ func (n *Want) EndProgressCycle() {
 		return
 	}
 
-	// Check for label violations accumulated during this cycle.
-	// StateLabels are populated before Initialize() is called, so all cycles are enforced.
-	if n.labelViolationCount > 0 {
-		violations := n.labelViolationCount
-		n.labelViolationCount = 0
-		n.inExecCycle = false
-		_ = n.SetModuleError("LabelViolation", fmt.Sprintf("%d label violation(s) in cycle %d — undeclared state key(s) written; check [WARN] logs", violations, n.execCycleCount))
-		return
+	// Check for state access policy violations accumulated during this cycle (best-effort: log warning, do not fail).
+	// Covers both label violations (undeclared keys) and governance violations (role/label permission denied).
+	if n.governanceViolationCount > 0 {
+		violations := n.governanceViolationCount
+		n.governanceViolationCount = 0
+		n.setGovernanceWarning("PolicyViolation", fmt.Sprintf("%d state access policy violation(s) in cycle %d — check [GOVERNANCE]/[WARN] logs", violations, n.execCycleCount))
 	}
-	n.labelViolationCount = 0
+	n.governanceViolationCount = 0
 
-	// CRITICAL: If achieved, ALWAYS enforce achieving_percentage = 100
-	if n.Status == WantStatusAchieved {
+	// CRITICAL: If achieved (with or without warning), ALWAYS enforce achieving_percentage = 100
+	if IsAchievedStatus(n.Status) {
 		n.storeState("achieving_percentage", 100.0)
+	}
+
+	// fetchFrom expansion must run BEFORE FinalResultField so that derived fields are
+	// up-to-date when FinalResultField reads them in the same cycle.
+	// (e.g. mrs_raw_output written by agent → fetchFrom populates smartgolf_all_available_times
+	//  → FinalResultField reads smartgolf_all_available_times for final_result)
+	if n.WantTypeDefinition != nil {
+		for _, sd := range n.WantTypeDefinition.State {
+			if sd.FetchFrom == "" || sd.OnFetchData == "" {
+				continue
+			}
+			source := GetCurrent[any](n, sd.FetchFrom, nil)
+			if source == nil {
+				continue
+			}
+			sourceMap, ok := source.(map[string]any)
+			if !ok {
+				continue
+			}
+			if val := extractJSONPath(sourceMap, sd.OnFetchData); val != nil {
+				n.storeState(sd.Name, val)
+			}
+		}
 	}
 
 	// Auto-override final_result from FinalResultField if configured (handles dot-notation and zero-value skipping).
@@ -743,27 +776,6 @@ func (n *Want) EndProgressCycle() {
 			}
 			if !skip {
 				n.StoreState("final_result", val) // StoreState emits StateChangeEvent → handler propagates to parent
-			}
-		}
-	}
-
-	// fetchFrom expansion: state fields that declare fetchFrom+onFetchData are auto-populated
-	// from a source state field written by an agent (e.g. MonitorMRSAgent writes mrs_raw_output).
-	if n.WantTypeDefinition != nil {
-		for _, sd := range n.WantTypeDefinition.State {
-			if sd.FetchFrom == "" || sd.OnFetchData == "" {
-				continue
-			}
-			source := GetCurrent[any](n, sd.FetchFrom, nil)
-			if source == nil {
-				continue
-			}
-			sourceMap, ok := source.(map[string]any)
-			if !ok {
-				continue
-			}
-			if val := extractJSONPath(sourceMap, sd.OnFetchData); val != nil {
-				n.storeState(sd.Name, val)
 			}
 		}
 	}
@@ -874,8 +886,11 @@ func (n *Want) StartProgressionLoop(
 	go func() {
 		defer onComplete()
 		defer func() {
-			if n.GetStatus() == WantStatusReaching {
+			switch n.GetStatus() {
+			case WantStatusReaching:
 				n.SetStatus(WantStatusAchieved)
+			case WantStatusReachingWithWarning:
+				n.SetStatus(WantStatusAchievedWithWarning)
 			}
 		}()
 
@@ -1454,9 +1469,9 @@ func (n *Want) StoreParentState(key string, value any) {
 	engine := &GovernanceEngine{}
 
 	if !engine.CanWriteParentState(role, label) {
-		n.StoreLog("[GOVERNANCE] Write Denied: child %q (role:%s) cannot write to parent %q's key %q (label:%v)\n",
+		n.StoreLog("[GOVERNANCE] Write Warning: child %q (role:%s) attempted to write parent %q's key %q (label:%v) — policy not satisfied, proceeding anyway\n",
 			n.Metadata.Name, role, parent.Metadata.Name, key, label)
-		return
+		n.governanceViolationCount++
 	}
 
 	parent.storeState(key, value)
@@ -1471,20 +1486,18 @@ func (n *Want) MergeParentState(updates map[string]any) {
 
 	role := n.GetRole()
 	engine := &GovernanceEngine{}
-	authorizedUpdates := make(map[string]any)
 
-	for k, v := range updates {
+	for k := range updates {
 		label := parent.StateLabels[k]
-		if engine.CanWriteParentState(role, label) {
-			authorizedUpdates[k] = v
-		} else {
-			n.StoreLog("[GOVERNANCE] Merge Denied: child %q (role:%s) tried to write %q's key %q (label:%v)\n",
+		if !engine.CanWriteParentState(role, label) {
+			n.StoreLog("[GOVERNANCE] Merge Warning: child %q (role:%s) attempted to write %q's key %q (label:%v) — policy not satisfied, proceeding anyway\n",
 				n.Metadata.Name, role, parent.Metadata.Name, k, label)
+			n.governanceViolationCount++
 		}
 	}
 
-	if len(authorizedUpdates) > 0 {
-		parent.MergeState(authorizedUpdates)
+	if len(updates) > 0 {
+		parent.MergeState(updates)
 	}
 }
 
@@ -1913,7 +1926,7 @@ func (n *Want) SetGoal(key string, value any) {
 		n.storeState(key, value)
 	} else {
 		WarnLog("[WARN] SetGoal(%q) dropped on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.labelViolationCount++
+		n.governanceViolationCount++
 	}
 }
 
@@ -1929,7 +1942,7 @@ func (n *Want) SetCurrent(key string, value any) {
 		n.storeState(key, value)
 	} else {
 		WarnLog("[WARN] SetCurrent(%q) dropped on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.labelViolationCount++
+		n.governanceViolationCount++
 	}
 }
 
@@ -1994,7 +2007,7 @@ func (n *Want) SetPlan(key string, value any) {
 		n.storeState(key, value)
 	} else {
 		WarnLog("[WARN] SetPlan(%q) dropped on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.labelViolationCount++
+		n.governanceViolationCount++
 	}
 }
 
@@ -2016,7 +2029,7 @@ func (n *Want) SetInternal(key string, value any) {
 		n.storeState(key, value)
 	} else {
 		WarnLog("[WARN] SetInternal(%q) dropped on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.labelViolationCount++
+		n.governanceViolationCount++
 	}
 }
 
@@ -2506,6 +2519,23 @@ func (w *Want) SetConfigError(field string, message string) error {
 	w.StoreLog("CONFIG_ERROR: %s - %s", field, message)
 	w.SetStatus(WantStatusConfigError)
 	return fmt.Errorf("config error [%s]: %s", field, message)
+}
+
+// setGovernanceWarning records a governance or label access violation as a warning.
+// The want continues running — governance rules are best-effort, not enforced hard stops.
+// Status transitions: reaching → reaching_with_warning, achieved → achieved_with_warning.
+func (w *Want) setGovernanceWarning(component string, message string) {
+	w.storeStateMulti(map[string]any{
+		"governance_warning_component": component,
+		"governance_warning_message":   message,
+	})
+	w.StoreLog("[GOVERNANCE_WARNING] %s - %s", component, message)
+	switch w.Status {
+	case WantStatusReaching, WantStatusReachingWithWarning:
+		w.SetStatus(WantStatusReachingWithWarning)
+	case WantStatusAchieved, WantStatusAchievedWithWarning:
+		w.SetStatus(WantStatusAchievedWithWarning)
+	}
 }
 
 // SetModuleError marks the want as having a module/implementation error

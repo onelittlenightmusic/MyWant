@@ -328,11 +328,11 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     }
   };
 
-  const isRunning = want.status === 'reaching' || want.status === 'waiting_user_action';
+  const isRunning = want.status === 'reaching' || want.status === 'reaching_with_warning' || want.status === 'waiting_user_action';
   const isFailed = want.status === 'failed';
   const hasError = Boolean(isFailed && want.state?.current?.error);
   const isSuspended = want.status === 'suspended';
-  const canControl = want.status === 'reaching' || want.status === 'waiting_user_action' || want.status === 'stopped';
+  const canControl = want.status === 'reaching' || want.status === 'reaching_with_warning' || want.status === 'waiting_user_action' || want.status === 'stopped';
   const canSuspendResume = isRunning && (onSuspend || onResume);
   const hasScheduling = (want.spec?.when && want.spec.when.length > 0);
 

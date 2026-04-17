@@ -409,7 +409,7 @@ export const WantCard: React.FC<WantCardProps> = ({
               {children!.map((child, idx) => (
                 <div
                   key={idx}
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`}
+                  className={`w-2 h-2 rounded-full flex-shrink-0 ${(child.status === 'reaching' || child.status === 'reaching_with_warning' || child.status === 'waiting_user_action') ? styles.pulseGlow : ''}`}
                   style={{ backgroundColor: getStatusHexColor(child.status) }}
                   title={child.status}
                 />

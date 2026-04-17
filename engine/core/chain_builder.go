@@ -1411,13 +1411,13 @@ func (cb *ChainBuilder) startWant(wantKey string, want *runtimeWant) {
 	displayName := want.want.Metadata.Name
 	// Check if already in a terminal state
 	status := want.want.GetStatus()
-	if status == WantStatusAchieved || status == WantStatusFailed {
+	if IsAchievedStatus(status) || status == WantStatusFailed {
 		log.Printf("[START-WANT] '%s' already in terminal state (%s), skipping\n", displayName, status)
 		return
 	}
 
-	// Check if already running (reaching)
-	if status == WantStatusReaching {
+	// Check if already running (reaching or reaching_with_warning)
+	if IsReachingStatus(status) {
 		return
 	}
 

@@ -67,11 +67,13 @@ export const getStatusColor = (status: WantExecutionStatus | WantPhase): string 
       return 'gray';
     case 'initializing':
     case 'reaching':
+    case 'reaching_with_warning':
       return 'blue';
     case 'suspended':
     case 'waiting_user_action':
       return 'yellow';
     case 'achieved':
+    case 'achieved_with_warning':
       return 'green';
     case 'failed':
     case 'module_error':
@@ -97,12 +99,14 @@ export const getStatusIcon = (status: WantExecutionStatus | WantPhase): string =
     case 'initializing':
       return '🔄';
     case 'reaching':
+    case 'reaching_with_warning':
       return '▶️';
     case 'suspended':
       return '⏸️';
     case 'waiting_user_action':
       return '🔔';
     case 'achieved':
+    case 'achieved_with_warning':
       return '✅';
     case 'failed':
     case 'module_error':
@@ -130,12 +134,14 @@ export const getStatusIconComponent = (status: WantExecutionStatus | WantPhase, 
     case 'initializing':
       return React.createElement(RotateCw, { ...iconProps, className: classNames(iconProps.className, 'animate-spin') });
     case 'reaching':
+    case 'reaching_with_warning':
       return React.createElement(Play, iconProps);
     case 'suspended':
       return React.createElement(Pause, iconProps);
     case 'waiting_user_action':
       return React.createElement(Bell, { ...iconProps, className: classNames(iconProps.className, 'animate-pulse') });
     case 'achieved':
+    case 'achieved_with_warning':
       return React.createElement(CheckCircle, iconProps);
     case 'failed':
     case 'module_error':

@@ -55,9 +55,10 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
 
   // Auto-enable refresh when modal opens with running want
   useEffect(() => {
-    if (isOpen && selectedWantDetails && selectedWantDetails.status === 'reaching') {
+    const isReaching = selectedWantDetails?.status === 'reaching' || selectedWantDetails?.status === 'reaching_with_warning';
+    if (isOpen && selectedWantDetails && isReaching) {
       setAutoRefresh(true);
-    } else if (isOpen && selectedWantDetails && selectedWantDetails.status !== 'reaching' && autoRefresh) {
+    } else if (isOpen && selectedWantDetails && !isReaching && autoRefresh) {
       setAutoRefresh(false);
     }
   }, [isOpen, selectedWantDetails?.status]);
@@ -67,7 +68,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     if (!isOpen || !want || !autoRefresh) return;
 
     const interval = setInterval(() => {
-      if (selectedWantDetails && selectedWantDetails.status === 'reaching') {
+      if (selectedWantDetails && (selectedWantDetails.status === 'reaching' || selectedWantDetails.status === 'reaching_with_warning')) {
         const wantId = want.metadata?.id || want.id;
         if (wantId) {
           fetchWantDetails(wantId);
@@ -128,7 +129,7 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
   const footer = (
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-4">
-        {want.status === 'reaching' && (
+        {(want.status === 'reaching' || want.status === 'reaching_with_warning') && (
           <label className="flex items-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer">
             <input
               type="checkbox"

@@ -7,9 +7,11 @@ import { WantExecutionStatus, WantPhase } from '@/types/want';
 export const getStatusHexColor = (status: WantExecutionStatus | WantPhase): string => {
   switch (status) {
     case 'achieved':
+    case 'achieved_with_warning':
       return '#10b981'; // Green
-    
+
     case 'reaching':
+    case 'reaching_with_warning':
     case 'initializing':
       return '#9333ea'; // Purple (Active)
     
