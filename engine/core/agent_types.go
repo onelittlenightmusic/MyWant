@@ -177,6 +177,7 @@ type AgentRegistry struct {
 	agents             map[string]Agent
 	capabilityToAgents map[string][]string
 	agentSpecs         map[string]*AgentSpec // NEW: agent specs for validation
+	pluginStateUpdates map[string][]StateDef // capName -> state defs declared by MRS plugin agents
 	mutex              sync.RWMutex
 }
 
@@ -186,8 +187,24 @@ func NewAgentRegistry() *AgentRegistry {
 		capabilities:       make(map[string]Capability),
 		agents:             make(map[string]Agent),
 		capabilityToAgents: make(map[string][]string),
-		agentSpecs:         make(map[string]*AgentSpec), // NEW
+		agentSpecs:         make(map[string]*AgentSpec),
+		pluginStateUpdates: make(map[string][]StateDef),
 	}
+}
+
+// RegisterPluginStateUpdates stores the state defs declared by an MRS plugin agent.
+func (r *AgentRegistry) RegisterPluginStateUpdates(capName string, defs []StateDef) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.pluginStateUpdates[capName] = defs
+}
+
+// GetPluginStateUpdatesForCapability returns state defs declared by the plugin agent
+// that provides the given capability. Returns nil if none are registered.
+func (r *AgentRegistry) GetPluginStateUpdatesForCapability(capName string) []StateDef {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.pluginStateUpdates[capName]
 }
 
 func (r *AgentRegistry) RegisterCapability(cap Capability) {

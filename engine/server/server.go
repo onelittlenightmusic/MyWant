@@ -56,6 +56,12 @@ func New(config Config) *Server {
 	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
 		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
 	}
+
+	// Load MRS plugin agents from ~/.mywant/custom-types/ (best-effort)
+	if err := agentRegistry.LoadUserCustomAgents(mywant.UserCustomTypesDir()); err != nil {
+		log.Printf("[SERVER] Warning: Failed to load user custom agents: %v\n", err)
+	}
+
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
 	// Load recipes from recipes/ directory as custom types

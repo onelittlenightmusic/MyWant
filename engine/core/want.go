@@ -722,7 +722,10 @@ func (n *Want) EndProgressCycle() {
 			if sd.FetchFrom == "" || sd.OnFetchData == "" {
 				continue
 			}
-			source := GetCurrent[any](n, sd.FetchFrom, nil)
+			// Read fetchFrom source from the flat state map (not label-gated) so that
+			// transiently written fields like mrs_raw_output (written via StoreState by
+			// plugin agents) are accessible even when not declared in the type definition.
+			source, _ := n.getState(sd.FetchFrom)
 			if source == nil {
 				continue
 			}
@@ -1921,12 +1924,11 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 // ============================================================================
 
 func (n *Want) SetGoal(key string, value any) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		n.storeState(key, value)
-	} else {
-		WarnLog("[WARN] SetGoal(%q) dropped on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
+	if label, ok := n.StateLabels[key]; !ok || label != LabelGoal {
+		WarnLog("[WARN] SetGoal(%q) on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
+	n.storeState(key, value)
 }
 
 func (n *Want) GetGoal(key string) (any, bool) {
@@ -1937,12 +1939,11 @@ func (n *Want) GetGoal(key string) (any, bool) {
 }
 
 func (n *Want) SetCurrent(key string, value any) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		n.storeState(key, value)
-	} else {
-		WarnLog("[WARN] SetCurrent(%q) dropped on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
+	if label, ok := n.StateLabels[key]; !ok || label != LabelCurrent {
+		WarnLog("[WARN] SetCurrent(%q) on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
+	n.storeState(key, value)
 }
 
 func (n *Want) GetCurrent(key string) (any, bool) {
@@ -2002,12 +2003,11 @@ func (n *Want) getAllByLabel(label StateLabel) map[string]any {
 }
 
 func (n *Want) SetPlan(key string, value any) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.storeState(key, value)
-	} else {
-		WarnLog("[WARN] SetPlan(%q) dropped on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
+	if label, ok := n.StateLabels[key]; !ok || label != LabelPlan {
+		WarnLog("[WARN] SetPlan(%q) on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
+	n.storeState(key, value)
 }
 
 func (n *Want) GetPlan(key string) (any, bool) {
@@ -2024,12 +2024,11 @@ func (n *Want) ClearPlan(key string) {
 }
 
 func (n *Want) SetInternal(key string, value any) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
-		n.storeState(key, value)
-	} else {
-		WarnLog("[WARN] SetInternal(%q) dropped on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
+	if label, ok := n.StateLabels[key]; !ok || label != LabelInternal {
+		WarnLog("[WARN] SetInternal(%q) on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
+	n.storeState(key, value)
 }
 
 func (n *Want) GetInternal(key string) (any, bool) {
@@ -2728,6 +2727,30 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 			if !existing[r] {
 				n.Spec.Requires = append(n.Spec.Requires, r)
 				existing[r] = true
+			}
+		}
+	}
+
+	// Inject state defs declared by plugin agents (via agent.yaml state_updates).
+	// For each required capability that has registered plugin state updates, merge
+	// the declared fields into typeDef.State (deduplicated by field name).
+	if n.agentRegistry != nil && len(n.Spec.Requires) > 0 {
+		existingStateFields := make(map[string]bool, len(typeDef.State))
+		for _, sd := range typeDef.State {
+			existingStateFields[sd.Name] = true
+		}
+		for _, capName := range n.Spec.Requires {
+			pluginDefs := n.agentRegistry.GetPluginStateUpdatesForCapability(capName)
+			for _, sd := range pluginDefs {
+				if !existingStateFields[sd.Name] {
+					typeDef.State = append(typeDef.State, sd)
+					existingStateFields[sd.Name] = true
+					// Initialize the new field too
+					if sd.InitialValue != nil {
+						n.State.Store(sd.Name, sd.InitialValue)
+					}
+					n.ProvidedStateFields = append(n.ProvidedStateFields, sd.Name)
+				}
 			}
 		}
 	}

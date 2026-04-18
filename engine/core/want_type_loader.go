@@ -133,7 +133,7 @@ type ExampleDef struct {
 	ExpectedBehavior string         `json:"expectedBehavior" yaml:"expectedBehavior"`
 }
 
-// WantTypeWrapper is the top-level YAML structure
+// WantTypeWrapper is the top-level YAML structure for wantType-only files.
 type WantTypeWrapper struct {
 	WantType WantTypeDefinition `yaml:"wantType"`
 }
@@ -320,9 +320,29 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 			return nil
 		}
 
-		def, err := w.loadWantTypeFromFile(path)
-		if err != nil {
-			msg := fmt.Sprintf("Warning: failed to load user custom type %s: %v", path, err)
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			msg := fmt.Sprintf("Warning: failed to read user custom plugin %s: %v", path, readErr)
+			log.Printf("%s\n", msg)
+			w.loadWarnings = append(w.loadWarnings, msg)
+			return nil
+		}
+
+		var wrapper WantTypeWrapper
+		if yamlErr := yaml.Unmarshal(data, &wrapper); yamlErr != nil {
+			msg := fmt.Sprintf("Warning: failed to parse user custom plugin %s: %v", path, yamlErr)
+			log.Printf("%s\n", msg)
+			w.loadWarnings = append(w.loadWarnings, msg)
+			return nil
+		}
+
+		// Skip files that have no wantType key (e.g. agent.yaml files)
+		if wrapper.WantType.Metadata.Name == "" {
+			return nil
+		}
+		def := &wrapper.WantType
+		if valErr := w.validateDefinition(def); valErr != nil {
+			msg := fmt.Sprintf("Warning: validation failed for user custom type %s: %v", path, valErr)
 			log.Printf("%s\n", msg)
 			w.loadWarnings = append(w.loadWarnings, msg)
 			return nil

@@ -338,6 +338,158 @@ coordinator.Provide(someData)
 **重要：** イベント駆動（パケットなし）では Progress() を再トリガーできません。
 その場合は SetStatus() で状態を設定する必要があります。
 
+## Progress の再開可能実装パターン（Resumable Progress）
+
+### 原則
+
+`Progress()` はいつでも中断される可能性があります（サーバー停止、goroutineの再スケジュール、エラーなど）。
+再度 `Progress()` が呼ばれたとき、**中断前の途中状態から再開できる**実装が求められます。
+
+### 基本ルール
+
+> **欲しい値が State になければ、それを作るために必要な値を再帰的に確認する。**
+
+明示的なステップ変数（`_step` など）は使いません。
+**各値の存在そのものが再開ポイント**になります。
+
+1. 最終的に欲しい値（例: `c`）が State にあれば完了
+2. なければ `c` の依存値（例: `a`, `b`）を確認する
+3. 依存値がなければ、それを取得・計算して State に保存する
+4. すべての依存値が揃ったら `c` を計算して State に保存する
+
+### 実装テンプレート（`c = a + b` の例）
+
+```go
+func (w *MyWant) Progress() {
+    // 最終値 c が揃っていれば完了
+    c, hasC := w.GetCurrent("c")
+    if hasC {
+        w.SetStatus(WantStatusAchieved)
+        return
+    }
+
+    // c がない → a を確認
+    a, hasA := w.GetCurrent("a")
+    if !hasA {
+        // a がない → 取得する
+        fetched, err := fetchA()
+        if err != nil {
+            w.SetStatus(WantStatusFailed)
+            return
+        }
+        w.SetCurrent("a", fetched)
+        a = fetched
+    }
+
+    // b を確認
+    b, hasB := w.GetCurrent("b")
+    if !hasB {
+        // b がない → 取得する
+        fetched, err := fetchB()
+        if err != nil {
+            w.SetStatus(WantStatusFailed)
+            return
+        }
+        w.SetCurrent("b", fetched)
+        b = fetched
+    }
+
+    // a と b が揃った → c を計算して保存
+    _ = c // 未使用変数の回避
+    w.SetCurrent("c", a.(int) + b.(int))
+    w.SetStatus(WantStatusAchieved)
+}
+```
+
+**再開時の動作:**
+
+| 中断タイミング | 再開時の挙動 |
+|--------------|------------|
+| `a` 取得前 | `a` の取得から再開 |
+| `a` 取得後・`b` 取得前 | `a` はスキップ、`b` の取得から再開 |
+| `b` 取得後・`c` 計算前 | `a`, `b` はスキップ、`c` の計算から再開 |
+| `c` 保存後 | 冒頭で `c` を検出し即完了 |
+
+### より複雑な依存関係
+
+依存関係が深い場合も同じパターンを入れ子で適用します。
+
+```go
+func (w *MyWant) Progress() {
+    // 最終値: summary
+    if _, ok := w.GetCurrent("summary"); ok {
+        w.SetStatus(WantStatusAchieved)
+        return
+    }
+
+    // summary の依存: user_profile
+    userProfile, hasProfile := w.GetCurrent("user_profile")
+    if !hasProfile {
+        // user_profile の依存: user_id
+        userID, hasID := w.GetCurrent("user_id")
+        if !hasID {
+            id, err := resolveUserID()
+            if err != nil { w.SetStatus(WantStatusFailed); return }
+            w.SetCurrent("user_id", id)
+            userID = id
+        }
+        profile, err := fetchProfile(userID)
+        if err != nil { w.SetStatus(WantStatusFailed); return }
+        w.SetCurrent("user_profile", profile)
+        userProfile = profile
+    }
+
+    // summary の依存: recent_activity
+    activity, hasActivity := w.GetCurrent("recent_activity")
+    if !hasActivity {
+        fetched, err := fetchActivity()
+        if err != nil { w.SetStatus(WantStatusFailed); return }
+        w.SetCurrent("recent_activity", fetched)
+        activity = fetched
+    }
+
+    // すべて揃った → summary を生成
+    w.SetCurrent("summary", buildSummary(userProfile, activity))
+    w.SetStatus(WantStatusAchieved)
+}
+```
+
+### アンチパターン
+
+```go
+// ❌ 悪い例: State を読まず毎回最初から処理する
+func (w *MyWant) Progress() {
+    a := fetchA()   // 再開時も毎回実行される（副作用・無駄なAPI呼び出し）
+    b := fetchB()
+    w.SetCurrent("c", a + b)
+    w.SetStatus(WantStatusAchieved)
+}
+```
+
+```go
+// ❌ 悪い例: _step で手続き的に管理する
+func (w *MyWant) Progress() {
+    step, _ := w.GetInternal("_step")
+    switch step {
+    case "": fetchA(); w.SetInternal("_step", "got_a")   // 値ではなくステップを記録
+    case "got_a": fetchB(); w.SetInternal("_step", "got_b")
+    case "got_b": computeC(); w.SetStatus(WantStatusAchieved)
+    }
+    // → 依存関係が増えるほど複雑化し、値の再利用ができない
+}
+```
+
+### チェックリスト（再開可能実装）
+
+- [ ] 最終的に欲しい値を先に State から確認している
+- [ ] 値がなければ、その依存値を再帰的に確認している
+- [ ] 各値の取得・計算後に必ず State に保存している（次回はスキップされる）
+- [ ] `_step` などの手続き的なフェーズ変数を使っていない
+- [ ] 同じ `Progress()` が複数回呼ばれても正しく動作する（冪等性）
+- [ ] 外部API呼び出しなど副作用のある処理は、結果を State に保存してから先に進む
+
+---
+
 ## チェックリスト：カスタムWant型の開発
 
 新しいWant型を作成する場合のチェックリスト：
