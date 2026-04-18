@@ -487,16 +487,22 @@ class MyWantApiClient {
     // First get the current want
     const current = await this.getWant(id);
 
-    // Merge updates into state
-    const updatedWant = {
-      ...current,
+    // Merge updates into state.current
+    const updatedWant: UpdateWantRequest = {
+      metadata: current.metadata,
+      spec: current.spec,
+      status: current.status,
       state: {
         ...current.state,
-        ...updates,
+        current: {
+          ...(current.state?.current || {}),
+          ...updates,
+        },
       },
+      history: current.history,
     };
 
-    const response = await this.client.put(`/api/v1/wants/${id}`, updatedWant);
+    const response = await this.client.put<Want>(`/api/v1/wants/${id}`, updatedWant);
     return response.data;
   }
 

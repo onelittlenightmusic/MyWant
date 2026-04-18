@@ -18,12 +18,12 @@ export interface InteractMessageRequest {
 export interface Recommendation {
   id: string;
   title: string;
-  approach: 'recipe' | 'custom' | 'hybrid';
+  approach?: 'recipe' | 'custom' | 'hybrid';
   description: string;
-  config: {
+  config?: {
     wants: Want[];
   };
-  metadata: {
+  metadata?: {
     want_count: number;
     want_types_used: string[];
     recipes_used: string[];

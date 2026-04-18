@@ -25,6 +25,7 @@ export interface CreateDraftWantData {
 // Data for updating a draft want in the backend
 export interface UpdateDraftWantData {
   recommendations?: Recommendation[];
+  selected_recommendation_id?: string;
   isThinking?: boolean;
   error?: string;
 }
@@ -40,14 +41,16 @@ export function wantToDraft(want: Want): DraftWant | null {
   }
 
   const current = want.state?.current || {};
+  const phase = current.phase as string || '';
+  const isThinking = current.isThinking as boolean || phase === 'ideating' || phase === 'decomposing' || phase === 're_planning';
 
   return {
     id: want.metadata.id || want.id || '',
     sessionId: current.sessionId as string || '',
     message: current.message as string || '',
-    recommendations: (current.recommendations as Recommendation[]) || [],
+    recommendations: (current.proposed_recommendations as Recommendation[]) || (current.recommendations as Recommendation[]) || [],
     selectedRecommendation: null,
-    isThinking: current.isThinking as boolean || false,
+    isThinking: isThinking,
     createdAt: current.createdAt as string || '',
     error: current.error as string | undefined
   };
