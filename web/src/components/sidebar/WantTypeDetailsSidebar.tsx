@@ -107,7 +107,7 @@ export const WantTypeDetailsSidebar: React.FC<WantTypeDetailsSidebarProps> = ({
       {wantType && (
         <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex gap-1 justify-center">
           {/* Deploy first example */}
-          {wantType.examples.length > 0 && (
+          {(wantType.examples?.length || 0) > 0 && (
             <button
               onClick={() => {
                 handleDeployExample(wantType.examples[0]);
@@ -206,11 +206,11 @@ const OverviewTab: React.FC<{ wantType: WantTypeDefinition }> = ({ wantType }) =
 
     <TabSection title="Summary">
       <div className="space-y-2 sm:space-y-3">
-        <InfoRow label="Parameters" value={wantType.parameters.length} />
-        <InfoRow label="State Keys" value={wantType.state.length} />
+        <InfoRow label="Parameters" value={wantType.parameters?.length || 0} />
+        <InfoRow label="State Keys" value={wantType.state?.length || 0} />
         <InfoRow label="Require Type" value={wantType.require?.type || 'none'} />
-        <InfoRow label="Agents" value={wantType.agents.length} />
-        <InfoRow label="Examples" value={wantType.examples.length} />
+        <InfoRow label="Agents" value={wantType.agents?.length || 0} />
+        <InfoRow label="Examples" value={wantType.examples?.length || 0} />
       </div>
     </TabSection>
 

@@ -92,8 +92,8 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       data-keyboard-nav-selected={selected}
       data-keyboard-nav-id={wantType.name}
       className={classNames(
-        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-shadow duration-200 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[8rem] sm:min-h-[10rem]',
-        selected ? 'border-blue-500 border-2' : 'border-gray-200 dark:border-gray-700',
+        'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 cursor-pointer group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset h-full flex flex-col min-h-[6rem] sm:min-h-[10rem]',
+        selected ? 'border-blue-500 border-2 shadow-lg scale-[1.02] z-10' : 'border-gray-200 dark:border-gray-700',
         className || ''
       )}
       style={backgroundStyle.style}
@@ -101,58 +101,67 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       {/* Overlay - semi-transparent background */}
       <div className={getBackgroundOverlayClass()}></div>
 
-      {/* Card content */}
-      <div className="relative z-10">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-2 sm:mb-4">
-        <div className="flex-1 min-w-0">
-          <h3
-            className="text-xs sm:text-lg font-semibold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
-            onClick={() => onView(wantType)}
-          >
-            <Zap className="h-3 w-3 sm:h-4 w-4 flex-shrink-0 text-yellow-500" />
-            {truncateText(wantType.title, 30)}
-          </h3>
-          <p className="text-[10px] sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
-            {wantType.name}
-          </p>
-        </div>
+      {/* Content Area */}
+      <div className="relative z-10 px-3 sm:px-6 pb-3 pt-3 order-1 flex-1">
+        <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+          {wantType.name}
+        </p>
+      </div>
 
-        <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2 flex-shrink-0">
-          {/* Pattern badge */}
-          <span className={classNames('inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium', patternColors[wantType.pattern] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
-            {patternIcons[wantType.pattern]}
-            <span className="capitalize">{wantType.pattern}</span>
-          </span>
+      {/* Header (Title Area) - Moved to bottom to match WantCard */}
+      <div className="relative z-20 order-2 mt-auto">
+        <div className={classNames(
+          "backdrop-blur-[2px] transition-colors duration-200 px-3 sm:px-6 py-1.5 flex items-center justify-between",
+          selected ? "bg-blue-100/90 dark:bg-blue-900/70" : "bg-white/60 dark:bg-gray-900/70"
+        )}>
+          <div className="flex-1 min-w-0">
+            <h3
+              className="text-[9px] sm:text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
+              onClick={(e) => { e.stopPropagation(); onView(wantType); }}
+            >
+              <Zap className="h-2 w-2 sm:h-3.5 sm:w-3.5 flex-shrink-0 text-yellow-500" />
+              {truncateText(wantType.title, 30)}
+            </h3>
+          </div>
 
-          {/* Category badge */}
-          <span
-            className={classNames('inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}
-            title={wantType.category}
-          >
-            {categoryIcons[wantType.category] || <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
-          </span>
+          <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2 flex-shrink-0">
+            {/* Pattern badge */}
+            <span className={classNames('inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[8px] sm:text-[10px] font-medium', patternColors[wantType.pattern] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}>
+              {patternIcons[wantType.pattern]}
+              <span className="capitalize hidden sm:inline">{wantType.pattern}</span>
+            </span>
 
-          {/* Actions menu */}
-          <div className="relative group/menu">
-            <button className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            {/* Category badge */}
+            <span
+              className={classNames('inline-flex items-center px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full', categoryColors[wantType.category] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300')}
+              title={wantType.category}
+            >
+              {categoryIcons[wantType.category] || <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
+            </span>
 
-            <div className="absolute right-0 top-8 w-40 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200">
-              <div className="py-1">
-                <button
-                  onClick={() => onView(wantType)}
-                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Details
-                </button>
+            {/* Actions menu */}
+            <div className="relative group/menu">
+              <button 
+                className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="absolute right-0 bottom-full mb-2 w-40 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all duration-200">
+                <div className="py-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onView(wantType); }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Details
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
   );
