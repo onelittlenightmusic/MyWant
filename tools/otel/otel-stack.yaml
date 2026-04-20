@@ -1,0 +1,17 @@
+# グローバルパラメーター compose_file を事前に設定してからデプロイしてください:
+#   ./bin/mywant params set compose_file /path/to/tools/otel/docker-compose.yaml
+#
+# デプロイ:
+#   ./bin/mywant wants create -f tools/otel/otel-stack.yaml
+
+wants:
+  - metadata:
+      name: otel-stack
+      type: managed_launch
+    spec:
+      params:
+        launcher: docker_compose
+        # compose_file はグローバルパラメーター "compose_file" から解決されます
+        health_check_url: "http://localhost:3000/api/health"
+        health_check_interval: "3s"
+        health_check_max_retries: 40

@@ -1,0 +1,56 @@
+services:
+
+  # ── OpenTelemetry Collector ────────────────────────────────────────────────
+  # Receives OTLP/gRPC from MyWant and routes:
+  #   traces → Tempo
+  #   logs   → Loki
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"   # OTLP gRPC  ← MyWant の otel_endpoint はここ
+      - "4318:4318"   # OTLP HTTP  (optional)
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      - tempo
+      - loki
+
+  # ── Grafana Tempo (trace backend) ─────────────────────────────────────────
+  tempo:
+    image: grafana/tempo:latest
+    command: ["-config.file=/etc/tempo.yaml"]
+    ports:
+      - "3200:3200"   # Tempo HTTP API (Grafana datasource)
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+
+  # ── Grafana Loki (log backend) ────────────────────────────────────────────
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki.yaml:/etc/loki/local-config.yaml
+
+  # ── Grafana (visualization) ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - tempo
+      - loki
+
+volumes:
+  tempo-data:
+  grafana-data:
