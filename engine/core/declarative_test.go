@@ -83,9 +83,11 @@ func TestWantExecCycle(t *testing.T) {
 		t.Error("State key2 not properly stored during exec cycle")
 	}
 
-	// storeState is a raw write (no label, no history) - history should remain empty
-	if len(want.BuildHistory().StateHistory) != 0 {
-		t.Error("storeState should not record state history")
+	// storeState delegates to StoreState which records history since the unification.
+	// Verify that history entries were recorded (one per unique key).
+	history := want.BuildHistory().StateHistory
+	if len(history) == 0 {
+		t.Error("storeState should record state history via StoreState")
 	}
 }
 
