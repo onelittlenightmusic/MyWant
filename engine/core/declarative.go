@@ -151,6 +151,12 @@ type Progressable interface {
 	Progress()        // Execute logic (no completion signal)
 }
 
+// Failable is an optional extension of Progressable for want types that can
+// declare a failed termination condition (e.g. via finalizeWhen.failed).
+type Failable interface {
+	IsFailed() bool // Returns true when want should terminate with WantStatusFailed
+}
+
 // migrateAllWantsAgentHistory runs agent history migration on all wants
 func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	// Note: This function is called from compilePhase which is already protected by reconcileMutex

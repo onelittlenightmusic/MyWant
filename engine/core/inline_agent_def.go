@@ -10,12 +10,21 @@ type InlineAgentDef struct {
 	Interval   int    `json:"interval,omitempty" yaml:"interval,omitempty"`   // execution interval in seconds; 0 = default
 }
 
-// AchievedWhenDef defines a declarative achievement condition for ScriptableWant.
-// Replaces the need for a Go IsAchieved() implementation.
-type AchievedWhenDef struct {
+// ConditionDef defines a single declarative state condition (field operator value).
+type ConditionDef struct {
 	Field    string `json:"field" yaml:"field"`       // current-labeled state field name
 	Operator string `json:"operator" yaml:"operator"` // ==, !=, >, >=, <, <=
 	Value    any    `json:"value" yaml:"value"`        // comparison value
+}
+
+// AchievedWhenDef is an alias kept for backward compatibility. Use ConditionDef directly.
+type AchievedWhenDef = ConditionDef
+
+// FinalizeWhen groups the conditions that determine how a ScriptableWant terminates.
+// Both fields are optional; omitting one means that outcome is never triggered declaratively.
+type FinalizeWhen struct {
+	Achieved *ConditionDef `json:"achieved,omitempty" yaml:"achieved,omitempty"` // transition to WantStatusAchieved
+	Failed   *ConditionDef `json:"failed,omitempty" yaml:"failed,omitempty"`   // transition to WantStatusFailed
 }
 
 // LifecycleHookDef defines actions executed at a want lifecycle event (onInitialize, onDelete, onAchieved).

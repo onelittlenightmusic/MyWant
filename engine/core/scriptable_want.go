@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"sync"
 	"time"
 )
 
@@ -22,18 +23,22 @@ type ScriptableWant struct {
 // ScriptableLocals holds no runtime locals; state is managed entirely via Want state.
 type ScriptableLocals struct{}
 
-// Initialize copies all parameters to state using their declared labels,
-// then executes the onInitialize lifecycle hook if defined.
+// Initialize resets the agentRunGuard, copies parameters, then executes onInitialize.
+// State reset (resetOnRestart) is handled generically by Want.prepareForRestart()
+// before this method is called, so onInitialize always starts from a clean baseline.
 func (s *ScriptableWant) Initialize() {
 	if s.WantTypeDefinition == nil {
 		return
 	}
-	// Build a quick lookup of state field label by name.
+
+	// Reset agentRunGuard so DoAgents can run again on restart.
+	s.agentRunGuard = sync.Map{}
+
+	// Copy spec params into state using declared labels.
 	labels := make(map[string]string, len(s.WantTypeDefinition.State))
 	for _, sd := range s.WantTypeDefinition.State {
 		labels[sd.Name] = sd.Label
 	}
-
 	for k, v := range s.Spec.Params {
 		switch labels[k] {
 		case "goal":
@@ -47,6 +52,7 @@ func (s *ScriptableWant) Initialize() {
 		}
 	}
 
+	// Run onInitialize (sets plan fields, copies additional params, runs agents).
 	if s.WantTypeDefinition.OnInitialize != nil {
 		s.execLifecycleHook(s.WantTypeDefinition.OnInitialize)
 	}
@@ -57,6 +63,9 @@ func (s *ScriptableWant) OnDelete() {
 	if s.WantTypeDefinition == nil || s.WantTypeDefinition.OnDelete == nil {
 		return
 	}
+	// Reset all agent run guards so DoAgents that already ran during
+	// onInitialize can be re-executed by the onDelete hook.
+	s.agentRunGuard = sync.Map{}
 	s.execLifecycleHook(s.WantTypeDefinition.OnDelete)
 }
 
@@ -115,20 +124,39 @@ func (s *ScriptableWant) interpolate(tmpl string) string {
 	})
 }
 
-// IsAchieved evaluates the declarative AchievedWhen condition if defined.
-// If AchievedWhen is absent but the want type declares a "status" state field
-// with initialValue "pending", the implicit rule "status != pending" is applied.
-// Otherwise falls back to checking the predefined `achieved` current state field.
+// IsAchieved evaluates the declarative achieved condition.
+// Priority: finalizeWhen.achieved > achievedWhen (deprecated) > implicit status!=pending > achieved field.
 func (s *ScriptableWant) IsAchieved() bool {
-	if s.WantTypeDefinition != nil && s.WantTypeDefinition.AchievedWhen != nil {
-		aw := s.WantTypeDefinition.AchievedWhen
-		actual := GetCurrent[any](&s.Want, aw.Field, nil)
-		return evaluateAchievedWhen(actual, aw.Operator, aw.Value)
-	}
-	if s.WantTypeDefinition != nil && hasStatusPendingField(s.WantTypeDefinition) {
-		return GetCurrent(&s.Want, "status", "") != "pending"
+	if s.WantTypeDefinition != nil {
+		def := s.WantTypeDefinition
+		if def.FinalizeWhen != nil && def.FinalizeWhen.Achieved != nil {
+			c := def.FinalizeWhen.Achieved
+			return evaluateCondition(GetCurrent[any](&s.Want, c.Field, nil), c.Operator, c.Value)
+		}
+		if def.AchievedWhen != nil {
+			aw := def.AchievedWhen
+			return evaluateCondition(GetCurrent[any](&s.Want, aw.Field, nil), aw.Operator, aw.Value)
+		}
+		if hasStatusPendingField(def) {
+			// Implicit rule: achieved when status leaves "pending" AND is not "failed"
+			status := GetCurrent(&s.Want, "status", "")
+			return status != "pending" && status != "failed"
+		}
 	}
 	return GetCurrent(&s.Want, "achieved", false)
+}
+
+// IsFailed evaluates the declarative failed condition (finalizeWhen.failed).
+// Returns false if no failed condition is defined.
+func (s *ScriptableWant) IsFailed() bool {
+	if s.WantTypeDefinition == nil || s.WantTypeDefinition.FinalizeWhen == nil {
+		return false
+	}
+	c := s.WantTypeDefinition.FinalizeWhen.Failed
+	if c == nil {
+		return false
+	}
+	return evaluateCondition(GetCurrent[any](&s.Want, c.Field, nil), c.Operator, c.Value)
 }
 
 // hasStatusPendingField reports whether the want type defines a "status" state field
@@ -168,8 +196,8 @@ func resolveSpecialValue(v any) any {
 	return v
 }
 
-// evaluateAchievedWhen compares actual (from state) against expected using the operator.
-func evaluateAchievedWhen(actual any, operator string, expected any) bool {
+// evaluateCondition compares actual (from state) against expected using the operator.
+func evaluateCondition(actual any, operator string, expected any) bool {
 	expected = resolveSpecialValue(expected)
 	// Convert to float64 for numeric comparisons.
 	af, aOK := toFloat64(actual)

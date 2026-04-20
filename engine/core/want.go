@@ -18,6 +18,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	otellog "go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -125,6 +128,9 @@ type WantSpec struct {
 	Requires            []string             `json:"requires,omitempty" yaml:"requires,omitempty"`
 	When                []WhenSpec           `json:"when,omitempty" yaml:"when,omitempty"`
 	FinalResultField    string               `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`
+	// ResetOnRestart controls whether state is reset to initialValues on each scheduled restart.
+	// Defaults to true (nil treated as true). Set explicitly to false to preserve state across restarts.
+	ResetOnRestart *bool `json:"resetOnRestart,omitempty" yaml:"resetOnRestart,omitempty"`
 }
 
 // GetParam returns the value for the given key from Params map
@@ -510,6 +516,10 @@ type Want struct {
 	// Retry mechanism for failed phases
 	PhaseRetryCount map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
+
+	// OpenTelemetry: lifecycle span for this want (started on first non-idle status, ended at terminal)
+	otelSpan    trace.Span      `json:"-" yaml:"-"`
+	otelSpanCtx context.Context `json:"-" yaml:"-"`
 }
 
 // MarshalYAML handles custom YAML marshalling for the Want struct.
@@ -603,6 +613,60 @@ func (n *Want) SetStatus(status WantStatus) {
 			// This is part of the standard progression cycle completion pattern
 			n.emitOwnerCompletionEventIfOwned()
 		}
+
+		// OpenTelemetry: manage want lifecycle span
+		n.otelOnStatusChange(oldStatus, status)
+	}
+}
+
+// otelOnStatusChange manages the OTEL lifecycle span for this want.
+//   - First active status → start a new span
+//   - Every status change → add a span event
+//   - Terminal status → end the span
+func (n *Want) otelOnStatusChange(oldStatus, newStatus WantStatus) {
+	if !IsOTELEnabled() {
+		return
+	}
+
+	terminalStatuses := map[WantStatus]bool{
+		WantStatusAchieved:            true,
+		WantStatusAchievedWithWarning: true,
+		WantStatusFailed:              true,
+		WantStatusCancelled:           true,
+		WantStatusTerminated:          true,
+	}
+
+	// Start span when want first becomes active
+	if n.otelSpan == nil && oldStatus == WantStatusIdle {
+		tracer := otelTracer()
+		if tracer != nil {
+			ctx, span := tracer.Start(context.Background(), "want/"+n.Metadata.Name,
+				trace.WithAttributes(
+					attribute.String("want.name", n.Metadata.Name),
+					attribute.String("want.type", n.Metadata.Type),
+					attribute.String("want.id", n.Metadata.ID),
+				),
+			)
+			n.otelSpan = span
+			n.otelSpanCtx = ctx
+		}
+	}
+
+	if n.otelSpan == nil {
+		return
+	}
+
+	// Record status transition as a span event
+	n.otelSpan.AddEvent("status_change", trace.WithAttributes(
+		attribute.String("want.status.old", string(oldStatus)),
+		attribute.String("want.status.new", string(newStatus)),
+	))
+
+	// End span at terminal status
+	if terminalStatuses[newStatus] {
+		n.otelSpan.End()
+		n.otelSpan = nil
+		n.otelSpanCtx = nil
 	}
 }
 
@@ -612,6 +676,33 @@ func (n *Want) SetStatus(status WantStatus) {
 func (n *Want) RestartWant() {
 	n.StoreLog("[RESTART] Want '%s' restarting execution\n", n.Metadata.Name)
 	n.SetStatus(WantStatusIdle)
+}
+
+// prepareForRestart resets state fields to initialValues before Initialize() is called.
+// Called from the progression loop at both goroutine start and ControlTriggerRestart.
+// Order is guaranteed: reset state → Initialize() → onInitialize.
+// Type-specific per-run resets (e.g. agentRunGuard for ScriptableWant) are handled
+// inside the progressable's own Initialize().
+func (n *Want) prepareForRestart() {
+	// Reset state fields to initialValues when resetOnRestart is enabled (nil = true).
+	if n.Spec.ResetOnRestart == nil || *n.Spec.ResetOnRestart {
+		cb := GetGlobalChainBuilder()
+		if cb != nil {
+			typeDef := cb.GetWantTypeDefinition(n.Metadata.Type)
+			if typeDef != nil {
+				resetState := make(map[string]any)
+				for _, sd := range typeDef.State {
+					if sd.InitialValue != nil {
+						resetState[sd.Name] = sd.InitialValue
+					}
+				}
+				if len(resetState) > 0 {
+					n.storeStateMulti(resetState)
+					InfoLog("[RESTART] Reset %d state field(s) to initialValues for '%s'\n", len(resetState), n.Metadata.Name)
+				}
+			}
+		}
+	}
 }
 
 // NotifyCompletion notifies the ChainBuilder that this want has achieved completion Called automatically by SetStatus() when want reaches WantStatusAchieved This enables wants (especially receivers like Coordinators) to self-notify completion Replaces the previous pattern where senders would call UpdateCompletedFlag
@@ -873,8 +964,9 @@ func (n *Want) StartProgressionLoop(
 			}
 		}()
 
-		// Initialize the progressable before starting execution
-		// This resets state for fresh execution (especially important for restarts)
+		// Reset per-run state then initialize.
+		// Order: reset state/agentRunGuard → Initialize() → onInitialize.
+		n.prepareForRestart()
 		if n.progressable != nil {
 			n.progressable.Initialize()
 			n.syncLocalsAfterInitialize()
@@ -917,6 +1009,7 @@ func (n *Want) StartProgressionLoop(
 					if err := n.StopAllBackgroundAgents(); err != nil {
 						n.StoreLog("ERROR: Failed to stop background agents on restart: %v", err)
 					}
+					n.prepareForRestart()
 					if n.progressable != nil {
 						n.progressable.Initialize()
 						n.syncLocalsAfterInitialize()
@@ -932,6 +1025,17 @@ func (n *Want) StartProgressionLoop(
 			if n.IsSuspended() {
 				time.Sleep(GlobalExecutionInterval)
 				continue
+			}
+
+			// 3.1a. Check if want has failed (before precondition check)
+			if failable, ok := n.progressable.(Failable); ok {
+				if failable.IsFailed() {
+					n.SetStatus(WantStatusFailed)
+					if err := n.StopAllBackgroundAgents(); err != nil {
+						n.StoreLog("ERROR: Failed to stop background agents on failed: %v", err)
+					}
+					return
+				}
 			}
 
 			// 3.1. Check if want is achieved (before precondition check)
@@ -1092,6 +1196,16 @@ func (n *Want) StartProgressionLoop(
 			if currentStatus == WantStatusConfigError {
 				// Config error - wait for config update (will be handled in next iteration)
 				continue
+			}
+
+			// 8.6a. Check if want has failed AFTER execution cycle
+			if failable, ok := n.progressable.(Failable); ok && failable.IsFailed() {
+				n.SetStatus(WantStatusFailed)
+				n.FlushThinkingAgents(context.Background())
+				if err := n.StopAllBackgroundAgents(); err != nil {
+					n.StoreLog("ERROR: Failed to stop background agents on failed: %v", err)
+				}
+				return
 			}
 
 			// 8.6. Check if want is achieved AFTER execution cycle (catch state changes from Progress)
@@ -1623,11 +1737,26 @@ func (n *Want) DirectLog(message string, args ...any) {
 	formatted := fmt.Sprintf(message, args...)
 	InfoLog("[%s] %s", n.Metadata.Name, formatted)
 	n.getHistoryManager().AddLogEntry(formatted)
+	n.otelEmitWantLog(otellog.SeverityInfo, formatted)
 }
 
 func (n *Want) StoreLog(message string, args ...any) {
 	formatted := fmt.Sprintf(message, args...)
 	n.getHistoryManager().AddLogEntry(formatted)
+	n.otelEmitWantLog(otellog.SeverityDebug, formatted)
+}
+
+// otelEmitWantLog emits a log record with want identity attributes.
+func (n *Want) otelEmitWantLog(severity otellog.Severity, body string) {
+	ctx := n.otelSpanCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	otelEmitLog(ctx, severity, body,
+		otellog.String("want.name", n.Metadata.Name),
+		otellog.String("want.type", n.Metadata.Type),
+		otellog.String("want.status", string(n.Status)),
+	)
 }
 
 func (n *Want) getState(key string) (any, bool) {
@@ -1635,7 +1764,7 @@ func (n *Want) getState(key string) (any, bool) {
 }
 
 func (n *Want) storeState(key string, value any) {
-	n.State.Store(key, value)
+	n.StoreState(key, value)
 }
 
 // StoreStateMulti writes multiple key-value pairs into the want's state. 
@@ -2455,7 +2584,22 @@ func (n *Want) FinishAgentRun(agentName string, permanent bool) {
 
 func (n *Want) getHistoryManager() *HistoryManager {
 	if n.history == nil {
-		n.history = NewHistoryManager()
+		hm := NewHistoryManager()
+		// Inject OTEL span-event hook for state changes
+		hm.OnStateEntry = func(key string, value any) {
+			if n.otelSpan == nil || !IsOTELEnabled() {
+				return
+			}
+			valStr := fmt.Sprintf("%v", value)
+			if len(valStr) > 256 {
+				valStr = valStr[:256] + "…"
+			}
+			n.otelSpan.AddEvent("state_change", trace.WithAttributes(
+				attribute.String("state.key", key),
+				attribute.String("state.value", valStr),
+			))
+		}
+		n.history = hm
 	}
 	return n.history
 }

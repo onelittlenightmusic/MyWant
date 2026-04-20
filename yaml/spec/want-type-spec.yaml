@@ -64,7 +64,7 @@ components:
           type: string
           description: Default state key for final_result
         achievedWhen:
-          description: Declarative achievement condition (replaces Go IsAchieved())
+          description: "Deprecated: use finalizeWhen.achieved instead."
           type: object
           properties:
             field:
@@ -74,6 +74,33 @@ components:
               enum: ["==", "!=", ">", ">=", "<", "<="]
             value: {}
           required: [field, operator, value]
+          additionalProperties: false
+        finalizeWhen:
+          description: Declarative termination conditions grouping achieved and failed outcomes.
+          type: object
+          properties:
+            achieved:
+              type: object
+              properties:
+                field:
+                  type: string
+                operator:
+                  type: string
+                  enum: ["==", "!=", ">", ">=", "<", "<="]
+                value: {}
+              required: [field, operator, value]
+              additionalProperties: false
+            failed:
+              type: object
+              properties:
+                field:
+                  type: string
+                operator:
+                  type: string
+                  enum: ["==", "!=", ">", ">=", "<", "<="]
+                value: {}
+              required: [field, operator, value]
+              additionalProperties: false
           additionalProperties: false
         onInitialize:
           description: Actions to execute when the want is initialized

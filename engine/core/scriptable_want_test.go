@@ -89,9 +89,9 @@ func TestEvaluateAchievedWhen(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got := evaluateAchievedWhen(c.actual, c.op, c.expected)
+		got := evaluateCondition(c.actual, c.op, c.expected)
 		if got != c.want {
-			t.Errorf("evaluateAchievedWhen(%v, %s, %v) = %v, want %v",
+			t.Errorf("evaluateCondition(%v, %s, %v) = %v, want %v",
 				c.actual, c.op, c.expected, got, c.want)
 		}
 	}

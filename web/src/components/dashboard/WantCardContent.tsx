@@ -9,6 +9,40 @@ import { formatDate, formatDuration, truncateText, classNames } from '@/utils/he
 import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
 
+// ── FinalResultDisplay ────────────────────────────────────────────────────────
+// Shows the final_result value truncated. Clicking opens the detail view.
+const FinalResultDisplay: React.FC<{
+  value: unknown;
+  isChild: boolean;
+  copied: boolean;
+  onCopy: (e: React.MouseEvent) => void;
+  onView: () => void;
+}> = ({ value, isChild, copied, onCopy, onView }) => {
+  const fullText = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  const truncateLimit = isChild ? 40 : 50;
+
+  return (
+    <div className={`${isChild ? "mt-4" : "mt-8"} relative flex justify-start`}>
+      <button
+        onClick={onView}
+        className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 w-full text-left cursor-pointer pr-7`}
+      >
+        <span className="truncate">{truncateText(fullText, truncateLimit)}</span>
+      </button>
+      <button
+        onClick={onCopy}
+        className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-green-400"
+        title="Copy to clipboard"
+      >
+        {copied
+          ? <Check className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
+          : <Copy className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
+        }
+      </button>
+    </div>
+  );
+};
+
 const HeartInBottle: React.FC<{ className?: string }> = ({ className }) => (
   <span className={`relative inline-flex items-center justify-center flex-shrink-0 ${className ?? ''}`}>
     <span className="leading-none">🫙</span>
@@ -847,32 +881,13 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Final result display */}
       {want.state?.final_result != null && want.state?.final_result !== '' && (
-        <div className={`${isChild ? "mt-4" : "mt-8"} group/finalresult relative flex justify-start`}>
-          <button
-            onClick={() => onViewResults ? onViewResults(want) : onView(want)}
-            className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 w-full text-left transition-colors cursor-pointer hover:bg-gray-900/90 hover:text-green-300 pr-7`}
-            title="Click to view results"
-          >
-            <span className="truncate">
-              {truncateText(
-                typeof want.state!.final_result === 'string'
-                  ? want.state!.final_result as string
-                  : JSON.stringify(want.state!.final_result),
-                isChild ? 40 : 50
-              )}
-            </span>
-          </button>
-          <button
-            onClick={handleCopyFinalResult}
-            className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-400 hover:text-green-300 hover:bg-gray-700/60"
-            title="Copy to clipboard"
-          >
-            {finalResultCopied
-              ? <Check className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
-              : <Copy className={isChild ? "w-3 h-3" : "w-3.5 h-3.5"} />
-            }
-          </button>
-        </div>
+        <FinalResultDisplay
+          value={want.state!.final_result}
+          isChild={isChild}
+          copied={finalResultCopied}
+          onCopy={handleCopyFinalResult}
+          onView={() => onViewResults ? onViewResults(want) : onView(want)}
+        />
       )}
 
       {/* Goal Breakdown Proposal */}

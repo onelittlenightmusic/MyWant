@@ -928,6 +928,14 @@ func (oaw *OwnerAwareWant) Progress() {
 	}
 }
 
+// IsFailed delegates to the wrapped want if it implements Failable.
+func (oaw *OwnerAwareWant) IsFailed() bool {
+	if failable, ok := oaw.BaseWant.(Failable); ok {
+		return failable.IsFailed()
+	}
+	return false
+}
+
 // OnDelete delegates to the wrapped want if it implements OnDeletable
 func (oaw *OwnerAwareWant) OnDelete() {
 	if deletable, ok := oaw.BaseWant.(OnDeletable); ok {

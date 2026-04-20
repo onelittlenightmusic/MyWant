@@ -79,6 +79,8 @@ type ChainBuilder struct {
 	agentRegistry        *AgentRegistry                  // Agent registry for agent-enabled wants
 	waitGroup            *sync.WaitGroup                 // Execution synchronization
 	config               Config                          // Current configuration
+	ServerConfig         any                             // Global server config passed from server layer
+	goalThinkerUseStub   bool                            // Whether goal_thinker should use stub (no LLM)
 
 	// Reconcile loop fields
 	reconcileStop      chan bool            // Stop signal for reconcile loop
@@ -1755,3 +1757,47 @@ func GetGlobalChainBuilder() *ChainBuilder {
 }
 
 // Queue methods for labels
+
+func SetGlobalServerConfig(cfg any) {
+	if globalChainBuilder != nil {
+		globalChainBuilder.SetServerConfig(cfg)
+	}
+}
+
+func GetGlobalServerConfig() any {
+	if globalChainBuilder != nil {
+		return globalChainBuilder.GetServerConfig()
+	}
+	return nil
+}
+
+func (cb *ChainBuilder) SetServerConfig(cfg any) {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+	cb.ServerConfig = cfg
+}
+
+func (cb *ChainBuilder) GetServerConfig() any {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+	return cb.ServerConfig
+}
+
+// SetGlobalGoalThinkerUseStub configures whether the goal thinker should use stub mode (skip LLM).
+func SetGlobalGoalThinkerUseStub(v bool) {
+	if globalChainBuilder != nil {
+		globalChainBuilder.reconcileMutex.Lock()
+		globalChainBuilder.goalThinkerUseStub = v
+		globalChainBuilder.reconcileMutex.Unlock()
+	}
+}
+
+// GetGlobalGoalThinkerUseStub returns whether the goal thinker stub mode is enabled.
+func GetGlobalGoalThinkerUseStub() bool {
+	if globalChainBuilder != nil {
+		globalChainBuilder.reconcileMutex.RLock()
+		defer globalChainBuilder.reconcileMutex.RUnlock()
+		return globalChainBuilder.goalThinkerUseStub
+	}
+	return false
+}

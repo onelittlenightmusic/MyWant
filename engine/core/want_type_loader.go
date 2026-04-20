@@ -29,7 +29,8 @@ type WantTypeDefinition struct {
 	GlobalOverrideFrom  string                 `json:"globalOverrideFrom,omitempty" yaml:"globalOverrideFrom,omitempty"`   // Global param key whose object fields override ALL params (highest priority)
 	Agents              []AgentDef             `json:"agents" yaml:"agents"`
 	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`     // executable inline agent definitions
-	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // declarative achievement condition
+	FinalizeWhen        *FinalizeWhen          `json:"finalizeWhen,omitempty" yaml:"finalizeWhen,omitempty"`     // declarative termination conditions (achieved + failed)
+	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // Deprecated: use finalizeWhen.achieved
 	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"`     // actions to run when want is initialized
 	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`             // actions to run when want is deleted
 	OnAchieved          *LifecycleHookDef      `json:"onAchieved,omitempty" yaml:"onAchieved,omitempty"`         // actions to run each Progress() tick while achieved

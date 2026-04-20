@@ -56,6 +56,9 @@ func (cb *ChainBuilder) RestartWant(wantID string) error {
 		return fmt.Errorf("want with ID %s not found", wantID)
 	}
 
+	// State reset and agentRunGuard reset are handled inside ScriptableWant.Initialize()
+	// so that the order is always: reset → onInitialize (idempotent by design).
+
 	// Call Want's RestartWant method which sets status to Idle
 	targetWant.RestartWant()
 	InfoLog("[RESTART:DEBUG] Want '%s' status now: %s\n", targetWant.Metadata.Name, targetWant.GetStatus())

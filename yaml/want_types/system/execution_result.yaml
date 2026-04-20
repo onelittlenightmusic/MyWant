@@ -217,6 +217,16 @@ wantType:
     label: current
     initialValue: 0
 
+  finalizeWhen:
+    achieved:
+      field: status
+      operator: "=="
+      value: completed
+    failed:
+      field: status
+      operator: "=="
+      value: failed
+
   onInitialize:
     params:
       command: command
