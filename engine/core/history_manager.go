@@ -12,6 +12,10 @@ type HistoryManager struct {
 	LogHistoryRing       *ringBuffer[LogHistoryEntry]
 	AgentHistoryRing     *ringBuffer[AgentExecution]
 	mu                   sync.Mutex
+
+	// OnStateEntry is called after a state entry is recorded. Used by Want to emit
+	// OTEL span events without coupling HistoryManager to the tracing library.
+	OnStateEntry func(key string, value any)
 }
 
 // NewHistoryManager creates and initializes a new HistoryManager
@@ -59,6 +63,10 @@ func (h *HistoryManager) AddStateEntry(key string, value any) {
 		Timestamp:  time.Now(),
 		StateValue: map[string]any{key: value},
 	})
+
+	if h.OnStateEntry != nil {
+		h.OnStateEntry(key, value)
+	}
 }
 
 // AddParameterEntry adds an entry to parameter history, with similar merging logic
