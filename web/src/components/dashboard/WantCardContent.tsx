@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Bot, Heart, Pause, Clock, ThumbsUp, ThumbsDown, Trash2, Circle, X, Camera, Copy, Check, MessageSquare, Settings } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
-import { ConfirmationBubble } from '@/components/notifications';
 import { BrowserFrame } from '@/components/replay/BrowserFrame';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
@@ -158,6 +157,54 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     } catch (err) {
       console.error('[WantCard] choice state update failed:', err);
     }
+  };
+
+  // Timer-specific state
+  const isTimer = wantType === 'timer';
+  const timerSelected = (want.state?.current?.selected as string) || '5m';
+  const timerRemaining = typeof want.state?.current?.remaining_seconds === 'number' ? want.state.current.remaining_seconds : 0;
+  const timerIsRunning = want.state?.current?.is_running === true;
+  const timerPresets = Array.isArray(want.spec?.params?.presets) ? want.spec.params.presets : ["1m", "5m", "10m", "30m", "1h"];
+  const timerTargetParam = (want.state?.current?.target_param as string) || '';
+  const [localTimerSelected, setLocalTimerSelected] = useState(timerSelected);
+
+  useEffect(() => {
+    setLocalTimerSelected(timerSelected);
+  }, [timerSelected]);
+
+  const handleTimerPresetChange = async (preset: string) => {
+    setLocalTimerSelected(preset);
+    const id = want.metadata?.id;
+    if (!id) return;
+    try {
+      await fetch(`/api/v1/states/${id}/selected`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(preset),
+      });
+    } catch (err) {
+      console.error('[WantCard] timer preset update failed:', err);
+    }
+  };
+
+  const handleTimerToggle = async () => {
+    const id = want.metadata?.id;
+    if (!id) return;
+    try {
+      await fetch(`/api/v1/states/${id}/is_running`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(!timerIsRunning),
+      });
+    } catch (err) {
+      console.error('[WantCard] timer toggle failed:', err);
+    }
+  };
+
+  const formatTimer = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   useEffect(() => {
@@ -319,11 +366,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     return { position: 'fixed', left, top, width: bubbleWidth, maxHeight: bubbleMaxHeight };
   };
 
-  // Confirmation dialog state
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [confirmationAction, setConfirmationAction] = useState<'approve' | 'deny' | null>(null);
+  // Reaction submission state
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
 
   // Copy state for final_result
   const [finalResultCopied, setFinalResultCopied] = useState(false);
@@ -370,91 +414,29 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const canSuspendResume = isRunning && (onSuspend || onResume);
   const hasScheduling = (want.spec?.when && want.spec.when.length > 0);
 
-  // Handler for approval button
-  const handleApproveClick = () => {
-    if (onShowReactionConfirmation) {
-      onShowReactionConfirmation(want, 'approve');
-    } else {
-      // Fallback to local confirmation if handler not provided
-      setConfirmationAction('approve');
-      setConfirmationMessage(isGoal ? 'Approve the proposed decomposition plan?' : 'Approve this reminder?');
-      setShowConfirmation(true);
-    }
-  };
-
-  // Handler for denial button
-  const handleDenyClick = () => {
-    if (onShowReactionConfirmation) {
-      onShowReactionConfirmation(want, 'deny');
-    } else {
-      // Fallback to local confirmation if handler not provided
-      setConfirmationAction('deny');
-      setConfirmationMessage(isGoal ? 'Reject the proposed decomposition plan?' : 'Reject this reminder?');
-      setShowConfirmation(true);
-    }
-  };
-
-  // Handler for confirmation dialog confirmation
-  const handleReactionConfirm = async () => {
-    if (!queueId || !confirmationAction) return;
-
-    console.log('[REACTION] Starting reaction submission...');
-    console.log('[REACTION] Queue ID:', queueId);
-    console.log('[REACTION] Action:', confirmationAction);
-
+  // Submit reaction directly without confirmation
+  const submitReaction = async (approved: boolean) => {
+    if (!queueId || isSubmittingReaction) return;
     setIsSubmittingReaction(true);
     try {
       const typeLabel = isGoal ? 'decomposition proposal' : 'reminder';
-      const requestBody = {
-        approved: confirmationAction === 'approve',
-        comment: `User ${confirmationAction === 'approve' ? 'approved' : 'denied'} ${typeLabel}`
-      };
-      console.log('[REACTION] Request body:', requestBody);
-
-      const url = `/api/v1/reactions/${queueId}`;
-      console.log('[REACTION] Sending PUT request to:', url);
-
-      const response = await fetch(url, {
+      await fetch(`/api/v1/reactions/${queueId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          approved,
+          comment: `User ${approved ? 'approved' : 'denied'} ${typeLabel}`,
+        }),
       });
-
-      console.log('[REACTION] Response status:', response.status);
-      console.log('[REACTION] Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[REACTION] Error response:', errorText);
-        throw new Error(`Failed to submit reaction: ${response.statusText}`);
-      }
-
-      const responseData = await response.json();
-      console.log('[REACTION] Response data:', responseData);
-
-      // Success - close confirmation dialog
-      setShowConfirmation(false);
-      setConfirmationAction(null);
-      setConfirmationMessage(null);
-
-      // Optionally refresh the want data or show success message
-      console.log(`Reminder ${confirmationAction === 'approve' ? 'approved' : 'denied'} successfully`);
     } catch (error) {
       console.error('Error submitting reaction:', error);
-      // Could show error notification here
     } finally {
       setIsSubmittingReaction(false);
     }
   };
 
-  // Handler for confirmation dialog cancellation
-  const handleReactionCancel = () => {
-    setShowConfirmation(false);
-    setConfirmationAction(null);
-    setConfirmationMessage(null);
-  };
+  const handleApproveClick = () => submitReaction(true);
+  const handleDenyClick = () => submitReaction(false);
 
   // Responsive sizing based on whether it's a child card
   type SizeConfig = {
@@ -952,18 +934,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       </div>
       </div>{/* end flex container */}
-
-      {/* Confirmation Message Notification */}
-      <ConfirmationBubble
-        message={confirmationMessage}
-        isVisible={showConfirmation}
-        onDismiss={() => setShowConfirmation(false)}
-        onConfirm={handleReactionConfirm}
-        onCancel={handleReactionCancel}
-        loading={isSubmittingReaction}
-        title="Confirm"
-        layout="header-overlay"
-      />
 
       {/* Floating Replay Bubble - portal, no backdrop, anchored near card */}
       {showReplayBubble && createPortal(
