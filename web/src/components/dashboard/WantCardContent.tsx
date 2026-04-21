@@ -915,40 +915,38 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
       {/* Reminder Reaction Buttons */}
       {shouldShowReactionButtons && (
-        <div className={isChild ? "mt-2" : "mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"}>
-          <div className="flex gap-2">
+        <div className={isChild ? "mt-2" : "mt-4 border-t border-gray-200 dark:border-gray-700"}>
+          <div className="flex h-10">
             <button
               onClick={handleDenyClick}
               disabled={isSubmittingReaction}
-              className={classNames(
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
-                'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'transition-colors'
-              )}
               title="Reject this reminder"
+              className={classNames(
+                'flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150',
+                isSubmittingReaction
+                  ? 'bg-gray-400/20 cursor-not-allowed grayscale opacity-40'
+                  : 'bg-red-600/90 hover:brightness-110 active:opacity-80'
+              )}
             >
-              <ThumbsDown className="h-4 w-4" />
-              <span className={isChild ? 'hidden' : ''}>Deny</span>
+              <ThumbsDown className="h-3.5 w-3.5 text-white" />
+              <span className="text-[9px] font-bold leading-none uppercase tracking-tighter text-white">Deny</span>
             </button>
+            <div className="w-px bg-white/15 self-stretch" />
             <button
               onClick={handleApproveClick}
               disabled={isSubmittingReaction}
-              className={classNames(
-                'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium',
-                'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'transition-colors'
-              )}
               title="Approve this reminder"
+              className={classNames(
+                'flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150',
+                isSubmittingReaction
+                  ? 'bg-gray-400/20 cursor-not-allowed grayscale opacity-40'
+                  : 'bg-green-600/90 hover:brightness-110 active:opacity-80'
+              )}
             >
-              <ThumbsUp className="h-4 w-4" />
-              <span className={isChild ? 'hidden' : ''}>Approve</span>
+              <ThumbsUp className="h-3.5 w-3.5 text-white" />
+              <span className="text-[9px] font-bold leading-none uppercase tracking-tighter text-white">Approve</span>
             </button>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-            Waiting for your decision...
-          </p>
         </div>
       )}
 
