@@ -159,53 +159,56 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
     }
   };
 
-  // Timer-specific state
+  // Timer-specific state (global WhenSpec parameter control)
   const isTimer = wantType === 'timer';
-  const timerSelected = (want.state?.current?.selected as string) || '5m';
-  const timerRemaining = typeof want.state?.current?.remaining_seconds === 'number' ? want.state.current.remaining_seconds : 0;
-  const timerIsRunning = want.state?.current?.is_running === true;
-  const timerPresets = Array.isArray(want.spec?.params?.presets) ? want.spec.params.presets : ["1m", "5m", "10m", "30m", "1h"];
+  const timerEvery = (want.state?.current?.every as string) || '';
+  const timerAt = (want.state?.current?.at as string) || '';
   const timerTargetParam = (want.state?.current?.target_param as string) || '';
-  const [localTimerSelected, setLocalTimerSelected] = useState(timerSelected);
+  const [localTimerEvery, setLocalTimerEvery] = useState(timerEvery);
+  const [localTimerAt, setLocalTimerAt] = useState(timerAt);
+  const timerEveryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerAtDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setLocalTimerSelected(timerSelected);
-  }, [timerSelected]);
+  useEffect(() => { setLocalTimerEvery(timerEvery); }, [timerEvery]);
+  useEffect(() => { setLocalTimerAt(timerAt); }, [timerAt]);
 
-  const handleTimerPresetChange = async (preset: string) => {
-    setLocalTimerSelected(preset);
-    const id = want.metadata?.id;
-    if (!id) return;
-    try {
-      await fetch(`/api/v1/states/${id}/selected`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(preset),
-      });
-    } catch (err) {
-      console.error('[WantCard] timer preset update failed:', err);
-    }
+  const handleTimerEveryChange = (value: string) => {
+    setLocalTimerEvery(value);
+    if (timerEveryDebounceRef.current) clearTimeout(timerEveryDebounceRef.current);
+    timerEveryDebounceRef.current = setTimeout(async () => {
+      const id = want.metadata?.id;
+      if (!id) return;
+      try {
+        await fetch(`/api/v1/states/${id}/every`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(value),
+        });
+      } catch (err) {
+        console.error('[WantCard] timer every update failed:', err);
+      }
+    }, 400);
   };
 
-  const handleTimerToggle = async () => {
-    const id = want.metadata?.id;
-    if (!id) return;
-    try {
-      await fetch(`/api/v1/states/${id}/is_running`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(!timerIsRunning),
-      });
-    } catch (err) {
-      console.error('[WantCard] timer toggle failed:', err);
-    }
+  const handleTimerAtChange = (value: string) => {
+    setLocalTimerAt(value);
+    if (timerAtDebounceRef.current) clearTimeout(timerAtDebounceRef.current);
+    timerAtDebounceRef.current = setTimeout(async () => {
+      const id = want.metadata?.id;
+      if (!id) return;
+      try {
+        await fetch(`/api/v1/states/${id}/at`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(value),
+        });
+      } catch (err) {
+        console.error('[WantCard] timer at update failed:', err);
+      }
+    }, 400);
   };
 
-  const formatTimer = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
+  const TIMER_EVERY_PRESETS = ['1m', '5m', '10m', '30m', '1h', '6h', '1d'];
 
   useEffect(() => {
     setLocalSliderValue(sliderValue);
@@ -484,6 +487,45 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
             <StatusBadge status={want.status} size="sm" />
           </div>
         )}
+
+        {/* Top-level Reaction Overlay - Full width flat grid style */}
+        {shouldShowReactionButtons && (
+          <div className="absolute inset-x-0 top-0 z-[30] border-b border-white/10 dark:border-gray-800 shadow-lg animate-in slide-in-from-top duration-300">
+             <div className="grid grid-cols-2 h-12 divide-x divide-white/10 dark:divide-gray-800">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDenyClick(); }}
+                disabled={isSubmittingReaction}
+                className={classNames(
+                  'flex items-center justify-center gap-2 transition-all duration-150',
+                  isSubmittingReaction
+                    ? 'bg-gray-400/40 cursor-not-allowed opacity-60'
+                    : 'bg-red-600 hover:bg-red-700 active:opacity-90'
+                )}
+              >
+                <ThumbsDown className="h-4 w-4 text-white" />
+                <span className="text-xs font-bold uppercase tracking-wider text-white">Deny</span>
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleApproveClick(); }}
+                disabled={isSubmittingReaction}
+                className={classNames(
+                  'flex items-center justify-center gap-2 transition-all duration-150',
+                  isSubmittingReaction
+                    ? 'bg-gray-400/40 cursor-not-allowed opacity-60'
+                    : 'bg-green-600 hover:bg-green-700 active:opacity-90'
+                )}
+              >
+                {isSubmittingReaction ? (
+                   <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <ThumbsUp className="h-4 w-4 text-white" />
+                )}
+                <span className="text-xs font-bold uppercase tracking-wider text-white">Approve</span>
+              </button>
+            </div>
+          </div>
+        )}
+
       <div className={classNames(
         "order-2 mt-auto",
         styles.controlCardHeader,
@@ -725,6 +767,114 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
          </select>
        </div>
       )}
+
+      {isTimer && (() => {
+        const cx = 70, cy = 70, rFace = 56, rTick = 42, rLabel = 57;
+        const selectedIdx = TIMER_EVERY_PRESETS.indexOf(localTimerEvery);
+
+        // Convert preset string to seconds for log-scale positioning
+        const toSeconds = (s: string) => {
+          if (s.endsWith('d')) return parseInt(s) * 86400;
+          if (s.endsWith('h')) return parseInt(s) * 3600;
+          if (s.endsWith('m')) return parseInt(s) * 60;
+          return parseInt(s);
+        };
+        const startDeg = -70, arcDeg = 270; // slightly right of top → lower-left, clockwise (gap on upper-left)
+        const logVals = TIMER_EVERY_PRESETS.map(p => Math.log(toSeconds(p)));
+        const logMin = logVals[0], logRange = logVals[logVals.length - 1] - logMin;
+        const angleFor = (i: number) => {
+          const norm = (logVals[i] - logMin) / logRange;
+          return (startDeg + norm * arcDeg) * (Math.PI / 180);
+        };
+        const handAngle = selectedIdx >= 0 ? angleFor(selectedIdx) : -Math.PI / 2;
+        const handX = cx + rTick * Math.cos(handAngle);
+        const handY = cy + rTick * Math.sin(handAngle);
+        return (
+          <div className={`${(isChild || (isControl && !isFocused)) ? "mt-1" : "mt-2"} space-y-1`}>
+            {/* Clock dial + value side by side */}
+            <div className="flex items-center gap-2">
+              <svg width="140" height="140" viewBox="0 0 140 140" className="flex-shrink-0">
+                {/* Face: active arc (log-scale range) */}
+                {(() => {
+                  const a0 = angleFor(0);
+                  const a1 = angleFor(TIMER_EVERY_PRESETS.length - 1);
+                  const x0 = cx + rFace * Math.cos(a0), y0 = cy + rFace * Math.sin(a0);
+                  const x1 = cx + rFace * Math.cos(a1), y1 = cy + rFace * Math.sin(a1);
+                  return (
+                    <>
+                      <circle cx={cx} cy={cy} r={rFace} fill="none" stroke="#e5e7eb" strokeWidth="1.5" />
+                      <path d={`M ${x0} ${y0} A ${rFace} ${rFace} 0 ${arcDeg > 180 ? 1 : 0} 1 ${x1} ${y1}`}
+                        fill="none" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" />
+                    </>
+                  );
+                })()}
+                {/* 0m marker at top (12 o'clock) */}
+                <text x={cx} y={cy - rLabel - 1} textAnchor="middle" dominantBaseline="auto"
+                  fontSize="7" fontFamily="monospace" fill="#9ca3af">0</text>
+                <line x1={cx} y1={cy - rFace + 3} x2={cx} y2={cy - rFace + 8}
+                  stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round" />
+                {/* Preset ticks + labels */}
+                {TIMER_EVERY_PRESETS.map((preset, idx) => {
+                  const angle = angleFor(idx);
+                  const tx = cx + rTick * Math.cos(angle);
+                  const ty = cy + rTick * Math.sin(angle);
+                  const lx = cx + rLabel * Math.cos(angle);
+                  const ly = cy + rLabel * Math.sin(angle);
+                  const isSel = preset === localTimerEvery;
+                  return (
+                    <g key={preset} style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); handleTimerEveryChange(preset); }}>
+                      {/* Larger hit area */}
+                      <circle cx={tx} cy={ty} r={10} fill="transparent" />
+                      <circle cx={tx} cy={ty} r={isSel ? 5.5 : 3.5}
+                        fill={isSel ? '#3b82f6' : '#9ca3af'}
+                        style={{ transition: 'all 0.2s' }} />
+                      <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central"
+                        fontSize="9.5" fontFamily="monospace"
+                        fontWeight={isSel ? 'bold' : 'normal'}
+                        fill={isSel ? '#3b82f6' : '#6b7280'}>
+                        {preset}
+                      </text>
+                    </g>
+                  );
+                })}
+                {/* Hand */}
+                {selectedIdx >= 0 && (
+                  <line x1={cx} y1={cy} x2={handX} y2={handY}
+                    stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"
+                    style={{ transition: 'all 0.25s ease' }} />
+                )}
+                {/* Center pivot */}
+                <circle cx={cx} cy={cy} r="3.5" fill="#3b82f6" />
+              </svg>
+              {/* Value display to the right */}
+              <div className="flex flex-col items-start gap-0.5 flex-1">
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate leading-none" title={timerTargetParam}>
+                  {timerTargetParam || 'timer'}
+                </span>
+                <span className="text-xl font-mono font-bold text-blue-500 dark:text-blue-400 leading-tight">
+                  {localTimerEvery || '--'}
+                </span>
+                {localTimerAt && (
+                  <span className="text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                    @ {localTimerAt}
+                  </span>
+                )}
+              </div>
+            </div>
+            {/* at input */}
+            <input
+              type="text"
+              value={localTimerAt}
+              onChange={(e) => handleTimerAtChange(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              placeholder="at (optional, e.g. 09:00)"
+              className="w-full px-2 py-0.5 text-[10px] font-mono border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+        );
+      })()}
       {/* Replay type: Record / Record in debug buttons (shown when idle, no final result yet) */}
       {isReplay && !recordingActive && !debugRecordingActive && !hasFinalResult && (
         <div className={`flex items-center gap-2 ${isChild ? "mt-2" : "mt-4"}`}>
@@ -872,67 +1022,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         />
       )}
 
-      {/* Goal Breakdown Proposal */}
-      {isGoal && goalPhase === 'awaiting_approval' && proposedBreakdown && proposedBreakdown.length > 0 && (
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">
-          <div className="flex items-center gap-2 mb-2 text-blue-700 dark:text-blue-300">
-            <Bot className="h-4 w-4" />
-            <span className="text-xs font-semibold">AI Decomposition Proposal</span>
-          </div>
-          {proposedResponse && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 mb-2 italic">"{proposedResponse}"</p>
-          )}
-          <ul className="space-y-1.5">
-            {proposedBreakdown.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-xs text-gray-700 dark:text-gray-300">
-                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">[{item.type}]</span> {item.description}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Reminder Reaction Buttons */}
-      {shouldShowReactionButtons && (
-        <div className={isChild ? "mt-2" : "mt-4 border-t border-gray-200 dark:border-gray-700"}>
-          <div className="flex h-10">
-            <button
-              onClick={handleDenyClick}
-              disabled={isSubmittingReaction}
-              title="Reject this reminder"
-              className={classNames(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150',
-                isSubmittingReaction
-                  ? 'bg-gray-400/20 cursor-not-allowed grayscale opacity-40'
-                  : 'bg-red-600/90 hover:brightness-110 active:opacity-80'
-              )}
-            >
-              <ThumbsDown className="h-3.5 w-3.5 text-white" />
-              <span className="text-[9px] font-bold leading-none uppercase tracking-tighter text-white">Deny</span>
-            </button>
-            <div className="w-px bg-white/15 self-stretch" />
-            <button
-              onClick={handleApproveClick}
-              disabled={isSubmittingReaction}
-              title="Approve this reminder"
-              className={classNames(
-                'flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150',
-                isSubmittingReaction
-                  ? 'bg-gray-400/20 cursor-not-allowed grayscale opacity-40'
-                  : 'bg-green-600/90 hover:brightness-110 active:opacity-80'
-              )}
-            >
-              <ThumbsUp className="h-3.5 w-3.5 text-white" />
-              <span className="text-[9px] font-bold leading-none uppercase tracking-tighter text-white">Approve</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       </div>
+      
       </div>{/* end flex container */}
 
       {/* Floating Replay Bubble - portal, no backdrop, anchored near card */}

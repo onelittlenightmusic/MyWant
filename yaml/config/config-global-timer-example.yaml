@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      name: periodic_time_display_via_global_timer
+      type: command
+      labels:
+        role: timer
+    spec:
+      params:
+        command: "date '+[%H:%M:%S] Current Time (via global_timer)'"
+        timeout: 5
+      when:
+        - fromGlobalParam: timer1
