@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, Search } from 'lucide-react';
-import { Want, CreateWantRequest, UpdateWantRequest } from '@/types/want';
+import { Want, CreateWantRequest, UpdateWantRequest, WhenSpec } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { FormYamlToggle } from '@/components/common/FormYamlToggle';
@@ -9,6 +9,7 @@ import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
 import { TypeRecipeSelector, TypeRecipeSelectorRef } from './TypeRecipeSelector';
+import { WantInventoryPicker, WantSlot } from './WantInventoryPicker';
 import { RecommendationSelector } from '@/components/interact/RecommendationSelector';
 import { LabelsSection } from './sections/LabelsSection';
 import { DependenciesSection } from './sections/DependenciesSection';
@@ -121,7 +122,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
-  const [when, setWhen] = useState<Array<{ at?: string; every: string }>>([]);
+  const [when, setWhen] = useState<WhenSpec[]>([]);
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
@@ -206,8 +207,8 @@ export const WantForm: React.FC<WantFormProps> = ({
   const formToWantObject = () => {
     // Filter out using entries with empty keys
     const validUsing = using.filter(item => Object.keys(item)[0]?.trim());
-    // Filter out when entries with empty every
-    const validWhen = when.filter(item => item.every?.trim());
+    // Filter out when entries with neither every nor fromGlobalParam
+    const validWhen = when.filter(item => item.every?.trim() || item.fromGlobalParam?.trim());
 
     const ownerName = ownerWant?.metadata?.name || '';
     const ownerId = ownerWant?.metadata?.id || ownerWant?.id || '';
@@ -473,6 +474,8 @@ export const WantForm: React.FC<WantFormProps> = ({
 
       if (isEditing && editingWant?.metadata?.id) {
         await updateWant(editingWant.metadata.id, wantRequest as UpdateWantRequest);
+        onClose();
+        resetForm();
       } else {
         await createWant(wantRequest as CreateWantRequest);
 
@@ -486,10 +489,10 @@ export const WantForm: React.FC<WantFormProps> = ({
           }
           fetchWants().catch(console.error);
         }, 500);
-      }
 
-      onClose();
-      resetForm();
+        // Stay open and reset to inventory for next want
+        resetForm();
+      }
     } catch (error) {
       console.error('Failed to save want:', error);
       setApiError(error as ApiError);
@@ -505,7 +508,7 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   const headerAction = (
     <div className="flex items-stretch gap-0">
-      {!isEditing && (
+      {!isEditing && !!selectedTypeId && (
         <button
           type="button"
           onClick={() => setShowFilter(v => !v)}
@@ -646,47 +649,60 @@ export const WantForm: React.FC<WantFormProps> = ({
                   />
                 )}
               </div>
+            ) : selectedTypeId ? (
+              /* Type selected — slot header with Change button */
+              (() => {
+                const selWt = userFacingWantTypes.find(wt => wt.name === selectedTypeId);
+                const selRec = recipes.find(r => r.recipe?.metadata?.custom_type === selectedTypeId);
+                const title = selWt?.title || selRec?.recipe?.metadata?.name || selectedTypeId;
+                const category = selWt?.category || selRec?.recipe?.metadata?.category;
+                return (
+                  <div className="flex-shrink-0 flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                    <WantSlot
+                      id={selectedTypeId}
+                      itemType={selectedItemType}
+                      category={category}
+                      size={56}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{title}</p>
+                      {category && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 capitalize">{category}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                        {selectedItemType === 'recipe' ? '📦 Recipe' : '⚡ Want Type'}
+                      </p>
+                    </div>
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTypeId(null);
+                          setSelectedItemType('want-type');
+                          setType('');
+                          setName('');
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
-              /* Normal Mode - TypeRecipeSelector always shown */
-              <div className={selectedTypeId ? "flex-shrink-0" : "flex-1 min-h-0 flex flex-col"}>
-                {!selectedTypeId && (
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex-shrink-0">
-                    Select Want Type or Recipe *
-                  </label>
-                )}
-                <TypeRecipeSelector
-                  ref={typeSelectorRef}
+              /* No type selected — Minecraft-style inventory picker */
+              <div className="flex-1 min-h-0">
+                <WantInventoryPicker
                   wantTypes={userFacingWantTypes}
                   recipes={recipes}
-                  selectedId={selectedTypeId}
-                  showSearch={showFilter}
                   onSelect={(id, itemType) => {
                     setSelectedTypeId(id);
                     setSelectedItemType(itemType);
-                    // Update type based on selection
                     setType(id);
-                    // Auto-generate unique name that doesn't conflict with existing wants
                     const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                    const generatedName = generateUniqueWantName(id, itemType, existingNames, userNameSuffix);
-                    setName(generatedName);
-
-                    // Auto-focus Want Name after selection
-                    setTimeout(() => {
-                      nameInputRef.current?.focus();
-                    }, 0);
-                  }}
-                  onClear={() => {
-                    setSelectedTypeId(null);
-                    setSelectedItemType('want-type');
-                    setType('');
-                    setName('');
-                  }}
-                  onGenerateName={(id, itemType, suffix) => {
-                    const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
-                    return generateUniqueWantName(id, itemType, existingNames, suffix);
-                  }}
-                  onArrowDown={() => {
-                    nameInputRef.current?.focus();
+                    setName(generateUniqueWantName(id, itemType, existingNames, userNameSuffix));
+                    setTimeout(() => nameInputRef.current?.focus(), 0);
                   }}
                 />
               </div>
