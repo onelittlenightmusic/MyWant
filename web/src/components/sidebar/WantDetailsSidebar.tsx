@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History, Eraser, MessageSquare, Send } from 'lucide-react';
-import { Want, WantExecutionStatus } from '@/types/want';
+import { Settings, Eye, AlertTriangle, Clock, Bot, Save, Edit, FileText, ChevronDown, ChevronRight, X, Database, Plus, BookOpen, Copy, Check, History, Eraser, MessageSquare, Send, Sparkles, ThumbsUp } from 'lucide-react';
+import { Want, WantExecutionStatus, WhenSpec } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { FormYamlToggle } from '@/components/common/FormYamlToggle';
@@ -23,6 +23,7 @@ import { SchedulingSection } from '@/components/forms/sections/SchedulingSection
 import { SummarySidebarContent } from './SummarySidebarContent';
 import { ConfirmationBubble } from '@/components/notifications';
 import { apiClient } from '@/api/client';
+import { Recommendation } from '@/types/interact';
 import {
   DetailsSidebar,
   TabContent,
@@ -38,6 +39,8 @@ interface WantDetailsSidebarProps {
   initialTab?: 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat';
   initialTabVersion?: number;
   seriesWants?: Want[]; // All wants in the same series (for Versions tab)
+  recommendations?: Recommendation[];
+  onRecommendationSelect?: (rec: Recommendation) => void;
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
   onRegisterHeaderActions?: (handlers: { handleRefresh: () => void; handleToggleAutoRefresh: () => void }) => void;
@@ -81,6 +84,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'results',
   initialTabVersion = 0,
+  recommendations = [],
+  onRecommendationSelect,
   onWantUpdate,
   onHeaderStateChange,
   onRegisterHeaderActions,
@@ -574,7 +579,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
             )}
             {showPrevTab && prevTabId === 'results' && (
               <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
-                <ResultsTab want={wantDetails} onClearState={() => setShowClearStateConfirmation(true)} />
+                <ResultsTab
+                  want={wantDetails}
+                  recommendations={recommendations}
+                  onRecommendationSelect={onRecommendationSelect}
+                  onClearState={() => setShowClearStateConfirmation(true)}
+                />
               </div>
             )}
             {showPrevTab && prevTabId === 'logs' && (
@@ -627,7 +637,12 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
             {activeTab === 'results' && (
               <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
-                <ResultsTab want={wantDetails} onClearState={() => setShowClearStateConfirmation(true)} />
+                <ResultsTab
+                  want={wantDetails}
+                  recommendations={recommendations}
+                  onRecommendationSelect={onRecommendationSelect}
+                  onClearState={() => setShowClearStateConfirmation(true)}
+                />
               </div>
             )}
 
@@ -882,7 +897,7 @@ const SettingsTab: React.FC<{
   const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
   const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
   const [using, setUsing] = useState<Array<Record<string, string>>>(want.spec?.using || []);
-  const [when, setWhen] = useState<Array<{ at?: string; every: string }>>(want.spec?.when || []);
+  const [when, setWhen] = useState<WhenSpec[]>(want.spec?.when || []);
 
   // Section refs for keyboard navigation
   const paramsSectionRef = useRef<HTMLButtonElement>(null);
@@ -951,7 +966,7 @@ const SettingsTab: React.FC<{
   }, [want.metadata?.id, using, onWantUpdate]);
 
   // Handler for scheduling changes - saves to API
-  const handleSchedulingChange = useCallback(async (newWhen: Array<{ at?: string; every: string }>) => {
+  const handleSchedulingChange = useCallback(async (newWhen: WhenSpec[]) => {
     if (!want.metadata?.id) return;
 
     const oldWhen = when;
@@ -1452,7 +1467,12 @@ const sortByTimestamp = (obj: Record<string, unknown>, timestamps?: Record<strin
   return Object.fromEntries(entries);
 };
 
-const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want, onClearState }) => {
+const ResultsTab: React.FC<{
+  want: Want;
+  recommendations?: Recommendation[];
+  onRecommendationSelect?: (rec: Recommendation) => void;
+  onClearState?: () => void;
+}> = ({ want, recommendations = [], onRecommendationSelect, onClearState }) => {
   const ts = want.state_timestamps;
   const hasCurrent = want.state?.current && Object.keys(want.state.current).length > 0;
   const hasGoal = want.state?.goal && Object.keys(want.state.goal).length > 0;
@@ -1462,6 +1482,11 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
   const [isHiddenStateExpanded, setIsHiddenStateExpanded] = useState(false);
   const hasFinalResult = want.state?.final_result != null && want.state?.final_result !== '';
   const [finalResultCopied, setFinalResultCopied] = useState(false);
+  
+  // Extract goal proposal info
+  const proposedBreakdown = want.state?.current?.proposed_breakdown as any[] | undefined;
+  const proposedResponse = want.state?.current?.proposed_response as string | undefined;
+
   const handleCopyFinalResult = () => {
     const value = want.state?.final_result;
     const text = typeof value === 'string' ? value : JSON.stringify(value);
@@ -1474,86 +1499,164 @@ const ResultsTab: React.FC<{ want: Want; onClearState?: () => void }> = ({ want,
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto px-3 sm:px-4 pt-0 pb-3 sm:py-4">
-        {hasAnyState || hasHiddenState || hasFinalResult ? (
-          <div className="space-y-2">
-            {hasFinalResult && (
-              <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-green-600 dark:text-green-400 mb-1 sm:mb-3">Final Result</h4>
-                <div className="group/finalresult relative">
-                  <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all pr-7">
-                    {typeof want.state!.final_result === 'string'
-                      ? want.state!.final_result as string
-                      : JSON.stringify(want.state!.final_result, null, 2)}
-                  </pre>
+        <div className="space-y-4 pt-3">
+          {/* AI Ideas Section (for drafts) */}
+          {recommendations.length > 0 && (
+            <TabSection title="AI Ideas" className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
+              <div className="flex items-center gap-2 mb-3 text-blue-700 dark:text-blue-300">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-xs font-medium italic">Select an idea to materialize into a real want.</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {recommendations.map((rec) => (
                   <button
-                    onClick={handleCopyFinalResult}
-                    className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    title="Copy to clipboard"
+                    key={rec.id}
+                    onClick={() => onRecommendationSelect?.(rec)}
+                    className="flex items-center gap-3 w-full text-left p-3 rounded-lg bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all group"
                   >
-                    {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                        {rec.title}
+                      </div>
+                      {rec.description && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                          {rec.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Plus className="h-5 w-5" />
+                    </div>
                   </button>
-                </div>
+                ))}
               </div>
-            )}
+            </TabSection>
+          )}
 
-            {hasCurrent && (
-              <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Current</h4>
-                <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(sortByTimestamp(want.state!.current as Record<string, unknown>, ts))}
-                </div>
+          {/* AI Decomposition Proposal Section (for goals) */}
+          {proposedBreakdown && proposedBreakdown.length > 0 && (
+            <TabSection title="AI Decomposition Proposal" className="bg-purple-50/50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30">
+              <div className="flex items-center gap-2 mb-3 text-purple-700 dark:text-purple-300">
+                <Bot className="h-4 w-4" />
+                <span className="text-xs font-medium italic">Approve this plan on the card to execute.</span>
               </div>
-            )}
-
-            {hasGoal && (
-              <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Goal</h4>
-                <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(sortByTimestamp(want.state!.goal as Record<string, unknown>, ts))}
+              
+              {proposedResponse && (
+                <div className="mb-4 text-sm text-purple-800 dark:text-purple-300 leading-relaxed italic border-l-2 border-purple-300 dark:border-purple-700 pl-3">
+                  "{proposedResponse}"
                 </div>
-              </div>
-            )}
+              )}
 
-            {hasPlan && (
-              <div className={SECTION_CONTAINER_CLASS}>
-                <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Plan</h4>
-                <div className="space-y-1 sm:space-y-2">
-                  {renderKeyValuePairs(sortByTimestamp(want.state!.plan as Record<string, unknown>, ts))}
-                </div>
-              </div>
-            )}
-
-            {hasHiddenState && (
-              <>
-                <button
-                  onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
-                  className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm hover:text-gray-900 dark:hover:text-white py-2 mt-4 transition-colors"
-                >
-                  {isHiddenStateExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  )}
-                  Hidden State
-                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({Object.keys(want.hidden_state).length})</span>
-                </button>
-                {isHiddenStateExpanded && (
-                  <div className={SECTION_CONTAINER_CLASS}>
-                    <div className="space-y-1 sm:space-y-2">
-                      {renderKeyValuePairs(want.hidden_state)}
+              <div className="space-y-3">
+                {proposedBreakdown.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-2.5 rounded-md bg-white/60 dark:bg-gray-800/60 border border-purple-100/50 dark:border-purple-800/50">
+                    <div className="mt-1 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center text-[10px] font-bold text-purple-600 dark:text-purple-400 flex-shrink-0">
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-tight">
+                          {item.type}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-700 dark:text-gray-200 font-medium leading-normal">
+                        {item.description}
+                      </p>
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No state data available</p>
-            <p className="text-xs text-gray-400 mt-2">State will appear here once the want executes</p>
-          </div>
-        )}
+                ))}
+              </div>
+            </TabSection>
+          )}
+
+          {hasAnyState || hasHiddenState || hasFinalResult ? (
+            <div className="space-y-4">
+              {hasFinalResult && (
+                <div className={SECTION_CONTAINER_CLASS}>
+                  <div className="flex items-baseline justify-between mb-1 sm:mb-3">
+                    <h4 className="text-sm sm:text-base font-medium text-green-600 dark:text-green-400">Final Result</h4>
+                    {want.state_timestamps?.final_result && (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {new Date(want.state_timestamps.final_result).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="group/finalresult relative">
+                    <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all pr-7">
+                      {typeof want.state!.final_result === 'string'
+                        ? want.state!.final_result as string
+                        : JSON.stringify(want.state!.final_result, null, 2)}
+                    </pre>
+                    <button
+                      onClick={handleCopyFinalResult}
+                      className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      title="Copy to clipboard"
+                    >
+                      {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hasCurrent && (
+                <div className={SECTION_CONTAINER_CLASS}>
+                  <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Current</h4>
+                  <div className="space-y-1 sm:space-y-2">
+                    {renderKeyValuePairs(sortByTimestamp(want.state!.current as Record<string, unknown>, ts))}
+                  </div>
+                </div>
+              )}
+
+              {hasGoal && (
+                <div className={SECTION_CONTAINER_CLASS}>
+                  <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Goal</h4>
+                  <div className="space-y-1 sm:space-y-2">
+                    {renderKeyValuePairs(sortByTimestamp(want.state!.goal as Record<string, unknown>, ts))}
+                  </div>
+                </div>
+              )}
+
+              {hasPlan && (
+                <div className={SECTION_CONTAINER_CLASS}>
+                  <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-1 sm:mb-3">Plan</h4>
+                  <div className="space-y-1 sm:space-y-2">
+                    {renderKeyValuePairs(sortByTimestamp(want.state!.plan as Record<string, unknown>, ts))}
+                  </div>
+                </div>
+              )}
+
+              {hasHiddenState && (
+                <>
+                  <button
+                    onClick={() => setIsHiddenStateExpanded(!isHiddenStateExpanded)}
+                    className="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm hover:text-gray-900 dark:hover:text-white py-2 mt-4 transition-colors"
+                  >
+                    {isHiddenStateExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    )}
+                    Hidden State
+                    <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">({Object.keys(want.hidden_state).length})</span>
+                  </button>
+                  {isHiddenStateExpanded && (
+                    <div className={SECTION_CONTAINER_CLASS}>
+                      <div className="space-y-1 sm:space-y-2">
+                        {renderKeyValuePairs(want.hidden_state)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No state data available</p>
+              <p className="text-xs text-gray-400 mt-2">State will appear here once the want executes</p>
+            </div>
+          )}
+        </div>
       </div>
       {onClearState && (hasAnyState || hasHiddenState) && (
         <div className="flex-shrink-0 flex justify-end px-3 sm:px-4 py-1 border-t border-gray-100 dark:border-gray-800">

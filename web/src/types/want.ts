@@ -64,8 +64,9 @@ export interface WantMetadata {
 }
 
 export interface WhenSpec {
-  at?: string;    // Time expression like "7am", "17:30", "midnight"
-  every: string;  // Frequency like "day", "5 minutes", "2 hours"
+  at?: string;               // Time expression like "7am", "17:30", "midnight"
+  every?: string;            // Frequency like "day", "5 minutes", "2 hours"
+  fromGlobalParam?: string; // Reference to a named timer defined in parameters.yaml
 }
 
 export interface WantSpec {
@@ -73,6 +74,7 @@ export interface WantSpec {
   using?: Array<Record<string, string>>;
   recipe?: string;
   when?: WhenSpec[];
+  resetOnRestart?: boolean; // Default true; set false to preserve state across scheduled restarts
 }
 
 export interface WantStats {

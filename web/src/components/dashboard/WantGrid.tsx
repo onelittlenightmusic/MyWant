@@ -432,6 +432,9 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   onClose={onBubbleClose || (() => {})}
                   onCreateWant={onCreateWant}
                   onWantDropped={onWantDropped}
+                  onDraftClick={onDraftClick}
+                  onDraftDelete={onDraftDelete}
+                  activeDraftId={activeDraftId}
                   parentIndex={bubbleParentIndex}
                   gridColumns={gridColumns}
                   caretCenterX={bubbleCaretCenterX ?? undefined}
@@ -472,6 +475,9 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                 onClose={onBubbleClose || (() => {})}
                 onCreateWant={onCreateWant}
                 onWantDropped={onWantDropped}
+                onDraftClick={onDraftClick}
+                onDraftDelete={onDraftDelete}
+                activeDraftId={activeDraftId}
                 parentIndex={bubbleParentIndex}
                 gridColumns={gridColumns}
                 caretCenterX={bubbleCaretCenterX ?? undefined}
@@ -530,6 +536,9 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
             onClose={onBubbleClose || (() => {})}
             onCreateWant={onCreateWant}
             onWantDropped={onWantDropped}
+            onDraftClick={onDraftClick}
+            onDraftDelete={onDraftDelete}
+            activeDraftId={activeDraftId}
             parentIndex={bubbleParentIndex}
             gridColumns={gridColumns}
             caretCenterX={bubbleCaretCenterX ?? undefined}

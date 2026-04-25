@@ -35,28 +35,33 @@ export const DRAFT_WANT_LABEL = '__draft';
 
 // Convert a backend Want to a frontend DraftWant
 export function wantToDraft(want: Want): DraftWant | null {
-  // Check if this is a draft want
-  if (want.metadata?.labels?.[DRAFT_WANT_LABEL] !== 'true') {
+  const current = want.state?.current || {};
+  const phase = current.phase as string || '';
+  
+  // Treat as draft if labeled as draft OR if in ideating phase
+  const isDraft = want.metadata?.labels?.[DRAFT_WANT_LABEL] === 'true' || phase === 'ideating';
+  
+  if (!isDraft) {
     return null;
   }
 
-  const current = want.state?.current || {};
-  const phase = current.phase as string || '';
   const isThinking = current.isThinking as boolean || phase === 'ideating' || phase === 'decomposing' || phase === 're_planning';
 
   return {
     id: want.metadata.id || want.id || '',
-    sessionId: current.sessionId as string || '',
-    message: current.message as string || '',
+    sessionId: (current.sessionId as string) || '',
+    message: (current.goal_text as string) || (current.message as string) || want.metadata.name,
     recommendations: (current.proposed_recommendations as Recommendation[]) || (current.recommendations as Recommendation[]) || [],
     selectedRecommendation: null,
     isThinking: isThinking,
-    createdAt: current.createdAt as string || '',
+    createdAt: current.createdAt as string || new Date().toISOString(),
     error: current.error as string | undefined
   };
 }
 
 // Check if a Want is a draft want
 export function isDraftWant(want: Want): boolean {
-  return want.metadata?.labels?.[DRAFT_WANT_LABEL] === 'true';
+  if (want.metadata?.labels?.[DRAFT_WANT_LABEL] === 'true') return true;
+  const phase = want.state?.current?.phase as string | undefined;
+  return phase === 'ideating';
 }

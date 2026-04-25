@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, Layers, Heart, Plus } from 'lucide-react';
 import { Want } from '@/types/want';
+import { DraftWant, isDraftWant, wantToDraft } from '@/types/draft';
 import { WantCard } from './WantCard/WantCard';
+import { DraftWantCard } from './DraftWantCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
@@ -27,6 +29,9 @@ interface WantChildrenBubbleProps {
   onClose: () => void;
   onCreateWant?: (parentWant?: Want) => void;
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
+  onDraftClick?: (draft: DraftWant) => void;
+  onDraftDelete?: (draft: DraftWant) => void;
+  activeDraftId?: string | null;
   depth?: number;
   parentIndex?: number;
   gridColumns?: number;
@@ -51,6 +56,9 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
   onClose,
   onCreateWant,
   onWantDropped,
+  onDraftClick,
+  onDraftDelete,
+  activeDraftId,
   depth = 0,
   parentIndex = 0,
   gridColumns = 1,
@@ -248,26 +256,37 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
                   w.metadata?.ownerReferences?.some(ref => ref.id === childId)
                 );
                 const isExpanded = nextExpandedId === childId;
+                const childIsDraft = isDraftWant(child);
+                const childDraft = childIsDraft ? wantToDraft(child) : null;
 
                 return (
                   <React.Fragment key={childId}>
                     <div className={classNames(isExpanded ? 'ring-2 ring-blue-400 ring-offset-2 dark:ring-offset-gray-900 rounded-lg transition-all duration-300' : 'transition-all duration-300')}>
-                      <WantCard
-                        index={index}
-                        want={child}
-                        children={childChildren}
-                        selected={isSelected}
-                        selectedWant={selectedWant}
-                        onView={onChildClick}
-                        onViewAgents={onViewAgents || (() => {})}
-                        onViewResults={onViewResults || (() => {})}
-                        onViewChat={onViewChat || (() => {})}
-                        onEdit={onEditWant}
-                        onDelete={onDeleteWant}
-                        onSuspend={onSuspendWant}
-                        onResume={onResumeWant}
-                        onShowReactionConfirmation={onShowReactionConfirmation}
-                      />
+                      {childIsDraft && childDraft ? (
+                        <DraftWantCard
+                          draft={childDraft}
+                          selected={activeDraftId === childId}
+                          onClick={() => onDraftClick?.(childDraft)}
+                          onDelete={() => onDraftDelete?.(childDraft)}
+                        />
+                      ) : (
+                        <WantCard
+                          index={index}
+                          want={child}
+                          children={childChildren}
+                          selected={isSelected}
+                          selectedWant={selectedWant}
+                          onView={onChildClick}
+                          onViewAgents={onViewAgents || (() => {})}
+                          onViewResults={onViewResults || (() => {})}
+                          onViewChat={onViewChat || (() => {})}
+                          onEdit={onEditWant}
+                          onDelete={onDeleteWant}
+                          onSuspend={onSuspendWant}
+                          onResume={onResumeWant}
+                          onShowReactionConfirmation={onShowReactionConfirmation}
+                        />
+                      )}
                     </div>
 
                     {/* Cascading bubble for this child if it's expanded */}
@@ -289,6 +308,9 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
                         onResumeWant={onResumeWant}
                         onShowReactionConfirmation={onShowReactionConfirmation}
                         onClose={onClose}
+                        onDraftClick={onDraftClick}
+                        onDraftDelete={onDraftDelete}
+                        activeDraftId={activeDraftId}
                         depth={depth + 1}
                         parentIndex={index}
                         gridColumns={innerGridColumns}

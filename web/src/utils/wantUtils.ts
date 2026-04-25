@@ -28,7 +28,7 @@ export async function updateWantParameters(
 export async function updateWantScheduling(
   wantId: string,
   want: Want,
-  newWhen: Array<{ at?: string; every: string }>,
+  newWhen: Want['spec']['when'],
   updateWantFn: (id: string, request: UpdateWantRequest) => Promise<void>
 ): Promise<void> {
   await updateWantFn(wantId, {

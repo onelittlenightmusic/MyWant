@@ -22,6 +22,10 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
 }) => {
   const [isSelecting, setIsSelecting] = useState<string | null>(null);
 
+  // If we have recommendations, we want to show them clearly even if still "thinking" (awaiting user)
+  const hasIdeas = draft.recommendations.length > 0;
+  const showAsThinking = draft.isThinking && !hasIdeas;
+
   // Convert DraftWant to a partial Want object for WantCardContent
   const pseudoWant: Want = {
     id: draft.id,
@@ -34,10 +38,10 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
     spec: {
       params: {}
     },
-    status: draft.isThinking ? 'reaching' : (draft.error ? 'failed' : 'created'),
+    status: showAsThinking ? 'reaching' : (draft.error ? 'failed' : 'created'),
     state: {
       current: {
-        achieving_percentage: draft.isThinking ? 10 : 100,
+        achieving_percentage: showAsThinking ? 10 : 100,
         error: draft.error
       }
     }
@@ -46,9 +50,14 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
   const handleSelectRecommendation = async (recId: string) => {
     setIsSelecting(recId);
     try {
-      // Use specialized updateDraftWant which merges into state.current correctly
-      await apiClient.updateDraftWant(draft.id, {
-        selected_recommendation_id: recId
+      // Write directly to the running want's state.current via the states API.
+      // PUT /api/v1/wants/{id} is ignored for state-only changes because wantsEqual
+      // skips State comparison, so no ChangeEvent is generated and the runtime want
+      // never receives the update.
+      await fetch(`/api/v1/states/${draft.id}/selected_recommendation_id`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recId),
       });
     } catch (error) {
       console.error('Failed to select recommendation:', error);
@@ -58,7 +67,7 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
   };
 
   // Match WantCard's progress bar styles
-  const achievingPercentage = draft.isThinking ? 10 : 100;
+  const achievingPercentage = showAsThinking ? 10 : 100;
   
   const whiteProgressBarStyle = {
     position: 'absolute' as const,
@@ -91,52 +100,15 @@ export const DraftWantCard: React.FC<DraftWantCardProps> = ({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex-1">
-        <WantCardContent
-          want={pseudoWant}
-          isChild={false}
-          onView={() => onClick()}
-        />
+      <div className="relative z-10 flex-1 flex flex-col min-h-0">
+        <div className="max-h-[120px] overflow-hidden">
+          <WantCardContent
+            want={pseudoWant}
+            isChild={false}
+            onView={() => onClick()}
+          />
+        </div>
         
-        {/* Recommendations / Ideas Seeds */}
-        {draft.recommendations.length > 0 && !draft.error && (
-          <div className="px-4 pb-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
-            <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1">
-              <Sparkles className="w-3 h-3" />
-              アイディアの種を選んで具体化する
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {draft.recommendations.map((rec) => (
-                <button
-                  key={rec.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectRecommendation(rec.id);
-                  }}
-                  disabled={isSelecting !== null}
-                  className={classNames(
-                    'text-left px-3 py-2 rounded-xl text-xs transition-all border shadow-sm flex items-center justify-between group/seed',
-                    isSelecting === rec.id 
-                      ? 'bg-blue-100 border-blue-300 text-blue-700' 
-                      : 'bg-white dark:bg-gray-700 border-gray-100 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                  )}
-                >
-                  <div className="flex-1">
-                    <div className="font-semibold">{rec.title}</div>
-                    {rec.description && (
-                      <div className="text-[9px] opacity-60 line-clamp-1">{rec.description}</div>
-                    )}
-                  </div>
-                  <Send className={classNames(
-                    'w-3 h-3 ml-2 transition-transform',
-                    isSelecting === rec.id ? 'translate-x-1 text-blue-500' : 'opacity-0 group-hover/seed:opacity-100'
-                  )} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Draft delete button */}
         <button
           onClick={(e) => {
