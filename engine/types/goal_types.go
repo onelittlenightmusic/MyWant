@@ -34,10 +34,11 @@ func (g *GoalWant) Initialize() {
 
 	g.SetGoal("goal_text", g.GetStringParam("goal_text", ""))
 	g.SetCurrent("interactive", true)
-	g.SetCurrent("phase", "decomposing")
+	g.SetCurrent("phase", "ideating")
 	g.SetCurrent("cc_messages", []any{})
 	g.SetCurrent("cc_responses", []any{})
 	g.SetCurrent("cc_message_count", 0)
+	g.SetCurrent("proposed_recommendations", []any{})
 	g.SetCurrent("proposed_breakdown", []any{})
 	g.SetCurrent("proposed_response", "")
 
@@ -58,23 +59,7 @@ func (g *GoalWant) Initialize() {
 // IsAchieved always returns false — the GoalThinker ThinkAgent manages lifecycle.
 func (g *GoalWant) IsAchieved() bool { return false }
 
-// Progress syncs direction_map_json into Spec.Params and calls InterpretDirections
-// when in the monitoring phase (OPA planner manages child want dispatching).
-// It also ensures the DispatchThinker background agent is running.
-func (g *GoalWant) Progress() {
-	// Ensure DispatchThinker is running to realize desired_dispatch requests.
-	dispatchThinkerID := DispatchThinkerName + "-" + g.Metadata.ID
-	if _, running := g.GetBackgroundAgent(dispatchThinkerID); !running {
-		agent := NewDispatchThinker(dispatchThinkerID)
-		if err := g.AddBackgroundAgent(agent); err != nil {
-			g.DirectLog("[GoalWant] ERROR starting DispatchThinker: %v", err)
-		}
-	}
-
-	phase := GetCurrent(&g.Want, "phase", "decomposing")
-	if phase != "monitoring" {
-		return
-	}
-
-	InterpretDirectionsCoordinator(&g.Want)
-}
+// Progress is a no-op for GoalWant: child want spawning is handled exclusively
+// by the GoalThinker ThinkAgent (goalThinkerCommitApproval) directly under the
+// parent want, so no DispatchThinker or InterpretDirectionsCoordinator is needed.
+func (g *GoalWant) Progress() {}

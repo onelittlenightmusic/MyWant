@@ -94,6 +94,20 @@ wantType:
     initialValue: []
     label: current
 
+  - name: proposed_recommendations
+    description: List of creative recommendations pending user selection
+    type: object
+    persistent: true
+    initialValue: []
+    label: current
+
+  - name: selected_recommendation_id
+    description: ID of the recommendation selected by the user in the ideating phase
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
   - name: proposed_response
     description: Brief explanation from the AI about the proposed breakdown
     type: string

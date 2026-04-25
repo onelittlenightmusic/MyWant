@@ -188,6 +188,109 @@ Provide an updated breakdown of sub-wants. Respond ONLY with valid JSON:
     return parse_json_response(content)
 
 
+def ideate_with_llm(goal_text: str, available_capabilities: list) -> dict:
+    """Use Claude CLI to generate creative ideas (seeds) for a vague goal."""
+    cap_text = format_capabilities(available_capabilities)
+
+    prompt = f"""You are a creative brainstorming assistant for MyWant.
+The user has a vague desire or is looking for inspiration.
+User input: "{goal_text}"
+
+AVAILABLE CAPABILITIES:
+{cap_text}
+
+Task:
+Generate 3-5 distinct and creative "seeds" (ideas) that would satisfy this desire.
+Each seed should be a short, inspiring title or action.
+
+Example for "I'm bored":
+1. "Creative Deep Work: Start a new coding project with an unfamiliar language"
+2. "Active Exploration: Visit a local park or trail you've never been to"
+3. "Culinary Adventure: Find a recipe with ingredients you have and cook something new"
+
+Respond ONLY with a valid JSON object:
+{{
+  "recommendations": [
+    {{
+      "id": "unique-slug",
+      "title": "Short title",
+      "description": "One sentence explaining the idea"
+    }}
+  ],
+  "response_text": "A friendly encouraging message about the ideas"
+}}"""
+
+    content = call_claude_cli(prompt)
+    return parse_json_response(content)
+
+
+def ideate_with_stub(goal_text: str) -> dict:
+    if "ゴルフ" in goal_text:
+        return {
+            "recommendations": [
+                {"id": "golf-check", "title": "ゴルフ練習の空き時間を検索", "description": "SmartGolfの最新の空き状況を確認します。"},
+                {"id": "golf-lesson", "title": "初心者向けレッスンを探す", "description": "レベルに合わせた練習プランを提案。"}
+            ],
+            "response_text": "ゴルフの練習ですね！まずは練習場の空き状況を確認するのが良さそうです。"
+        }
+    return {
+        "recommendations": [
+            {"id": "stub-1", "title": "近場ホテルでプチ旅行", "description": "割引を活用して近場でリフレッシュ。"},
+            {"id": "stub-2", "title": "日帰りハイキング", "description": "自然の中で体を動かす1日。"},
+            {"id": "stub-3", "title": "食の冒険", "description": "気になっていた未知のグルメを開拓。"},
+            {"id": "stub-golf", "title": "ゴルフ", "description": "SmartGolfで練習場の空き状況を確認してスケジュールを組む。"}
+        ],
+        "response_text": f"（スタブモード） '{goal_text}' に向けて、いくつかアイディアを考えました！"
+    }
+
+def decompose_with_stub(goal_text: str) -> dict:
+    if "ゴルフ" in goal_text:
+        return {
+            "breakdown": [
+                {
+                    "name": "check-golf-availability",
+                    "type": "smartgolf_list_available",
+                    "description": "SmartGolfで利用可能な練習場の空き時間を一覧表示します",
+                    "params": {}
+                },
+                {
+                    "name": "book-golf-slot",
+                    "type": "smartgolf_book",
+                    "description": "空き状況から希望の時間帯を予約します",
+                    "params": {},
+                    "using": [{"direction": "check-golf-availability"}]
+                },
+                {
+                    "name": "golf-reminder",
+                    "type": "reminder",
+                    "description": "ゴルフ当日のリマインダーを設定します",
+                    "params": {
+                        "message": "ゴルフの準備をしましょう！道具・シューズ・予約確認書を忘れずに。",
+                        "duration_from_now": "1 hours"
+                    },
+                    "using": [{"direction": "book-golf-slot"}]
+                }
+            ],
+            "response_text": "ゴルフのスケジュールを組みます。まずSmartGolfで空き状況を確認し、予約→当日リマインダーの順で進めます。"
+        }
+    return {
+        "breakdown": [
+            {
+                "name": "search-options",
+                "type": "knowledge",
+                "description": f"Searching for concrete options for: {goal_text}",
+                "params": {"topic": goal_text, "output_path": "knowledge/plan.md"}
+            },
+            {
+                "name": "finalize-booking",
+                "type": "reminder",
+                "description": "Complete the final booking",
+                "params": {"message": f"Finalize: {goal_text}", "duration_from_now": "1 hours"}
+            }
+        ],
+        "response_text": f"'{goal_text}' を実現するための具体的なステップを用意しました。"
+    }
+
 def main():
     try:
         raw_input = sys.stdin.read()
@@ -202,10 +305,21 @@ def main():
 
     # Check if Claude CLI is available
     use_llm = shutil.which("claude") is not None
+    use_stub = input_data.get("use_stub", False)
 
     try:
-        if phase == "decompose":
-            if use_llm:
+        if phase == "ideate":
+            if use_stub:
+                result = ideate_with_stub(goal_text)
+            elif use_llm:
+                result = ideate_with_llm(goal_text, available_capabilities)
+            else:
+                result = {"recommendations": [{"id": "fallback", "title": "Research on " + goal_text, "description": "Explore options."}], "response_text": "Fallback ideation"}
+
+        elif phase == "decompose":
+            if use_stub:
+                result = decompose_with_stub(goal_text)
+            elif use_llm:
                 result = decompose_with_llm(goal_text, available_capabilities)
             else:
                 result = fallback_breakdown(goal_text)

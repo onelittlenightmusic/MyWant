@@ -22,14 +22,34 @@ func init() {
 // goalThinkerThink is the ThinkAgent function that implements the Goal Thinker lifecycle.
 // It drives the goal want through four phases:
 //
+//   - ideating         → call Python script (ideate) → store proposed_recommendations → await selection
 //   - decomposing      → call Python script → store proposed_breakdown → create reaction queue → awaiting_approval
 //   - awaiting_approval → poll reaction queue → on approved: AddChildWant per item → monitoring; on rejected: decomposing
 //   - monitoring       → detect cc_message_count changes → on change: re_planning
 //   - re_planning      → call Python script (replan) → update proposed_breakdown → create queue → awaiting_approval
 func goalThinkerThink(ctx context.Context, want *Want) error {
-	phase := GetCurrent(want, "phase", "decomposing")
+	phase := GetCurrent(want, "phase", "ideating")
+
+	// If a recommendation was selected, transition to decomposing immediately
+	selectedID := GetCurrent(want, "selected_recommendation_id", "")
+	if selectedID != "" && phase == "ideating" {
+		recs := GetCurrent(want, "proposed_recommendations", []any{})
+		for _, r := range recs {
+			if m, ok := r.(map[string]any); ok && m["id"] == selectedID {
+				title, _ := m["title"].(string)
+				want.SetGoal("goal_text", title) // Update goal text to the selected idea
+				want.SetCurrent("phase", "decomposing")
+				want.SetCurrent("selected_recommendation_id", "") // Clear selection
+				want.SetStatus(WantStatusReaching)
+				want.DirectLog("[GOAL-THINKER] Recommendation selected: %s, transitioning to decomposing", title)
+				return goalThinkerDecompose(ctx, want)
+			}
+		}
+	}
 
 	switch phase {
+	case "ideating":
+		return goalThinkerIdeate(ctx, want)
 	case "decomposing":
 		return goalThinkerDecompose(ctx, want)
 	case "awaiting_approval":
@@ -42,6 +62,49 @@ func goalThinkerThink(ctx context.Context, want *Want) error {
 		want.DirectLog("[GOAL-THINKER] Unknown phase: %s", phase)
 		return nil
 	}
+}
+
+// goalThinkerIdeate calls the Python script in ideate mode to get creative seeds.
+func goalThinkerIdeate(ctx context.Context, want *Want) error {
+	// Skip if already has recommendations or breakdown
+	existingRecs := GetCurrent(want, "proposed_recommendations", []any{})
+	if len(existingRecs) > 0 {
+		return nil
+	}
+
+	goalText := GetGoal(want, "goal_text", "")
+	if goalText == "" {
+		return nil
+	}
+
+	// If goal text looks concrete enough, skip ideating (optional logic)
+	// For now, let's always ideate if it's the first phase
+
+	want.DirectLog("[GOAL-THINKER] Ideating for goal: %s", goalText)
+
+	useStub := GetGlobalGoalThinkerUseStub()
+	want.DirectLog("[DEBUG] GOAL-THINKER: use_stub=%v", useStub)
+
+	result, err := callGoalThinkerScript(ctx, map[string]any{
+		"phase":                  "ideate",
+		"goal_text":              goalText,
+		"available_capabilities": computeAvailableCapabilities(),
+		"use_stub":               useStub,
+	})
+	if err != nil {
+		want.DirectLog("[GOAL-THINKER] Script error during ideate: %v", err)
+		return nil
+	}
+
+	recs, _ := result["recommendations"].([]any)
+	responseText, _ := result["response_text"].(string)
+
+	want.SetCurrent("proposed_recommendations", recs)
+	want.SetCurrent("proposed_response", responseText)
+	want.SetStatus(WantStatusWaitingUserAction)
+	want.DirectLog("[GOAL-THINKER] Proposed %d ideas, waiting for user selection", len(recs))
+
+	return nil
 }
 
 // goalThinkerDecompose calls the Python script to break down the goal_text into sub-wants.
@@ -68,11 +131,15 @@ func goalThinkerDecompose(ctx context.Context, want *Want) error {
 
 	want.DirectLog("[GOAL-THINKER] Decomposing goal: %s", goalText)
 
+	useStub := GetGlobalGoalThinkerUseStub()
+
 	result, err := callGoalThinkerScript(ctx, map[string]any{
 		"phase":                  "decompose",
 		"goal_text":              goalText,
 		"available_capabilities": computeAvailableCapabilities(),
+		"use_stub":               useStub,
 	})
+
 	if err != nil {
 		want.DirectLog("[GOAL-THINKER] Script error during decompose: %v", err)
 		return nil
@@ -114,25 +181,31 @@ func goalThinkerProposeBreakdown(ctx context.Context, want *Want, breakdown []an
 	return nil
 }
 
-// goalThinkerCommitApproval applies an approved breakdown: builds direction_map,
-// stores targets as goal state, and transitions to the monitoring phase.
+// goalThinkerCommitApproval applies an approved breakdown: spawns child wants directly
+// under the parent (whim) want (or the goal want itself if no parent exists),
+// then transitions to the monitoring phase.
 func goalThinkerCommitApproval(want *Want, breakdown []any) error {
 	want.SetGoal("targets", breakdown)
 
-	dm := buildGoalDirectionMap(breakdown)
-	if existingJSON, ok := want.GetCurrent("direction_map_json"); ok {
-		if existingStr, ok := existingJSON.(string); ok && existingStr != "" {
-			existingDM := make(map[string]DirectionConfig)
-			if err := json.Unmarshal([]byte(existingStr), &existingDM); err == nil {
-				for k, v := range dm {
-					existingDM[k] = v
-				}
-				dm = existingDM
-			}
+	// Determine spawn target: use the controller parent (e.g. whim) when available,
+	// otherwise fall back to this goal want itself.
+	spawnTarget := want.GetParentWant()
+	if spawnTarget == nil {
+		spawnTarget = want
+		want.DirectLog("[GOAL-THINKER] No parent want found, spawning under goal want")
+	} else {
+		want.DirectLog("[GOAL-THINKER] Spawning %d child wants under parent '%s'", len(breakdown), spawnTarget.Metadata.Name)
+	}
+
+	for _, item := range breakdown {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if err := spawnChildWantFromBreakdownItem(spawnTarget, m); err != nil {
+			want.DirectLog("[GOAL-THINKER] Failed to spawn child want: %v", err)
 		}
 	}
-	dmJSON, _ := json.Marshal(dm)
-	want.SetCurrent("direction_map_json", string(dmJSON))
 
 	currentCount := toInt(GetCurrent(want, "cc_message_count", 0))
 	want.StoreState("_last_cc_message_count", currentCount)
@@ -317,6 +390,21 @@ func spawnChildWantFromBreakdownItem(parent *Want, item map[string]any) error {
 		"goal_parent": parent.Metadata.Name,
 	}
 	child.Spec.SetParamsFromMap(params)
+
+	// Extract optional "using" selectors from breakdown item
+	if rawUsing, ok := item["using"].([]any); ok {
+		for _, u := range rawUsing {
+			if uMap, ok := u.(map[string]any); ok {
+				entry := make(map[string]string, len(uMap))
+				for k, v := range uMap {
+					if s, ok := v.(string); ok {
+						entry[k] = s
+					}
+				}
+				child.Spec.Using = append(child.Spec.Using, entry)
+			}
+		}
+	}
 
 	return parent.AddChildWant(child)
 }
