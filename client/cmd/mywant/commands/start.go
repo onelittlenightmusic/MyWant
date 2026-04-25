@@ -155,6 +155,8 @@ var StartCmd = &cobra.Command{
 			ConfigPath:     getConfigPath(),
 			MemoryPath:     filepath.Join(getMyWantDir(), "state.yaml"),
 			WebFS:          web.GetFileSystem(!debug),
+			OTELEndpoint:   config.OTELEndpoint,
+			GoalThinker:    server.GoalThinkerConfig{UseStub: config.GoalThinker.UseStub},
 		}
 
 		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)

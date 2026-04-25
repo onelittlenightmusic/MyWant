@@ -108,8 +108,6 @@ func (n *Want) ExecuteAgents() error {
 
 		if len(agents) == 0 {
 			n.StoreLog("⚠️ WARNING: No agents found providing requirement '%s'", requirement)
-		} else {
-			n.StoreLog("✅ Found %d agent(s) for '%s': %v", len(agents), requirement, getAgentNames(agents))
 		}
 
 		for _, agent := range agents {

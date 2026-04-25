@@ -129,6 +129,12 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		config = mywant.Config{Wants: []*mywant.Want{newWant}}
 	}
 
+	// Resolve fromGlobalParam references in spec.when using parameters.yaml values
+	if err := mywant.ResolveFromGlobalParams(config.Wants); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Failed to resolve fromGlobalParam", err.Error())
+		return
+	}
+
 	if err := s.validateWantTypes(config); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid want type", err.Error())
 		return

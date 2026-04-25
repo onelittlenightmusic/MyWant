@@ -176,6 +176,10 @@ func CalculateNextExecution(spec WhenSpec, now time.Time) (time.Time, error) {
 
 // ValidateWhenSpec validates a WhenSpec configuration
 func ValidateWhenSpec(spec WhenSpec) error {
+	// fromGlobalParam is unresolved only when every is still empty
+	if spec.FromGlobalParam != "" && spec.Every == "" {
+		return fmt.Errorf("fromGlobalParam %q was not resolved before scheduling; call ResolveFromGlobalParams first", spec.FromGlobalParam)
+	}
 	if spec.Every == "" {
 		return fmt.Errorf("'every' field is required in WhenSpec")
 	}

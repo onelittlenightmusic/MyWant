@@ -12,17 +12,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// GoalThinkerSettings holds goal_thinker configuration from config.yaml.
+type GoalThinkerSettings struct {
+	UseStub bool `yaml:"use_stub"` // If true, call stub Python script instead of LLM
+}
+
 // MyWantConfig represents the CLI configuration
 type MyWantConfig struct {
-	AgentMode        string            `yaml:"agent_mode"`         // local, webhook, grpc
-	ServerHost       string            `yaml:"server_host"`        // Main server host
-	ServerPort       int               `yaml:"server_port"`        // Main server port
-	AgentServiceHost string            `yaml:"agent_service_host"` // Agent service host (for webhook mode)
-	AgentServicePort int               `yaml:"agent_service_port"` // Agent service port (for webhook mode)
-	MockFlightPort   int               `yaml:"mock_flight_port"`   // Mock flight server port
-	HeaderPosition   string            `yaml:"header_position"`    // top or bottom
-	ColorMode        string            `yaml:"color_mode"`         // light, dark, system
-	Environments     map[string]string `yaml:"environments"`       // arbitrary env vars applied at startup
+	AgentMode        string              `yaml:"agent_mode"`         // local, webhook, grpc
+	ServerHost       string              `yaml:"server_host"`        // Main server host
+	ServerPort       int                 `yaml:"server_port"`        // Main server port
+	AgentServiceHost string              `yaml:"agent_service_host"` // Agent service host (for webhook mode)
+	AgentServicePort int                 `yaml:"agent_service_port"` // Agent service port (for webhook mode)
+	MockFlightPort   int                 `yaml:"mock_flight_port"`   // Mock flight server port
+	HeaderPosition   string              `yaml:"header_position"`    // top or bottom
+	ColorMode        string              `yaml:"color_mode"`         // light, dark, system
+	Environments     map[string]string   `yaml:"environments"`       // arbitrary env vars applied at startup
+	OTELEndpoint     string              `yaml:"otel_endpoint"`      // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
+	GoalThinker      GoalThinkerSettings `yaml:"goal_thinker"`       // Goal thinker settings
 }
 
 // ApplyEnvironments sets entries from the environments section as environment variables.
@@ -112,10 +119,37 @@ var ConfigCmd = &cobra.Command{
 }
 
 var configSetCmd = &cobra.Command{
-	Use:     "set",
+	Use:     "set [key value]",
 	Aliases: []string{"s"},
-	Short:   "Set configuration interactively",
+	Short:   "Set configuration value (or interactively if no args given)",
+	Long: `Set a single config key directly:
+  mywant config set otel_endpoint localhost:4317
+  mywant config set server_port 9090
+
+Or run without arguments for interactive setup.
+
+Valid keys: agent_mode, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Non-interactive: config set <key> <value>
+		if len(args) == 2 {
+			config, err := LoadConfig()
+			if err != nil {
+				fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
+				config = DefaultConfig()
+			}
+			key, value := args[0], args[1]
+			if err := applyConfigKey(config, key, value); err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+			if err := config.Save(); err != nil {
+				fmt.Printf("Error saving config: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("✅ %s = %s\n", key, value)
+			return
+		}
+
 		reader := bufio.NewReader(os.Stdin)
 
 		// Load current config or use default
@@ -326,6 +360,45 @@ func displayConfig(config *MyWantConfig) {
 
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("Config file: %s\n", getConfigPath())
+}
+
+// applyConfigKey sets a single config field by name.
+func applyConfigKey(config *MyWantConfig, key, value string) error {
+	switch key {
+	case "agent_mode":
+		config.AgentMode = value
+	case "server_host":
+		config.ServerHost = value
+	case "server_port":
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("server_port must be an integer")
+		}
+		config.ServerPort = port
+	case "agent_service_host":
+		config.AgentServiceHost = value
+	case "agent_service_port":
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("agent_service_port must be an integer")
+		}
+		config.AgentServicePort = port
+	case "mock_flight_port":
+		port, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("mock_flight_port must be an integer")
+		}
+		config.MockFlightPort = port
+	case "header_position":
+		config.HeaderPosition = value
+	case "color_mode":
+		config.ColorMode = value
+	case "otel_endpoint":
+		config.OTELEndpoint = value
+	default:
+		return fmt.Errorf("unknown config key %q. Valid keys: agent_mode, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint", key)
+	}
+	return nil
 }
 
 // maskSecret masks all but the first 4 characters of a secret value
