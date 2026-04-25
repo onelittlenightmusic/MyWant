@@ -50,6 +50,7 @@ interface WantDetailsSidebarProps {
   onResume?: (want: Want) => void;
   onDelete?: (want: Want) => void;
   onSaveRecipe?: (want: Want) => void;
+  onTabChange?: (tab: 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat') => void;
   
   // Summary related props (added for non-want state)
   summaryProps?: {
@@ -95,6 +96,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   onResume,
   onDelete,
   onSaveRecipe,
+  onTabChange,
   summaryProps,
   seriesWants = [],
 }) => {

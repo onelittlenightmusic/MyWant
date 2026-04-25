@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Heart, StickyNote } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart, StickyNote, LayoutGrid, Grid2X2 } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -35,6 +35,7 @@ import { HeaderOverlay } from '@/components/layout/HeaderOverlay';
 import { Toast } from '@/components/notifications';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 import { SaveAsRecipeModal } from '@/components/modals/SaveAsRecipeModal';
+import { WantCanvas, CANVAS_LABEL_X, CANVAS_LABEL_Y } from '@/components/dashboard/WantCanvas';
 
 
 export const Dashboard: React.FC = () => {
@@ -58,7 +59,7 @@ export const Dashboard: React.FC = () => {
   const [showReactionConfirmation, setShowReactionConfirmation] = useState(false);
   const [reactionAction, setReactionAction] = useState<'approve' | 'deny' | null>(null);
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents' | 'chat'>('results');
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat'>('results');
   const [sidebarTabVersion, setSidebarTabVersion] = useState(0);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [selectedLabel, setSelectedLabel] = useState<{ key: string; value: string } | null>(null);
@@ -88,6 +89,11 @@ export const Dashboard: React.FC = () => {
   // Minimap state
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
+
+  // Canvas mode (2D grid placement)
+  const [canvasMode, setCanvasMode] = useState(false);
+  const pendingCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
+  const prevWantIdsRef = useRef<Set<string>>(new Set());
 
   // Only orphan (no ownerReferences) draft wants are shown as top-level DraftWantCards.
   // Draft wants that are children of another want (e.g. goal under whim) are rendered
@@ -192,6 +198,18 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => { if (error) { const t = setTimeout(() => clearError(), 5000); return () => clearTimeout(t); } }, [error, clearError]);
 
+  // When a new want appears after the form is submitted, apply any pending canvas position
+  useEffect(() => {
+    if (!pendingCanvasPosRef.current) return;
+    const currentIds = new Set(wants.map(w => w.metadata?.id || w.id || '').filter(Boolean));
+    const newIds = Array.from(currentIds).filter(id => !prevWantIdsRef.current.has(id));
+    if (newIds.length > 0 && pendingCanvasPosRef.current) {
+      const pos = pendingCanvasPosRef.current;
+      pendingCanvasPosRef.current = null;
+      newIds.forEach(id => { handleCanvasSavePosition(id, pos.x, pos.y); });
+    }
+  }, [wants]);
+
   // GUI state sync via /api/v1/gui/state.
   // Each tab tracks its own lastSeqRef. When the server seq advances, apply the new state.
   // This enables multi-tab sync: all tabs independently notice the seq change and apply it.
@@ -228,6 +246,17 @@ export const Dashboard: React.FC = () => {
             const tab = validTabs.includes(sidebarTab as ValidTab) ? sidebarTab as ValidTab : undefined;
             if (tab) setSidebarInitialTab(tab);
             setSidebarTabVersion(v => v + 1);
+
+            // Center the want in the dashboard if it's a new selection or explicitly requested via CLI.
+            // This ensures synchronization across multiple tabs and from the CLI.
+            const currentId = sidebar.selectedItem?.metadata?.id || sidebar.selectedItem?.id;
+            const isNewSelection = sidebarWantId !== currentId;
+
+            if (isNewSelection || cur['source'] === 'cli') {
+              setTimeout(() => {
+                focusWantInDashboard(sidebarWantId);
+              }, 100);
+            }
           }
         } else if (sidebarOpen === false) {
           sidebar.clearSelection();
@@ -402,6 +431,26 @@ export const Dashboard: React.FC = () => {
     }, 80);
   };
 
+  /**
+   * Centers a want card in the dashboard view.
+   * Handles desktop (center) vs mobile (visible area top 30%) positioning,
+   * triggers blinking effect, and ensures visibility.
+   */
+  const focusWantInDashboard = (wantId: string, smooth = true) => {
+    const element = document.querySelector(`[data-want-id="${wantId}"]`);
+    if (!element) return;
+
+    if (window.innerWidth < 640) {
+      scrollCardIntoMobileView(wantId);
+    } else {
+      element.scrollIntoView({ 
+        behavior: smooth ? 'smooth' : 'auto', 
+        block: 'center' 
+      });
+    }
+    useWantStore.getState().setBlinkingWantId(wantId);
+  };
+
   const handleViewWant = (want: Want | { id: string; parentId?: string }) => {
     const wantToView = 'metadata' in want ? want : wants.find(w => (w.metadata?.id === want.id) || (w.id === want.id));
     if (wantToView) {
@@ -420,7 +469,7 @@ export const Dashboard: React.FC = () => {
       const wantId = wantToView.metadata?.id || wantToView.id;
       if (wantId) {
         setLastSelectedWantId(wantId);
-        scrollCardIntoMobileView(wantId);
+        focusWantInDashboard(wantId);
       }
       // Set expanded chain: expand bubble if this want is a Target or has children
       const wantType = wantToView.metadata?.type?.toLowerCase() || '';
@@ -480,21 +529,21 @@ export const Dashboard: React.FC = () => {
     if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
       sidebar.clearSelection(); setExpandedChain([]); return;
     }
-    sidebar.selectItem(want); setSidebarInitialTab('agents'); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+    sidebar.selectItem(want); setSidebarInitialTab('agents'); if (wantId) { setLastSelectedWantId(wantId); focusWantInDashboard(wantId); }
   };
   const handleViewResults = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
       sidebar.clearSelection(); setExpandedChain([]); return;
     }
-    sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+    sidebar.selectItem(want); setSidebarInitialTab('results'); setSidebarTabVersion(v => v + 1); if (wantId) { setLastSelectedWantId(wantId); focusWantInDashboard(wantId); }
   };
   const handleViewChat = (want: Want) => {
     const wantId = want.metadata?.id || want.id;
     if ((selectedWant?.metadata?.id || selectedWant?.id) === wantId) {
       sidebar.clearSelection(); setExpandedChain([]); return;
     }
-    sidebar.selectItem(want); setSidebarInitialTab('chat'); if (wantId) { setLastSelectedWantId(wantId); scrollCardIntoMobileView(wantId); }
+    sidebar.selectItem(want); setSidebarInitialTab('chat'); if (wantId) { setLastSelectedWantId(wantId); focusWantInDashboard(wantId); }
   };
 
   const handleDraftClick = (draft: DraftWant) => {
@@ -529,9 +578,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleMinimapClick = (wantId: string) => {
-    const element = document.querySelector(`[data-want-id="${wantId}"]`);
-    element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    useWantStore.getState().setBlinkingWantId(wantId);
+    focusWantInDashboard(wantId);
     
     // Close minimap on mobile after selection
     if (window.innerWidth < 1024) {
@@ -721,6 +768,41 @@ export const Dashboard: React.FC = () => {
     } catch (e: any) {
       showNotification(`✗ Failed: ${e.message}`);
     }
+  };
+
+  // Canvas: save (x, y) into want's labels via PUT /api/v1/wants/:id
+  const handleCanvasSavePosition = async (wantId: string, x: number, y: number) => {
+    const want = wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId));
+    if (!want) {
+      console.warn('[Canvas] want not found for id:', wantId);
+      throw new Error(`Want not found: ${wantId}`);
+    }
+    await apiClient.updateWant(wantId, {
+      metadata: {
+        ...want.metadata,
+        labels: { ...(want.metadata?.labels || {}), [CANVAS_LABEL_X]: String(x), [CANVAS_LABEL_Y]: String(y) },
+      },
+      spec: want.spec,
+      status: want.status,
+      state: want.state,
+    });
+    await fetchWants();
+  };
+
+  // Canvas: move an existing block — save position to backend
+  const handleCanvasMoveWant = async (wantId: string, x: number, y: number) => {
+    try {
+      await handleCanvasSavePosition(wantId, x, y);
+    } catch (e: any) {
+      showNotification(`✗ Failed to save position: ${e?.message ?? 'Unknown error'}`);
+    }
+  };
+
+  // Canvas: click on empty cell — open form and remember target position
+  const handleCanvasCreateWant = (x: number, y: number) => {
+    prevWantIdsRef.current = new Set(wants.map(w => w.metadata?.id || w.id || '').filter(Boolean));
+    pendingCanvasPosRef.current = { x, y };
+    handleCreateWant();
   };
 
   const handleUnparentWant = async (id: string) => {
@@ -1111,26 +1193,70 @@ export const Dashboard: React.FC = () => {
         onDrop={handleGlobalDrop}
       >
         <div ref={cardListScrollRef} className={classNames(
-          "flex-1 overflow-y-auto transition-colors duration-200",
+          "flex-1 flex flex-col overflow-hidden transition-colors duration-200",
+          !canvasMode && "overflow-y-auto",
           isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset"
         )}>
-          <div className={classNames(
-            "p-3 sm:p-6 flex flex-col h-full min-h-full pb-24",
-            (sidebar.showSummary || !!selectedWant || sidebar.showMemo) ? "lg:pb-24 pb-[50vh]" : "pb-24"
-          )}>
-            <React.Fragment>
-              {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
-              <div className="flex-1 flex flex-col">
-                <WantGrid
-                  wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
-                  expandedChain={expandedChain}
-                  allWants={regularWants}
-                  onBubbleChildClick={handleBubbleChildClick}
-                  onBubbleClose={() => setExpandedChain([])}
-                />
-              </div>
-            </React.Fragment>
+          {/* View mode toggle bar */}
+          <div className="flex items-center gap-1 px-3 sm:px-6 pt-3 sm:pt-4 pb-1 shrink-0">
+            <button
+              onClick={() => setCanvasMode(false)}
+              className={classNames(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors',
+                !canvasMode
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              )}
+              title="List view"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">List</span>
+            </button>
+            <button
+              onClick={() => setCanvasMode(true)}
+              className={classNames(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors',
+                canvasMode
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              )}
+              title="Canvas view — place wants on a 2D grid"
+            >
+              <Grid2X2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Canvas</span>
+            </button>
           </div>
+
+          {canvasMode ? (
+            <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
+              {error && <div className="mx-3 sm:mx-6 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 flex items-center justify-between shrink-0"><span>{error}</span><button onClick={clearError} className="ml-2 text-red-400 hover:text-red-600">✕</button></div>}
+              <WantCanvas
+                wants={filteredWants.length > 0 ? filteredWants : regularWants}
+                selectedWant={selectedWant}
+                onViewWant={handleViewWant}
+                onCreateWant={handleCanvasCreateWant}
+                onMoveWant={handleCanvasMoveWant}
+              />
+            </div>
+          ) : (
+            <div className={classNames(
+              "p-3 sm:p-6 flex flex-col flex-1 min-h-full pb-24",
+              (sidebar.showSummary || !!selectedWant || sidebar.showMemo) ? "lg:pb-24 pb-[50vh]" : "pb-24"
+            )}>
+              <React.Fragment>
+                {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
+                <div className="flex-1 flex flex-col">
+                  <WantGrid
+                    wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
+                    expandedChain={expandedChain}
+                    allWants={regularWants}
+                    onBubbleChildClick={handleBubbleChildClick}
+                    onBubbleClose={() => setExpandedChain([])}
+                  />
+                </div>
+              </React.Fragment>
+            </div>
+          )}
         </div>
       </main>
       <RightSidebar
@@ -1167,6 +1293,7 @@ export const Dashboard: React.FC = () => {
             onResume={() => resumeWant(selectedWant?.metadata?.id || selectedWant?.id || '')}
             onDelete={() => { const id = selectedWant?.metadata?.id || selectedWant?.id; if (id) useWantStore.getState().setDeleteConfirmWantId(id); }}
             onSaveRecipe={() => handleSaveRecipeFromWant(selectedWant!)}
+            onTabChange={setSidebarInitialTab}
             seriesWants={seriesWants}
             summaryProps={{
               wants,
