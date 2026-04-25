@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -1058,6 +1059,7 @@ func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters": params,
 		"count":      len(params),
+		"types":      mywant.GetGlobalParamTypes(),
 	})
 }
 
@@ -1080,6 +1082,7 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters": params,
 		"count":      len(params),
+		"types":      mywant.GetGlobalParamTypes(),
 	})
 }
 
@@ -1089,6 +1092,81 @@ func (s *Server) deleteGlobalState(w http.ResponseWriter, r *http.Request) {
 		s.globalBuilder.LogAPIOperation("DELETE", "/api/v1/global-state", "", "success", http.StatusNoContent, "", "Global state cleared")
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+const guiStateWantID = "system-gui-state"
+
+// guiStateSeq is a monotonically increasing counter incremented on every PUT to /api/v1/gui/state.
+// Clients use it to detect changes without relying on the source field, enabling multi-tab sync.
+var guiStateSeq int64
+var guiStateSeqMu sync.Mutex
+
+func nextGUIStateSeq() int64 {
+	guiStateSeqMu.Lock()
+	defer guiStateSeqMu.Unlock()
+	guiStateSeq++
+	return guiStateSeq
+}
+
+func currentGUIStateSeq() int64 {
+	guiStateSeqMu.Lock()
+	defer guiStateSeqMu.Unlock()
+	return guiStateSeq
+}
+
+// guiStateResponse wraps the GUI state with a monotonic seq number for multi-tab sync.
+type guiStateResponse struct {
+	Seq   int64          `json:"seq"`
+	State map[string]any `json:"state"`
+}
+
+// getGUIState handles GET /api/v1/gui/state
+func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, guiStateResponse{
+		Seq:   currentGUIStateSeq(),
+		State: guiFields(want),
+	})
+}
+
+// updateGUIState handles PUT /api/v1/gui/state
+// Merges the request body into the gui_state want's state and increments seq.
+func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
+		return
+	}
+
+	var updates map[string]any
+	if err := DecodeRequest(r, &updates); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+
+	for key, val := range updates {
+		want.StoreState(key, val)
+	}
+	s.JSONResponse(w, http.StatusOK, guiStateResponse{
+		Seq:   nextGUIStateSeq(),
+		State: guiFields(want),
+	})
+}
+
+// guiFields extracts the GUI-relevant fields from the want's explicit state.
+func guiFields(want *mywant.Want) map[string]any {
+	all := want.GetExplicitState()
+	keys := []string{"source", "dashboard_status_filter", "dashboard_search_query",
+		"sidebar_open", "sidebar_want_id", "sidebar_active_tab"}
+	out := make(map[string]any, len(keys))
+	for _, k := range keys {
+		out[k] = all[k]
+	}
+	return out
 }
 
 // Error Logging Helper

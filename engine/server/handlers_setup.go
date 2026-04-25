@@ -200,6 +200,10 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
 	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
 
+	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
+	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
+	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
+
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
 

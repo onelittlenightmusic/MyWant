@@ -546,14 +546,14 @@ class MyWantApiClient {
   }
 
   // Global Parameters
-  async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number }> {
-    return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters');
+  async getGlobalParameters(): Promise<{ parameters: Record<string, unknown>; count: number; types: Record<string, string[]> }> {
+    return this.deduplicatedGet<{ parameters: Record<string, unknown>; count: number; types: Record<string, string[]> }>('/api/v1/global-parameters');
   }
 
-  async getGlobalParametersConditional(ifNoneMatch?: string): Promise<{ data: { parameters: Record<string, unknown>; count: number } | null; etag: string | undefined }> {
+  async getGlobalParametersConditional(ifNoneMatch?: string): Promise<{ data: { parameters: Record<string, unknown>; count: number; types: Record<string, string[]> } | null; etag: string | undefined }> {
     const headers: Record<string, string> = {};
     if (ifNoneMatch) headers['If-None-Match'] = `"${ifNoneMatch}"`;
-    const response = await this.client.get<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', {
+    const response = await this.client.get<{ parameters: Record<string, unknown>; count: number; types: Record<string, string[]> }>('/api/v1/global-parameters', {
       headers,
       validateStatus: (s) => s === 200 || s === 304,
     });
@@ -562,8 +562,8 @@ class MyWantApiClient {
     return { data: response.data, etag };
   }
 
-  async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number }> {
-    const response = await this.client.put<{ parameters: Record<string, unknown>; count: number }>('/api/v1/global-parameters', { parameters });
+  async updateGlobalParameters(parameters: Record<string, unknown>): Promise<{ parameters: Record<string, unknown>; count: number; types: Record<string, string[]> }> {
+    const response = await this.client.put<{ parameters: Record<string, unknown>; count: number; types: Record<string, string[]> }>('/api/v1/global-parameters', { parameters });
     return response.data;
   }
 
@@ -613,6 +613,22 @@ class MyWantApiClient {
 
   async deleteAchievementRule(id: string): Promise<void> {
     await this.client.delete(`/api/v1/achievements/rules/${id}`);
+  }
+
+  // GUI state — backed by the gui_state want, surfaced via /api/v1/gui/state
+  async getGUIState(): Promise<{ seq: number; state: Record<string, unknown> }> {
+    const response = await this.client.get<{ seq: number; state: Record<string, unknown> }>('/api/v1/gui/state');
+    return response.data;
+  }
+
+  async updateGUIState(updates: Record<string, unknown>): Promise<{ seq: number; state: Record<string, unknown> }> {
+    const response = await this.client.put<{ seq: number; state: Record<string, unknown> }>('/api/v1/gui/state', updates);
+    return response.data;
+  }
+
+  // @deprecated — use updateGUIState instead
+  async updateGUIWantState(wantId: string, updates: Record<string, unknown>): Promise<void> {
+    await this.client.put(`/api/v1/states/${wantId}`, updates);
   }
 }
 

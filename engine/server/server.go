@@ -33,9 +33,10 @@ type Server struct {
 	errorHistory         []ErrorHistoryEntry              // Store error history
 	errorMu              sync.Mutex                       // Protects errorHistory slice
 	router               *mux.Router
-	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
-	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
-	httpServer           *http.Server                // HTTP server instance
+	reactionQueueManager *types.ReactionQueueManager      // Reaction queue manager for reminder wants
+	interactionManager   *mywant.InteractionManager       // Interactive want creation manager
+	httpServer           *http.Server                     // HTTP server instance
+	otelShutdown         func(context.Context) error      // OpenTelemetry shutdown hook
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -46,6 +47,14 @@ type Server struct {
 
 // New creates a new MyWant server
 func New(config Config) *Server {
+	// Initialise OpenTelemetry (best-effort; non-fatal on failure)
+	otelShutdown, err := mywant.InitOTEL(context.Background(), config.OTELEndpoint)
+	if err != nil {
+		log.Printf("[SERVER] Warning: OTEL init failed: %v\n", err)
+		otelShutdown = func(context.Context) error { return nil }
+	}
+	_ = otelShutdown // stored below after Server is constructed
+
 	agentRegistry := mywant.NewAgentRegistry()
 
 	// Load capabilities and agents from directories if they exist
@@ -93,6 +102,7 @@ func New(config Config) *Server {
 	mywant.SetGlobalDataTypeLoader(dataTypeLoader)
 
 	globalBuilder := mywant.NewChainBuilderWithPaths(config.ConfigPath, config.MemoryPath)
+	mywant.SetGlobalServerConfig(config)
 
 	// Load initial configuration from memory file if it exists (persistence)
 	initialConfig := mywant.Config{Wants: []*mywant.Want{}}
@@ -105,6 +115,23 @@ func New(config Config) *Server {
 		}
 	}
 
+	// Remove any stale gui_state wants (they should not persist across restarts)
+	// and inject a fresh one so it is always available from the start.
+	filtered := initialConfig.Wants[:0]
+	for _, w := range initialConfig.Wants {
+		if w.Metadata.Type != "gui_state" {
+			filtered = append(filtered, w)
+		}
+	}
+	initialConfig.Wants = append(filtered, &mywant.Want{
+		Metadata: mywant.Metadata{
+			ID:           "system-gui-state",
+			Name:         "system-gui-state",
+			Type:         "gui_state",
+			IsSystemWant: true,
+		},
+	})
+
 	globalBuilder.SetConfigInternal(initialConfig)
 	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
@@ -112,6 +139,7 @@ func New(config Config) *Server {
 
 	// Register the global ChainBuilder so wants can access it for the retrigger mechanism
 	mywant.SetGlobalChainBuilder(globalBuilder)
+	mywant.SetGlobalGoalThinkerUseStub(config.GoalThinker.UseStub)
 
 	// Register all agent implementations (auto-registered via init() functions)
 	mywant.RegisterAllKnownAgentImplementations(agentRegistry)
@@ -174,6 +202,7 @@ func New(config Config) *Server {
 		router:               mux.NewRouter(),
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
+		otelShutdown:         otelShutdown,
 	}
 }
 
@@ -237,7 +266,14 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.globalBuilder.Shutdown()
 	}
 
-	// 2. Shutdown HTTP server
+	// 2. Flush and shut down OpenTelemetry exporters
+	if s.otelShutdown != nil {
+		if err := s.otelShutdown(ctx); err != nil {
+			log.Printf("[SERVER] Warning: OTEL shutdown error: %v\n", err)
+		}
+	}
+
+	// 3. Shutdown HTTP server
 	if s.httpServer != nil {
 		return s.httpServer.Shutdown(ctx)
 	}

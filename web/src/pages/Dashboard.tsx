@@ -89,8 +89,14 @@ export const Dashboard: React.FC = () => {
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
 
-  const drafts = useMemo(() => wants.filter(isDraftWant).map(wantToDraft).filter((d): d is DraftWant => d !== null), [wants]);
-  const regularWants = useMemo(() => wants.filter(w => !isDraftWant(w)), [wants]);
+  // Only orphan (no ownerReferences) draft wants are shown as top-level DraftWantCards.
+  // Draft wants that are children of another want (e.g. goal under whim) are rendered
+  // inside the parent's WantChildrenBubble instead.
+  const drafts = useMemo(() => wants
+    .filter(w => isDraftWant(w) && !(w.metadata?.ownerReferences && w.metadata.ownerReferences.length > 0))
+    .map(wantToDraft)
+    .filter((d): d is DraftWant => d !== null), [wants]);
+  const regularWants = useMemo(() => wants, [wants]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [showRecommendationForm, setShowRecommendationForm] = useState(false);
@@ -186,6 +192,75 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => { if (error) { const t = setTimeout(() => clearError(), 5000); return () => clearTimeout(t); } }, [error, clearError]);
 
+  // GUI state sync via /api/v1/gui/state.
+  // Each tab tracks its own lastSeqRef. When the server seq advances, apply the new state.
+  // This enables multi-tab sync: all tabs independently notice the seq change and apply it.
+  const lastGuiSeqRef = useRef<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const { seq, state: cur } = await apiClient.getGUIState();
+        if (cancelled) return;
+        if (seq <= lastGuiSeqRef.current) return;
+        lastGuiSeqRef.current = seq;
+
+        // Apply dashboard filters
+        const statusFilter = cur['dashboard_status_filter'] as string | undefined;
+        const searchQ = cur['dashboard_search_query'] as string | undefined;
+        if (searchQ !== undefined) setSearchQuery(searchQ);
+        if (statusFilter !== undefined) {
+          setStatusFilters(statusFilter ? [statusFilter as WantExecutionStatus] : []);
+        }
+
+        // Apply sidebar state
+        const sidebarOpen = cur['sidebar_open'] as boolean | undefined;
+        const sidebarWantId = cur['sidebar_want_id'] as string | undefined;
+        const sidebarTab = cur['sidebar_active_tab'] as string | undefined;
+        if (sidebarOpen && sidebarWantId) {
+          const target = wants.find(w => (w.metadata?.id === sidebarWantId) || (w.id === sidebarWantId));
+          if (target) {
+            sidebar.selectItem(target);
+            const validTabs = ['settings', 'results', 'logs', 'agents', 'chat'] as const;
+            type ValidTab = typeof validTabs[number];
+            const tab = validTabs.includes(sidebarTab as ValidTab) ? sidebarTab as ValidTab : undefined;
+            if (tab) setSidebarInitialTab(tab);
+            setSidebarTabVersion(v => v + 1);
+          }
+        } else if (sidebarOpen === false) {
+          sidebar.clearSelection();
+        }
+      } catch {
+        // server may be temporarily unavailable
+      }
+    };
+
+    poll();
+    const id = setInterval(poll, 2_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [wants, sidebar, setSidebarInitialTab, setSidebarTabVersion]);
+
+  // Write back GUI state on user actions (sidebar open/close, filter, search).
+  // Updates lastGuiSeqRef so this tab doesn't re-apply its own write.
+  const guiWriteBackMountedRef = useRef(false);
+  useEffect(() => {
+    if (!guiWriteBackMountedRef.current) {
+      guiWriteBackMountedRef.current = true;
+      return;
+    }
+    apiClient.updateGUIState({
+      source: 'frontend',
+      dashboard_status_filter: statusFilters[0] ?? '',
+      dashboard_search_query: searchQuery,
+      sidebar_open: !!sidebar.selectedItem,
+      sidebar_want_id: sidebar.selectedItem?.metadata?.id ?? '',
+      sidebar_active_tab: sidebarInitialTab,
+    }).then(({ seq }) => { lastGuiSeqRef.current = seq; }).catch(() => {});
+  }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab]);
+
+
   const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); } else { setIsSelectMode(true); } };
   const handleSelectWant = (id: string) => {
     setLastSelectedWantId(id);
@@ -230,6 +305,12 @@ export const Dashboard: React.FC = () => {
         await apiClient.deleteDraftWant(deleteDraftState.id);
         setShowDeleteDraftConfirmation(false);
         setDeleteDraftState(null);
+        setRecommendations([]); // BUG FIX: clear recommendations when draft is deleted
+        setSelectedRecommendation(null);
+        if (activeDraftId === deleteDraftState.id) {
+           setActiveDraftId(null);
+           sidebar.clearSelection();
+        }
         showNotification(`Deleted draft`);
         await fetchWants();
       } catch (e) {
@@ -417,13 +498,33 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleDraftClick = (draft: DraftWant) => {
+    // If clicking the already selected draft, clear selection
+    if (activeDraftId === draft.id) {
+      setActiveDraftId(null);
+      setRecommendations([]);
+      setSelectedRecommendation(null);
+      sidebar.clearSelection();
+      return;
+    }
+
     setActiveDraftId(draft.id);
+    sidebar.clearSelection(); // Clear regular want selection if any
+    
     if (draft.recommendations.length > 0) {
       setRecommendations(draft.recommendations);
       setSelectedRecommendation(draft.selectedRecommendation);
-      setShowRecommendationForm(true);
-      setEditingWant(null);
-      sidebar.openForm();
+      // We no longer open the form automatically. 
+      // Instead, we show them in the WantDetailsSidebar.
+      // But we need a pseudo-want to show details for a draft.
+      const pseudoWant: Want = {
+        id: draft.id,
+        metadata: { id: draft.id, name: draft.message, type: 'draft' },
+        spec: { params: {} },
+        status: draft.error ? 'failed' : 'reaching',
+        state: { current: { error: draft.error } }
+      };
+      sidebar.selectItem(pseudoWant);
+      setSidebarInitialTab('results');
     }
   };
 
@@ -479,6 +580,31 @@ export const Dashboard: React.FC = () => {
   const handleRecommendationDeploy = async (rid: string, mods?: ConfigModifications) => {
     const ad = drafts.find(d => d.id === activeDraftId);
     if (!ad) return;
+
+    // Handle goal-thinker drafts (no sessionId)
+    if (!ad.sessionId) {
+      try {
+        await fetch(`/api/v1/states/${ad.id}/selected_recommendation_id`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rid),
+        });
+        showNotification(`Materializing idea...`);
+        setShowRecommendationForm(false);
+        setRecommendations([]);
+        setSelectedRecommendation(null);
+        sidebar.closeForm();
+        setActiveDraftId(null);
+        sidebar.clearSelection();
+        await fetchWants();
+        return;
+      } catch (e: any) {
+        showNotification(`Failed to materialize: ${e.message}`);
+        return;
+      }
+    }
+
+    // Normal interactive session deployment
     try {
       const r = await apiClient.deployRecommendation(ad.sessionId, { recommendation_id: rid, modifications: mods });
       showNotification(`Deployed ${r.want_ids.length} want(s) successfully!`);
@@ -627,6 +753,13 @@ export const Dashboard: React.FC = () => {
       await createWant({ metadata: { name, type: wantType, labels: { 'mywant.io/type': wantType } }, spec: { params } });
       setDraggingTemplate(null); showNotification(`✓ Created "${name}"`); await fetchWants();
     } catch (e: any) { showNotification(`✗ Failed: ${e.message}`); }
+  };
+
+  const handleRecommendationSelectFromSidebar = (rec: Recommendation) => {
+    setSelectedRecommendation(rec);
+    setShowRecommendationForm(true);
+    setEditingWant(null);
+    sidebar.openForm();
   };
 
   const handleLabelDropped = async (wantId: string) => {
@@ -1023,6 +1156,8 @@ export const Dashboard: React.FC = () => {
             want={selectedWant}
             initialTab={sidebarInitialTab}
             initialTabVersion={sidebarTabVersion}
+            recommendations={recommendations}
+            onRecommendationSelect={handleRecommendationSelectFromSidebar}
             onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }}
             onHeaderStateChange={setHeaderState}
             onRegisterHeaderActions={sidebar.registerHeaderActions}
