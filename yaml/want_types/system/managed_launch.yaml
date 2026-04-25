@@ -17,7 +17,7 @@ wantType:
     category: system
     pattern: independent
 
-  finalResultField: status
+  finalResultField: launch_summary
 
   onInitialize:
     params:
@@ -68,6 +68,7 @@ wantType:
       description: "(docker_compose only) Absolute path to a docker-compose.yaml file"
       type: string
       required: false
+      defaultGlobalParameter: compose_file
 
     - name: health_check_url
       description: HTTP URL to poll for readiness (both modes). Achieved once URL returns 2xx.
@@ -124,6 +125,13 @@ wantType:
       persistent: true
       label: current
       initialValue: 'pending'
+
+    - name: launch_summary
+      description: Human-readable summary of what is running (containers, PID, command, etc.)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
 
     - name: launch_error
       description: Error message if launch failed or exited unexpectedly
@@ -223,14 +231,6 @@ wantType:
       label: current
       initialValue: 0
 
-  # docker_compose lifecycle is handled by the Ansible inline agent below.
-  # process lifecycle is handled by the Go launch_manager agent.
-  inlineAgents:
-    - name: docker_compose_lifecycle
-      type: do
-      runtime: ansible
-      scriptFile: yaml/scripts/docker_compose_lifecycle.yaml
-
   requires:
     - launch_management
 
@@ -266,3 +266,24 @@ wantType:
             compose_file: /opt/myapp/docker-compose.yaml
             health_check_url: "http://localhost:8080/ready"
       expectedBehavior: Runs docker compose up -d, polls /ready, marks as running when 2xx.
+
+    - name: otel-stack
+      description: Start the OpenTelemetry observability stack (otelcol + Tempo + Loki + Grafana)
+      want:
+        metadata:
+          name: otel-stack
+          type: managed_launch
+        spec:
+          params:
+            launcher: docker_compose
+            # compose_file is resolved from global parameter "compose_file".
+            # Set it before deploying: ./bin/mywant config set compose_file /path/to/tools/otel/docker-compose.yaml
+            health_check_url: "http://localhost:3000/api/health"
+            health_check_interval: "3s"
+            health_check_max_retries: 40
+      expectedBehavior: |
+        Runs docker compose up -d for otelcol+Tempo+Loki+Grafana.
+        Polls Grafana health endpoint, marks as running when 2xx.
+        Grafana is available at http://localhost:3000 (admin/admin).
+        MyWant traces and logs are visible after setting otel_endpoint: "localhost:4317" in ~/.mywant/config.yaml.
+        Deleting the want runs docker compose down automatically.

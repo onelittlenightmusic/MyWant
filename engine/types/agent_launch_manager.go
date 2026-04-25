@@ -47,7 +47,7 @@ func manageLaunch(ctx context.Context, want *mywant.Want) error {
 func launchStart(ctx context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return nil // delegated to Ansible docker_compose_lifecycle inline agent
+		return launchDockerComposeStart(ctx, want)
 	default: // "process" and any other process-based type
 		return launchProcessStart(ctx, want)
 	}
@@ -56,7 +56,7 @@ func launchStart(ctx context.Context, want *mywant.Want, launchType string) erro
 func launchStop(ctx context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return nil // delegated to Ansible docker_compose_lifecycle inline agent
+		return launchDockerComposeStop(ctx, want)
 	default: // "process"
 		return launchProcessStop(want)
 	}
@@ -65,7 +65,7 @@ func launchStop(ctx context.Context, want *mywant.Want, launchType string) error
 func launchPoll(_ context.Context, want *mywant.Want, launchType string) error {
 	switch launchType {
 	case "docker_compose":
-		return nil // delegated to Ansible docker_compose_lifecycle inline agent
+		return launchDockerComposePoll(want)
 	default: // "process" and any other process-based type
 		return launchProcessPoll(want)
 	}
@@ -103,6 +103,11 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.SetCurrent("status", "running")
+	{
+		cmd := mywant.GetCurrent(want, "process_command", "")
+		summary := fmt.Sprintf("process running: %s (PID %d, log: %s)", cmd, pid, logFile)
+		want.SetCurrent("launch_summary", summary)
+	}
 
 	// Optional: extract a URL from the log using url_regex → store in result_field
 	urlRegex := mywant.GetCurrent(want, "url_regex", "")
@@ -183,6 +188,7 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 	}
 
 	want.SetCurrent("status", "running")
+	want.SetCurrent("launch_summary", composeRunningSummary(composeFile))
 	return nil
 }
 
@@ -236,6 +242,33 @@ func launchDockerComposePoll(want *mywant.Want) error {
 func composeEnv(want *mywant.Want) []string {
 	env := os.Environ()
 
+	// On macOS, Docker Desktop installs credential helpers under its app bundle.
+	// When the server runs as a daemon it may not have this directory in PATH,
+	// causing "docker-credential-desktop: executable file not found in $PATH".
+	// Append the well-known location if it exists and is not already in PATH.
+	extraPaths := []string{
+		"/Applications/Docker.app/Contents/Resources/bin",
+		"/usr/local/bin",
+	}
+	currentPath := os.Getenv("PATH")
+	var additions []string
+	for _, p := range extraPaths {
+		if !strings.Contains(currentPath, p) {
+			if _, err := os.Stat(p); err == nil {
+				additions = append(additions, p)
+			}
+		}
+	}
+	if len(additions) > 0 {
+		newPath := strings.Join(additions, ":") + ":" + currentPath
+		for i, e := range env {
+			if strings.HasPrefix(e, "PATH=") {
+				env[i] = "PATH=" + newPath
+				break
+			}
+		}
+	}
+
 	// Source 1: launch_env_* prefix keys (YAML-friendly, set via onInitialize.current)
 	all := want.GetAllCurrent()
 	for k, v := range all {
@@ -258,6 +291,22 @@ func composeEnv(want *mywant.Want) []string {
 	}
 
 	return env
+}
+
+// composeRunningSummary returns a one-line summary of running compose services.
+func composeRunningSummary(composeFile string) string {
+	out, err := exec.Command("docker", "compose", "-f", composeFile, "ps", "--format", "{{.Service}}:{{.State}}").Output()
+	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
+		return fmt.Sprintf("docker compose running (%s)", composeFile)
+	}
+	var parts []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			parts = append(parts, line)
+		}
+	}
+	return "containers: " + strings.Join(parts, ", ")
 }
 
 // composeRecentLogs returns the last n lines from all compose services.
