@@ -1157,16 +1157,9 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// guiFields extracts the GUI-relevant fields from the want's explicit state.
+// guiFields returns the declared GUI state fields via ProvidedStateFields.
 func guiFields(want *mywant.Want) map[string]any {
-	all := want.GetExplicitState()
-	keys := []string{"source", "dashboard_status_filter", "dashboard_search_query",
-		"sidebar_open", "sidebar_want_id", "sidebar_active_tab"}
-	out := make(map[string]any, len(keys))
-	for _, k := range keys {
-		out[k] = all[k]
-	}
-	return out
+	return want.GetExplicitState()
 }
 
 // Error Logging Helper

@@ -1316,6 +1316,17 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	// Update label registry
 	cb.registerLabelsFromWant(wantConfig)
 
+	// Directly update the live want's metadata so the hash changes immediately.
+	// Reconciliation only calls addWant for wants not yet in cb.wants, so without
+	// this direct update, metadata changes (e.g. canvas labels) would never be reflected.
+	cb.wantsMu.RLock()
+	if rw, exists := cb.wants[wantConfig.Metadata.ID]; exists {
+		rw.want.metadataMutex.Lock()
+		rw.want.Metadata = wantConfig.Metadata
+		rw.want.metadataMutex.Unlock()
+	}
+	cb.wantsMu.RUnlock()
+
 	// Trigger immediate reconciliation via channel
 	if !cb.inReconciliation {
 		select {

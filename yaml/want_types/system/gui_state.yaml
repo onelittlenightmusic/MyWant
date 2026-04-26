@@ -57,3 +57,10 @@ wantType:
       label: current
       persistent: false
       initialValue: ""
+
+    - name: canvas_scale
+      description: Zoom scale of the 2D canvas view (0.2–2.5)
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 1.0

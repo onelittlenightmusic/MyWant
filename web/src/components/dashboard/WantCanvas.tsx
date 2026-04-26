@@ -8,6 +8,9 @@ const GAP = 6;
 const STEP = CELL_SIZE + GAP;
 const MIN_COLS = 10;
 const MIN_ROWS = 8;
+const MIN_SCALE = 0.2;
+const MAX_SCALE = 2.5;
+const SCALE_STEP = 0.1;
 
 export const CANVAS_LABEL_X = 'mywant.io/canvas-x';
 export const CANVAS_LABEL_Y = 'mywant.io/canvas-y';
@@ -63,6 +66,8 @@ interface WantCanvasProps {
   onViewWant: (want: Want) => void;
   onCreateWant: (canvasX: number, canvasY: number) => void;
   onMoveWant: (wantId: string, x: number, y: number) => void;
+  scale?: number;
+  onScaleChange?: (scale: number) => void;
 }
 
 export const WantCanvas: React.FC<WantCanvasProps> = ({
@@ -71,10 +76,68 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   onViewWant,
   onCreateWant,
   onMoveWant,
+  scale: scaleProp = 1.0,
+  onScaleChange,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
+  const scale = scaleProp;
+  const lastPinchDist = useRef<number | null>(null);
+
+  const clampScale = (v: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, v));
+  const applyScale = useCallback((v: number) => { onScaleChange?.(clampScale(v)); }, [onScaleChange]);
+  const zoomIn = () => applyScale(Math.round((scale + SCALE_STEP) * 10) / 10);
+  const zoomOut = () => applyScale(Math.round((scale - SCALE_STEP) * 10) / 10);
+
+  // Non-passive wheel + touch listeners so preventDefault works (React handlers are passive)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        onScaleChange?.(clampScale(Math.round(scale * factor * 100) / 100));
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (lastPinchDist.current !== null) {
+        const factor = dist / lastPinchDist.current;
+        onScaleChange?.(clampScale(Math.round(scale * factor * 100) / 100));
+      }
+      lastPinchDist.current = dist;
+    };
+
+    const onTouchEnd = () => { lastPinchDist.current = null; };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [scale, onScaleChange]);
 
   // Optimistic local overrides: applied immediately on drop, cleared when backend confirms
   // Map<wantId, {x, y}>
@@ -164,8 +227,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   const cellFromEvent = (e: React.MouseEvent | React.DragEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const cx = Math.floor((e.clientX - rect.left) / STEP);
-    const cy = Math.floor((e.clientY - rect.top) / STEP);
+    const cx = Math.floor((e.clientX - rect.left) / (STEP * scale));
+    const cy = Math.floor((e.clientY - rect.top) / (STEP * scale));
     return { cx, cy };
   };
 
@@ -212,27 +275,58 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, []);
 
   return (
-    <div className="overflow-auto w-full flex-1" style={{ minHeight: 0 }}>
+    <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
+      {/* Zoom controls */}
+      <div className="absolute top-2 right-2 z-50 flex items-center gap-1 pointer-events-none select-none">
+        <button
+          className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
+          onClick={zoomOut}
+          title="Zoom out"
+        >−</button>
+        <span
+          className="pointer-events-auto text-white/70 text-xs font-mono w-12 text-center cursor-pointer hover:text-white transition-colors"
+          onClick={() => applyScale(1.0)}
+          title="Reset zoom"
+        >{Math.round(scale * 100)}%</span>
+        <button
+          className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
+          onClick={zoomIn}
+          title="Zoom in"
+        >+</button>
+      </div>
+
+      {/* Scroll container */}
       <div
-        ref={canvasRef}
-        className="relative select-none"
-        style={{
-          width: cols * STEP + GAP,
-          height: rows * STEP + GAP,
-          backgroundColor: '#0a0f1e',
-          backgroundImage: [
-            'linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px)',
-            'linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px)',
-          ].join(', '),
-          backgroundSize: `${STEP}px ${STEP}px`,
-          backgroundPosition: `${GAP / 2}px ${GAP / 2}px`,
-          cursor: dragWantId ? 'grabbing' : 'crosshair',
-        }}
-        onClick={handleCanvasClick}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onDragLeave={handleDragLeave}
+        ref={scrollRef}
+        className="overflow-auto w-full h-full"
       >
+        {/* Spacer div to drive scrollbars at the scaled size */}
+        <div style={{ width: (cols * STEP + GAP) * scale, height: (rows * STEP + GAP) * scale, position: 'relative' }}>
+          <div
+            ref={canvasRef}
+            className="relative select-none"
+            style={{
+              width: cols * STEP + GAP,
+              height: rows * STEP + GAP,
+              backgroundColor: '#0a0f1e',
+              backgroundImage: [
+                'linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px)',
+                'linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px)',
+              ].join(', '),
+              backgroundSize: `${STEP}px ${STEP}px`,
+              backgroundPosition: `${GAP / 2}px ${GAP / 2}px`,
+              cursor: dragWantId ? 'grabbing' : 'crosshair',
+              transform: `scale(${scale})`,
+              transformOrigin: '0 0',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+            }}
+            onClick={handleCanvasClick}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragLeave={handleDragLeave}
+          >
         {/* Drag-over highlight cell */}
         {dragOverCell && (
           <div
@@ -345,6 +439,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         })}
 
         {/* Empty cell hint on hover (CSS-only via cursor:crosshair) */}
+          </div>
+        </div>
       </div>
     </div>
   );

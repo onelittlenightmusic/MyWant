@@ -92,6 +92,7 @@ export const Dashboard: React.FC = () => {
 
   // Canvas mode (2D grid placement)
   const [canvasMode, setCanvasMode] = useState(false);
+  const [canvasScale, setCanvasScale] = useState(1.0);
   const pendingCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const prevWantIdsRef = useRef<Set<string>>(new Set());
 
@@ -182,10 +183,11 @@ export const Dashboard: React.FC = () => {
     fetchLabels();
   }, [fetchWants]);
 
-  // Smart polling: lightweight hash check → partial fetch of changed wants only
+  // Smart polling: always on — detects want changes (metadata, labels, state) across browsers/tabs
+  // autoRefresh adds visual spinner; polling itself is unconditional
   usePolling(
     () => { if (wants.length > 0) smartPollWants(); fetchLabels(); },
-    { interval: POLLING_INTERVAL_MS, enabled: headerState?.autoRefresh ?? false, immediate: false }
+    { interval: POLLING_INTERVAL_MS, enabled: true, immediate: false }
   );
 
   useEffect(() => {
@@ -224,6 +226,10 @@ export const Dashboard: React.FC = () => {
         if (cancelled) return;
         if (seq <= lastGuiSeqRef.current) return;
         lastGuiSeqRef.current = seq;
+
+        // Apply canvas scale
+        const savedScale = cur['canvas_scale'] as number | undefined;
+        if (savedScale !== undefined && savedScale > 0) setCanvasScale(savedScale);
 
         // Apply dashboard filters
         const statusFilter = cur['dashboard_status_filter'] as string | undefined;
@@ -288,6 +294,18 @@ export const Dashboard: React.FC = () => {
       sidebar_active_tab: sidebarInitialTab,
     }).then(({ seq }) => { lastGuiSeqRef.current = seq; }).catch(() => {});
   }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab]);
+
+  // Write-back for canvas scale — same pattern as other GUI state (no debounce, skip initial mount)
+  const canvasScaleWriteMountedRef = useRef(false);
+  useEffect(() => {
+    if (!canvasScaleWriteMountedRef.current) {
+      canvasScaleWriteMountedRef.current = true;
+      return;
+    }
+    apiClient.updateGUIState({ canvas_scale: canvasScale })
+      .then(({ seq }) => { lastGuiSeqRef.current = seq; })
+      .catch(() => {});
+  }, [canvasScale]);
 
 
   const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); } else { setIsSelectMode(true); } };
@@ -1231,11 +1249,13 @@ export const Dashboard: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
               {error && <div className="mx-3 sm:mx-6 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 flex items-center justify-between shrink-0"><span>{error}</span><button onClick={clearError} className="ml-2 text-red-400 hover:text-red-600">✕</button></div>}
               <WantCanvas
-                wants={filteredWants.length > 0 ? filteredWants : regularWants}
+                wants={regularWants}
                 selectedWant={selectedWant}
                 onViewWant={handleViewWant}
                 onCreateWant={handleCanvasCreateWant}
                 onMoveWant={handleCanvasMoveWant}
+                scale={canvasScale}
+                onScaleChange={setCanvasScale}
               />
             </div>
           ) : (
