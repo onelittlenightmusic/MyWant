@@ -1,9 +1,15 @@
-import React, { useState, useCallback, useRef, forwardRef } from 'react';
-import { Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import { Settings, ChevronDown, ChevronRight, Share2 } from 'lucide-react';
 import { SectionNavigationCallbacks } from '@/types/formSection';
 import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
-import { ParameterDef } from '@/types/wantType';
+import { ParameterDef, StateDef } from '@/types/wantType';
+
+interface ExposeEntry {
+  currentState?: string;
+  param?: string;
+  as?: string;
+}
 
 /**
  * Props for ParametersSection
@@ -13,6 +19,12 @@ interface ParametersSectionProps {
   parameters: Record<string, any>;
   /** Parameter definitions from want type (if available) */
   parameterDefinitions?: ParameterDef[];
+  /** State definitions from want type (for expose configuration) */
+  stateDefs?: StateDef[];
+  /** Current expose entries */
+  exposes?: ExposeEntry[];
+  /** Callback when exposes change */
+  onExposesChange?: (exposes: ExposeEntry[]) => void;
   /** Callback when parameters change */
   onChange: (parameters: Record<string, any>) => void;
   /** Whether the section is collapsed */
@@ -32,6 +44,9 @@ interface ParametersSectionProps {
 export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSectionProps>(({
   parameters,
   parameterDefinitions,
+  stateDefs,
+  exposes = [],
+  onExposesChange,
   onChange,
   isCollapsed,
   onToggleCollapse,
@@ -177,6 +192,50 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   const filteredParams = parameterDefinitions?.filter(
     param => param.required || showOptionalParams || (parameters[param.name] !== undefined) // Always show if already has a value
   ) || [];
+
+  const [expandedExposeFields, setExpandedExposeFields] = useState<Set<string>>(
+    () => new Set(exposes.filter(e => e.currentState && e.as).map(e => e.currentState!))
+  );
+
+  // Sync expanded fields when exposes are set from outside (e.g. loading an example)
+  useEffect(() => {
+    setExpandedExposeFields(prev => {
+      const next = new Set(prev);
+      exposes.forEach(e => {
+        if (e.currentState && e.as) next.add(e.currentState);
+      });
+      return next;
+    });
+  }, [exposes]);
+
+  /** Toggle expose input visibility for a state field */
+  const toggleExposeField = useCallback((stateKey: string) => {
+    setExpandedExposeFields(prev => {
+      const next = new Set(prev);
+      if (next.has(stateKey)) {
+        next.delete(stateKey);
+        // Clear the expose entry when collapsing
+        if (onExposesChange) {
+          onExposesChange(exposes.filter(e => e.currentState !== stateKey));
+        }
+      } else {
+        next.add(stateKey);
+      }
+      return next;
+    });
+  }, [exposes, onExposesChange]);
+
+  /** Update expose-as key for a state field */
+  const handleExposeAsChange = useCallback((stateKey: string, asValue: string) => {
+    if (!onExposesChange) return;
+    const next = exposes.filter(e => e.currentState !== stateKey);
+    if (asValue.trim()) {
+      next.push({ currentState: stateKey, as: asValue.trim() });
+    }
+    onExposesChange(next);
+  }, [exposes, onExposesChange]);
+
+  const currentStateFields = stateDefs?.filter(s => s.name !== 'final_result') || [];
 
   return (
     <div ref={sectionRef} className="space-y-2">
@@ -410,6 +469,60 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           ) : (
             <div className="text-sm text-gray-500 italic">
               No parameters defined for this want type.
+            </div>
+          )}
+
+          {/* State Exposures */}
+          {currentStateFields.length > 0 && onExposesChange && (
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-700 space-y-1">
+              {currentStateFields.map(s => {
+                const configuredAs = exposes.find(e => e.currentState === s.name)?.as || '';
+                const isExpanded = expandedExposeFields.has(s.name);
+                return (
+                  <div key={s.name} className="group flex items-center gap-2 min-h-[28px]">
+                    {/* State field name */}
+                    <span className="w-32 flex-shrink-0 text-xs font-mono text-gray-500 dark:text-gray-400 truncate" title={s.name}>
+                      {s.name}
+                    </span>
+
+                    {/* Expose toggle icon */}
+                    <button
+                      type="button"
+                      onClick={() => toggleExposeField(s.name)}
+                      title={isExpanded ? 'Remove expose' : 'Expose as global key'}
+                      className={`
+                        flex-shrink-0 p-1 rounded transition-all duration-150
+                        ${isExpanded || configuredAs
+                          ? 'text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20'
+                          : 'text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20'
+                        }
+                      `}
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
+
+                    {/* Expandable input */}
+                    {isExpanded && (
+                      <div className="flex items-center gap-1.5 flex-1 animate-in fade-in slide-in-from-left-1 duration-150">
+                        <span className="text-xs text-gray-300 dark:text-gray-600">→</span>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={configuredAs}
+                          onChange={e => handleExposeAsChange(s.name, e.target.value)}
+                          placeholder="global key name"
+                          className="flex-1 text-xs px-2 py-0.5 rounded-md border border-purple-200 dark:border-purple-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 placeholder-gray-300 dark:placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                        />
+                      </div>
+                    )}
+
+                    {/* Show configured value when collapsed */}
+                    {!isExpanded && configuredAs && (
+                      <span className="text-xs text-purple-500 dark:text-purple-400 font-mono">→ {configuredAs}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

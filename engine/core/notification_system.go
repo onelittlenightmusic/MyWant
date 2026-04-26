@@ -32,6 +32,31 @@ func (h *paramExposeHandler) OnEvent(ctx context.Context, event WantEvent) Event
 	return EventResponse{Handled: true}
 }
 
+// globalStateExposeHandler handles StateChangeEvent emitted by a top-level want and
+// propagates the value directly to global state as a flat key.
+// Used for exposes entries with CurrentState field on top-level (no parent) wants.
+type globalStateExposeHandler struct {
+	want     *Want
+	localKey string // state key in this want (ExposeEntry.CurrentState)
+	globalKey string // key to store in global state (ExposeEntry.As)
+}
+
+func (h *globalStateExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:global-state-expose:%s→%s", h.want.Metadata.Name, h.localKey, h.globalKey)
+}
+
+func (h *globalStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	sce, ok := event.(*StateChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if sce.GetSourceName() != h.want.Metadata.Name || sce.StateKey != h.localKey {
+		return EventResponse{}
+	}
+	StoreGlobalState(h.globalKey, sce.StateValue)
+	return EventResponse{Handled: true}
+}
+
 // currentStateExposeHandler handles StateChangeEvent emitted by this want and
 // propagates the value to the parent want's state as a different key.
 // Used for exposes entries with CurrentState field (bottom-up propagation).
@@ -142,7 +167,14 @@ func RegisterWant(want *Want) {
 			// Bottom-up: push state to parent when local state changes.
 			// "final_result" is handled specially via MergeParentState, so it works for top-level wants too.
 			if parentName == "" && entry.As != "final_result" {
-				continue // no parent to push to (non-final_result entries require a parent)
+				// Top-level want: expose directly to global state as a flat key.
+				handler := &globalStateExposeHandler{
+					want:      want,
+					localKey:  entry.CurrentState,
+					globalKey: entry.As,
+				}
+				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+				continue
 			}
 			handler := &currentStateExposeHandler{
 				want:       want,
@@ -177,6 +209,8 @@ func UnregisterWant(wantName string) {
 			want.GetSubscriptionSystem().Unsubscribe(EventTypeParameterChange, subscriberName)
 		} else if entry.CurrentState != "" {
 			if parentName == "" && entry.As != "final_result" {
+				subscriberName := fmt.Sprintf("%s:global-state-expose:%s→%s", wantName, entry.CurrentState, entry.As)
+				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
 				continue
 			}
 			subscriberName := fmt.Sprintf("%s:state-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.As)

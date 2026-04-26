@@ -40,12 +40,13 @@ wantType:
     label: current
     persistent: true
   examples:
-  - title: Slot selection choice
-    description: Selects a slot from available times
+  - title: SmartGolf slot selection
+    description: Selects an available SmartGolf slot fetched by smartgolf_list_available
     want:
       metadata:
-        name: slot-choice
+        name: smartgolf-slot-choice
         type: choice
       spec:
         params:
           target_param: selected_slot
+          choice_import_field: golf_choices

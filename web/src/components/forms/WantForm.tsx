@@ -123,6 +123,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
   const [when, setWhen] = useState<WhenSpec[]>([]);
+  const [exposes, setExposes] = useState<Array<{currentState?: string; param?: string; as?: string}>>([]);
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
@@ -226,7 +227,8 @@ export const WantForm: React.FC<WantFormProps> = ({
       spec: {
         ...(Object.keys(params).length > 0 && { params }),
         ...(validUsing.length > 0 && { using: validUsing }),
-        ...(validWhen.length > 0 && { when: validWhen })
+        ...(validWhen.length > 0 && { when: validWhen }),
+        ...(exposes.length > 0 && { exposes })
       }
     };
   };
@@ -239,6 +241,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams(want.spec?.params || {});
     setUsing(want.spec?.using || []);
     setWhen(want.spec?.when || []);
+    setExposes(want.spec?.exposes || []);
   };
 
   // Update YAML when form data changes
@@ -248,7 +251,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       console.log('Updating YAML - wantObject:', wantObject, 'using state:', using);
       setYamlContent(stringifyYaml(wantObject));
     }
-  }, [name, type, labels, params, using, when, editMode, ownerWant]);
+  }, [name, type, labels, params, using, when, exposes, editMode, ownerWant]);
 
   // Initialize form when sidebar opens/closes
   useEffect(() => {
@@ -312,6 +315,7 @@ export const WantForm: React.FC<WantFormProps> = ({
     setParams({});
     setUsing([]);
     setWhen([]);
+    setExposes([]);
     setSelectedTypeId(null); // Reset selector state
     setSelectedItemType('want-type');
     setUserNameSuffix('');
@@ -716,6 +720,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                   ref={paramsSectionRef}
                   parameters={params}
                   parameterDefinitions={selectedWantType?.parameters}
+                  stateDefs={selectedWantType?.state}
+                  exposes={exposes}
+                  onExposesChange={setExposes}
                   onChange={setParams}
                   isCollapsed={collapsedSections.has('parameters')}
                   onToggleCollapse={() => toggleSection('parameters')}
@@ -885,6 +892,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                         type="button"
                         onClick={() => {
                           setParams(example.want?.spec?.params || {});
+                          setExposes(example.want?.spec?.exposes || []);
                           setShowExampleMenu(false);
                         }}
                         className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

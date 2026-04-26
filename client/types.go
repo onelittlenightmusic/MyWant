@@ -43,11 +43,19 @@ type Metadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
 }
 
+// ExposeEntry represents a single expose declaration in WantSpec
+type ExposeEntry struct {
+	CurrentState string `json:"currentState,omitempty" yaml:"currentState,omitempty"`
+	Param        string `json:"param,omitempty" yaml:"param,omitempty"`
+	As           string `json:"as,omitempty" yaml:"as,omitempty"`
+}
+
 // WantSpec represents want specification
 type WantSpec struct {
-	Params map[string]any      `json:"params"`
-	Using  []map[string]string `json:"using,omitempty"`
-	When   []WhenSpec          `json:"when,omitempty"`
+	Params  map[string]any      `json:"params"`
+	Using   []map[string]string `json:"using,omitempty"`
+	When    []WhenSpec          `json:"when,omitempty"`
+	Exposes []ExposeEntry       `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 }
 
 // WhenSpec defines a scheduled execution time for a Want

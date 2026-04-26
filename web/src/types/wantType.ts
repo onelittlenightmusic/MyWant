@@ -78,9 +78,16 @@ export interface WantMetadata {
   labels: Record<string, string>;
 }
 
+export interface ExposeEntry {
+  currentState?: string;
+  param?: string;
+  as?: string;
+}
+
 export interface WantSpec {
   params: Record<string, unknown>;
   using?: Array<Record<string, string>>;
+  exposes?: ExposeEntry[];
 }
 
 export interface WantConfiguration {

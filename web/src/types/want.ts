@@ -69,12 +69,19 @@ export interface WhenSpec {
   fromGlobalParam?: string; // Reference to a named timer defined in parameters.yaml
 }
 
+export interface ExposeEntry {
+  currentState?: string;
+  param?: string;
+  as?: string;
+}
+
 export interface WantSpec {
   params?: Record<string, unknown>;
   using?: Array<Record<string, string>>;
   recipe?: string;
   when?: WhenSpec[];
   resetOnRestart?: boolean; // Default true; set false to preserve state across scheduled restarts
+  exposes?: ExposeEntry[];
 }
 
 export interface WantStats {
