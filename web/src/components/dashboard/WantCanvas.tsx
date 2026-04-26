@@ -6,9 +6,9 @@ import { classNames } from '@/utils/helpers';
 const CELL_SIZE = 110;
 const GAP = 6;
 const STEP = CELL_SIZE + GAP;
-const MIN_COLS = 10;
-const MIN_ROWS = 8;
-const MIN_SCALE = 0.2;
+const MIN_COLS = 30;
+const MIN_ROWS = 30;
+const MIN_SCALE = 0.3;
 const MAX_SCALE = 2.5;
 const SCALE_STEP = 0.1;
 
@@ -277,7 +277,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   return (
     <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
       {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-50 flex items-center gap-1 pointer-events-none select-none">
+      <div className="absolute top-2 left-2 z-50 flex items-center gap-1 pointer-events-none select-none">
         <button
           className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
           onClick={zoomOut}
