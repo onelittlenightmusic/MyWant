@@ -2,16 +2,16 @@ package mywant
 
 import "reflect"
 
-// wantsEqual compares two wants for equality
+// wantsEqual compares two wants for equality.
+// Only spec fields (params, using, when) and type trigger a restart.
+// Label changes are metadata-only and must NOT cause a want restart.
 func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 	// Compare metadata
 	if a.Metadata.Type != b.Metadata.Type {
 		return false
 	}
 
-	if !mapsEqual(a.GetLabels(), b.GetLabels()) {
-		return false
-	}
+	// Labels are metadata-only (e.g. canvas position, UI hints) — do NOT compare them.
 
 	if !reflect.DeepEqual(a.Metadata.OwnerReferences, b.Metadata.OwnerReferences) {
 		return false
