@@ -1,6 +1,8 @@
 package types
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -33,6 +35,9 @@ func init() {
 // raw JSON output to the "mrs_raw_output" state field. EndProgressCycle then expands
 // any state fields that declare fetchFrom+onFetchData automatically.
 //
+// Progress protocol: the script may emit {"_progress": <0-100>, "_message": "<text>"}
+// lines to stdout at any point; these update achieving_percentage / summary in real time.
+//
 // Concurrent tick protection is now handled by PollingAgent via Want.TryStartAgentRun /
 // FinishAgentRun, so no per-agent sync.Map guard is needed here.
 //
@@ -50,7 +55,13 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	defer cancel()
 
 	want.DirectLog("[MRS-MONITOR] executing skill: %s (timeout: %ds)", scriptPath, timeoutSec)
-	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, nil)
+	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, nil, func(pct int, msg string) {
+		want.SetCurrent("achieving_percentage", pct)
+		if msg != "" {
+			want.SetCurrent("summary", msg)
+		}
+		want.DirectLog("[MRS-MONITOR] progress %d%%: %s", pct, msg)
+	})
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
 		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
@@ -92,7 +103,13 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	defer cancel()
 
 	want.DirectLog("[MRS-DO] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
-	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args)
+	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args, func(pct int, msg string) {
+		want.SetCurrent("achieving_percentage", pct)
+		if msg != "" {
+			want.SetCurrent("summary", msg)
+		}
+		want.DirectLog("[MRS-DO] progress %d%%: %s", pct, msg)
+	})
 	if err != nil {
 		want.DirectLog("[MRS-DO] skill failed: %v", err)
 		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
@@ -159,31 +176,83 @@ func expandTilde(p string) string {
 
 // runMRSSkillWithArgs executes the skill script with optional CLI args and returns
 // the parsed JSON output. Pass nil or empty slice for no args.
-func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string) (map[string]any, error) {
+//
+// Progress protocol: the script may write {"_progress": <0-100>, "_message": "<text>"}
+// lines to stdout at any time during execution. These lines are forwarded to onProgress
+// (if non-nil) and are NOT included in the returned result. The last non-progress JSON
+// line is returned as the final result.
+func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string, onProgress func(int, string)) (map[string]any, error) {
 	cmdArgs := append([]string{scriptPath}, args...)
 	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
 	cmd.Env = os.Environ()
 
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		// Try to parse stdout as structured JSON error first (skill may output {"error":"..."} before exiting)
-		if len(out) > 0 {
-			var jsonErr map[string]any
-			if jsonParseErr := json.Unmarshal(out, &jsonErr); jsonParseErr == nil {
-				if msg, ok := jsonErr["error"].(string); ok && msg != "" {
-					return nil, fmt.Errorf("%s", msg)
-				}
+		return nil, fmt.Errorf("stdout pipe: %w", err)
+	}
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start: %w", err)
+	}
+
+	var finalResult map[string]any
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1 MB — handles large JSON output
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var obj map[string]any
+		if err := json.Unmarshal([]byte(line), &obj); err != nil {
+			continue // ignore non-JSON lines (e.g. debug prints)
+		}
+		if pct, ok := obj["_progress"]; ok {
+			if onProgress != nil {
+				onProgress(int(toMRSFloat64(pct)), mrsString(obj["_message"]))
+			}
+		} else {
+			finalResult = obj // last non-progress JSON line becomes the result
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		// Prefer structured error from the script's own JSON output
+		if finalResult != nil {
+			if msg, ok := finalResult["error"].(string); ok && msg != "" {
+				return nil, fmt.Errorf("%s", msg)
 			}
 		}
-		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
-			return nil, fmt.Errorf("exit error: %w\nstderr: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		if stderr := strings.TrimSpace(stderrBuf.String()); stderr != "" {
+			return nil, fmt.Errorf("exit error: %w\nstderr: %s", err, stderr)
 		}
 		return nil, fmt.Errorf("exit error: %w", err)
 	}
 
-	var result map[string]any
-	if err := json.Unmarshal(out, &result); err != nil {
-		return nil, fmt.Errorf("skill output is not valid JSON: %w", err)
+	if finalResult == nil {
+		return nil, fmt.Errorf("skill produced no JSON output")
 	}
-	return result, nil
+	return finalResult, nil
+}
+
+func toMRSFloat64(v any) float64 {
+	switch n := v.(type) {
+	case float64:
+		return n
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
+	}
+	return 0
+}
+
+func mrsString(v any) string {
+	if v == nil {
+		return ""
+	}
+	s, _ := v.(string)
+	return s
 }
