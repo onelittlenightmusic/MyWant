@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -198,23 +197,18 @@ func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string, 
 	}
 
 	var finalResult map[string]any
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1 MB — handles large JSON output
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
+	decoder := json.NewDecoder(stdout)
+	for decoder.More() {
 		var obj map[string]any
-		if err := json.Unmarshal([]byte(line), &obj); err != nil {
-			continue // ignore non-JSON lines (e.g. debug prints)
+		if err := decoder.Decode(&obj); err != nil {
+			break // unrecoverable parse error; check stderr below
 		}
 		if pct, ok := obj["_progress"]; ok {
 			if onProgress != nil {
 				onProgress(int(toMRSFloat64(pct)), mrsString(obj["_message"]))
 			}
 		} else {
-			finalResult = obj // last non-progress JSON line becomes the result
+			finalResult = obj
 		}
 	}
 
