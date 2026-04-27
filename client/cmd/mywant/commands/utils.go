@@ -31,9 +31,9 @@ var (
 	guiPidFile = filepath.Join(getMyWantDir(), "gui.pid")
 )
 
-// isPortOpen checks if a port is in use
+// isPortOpen checks if a port is being listened on
 func isPortOpen(port int) bool {
-	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port), "-sTCP:LISTEN")
 	output, err := cmd.Output()
 	return err == nil && len(output) > 0
 }
@@ -41,7 +41,7 @@ func isPortOpen(port int) bool {
 // killProcessOnPort finds and kills processes listening on the given port
 func killProcessOnPort(port int) bool {
 	// Use lsof to find the PID
-	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port))
+	cmd := exec.Command("lsof", "-t", fmt.Sprintf("-i:%d", port), "-sTCP:LISTEN")
 	output, err := cmd.Output()
 	if err != nil || len(output) == 0 {
 		return false
