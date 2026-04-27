@@ -380,5 +380,4 @@ Change ports in configuration:
 ## See Also
 
 - [MyWant CLI Usage Guide](MYWANT_CLI_USAGE.md)
-- [Agent Execution Modes](AgentExecutionModes.md)
-- [Agent Worker Mode](AgentWorkerMode.md)
+- [Agent Deployment Guide](agent-deployment.md)
