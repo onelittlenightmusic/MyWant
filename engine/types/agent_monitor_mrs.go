@@ -54,6 +54,8 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	if err != nil {
 		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
 		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
+		want.SetCurrent("error", err.Error())
+		want.SetCurrent("status", "failed")
 		return false, nil
 	}
 
@@ -94,6 +96,8 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	if err != nil {
 		want.DirectLog("[MRS-DO] skill failed: %v", err)
 		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
+		want.SetCurrent("error", err.Error())
+		want.SetCurrent("status", "failed")
 		return nil
 	}
 
@@ -162,6 +166,18 @@ func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string) 
 
 	out, err := cmd.Output()
 	if err != nil {
+		// Try to parse stdout as structured JSON error first (skill may output {"error":"..."} before exiting)
+		if len(out) > 0 {
+			var jsonErr map[string]any
+			if jsonParseErr := json.Unmarshal(out, &jsonErr); jsonParseErr == nil {
+				if msg, ok := jsonErr["error"].(string); ok && msg != "" {
+					return nil, fmt.Errorf("%s", msg)
+				}
+			}
+		}
+		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) > 0 {
+			return nil, fmt.Errorf("exit error: %w\nstderr: %s", err, strings.TrimSpace(string(exitErr.Stderr)))
+		}
 		return nil, fmt.Errorf("exit error: %w", err)
 	}
 
