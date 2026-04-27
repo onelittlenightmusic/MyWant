@@ -39,7 +39,6 @@ interface WantDetailsSidebarProps {
   initialTab?: 'settings' | 'results' | 'logs' | 'agents' | 'versions' | 'chat';
   initialTabVersion?: number;
   seriesWants?: Want[]; // All wants in the same series (for Versions tab)
-  recommendations?: Recommendation[];
   onRecommendationSelect?: (rec: Recommendation) => void;
   onWantUpdate?: () => void;
   onHeaderStateChange?: (state: { autoRefresh: boolean; loading: boolean; status: WantExecutionStatus }) => void;
@@ -85,7 +84,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   want,
   initialTab = 'results',
   initialTabVersion = 0,
-  recommendations = [],
   onRecommendationSelect,
   onWantUpdate,
   onHeaderStateChange,
@@ -583,7 +581,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
               <div className={classNames('absolute inset-0 overflow-y-auto pointer-events-none', isMovingRight ? 'animate-slide-out-left' : 'animate-slide-out-right')}>
                 <ResultsTab
                   want={wantDetails}
-                  recommendations={recommendations}
                   onRecommendationSelect={onRecommendationSelect}
                   onClearState={() => setShowClearStateConfirmation(true)}
                 />
@@ -641,7 +638,6 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
               <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
                 <ResultsTab
                   want={wantDetails}
-                  recommendations={recommendations}
                   onRecommendationSelect={onRecommendationSelect}
                   onClearState={() => setShowClearStateConfirmation(true)}
                 />
@@ -1471,10 +1467,12 @@ const sortByTimestamp = (obj: Record<string, unknown>, timestamps?: Record<strin
 
 const ResultsTab: React.FC<{
   want: Want;
-  recommendations?: Recommendation[];
   onRecommendationSelect?: (rec: Recommendation) => void;
   onClearState?: () => void;
-}> = ({ want, recommendations = [], onRecommendationSelect, onClearState }) => {
+}> = ({ want, onRecommendationSelect, onClearState }) => {
+  const recommendations: Recommendation[] =
+    (want.state?.current?.proposed_recommendations as Recommendation[]) ||
+    (want.state?.current?.recommendations as Recommendation[]) || [];
   const ts = want.state_timestamps;
   const hasCurrent = want.state?.current && Object.keys(want.state.current).length > 0;
   const hasGoal = want.state?.goal && Object.keys(want.state.goal).length > 0;

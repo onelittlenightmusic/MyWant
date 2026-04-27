@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Plus, Heart } from 'lucide-react';
 import { Want, WantExecutionStatus } from '@/types/want';
-import { DraftWant } from '@/types/draft';
 import { WantCard } from './WantCard';
 import { DraftWantCard } from './DraftWantCard';
 import { WantChildrenBubble } from './WantChildrenBubble';
@@ -17,10 +16,9 @@ interface WantWithChildren extends Want {
 
 interface WantGridProps {
   wants: Want[];
-  drafts?: DraftWant[];
-  activeDraftId?: string | null;
-  onDraftClick?: (draft: DraftWant) => void;
-  onDraftDelete?: (draft: DraftWant) => void;
+  drafts?: Want[];
+  onDraftClick?: (want: Want) => void;
+  onDraftDelete?: (want: Want) => void;
   loading: boolean;
   searchQuery: string;
   statusFilters: WantExecutionStatus[];
@@ -54,7 +52,6 @@ interface WantGridProps {
 export const WantGrid: React.FC<WantGridProps> = ({
   wants,
   drafts = [],
-  activeDraftId,
   onDraftClick,
   onDraftDelete,
   loading,
@@ -434,7 +431,6 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                   onWantDropped={onWantDropped}
                   onDraftClick={onDraftClick}
                   onDraftDelete={onDraftDelete}
-                  activeDraftId={activeDraftId}
                   parentIndex={bubbleParentIndex}
                   gridColumns={gridColumns}
                   caretCenterX={bubbleCaretCenterX ?? undefined}
@@ -446,14 +442,15 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
       })()}
 
       {drafts.map((draft, draftIndex) => {
+        const draftId = draft.metadata?.id || draft.id;
         const globalIndex = filteredWants.length + draftIndex;
         return (
-          <React.Fragment key={draft.id}>
+          <React.Fragment key={draftId}>
             <div
-              data-draft-id={draft.id}
+              data-draft-id={draftId}
               className="h-full"
             >
-              <DraftWantCard draft={draft} selected={activeDraftId === draft.id} onClick={() => onDraftClick?.(draft)} onDelete={() => onDraftDelete?.(draft)} />
+              <DraftWantCard want={draft} selected={(selectedWant?.metadata?.id || selectedWant?.id) === draftId} onClick={() => onDraftClick?.(draft)} onDelete={() => onDraftDelete?.(draft)} />
             </div>
             {globalIndex === bubbleRowEndIndex && bubbleParentWant && (
               <WantChildrenBubble
@@ -477,7 +474,6 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
                 onWantDropped={onWantDropped}
                 onDraftClick={onDraftClick}
                 onDraftDelete={onDraftDelete}
-                activeDraftId={activeDraftId}
                 parentIndex={bubbleParentIndex}
                 gridColumns={gridColumns}
                 caretCenterX={bubbleCaretCenterX ?? undefined}
@@ -538,7 +534,6 @@ const isSelected = isSelectMode ? (wantId && selectedWantIds.has(wantId)) : sele
             onWantDropped={onWantDropped}
             onDraftClick={onDraftClick}
             onDraftDelete={onDraftDelete}
-            activeDraftId={activeDraftId}
             parentIndex={bubbleParentIndex}
             gridColumns={gridColumns}
             caretCenterX={bubbleCaretCenterX ?? undefined}

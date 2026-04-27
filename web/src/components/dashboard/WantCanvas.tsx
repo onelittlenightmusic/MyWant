@@ -1,7 +1,12 @@
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
 import { Want } from '@/types/want';
+import { WantTypeListItem } from '@/types/wantType';
 import { getStatusHexColor } from './WantCard/parts/StatusColor';
+import { useWantTypeStore } from '@/stores/wantTypeStore';
+import { useWantStore } from '@/stores/wantStore';
 import { classNames } from '@/utils/helpers';
+import { WantCardFace } from './WantCardFace';
+import { getPatternColor } from './WantTypeVisuals';
 
 const CELL_SIZE = 110;
 const GAP = 6;
@@ -15,50 +20,11 @@ const SCALE_STEP = 0.1;
 export const CANVAS_LABEL_X = 'mywant.io/canvas-x';
 export const CANVAS_LABEL_Y = 'mywant.io/canvas-y';
 
-const TYPE_GRADIENT: Record<string, string> = {
-  whim: 'linear-gradient(160deg, #4c1d95 0%, #1e1b4b 100%)',
-  'whim-target': 'linear-gradient(160deg, #4c1d95 0%, #1e1b4b 100%)',
-  goal: 'linear-gradient(160deg, #1e3a5f 0%, #0f172a 100%)',
-  travel: 'linear-gradient(160deg, #064e3b 0%, #0f172a 100%)',
-  itinerary: 'linear-gradient(160deg, #064e3b 0%, #0f172a 100%)',
-  reminder: 'linear-gradient(160deg, #78350f 0%, #1c1917 100%)',
-  command: 'linear-gradient(160deg, #7c2d12 0%, #1c1917 100%)',
-  draft: 'linear-gradient(160deg, #1e293b 0%, #0f172a 100%)',
-};
-const DEFAULT_GRADIENT = 'linear-gradient(160deg, #1e293b 0%, #0f172a 100%)';
-
-const TYPE_EMOJI: Record<string, string> = {
-  whim: '✨',
-  'whim-target': '✨',
-  goal: '🎯',
-  travel: '✈️',
-  itinerary: '🗺️',
-  reminder: '⏰',
-  command: '💻',
-  flight: '✈️',
-  hotel: '🏨',
-  draft: '📝',
-};
-const DEFAULT_EMOJI = '💎';
-
-const getGradient = (type: string) => {
-  const t = type.toLowerCase();
-  for (const k of Object.keys(TYPE_GRADIENT)) {
-    if (t.includes(k)) return TYPE_GRADIENT[k];
-  }
-  return DEFAULT_GRADIENT;
-};
-
-const getEmoji = (type: string) => {
-  const t = type.toLowerCase();
-  for (const k of Object.keys(TYPE_EMOJI)) {
-    if (t.includes(k)) return TYPE_EMOJI[k];
-  }
-  return DEFAULT_EMOJI;
-};
-
 const isActiveStatus = (status: string) =>
   status === 'reaching' || status === 'initializing' || status === 'reaching_with_warning';
+
+const FLOAT_CARD_WIDTH = 280;
+const FLOAT_CARD_EST_HEIGHT = 220;
 
 interface WantCanvasProps {
   wants: Want[];
@@ -68,6 +34,8 @@ interface WantCanvasProps {
   onMoveWant: (wantId: string, x: number, y: number) => void;
   scale?: number;
   onScaleChange?: (scale: number) => void;
+  /** Pre-rendered card to float near the selected tile */
+  floatCard?: React.ReactNode;
 }
 
 export const WantCanvas: React.FC<WantCanvasProps> = ({
@@ -78,12 +46,22 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   onMoveWant,
   scale: scaleProp = 1.0,
   onScaleChange,
+  floatCard,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
+  const [floatPos, setFloatPos] = useState<{ left: number; top: number } | null>(null);
+
+  // Build want-type lookup from global store (type name → WantTypeListItem)
+  const wantTypes = useWantTypeStore(state => state.wantTypes);
+  const typeMap = useMemo(() => {
+    const m = new Map<string, WantTypeListItem>();
+    wantTypes.forEach(wt => m.set(wt.name, wt));
+    return m;
+  }, [wantTypes]);
   const lastPinchDist = useRef<number | null>(null);
 
   const clampScale = (v: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, v));
@@ -170,6 +148,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const occupied = new Set<string>();
 
     // First pass: wants with saved canvas positions (or local overrides)
+    // Conflict resolution: first come first served — duplicates fall to second pass
     wants.forEach(want => {
       const id = want.metadata?.id || want.id;
       if (!id) return;
@@ -177,8 +156,11 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       // Local override takes precedence (optimistic update)
       const override = localOverrides.get(id);
       if (override) {
-        map.set(id, override);
-        occupied.add(`${override.x},${override.y}`);
+        if (!occupied.has(`${override.x},${override.y}`)) {
+          map.set(id, override);
+          occupied.add(`${override.x},${override.y}`);
+        }
+        // If override cell is already taken, fall through to second-pass auto-assign
         return;
       }
 
@@ -188,8 +170,11 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         const x = parseInt(rawX, 10);
         const y = parseInt(rawY, 10);
         if (!isNaN(x) && !isNaN(y) && x >= 0 && y >= 0) {
-          map.set(id, { x, y });
-          occupied.add(`${x},${y}`);
+          if (!occupied.has(`${x},${y}`)) {
+            map.set(id, { x, y });
+            occupied.add(`${x},${y}`);
+          }
+          // If cell already taken, fall through to second-pass auto-assign
         }
       }
     });
@@ -213,6 +198,45 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
     return map;
   }, [wants, localOverrides]);
+
+  // Compute and track the screen position for the float card
+  const updateFloatPos = useCallback(() => {
+    if (!floatCard || !selectedWant || !scrollRef.current) { setFloatPos(null); return; }
+    const id = selectedWant.metadata?.id || selectedWant.id;
+    const pos = id ? positionMap.get(id) : undefined;
+    if (!pos) { setFloatPos(null); return; }
+
+    const scrollEl = scrollRef.current;
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const tileLeft = pos.x * STEP + GAP / 2;
+    const tileTop  = pos.y * STEP + GAP / 2;
+
+    const screenLeft   = scrollRect.left + tileLeft * scale - scrollEl.scrollLeft;
+    const screenBottom = scrollRect.top  + (tileTop + CELL_SIZE) * scale - scrollEl.scrollTop;
+    const screenTileTop = scrollRect.top + tileTop * scale - scrollEl.scrollTop;
+
+    // Clamp horizontally; flip above tile if not enough room below
+    const left = Math.max(8, Math.min(screenLeft, window.innerWidth - FLOAT_CARD_WIDTH - 8));
+    const wouldClipBottom = screenBottom + FLOAT_CARD_EST_HEIGHT > window.innerHeight - 8;
+    const top = wouldClipBottom
+      ? Math.max(8, screenTileTop - FLOAT_CARD_EST_HEIGHT - 8)
+      : screenBottom + 8;
+
+    setFloatPos({ left, top });
+  }, [floatCard, selectedWant, positionMap, scale]);
+
+  useEffect(() => { updateFloatPos(); }, [updateFloatPos]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateFloatPos);
+    window.addEventListener('resize', updateFloatPos);
+    return () => {
+      el.removeEventListener('scroll', updateFloatPos);
+      window.removeEventListener('resize', updateFloatPos);
+    };
+  }, [updateFloatPos]);
 
   // Canvas size: enough to fit all wants + some empty space
   const { cols, rows } = useMemo(() => {
@@ -242,6 +266,15 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     }
   }, [dragWantId, positionMap, cols, rows, onCreateWant]);
 
+  // True if a cell is occupied by a want other than the one being dragged
+  const isCellOccupied = useCallback((cx: number, cy: number, excludeId?: string) => {
+    for (const [id, pos] of positionMap.entries()) {
+      if (id === excludeId) continue;
+      if (pos.x === cx && pos.y === cy) return true;
+    }
+    return false;
+  }, [positionMap]);
+
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     if (!e.dataTransfer.types.includes('application/mywant-canvas-id')) return;
     e.preventDefault();
@@ -254,14 +287,13 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const wantId = e.dataTransfer.getData('application/mywant-canvas-id');
     if (!wantId) return;
     const { cx, cy } = cellFromEvent(e);
-    if (cx >= 0 && cy >= 0) {
-      // Apply optimistic local update immediately so the block doesn't snap back
+    if (cx >= 0 && cy >= 0 && !isCellOccupied(cx, cy, wantId)) {
       setLocalOverrides(prev => new Map(prev).set(wantId, { x: cx, y: cy }));
       onMoveWant(wantId, cx, cy);
     }
     setDragWantId(null);
     setDragOverCell(null);
-  }, [onMoveWant]);
+  }, [onMoveWant, isCellOccupied]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     // Only clear when actually leaving the canvas (not a child element)
@@ -328,19 +360,22 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             onDragLeave={handleDragLeave}
           >
         {/* Drag-over highlight cell */}
-        {dragOverCell && (
-          <div
-            className="absolute pointer-events-none rounded z-0"
-            style={{
-              left: dragOverCell.x * STEP + GAP / 2,
-              top: dragOverCell.y * STEP + GAP / 2,
-              width: CELL_SIZE,
-              height: CELL_SIZE,
-              border: '2px solid rgba(96,165,250,0.6)',
-              backgroundColor: 'rgba(96,165,250,0.08)',
-            }}
-          />
-        )}
+        {dragOverCell && (() => {
+          const blocked = isCellOccupied(dragOverCell.x, dragOverCell.y, dragWantId ?? undefined);
+          return (
+            <div
+              className="absolute pointer-events-none rounded z-0"
+              style={{
+                left: dragOverCell.x * STEP + GAP / 2,
+                top: dragOverCell.y * STEP + GAP / 2,
+                width: CELL_SIZE,
+                height: CELL_SIZE,
+                border: blocked ? '2px solid rgba(239,68,68,0.7)' : '2px solid rgba(96,165,250,0.6)',
+                backgroundColor: blocked ? 'rgba(239,68,68,0.12)' : 'rgba(96,165,250,0.08)',
+              }}
+            />
+          );
+        })()}
 
         {/* Want blocks */}
         {wants.map(want => {
@@ -353,36 +388,48 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           const isDragging = dragWantId === id;
           const statusColor = getStatusHexColor(want.status);
           const type = want.metadata?.type || '';
-          const gradient = getGradient(type);
-          const emoji = getEmoji(type);
+          const wantTypeInfo = typeMap.get(type);
+          const category = wantTypeInfo?.category ?? '';
+          const pattern = wantTypeInfo?.pattern ?? '';
           const name = want.metadata?.name || id;
           const active = isActiveStatus(want.status);
+          const patColor = getPatternColor(pattern);
 
           return (
-            <div
+            <WantCardFace
               key={id}
-              data-want-id={id}
+              typeName={type}
+              displayName={name}
+              category={category}
+              theme="dark"
+              iconSize={26}
               className={classNames(
-                'absolute rounded overflow-hidden z-10',
-                'transition-transform duration-100',
+                'rounded z-10 transition-transform duration-100',
                 !isDragging && 'hover:scale-[1.06] hover:z-20',
                 isSelected && 'scale-[1.06] z-30',
                 isDragging && 'opacity-40',
               )}
               style={{
+                position: 'absolute', // inline style overrides WantCardFace's `relative` class
                 left: pos.x * STEP + GAP / 2,
                 top: pos.y * STEP + GAP / 2,
                 width: CELL_SIZE,
                 height: CELL_SIZE,
-                background: gradient,
                 boxShadow: isSelected
-                  ? `0 0 0 2px #fff, 0 0 0 4px ${statusColor}, 0 6px 20px rgba(0,0,0,0.6)`
+                  ? `0 0 0 2px #fff, 0 0 0 4px ${statusColor}, 0 6px 20px rgba(0,0,0,0.7)`
                   : active
-                  ? `0 0 12px ${statusColor}50, 0 2px 8px rgba(0,0,0,0.5)`
-                  : '0 2px 8px rgba(0,0,0,0.5)',
+                  ? `0 0 14px ${patColor}60, 0 2px 10px rgba(0,0,0,0.6)`
+                  : '0 2px 10px rgba(0,0,0,0.6)',
                 cursor: isDragging ? 'grabbing' : 'grab',
               }}
+              dataAttributes={{ 'data-want-id': id }}
               onClick={e => { e.stopPropagation(); onViewWant(want); }}
+              onContextMenu={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                onViewWant(want);
+                useWantStore.getState().setQuickActionsWantId(id);
+              }}
               draggable
               onDragStart={e => {
                 e.dataTransfer.setData('application/mywant-canvas-id', id);
@@ -393,48 +440,26 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             >
               {/* Status bar (top) */}
               <div
-                className={classNames('absolute top-0 left-0 right-0', active && 'animate-pulse')}
+                className={classNames('absolute top-0 left-0 right-0 z-20', active && 'animate-pulse')}
                 style={{ height: 3, backgroundColor: statusColor }}
               />
 
-              {/* Content */}
-              <div className="flex flex-col items-center justify-center h-full gap-1 px-2 pt-1">
-                <span
-                  className="leading-none"
-                  style={{ fontSize: 28, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))' }}
-                >
-                  {emoji}
-                </span>
-
+              {/* Active dot (top-right) */}
+              {active && (
                 <div
-                  className={classNames('rounded-full', active && 'animate-pulse')}
-                  style={{ width: 6, height: 6, backgroundColor: statusColor, flexShrink: 0 }}
-                />
-
-                <span
-                  className="text-white/75 font-medium text-center leading-tight"
-                  style={{
-                    fontSize: 10,
-                    overflow: 'hidden',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical' as const,
-                    wordBreak: 'break-all',
-                    maxWidth: '100%',
-                  }}
-                >
-                  {name}
-                </span>
-              </div>
-
-              {/* Selected overlay */}
-              {isSelected && (
-                <div
-                  className="absolute inset-0 pointer-events-none rounded"
-                  style={{ border: `2px solid ${statusColor}`, opacity: 0.5 }}
+                  className="absolute top-2 right-2 z-20 rounded-full animate-pulse"
+                  style={{ width: 5, height: 5, backgroundColor: statusColor }}
                 />
               )}
-            </div>
+
+              {/* Selected border glow */}
+              {isSelected && (
+                <div
+                  className="absolute inset-0 pointer-events-none rounded z-30"
+                  style={{ border: `2px solid ${statusColor}`, opacity: 0.85 }}
+                />
+              )}
+            </WantCardFace>
           );
         })}
 
@@ -442,6 +467,23 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Float card — fixed near the selected tile, outside scroll/overflow */}
+      {floatCard && floatPos && (
+        <div
+          style={{
+            position: 'fixed',
+            left: floatPos.left,
+            top: floatPos.top,
+            width: FLOAT_CARD_WIDTH,
+            height: FLOAT_CARD_EST_HEIGHT,
+            zIndex: 50,
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {floatCard}
+        </div>
+      )}
     </div>
   );
 };

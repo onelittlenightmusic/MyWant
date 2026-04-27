@@ -18,13 +18,14 @@ import { addLabelToRegistry } from '@/utils/labelUtils';
 import { generateUniqueWantName } from '@/utils/nameGenerator';
 import { apiClient } from '@/api/client';
 import { Recommendation, ConfigModifications } from '@/types/interact';
-import { DraftWant, wantToDraft, isDraftWant } from '@/types/draft';
+import { isDraftWant } from '@/types/draft';
 import { WantRecipeAnalysis, RecipeMetadata, StateDef } from '@/types/recipe';
 
 // Components
 import { Header } from '@/components/layout/Header';
 import { RightSidebar } from '@/components/layout/RightSidebar';
 import { WantGrid } from '@/components/dashboard/WantGrid';
+import { WantCard } from '@/components/dashboard/WantCard/WantCard';
 import { WantMinimap } from '@/components/dashboard/WantMinimap';
 import { WantForm } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
@@ -74,8 +75,7 @@ export const Dashboard: React.FC = () => {
   const cardListScrollRef = useRef<HTMLDivElement>(null);
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
-  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
-  const [deleteDraftState, setDeleteDraftState] = useState<DraftWant | null>(null);
+  const [deleteDraftState, setDeleteDraftState] = useState<Want | null>(null);
   const [showDeleteDraftConfirmation, setShowDeleteDraftConfirmation] = useState(false);
   const [showSaveRecipeModal, setShowSaveRecipeModal] = useState(false);
   const [saveRecipeTarget, setSaveRecipeTarget] = useState<Want | null>(null);
@@ -100,15 +100,20 @@ export const Dashboard: React.FC = () => {
   // Draft wants that are children of another want (e.g. goal under whim) are rendered
   // inside the parent's WantChildrenBubble instead.
   const drafts = useMemo(() => wants
-    .filter(w => isDraftWant(w) && !(w.metadata?.ownerReferences && w.metadata.ownerReferences.length > 0))
-    .map(wantToDraft)
-    .filter((d): d is DraftWant => d !== null), [wants]);
+    .filter(w => isDraftWant(w) && !(w.metadata?.ownerReferences && w.metadata.ownerReferences.length > 0)),
+    [wants]);
   const regularWants = useMemo(() => wants, [wants]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const topLevelWants = useMemo(
+    () => regularWants.filter(w => !w.metadata?.ownerReferences?.some(r => r.controller && r.kind === 'Want')),
+    [regularWants]
+  );
   const [selectedRecommendation, setSelectedRecommendation] = useState<Recommendation | null>(null);
   const [showRecommendationForm, setShowRecommendationForm] = useState(false);
   const [gooseProvider, setGooseProvider] = useState<string>('claude-code');
-  const hasThinkingDraft = drafts.some(d => d.isThinking);
+  const hasThinkingDraft = drafts.some(d => {
+    const phase = d.state?.current?.phase as string | undefined;
+    return (d.state?.current?.isThinking as boolean) || phase === 'ideating' || phase === 'decomposing' || phase === 're_planning';
+  });
   const [isInteractSubmitting, setIsInteractSubmitting] = useState(false);
 
   const showNotification = (message: string) => { setNotificationMessage(message); setIsNotificationVisible(true); };
@@ -348,15 +353,15 @@ export const Dashboard: React.FC = () => {
   const handleDeleteWantCancel = () => { setShowDeleteConfirmation(false); setDeleteWantState(null); };
   const handleDeleteDraftConfirm = async () => {
     if (deleteDraftState) {
+      const draftId = deleteDraftState.metadata?.id || deleteDraftState.id;
       try {
-        await apiClient.deleteDraftWant(deleteDraftState.id);
+        await apiClient.deleteDraftWant(draftId);
         setShowDeleteDraftConfirmation(false);
         setDeleteDraftState(null);
-        setRecommendations([]); // BUG FIX: clear recommendations when draft is deleted
         setSelectedRecommendation(null);
-        if (activeDraftId === deleteDraftState.id) {
-           setActiveDraftId(null);
-           sidebar.clearSelection();
+        const selectedId = selectedWant?.metadata?.id || selectedWant?.id;
+        if (selectedId === draftId) {
+          sidebar.clearSelection();
         }
         showNotification(`Deleted draft`);
         await fetchWants();
@@ -564,35 +569,16 @@ export const Dashboard: React.FC = () => {
     sidebar.selectItem(want); setSidebarInitialTab('chat'); if (wantId) { setLastSelectedWantId(wantId); focusWantInDashboard(wantId); }
   };
 
-  const handleDraftClick = (draft: DraftWant) => {
-    // If clicking the already selected draft, clear selection
-    if (activeDraftId === draft.id) {
-      setActiveDraftId(null);
-      setRecommendations([]);
-      setSelectedRecommendation(null);
+  const handleDraftClick = (want: Want) => {
+    const wantId = want.metadata?.id || want.id;
+    const currentSelectedId = selectedWant?.metadata?.id || selectedWant?.id;
+    if (currentSelectedId === wantId) {
       sidebar.clearSelection();
       return;
     }
-
-    setActiveDraftId(draft.id);
-    sidebar.clearSelection(); // Clear regular want selection if any
-    
-    if (draft.recommendations.length > 0) {
-      setRecommendations(draft.recommendations);
-      setSelectedRecommendation(draft.selectedRecommendation);
-      // We no longer open the form automatically. 
-      // Instead, we show them in the WantDetailsSidebar.
-      // But we need a pseudo-want to show details for a draft.
-      const pseudoWant: Want = {
-        id: draft.id,
-        metadata: { id: draft.id, name: draft.message, type: 'draft' },
-        spec: { params: {} },
-        status: draft.error ? 'failed' : 'reaching',
-        state: { current: { error: draft.error } }
-      };
-      sidebar.selectItem(pseudoWant);
-      setSidebarInitialTab('results');
-    }
+    sidebar.selectItem(want);
+    setSidebarInitialTab('results');
+    if (wantId) setLastSelectedWantId(wantId);
   };
 
   const handleMinimapClick = (wantId: string) => {
@@ -616,8 +602,8 @@ export const Dashboard: React.FC = () => {
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     // Also activate the draft (same behavior as clicking the draft card)
-    const draft = drafts.find(d => d.id === draftId);
-    if (draft) handleDraftClick(draft);
+    const draftWant = drafts.find(d => (d.metadata?.id || d.id) === draftId);
+    if (draftWant) handleDraftClick(draftWant);
 
     // Close minimap on mobile after selection
     if (window.innerWidth < 1024) {
@@ -625,7 +611,7 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleDraftDelete = (draft: DraftWant) => { setDeleteDraftState(draft); setShowDeleteDraftConfirmation(true); };
+  const handleDraftDelete = (want: Want) => { setDeleteDraftState(want); setShowDeleteDraftConfirmation(true); };
 
   const handleInteractSubmit = async (message: string) => {
     setIsInteractSubmitting(true);
@@ -643,23 +629,22 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleRecommendationDeploy = async (rid: string, mods?: ConfigModifications) => {
-    const ad = drafts.find(d => d.id === activeDraftId);
-    if (!ad) return;
+    if (!selectedWant || !isDraftWant(selectedWant)) return;
+    const draftId = selectedWant.metadata?.id || selectedWant.id || '';
+    const sessionId = (selectedWant.state?.current?.sessionId as string) || '';
 
     // Handle goal-thinker drafts (no sessionId)
-    if (!ad.sessionId) {
+    if (!sessionId) {
       try {
-        await fetch(`/api/v1/states/${ad.id}/selected_recommendation_id`, {
+        await fetch(`/api/v1/states/${draftId}/selected_recommendation_id`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(rid),
         });
         showNotification(`Materializing idea...`);
         setShowRecommendationForm(false);
-        setRecommendations([]);
         setSelectedRecommendation(null);
         sidebar.closeForm();
-        setActiveDraftId(null);
         sidebar.clearSelection();
         await fetchWants();
         return;
@@ -671,10 +656,10 @@ export const Dashboard: React.FC = () => {
 
     // Normal interactive session deployment
     try {
-      const r = await apiClient.deployRecommendation(ad.sessionId, { recommendation_id: rid, modifications: mods });
+      const r = await apiClient.deployRecommendation(sessionId, { recommendation_id: rid, modifications: mods });
       showNotification(`Deployed ${r.want_ids.length} want(s) successfully!`);
-      if (activeDraftId) { try { await apiClient.deleteDraftWant(activeDraftId); } catch (e) {} setActiveDraftId(null); }
-      await fetchWants(); setShowRecommendationForm(false); setRecommendations([]); setSelectedRecommendation(null); sidebar.closeForm();
+      try { await apiClient.deleteDraftWant(draftId); } catch (e) {}
+      await fetchWants(); setShowRecommendationForm(false); setSelectedRecommendation(null); sidebar.closeForm();
     } catch (e: any) { showNotification(`Deployment failed: ${e.message}`); }
   };
 
@@ -1204,7 +1189,7 @@ export const Dashboard: React.FC = () => {
         )}
       </HeaderOverlay>
       <main
-        className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 lg:mr-[480px] mr-0 relative"
+        className="flex-1 flex overflow-hidden bg-gray-50 dark:bg-gray-950 relative"
         onDragEnter={handleGlobalDragEnter}
         onDragOver={handleGlobalDragOver}
         onDragLeave={handleGlobalDragLeave}
@@ -1213,6 +1198,7 @@ export const Dashboard: React.FC = () => {
         <div ref={cardListScrollRef} className={classNames(
           "flex-1 flex flex-col overflow-hidden transition-colors duration-200",
           !canvasMode && "overflow-y-auto",
+          !canvasMode && "lg:pr-[480px]",
           isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset"
         )}>
           {/* View mode toggle bar */}
@@ -1249,13 +1235,51 @@ export const Dashboard: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
               {error && <div className="mx-3 sm:mx-6 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 flex items-center justify-between shrink-0"><span>{error}</span><button onClick={clearError} className="ml-2 text-red-400 hover:text-red-600">✕</button></div>}
               <WantCanvas
-                wants={regularWants}
+                wants={topLevelWants}
                 selectedWant={selectedWant}
                 onViewWant={handleViewWant}
                 onCreateWant={handleCanvasCreateWant}
                 onMoveWant={handleCanvasMoveWant}
                 scale={canvasScale}
                 onScaleChange={setCanvasScale}
+                floatCard={selectedWant && (() => {
+                  const floatChildren = regularWants.filter(w =>
+                    w.metadata?.ownerReferences?.some(r => r.id === (selectedWant.metadata?.id || selectedWant.id))
+                  );
+                  const selectedId = selectedWant.metadata?.id || selectedWant.id;
+                  // onView for the float card: skip toggle-deselect when the want is already selected.
+                  // WantCard.handleContextMenu calls onView after setting the overlay; deselecting here
+                  // would unmount the card and hide the overlay before it renders.
+                  const handleFloatCardView = (w: Want) => {
+                    const wId = w.metadata?.id || w.id;
+                    if (wId !== selectedId) handleViewWant(w);
+                  };
+                  return (
+                    <WantCard
+                      want={selectedWant}
+                      children={floatChildren.length > 0 ? floatChildren : undefined}
+                      selected={true}
+                      selectedWant={selectedWant}
+                      onView={handleFloatCardView}
+                      onViewAgents={handleViewAgents}
+                      onViewResults={handleViewResults}
+                      onViewChat={handleViewChat}
+                      onEdit={handleEditWant}
+                      onDelete={handleDirectDeleteWant}
+                      onSuspend={handleSuspendWant}
+                      onResume={handleResumeWant}
+                      onShowReactionConfirmation={handleShowReactionConfirmation}
+                      index={0}
+                      stackCount={Math.min((selectedWant.metadata?.version ?? 1) - 1, 3)}
+                      correlationRate={correlationHighlights?.get(selectedWant.metadata?.id || selectedWant.id || '')}
+                      correlationHighlights={correlationHighlights}
+                      expandedParents={expandedParents}
+                      onToggleExpand={handleToggleExpand}
+                      isSelectMode={false}
+                      onCreateWant={handleCreateWant}
+                    />
+                  );
+                })()}
               />
             </div>
           ) : (
@@ -1267,7 +1291,7 @@ export const Dashboard: React.FC = () => {
                 {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
                 <div className="flex-1 flex flex-col">
                   <WantGrid
-                    wants={regularWants} drafts={drafts} activeDraftId={activeDraftId} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
+                    wants={regularWants} drafts={drafts} onDraftClick={handleDraftClick} onDraftDelete={handleDraftDelete} loading={loading} searchQuery={searchQuery} statusFilters={statusFilters} selectedWant={selectedWant} onViewWant={handleViewWant} onViewAgentsWant={handleViewAgents} onViewResultsWant={handleViewResults} onViewChatWant={handleViewChat} onEditWant={handleEditWant} onDeleteWant={handleDirectDeleteWant} onSuspendWant={handleSuspendWant} onResumeWant={handleResumeWant} onGetFilteredWants={setFilteredWants} expandedParents={expandedParents} onToggleExpand={handleToggleExpand} onCreateWant={handleCreateWant} onLabelDropped={handleLabelDropped} onWantDropped={handleWantDropped} onShowReactionConfirmation={handleShowReactionConfirmation} isSelectMode={isSelectMode} selectedWantIds={selectedWantIds} onSelectWant={handleSelectWant} correlationHighlights={correlationHighlights}
                     expandedChain={expandedChain}
                     allWants={regularWants}
                     onBubbleChildClick={handleBubbleChildClick}
@@ -1302,7 +1326,6 @@ export const Dashboard: React.FC = () => {
             want={selectedWant}
             initialTab={sidebarInitialTab}
             initialTabVersion={sidebarTabVersion}
-            recommendations={recommendations}
             onRecommendationSelect={handleRecommendationSelectFromSidebar}
             onWantUpdate={() => { if (selectedWant?.metadata?.id || selectedWant?.id) useWantStore.getState().fetchWantDetails((selectedWant.metadata?.id || selectedWant.id) as string); }}
             onHeaderStateChange={setHeaderState}
@@ -1343,13 +1366,12 @@ export const Dashboard: React.FC = () => {
         wants={filteredWants}
         drafts={drafts}
         selectedWantId={selectedWant?.metadata?.id || selectedWant?.id}
-        activeDraftId={activeDraftId}
         onWantClick={handleMinimapClick}
         onWantDoubleClick={handleMinimapDoubleClick}
         onDraftClick={handleMinimapDraftClick}
         isOpen={minimapOpen}
       />
-      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={recommendations} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
+      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={(selectedWant && isDraftWant(selectedWant) ? ((selectedWant.state?.current?.proposed_recommendations as Recommendation[]) || (selectedWant.state?.current?.recommendations as Recommendation[]) || []) : [])} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />

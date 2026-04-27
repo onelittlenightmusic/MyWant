@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, Layers, Heart, Plus } from 'lucide-react';
 import { Want } from '@/types/want';
-import { DraftWant, isDraftWant, wantToDraft } from '@/types/draft';
+import { isDraftWant } from '@/types/draft';
 import { WantCard } from './WantCard/WantCard';
 import { DraftWantCard } from './DraftWantCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -29,9 +29,8 @@ interface WantChildrenBubbleProps {
   onClose: () => void;
   onCreateWant?: (parentWant?: Want) => void;
   onWantDropped?: (draggedWantId: string, targetWantId: string) => void;
-  onDraftClick?: (draft: DraftWant) => void;
-  onDraftDelete?: (draft: DraftWant) => void;
-  activeDraftId?: string | null;
+  onDraftClick?: (want: Want) => void;
+  onDraftDelete?: (want: Want) => void;
   depth?: number;
   parentIndex?: number;
   gridColumns?: number;
@@ -58,7 +57,6 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
   onWantDropped,
   onDraftClick,
   onDraftDelete,
-  activeDraftId,
   depth = 0,
   parentIndex = 0,
   gridColumns = 1,
@@ -257,17 +255,16 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
                 );
                 const isExpanded = nextExpandedId === childId;
                 const childIsDraft = isDraftWant(child);
-                const childDraft = childIsDraft ? wantToDraft(child) : null;
 
                 return (
                   <React.Fragment key={childId}>
                     <div className={classNames(isExpanded ? 'ring-2 ring-blue-400 ring-offset-2 dark:ring-offset-gray-900 rounded-lg transition-all duration-300' : 'transition-all duration-300')}>
-                      {childIsDraft && childDraft ? (
+                      {childIsDraft ? (
                         <DraftWantCard
-                          draft={childDraft}
-                          selected={activeDraftId === childId}
-                          onClick={() => onDraftClick?.(childDraft)}
-                          onDelete={() => onDraftDelete?.(childDraft)}
+                          want={child}
+                          selected={(selectedWant?.metadata?.id || selectedWant?.id) === childId}
+                          onClick={() => onDraftClick?.(child)}
+                          onDelete={() => onDraftDelete?.(child)}
                         />
                       ) : (
                         <WantCard
@@ -310,7 +307,6 @@ export const WantChildrenBubble: React.FC<WantChildrenBubbleProps> = ({
                         onClose={onClose}
                         onDraftClick={onDraftClick}
                         onDraftDelete={onDraftDelete}
-                        activeDraftId={activeDraftId}
                         depth={depth + 1}
                         parentIndex={index}
                         gridColumns={innerGridColumns}

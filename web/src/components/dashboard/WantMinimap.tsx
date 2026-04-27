@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Want, WantExecutionStatus } from '@/types/want';
-import { DraftWant } from '@/types/draft';
+import { isDraftWant } from '@/types/draft';
 import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useConfigStore } from '@/stores/configStore';
@@ -25,9 +25,8 @@ const getStatusOverlayColor = (status: WantExecutionStatus): string => {
 
 interface WantMinimapProps {
   wants: Want[]; // Parent cards (filteredWants)
-  drafts: DraftWant[]; // Draft cards
+  drafts: Want[]; // Draft cards
   selectedWantId?: string;
-  activeDraftId?: string | null;
   onWantClick: (wantId: string) => void;
   onWantDoubleClick?: (wantId: string) => void;
   onDraftClick: (draftId: string) => void;
@@ -42,7 +41,7 @@ interface MinimapCardProps {
 }
 
 interface MinimapDraftCardProps {
-  draft: DraftWant;
+  want: Want;
   isSelected: boolean;
   onClick: () => void;
 }
@@ -109,26 +108,25 @@ const MinimapCard: React.FC<MinimapCardProps> = ({ want, isSelected, onClick, on
 /**
  * Miniature version of a Draft Want card
  */
-const MinimapDraftCard: React.FC<MinimapDraftCardProps> = ({ draft, isSelected, onClick }) => {
-  const minimapDraftCardClassName = classNames(
-    'rounded border-2 border-dashed cursor-pointer transition-all duration-200',
-    'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700',
-    'hover:border-blue-400 dark:hover:border-blue-300',
-    isSelected ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30' : 'border-gray-400 dark:border-gray-600',
-    draft.isThinking && 'animate-pulse' // Thinking state animation
-  );
-
-  const minimapDraftCardStyle = {
-    height: '40px',
-    minHeight: '40px'
-  };
+const MinimapDraftCard: React.FC<MinimapDraftCardProps> = ({ want, isSelected, onClick }) => {
+  const current = want.state?.current || {};
+  const phase = (current.phase as string) || '';
+  const isThinking = (current.isThinking as boolean) ||
+    phase === 'ideating' || phase === 'decomposing' || phase === 're_planning';
+  const message = (current.goal_text as string) || (current.message as string) || want.metadata?.name || 'Draft Want';
 
   return (
     <div
-      className={minimapDraftCardClassName}
-      style={minimapDraftCardStyle}
+      className={classNames(
+        'rounded border-2 border-dashed cursor-pointer transition-all duration-200',
+        'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700',
+        'hover:border-blue-400 dark:hover:border-blue-300',
+        isSelected ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30' : 'border-gray-400 dark:border-gray-600',
+        isThinking && 'animate-pulse',
+      )}
+      style={{ height: '40px', minHeight: '40px' }}
       onClick={onClick}
-      title={draft.message || 'Draft Want'}
+      title={message}
     />
   );
 };
@@ -142,7 +140,6 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
   wants,
   drafts,
   selectedWantId,
-  activeDraftId,
   onWantClick,
   onWantDoubleClick,
   onDraftClick,
@@ -181,14 +178,17 @@ export const WantMinimap: React.FC<WantMinimapProps> = ({
         })}
 
         {/* Draft cards */}
-        {drafts.map(draft => (
-          <MinimapDraftCard
-            key={draft.id}
-            draft={draft}
-            isSelected={activeDraftId === draft.id}
-            onClick={() => onDraftClick(draft.id)}
-          />
-        ))}
+        {drafts.map(draft => {
+          const draftId = draft.metadata?.id || draft.id || '';
+          return (
+            <MinimapDraftCard
+              key={draftId}
+              want={draft}
+              isSelected={selectedWantId === draftId}
+              onClick={() => onDraftClick(draftId)}
+            />
+          );
+        })}
 
         {/* Add Want button placeholder (for layout consistency with WantGrid) */}
         <div
