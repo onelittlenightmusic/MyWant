@@ -91,6 +91,21 @@ func (cb *ChainBuilder) QueueWantStart(ids []string) error {
 	})
 }
 
+// QueueWantRestart queues an atomic restart operation.
+// For running wants: sends ControlTriggerRestart to the existing goroutine.
+// For terminated/idle wants: sets status to Idle and triggers reconciliation.
+// This avoids the race condition of QueueWantStop+QueueWantStart across different channels.
+func (cb *ChainBuilder) QueueWantRestart(ids []string) error {
+	if len(ids) == 0 {
+		return fmt.Errorf("want IDs cannot be empty")
+	}
+	return cb.QueueOperation(&WantOperation{
+		Type:       "restart",
+		EntityType: "want",
+		IDs:        ids,
+	})
+}
+
 // QueueWantAddLabel queues a label addition operation
 func (cb *ChainBuilder) QueueWantAddLabel(wantID, key, value string) error {
 	if wantID == "" || key == "" {
@@ -203,6 +218,33 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			if err := cb.RestartWant(wantID); err != nil {
 				sendError(err)
 				return
+			}
+		}
+
+	case "restart":
+		// Atomic restart: send ControlTriggerRestart to running goroutine, or RestartWant for terminated/idle.
+		for _, wantID := range op.IDs {
+			cb.wantsMu.RLock()
+			runtime, exists := cb.wants[wantID]
+			cb.wantsMu.RUnlock()
+			if !exists || runtime == nil {
+				sendError(fmt.Errorf("want %s not found", wantID))
+				return
+			}
+			if runtime.want.goroutineActive.Load() {
+				cmd := &ControlCommand{Trigger: ControlTriggerRestart, WantID: wantID, Reason: "Restarted via API"}
+				if err := runtime.want.SendControlCommand(cmd); err != nil {
+					// Goroutine may have just exited; fall back to RestartWant
+					if err2 := cb.RestartWant(wantID); err2 != nil {
+						sendError(err2)
+						return
+					}
+				}
+			} else {
+				if err := cb.RestartWant(wantID); err != nil {
+					sendError(err)
+					return
+				}
 			}
 		}
 

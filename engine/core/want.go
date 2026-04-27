@@ -684,6 +684,9 @@ func (n *Want) RestartWant() {
 // Type-specific per-run resets (e.g. agentRunGuard for ScriptableWant) are handled
 // inside the progressable's own Initialize().
 func (n *Want) prepareForRestart() {
+	// Always reset agentRunGuard so DoAgents re-execute on restart.
+	n.agentRunGuard = sync.Map{}
+
 	// Reset state fields to initialValues when resetOnRestart is enabled (nil = true).
 	if n.Spec.ResetOnRestart == nil || *n.Spec.ResetOnRestart {
 		cb := GetGlobalChainBuilder()

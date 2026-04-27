@@ -545,9 +545,7 @@ func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, w
 	case "stop":    err = s.globalBuilder.QueueWantStop([]string{wantID})
 	case "start":   err = s.globalBuilder.QueueWantStart([]string{wantID})
 	case "restart":
-		if err = s.globalBuilder.QueueWantStop([]string{wantID}); err == nil {
-			err = s.globalBuilder.QueueWantStart([]string{wantID})
-		}
+		err = s.globalBuilder.QueueWantRestart([]string{wantID})
 	}
 
 	if err != nil {
@@ -587,9 +585,7 @@ func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, op
 	case "stop":    err = s.globalBuilder.QueueWantStop(body.IDs)
 	case "start":   err = s.globalBuilder.QueueWantStart(body.IDs)
 	case "restart":
-		if err = s.globalBuilder.QueueWantStop(body.IDs); err == nil {
-			err = s.globalBuilder.QueueWantStart(body.IDs)
-		}
+		err = s.globalBuilder.QueueWantRestart(body.IDs)
 	}
 
 	if err != nil {

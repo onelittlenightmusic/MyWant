@@ -497,17 +497,38 @@ func mrsExpandTilde(p string) string {
 }
 
 // mrsRunScript executes a Python3 script and returns parsed JSON output.
+// Progress lines ({"_progress": ...}) are consumed and discarded; the last
+// non-progress JSON object is returned as the result.
 func mrsRunScript(ctx context.Context, scriptPath string, args []string) (map[string]any, error) {
 	cmdArgs := append([]string{scriptPath}, args...)
 	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
 	cmd.Env = os.Environ()
-	out, err := cmd.Output()
+
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return nil, fmt.Errorf("stdout pipe: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("start: %w", err)
+	}
+
+	var finalResult map[string]any
+	decoder := json.NewDecoder(stdout)
+	for decoder.More() {
+		var obj map[string]any
+		if err := decoder.Decode(&obj); err != nil {
+			break
+		}
+		if _, ok := obj["_progress"]; !ok {
+			finalResult = obj
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("exit error: %w", err)
 	}
-	var result map[string]any
-	if err := json.Unmarshal(out, &result); err != nil {
-		return nil, fmt.Errorf("output is not valid JSON: %w", err)
+	if finalResult == nil {
+		return nil, fmt.Errorf("skill produced no JSON output")
 	}
-	return result, nil
+	return finalResult, nil
 }
