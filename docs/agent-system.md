@@ -93,9 +93,9 @@ The MyWant system follows the **Agent-State Interaction Rule (GCP Pattern)** to 
 #### ThinkAgent
 - **Purpose**: React to state changes and propagate computed values across want boundaries.
 - **Operational Principles**:
-  - **Goal Setting**: If `goal.*` is missing in the state, initialize it (Trigger: absence of `goal.*`).
-  - **Wait for Context**: Wait until `current.*` is populated by Monitor Agents.
-  - **Planning**: Compare `goal.*` with `current.*` to generate a `plan.*` (Trigger: presence of both `goal.*` and `current.*`).
+  - **Goal Setting**: If goal state is missing, initialize it via `SetGoal()`.
+  - **Wait for Context**: Wait until `GetCurrent()` returns values populated by Monitor Agents.
+  - **Planning**: Compare Goal with Current state to generate a Plan via `SetPlan()`.
 - **Examples**: Register in coordinator itinerary, await budget allocation, propagate reservation costs.
 - **Execution Characteristic**: **Background Ticker** (default 2s).
 - **State Access**: Reads/writes own State and ParentState.
@@ -104,16 +104,16 @@ The MyWant system follows the **Agent-State Interaction Rule (GCP Pattern)** to 
 - **Purpose**: Monitor and validate state by observing the external world.
 - **Operational Principles**:
   - **Observation**: Continuously observe external systems or resources.
-  - **State Update**: Write the observed external information into `current.*` fields.
+  - **State Update**: Write the observed external information into state using `SetCurrent()`.
 - **Examples**: Check reservation status, validate payments, monitor resources.
 - **Execution Characteristic**: **Asynchronous**.
 
 #### DoAgent
 - **Purpose**: Perform actions that change external state based on generated plans.
 - **Operational Principles**:
-  - **Execution**: Read the `plan.*` fields and execute the corresponding actions in the external world.
-  - **Flexibility**: **DoAgents can be executed even if no `plan.*` is present** (e.g., direct invocation via `ExecuteAgents()`).
-  - **Cleanup/Feedback**: Overwrite or remove `plan.*` upon successful execution to prevent redundant actions.
+  - **Execution**: Read the Plan fields (via `GetPlan()`) and execute the corresponding actions in the external world.
+  - **Flexibility**: **DoAgents can be executed even if no Plan is present** (e.g., direct invocation via `ExecuteAgents()`).
+  - **Cleanup/Feedback**: Clear the Plan (via `ClearPlan()`) upon successful execution to prevent redundant actions, and update progress via `SetCurrent()`.
 - **Examples**: Make hotel reservations, process payments, send notifications.
 - **Execution Characteristic**: **Synchronous**.
 
@@ -174,6 +174,27 @@ All agent types interact with a want's **State** as the central integration poin
 | MonitorAgent | `ExecuteAgents()` | Async goroutine, continuous | read/write | — |
 | PollAgent | `AddBackgroundAgent()` | Persistent bg, stop signal | read/write | — |
 | **ThinkAgent** | `AddBackgroundAgent()` | **Persistent bg, ticker (2s)** | **read/write** | **read/write** |
+
+### GPC (Goal, Plan, Current) Access Matrix
+
+The MyWant system uses the **GPC** (Goal → Plan → Current) logic to define the flow of intent to execution. Each agent type has specific permissions for these state fields:
+
+| Agent Type | Goal (Intent) | Plan (Instructions) | Current (Reality) | Primary Responsibility |
+|:---|:---:|:---:|:---:|:---|
+| **Thinker** | **Write** | **Write** | Read | Initializing goals and generating plans based on Current state. |
+| **Monitor** | Read | Read | **Write** | Observing the external world and updating Current state. |
+| **Do** | Read | **Read/Clear** | **Write** | Executing plans, clearing them on success, and updating Current. |
+
+#### `child-role` on Want Metadata
+
+Even when an operation is implemented as a **Want** (e.g., an MRS-scriptable want) rather than a standalone agent, it can assume these roles by setting the `child-role` in its metadata. This property determines which labels the child want is permitted to write in its parent coordinator's state:
+
+| `child-role` | Writable Parent Labels | Characteristic |
+|:---|:---|:---|
+| `thinker` | `plan` | Periodically calculates and writes plans (e.g., budget allocation). |
+| `monitor` | `current` | Background polling to update status. |
+| `doer` | `current` | Foreground, one-shot execution to write results. |
+| `admin` | `goal`, `plan`, `current`, `internal` | Full access for management/coordination wants. |
 
 #### Parent–Child State Coordination
 
@@ -335,17 +356,18 @@ type Agent interface {
 func (r *AgentRegistry) hotelReservationAction(ctx context.Context, want *Want) error {
     fmt.Printf("Hotel reservation agent executing for want: %s\n", want.Metadata.Name)
 
-    // Stage all state changes as a single object
-    want.StageStateChange(map[string]interface{}{
-        "reservation_id": "HTL-12345",
-        "status":        "confirmed",
-        "hotel_name":    "Premium Hotel",
-        "check_in":      "2025-09-20",
-        "check_out":     "2025-09-22",
-    })
+    // Check if we have a plan to execute
+    if plan, ok := want.GetPlan("reservation_status"); ok && plan == "confirmed" {
+        // Perform the actual external action
+        reservationID := "HTL-12345"
 
-    // Commit all changes at once
-    want.CommitStateChanges()
+        // Clear the plan to prevent redundant execution
+        want.ClearPlan("reservation_status")
+
+        // Set the results in Current state
+        want.SetCurrent("reservation_id", reservationID)
+        want.SetCurrent("status", "confirmed")
+    }
 
     return nil
 }
@@ -357,20 +379,13 @@ func (r *AgentRegistry) hotelReservationAction(ctx context.Context, want *Want) 
 func (r *AgentRegistry) hotelReservationMonitor(ctx context.Context, want *Want) error {
     fmt.Printf("Hotel reservation monitor checking status for want: %s\n", want.Metadata.Name)
 
-    if reservationID, exists := want.GetState("reservation_id"); exists {
+    if reservationID, ok := want.GetCurrent("reservation_id"); ok {
         // Check external system status
-        status := checkReservationStatus(reservationID)
+        status := checkReservationStatus(reservationID.(string))
 
-        // Stage monitoring updates
-        want.StageStateChange(map[string]interface{}{
-            "reservation_id": reservationID,
-            "status":        status,
-            "last_checked":  time.Now().Format(time.RFC3339),
-            "room_ready":    true,
-        })
-
-        // Commit all updates
-        want.CommitStateChanges()
+        // Update current status
+        want.SetCurrent("status", status)
+        want.SetCurrent("last_checked", time.Now().Format(time.RFC3339))
     }
 
     return nil
@@ -412,22 +427,19 @@ func (n *Want) ExecuteAgents() error {
 ```
 
 ### 3. State Management
-Agents use batched state updates for efficiency:
+Agents should use the semantic labeled methods to maintain GPC consistency. These methods automatically validate that the key has been declared with the correct label in the want's state definition.
 
 ```go
-// Single key-value staging
-want.StageStateChange("key", "value")
+// Preferred: Semantic labeled methods
+want.SetGoal("budget", 1000)
+want.SetPlan("action", "reserve")
+want.SetCurrent("status", "confirmed")
 
-// Object-based staging (preferred)
-want.StageStateChange(map[string]interface{}{
-    "key1": "value1",
-    "key2": "value2",
-    "key3": "value3",
-})
-
-// Atomic commit
-want.CommitStateChanges()
+// Direct state access (bypasses label validation)
+want.StoreState("key", "value")
 ```
+
+The system handles history recording and persistence automatically. For `DoAgent` and `MonitorAgent`, a `CommitStateChanges()` is performed automatically by the executor after the agent's `Exec` function returns.
 
 ## Lifecycle Management
 
@@ -529,152 +541,10 @@ make run-hotel-agent
   Want 'luxury-hotel-booking' requires: [hotel_reservation]
     Agents for 'hotel_reservation': agent_premium(do) hotel_monitor(monitor)
 🚀 Executing chain...
-Hotel reservation agent executing for want: luxury-hotel-booking
-💾 Committed 5 state changes for want luxury-hotel-booking in single batch
 Hotel reservation monitor checking status for want: luxury-hotel-booking
-💾 Committed 4 state changes for want luxury-hotel-booking in single batch
+[REGISTRY] Linked agent 'agent_premium' to capability value 'hotel_reservation'
+Hotel reservation agent executing for want: luxury-hotel-booking
 ✅ Hotel Agent Demo completed
 ```
 
 ## Best Practices
-
-### 1. Agent Design
-- Keep agents focused on single responsibilities
-- Use DoAgents for actions, MonitorAgents for status checking
-- Implement proper error handling and timeouts
-
-### 2. State Management
-- Use object-based staging for multiple related updates
-- Commit changes atomically to maintain consistency
-- Include timestamps and metadata in state updates
-
-### 3. Configuration
-- Use descriptive names for capabilities and agents
-- Include version information for tracking
-- Add tags for easy filtering and organization
-
-### 4. Error Handling
-- Validate configurations early with OpenAPI schemas
-- Implement graceful degradation for agent failures
-- Log detailed information for debugging
-
-### 5. State Ownership Rule (CRITICAL)
-
-> **Each want is the sole owner of its own State and Status.**
-> No Agent — and no code running on behalf of Want A — may read into another
-> Want B and directly mutate B's state or status.
-
-#### Why this rule exists
-
-Every want runs in its own goroutine. Writing to a foreign want's `State` or calling a foreign want's `SetStatus()` from outside that goroutine bypasses all locking assumptions and causes data races, broken status transitions, and corrupted history.
-
-#### The rule, concretely
-
-| Context | Allowed | Forbidden |
-|:--------|:--------|:----------|
-| `Progress()` / `Initialize()` | `b.StoreState(...)`, `b.SetStatus(...)` on receiver | `otherWant.StoreState(...)`, `otherWant.SetStatus(...)` |
-| Agent `Exec(ctx, want)` | `want.StoreStateForAgent(...)` on the passed-in `want` | fetching a different want from `cb.GetWants()` and writing its state |
-| ThinkAgent `ThinkFunc` | `want.StoreState(...)` on own want, `want.MergeParentState(...)` | writing state on any sibling or child want directly |
-
-#### Correct pattern for cross-want coordination (cancel + rebook)
-
-When one want needs to trigger a status change in another, use an **indirect signal**:
-
-```
-Itinerary (want A)                     reserve_hotel (want B)
-      │                                       │
-      │  w.StoreState("_cancel_requested",    │
-      │               true)                   │
-      │  cb.RestartWant(wantB.ID)  ──────────►│  goroutine restarts
-      │                                       │
-      │                                       │  Initialize(): detects _cancel_requested
-      │                                       │  Progress():   calls b.SetStatus(WantStatusCancelled)
-      │                                       │               ← owns its own status ✅
-      │◄── status == WantStatusCancelled ─────┘
-      │
-      │  (now safe to dispatch replacement want)
-```
-
-**Never do this:**
-
-```go
-// ❌ ILLEGAL — writing a foreign want's state from outside its goroutine
-for _, w := range cb.GetWants() {
-    if w.Metadata.ID == targetID {
-        w.SetStatus(WantStatusCancelled)   // race condition, ownership violation
-        w.StoreState("cancelled", true)    // same violation
-    }
-}
-```
-
-**Always do this instead:**
-
-```go
-// signal the target; let it cancel itself
-for _, w := range cb.GetWants() {
-    if w.Metadata.ID == targetID {
-        w.StoreState("_cancel_requested", true)  // only a flag write — safe
-        break
-    }
-}
-cb.RestartWant(targetID)  // wake the target's goroutine to process the flag
-```
-
-+### 6. Hierarchy Rule for Want Dispatch
-+
-+> **Sub-wants are forbidden from creating other sub-wants directly.**
-+> A want should never call `cb.AddWant` or similar methods to spawn siblings or children.
-+
-+#### Correct implementation for dynamic dispatch (e.g. Itinerary)
-+
-+1. **The Sub-want (Itinerary)** writes a dispatch request to the **Parent (Target)** state using `StoreParentState("_dispatch_queue", requests)`.
-+2. **The Parent (Target)** has a `DispatchThinkerAgent` running.
-+3. **DispatchThinkerAgent** monitors the queue and calls `parent.AddChildWant(newWant)` to perform the actual dispatch.
-+
-+This ensures that the responsibility for execution graph expansion always resides with the upper hierarchy (Target/Recipe).
-+
- ## Troubleshooting
-
- ### Common Issues
-
-
-1. **Agent Not Found**
-   - Check that capability `gives` matches want `requires`
-   - Verify agent has the required capability
-
-2. **Validation Failures**
-   - Ensure YAML follows OpenAPI schema
-   - Check required fields are present
-   - Validate agent types are `do`, `monitor`, or `think`
-
-3. **State Not Updated**
-   - Confirm agent calls `CommitStateChanges()`
-   - Check for goroutine panics in logs
-   - Verify agent execution completes successfully
-
-### Debug Tips
-
-- Use validation output to identify configuration issues
-- Check agent execution logs for runtime errors
-- Monitor state history for unexpected changes
-- Verify capability-to-agent mappings are correct
-
----
-
-## Implementation Plan for GCP Pattern
-
-To fully adopt the Agent-State Interaction Rule, the following phases are planned:
-
-### Phase 1: Foundation (Core Helpers)
-- Add dedicated helper methods to the `Want` struct in `engine/core/want.go`:
-  - `SetGoal(key, val)`, `GetCurrent(key)`, `SetPlan(key, val)`, `ClearPlan(key)`
-- These helpers will automatically handle the `goal.`, `current.`, and `plan.` prefixes.
-
-### Phase 2: Migration (Agent Refactoring)
-- Update `ThinkAgent` implementations (e.g., `condition_thinker`) to use GCP prefixes for goal and plan management.
-- Update `MonitorAgent` implementations (e.g., `monitor_flight_api`) to write results to `current.*`.
-- Update `DoAgent` logic to check for `plan.*` before execution, while maintaining backward compatibility for direct calls.
-
-### Phase 3: Visibility & Validation
-- Update the Dashboard (UI) to group state fields by GCP categories for better observability.
-- Add E2E tests specifically verifying the GCP loop (Think -> Plan -> Do -> Monitor -> Current -> Think).

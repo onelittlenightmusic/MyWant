@@ -63,6 +63,11 @@ Most commands have short versions for convenience.
 | | `delete` | `del`, `rm` | Delete a parameter |
 | | `import` | - | Import parameters from YAML/JSON file |
 | | `export` | - | Export parameters to stdout or file |
+| `gui` | - | - | Control the web GUI |
+| | `show` | - | Navigate the GUI to a specific view |
+| | `dashboard` | - | Navigate to the dashboard |
+| | `want` | - | Open sidebar for a specific want |
+| | `get` | `g` | Show current GUI state |
 
 ## Core Commands
 
@@ -252,6 +257,28 @@ Wants can persist key-value pairs via `StoreGlobalState`. The `memo` command let
 ./bin/mywant memo clear
 # Skip confirmation
 ./bin/mywant memo clear -y
+```
+
+### GUI Control
+
+Inspect and control the integrated web dashboard from the command line.
+
+```bash
+# Show the current GUI state (active view, sidebar status, filters)
+./bin/mywant gui get
+# Short version:
+./bin/mywant gui g
+
+# Navigate to the dashboard (close sidebar)
+./bin/mywant gui show dashboard
+# With status filter and search query
+./bin/mywant gui show dashboard --filter reaching --search "travel"
+
+# Open the sidebar for a specific want
+./bin/mywant gui show want <WANT_ID>
+# Open a specific tab in the sidebar
+./bin/mywant gui show want <WANT_ID> --tab logs
+# Available tabs: settings, results, logs, agents, versions, chat
 ```
 
 ### Global Parameters

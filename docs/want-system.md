@@ -200,22 +200,41 @@ wants:
 
 ### State Management
 
-MyWant uses **dual-layer state management**:
+MyWant uses **dual-layer state management** and a semantic labeling system known as **GPC** (Goal → Plan → Current).
+
+#### GPC (Goal, Plan, Current) Access Matrix
+
+The system categorizes state fields to define the flow of intent to execution. Different agent types (and Wants acting in specific roles) have defined permissions:
+
+| Entity Role | Goal (Intent) | Plan (Instructions) | Current (Reality) | Primary Responsibility |
+|:---|:---:|:---:|:---:|:---|
+| **Thinker** | **Write** | **Write** | Read | Initializing goals and generating plans based on Current state. |
+| **Monitor** | Read | Read | **Write** | Observing the external world and updating Current state. |
+| **Do** | Read | **Read/Clear** | **Write** | Executing plans, clearing them on success, and updating Current. |
+
+#### `child-role` for Cross-Want Coordination
+
+When a Want is part of a hierarchy (e.g., inside a coordinator recipe), it can assume a specific role by setting the `child-role` in its metadata. This determines which labels the child is permitted to write in its parent's state:
+
+- **`thinker`**: Authorized to write to `plan` fields in the parent.
+- **`monitor` / `doer`**: Authorized to write to `current` fields in the parent.
+- **`admin`**: Full access to all labels (`goal`, `plan`, `current`, `internal`).
+
+#### State Updates in Code
+
+For logic within `Progress()`, always use the semantic labeled methods. These ensure that you are adhering to the GPC governance rules.
 
 ```go
-// Batched state updates (recommended)
-want.BeginProgressCycle()
-want.StageStateChange(map[string]interface{}{
-    "batch_size": 1000,
-    "processed_count": 5000,
-    "status": "processing",
-})
-want.EndProgressCycle()  // Commits all staged changes atomically
+// Preferred: Semantic labeled methods (automatically validated)
+b.SetGoal("max_retries", 3)
+b.SetPlan("next_action", "validate")
+b.SetCurrent("status", "processing")
 
-// Agent state updates
-want.StageStateChange("reservation_id", "HTL-12345")
-want.StageStateChange("status", "confirmed")
-want.CommitStateChanges()  // Atomic commit
+// Batch updates
+StoreStateMulti(b, map[string]any{
+    "processed_count": 5000,
+    "last_update": time.Now(),
+})
 ```
 
 ### State History & Subscriptions
@@ -298,17 +317,13 @@ spec:
 ```
 
 ```go
-// ✅ Efficient state management
-want.BeginProgressCycle()
-want.StageStateChange(map[string]interface{}{
-    "processed_count": count,
-    "status": "active",
-    "metrics": map[string]interface{}{
-        "throughput": tps,
-        "error_rate": errorRate,
-    },
+// ✅ Efficient state management (GPC compliant)
+b.SetCurrent("processed_count", count)
+b.SetCurrent("status", "active")
+b.SetCurrent("metrics", map[string]interface{}{
+    "throughput": tps,
+    "error_rate": errorRate,
 })
-want.EndProgressCycle()  // Atomic commit
 ```
 
 MyWant's declarative want system transforms complex distributed processing into simple, readable configuration that expresses **what you want to achieve** rather than **how to achieve it**.

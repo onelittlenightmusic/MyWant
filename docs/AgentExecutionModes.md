@@ -461,19 +461,20 @@ func flightBookingAction(ctx context.Context, want *Want) error {
 ```go
 // In external agent service
 func handleFlightExecute(w http.ResponseWriter, r *http.Request) {
-    var req ExecuteRequest
-    json.NewDecoder(r.Body).Decode(&req)
+	var req ExecuteRequest
+	json.NewDecoder(r.Body).Decode(&req)
 
-    // Booking logic here
-    result := bookFlight(req.WantState)
+	// Booking logic here
+	result := bookFlight(req.WantState)
 
-    response := ExecuteResponse{
-        Status: "completed",
-        StateUpdates: map[string]any{
-            "booking_id": result,
-        },
-    }
-    json.NewEncoder(w).Encode(response)
+	response := ExecuteResponse{
+		Status: "completed",
+		StateUpdates: map[string]any{
+			"booking_id": result,
+			"status":     "confirmed",
+		},
+	}
+	json.NewEncoder(w).Encode(response)
 }
 ```
 

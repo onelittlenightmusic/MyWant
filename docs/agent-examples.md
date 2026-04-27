@@ -42,8 +42,8 @@ agents:
 ```go
 // Implementation
 func (r *AgentRegistry) stripePaymentAction(ctx context.Context, want *Want) error {
-    amount, _ := want.GetState("amount")
-    currency, _ := want.GetState("currency")
+    amount, _ := want.GetGoal("amount")
+    currency, _ := want.GetGoal("currency")
 
     // Make Stripe API call
     chargeID, err := stripeAPI.CreateCharge(amount, currency)
@@ -51,15 +51,12 @@ func (r *AgentRegistry) stripePaymentAction(ctx context.Context, want *Want) err
         return fmt.Errorf("stripe charge failed: %w", err)
     }
 
-    // Stage all results
-    want.StageStateChange(map[string]interface{}{
-        "charge_id": chargeID,
-        "status": "charged",
-        "processed_at": time.Now().Format(time.RFC3339),
-        "gateway": "stripe",
-    })
+    // Set results in Current state
+    want.SetCurrent("charge_id", chargeID)
+    want.SetCurrent("status", "charged")
+    want.SetCurrent("processed_at", time.Now().Format(time.RFC3339))
+    want.SetCurrent("gateway", "stripe")
 
-    want.CommitStateChanges()
     return nil
 }
 ```
@@ -103,15 +100,12 @@ func (r *AgentRegistry) healthMonitorAction(ctx context.Context, want *Want) err
             // Check system health
             metrics := checkSystemHealth()
 
-            want.StageStateChange(map[string]interface{}{
-                "cpu_usage": metrics.CPU,
-                "memory_usage": metrics.Memory,
-                "disk_usage": metrics.Disk,
-                "status": getHealthStatus(metrics),
-                "last_check": time.Now().Format(time.RFC3339),
-            })
-
-            want.CommitStateChanges()
+            // Update current state
+            want.SetCurrent("cpu_usage", metrics.CPU)
+            want.SetCurrent("memory_usage", metrics.Memory)
+            want.SetCurrent("disk_usage", metrics.Disk)
+            want.SetCurrent("status", getHealthStatus(metrics))
+            want.SetCurrent("last_check", time.Now().Format(time.RFC3339))
 
             // Exit if unhealthy
             if metrics.CPU > 0.9 {
@@ -251,22 +245,18 @@ Agents that trigger other agents in sequence:
 ```go
 func (r *AgentRegistry) pipelineInitiatorAction(ctx context.Context, want *Want) error {
     // Stage 1: Data preparation
-    want.StageStateChange(map[string]interface{}{
-        "stage": "data_prep",
-        "status": "processing",
-    })
-    want.CommitStateChanges()
+    want.SetCurrent("stage", "data_prep")
+    want.SetCurrent("status", "processing")
 
     // Prepare data
     processedData := prepareData()
 
     // Stage 2: Trigger next requirement
-    want.StageStateChange(map[string]interface{}{
-        "stage": "validation",
-        "prepared_data": processedData,
-        "next_requirement": "data_validation",
-    })
-    want.CommitStateChanges()
+    want.SetCurrent("stage", "validation")
+    want.SetCurrent("prepared_data", processedData)
+    
+    // Set a plan for the next agent
+    want.SetPlan("validate_data", true)
 
     return nil
 }
@@ -278,37 +268,26 @@ Agents that execute based on state conditions:
 
 ```go
 func (r *AgentRegistry) conditionalAgent(ctx context.Context, want *Want) error {
-    // Check condition from want state
-    priority, exists := want.GetState("priority")
+    // Check condition from want goals
+    priority, exists := want.GetGoal("priority")
     if !exists {
         return fmt.Errorf("priority not set")
     }
 
-    var action map[string]interface{}
-
     switch priority.(string) {
     case "high":
-        action = map[string]interface{}{
-            "processing_tier": "premium",
-            "sla_hours": 4,
-            "assigned_team": "senior",
-        }
+        want.SetCurrent("processing_tier", "premium")
+        want.SetCurrent("sla_hours", 4)
+        want.SetCurrent("assigned_team", "senior")
     case "normal":
-        action = map[string]interface{}{
-            "processing_tier": "standard",
-            "sla_hours": 24,
-            "assigned_team": "general",
-        }
+        want.SetCurrent("processing_tier", "standard")
+        want.SetCurrent("sla_hours", 24)
+        want.SetCurrent("assigned_team", "general")
     default:
-        action = map[string]interface{}{
-            "processing_tier": "basic",
-            "sla_hours": 72,
-            "assigned_team": "junior",
-        }
+        want.SetCurrent("processing_tier", "basic")
+        want.SetCurrent("sla_hours", 72)
+        want.SetCurrent("assigned_team", "junior")
     }
-
-    want.StageStateChange(action)
-    want.CommitStateChanges()
 
     return nil
 }
@@ -320,9 +299,9 @@ Agents specifically for handling failures:
 
 ```go
 func (r *AgentRegistry) errorRecoveryAgent(ctx context.Context, want *Want) error {
-    // Check for error state
-    if errorMsg, exists := want.GetState("error"); exists {
-        retryCount, _ := want.GetState("retry_count")
+    // Check for error state in Current
+    if errorMsg, exists := want.GetCurrent("error"); exists {
+        retryCount, _ := want.SetInternal("retry_count") // Internal state for retries
         count := 0
         if retryCount != nil {
             count = retryCount.(int)
@@ -330,22 +309,16 @@ func (r *AgentRegistry) errorRecoveryAgent(ctx context.Context, want *Want) erro
 
         if count < 3 {
             // Attempt recovery
-            want.StageStateChange(map[string]interface{}{
-                "error": nil,
-                "status": "retrying",
-                "retry_count": count + 1,
-                "retry_at": time.Now().Format(time.RFC3339),
-            })
+            want.SetCurrent("error", nil)
+            want.SetCurrent("status", "retrying")
+            want.SetInternal("retry_count", count + 1)
+            want.SetCurrent("retry_at", time.Now().Format(time.RFC3339))
         } else {
             // Mark as failed
-            want.StageStateChange(map[string]interface{}{
-                "status": "failed",
-                "final_error": errorMsg,
-                "failed_at": time.Now().Format(time.RFC3339),
-            })
+            want.SetCurrent("status", "failed")
+            want.SetCurrent("final_error", errorMsg)
+            want.SetCurrent("failed_at", time.Now().Format(time.RFC3339))
         }
-
-        want.CommitStateChanges()
     }
 
     return nil
@@ -368,20 +341,15 @@ agents:
 ### 2. State Management Patterns
 
 ```go
-// ✅ Good: Atomic updates with related data
-want.StageStateChange(map[string]interface{}{
-    "order_id": orderID,
-    "status": "confirmed",
-    "confirmed_at": time.Now(),
-    "confirmation_email": email,
-})
-want.CommitStateChanges()
+// ✅ Good: Atomic property setters
+want.SetCurrent("order_id", orderID)
+want.SetCurrent("status", "confirmed")
+want.SetCurrent("confirmed_at", time.Now())
+want.SetCurrent("confirmation_email", email)
 
-// ❌ Avoid: Multiple separate commits
-want.StageStateChange("order_id", orderID)
-want.CommitStateChanges()
-want.StageStateChange("status", "confirmed")
-want.CommitStateChanges()
+// ❌ Avoid: Batching with legacy methods
+// want.StageStateChange(...)
+// want.CommitStateChanges()
 ```
 
 ### 3. Error Handling Patterns
@@ -389,34 +357,26 @@ want.CommitStateChanges()
 ```go
 func (r *AgentRegistry) robustAgent(ctx context.Context, want *Want) error {
     // Set processing state
-    want.StageStateChange("status", "processing")
-    want.CommitStateChanges()
+    want.SetCurrent("status", "processing")
 
     defer func() {
         if r := recover(); r != nil {
             // Handle panic
-            want.StageStateChange(map[string]interface{}{
-                "status": "error",
-                "error": fmt.Sprintf("panic: %v", r),
-                "error_at": time.Now(),
-            })
-            want.CommitStateChanges()
+            want.SetCurrent("status", "error")
+            want.SetCurrent("error", fmt.Sprintf("panic: %v", r))
+            want.SetCurrent("error_at", time.Now())
         }
     }()
 
     // Main logic with timeout
     select {
     case <-ctx.Done():
-        want.StageStateChange("status", "cancelled")
-        want.CommitStateChanges()
+        want.SetCurrent("status", "cancelled")
         return ctx.Err()
     case result := <-doWork():
-        want.StageStateChange(map[string]interface{}{
-            "status": "completed",
-            "result": result,
-            "completed_at": time.Now(),
-        })
-        want.CommitStateChanges()
+        want.SetCurrent("status", "completed")
+        want.SetCurrent("result", result)
+        want.SetCurrent("completed_at", time.Now())
         return nil
     }
 }
@@ -456,21 +416,21 @@ agents:
 
 ```go
 func (r *AgentRegistry) apiIntegrationAgent(ctx context.Context, want *Want) error {
-    endpoint := want.Spec.Params["api_endpoint"].(string)
-    method := want.Spec.Params["method"].(string)
-    payload := want.Spec.Params["payload"]
+    endpoint, _ := want.GetGoal("api_endpoint")
+    method, _ := want.GetGoal("method")
+    payload, _ := want.GetGoal("payload")
 
     client := &http.Client{Timeout: 30 * time.Second}
 
     var req *http.Request
     var err error
 
-    if method == "POST" || method == "PUT" {
+    if method.(string) == "POST" || method.(string) == "PUT" {
         jsonPayload, _ := json.Marshal(payload)
-        req, err = http.NewRequestWithContext(ctx, method, endpoint, bytes.NewBuffer(jsonPayload))
+        req, err = http.NewRequestWithContext(ctx, method.(string), endpoint.(string), bytes.NewBuffer(jsonPayload))
         req.Header.Set("Content-Type", "application/json")
     } else {
-        req, err = http.NewRequestWithContext(ctx, method, endpoint, nil)
+        req, err = http.NewRequestWithContext(ctx, method.(string), endpoint.(string), nil)
     }
 
     if err != nil {
@@ -488,13 +448,10 @@ func (r *AgentRegistry) apiIntegrationAgent(ctx context.Context, want *Want) err
         return fmt.Errorf("response read failed: %w", err)
     }
 
-    want.StageStateChange(map[string]interface{}{
-        "api_response": string(body),
-        "status_code": resp.StatusCode,
-        "headers": resp.Header,
-        "called_at": time.Now().Format(time.RFC3339),
-    })
-    want.CommitStateChanges()
+    want.SetCurrent("api_response", string(body))
+    want.SetCurrent("status_code", resp.StatusCode)
+    want.SetCurrent("headers", resp.Header)
+    want.SetCurrent("called_at", time.Now().Format(time.RFC3339))
 
     return nil
 }
@@ -504,12 +461,12 @@ func (r *AgentRegistry) apiIntegrationAgent(ctx context.Context, want *Want) err
 
 ```go
 func (r *AgentRegistry) databaseAgent(ctx context.Context, want *Want) error {
-    query := want.Spec.Params["query"].(string)
-    params := want.Spec.Params["params"].([]interface{})
+    query, _ := want.GetGoal("query")
+    params, _ := want.GetGoal("params")
 
     db := getDBConnection()
 
-    rows, err := db.QueryContext(ctx, query, params...)
+    rows, err := db.QueryContext(ctx, query.(string), params.([]interface{})...)
     if err != nil {
         return fmt.Errorf("query failed: %w", err)
     }
@@ -534,12 +491,9 @@ func (r *AgentRegistry) databaseAgent(ctx context.Context, want *Want) error {
         results = append(results, row)
     }
 
-    want.StageStateChange(map[string]interface{}{
-        "query_results": results,
-        "row_count": len(results),
-        "executed_at": time.Now().Format(time.RFC3339),
-    })
-    want.CommitStateChanges()
+    want.SetCurrent("query_results", results)
+    want.SetCurrent("row_count", len(results))
+    want.SetCurrent("executed_at", time.Now().Format(time.RFC3339))
 
     return nil
 }
@@ -549,10 +503,10 @@ func (r *AgentRegistry) databaseAgent(ctx context.Context, want *Want) error {
 
 ```go
 func (r *AgentRegistry) fileProcessingAgent(ctx context.Context, want *Want) error {
-    filePath := want.Spec.Params["file_path"].(string)
-    operation := want.Spec.Params["operation"].(string)
+    filePath, _ := want.GetGoal("file_path")
+    operation, _ := want.GetGoal("operation")
 
-    file, err := os.Open(filePath)
+    file, err := os.Open(filePath.(string))
     if err != nil {
         return fmt.Errorf("file open failed: %w", err)
     }
@@ -560,7 +514,7 @@ func (r *AgentRegistry) fileProcessingAgent(ctx context.Context, want *Want) err
 
     var result map[string]interface{}
 
-    switch operation {
+    switch operation.(string) {
     case "word_count":
         scanner := bufio.NewScanner(file)
         wordCount := 0
@@ -590,11 +544,12 @@ func (r *AgentRegistry) fileProcessingAgent(ctx context.Context, want *Want) err
         }
     }
 
-    result["file_path"] = filePath
-    result["processed_at"] = time.Now().Format(time.RFC3339)
-
-    want.StageStateChange(result)
-    want.CommitStateChanges()
+    want.SetCurrent("file_path", filePath)
+    want.SetCurrent("processed_at", time.Now().Format(time.RFC3339))
+    
+    for k, v := range result {
+        want.SetCurrent(k, v)
+    }
 
     return nil
 }
@@ -609,14 +564,18 @@ func TestHotelReservationAgent(t *testing.T) {
     // Create test want
     want := &Want{
         Metadata: Metadata{Name: "test-hotel"},
-        Spec: WantSpec{
-            Params: map[string]interface{}{
-                "hotel_type": "luxury",
-                "check_in": "2025-01-01",
-            },
+        StateLabels: map[string]StateLabel{
+            "hotel_type": LabelGoal,
+            "check_in":   LabelGoal,
+            "reservation_id": LabelCurrent,
+            "status":         LabelCurrent,
         },
         State: make(map[string]interface{}),
     }
+    
+    // Set input goals
+    want.SetGoal("hotel_type", "luxury")
+    want.SetGoal("check_in", "2025-01-01")
 
     // Create registry and agent
     registry := NewAgentRegistry()
@@ -625,10 +584,12 @@ func TestHotelReservationAgent(t *testing.T) {
     // Execute agent
     err := registry.hotelReservationAction(ctx, want)
 
-    // Assert results
+    // Assert results from Current state
     assert.NoError(t, err)
-    assert.Equal(t, "HTL-12345", want.GetState("reservation_id"))
-    assert.Equal(t, "confirmed", want.GetState("status"))
+    resID, _ := want.GetCurrent("reservation_id")
+    status, _ := want.GetCurrent("status")
+    assert.Equal(t, "HTL-12345", resID)
+    assert.Equal(t, "confirmed", status)
 }
 ```
 
