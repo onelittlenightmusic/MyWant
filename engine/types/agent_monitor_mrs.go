@@ -66,7 +66,6 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
 		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
 		want.SetCurrent("error", err.Error())
-		want.SetCurrent("status", "failed")
 		return false, nil
 	}
 
@@ -114,7 +113,6 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 		want.DirectLog("[MRS-DO] skill failed: %v", err)
 		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
 		want.SetCurrent("error", err.Error())
-		want.SetCurrent("status", "failed")
 		return nil
 	}
 
