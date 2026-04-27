@@ -15,6 +15,7 @@ import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition }
 import { updateWantParameters, updateWantScheduling, updateWantLabels, updateWantDependencies } from '@/utils/wantUtils';
 import { WantControlButtons } from '@/components/dashboard/WantControlButtons';
 import { WantCardContent } from '@/components/dashboard/WantCardContent';
+import { ArrayResultTable } from '@/components/common/ArrayResultTable';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ParametersSection } from '@/components/forms/sections/ParametersSection';
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
@@ -1582,18 +1583,40 @@ const ResultsTab: React.FC<{
                     )}
                   </div>
                   <div className="group/finalresult relative">
-                    <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all pr-7">
-                      {typeof want.state!.final_result === 'string'
-                        ? want.state!.final_result as string
-                        : JSON.stringify(want.state!.final_result, null, 2)}
-                    </pre>
-                    <button
-                      onClick={handleCopyFinalResult}
-                      className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                      title="Copy to clipboard"
-                    >
-                      {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    </button>
+                    {Array.isArray(want.state!.final_result) &&
+                     (want.state!.final_result as unknown[]).length > 0 &&
+                     typeof (want.state!.final_result as unknown[])[0] === 'object' &&
+                     (want.state!.final_result as unknown[])[0] !== null ? (
+                      <>
+                        <ArrayResultTable
+                          data={want.state!.final_result as Record<string, unknown>[]}
+                          maxRows={10}
+                          size="normal"
+                        />
+                        <button
+                          onClick={handleCopyFinalResult}
+                          className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          title="Copy to clipboard"
+                        >
+                          {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <pre className="text-xs sm:text-sm font-mono text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all pr-7">
+                          {typeof want.state!.final_result === 'string'
+                            ? want.state!.final_result as string
+                            : JSON.stringify(want.state!.final_result, null, 2)}
+                        </pre>
+                        <button
+                          onClick={handleCopyFinalResult}
+                          className="absolute right-0 top-0 opacity-100 sm:opacity-0 sm:group-hover/finalresult:opacity-100 transition-opacity p-0.5 rounded text-green-500 hover:text-green-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          title="Copy to clipboard"
+                        >
+                          {finalResultCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

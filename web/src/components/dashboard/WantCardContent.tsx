@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { AlertTriangle, Bot, Heart, Clock, ThumbsUp, ThumbsDown, Copy, Check, MessageSquare } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { ArrayResultTable } from '@/components/common/ArrayResultTable';
 import { formatDate, formatDuration, truncateText, classNames } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
 import styles from './WantCard.module.css';
@@ -18,8 +19,38 @@ const FinalResultDisplay: React.FC<{
   onCopy: (e: React.MouseEvent) => void;
   onView: () => void;
 }> = ({ value, isChild, copied, onCopy, onView }) => {
+  const isArrayOfObjects =
+    Array.isArray(value) &&
+    value.length > 0 &&
+    typeof value[0] === 'object' &&
+    value[0] !== null;
+
   const fullText = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
   const truncateLimit = isChild ? 40 : 50;
+
+  if (isArrayOfObjects) {
+    const data = value as Record<string, unknown>[];
+    return (
+      <div className={`${isChild ? 'mt-4' : 'mt-8'}`}>
+        <div className="flex items-center justify-between mb-0.5">
+          <button
+            onClick={onView}
+            className={`${isChild ? 'text-[0.5rem]' : 'text-[0.55rem] sm:text-[0.6rem]'} font-mono text-green-400/70 hover:text-green-400 cursor-pointer`}
+          >
+            [{data.length} items] — view all
+          </button>
+          <button onClick={onCopy} className="p-0.5 rounded text-green-400" title="Copy to clipboard">
+            {copied
+              ? <Check className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+              : <Copy className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+            }
+          </button>
+        </div>
+        <ArrayResultTable data={data} maxRows={isChild ? 3 : 5} size="compact" />
+      </div>
+    );
+  }
+
   return (
     <div className={`${isChild ? 'mt-4' : 'mt-8'} relative flex justify-start`}>
       <button
