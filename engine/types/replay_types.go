@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ReplayWant, ReplayLocals]("replay")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[ReplayWant, ReplayLocals]("replay")
+	})
 }
 
 // ReplayLocals holds type-specific local state for ReplayWant

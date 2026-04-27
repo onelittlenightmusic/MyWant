@@ -5,8 +5,10 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[PrimeNumbers, PrimeNumbersLocals]("prime numbers")
-	RegisterWantImplementation[PrimeSequence, PrimeSequenceLocals]("prime sequence")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[PrimeNumbers, PrimeNumbersLocals]("prime numbers")
+		RegisterWantImplementation[PrimeSequence, PrimeSequenceLocals]("prime sequence")
+	})
 }
 
 // PrimeNumbersLocals holds type-specific local state for PrimeNumbers want

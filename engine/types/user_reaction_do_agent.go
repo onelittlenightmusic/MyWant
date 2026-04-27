@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterDoAgent("user_reaction_do", performAutoApproval)
+	RegisterWithInit(func() {
+		RegisterDoAgent("user_reaction_do", performAutoApproval)
+	})
 }
 
 func performAutoApproval(ctx context.Context, want *Want) error {

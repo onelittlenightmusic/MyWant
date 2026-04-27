@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[BudgetWant, BudgetWantLocals]("budget")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[BudgetWant, BudgetWantLocals]("budget")
+	})
 }
 
 // BudgetWantLocals holds type-specific local state for BudgetWant

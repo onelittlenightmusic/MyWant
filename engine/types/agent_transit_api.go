@@ -17,7 +17,9 @@ import (
 const transitDoAgentName = "agent_transit_api"
 
 func init() {
-	RegisterDoAgent(transitDoAgentName, executeTransitQuery)
+	RegisterWithInit(func() {
+		RegisterDoAgent(transitDoAgentName, executeTransitQuery)
+	})
 }
 
 // --- OpenTripPlanner 2.x GraphQL response types ---

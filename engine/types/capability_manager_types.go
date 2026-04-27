@@ -10,34 +10,36 @@ import (
 const capabilityManagerAgentName = "capability_manager_agent"
 
 func init() {
-	RegisterWantImplementation[CapabilityManagerWant, CapabilityManagerLocals]("capability_manager")
-	RegisterThinkAgentType(capabilityManagerAgentName, []Capability{
-		{Name: "capability_management", Gives: []string{"capability_management"},
-			Description: "Evaluates achievement rules and dynamically awards achievements and capabilities"},
-	}, capabilityManagerThink)
-
-	// Hook: when an achievement is unlocked, link it into AgentRegistry.
-	// available_capabilities is now computed on-demand from the achievement store,
-	// so no global state update is needed here.
-	RegisterOnAchievementAdded(func(a Achievement) {
-		if a.UnlocksCapability == "" {
-			return
-		}
-		cb := GetGlobalChainBuilder()
-		if cb == nil {
-			return
-		}
-		wants := cb.GetWants()
-		if len(wants) == 0 {
-			return
-		}
-		registry := wants[0].GetAgentRegistry()
-		if registry == nil {
-			return
-		}
-		registry.LinkCapabilityToAgent(a.AgentName, a.UnlocksCapability)
-		log.Printf("[CapabilityManager] Linked capability '%s' to agent '%s'",
-			a.UnlocksCapability, a.AgentName)
+	RegisterWithInit(func() {
+		RegisterWantImplementation[CapabilityManagerWant, CapabilityManagerLocals]("capability_manager")
+		RegisterThinkAgentType(capabilityManagerAgentName, []Capability{
+			{Name: "capability_management", Gives: []string{"capability_management"},
+				Description: "Evaluates achievement rules and dynamically awards achievements and capabilities"},
+		}, capabilityManagerThink)
+	
+		// Hook: when an achievement is unlocked, link it into AgentRegistry.
+		// available_capabilities is now computed on-demand from the achievement store,
+		// so no global state update is needed here.
+		RegisterOnAchievementAdded(func(a Achievement) {
+			if a.UnlocksCapability == "" {
+				return
+			}
+			cb := GetGlobalChainBuilder()
+			if cb == nil {
+				return
+			}
+			wants := cb.GetWants()
+			if len(wants) == 0 {
+				return
+			}
+			registry := wants[0].GetAgentRegistry()
+			if registry == nil {
+				return
+			}
+			registry.LinkCapabilityToAgent(a.AgentName, a.UnlocksCapability)
+			log.Printf("[CapabilityManager] Linked capability '%s' to agent '%s'",
+				a.UnlocksCapability, a.AgentName)
+		})
 	})
 }
 

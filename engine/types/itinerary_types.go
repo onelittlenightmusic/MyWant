@@ -8,7 +8,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ItineraryWant, ItineraryLocals]("itinerary")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[ItineraryWant, ItineraryLocals]("itinerary")
+	})
 }
 
 type ItineraryLocals struct {

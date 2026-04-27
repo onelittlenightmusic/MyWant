@@ -13,7 +13,6 @@ import (
 
 	mywant "mywant/engine/core"
 	types "mywant/engine/types"
-	_ "mywant/engine/types"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
@@ -54,6 +53,11 @@ func New(config Config) *Server {
 		otelShutdown = func(context.Context) error { return nil }
 	}
 	_ = otelShutdown // stored below after Server is constructed
+
+	// Run all type/agent registrations queued by init() in engine/types FIRST,
+	// so that doActionRegistry/monitorActionRegistry are populated before LoadAgents()
+	// calls setAgentAction(), which links YAML agents to their Go implementations.
+	mywant.RunDeferredRegistrations()
 
 	agentRegistry := mywant.NewAgentRegistry()
 
@@ -141,7 +145,6 @@ func New(config Config) *Server {
 	mywant.SetGlobalChainBuilder(globalBuilder)
 	mywant.SetGlobalGoalThinkerUseStub(config.GoalThinker.UseStub)
 
-	// Register all agent implementations (auto-registered via init() functions)
 	mywant.RegisterAllKnownAgentImplementations(agentRegistry)
 
 	// Derive MonitorCapabilities cache for all want type definitions by

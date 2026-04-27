@@ -15,10 +15,12 @@ import (
 const pythonThinkerAgentName = "python"
 
 func init() {
-	RegisterWantImplementation[PythonThinkerWant, PythonThinkerLocals]("python")
-	RegisterThinkAgentType(pythonThinkerAgentName, []Capability{
-		{Name: "python_thinking", Gives: []string{"python_thinking"}, Description: "Runs a Python script as a think agent each tick"},
-	}, pythonThinkerThink)
+	RegisterWithInit(func() {
+		RegisterWantImplementation[PythonThinkerWant, PythonThinkerLocals]("python")
+		RegisterThinkAgentType(pythonThinkerAgentName, []Capability{
+			{Name: "python_thinking", Gives: []string{"python_thinking"}, Description: "Runs a Python script as a think agent each tick"},
+		}, pythonThinkerThink)
+	})
 }
 
 // PythonThinkerLocals holds type-specific local state (no runtime locals needed).

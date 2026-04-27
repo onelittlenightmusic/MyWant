@@ -12,7 +12,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[GmailWant, GmailLocals]("gmail")
+	})
 }
 
 // GmailLocals holds type-specific local state for GmailWant

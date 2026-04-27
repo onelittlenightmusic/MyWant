@@ -8,10 +8,12 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
-	RegisterWantImplementation[HotelWant, HotelWantLocals]("hotel")
-	RegisterWantImplementation[BuffetWant, BuffetWantLocals]("buffet")
-	RegisterWantImplementation[FlightWant, FlightWantLocals]("flight")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[RestaurantWant, RestaurantWantLocals]("restaurant")
+		RegisterWantImplementation[HotelWant, HotelWantLocals]("hotel")
+		RegisterWantImplementation[BuffetWant, BuffetWantLocals]("buffet")
+		RegisterWantImplementation[FlightWant, FlightWantLocals]("flight")
+	})
 }
 
 // RestaurantWantLocals holds type-specific local state for RestaurantWant

@@ -12,7 +12,9 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("launch_manager", manageLaunch)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("launch_manager", manageLaunch)
+	})
 }
 
 // manageLaunch dispatches to the appropriate lifecycle implementation.
@@ -39,6 +41,30 @@ func manageLaunch(ctx context.Context, want *mywant.Want) error {
 	// Legacy: docker_run (docker_plan → docker_phase)
 	if plan := mywant.GetPlan(want, "docker_plan", ""); plan != "" {
 		return manageDocker(ctx, want)
+	}
+
+	// process_plan: cloudflare-plugin and similar custom-type plugins that use
+	// process_* state fields and check process_status in achievedWhen.
+	if plan := mywant.GetPlan(want, "process_plan", ""); plan != "" {
+		processStatus := mywant.GetCurrent(want, "process_status", "")
+		switch plan {
+		case "start":
+			if processStatus == "running" {
+				return launchProcessPoll(want)
+			}
+			err := launchProcessStart(ctx, want)
+			if err == nil {
+				want.SetCurrent("process_status", "running")
+			} else {
+				want.SetCurrent("process_status", "failed")
+			}
+			return err
+		case "stop":
+			err := launchProcessStop(want)
+			want.SetCurrent("process_status", "stopped")
+			return err
+		}
+		return nil
 	}
 
 	return nil

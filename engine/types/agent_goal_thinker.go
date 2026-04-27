@@ -14,9 +14,11 @@ import (
 const goalThinkerAgentName = "goal_thinker"
 
 func init() {
-	RegisterThinkAgentType(goalThinkerAgentName, []Capability{
-		{Name: "goal_thinking", Gives: []string{"goal_thinking"}, Description: "Decomposes a user goal into sub-wants and monitors conversation-based replanning"},
-	}, goalThinkerThink)
+	RegisterWithInit(func() {
+		RegisterThinkAgentType(goalThinkerAgentName, []Capability{
+			{Name: "goal_thinking", Gives: []string{"goal_thinking"}, Description: "Decomposes a user goal into sub-wants and monitors conversation-based replanning"},
+		}, goalThinkerThink)
+	})
 }
 
 // goalThinkerThink is the ThinkAgent function that implements the Goal Thinker lifecycle.

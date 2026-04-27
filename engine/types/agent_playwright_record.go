@@ -25,13 +25,15 @@ var (
 )
 
 func init() {
-	mywant.RegisterMonitorAgentType(
-		playwrightRecordAgentName,
-		[]mywant.Capability{
-			mywant.Cap("playwright_recording"),
-		},
-		monitorPlaywrightRecording,
-	)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterMonitorAgentType(
+			playwrightRecordAgentName,
+			[]mywant.Capability{
+				mywant.Cap("playwright_recording"),
+			},
+			monitorPlaywrightRecording,
+		)
+	})
 }
 
 // monitorPlaywrightRecording is the MonitorAgent poll function for browser recording.

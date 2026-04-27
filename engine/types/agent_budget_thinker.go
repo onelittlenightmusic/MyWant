@@ -9,7 +9,9 @@ import (
 const budgetThinkerAgentName = "budget_thinker"
 
 func init() {
-	RegisterThinkAgent(budgetThinkerAgentName, budgetThinkerThink)
+	RegisterWithInit(func() {
+		RegisterThinkAgent(budgetThinkerAgentName, budgetThinkerThink)
+	})
 }
 
 func budgetThinkerThink(ctx context.Context, want *Want) error {

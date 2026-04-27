@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[TimerWant, TimerLocals]("timer")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[TimerWant, TimerLocals]("timer")
+	})
 }
 
 // TimerLocals holds type-specific local state to detect changes.

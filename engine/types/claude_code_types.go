@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ClaudeCodeThreadWant, ClaudeCodeThreadLocals]("claude_code_thread")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[ClaudeCodeThreadWant, ClaudeCodeThreadLocals]("claude_code_thread")
+	})
 }
 
 // Phase constants for ClaudeCodeThreadWant

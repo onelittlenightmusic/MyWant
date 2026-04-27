@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[SlackPostWant, SlackPostLocals]("slack_post")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[SlackPostWant, SlackPostLocals]("slack_post")
+	})
 }
 
 type SlackPostLocals struct{}

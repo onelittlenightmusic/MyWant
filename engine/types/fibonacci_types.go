@@ -5,8 +5,10 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[FibonacciNumbers, FibonacciNumbersLocals]("fibonacci numbers")
-	RegisterWantImplementation[FibonacciFilter, FibonacciFilterLocals]("fibonacci filter")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[FibonacciNumbers, FibonacciNumbersLocals]("fibonacci numbers")
+		RegisterWantImplementation[FibonacciFilter, FibonacciFilterLocals]("fibonacci filter")
+	})
 }
 
 // FibonacciNumbersLocals holds type-specific local state for FibonacciNumbers

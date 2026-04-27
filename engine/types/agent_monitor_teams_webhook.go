@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterMonitorAgent("monitor_teams_webhook", func(ctx context.Context, want *Want) (bool, error) {
-		return PollWebhook(ctx, want, teamsWebhookConfig)
+	RegisterWithInit(func() {
+		RegisterMonitorAgent("monitor_teams_webhook", func(ctx context.Context, want *Want) (bool, error) {
+			return PollWebhook(ctx, want, teamsWebhookConfig)
+		})
 	})
 }

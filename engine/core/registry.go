@@ -6,6 +6,27 @@ import (
 	"reflect"
 )
 
+// deferredRegistrations holds registration functions queued by init() in engine/types.
+// They are executed by RunDeferredRegistrations() called from server.New() / worker.New(),
+// so that type/agent registration (and its log output) only happens on server startup,
+// not on every CLI command invocation.
+var deferredRegistrations []func()
+
+// RegisterWithInit queues fn to be run by RunDeferredRegistrations.
+// Call this inside init() functions instead of calling Register* directly.
+func RegisterWithInit(fn func()) {
+	deferredRegistrations = append(deferredRegistrations, fn)
+}
+
+// RunDeferredRegistrations executes all registrations queued via RegisterWithInit.
+// Must be called once from server.New() and worker.New() before RegisterAllKnownAgentImplementations.
+func RunDeferredRegistrations() {
+	for _, fn := range deferredRegistrations {
+		fn()
+	}
+	deferredRegistrations = nil
+}
+
 // Global registries for Go implementations of Want types
 var (
 	typeImplementationRegistry   = make(map[string]reflect.Type)

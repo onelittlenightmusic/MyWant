@@ -16,7 +16,9 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("mcp_tools", executeMCPOperation)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("mcp_tools", executeMCPOperation)
+	})
 }
 
 // ============ NativeMCPManager ============

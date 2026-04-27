@@ -16,7 +16,9 @@ import (
 const flightMonitorAgentName = "monitor_flight_api"
 
 func init() {
-	RegisterMonitorAgent(flightMonitorAgentName, monitorFlightStatus)
+	RegisterWithInit(func() {
+		RegisterMonitorAgent(flightMonitorAgentName, monitorFlightStatus)
+	})
 }
 
 func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {

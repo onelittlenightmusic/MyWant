@@ -12,7 +12,9 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("execution_command", executeCommand)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("execution_command", executeCommand)
+	})
 }
 
 // executeCommand performs the actual command execution and writes results directly to want state.

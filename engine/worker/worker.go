@@ -12,7 +12,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
-	_ "mywant/engine/types" // init() registers agent implementations
+	_ "mywant/engine/types" // ensures init() queues run; RunDeferredRegistrations executes them
 
 	"github.com/gorilla/mux"
 )
@@ -34,6 +34,9 @@ type Worker struct {
 
 // New creates a new Agent Service worker
 func New(config Config) *Worker {
+	// Populate doActionRegistry/monitorActionRegistry BEFORE LoadAgents() links them.
+	mywant.RunDeferredRegistrations()
+
 	// Initialize agent registry
 	agentRegistry := mywant.NewAgentRegistry()
 
@@ -71,7 +74,6 @@ func New(config Config) *Worker {
 
 // registerDynamicAgents registers code-based agent implementations
 func (w *Worker) registerDynamicAgents() {
-	// Register all agent implementations (auto-registered via init() functions)
 	mywant.RegisterAllKnownAgentImplementations(w.agentRegistry)
 
 	log.Printf("[WORKER] Registered %d agents", len(w.agentRegistry.GetAllAgents()))

@@ -12,7 +12,9 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("knowledge_agent", executeKnowledgeAction)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("knowledge_agent", executeKnowledgeAction)
+	})
 }
 
 // executeKnowledgeAction dispatches to monitor or update based on want requirements

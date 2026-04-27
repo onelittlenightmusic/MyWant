@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ChoiceWant, ChoiceLocals]("choice")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[ChoiceWant, ChoiceLocals]("choice")
+	})
 }
 
 // ChoiceLocals holds type-specific local state.

@@ -10,7 +10,9 @@ import (
 const userReactionMonitorAgentName = "user_reaction_monitor"
 
 func init() {
-	RegisterMonitorAgent(userReactionMonitorAgentName, pollUserReactions)
+	RegisterWithInit(func() {
+		RegisterMonitorAgent(userReactionMonitorAgentName, pollUserReactions)
+	})
 }
 
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {

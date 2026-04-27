@@ -17,7 +17,9 @@ import (
 const weatherAgentName = "agent_weather"
 
 func init() {
-	RegisterDoAgent(weatherAgentName, executeWeatherFetch)
+	RegisterWithInit(func() {
+		RegisterDoAgent(weatherAgentName, executeWeatherFetch)
+	})
 }
 
 // owmResponse is the minimal OpenWeatherMap current weather response

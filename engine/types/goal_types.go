@@ -3,7 +3,9 @@ package types
 import . "mywant/engine/core"
 
 func init() {
-	RegisterWantImplementation[GoalWant, GoalLocals]("goal")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[GoalWant, GoalLocals]("goal")
+	})
 }
 
 // GoalLocals holds type-specific local state (no runtime locals needed).

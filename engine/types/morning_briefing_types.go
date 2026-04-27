@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[MorningBriefingWant, MorningBriefingLocals]("briefing")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[MorningBriefingWant, MorningBriefingLocals]("briefing")
+	})
 }
 
 // MorningBriefingLocals holds no runtime locals; all state is managed via labeled state fields.

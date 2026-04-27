@@ -7,7 +7,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("knowledge")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[KnowledgeWant, KnowledgeLocals]("knowledge")
+	})
 }
 
 // KnowledgeLocals holds type-specific local state for KnowledgeWant

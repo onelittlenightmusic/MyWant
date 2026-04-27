@@ -13,7 +13,9 @@ import (
 const agentRestaurantName = "agent_restaurant_premium"
 
 func init() {
-	RegisterDoAgent(agentRestaurantName, executeRestaurantReservation)
+	RegisterWithInit(func() {
+		RegisterDoAgent(agentRestaurantName, executeRestaurantReservation)
+	})
 }
 
 // executeRestaurantReservation performs a restaurant reservation.

@@ -8,7 +8,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[ReminderWant, ReminderLocals]("reminder")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[ReminderWant, ReminderLocals]("reminder")
+	})
 }
 
 // ReminderPhase constants

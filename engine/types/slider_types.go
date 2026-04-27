@@ -3,7 +3,9 @@ package types
 import . "mywant/engine/core"
 
 func init() {
-	RegisterWantImplementation[SliderWant, SliderLocals]("slider")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[SliderWant, SliderLocals]("slider")
+	})
 }
 
 // SliderLocals holds type-specific local state.

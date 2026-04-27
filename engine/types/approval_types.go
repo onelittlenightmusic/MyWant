@@ -7,8 +7,10 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[EvidenceWant, EvidenceWantLocals]("evidence")
-	RegisterWantImplementation[DescriptionWant, DescriptionWantLocals]("description")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[EvidenceWant, EvidenceWantLocals]("evidence")
+		RegisterWantImplementation[DescriptionWant, DescriptionWantLocals]("description")
+	})
 }
 
 // ApprovalResult represents the outcome of an approval process

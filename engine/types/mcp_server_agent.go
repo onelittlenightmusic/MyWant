@@ -12,8 +12,10 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("mcp_server_do", startMCPServer)
-	mywant.RegisterMonitorAgent("mcp_server_monitor", monitorMCPServer)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("mcp_server_do", startMCPServer)
+		mywant.RegisterMonitorAgent("mcp_server_monitor", monitorMCPServer)
+	})
 }
 
 // MCPServerProcess 実行中のMCPサーバプロセスを管理する構造体

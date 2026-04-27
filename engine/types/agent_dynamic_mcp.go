@@ -13,10 +13,12 @@ import (
 )
 
 func init() {
-	mywant.RegisterDoAgent("discovery_agent", executeDiscoveryAction)
-	mywant.RegisterDoAgent("developer_agent", executeDeveloperAction)
-	mywant.RegisterDoAgent("compiler_agent", executeCompilerAction)
-	mywant.RegisterDoAgent("validator_agent", executeValidatorAction)
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterDoAgent("discovery_agent", executeDiscoveryAction)
+		mywant.RegisterDoAgent("developer_agent", executeDeveloperAction)
+		mywant.RegisterDoAgent("compiler_agent", executeCompilerAction)
+		mywant.RegisterDoAgent("validator_agent", executeValidatorAction)
+	})
 }
 
 // --- Discovery Action ---

@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[GUIStateWant, GUIStateLocals]("gui_state")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[GUIStateWant, GUIStateLocals]("gui_state")
+	})
 }
 
 // GUIStateLocals holds type-specific local state (none needed).

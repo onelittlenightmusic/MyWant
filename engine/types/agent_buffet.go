@@ -13,7 +13,9 @@ import (
 const agentBuffetName = "agent_buffet_premium"
 
 func init() {
-	RegisterDoAgent(agentBuffetName, executeBuffetReservation)
+	RegisterWithInit(func() {
+		RegisterDoAgent(agentBuffetName, executeBuffetReservation)
+	})
 }
 
 // executeBuffetReservation performs a buffet reservation.

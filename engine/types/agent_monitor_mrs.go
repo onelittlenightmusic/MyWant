@@ -19,16 +19,18 @@ const mrsMonitorAgentName = "monitor_mrs_agent"
 const mrsDoAgentName = "do_mrs_agent"
 
 func init() {
-	RegisterMonitorAgentType(
-		mrsMonitorAgentName,
-		[]Capability{Cap(mrsMonitorAgentName)},
-		monitorMRSAgentFn,
-	)
-	RegisterDoAgentType(
-		mrsDoAgentName,
-		[]Capability{Cap(mrsDoAgentName)},
-		doMRSAgentFn,
-	)
+	RegisterWithInit(func() {
+		RegisterMonitorAgentType(
+			mrsMonitorAgentName,
+			[]Capability{Cap(mrsMonitorAgentName)},
+			monitorMRSAgentFn,
+		)
+		RegisterDoAgentType(
+			mrsDoAgentName,
+			[]Capability{Cap(mrsDoAgentName)},
+			doMRSAgentFn,
+		)
+	})
 }
 
 // monitorMRSAgentFn executes a Machine-Readable Skill script (no CLI args) and writes

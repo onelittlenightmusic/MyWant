@@ -5,7 +5,9 @@ import (
 )
 
 func init() {
-	RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[SilencerWant, SilencerLocals]("silencer")
+	})
 }
 
 // SilencerWant represents a want that automatically processes reaction requests

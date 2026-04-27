@@ -8,7 +8,9 @@ import (
 const conditionThinkerAgentName = "condition_thinker"
 
 func init() {
-	RegisterThinkAgent(conditionThinkerAgentName, conditionThinkerThink)
+	RegisterWithInit(func() {
+		RegisterThinkAgent(conditionThinkerAgentName, conditionThinkerThink)
+	})
 }
 
 func conditionThinkerThink(ctx context.Context, want *Want) error {

@@ -13,10 +13,12 @@ import (
 const opaLLMThinkerAgentName = "opa_llm_thinker"
 
 func init() {
-	RegisterWantImplementation[OpaLLMPlannerWant, OpaLLMPlannerLocals]("plan")
-	RegisterThinkAgentType(opaLLMThinkerAgentName, []Capability{
-		{Name: "opa_llm_planning", Gives: []string{"opa_llm_planning"}, Description: "Plans actions using OPA policy engine and LLM reasoning"},
-	}, opaLLMThinkerThink)
+	RegisterWithInit(func() {
+		RegisterWantImplementation[OpaLLMPlannerWant, OpaLLMPlannerLocals]("plan")
+		RegisterThinkAgentType(opaLLMThinkerAgentName, []Capability{
+			{Name: "opa_llm_planning", Gives: []string{"opa_llm_planning"}, Description: "Plans actions using OPA policy engine and LLM reasoning"},
+		}, opaLLMThinkerThink)
+	})
 }
 
 // OpaLLMPlannerLocals holds type-specific local state (no runtime locals needed).

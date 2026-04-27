@@ -6,7 +6,9 @@ import (
 )
 
 func init() {
-	mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("email_dynamic")
+	mywant.RegisterWithInit(func() {
+		mywant.RegisterWantImplementation[GmailDynamicWant, GmailDynamicLocals]("email_dynamic")
+	})
 }
 
 // GmailDynamicPhase represents the current phase of the dynamic want lifecycle

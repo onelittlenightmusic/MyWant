@@ -12,7 +12,9 @@ import (
 const transitMaxRetries = 3
 
 func init() {
-	RegisterWantImplementation[TransitWant, TransitLocals]("transit")
+	RegisterWithInit(func() {
+		RegisterWantImplementation[TransitWant, TransitLocals]("transit")
+	})
 }
 
 // TransitLocals holds type-specific local state for TransitWant

@@ -17,7 +17,9 @@ import (
 const slackPostAgentName = "agent_slack_post"
 
 func init() {
-	RegisterDoAgent(slackPostAgentName, executeSlackPost)
+	RegisterWithInit(func() {
+		RegisterDoAgent(slackPostAgentName, executeSlackPost)
+	})
 }
 
 // executeSlackPost reads composed state and posts the briefing to Slack
