@@ -71,12 +71,14 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const outerRef  = useRef<HTMLDivElement>(null);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
-  const [toolbarFixed, setToolbarFixed] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+
+  // Optimistic local overrides
+  const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
 
   // Ref so non-passive event handlers can read latest scale without re-registering
   const scaleRef = useRef(scale);
@@ -87,24 +89,18 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
 
-  // Keep the toolbar pinned to the viewport corner by computing its fixed position
-  // from the outer container's bounding rect. This survives any canvas scroll/zoom.
+  // Keep track of the viewport size to enable centering small canvases
   useEffect(() => {
-    const el = outerRef.current;
+    const el = scrollRef.current;
     if (!el) return;
     const update = () => {
-      const r = el.getBoundingClientRect();
-      setToolbarFixed(isBottom
-        ? { left: r.left + 8, bottom: window.innerHeight - r.bottom + 8 }
-        : { left: r.left + 8, top: r.top + 8 });
+      setViewportSize({ width: el.clientWidth, height: el.clientHeight });
     };
-    // Defer initial update so the browser has finished layout before we read getBoundingClientRect
-    requestAnimationFrame(update);
+    update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
-    window.addEventListener('resize', update);
-    return () => { ro.disconnect(); window.removeEventListener('resize', update); };
-  }, [isBottom]);
+    return () => ro.disconnect();
+  }, []);
 
   const wantTypes = useWantTypeStore(state => state.wantTypes);
   const typeMap = useMemo(() => {
@@ -114,121 +110,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, [wantTypes]);
 
   const clampScale = (v: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, v));
-
-  // Zoom keeping the viewport center fixed in canvas-coordinate space.
-  const applyScaleWithCenter = useCallback((newScale: number) => {
-    const clamped = clampScale(newScale);
-    const el = scrollRef.current;
-    if (!el) { onScaleChange?.(clamped); return; }
-    const cur = scaleRef.current;
-    const vw = el.clientWidth;
-    const vh = el.clientHeight;
-    const cx = (el.scrollLeft + vw / 2) / cur;
-    const cy = (el.scrollTop  + vh / 2) / cur;
-    onScaleChange?.(clamped);
-    requestAnimationFrame(() => {
-      if (!scrollRef.current) return;
-      scrollRef.current.scrollLeft = Math.max(0, cx * clamped - vw / 2);
-      scrollRef.current.scrollTop  = Math.max(0, cy * clamped - vh / 2);
-    });
-  }, [onScaleChange]);
-
-  const zoomIn  = () => applyScaleWithCenter(Math.round((scale + SCALE_STEP) * 10) / 10);
-  const zoomOut = () => applyScaleWithCenter(Math.round((scale - SCALE_STEP) * 10) / 10);
-
-  // Non-passive wheel + pinch listeners (React's synthetic handlers are passive)
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        // Zoom: keep viewport center fixed
-        e.preventDefault();
-        const cur = scaleRef.current;
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        const next = clampScale(Math.round(cur * factor * 100) / 100);
-        const vw = el.clientWidth;
-        const vh = el.clientHeight;
-        const cx = (el.scrollLeft + vw / 2) / cur;
-        const cy = (el.scrollTop  + vh / 2) / cur;
-        onScaleChange?.(next);
-        requestAnimationFrame(() => {
-          if (!scrollRef.current) return;
-          scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
-          scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
-        });
-      } else if (e.shiftKey) {
-        // Shift+Wheel → horizontal scroll (for mice without horizontal wheel)
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-      // else: native vertical / trackpad-horizontal scroll
-    };
-
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
-    };
-
-    const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      e.preventDefault();
-      const dx = e.touches[0].clientX - e.touches[1].clientX;
-      const dy = e.touches[0].clientY - e.touches[1].clientY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (lastPinchDist.current !== null) {
-        const cur = scaleRef.current;
-        const next = clampScale(Math.round(cur * (dist / lastPinchDist.current) * 100) / 100);
-        const vw = el.clientWidth;
-        const vh = el.clientHeight;
-        const cx = (el.scrollLeft + vw / 2) / cur;
-        const cy = (el.scrollTop  + vh / 2) / cur;
-        onScaleChange?.(next);
-        requestAnimationFrame(() => {
-          if (!scrollRef.current) return;
-          scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
-          scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
-        });
-      }
-      lastPinchDist.current = dist;
-    };
-
-    const onTouchEnd = () => { lastPinchDist.current = null; };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    el.addEventListener('touchstart', onTouchStart, { passive: false });
-    el.addEventListener('touchmove', onTouchMove, { passive: false });
-    el.addEventListener('touchend', onTouchEnd);
-    return () => {
-      el.removeEventListener('wheel', onWheel);
-      el.removeEventListener('touchstart', onTouchStart);
-      el.removeEventListener('touchmove', onTouchMove);
-      el.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [onScaleChange]); // no `scale` dependency — reads via scaleRef
-
-  // Optimistic local overrides
-  const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
-
-  useEffect(() => {
-    setLocalOverrides(prev => {
-      if (prev.size === 0) return prev;
-      const next = new Map(prev);
-      wants.forEach(want => {
-        const id = want.metadata?.id || want.id;
-        if (!id) return;
-        const ov = next.get(id);
-        if (!ov) return;
-        const sx = parseInt(want.metadata?.labels?.[CANVAS_LABEL_X] ?? '', 10);
-        const sy = parseInt(want.metadata?.labels?.[CANVAS_LABEL_Y] ?? '', 10);
-        if (sx === ov.x && sy === ov.y) next.delete(id);
-      });
-      return next.size !== prev.size ? next : prev;
-    });
-  }, [wants]);
 
   // Combined layout: positionMap + canvas bounds + origin offset for (0,0).
   // originX/Y translate grid coords → pixel coords: pixel = (gridCoord + origin) * STEP
@@ -289,9 +170,124 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     };
   }, [wants, localOverrides]);
 
+  const canvasW = cols * STEP + GAP;
+  const canvasH = rows * STEP + GAP;
+
+  // Offsets used to center the grid if it's smaller than the viewport.
+  const offsetX = Math.max(0, (viewportSize.width - canvasW * scale) / 2);
+  const offsetY = Math.max(0, (viewportSize.height - canvasH * scale) / 2);
+
+  // Zoom keeping the viewport center fixed in canvas-coordinate space.
+  const applyScaleWithCenter = useCallback((newScale: number) => {
+    const clamped = clampScale(newScale);
+    const el = scrollRef.current;
+    if (!el) { onScaleChange?.(clamped); return; }
+    const cur = scaleRef.current;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+
+    // Current centering offsets
+    const osx = Math.max(0, (vw - canvasW * cur) / 2);
+    const osy = Math.max(0, (vh - canvasH * cur) / 2);
+
+    // Canvas-space coordinate at the viewport center
+    const cx = (el.scrollLeft - osx + vw / 2) / cur;
+    const cy = (el.scrollTop  - osy + vh / 2) / cur;
+
+    onScaleChange?.(clamped);
+
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const nextVw = scrollRef.current.clientWidth;
+      const nextVh = scrollRef.current.clientHeight;
+      const nextOsx = Math.max(0, (nextVw - canvasW * clamped) / 2);
+      const nextOsy = Math.max(0, (nextVh - canvasH * clamped) / 2);
+      scrollRef.current.scrollLeft = cx * clamped + nextOsx - nextVw / 2;
+      scrollRef.current.scrollTop  = cy * clamped + nextOsy - nextVh / 2;
+    });
+  }, [onScaleChange, canvasW, canvasH]);
+
+  const zoomIn  = () => applyScaleWithCenter(Math.round((scale + SCALE_STEP) * 10) / 10);
+  const zoomOut = () => applyScaleWithCenter(Math.round((scale - SCALE_STEP) * 10) / 10);
+
+  const applyScaleRef = useRef(applyScaleWithCenter);
+  useEffect(() => { applyScaleRef.current = applyScaleWithCenter; }, [applyScaleWithCenter]);
+
+  // Non-passive wheel + pinch listeners (React's synthetic handlers are passive)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Zoom: keep viewport center fixed
+        e.preventDefault();
+        const cur = scaleRef.current;
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const next = clampScale(Math.round(cur * factor * 100) / 100);
+        applyScaleRef.current(next);
+      } else if (e.shiftKey) {
+        // Shift+Wheel → horizontal scroll (for mice without horizontal wheel)
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+      // else: native vertical / trackpad-horizontal scroll
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (lastPinchDist.current !== null) {
+        const cur = scaleRef.current;
+        const next = clampScale(Math.round(cur * (dist / lastPinchDist.current) * 100) / 100);
+        applyScaleRef.current(next);
+      }
+      lastPinchDist.current = dist;
+    };
+
+    const onTouchEnd = () => { lastPinchDist.current = null; };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [onScaleChange]); // no `scale` dependency — reads via scaleRef
+
+  useEffect(() => {
+    setLocalOverrides(prev => {
+      if (prev.size === 0) return prev;
+      const next = new Map(prev);
+      wants.forEach(want => {
+        const id = want.metadata?.id || want.id;
+        if (!id) return;
+        const ov = next.get(id);
+        if (!ov) return;
+        const sx = parseInt(want.metadata?.labels?.[CANVAS_LABEL_X] ?? '', 10);
+        const sy = parseInt(want.metadata?.labels?.[CANVAS_LABEL_Y] ?? '', 10);
+        if (sx === ov.x && sy === ov.y) next.delete(id);
+      });
+      return next.size !== prev.size ? next : prev;
+    });
+  }, [wants]);
+
   // Scroll once on mount so (0,0) appears at the viewport center.
-  // Uses ResizeObserver so we fire only after the container has a real size,
-  // plus a double-RAF fallback for cases where the observer fires late.
+  // Uses ResizeObserver so we fire only after the container has a real size.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -300,16 +296,26 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       if (scrolled || !el.clientWidth || !el.clientHeight) return;
       scrolled = true;
       const s = scaleRef.current;
-      // Pixel position of the (0,0) tile's center within the spacer
-      const px = (CANVAS_HALF * STEP + GAP / 2 + CELL_SIZE / 2) * s;
-      el.scrollLeft = Math.max(0, px - el.clientWidth  / 2);
-      el.scrollTop  = Math.max(0, px - el.clientHeight / 2);
+      const vw = el.clientWidth;
+      const vh = el.clientHeight;
+
+      // Pixel position of the (0,0) tile's center relative to canvas top-left
+      const rawPx = originX * STEP + GAP / 2 + CELL_SIZE / 2;
+      const rawPy = originY * STEP + GAP / 2 + CELL_SIZE / 2;
+
+      // Current centering offsets
+      const osx = Math.max(0, (vw - canvasW * s) / 2);
+      const osy = Math.max(0, (vh - canvasH * s) / 2);
+
+      el.scrollLeft = rawPx * s + osx - vw / 2;
+      el.scrollTop  = rawPy * s + osy - vh / 2;
     };
     const ro = new ResizeObserver(doScroll);
     ro.observe(el);
+    // Double-RAF as fallback
     requestAnimationFrame(() => requestAnimationFrame(doScroll));
     return () => ro.disconnect();
-  }, []); // mount only
+  }, [originX, originY, canvasW, canvasH]); // re-run if layout bounds change before first scroll
 
   // Track viewport center of the selected tile for the overlay
   const updateTileCenter = useCallback(() => {
@@ -322,11 +328,12 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const rect = el.getBoundingClientRect();
     const tileLeft = (pos.x + originX) * STEP + GAP / 2;
     const tileTop  = (pos.y + originY) * STEP + GAP / 2;
+
     setTileCenter({
-      x: rect.left + (tileLeft + CELL_SIZE / 2) * scale - el.scrollLeft,
-      y: rect.top  + (tileTop  + CELL_SIZE / 2) * scale - el.scrollTop,
+      x: rect.left + offsetX + (tileLeft + CELL_SIZE / 2) * scale - el.scrollLeft,
+      y: rect.top  + offsetY + (tileTop  + CELL_SIZE / 2) * scale - el.scrollTop,
     });
-  }, [floatCard, selectedWant, positionMap, scale, originX, originY]);
+  }, [floatCard, selectedWant, positionMap, scale, originX, originY, canvasW, canvasH, offsetX, offsetY]);
 
   useEffect(() => { updateTileCenter(); }, [updateTileCenter]);
   useEffect(() => {
@@ -391,21 +398,18 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     }
   }, []);
 
-  const canvasW = cols * STEP + GAP;
-  const canvasH = rows * STEP + GAP;
-
   return (
-    <div ref={outerRef} className="w-full flex-1 relative" style={{ minHeight: 0 }}>
-      {/* Toolbar: fixed to the viewport corner on the header-side edge.
-           Rendered only after toolbarFixed is computed to avoid overlapping the header. */}
-      {toolbarFixed && (
+    <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
+      {/* Zoom toolbar: fixed to the viewport, just inside the header edge.
+           Uses --header-height CSS var set by Header component. */}
       <div
-        className="z-50 flex items-center gap-2 pointer-events-none select-none"
+        className="z-50 flex items-center gap-1 pointer-events-none select-none"
         style={{
           position: 'fixed',
-          left: toolbarFixed.left,
-          top: toolbarFixed.top,
-          bottom: toolbarFixed.bottom,
+          left: 8,
+          ...(isBottom
+            ? { bottom: 'calc(var(--header-height, 56px) + 8px)' }
+            : { top: 'calc(var(--header-height, 56px) + 8px)' }),
         }}
       >
         {toolbarContent && (
@@ -428,12 +432,17 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           >+</button>
         </div>
       </div>
-      )}
 
       {/* Scroll container */}
       <div ref={scrollRef} className="overflow-auto w-full h-full">
-        {/* Spacer drives scrollbars at scaled size */}
-        <div style={{ width: canvasW * scale, height: canvasH * scale, position: 'relative' }}>
+        {/* Spacer drives scrollbars at scaled size, with min-size to enable centering. */}
+        <div style={{
+          width: canvasW * scale,
+          height: canvasH * scale,
+          minWidth: '100%',
+          minHeight: '100%',
+          position: 'relative',
+        }}>
           <div
             ref={canvasRef}
             className="relative select-none"
@@ -451,7 +460,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               transform: `scale(${scale})`,
               transformOrigin: '0 0',
               position: 'absolute',
-              top: 0, left: 0,
+              left: offsetX,
+              top: offsetY,
             }}
             onClick={handleCanvasClick}
             onDragOver={handleDragOver}
