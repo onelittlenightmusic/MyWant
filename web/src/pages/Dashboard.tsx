@@ -3,6 +3,7 @@ import { RefreshCw, ChevronDown, Heart, StickyNote, LayoutGrid, Grid2X2 } from '
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
+import { useConfigStore } from '@/stores/configStore';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { useUIStore } from '@/stores/uiStore';
 import { usePolling } from '@/hooks/usePolling';
@@ -89,6 +90,9 @@ export const Dashboard: React.FC = () => {
   // Minimap state
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
+
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
 
   // Canvas mode (2D grid placement)
   const [canvasMode, setCanvasMode] = useState(false);
@@ -1203,7 +1207,10 @@ export const Dashboard: React.FC = () => {
         )}>
           {/* View mode toggle bar — list mode only; canvas mode shows it inside WantCanvas toolbar */}
           {!canvasMode && (
-            <div className="flex items-center gap-1 px-3 sm:px-6 pt-3 sm:pt-4 pb-1 shrink-0">
+            <div className={classNames(
+              "flex items-center gap-1 px-3 sm:px-6 shrink-0",
+              isBottom ? "pb-3 sm:pb-4 pt-1 order-last" : "pt-3 sm:pt-4 pb-1"
+            )}>
               <button
                 onClick={() => setCanvasMode(false)}
                 className={classNames(

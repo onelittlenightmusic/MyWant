@@ -4,6 +4,7 @@ import { WantTypeListItem } from '@/types/wantType';
 import { getStatusHexColor } from './WantCard/parts/StatusColor';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useWantStore } from '@/stores/wantStore';
+import { useConfigStore } from '@/stores/configStore';
 import { classNames } from '@/utils/helpers';
 import { WantCardFace } from './WantCardFace';
 import { getPatternColor } from './WantTypeVisuals';
@@ -70,16 +71,39 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const outerRef  = useRef<HTMLDivElement>(null);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
+  const [toolbarFixed, setToolbarFixed] = useState<{ left: number; top?: number; bottom?: number }>({ left: 8, top: 8 });
 
   // Ref so non-passive event handlers can read latest scale without re-registering
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 
   const lastPinchDist = useRef<number | null>(null);
+
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
+  // Keep the toolbar pinned to the viewport corner by computing its fixed position
+  // from the outer container's bounding rect. This survives any canvas scroll/zoom.
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setToolbarFixed(isBottom
+        ? { left: r.left + 8, bottom: window.innerHeight - r.bottom + 8 }
+        : { left: r.left + 8, top: r.top + 8 });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener('resize', update);
+    return () => { ro.disconnect(); window.removeEventListener('resize', update); };
+  }, [isBottom]);
 
   const wantTypes = useWantTypeStore(state => state.wantTypes);
   const typeMap = useMemo(() => {
@@ -265,17 +289,25 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, [wants, localOverrides]);
 
   // Scroll once on mount so (0,0) appears at the viewport center.
-  // Double RAF ensures the browser has computed layout before reading clientWidth/Height.
+  // Uses ResizeObserver so we fire only after the container has a real size,
+  // plus a double-RAF fallback for cases where the observer fires late.
   useEffect(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const s = scaleRef.current;
-        el.scrollLeft = Math.max(0, CANVAS_HALF * STEP * s - el.clientWidth  / 2);
-        el.scrollTop  = Math.max(0, CANVAS_HALF * STEP * s - el.clientHeight / 2);
-      });
-    });
+    const el = scrollRef.current;
+    if (!el) return;
+    let scrolled = false;
+    const doScroll = () => {
+      if (scrolled || !el.clientWidth || !el.clientHeight) return;
+      scrolled = true;
+      const s = scaleRef.current;
+      // Pixel position of the (0,0) tile's center within the spacer
+      const px = (CANVAS_HALF * STEP + GAP / 2 + CELL_SIZE / 2) * s;
+      el.scrollLeft = Math.max(0, px - el.clientWidth  / 2);
+      el.scrollTop  = Math.max(0, px - el.clientHeight / 2);
+    };
+    const ro = new ResizeObserver(doScroll);
+    ro.observe(el);
+    requestAnimationFrame(() => requestAnimationFrame(doScroll));
+    return () => ro.disconnect();
   }, []); // mount only
 
   // Track viewport center of the selected tile for the overlay
@@ -362,9 +394,17 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const canvasH = rows * STEP + GAP;
 
   return (
-    <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
-      {/* Toolbar: list/canvas toggle + zoom controls — fixed top-left of canvas */}
-      <div className="absolute top-2 left-2 z-50 flex items-center gap-2 pointer-events-none select-none">
+    <div ref={outerRef} className="w-full flex-1 relative" style={{ minHeight: 0 }}>
+      {/* Toolbar: fixed to the viewport corner on the header-side edge */}
+      <div
+        className="z-50 flex items-center gap-2 pointer-events-none select-none"
+        style={{
+          position: 'fixed',
+          left: toolbarFixed.left,
+          top: toolbarFixed.top,
+          bottom: toolbarFixed.bottom,
+        }}
+      >
         {toolbarContent && (
           <div className="pointer-events-auto flex items-center">
             {toolbarContent}
