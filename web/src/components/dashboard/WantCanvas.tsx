@@ -71,6 +71,10 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isPanningRef  = useRef(false);
+  const panStartRef   = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
+  const hasPannedRef  = useRef(false);
+  const [isPanning, setIsPanning] = useState(false);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
@@ -85,6 +89,32 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 
   const lastPinchDist = useRef<number | null>(null);
+
+  // Mouse-drag panning: track at document level so drag outside canvas still works
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isPanningRef.current || !panStartRef.current) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      const dx = e.clientX - panStartRef.current.x;
+      const dy = e.clientY - panStartRef.current.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) hasPannedRef.current = true;
+      el.scrollLeft = panStartRef.current.sl - dx;
+      el.scrollTop  = panStartRef.current.st - dy;
+    };
+    const onUp = () => {
+      if (!isPanningRef.current) return;
+      isPanningRef.current = false;
+      panStartRef.current  = null;
+      setIsPanning(false);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
+  }, []);
 
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
@@ -356,8 +386,22 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     };
   }, [scale, originX, originY]);
 
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    // Don't start panning when clicking on a tile
+    if ((e.target as HTMLElement).closest('[data-want-id]')) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    e.preventDefault(); // prevent text selection during drag
+    isPanningRef.current = true;
+    hasPannedRef.current = false;
+    panStartRef.current  = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+    setIsPanning(true);
+  }, []);
+
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (dragWantId) return;
+    if (hasPannedRef.current) return; // pan drag — not a click
     const { cx, cy } = cellFromEvent(e);
     const occupied = Array.from(positionMap.values()).some(p => p.x === cx && p.y === cy);
     if (!occupied) onCreateWant(cx, cy);
@@ -456,13 +500,14 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               ].join(', '),
               backgroundSize: `${STEP}px ${STEP}px`,
               backgroundPosition: `${GAP / 2}px ${GAP / 2}px`,
-              cursor: dragWantId ? 'grabbing' : 'crosshair',
+              cursor: dragWantId || isPanning ? 'grabbing' : 'grab',
               transform: `scale(${scale})`,
               transformOrigin: '0 0',
               position: 'absolute',
               left: offsetX,
               top: offsetY,
             }}
+            onMouseDown={handleCanvasMouseDown}
             onClick={handleCanvasClick}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
