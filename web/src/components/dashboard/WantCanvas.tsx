@@ -12,8 +12,8 @@ import { CanvasChildOverlay } from './CanvasChildOverlay';
 const CELL_SIZE = 110;
 const GAP = 6;
 const STEP = CELL_SIZE + GAP;
-/** Half-size of the virtual grid. (0,0) is the center; cells range [-HALF, +HALF]. */
-const CANVAS_HALF = 50;
+/** Half-size of the default virtual grid. (0,0) is the center; cells range [-HALF, +HALF]. */
+const CANVAS_HALF = 15;
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 2.5;
 const SCALE_STEP = 0.1;
@@ -25,6 +25,7 @@ const isActiveStatus = (status: string) =>
   status === 'reaching' || status === 'initializing' || status === 'reaching_with_warning';
 
 // Pre-compute spiral coordinates emanating from (0,0) outward.
+// Uses a larger range than CANVAS_HALF so auto-placement works even with many wants.
 function buildSpiralCoords(maxRings: number): ReadonlyArray<{ x: number; y: number }> {
   const result: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
   for (let k = 1; k <= maxRings; k++) {
@@ -35,7 +36,7 @@ function buildSpiralCoords(maxRings: number): ReadonlyArray<{ x: number; y: numb
   }
   return result;
 }
-const SPIRAL_COORDS = buildSpiralCoords(CANVAS_HALF);
+const SPIRAL_COORDS = buildSpiralCoords(50);
 
 interface WantCanvasProps {
   wants: Want[];
@@ -76,7 +77,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 
   const lastPinchDist = useRef<number | null>(null);
-  const hasInitialScrolled = useRef(false);
 
   const wantTypes = useWantTypeStore(state => state.wantTypes);
   const typeMap = useMemo(() => {
@@ -255,15 +255,16 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, [wants, localOverrides]);
 
   // Scroll once on mount so (0,0) appears at the viewport center.
+  // Double RAF ensures the browser has computed layout before reading clientWidth/Height.
   useEffect(() => {
-    if (hasInitialScrolled.current) return;
     requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (!el || el.clientWidth === 0) return;
-      const s = scaleRef.current;
-      el.scrollLeft = Math.max(0, CANVAS_HALF * STEP * s - el.clientWidth  / 2);
-      el.scrollTop  = Math.max(0, CANVAS_HALF * STEP * s - el.clientHeight / 2);
-      hasInitialScrolled.current = true;
+      requestAnimationFrame(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const s = scaleRef.current;
+        el.scrollLeft = Math.max(0, CANVAS_HALF * STEP * s - el.clientWidth  / 2);
+        el.scrollTop  = Math.max(0, CANVAS_HALF * STEP * s - el.clientHeight / 2);
+      });
     });
   }, []); // mount only
 
