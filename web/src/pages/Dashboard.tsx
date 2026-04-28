@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Heart, StickyNote, LayoutGrid, Grid2X2 } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart, StickyNote } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -1156,6 +1156,8 @@ export const Dashboard: React.FC = () => {
         onRadarModeToggle={() => setRadarMode(prev => !prev)}
         showGlobalState={sidebar.showMemo}
         onGlobalStateToggle={sidebar.toggleMemo}
+        showCanvasMode={canvasMode}
+        onCanvasModeToggle={() => setCanvasMode(prev => !prev)}
       />
       <HeaderOverlay
         isVisible={isSelectMode || showReactionConfirmation || showDeleteDraftConfirmation}
@@ -1205,37 +1207,6 @@ export const Dashboard: React.FC = () => {
           !canvasMode && "lg:pr-[480px]",
           isGlobalDragOver && "bg-blue-50 dark:bg-blue-900/20 border-4 border-dashed border-blue-400 border-inset"
         )}>
-          {/* View mode toggle bar — list mode only; canvas mode shows it inside WantCanvas toolbar */}
-          {!canvasMode && (
-            <div className={classNames(
-              "flex items-center gap-1 px-3 sm:px-6 shrink-0",
-              isBottom ? "pb-3 sm:pb-4 pt-1 order-last" : "pt-3 sm:pt-4 pb-1"
-            )}>
-              <button
-                onClick={() => setCanvasMode(false)}
-                className={classNames(
-                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors',
-                  'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700'
-                )}
-                title="List view"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">List</span>
-              </button>
-              <button
-                onClick={() => setCanvasMode(true)}
-                className={classNames(
-                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors',
-                  'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                )}
-                title="Canvas view — place wants on a 2D grid"
-              >
-                <Grid2X2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Canvas</span>
-              </button>
-            </div>
-          )}
-
           {canvasMode ? (
             <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
               {error && <div className="mx-3 sm:mx-6 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 flex items-center justify-between shrink-0"><span>{error}</span><button onClick={clearError} className="ml-2 text-red-400 hover:text-red-600">✕</button></div>}
@@ -1247,25 +1218,6 @@ export const Dashboard: React.FC = () => {
                 onMoveWant={handleCanvasMoveWant}
                 scale={canvasScale}
                 onScaleChange={setCanvasScale}
-                toolbarContent={
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCanvasMode(false)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors text-white/60 hover:text-white hover:bg-white/10"
-                      title="List view"
-                    >
-                      <LayoutGrid className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">List</span>
-                    </button>
-                    <button
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors bg-white/15 text-white border border-white/20"
-                      title="Canvas view"
-                    >
-                      <Grid2X2 className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Canvas</span>
-                    </button>
-                  </div>
-                }
                 floatCard={selectedWant && (() => {
                   const selectedId = selectedWant.metadata?.id || selectedWant.id;
                   const handleFloatCardView = (w: Want) => {

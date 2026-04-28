@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy } from 'lucide-react';
+import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
@@ -32,6 +32,8 @@ interface HeaderProps {
   onRadarModeToggle?: () => void;
   showGlobalState?: boolean;
   onGlobalStateToggle?: () => void;
+  showCanvasMode?: boolean;
+  onCanvasModeToggle?: () => void;
 }
 
 const menuItems = [
@@ -70,7 +72,9 @@ export const Header: React.FC<HeaderProps> = ({
   showRadarMode = false,
   onRadarModeToggle,
   showGlobalState = false,
-  onGlobalStateToggle
+  onGlobalStateToggle,
+  showCanvasMode = false,
+  onCanvasModeToggle,
 }) => {
   const config = useConfigStore(state => state.config);
   const location = useLocation();
@@ -409,6 +413,41 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Stats</span>
               </button>
             </Tooltip>
+          )}
+
+          {/* List / Canvas view toggle */}
+          {onCanvasModeToggle && (
+            <>
+              <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
+              <Tooltip label="List view">
+                <button
+                  onClick={() => { if (showCanvasMode) onCanvasModeToggle(); }}
+                  className={classNames(
+                    'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
+                    !showCanvasMode
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  )}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">List</span>
+                </button>
+              </Tooltip>
+              <Tooltip label="Canvas view">
+                <button
+                  onClick={() => { if (!showCanvasMode) onCanvasModeToggle(); }}
+                  className={classNames(
+                    'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
+                    showCanvasMode
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  )}
+                >
+                  <Grid2X2 className="h-4 w-4" />
+                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Canvas</span>
+                </button>
+              </Tooltip>
+            </>
           )}
 
           {/* Add Want / Add Whim — separated by a thin line */}
