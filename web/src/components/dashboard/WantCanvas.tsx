@@ -51,6 +51,8 @@ interface WantCanvasProps {
   /** Children of the selected want, grouped into the role overlay */
   childWants?: Want[];
   onDeselect?: () => void;
+  /** Extra controls rendered in the top-left toolbar (e.g. list/canvas toggle) */
+  toolbarContent?: React.ReactNode;
 }
 
 export const WantCanvas: React.FC<WantCanvasProps> = ({
@@ -64,6 +66,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   floatCard,
   childWants = [],
   onDeselect: _onDeselect,
+  toolbarContent,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -114,21 +117,28 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
-      e.preventDefault();
-      const cur = scaleRef.current;
-      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-      const next = clampScale(Math.round(cur * factor * 100) / 100);
-      const vw = el.clientWidth;
-      const vh = el.clientHeight;
-      const cx = (el.scrollLeft + vw / 2) / cur;
-      const cy = (el.scrollTop  + vh / 2) / cur;
-      onScaleChange?.(next);
-      requestAnimationFrame(() => {
-        if (!scrollRef.current) return;
-        scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
-        scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
-      });
+      if (e.ctrlKey || e.metaKey) {
+        // Zoom: keep viewport center fixed
+        e.preventDefault();
+        const cur = scaleRef.current;
+        const factor = e.deltaY < 0 ? 1.1 : 0.9;
+        const next = clampScale(Math.round(cur * factor * 100) / 100);
+        const vw = el.clientWidth;
+        const vh = el.clientHeight;
+        const cx = (el.scrollLeft + vw / 2) / cur;
+        const cy = (el.scrollTop  + vh / 2) / cur;
+        onScaleChange?.(next);
+        requestAnimationFrame(() => {
+          if (!scrollRef.current) return;
+          scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
+          scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
+        });
+      } else if (e.shiftKey) {
+        // Shift+Wheel → horizontal scroll (for mice without horizontal wheel)
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+      // else: native vertical / trackpad-horizontal scroll
     };
 
     const onTouchStart = (e: TouchEvent) => {
@@ -353,20 +363,27 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   return (
     <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
-      {/* Zoom controls */}
-      <div className="absolute top-2 left-2 z-50 flex items-center gap-1 pointer-events-none select-none">
-        <button
-          className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
-          onClick={zoomOut} title="Zoom out"
-        >−</button>
-        <span
-          className="pointer-events-auto text-white/70 text-xs font-mono w-12 text-center cursor-pointer hover:text-white transition-colors"
-          onClick={() => applyScaleWithCenter(1.0)} title="Reset zoom"
-        >{Math.round(scale * 100)}%</span>
-        <button
-          className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
-          onClick={zoomIn} title="Zoom in"
-        >+</button>
+      {/* Toolbar: list/canvas toggle + zoom controls — fixed top-left of canvas */}
+      <div className="absolute top-2 left-2 z-50 flex items-center gap-2 pointer-events-none select-none">
+        {toolbarContent && (
+          <div className="pointer-events-auto flex items-center">
+            {toolbarContent}
+          </div>
+        )}
+        <div className="flex items-center gap-1">
+          <button
+            className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
+            onClick={zoomOut} title="Zoom out"
+          >−</button>
+          <span
+            className="pointer-events-auto text-white/70 text-xs font-mono w-12 text-center cursor-pointer hover:text-white transition-colors"
+            onClick={() => applyScaleWithCenter(1.0)} title="Reset zoom"
+          >{Math.round(scale * 100)}%</span>
+          <button
+            className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
+            onClick={zoomIn} title="Zoom in"
+          >+</button>
+        </div>
       </div>
 
       {/* Scroll container */}
