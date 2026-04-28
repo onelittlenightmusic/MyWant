@@ -7,6 +7,7 @@ import { useWantStore } from '@/stores/wantStore';
 import { classNames } from '@/utils/helpers';
 import { WantCardFace } from './WantCardFace';
 import { getPatternColor } from './WantTypeVisuals';
+import { CanvasChildOverlay } from './CanvasChildOverlay';
 
 const CELL_SIZE = 110;
 const GAP = 6;
@@ -34,8 +35,12 @@ interface WantCanvasProps {
   onMoveWant: (wantId: string, x: number, y: number) => void;
   scale?: number;
   onScaleChange?: (scale: number) => void;
-  /** Pre-rendered card to float near the selected tile */
+  /** Pre-rendered card to show centered over the selected tile */
   floatCard?: React.ReactNode;
+  /** Children of the selected want, grouped into the overlay */
+  childWants?: Want[];
+  /** Called to close the overlay (deselect) */
+  onDeselect?: () => void;
 }
 
 export const WantCanvas: React.FC<WantCanvasProps> = ({
@@ -47,13 +52,15 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   scale: scaleProp = 1.0,
   onScaleChange,
   floatCard,
+  childWants = [],
+  onDeselect,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
-  const [floatPos, setFloatPos] = useState<{ left: number; top: number } | null>(null);
+  const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
 
   // Build want-type lookup from global store (type name → WantTypeListItem)
   const wantTypes = useWantTypeStore(state => state.wantTypes);
@@ -199,44 +206,35 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     return map;
   }, [wants, localOverrides]);
 
-  // Compute and track the screen position for the float card
-  const updateFloatPos = useCallback(() => {
-    if (!floatCard || !selectedWant || !scrollRef.current) { setFloatPos(null); return; }
+  // Track viewport center of the selected tile (used to center the overlay)
+  const updateTileCenter = useCallback(() => {
+    if (!floatCard || !selectedWant || !scrollRef.current) { setTileCenter(null); return; }
     const id = selectedWant.metadata?.id || selectedWant.id;
     const pos = id ? positionMap.get(id) : undefined;
-    if (!pos) { setFloatPos(null); return; }
+    if (!pos) { setTileCenter(null); return; }
 
     const scrollEl = scrollRef.current;
     const scrollRect = scrollEl.getBoundingClientRect();
     const tileLeft = pos.x * STEP + GAP / 2;
     const tileTop  = pos.y * STEP + GAP / 2;
 
-    const screenLeft   = scrollRect.left + tileLeft * scale - scrollEl.scrollLeft;
-    const screenBottom = scrollRect.top  + (tileTop + CELL_SIZE) * scale - scrollEl.scrollTop;
-    const screenTileTop = scrollRect.top + tileTop * scale - scrollEl.scrollTop;
-
-    // Clamp horizontally; flip above tile if not enough room below
-    const left = Math.max(8, Math.min(screenLeft, window.innerWidth - FLOAT_CARD_WIDTH - 8));
-    const wouldClipBottom = screenBottom + FLOAT_CARD_EST_HEIGHT > window.innerHeight - 8;
-    const top = wouldClipBottom
-      ? Math.max(8, screenTileTop - FLOAT_CARD_EST_HEIGHT - 8)
-      : screenBottom + 8;
-
-    setFloatPos({ left, top });
+    const x = scrollRect.left + (tileLeft + CELL_SIZE / 2) * scale - scrollEl.scrollLeft;
+    const y = scrollRect.top  + (tileTop  + CELL_SIZE / 2) * scale - scrollEl.scrollTop;
+    setTileCenter({ x, y });
   }, [floatCard, selectedWant, positionMap, scale]);
 
-  useEffect(() => { updateFloatPos(); }, [updateFloatPos]);
+  useEffect(() => { updateTileCenter(); }, [updateTileCenter]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.addEventListener('scroll', updateFloatPos);
-    window.addEventListener('resize', updateFloatPos);
+    el.addEventListener('scroll', updateTileCenter);
+    window.addEventListener('resize', updateTileCenter);
     return () => {
-      el.removeEventListener('scroll', updateFloatPos);
-      window.removeEventListener('resize', updateFloatPos);
+      el.removeEventListener('scroll', updateTileCenter);
+      window.removeEventListener('resize', updateTileCenter);
     };
-  }, [updateFloatPos]);
+  }, [updateTileCenter]);
 
   // Canvas size: enough to fit all wants + some empty space
   const { cols, rows } = useMemo(() => {
@@ -468,21 +466,16 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         </div>
       </div>
 
-      {/* Float card — fixed near the selected tile, outside scroll/overflow */}
-      {floatCard && floatPos && (
-        <div
-          style={{
-            position: 'fixed',
-            left: floatPos.left,
-            top: floatPos.top,
-            width: FLOAT_CARD_WIDTH,
-            height: FLOAT_CARD_EST_HEIGHT,
-            zIndex: 50,
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          {floatCard}
-        </div>
+      {/* Child overlay — float card centered on tile + child mini-tiles around it */}
+      {floatCard && tileCenter && (
+        <CanvasChildOverlay
+          floatCard={floatCard}
+          childWants={childWants}
+          tileCenterX={tileCenter.x}
+          tileCenterY={tileCenter.y}
+          onClickChild={onViewWant}
+          onClose={() => onDeselect?.()}
+        />
       )}
     </div>
   );

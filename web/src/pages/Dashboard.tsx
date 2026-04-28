@@ -1243,13 +1243,7 @@ export const Dashboard: React.FC = () => {
                 scale={canvasScale}
                 onScaleChange={setCanvasScale}
                 floatCard={selectedWant && (() => {
-                  const floatChildren = regularWants.filter(w =>
-                    w.metadata?.ownerReferences?.some(r => r.id === (selectedWant.metadata?.id || selectedWant.id))
-                  );
                   const selectedId = selectedWant.metadata?.id || selectedWant.id;
-                  // onView for the float card: skip toggle-deselect when the want is already selected.
-                  // WantCard.handleContextMenu calls onView after setting the overlay; deselecting here
-                  // would unmount the card and hide the overlay before it renders.
                   const handleFloatCardView = (w: Want) => {
                     const wId = w.metadata?.id || w.id;
                     if (wId !== selectedId) handleViewWant(w);
@@ -1257,7 +1251,6 @@ export const Dashboard: React.FC = () => {
                   return (
                     <WantCard
                       want={selectedWant}
-                      children={floatChildren.length > 0 ? floatChildren : undefined}
                       selected={true}
                       selectedWant={selectedWant}
                       onView={handleFloatCardView}
@@ -1280,6 +1273,10 @@ export const Dashboard: React.FC = () => {
                     />
                   );
                 })()}
+                childWants={selectedWant ? regularWants.filter(w =>
+                  w.metadata?.ownerReferences?.some(r => r.id === (selectedWant.metadata?.id || selectedWant.id))
+                ) : []}
+                onDeselect={sidebar.clearSelection}
               />
             </div>
           ) : (
