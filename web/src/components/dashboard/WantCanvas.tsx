@@ -12,8 +12,8 @@ import { CanvasChildOverlay } from './CanvasChildOverlay';
 const CELL_SIZE = 110;
 const GAP = 6;
 const STEP = CELL_SIZE + GAP;
-const MIN_COLS = 30;
-const MIN_ROWS = 30;
+/** Half-size of the virtual grid. (0,0) is the center; cells range [-HALF, +HALF]. */
+const CANVAS_HALF = 50;
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 2.5;
 const SCALE_STEP = 0.1;
@@ -24,8 +24,18 @@ export const CANVAS_LABEL_Y = 'mywant.io/canvas-y';
 const isActiveStatus = (status: string) =>
   status === 'reaching' || status === 'initializing' || status === 'reaching_with_warning';
 
-const FLOAT_CARD_WIDTH = 280;
-const FLOAT_CARD_EST_HEIGHT = 220;
+// Pre-compute spiral coordinates emanating from (0,0) outward.
+function buildSpiralCoords(maxRings: number): ReadonlyArray<{ x: number; y: number }> {
+  const result: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
+  for (let k = 1; k <= maxRings; k++) {
+    for (let x = -k; x <= k; x++) result.push({ x, y: -k });      // top edge
+    for (let y = -k + 1; y <= k; y++) result.push({ x: k, y });   // right edge
+    for (let x = k - 1; x >= -k; x--) result.push({ x, y: k });  // bottom edge
+    for (let y = k - 1; y >= -k + 1; y--) result.push({ x: -k, y }); // left edge
+  }
+  return result;
+}
+const SPIRAL_COORDS = buildSpiralCoords(CANVAS_HALF);
 
 interface WantCanvasProps {
   wants: Want[];
@@ -37,9 +47,8 @@ interface WantCanvasProps {
   onScaleChange?: (scale: number) => void;
   /** Pre-rendered card to show centered over the selected tile */
   floatCard?: React.ReactNode;
-  /** Children of the selected want, grouped into the overlay */
+  /** Children of the selected want, grouped into the role overlay */
   childWants?: Want[];
-  /** Called to close the overlay (deselect) */
   onDeselect?: () => void;
 }
 
@@ -53,7 +62,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   onScaleChange,
   floatCard,
   childWants = [],
-  onDeselect,
+  onDeselect: _onDeselect,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -62,39 +71,71 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
 
-  // Build want-type lookup from global store (type name → WantTypeListItem)
+  // Ref so non-passive event handlers can read latest scale without re-registering
+  const scaleRef = useRef(scale);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+
+  const lastPinchDist = useRef<number | null>(null);
+  const hasInitialScrolled = useRef(false);
+
   const wantTypes = useWantTypeStore(state => state.wantTypes);
   const typeMap = useMemo(() => {
     const m = new Map<string, WantTypeListItem>();
     wantTypes.forEach(wt => m.set(wt.name, wt));
     return m;
   }, [wantTypes]);
-  const lastPinchDist = useRef<number | null>(null);
 
   const clampScale = (v: number) => Math.max(MIN_SCALE, Math.min(MAX_SCALE, v));
-  const applyScale = useCallback((v: number) => { onScaleChange?.(clampScale(v)); }, [onScaleChange]);
-  const zoomIn = () => applyScale(Math.round((scale + SCALE_STEP) * 10) / 10);
-  const zoomOut = () => applyScale(Math.round((scale - SCALE_STEP) * 10) / 10);
 
-  // Non-passive wheel + touch listeners so preventDefault works (React handlers are passive)
+  // Zoom keeping the viewport center fixed in canvas-coordinate space.
+  const applyScaleWithCenter = useCallback((newScale: number) => {
+    const clamped = clampScale(newScale);
+    const el = scrollRef.current;
+    if (!el) { onScaleChange?.(clamped); return; }
+    const cur = scaleRef.current;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+    const cx = (el.scrollLeft + vw / 2) / cur;
+    const cy = (el.scrollTop  + vh / 2) / cur;
+    onScaleChange?.(clamped);
+    requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      scrollRef.current.scrollLeft = Math.max(0, cx * clamped - vw / 2);
+      scrollRef.current.scrollTop  = Math.max(0, cy * clamped - vh / 2);
+    });
+  }, [onScaleChange]);
+
+  const zoomIn  = () => applyScaleWithCenter(Math.round((scale + SCALE_STEP) * 10) / 10);
+  const zoomOut = () => applyScaleWithCenter(Math.round((scale - SCALE_STEP) * 10) / 10);
+
+  // Non-passive wheel + pinch listeners (React's synthetic handlers are passive)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        onScaleChange?.(clampScale(Math.round(scale * factor * 100) / 100));
-      }
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const cur = scaleRef.current;
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      const next = clampScale(Math.round(cur * factor * 100) / 100);
+      const vw = el.clientWidth;
+      const vh = el.clientHeight;
+      const cx = (el.scrollLeft + vw / 2) / cur;
+      const cy = (el.scrollTop  + vh / 2) / cur;
+      onScaleChange?.(next);
+      requestAnimationFrame(() => {
+        if (!scrollRef.current) return;
+        scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
+        scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
+      });
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        const dx = e.touches[0].clientX - e.touches[1].clientX;
-        const dy = e.touches[0].clientY - e.touches[1].clientY;
-        lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
-      }
+      if (e.touches.length !== 2) return;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
     };
 
     const onTouchMove = (e: TouchEvent) => {
@@ -104,8 +145,18 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (lastPinchDist.current !== null) {
-        const factor = dist / lastPinchDist.current;
-        onScaleChange?.(clampScale(Math.round(scale * factor * 100) / 100));
+        const cur = scaleRef.current;
+        const next = clampScale(Math.round(cur * (dist / lastPinchDist.current) * 100) / 100);
+        const vw = el.clientWidth;
+        const vh = el.clientHeight;
+        const cx = (el.scrollLeft + vw / 2) / cur;
+        const cy = (el.scrollTop  + vh / 2) / cur;
+        onScaleChange?.(next);
+        requestAnimationFrame(() => {
+          if (!scrollRef.current) return;
+          scrollRef.current.scrollLeft = Math.max(0, cx * next - vw / 2);
+          scrollRef.current.scrollTop  = Math.max(0, cy * next - vh / 2);
+        });
       }
       lastPinchDist.current = dist;
     };
@@ -122,15 +173,11 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       el.removeEventListener('touchmove', onTouchMove);
       el.removeEventListener('touchend', onTouchEnd);
     };
-  }, [scale, onScaleChange]);
+  }, [onScaleChange]); // no `scale` dependency — reads via scaleRef
 
-  // Optimistic local overrides: applied immediately on drop, cleared when backend confirms
-  // Map<wantId, {x, y}>
-  const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(
-    new Map()
-  );
+  // Optimistic local overrides
+  const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
 
-  // When `wants` changes (after fetchWants), clear overrides whose new label matches
   useEffect(() => {
     setLocalOverrides(prev => {
       if (prev.size === 0) return prev;
@@ -138,93 +185,106 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       wants.forEach(want => {
         const id = want.metadata?.id || want.id;
         if (!id) return;
-        const override = next.get(id);
-        if (!override) return;
-        const savedX = parseInt(want.metadata?.labels?.[CANVAS_LABEL_X] ?? '', 10);
-        const savedY = parseInt(want.metadata?.labels?.[CANVAS_LABEL_Y] ?? '', 10);
-        // Backend confirmed the position → remove override
-        if (savedX === override.x && savedY === override.y) next.delete(id);
+        const ov = next.get(id);
+        if (!ov) return;
+        const sx = parseInt(want.metadata?.labels?.[CANVAS_LABEL_X] ?? '', 10);
+        const sy = parseInt(want.metadata?.labels?.[CANVAS_LABEL_Y] ?? '', 10);
+        if (sx === ov.x && sy === ov.y) next.delete(id);
       });
       return next.size !== prev.size ? next : prev;
     });
   }, [wants]);
 
-  // Compute display positions for all wants (backend labels + local overrides)
-  const positionMap = useMemo(() => {
+  // Combined layout: positionMap + canvas bounds + origin offset for (0,0).
+  // originX/Y translate grid coords → pixel coords: pixel = (gridCoord + origin) * STEP
+  const { positionMap, cols, rows, originX, originY } = useMemo(() => {
     const map = new Map<string, { x: number; y: number }>();
     const occupied = new Set<string>();
 
-    // First pass: wants with saved canvas positions (or local overrides)
-    // Conflict resolution: first come first served — duplicates fall to second pass
+    // First pass: saved / overridden positions
     wants.forEach(want => {
       const id = want.metadata?.id || want.id;
       if (!id) return;
-
-      // Local override takes precedence (optimistic update)
-      const override = localOverrides.get(id);
-      if (override) {
-        if (!occupied.has(`${override.x},${override.y}`)) {
-          map.set(id, override);
-          occupied.add(`${override.x},${override.y}`);
-        }
-        // If override cell is already taken, fall through to second-pass auto-assign
+      const ov = localOverrides.get(id);
+      if (ov) {
+        const key = `${ov.x},${ov.y}`;
+        if (!occupied.has(key)) { map.set(id, ov); occupied.add(key); }
         return;
       }
-
       const rawX = want.metadata?.labels?.[CANVAS_LABEL_X];
       const rawY = want.metadata?.labels?.[CANVAS_LABEL_Y];
       if (rawX !== undefined && rawY !== undefined) {
         const x = parseInt(rawX, 10);
         const y = parseInt(rawY, 10);
-        if (!isNaN(x) && !isNaN(y) && x >= 0 && y >= 0) {
-          if (!occupied.has(`${x},${y}`)) {
-            map.set(id, { x, y });
-            occupied.add(`${x},${y}`);
-          }
-          // If cell already taken, fall through to second-pass auto-assign
+        if (!isNaN(x) && !isNaN(y)) {
+          const key = `${x},${y}`;
+          if (!occupied.has(key)) { map.set(id, { x, y }); occupied.add(key); }
         }
       }
     });
 
-    // Second pass: auto-assign for wants without saved position
-    let nx = 0;
-    let ny = 0;
-    const advance = () => {
-      nx++;
-      if (nx >= MIN_COLS) { nx = 0; ny++; }
-    };
-
+    // Second pass: spiral auto-assign from center outward
+    let si = 0;
     wants.forEach(want => {
       const id = want.metadata?.id || want.id;
       if (!id || map.has(id)) return;
-      while (occupied.has(`${nx},${ny}`)) advance();
-      map.set(id, { x: nx, y: ny });
-      occupied.add(`${nx},${ny}`);
-      advance();
+      while (si < SPIRAL_COORDS.length) {
+        const coord = SPIRAL_COORDS[si++];
+        const key = `${coord.x},${coord.y}`;
+        if (!occupied.has(key)) { map.set(id, { ...coord }); occupied.add(key); break; }
+      }
     });
 
-    return map;
+    // Canvas bounds: at least CANVAS_HALF in every direction with 2-cell padding
+    let minX = -CANVAS_HALF, maxX = CANVAS_HALF;
+    let minY = -CANVAS_HALF, maxY = CANVAS_HALF;
+    map.forEach(({ x, y }) => {
+      if (x - 2 < minX) minX = x - 2;
+      if (x + 2 > maxX) maxX = x + 2;
+      if (y - 2 < minY) minY = y - 2;
+      if (y + 2 > maxY) maxY = y + 2;
+    });
+
+    return {
+      positionMap: map,
+      cols: maxX - minX + 1,
+      rows: maxY - minY + 1,
+      originX: -minX,  // pixel offset: cell (0,0) → pixel (originX * STEP + GAP/2)
+      originY: -minY,
+    };
   }, [wants, localOverrides]);
 
-  // Track viewport center of the selected tile (used to center the overlay)
+  // Scroll once on mount so (0,0) appears at the viewport center.
+  useEffect(() => {
+    if (hasInitialScrolled.current) return;
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (!el || el.clientWidth === 0) return;
+      const s = scaleRef.current;
+      el.scrollLeft = Math.max(0, CANVAS_HALF * STEP * s - el.clientWidth  / 2);
+      el.scrollTop  = Math.max(0, CANVAS_HALF * STEP * s - el.clientHeight / 2);
+      hasInitialScrolled.current = true;
+    });
+  }, []); // mount only
+
+  // Track viewport center of the selected tile for the overlay
   const updateTileCenter = useCallback(() => {
     if (!floatCard || !selectedWant || !scrollRef.current) { setTileCenter(null); return; }
     const id = selectedWant.metadata?.id || selectedWant.id;
     const pos = id ? positionMap.get(id) : undefined;
     if (!pos) { setTileCenter(null); return; }
 
-    const scrollEl = scrollRef.current;
-    const scrollRect = scrollEl.getBoundingClientRect();
-    const tileLeft = pos.x * STEP + GAP / 2;
-    const tileTop  = pos.y * STEP + GAP / 2;
-
-    const x = scrollRect.left + (tileLeft + CELL_SIZE / 2) * scale - scrollEl.scrollLeft;
-    const y = scrollRect.top  + (tileTop  + CELL_SIZE / 2) * scale - scrollEl.scrollTop;
-    setTileCenter({ x, y });
-  }, [floatCard, selectedWant, positionMap, scale]);
+    const el = scrollRef.current;
+    const rect = el.getBoundingClientRect();
+    const tileLeft = (pos.x + originX) * STEP + GAP / 2;
+    const tileTop  = (pos.y + originY) * STEP + GAP / 2;
+    setTileCenter({
+      x: rect.left + (tileLeft + CELL_SIZE / 2) * scale - el.scrollLeft,
+      y: rect.top  + (tileTop  + CELL_SIZE / 2) * scale - el.scrollTop,
+    });
+  }, [floatCard, selectedWant, positionMap, scale, originX, originY]);
 
   useEffect(() => { updateTileCenter(); }, [updateTileCenter]);
-
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -236,35 +296,22 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     };
   }, [updateTileCenter]);
 
-  // Canvas size: enough to fit all wants + some empty space
-  const { cols, rows } = useMemo(() => {
-    let maxX = MIN_COLS - 1;
-    let maxY = MIN_ROWS - 1;
-    positionMap.forEach(({ x, y }) => {
-      if (x > maxX) maxX = x;
-      if (y > maxY) maxY = y;
-    });
-    return { cols: maxX + 3, rows: maxY + 3 };
-  }, [positionMap]);
-
-  const cellFromEvent = (e: React.MouseEvent | React.DragEvent) => {
+  // Convert a mouse/drag event position to grid coordinates (possibly negative)
+  const cellFromEvent = useCallback((e: React.MouseEvent | React.DragEvent) => {
     const rect = canvasRef.current!.getBoundingClientRect();
-    const cx = Math.floor((e.clientX - rect.left) / (STEP * scale));
-    const cy = Math.floor((e.clientY - rect.top) / (STEP * scale));
-    return { cx, cy };
-  };
+    return {
+      cx: Math.floor((e.clientX - rect.left) / (STEP * scale)) - originX,
+      cy: Math.floor((e.clientY - rect.top)  / (STEP * scale)) - originY,
+    };
+  }, [scale, originX, originY]);
 
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (dragWantId) return;
     const { cx, cy } = cellFromEvent(e);
-    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) return;
     const occupied = Array.from(positionMap.values()).some(p => p.x === cx && p.y === cy);
-    if (!occupied) {
-      onCreateWant(cx, cy);
-    }
-  }, [dragWantId, positionMap, cols, rows, onCreateWant]);
+    if (!occupied) onCreateWant(cx, cy);
+  }, [dragWantId, positionMap, onCreateWant, cellFromEvent]);
 
-  // True if a cell is occupied by a want other than the one being dragged
   const isCellOccupied = useCallback((cx: number, cy: number, excludeId?: string) => {
     for (const [id, pos] of positionMap.entries()) {
       if (id === excludeId) continue;
@@ -278,31 +325,30 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     e.preventDefault();
     const { cx, cy } = cellFromEvent(e);
     setDragOverCell({ x: cx, y: cy });
-  }, []);
+  }, [cellFromEvent]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const wantId = e.dataTransfer.getData('application/mywant-canvas-id');
     if (!wantId) return;
     const { cx, cy } = cellFromEvent(e);
-    if (cx >= 0 && cy >= 0 && !isCellOccupied(cx, cy, wantId)) {
+    if (!isCellOccupied(cx, cy, wantId)) {
       setLocalOverrides(prev => new Map(prev).set(wantId, { x: cx, y: cy }));
       onMoveWant(wantId, cx, cy);
     }
     setDragWantId(null);
     setDragOverCell(null);
-  }, [onMoveWant, isCellOccupied]);
+  }, [onMoveWant, isCellOccupied, cellFromEvent]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    // Only clear when actually leaving the canvas (not a child element)
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    if (
-      e.clientX < rect.left || e.clientX > rect.right ||
-      e.clientY < rect.top || e.clientY > rect.bottom
-    ) {
+    if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
       setDragOverCell(null);
     }
   }, []);
+
+  const canvasW = cols * STEP + GAP;
+  const canvasH = rows * STEP + GAP;
 
   return (
     <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
@@ -310,34 +356,28 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       <div className="absolute top-2 left-2 z-50 flex items-center gap-1 pointer-events-none select-none">
         <button
           className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
-          onClick={zoomOut}
-          title="Zoom out"
+          onClick={zoomOut} title="Zoom out"
         >−</button>
         <span
           className="pointer-events-auto text-white/70 text-xs font-mono w-12 text-center cursor-pointer hover:text-white transition-colors"
-          onClick={() => applyScale(1.0)}
-          title="Reset zoom"
+          onClick={() => applyScaleWithCenter(1.0)} title="Reset zoom"
         >{Math.round(scale * 100)}%</span>
         <button
           className="pointer-events-auto w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white text-lg font-bold flex items-center justify-center transition-colors"
-          onClick={zoomIn}
-          title="Zoom in"
+          onClick={zoomIn} title="Zoom in"
         >+</button>
       </div>
 
       {/* Scroll container */}
-      <div
-        ref={scrollRef}
-        className="overflow-auto w-full h-full"
-      >
-        {/* Spacer div to drive scrollbars at the scaled size */}
-        <div style={{ width: (cols * STEP + GAP) * scale, height: (rows * STEP + GAP) * scale, position: 'relative' }}>
+      <div ref={scrollRef} className="overflow-auto w-full h-full">
+        {/* Spacer drives scrollbars at scaled size */}
+        <div style={{ width: canvasW * scale, height: canvasH * scale, position: 'relative' }}>
           <div
             ref={canvasRef}
             className="relative select-none"
             style={{
-              width: cols * STEP + GAP,
-              height: rows * STEP + GAP,
+              width: canvasW,
+              height: canvasH,
               backgroundColor: '#0a0f1e',
               backgroundImage: [
                 'linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px)',
@@ -349,124 +389,113 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               transform: `scale(${scale})`,
               transformOrigin: '0 0',
               position: 'absolute',
-              top: 0,
-              left: 0,
+              top: 0, left: 0,
             }}
             onClick={handleCanvasClick}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragLeave={handleDragLeave}
           >
-        {/* Drag-over highlight cell */}
-        {dragOverCell && (() => {
-          const blocked = isCellOccupied(dragOverCell.x, dragOverCell.y, dragWantId ?? undefined);
-          return (
-            <div
-              className="absolute pointer-events-none rounded z-0"
-              style={{
-                left: dragOverCell.x * STEP + GAP / 2,
-                top: dragOverCell.y * STEP + GAP / 2,
-                width: CELL_SIZE,
-                height: CELL_SIZE,
-                border: blocked ? '2px solid rgba(239,68,68,0.7)' : '2px solid rgba(96,165,250,0.6)',
-                backgroundColor: blocked ? 'rgba(239,68,68,0.12)' : 'rgba(96,165,250,0.08)',
-              }}
-            />
-          );
-        })()}
-
-        {/* Want blocks */}
-        {wants.map(want => {
-          const id = want.metadata?.id || want.id;
-          if (!id) return null;
-          const pos = positionMap.get(id);
-          if (!pos) return null;
-
-          const isSelected = (selectedWant?.metadata?.id || selectedWant?.id) === id;
-          const isDragging = dragWantId === id;
-          const statusColor = getStatusHexColor(want.status);
-          const type = want.metadata?.type || '';
-          const wantTypeInfo = typeMap.get(type);
-          const category = wantTypeInfo?.category ?? '';
-          const pattern = wantTypeInfo?.pattern ?? '';
-          const name = want.metadata?.name || id;
-          const active = isActiveStatus(want.status);
-          const patColor = getPatternColor(pattern);
-
-          return (
-            <WantCardFace
-              key={id}
-              typeName={type}
-              displayName={name}
-              category={category}
-              theme="dark"
-              iconSize={26}
-              className={classNames(
-                'rounded z-10 transition-transform duration-100',
-                !isDragging && 'hover:scale-[1.06] hover:z-20',
-                isSelected && 'scale-[1.06] z-30',
-                isDragging && 'opacity-40',
-              )}
-              style={{
-                position: 'absolute', // inline style overrides WantCardFace's `relative` class
-                left: pos.x * STEP + GAP / 2,
-                top: pos.y * STEP + GAP / 2,
-                width: CELL_SIZE,
-                height: CELL_SIZE,
-                boxShadow: isSelected
-                  ? `0 0 0 2px #fff, 0 0 0 4px ${statusColor}, 0 6px 20px rgba(0,0,0,0.7)`
-                  : active
-                  ? `0 0 14px ${patColor}60, 0 2px 10px rgba(0,0,0,0.6)`
-                  : '0 2px 10px rgba(0,0,0,0.6)',
-                cursor: isDragging ? 'grabbing' : 'grab',
-              }}
-              dataAttributes={{ 'data-want-id': id }}
-              onClick={e => { e.stopPropagation(); onViewWant(want); }}
-              onContextMenu={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onViewWant(want);
-                useWantStore.getState().setQuickActionsWantId(id);
-              }}
-              draggable
-              onDragStart={e => {
-                e.dataTransfer.setData('application/mywant-canvas-id', id);
-                e.dataTransfer.effectAllowed = 'move';
-                setDragWantId(id);
-              }}
-              onDragEnd={() => { setDragWantId(null); setDragOverCell(null); }}
-            >
-              {/* Status bar (top) */}
-              <div
-                className={classNames('absolute top-0 left-0 right-0 z-20', active && 'animate-pulse')}
-                style={{ height: 3, backgroundColor: statusColor }}
-              />
-
-              {/* Active dot (top-right) */}
-              {active && (
+            {/* Drag-over highlight */}
+            {dragOverCell && (() => {
+              const blocked = isCellOccupied(dragOverCell.x, dragOverCell.y, dragWantId ?? undefined);
+              return (
                 <div
-                  className="absolute top-2 right-2 z-20 rounded-full animate-pulse"
-                  style={{ width: 5, height: 5, backgroundColor: statusColor }}
+                  className="absolute pointer-events-none rounded z-0"
+                  style={{
+                    left: (dragOverCell.x + originX) * STEP + GAP / 2,
+                    top:  (dragOverCell.y + originY) * STEP + GAP / 2,
+                    width: CELL_SIZE, height: CELL_SIZE,
+                    border: blocked ? '2px solid rgba(239,68,68,0.7)' : '2px solid rgba(96,165,250,0.6)',
+                    backgroundColor: blocked ? 'rgba(239,68,68,0.12)' : 'rgba(96,165,250,0.08)',
+                  }}
                 />
-              )}
+              );
+            })()}
 
-              {/* Selected border glow */}
-              {isSelected && (
-                <div
-                  className="absolute inset-0 pointer-events-none rounded z-30"
-                  style={{ border: `2px solid ${statusColor}`, opacity: 0.85 }}
-                />
-              )}
-            </WantCardFace>
-          );
-        })}
+            {/* Want tiles */}
+            {wants.map(want => {
+              const id = want.metadata?.id || want.id;
+              if (!id) return null;
+              const pos = positionMap.get(id);
+              if (!pos) return null;
 
-        {/* Empty cell hint on hover (CSS-only via cursor:crosshair) */}
+              const isSelected = (selectedWant?.metadata?.id || selectedWant?.id) === id;
+              const isDragging = dragWantId === id;
+              const statusColor = getStatusHexColor(want.status);
+              const type = want.metadata?.type || '';
+              const wantTypeInfo = typeMap.get(type);
+              const category = wantTypeInfo?.category ?? '';
+              const pattern = wantTypeInfo?.pattern ?? '';
+              const name = want.metadata?.name || id;
+              const active = isActiveStatus(want.status);
+              const patColor = getPatternColor(pattern);
+
+              return (
+                <WantCardFace
+                  key={id}
+                  typeName={type}
+                  displayName={name}
+                  category={category}
+                  theme="dark"
+                  iconSize={26}
+                  className={classNames(
+                    'rounded z-10 transition-transform duration-100',
+                    !isDragging && 'hover:scale-[1.06] hover:z-20',
+                    isSelected && 'scale-[1.06] z-30',
+                    isDragging && 'opacity-40',
+                  )}
+                  style={{
+                    position: 'absolute',
+                    left: (pos.x + originX) * STEP + GAP / 2,
+                    top:  (pos.y + originY) * STEP + GAP / 2,
+                    width: CELL_SIZE, height: CELL_SIZE,
+                    boxShadow: isSelected
+                      ? `0 0 0 2px #fff, 0 0 0 4px ${statusColor}, 0 6px 20px rgba(0,0,0,0.7)`
+                      : active
+                      ? `0 0 14px ${patColor}60, 0 2px 10px rgba(0,0,0,0.6)`
+                      : '0 2px 10px rgba(0,0,0,0.6)',
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                  }}
+                  dataAttributes={{ 'data-want-id': id }}
+                  onClick={e => { e.stopPropagation(); onViewWant(want); }}
+                  onContextMenu={e => {
+                    e.preventDefault(); e.stopPropagation();
+                    onViewWant(want);
+                    useWantStore.getState().setQuickActionsWantId(id);
+                  }}
+                  draggable
+                  onDragStart={e => {
+                    e.dataTransfer.setData('application/mywant-canvas-id', id);
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDragWantId(id);
+                  }}
+                  onDragEnd={() => { setDragWantId(null); setDragOverCell(null); }}
+                >
+                  <div
+                    className={classNames('absolute top-0 left-0 right-0 z-20', active && 'animate-pulse')}
+                    style={{ height: 3, backgroundColor: statusColor }}
+                  />
+                  {active && (
+                    <div
+                      className="absolute top-2 right-2 z-20 rounded-full animate-pulse"
+                      style={{ width: 5, height: 5, backgroundColor: statusColor }}
+                    />
+                  )}
+                  {isSelected && (
+                    <div
+                      className="absolute inset-0 pointer-events-none rounded z-30"
+                      style={{ border: `2px solid ${statusColor}`, opacity: 0.85 }}
+                    />
+                  )}
+                </WantCardFace>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Child overlay — float card centered on tile + child mini-tiles around it */}
+      {/* Child overlay: float card centered on tile + child mini-tiles by role */}
       {floatCard && tileCenter && (
         <CanvasChildOverlay
           floatCard={floatCard}
