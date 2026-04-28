@@ -76,7 +76,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
-  const [toolbarFixed, setToolbarFixed] = useState<{ left: number; top?: number; bottom?: number }>({ left: 8, top: 8 });
+  const [toolbarFixed, setToolbarFixed] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
 
   // Ref so non-passive event handlers can read latest scale without re-registering
   const scaleRef = useRef(scale);
@@ -98,7 +98,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         ? { left: r.left + 8, bottom: window.innerHeight - r.bottom + 8 }
         : { left: r.left + 8, top: r.top + 8 });
     };
-    update();
+    // Defer initial update so the browser has finished layout before we read getBoundingClientRect
+    requestAnimationFrame(update);
     const ro = new ResizeObserver(update);
     ro.observe(el);
     window.addEventListener('resize', update);
@@ -395,7 +396,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   return (
     <div ref={outerRef} className="w-full flex-1 relative" style={{ minHeight: 0 }}>
-      {/* Toolbar: fixed to the viewport corner on the header-side edge */}
+      {/* Toolbar: fixed to the viewport corner on the header-side edge.
+           Rendered only after toolbarFixed is computed to avoid overlapping the header. */}
+      {toolbarFixed && (
       <div
         className="z-50 flex items-center gap-2 pointer-events-none select-none"
         style={{
@@ -425,6 +428,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           >+</button>
         </div>
       </div>
+      )}
 
       {/* Scroll container */}
       <div ref={scrollRef} className="overflow-auto w-full h-full">
