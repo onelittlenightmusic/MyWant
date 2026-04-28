@@ -474,7 +474,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           tileCenterX={tileCenter.x}
           tileCenterY={tileCenter.y}
           onClickChild={onViewWant}
-          onClose={() => onDeselect?.()}
         />
       )}
     </div>

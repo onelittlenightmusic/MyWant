@@ -18,7 +18,6 @@ export const CHILD_TILE_SIZE = 84;
 interface ChildMiniTileProps {
   want: Want;
   role: ChildRole;
-  /** Absolute position within fixed overlay */
   left: number;
   top: number;
   animationDelay?: number;
@@ -44,27 +43,35 @@ export const ChildMiniTile: React.FC<ChildMiniTileProps> = ({
   const roleColor = ROLE_COLORS[role];
 
   return (
-    <WantCardFace
-      typeName={type}
-      displayName={name}
-      category={category}
-      theme="dark"
-      iconSize={20}
-      className="rounded"
+    // ラッパーで touch/click バブリングを止める
+    <div
       style={{
         position: 'fixed',
         left,
         top,
         width: CHILD_TILE_SIZE,
         height: CHILD_TILE_SIZE,
-        boxShadow: `0 0 0 2px ${roleColor}, 0 4px 16px rgba(0,0,0,0.6)`,
-        cursor: 'pointer',
+        zIndex: 51,
         animation: `canvasChildPop 180ms ease-out ${animationDelay}ms both`,
-        zIndex: 102,
       }}
       onClick={e => { e.stopPropagation(); onClick(want); }}
+      onTouchStart={e => e.stopPropagation()}
+      onTouchEnd={e => e.stopPropagation()}
     >
-      <div className="absolute top-0 left-0 right-0 z-20" style={{ height: 2, backgroundColor: statusColor }} />
-    </WantCardFace>
+      <WantCardFace
+        typeName={type}
+        displayName={name}
+        category={category}
+        theme="dark"
+        iconSize={20}
+        className="rounded w-full h-full"
+        style={{
+          boxShadow: `0 0 0 2px ${roleColor}, 0 4px 16px rgba(0,0,0,0.6)`,
+          cursor: 'pointer',
+        }}
+      >
+        <div className="absolute top-0 left-0 right-0 z-20" style={{ height: 2, backgroundColor: statusColor }} />
+      </WantCardFace>
+    </div>
   );
 };

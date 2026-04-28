@@ -20,11 +20,9 @@ function getRole(want: Want): ChildRole {
 interface CanvasChildOverlayProps {
   floatCard: React.ReactNode;
   childWants: Want[];
-  /** Viewport coordinates of the parent tile's center */
   tileCenterX: number;
   tileCenterY: number;
   onClickChild: (want: Want) => void;
-  onClose: () => void;
 }
 
 export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
@@ -33,7 +31,6 @@ export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
   tileCenterX,
   tileCenterY,
   onClickChild,
-  onClose,
 }) => {
   const groups = useMemo(() => ({
     thinkers: childWants.filter(w => getRole(w) === 'thinker').slice(0, MAX_PER_SIDE),
@@ -42,7 +39,6 @@ export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
     others:   childWants.filter(w => getRole(w) === 'other').slice(0, MAX_PER_SIDE),
   }), [childWants]);
 
-  // Float card top-left, clamped to viewport
   const cardLeft = Math.max(8, Math.min(
     tileCenterX - FLOAT_CARD_WIDTH / 2,
     window.innerWidth - FLOAT_CARD_WIDTH - 8,
@@ -96,24 +92,13 @@ export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0"
-      style={{ zIndex: 100 }}
-      onClick={onClose}
-    >
-      {/* Backdrop blur */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" />
-
-      {/* Float card */}
+    <>
+      {/* Float card — stopPropagation で外側の click/touch ハンドラーへのバブリングを防ぐ */}
       <div
-        style={{
-          position: 'fixed',
-          left: cardLeft,
-          top: cardTop,
-          width: FLOAT_CARD_WIDTH,
-          zIndex: 101,
-        }}
+        style={{ position: 'fixed', left: cardLeft, top: cardTop, width: FLOAT_CARD_WIDTH, zIndex: 50 }}
         onClick={e => e.stopPropagation()}
+        onTouchStart={e => e.stopPropagation()}
+        onTouchEnd={e => e.stopPropagation()}
       >
         {floatCard}
       </div>
@@ -123,6 +108,6 @@ export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
       {renderGroup(groups.monitors, 'monitor', 'left')}
       {renderGroup(groups.doers,    'doer',    'right')}
       {renderGroup(groups.others,   'other',   'bottom')}
-    </div>
+    </>
   );
 };
