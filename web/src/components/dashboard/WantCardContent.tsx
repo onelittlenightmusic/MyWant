@@ -261,7 +261,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         )}
 
         {/* Card header (type name + indicators) */}
-        {wantType !== 'weather' && (
+        {(!isFullScreen || isFocused) && (
           <div className={classNames(
             'order-2 mt-auto',
             styles.controlCardHeader,
