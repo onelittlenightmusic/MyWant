@@ -9,6 +9,8 @@ import { classNames } from '@/utils/helpers';
 import { WantCardFace } from './WantCardFace';
 import { getPatternColor } from './WantTypeVisuals';
 import { CanvasChildOverlay } from './CanvasChildOverlay';
+import { useFieldMatchProximity, FieldMatchRec } from './hooks/useFieldMatchProximity';
+import { FieldMatchBubble } from './FieldMatchBubble';
 
 const CELL_SIZE = 110;
 const GAP = 6;
@@ -84,6 +86,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
+  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -297,6 +300,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   const canvasW = cols * STEP + GAP;
   const canvasH = rows * STEP + GAP;
+
+  const { proximity, check: checkProximity, clear: clearProximity, dismiss: dismissProximity } =
+    useFieldMatchProximity({ positionMap, wants, step: STEP, cellSize: CELL_SIZE, originX, originY });
   canvasWRef.current = canvasW;
   canvasHRef.current = canvasH;
 
@@ -657,7 +663,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     e.preventDefault();
     const { cx, cy } = cellFromEvent(e);
     setDragOverCell({ x: cx, y: cy });
-  }, [cellFromEvent]);
+    checkProximity(dragWantId, { x: cx, y: cy });
+  }, [cellFromEvent, checkProximity, dragWantId]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -719,7 +726,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       </div>
 
       {/* Scroll container: absolute fill so height is bounded by the outer div */}
-      <div ref={scrollRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
+      <div ref={el => { (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el; if (el) setContainerRect(el.getBoundingClientRect()); }} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
         {/* Spacer drives scrollbars at scaled size, with min-size to enable centering. */}
         <div ref={spacerRef} style={{
           width: canvasW * scale,
@@ -830,7 +837,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                     e.dataTransfer.effectAllowed = 'move';
                     setDragWantId(id);
                   }}
-                  onDragEnd={() => { setDragWantId(null); setDragOverCell(null); }}
+                  onDragEnd={() => { setDragWantId(null); setDragOverCell(null); clearProximity(); }}
                 >
                   <div
                     className={classNames('absolute top-0 left-0 right-0 z-20', active && 'animate-pulse')}
@@ -863,6 +870,27 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           tileCenterX={tileCenter.x}
           tileCenterY={tileCenter.y}
           onClickChild={onViewWant}
+        />
+      )}
+
+      {/* Field match recommendation bubble */}
+      {proximity && (
+        <FieldMatchBubble
+          proximity={proximity}
+          scale={scale}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          scrollLeft={scrollRef.current?.scrollLeft ?? 0}
+          scrollTop={scrollRef.current?.scrollTop ?? 0}
+          containerRect={containerRect}
+          onApply={async (rec: FieldMatchRec) => {
+            await fetch('/api/v1/wants/field-match-recommendations/apply', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ param_change: rec.param_change }),
+            });
+          }}
+          onDismiss={() => dismissProximity(proximity.sourceId, proximity.targetId)}
         />
       )}
     </div>

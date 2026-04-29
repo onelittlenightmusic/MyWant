@@ -57,6 +57,10 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/labels/{key}", s.handleOptions).Methods("OPTIONS")
 
+	// Field match recommendations
+	wants.HandleFunc("/field-match-recommendations", s.getFieldMatchRecommendations).Methods("GET", "OPTIONS")
+	wants.HandleFunc("/field-match-recommendations/apply", s.applyFieldMatchRecommendation).Methods("POST", "OPTIONS")
+
 	// Agents CRUD
 	agents := api.PathPrefix("/agents").Subrouter()
 	agents.HandleFunc("", s.createAgent).Methods("POST")
