@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from 'react';
-import { Want } from '@/types/want';
 
 export interface FieldMatchRec {
   score: number;
@@ -20,7 +19,6 @@ export interface ProximityState {
 
 interface Options {
   positionMap: Map<string, { x: number; y: number }>;
-  wants: Want[];
   step: number;
   cellSize: number;
   originX: number;

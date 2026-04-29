@@ -1299,6 +1299,7 @@ export const Dashboard: React.FC = () => {
                   w.metadata?.ownerReferences?.some(r => r.id === (selectedWant.metadata?.id || selectedWant.id))
                 ) : []}
                 onDeselect={sidebar.clearSelection}
+                correlationHighlights={correlationHighlights}
               />
             </div>
           ) : (

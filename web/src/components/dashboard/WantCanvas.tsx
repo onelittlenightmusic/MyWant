@@ -59,6 +59,8 @@ interface WantCanvasProps {
   onDeselect?: () => void;
   /** Extra controls rendered in the top-left toolbar (e.g. list/canvas toggle) */
   toolbarContent?: React.ReactNode;
+  /** wantId → correlation rate (0–N); populated when radar mode is active */
+  correlationHighlights?: Map<string, number>;
 }
 
 export const WantCanvas: React.FC<WantCanvasProps> = ({
@@ -76,6 +78,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   childWants = [],
   onDeselect: _onDeselect,
   toolbarContent,
+  correlationHighlights,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const spacerRef  = useRef<HTMLDivElement>(null);
@@ -301,7 +304,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const canvasH = rows * STEP + GAP;
 
   const { proximity, checkOnDrop, clear: clearProximity, dismiss: dismissProximity, resetDismissed } =
-    useFieldMatchProximity({ positionMap, wants, step: STEP, cellSize: CELL_SIZE, originX, originY });
+    useFieldMatchProximity({ positionMap, step: STEP, cellSize: CELL_SIZE, originX, originY });
 
   canvasWRef.current = canvasW;
   canvasHRef.current = canvasH;
@@ -676,7 +679,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     }
     setDragWantId(null);
     setDragOverCell(null);
-    // Check proximity at the drop position and fetch recommendations immediately
     checkOnDrop(wantId, { x: cx, y: cy });
   }, [onMoveWant, isCellOccupied, cellFromEvent, checkOnDrop]);
 
@@ -684,9 +686,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
       setDragOverCell(null);
-      clearProximity();
     }
-  }, [clearProximity]);
+  }, []);
 
   return (
     <div
@@ -782,7 +783,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               );
             })()}
 
-
             {/* Want tiles */}
             {wants.map(want => {
               const id = want.metadata?.id || want.id;
@@ -800,6 +800,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               const name = want.metadata?.name || id;
               const active = isActiveStatus(want.status);
               const patColor = getPatternColor(pattern);
+              const corrRate = correlationHighlights?.get(id) ?? 0;
+              const isCorrelated = corrRate > 0;
 
               return (
                 <WantCardFace
@@ -814,6 +816,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                     !isDragging && 'hover:scale-[1.06] hover:z-20',
                     isSelected && 'scale-[1.06] z-30',
                     isDragging && 'opacity-40',
+                    isCorrelated && 'z-20',
                   )}
 
                   style={{
@@ -823,6 +826,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                     width: CELL_SIZE, height: CELL_SIZE,
                     boxShadow: isSelected
                       ? `0 0 0 2px #fff, 0 0 0 4px ${statusColor}, 0 6px 20px rgba(0,0,0,0.7)`
+                      : isCorrelated
+                      ? `0 0 0 2px rgba(250,204,21,${Math.min(0.4 + corrRate * 0.15, 0.9)}), 0 0 ${12 + corrRate * 4}px rgba(250,204,21,0.5), 0 2px 10px rgba(0,0,0,0.6)`
                       : active
                       ? `0 0 14px ${patColor}60, 0 2px 10px rgba(0,0,0,0.6)`
                       : '0 2px 10px rgba(0,0,0,0.6)',
