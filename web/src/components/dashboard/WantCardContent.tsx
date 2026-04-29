@@ -31,7 +31,7 @@ const FinalResultDisplay: React.FC<{
   if (isArrayOfObjects) {
     const data = value as Record<string, unknown>[];
     return (
-      <div className={`${isChild ? 'mt-4' : 'mt-8'}`}>
+      <div>
         <div className="flex items-center justify-between mb-0.5">
           <button
             onClick={onView}
@@ -52,7 +52,7 @@ const FinalResultDisplay: React.FC<{
   }
 
   return (
-    <div className={`${isChild ? 'mt-4' : 'mt-8'} relative flex justify-start`}>
+    <div className={`relative flex justify-start`}>
       <button
         onClick={onView}
         className={`inline-flex items-center gap-1.5 ${isChild ? 'text-[0.6rem] sm:text-[0.7rem]' : 'text-[0.7rem] sm:text-[0.8rem]'} font-mono font-bold text-green-400 bg-gray-900/80 border border-green-700/60 rounded-md px-2 py-0.5 w-full text-left cursor-pointer pr-7`}
