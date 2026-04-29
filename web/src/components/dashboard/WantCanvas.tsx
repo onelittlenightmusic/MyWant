@@ -70,6 +70,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   toolbarContent,
 }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const spacerRef  = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isPanningRef  = useRef(false);
   const panStartRef   = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
@@ -87,6 +88,12 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   // Ref so non-passive event handlers can read latest scale without re-registering
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
+
+  // Tracks whether zoom is coming from a continuous gesture (wheel/pinch) to skip CSS transition
+  const isGestureZoomRef = useRef(false);
+  const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // RAF id for scroll animation
+  const scrollAnimRafRef = useRef<number | null>(null);
 
   const lastPinchDist = useRef<number | null>(null);
 
@@ -216,25 +223,51 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const vw = el.clientWidth;
     const vh = el.clientHeight;
 
-    // Current centering offsets
     const osx = Math.max(0, (vw - canvasW * cur) / 2);
     const osy = Math.max(0, (vh - canvasH * cur) / 2);
-
-    // Canvas-space coordinate at the viewport center
     const cx = (el.scrollLeft - osx + vw / 2) / cur;
     const cy = (el.scrollTop  - osy + vh / 2) / cur;
 
+    const animated = !isGestureZoomRef.current;
+
     onScaleChange?.(clamped);
 
-    requestAnimationFrame(() => {
-      if (!scrollRef.current) return;
-      const nextVw = scrollRef.current.clientWidth;
-      const nextVh = scrollRef.current.clientHeight;
-      const nextOsx = Math.max(0, (nextVw - canvasW * clamped) / 2);
-      const nextOsy = Math.max(0, (nextVh - canvasH * clamped) / 2);
-      scrollRef.current.scrollLeft = cx * clamped + nextOsx - nextVw / 2;
-      scrollRef.current.scrollTop  = cy * clamped + nextOsy - nextVh / 2;
-    });
+    if (!animated) {
+      // Gesture zoom: snap scroll immediately in next frame
+      requestAnimationFrame(() => {
+        if (!scrollRef.current) return;
+        const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
+        const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
+        scrollRef.current.scrollLeft = cx * clamped + nextOsx - vw / 2;
+        scrollRef.current.scrollTop  = cy * clamped + nextOsy - vh / 2;
+      });
+      return;
+    }
+
+    // Button zoom: animate scroll position over the same duration as the CSS transition
+    const DURATION = 180;
+    const startSl = el.scrollLeft;
+    const startSt = el.scrollTop;
+    if (scrollAnimRafRef.current !== null) cancelAnimationFrame(scrollAnimRafRef.current);
+    let startTime: number | null = null;
+
+    const animScroll = (timestamp: number) => {
+      if (startTime === null) startTime = timestamp;
+      const t = Math.min((timestamp - startTime) / DURATION, 1);
+      // ease-out cubic
+      const ease = 1 - Math.pow(1 - t, 3);
+      const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
+      const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
+      const targetSl = cx * clamped + nextOsx - vw / 2;
+      const targetSt = cy * clamped + nextOsy - vh / 2;
+      if (scrollRef.current) {
+        scrollRef.current.scrollLeft = startSl + (targetSl - startSl) * ease;
+        scrollRef.current.scrollTop  = startSt + (targetSt - startSt) * ease;
+      }
+      if (t < 1) scrollAnimRafRef.current = requestAnimationFrame(animScroll);
+      else scrollAnimRafRef.current = null;
+    };
+    scrollAnimRafRef.current = requestAnimationFrame(animScroll);
   }, [onScaleChange, canvasW, canvasH]);
 
   const zoomIn  = () => applyScaleWithCenter(Math.round((scale + SCALE_STEP) * 10) / 10);
@@ -252,6 +285,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       if (e.ctrlKey || e.metaKey) {
         // Zoom: keep viewport center fixed
         e.preventDefault();
+        isGestureZoomRef.current = true;
+        if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+        gestureTimeoutRef.current = setTimeout(() => { isGestureZoomRef.current = false; }, 300);
         const cur = scaleRef.current;
         const factor = e.deltaY < 0 ? 1.1 : 0.9;
         const next = clampScale(Math.round(cur * factor * 100) / 100);
@@ -274,6 +310,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       e.preventDefault();
+      isGestureZoomRef.current = true;
+      if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+      gestureTimeoutRef.current = setTimeout(() => { isGestureZoomRef.current = false; }, 300);
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -483,7 +522,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       {/* Scroll container: absolute fill so height is bounded by the outer div */}
       <div ref={scrollRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
         {/* Spacer drives scrollbars at scaled size, with min-size to enable centering. */}
-        <div style={{
+        <div ref={spacerRef} style={{
           width: canvasW * scale,
           height: canvasH * scale,
           minWidth: '100%',
@@ -506,6 +545,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               cursor: dragWantId || isPanning ? 'grabbing' : 'grab',
               transform: `scale(${scale})`,
               transformOrigin: '0 0',
+              transition: isGestureZoomRef.current ? undefined : 'transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               position: 'absolute',
               left: offsetX,
               top: offsetY,
