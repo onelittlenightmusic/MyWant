@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
 import { Want } from '@/types/want';
 import { WantTypeListItem } from '@/types/wantType';
 import { getStatusHexColor } from './WantCard/parts/StatusColor';
@@ -443,7 +443,10 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, []);
 
   return (
-    <div className="w-full flex-1 relative" style={{ minHeight: 0 }}>
+    <div
+      className="w-full flex-1 relative overflow-hidden"
+      style={{ minHeight: 0, height: 'calc(100vh - var(--header-height, 56px))' }}
+    >
       {/* Zoom toolbar: fixed to the viewport, just inside the header edge.
            Uses --header-height CSS var set by Header component. */}
       <div
@@ -477,8 +480,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         </div>
       </div>
 
-      {/* Scroll container */}
-      <div ref={scrollRef} className="overflow-auto w-full h-full">
+      {/* Scroll container: absolute fill so height is bounded by the outer div */}
+      <div ref={scrollRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
         {/* Spacer drives scrollbars at scaled size, with min-size to enable centering. */}
         <div style={{
           width: canvasW * scale,
