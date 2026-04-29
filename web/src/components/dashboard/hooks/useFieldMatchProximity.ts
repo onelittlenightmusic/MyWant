@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Want } from '@/types/want';
 
 export interface FieldMatchRec {
-  id: string;
   score: number;
   description: string;
   source: { want_id: string; want_name: string; field_name: string; field_type: string; is_final: boolean };

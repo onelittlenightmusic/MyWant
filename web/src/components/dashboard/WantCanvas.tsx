@@ -887,7 +887,11 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             await fetch('/api/v1/wants/field-match-recommendations/apply', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ param_change: rec.param_change }),
+              body: JSON.stringify({
+                source_id: proximity.sourceId,
+                target_id: proximity.targetId,
+                param_change: rec.param_change,
+              }),
             });
           }}
           onDismiss={() => dismissProximity(proximity.sourceId, proximity.targetId)}

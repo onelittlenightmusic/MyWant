@@ -35,11 +35,14 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
   const vx = proximity.midX * scale + offsetX - scrollLeft + containerRect.left;
   const vy = proximity.midY * scale + offsetY - scrollTop + containerRect.top;
 
+  const recKey = (rec: FieldMatchRec) => `${rec.source.field_name}→${rec.target.param_name}`;
+
   const handleApply = async (rec: FieldMatchRec) => {
-    setApplying(rec.id);
+    const key = recKey(rec);
+    setApplying(key);
     try {
       await onApply(rec);
-      setApplied(prev => new Set(prev).add(rec.id));
+      setApplied(prev => new Set(prev).add(key));
     } finally {
       setApplying(null);
     }
@@ -76,13 +79,14 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
         {/* Recommendation list */}
         <div className="p-2 space-y-1.5">
           {proximity.recs.map(rec => {
-            const isApplied = applied.has(rec.id);
-            const isApplying = applying === rec.id;
+            const key = recKey(rec);
+            const isApplied = applied.has(key);
+            const isApplying = applying === key;
             const score = Math.round(rec.score * 100);
 
             return (
               <div
-                key={rec.id}
+                key={key}
                 className={`rounded-lg px-2.5 py-2 border transition-colors ${
                   isApplied
                     ? 'bg-green-900/40 border-green-500/40'

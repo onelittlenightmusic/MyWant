@@ -1,8 +1,6 @@
 package server
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"maps"
 	"net/http"
@@ -14,8 +12,8 @@ import (
 )
 
 // FieldMatchRecommendation is a single suggestion to connect a source field to a target param.
+// ID has been removed — recommendations are stateless; provenance is carried in the apply request.
 type FieldMatchRecommendation struct {
-	ID          string      `json:"id"`
 	Score       float64     `json:"score"`
 	Description string      `json:"description"`
 	Source      FieldRef    `json:"source"`
@@ -44,12 +42,6 @@ type ParamChange struct {
 	WantID    string `json:"want_id"`
 	ParamName string `json:"param_name"`
 	Value     any    `json:"value"`
-}
-
-func newRecID() string {
-	b := make([]byte, 6)
-	rand.Read(b)
-	return "rec-" + hex.EncodeToString(b)
 }
 
 // GET /api/v1/wants/field-match-recommendations?source_id=xxx&target_id=yyy
@@ -82,9 +74,12 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 }
 
 // POST /api/v1/wants/field-match-recommendations/apply
-// Body: { "param_change": { "want_id": "...", "param_name": "...", "value": ... } }
+// Body: { "source_id": "...", "target_id": "...", "param_change": { "want_id": "...", "param_name": "...", "value": ... } }
+// source_id and target_id identify the want pair that generated the recommendation (for audit/logging).
 func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		SourceID    string      `json:"source_id"`
+		TargetID    string      `json:"target_id"`
 		ParamChange ParamChange `json:"param_change"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
@@ -92,8 +87,22 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		return
 	}
 	pc := req.ParamChange
+	if req.SourceID == "" || req.TargetID == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "source_id and target_id are required", "")
+		return
+	}
 	if pc.WantID == "" || pc.ParamName == "" {
 		s.JSONError(w, r, http.StatusBadRequest, "param_change.want_id and param_name are required", "")
+		return
+	}
+	// Validate that source want exists (confirms the recommendation context is genuine).
+	if _, _, ok := s.globalBuilder.FindWantByID(req.SourceID); !ok {
+		s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", req.SourceID), "")
+		return
+	}
+	// param_change.want_id must match target_id.
+	if pc.WantID != req.TargetID {
+		s.JSONError(w, r, http.StatusBadRequest, "param_change.want_id must match target_id", "")
 		return
 	}
 
@@ -135,10 +144,12 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 	updated.Spec.Params = newParams
 	s.globalBuilder.UpdateWant(updated)
 
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/field-match-recommendations/apply", pc.WantID, "success", http.StatusOK, "", fmt.Sprintf("Applied param %s=%v", pc.ParamName, pc.Value))
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/field-match-recommendations/apply", pc.WantID, "success", http.StatusOK, "",
+		fmt.Sprintf("Applied param %s=%v (source=%s → target=%s)", pc.ParamName, pc.Value, req.SourceID, req.TargetID))
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"success":    true,
-		"want_id":    pc.WantID,
+		"source_id":  req.SourceID,
+		"target_id":  req.TargetID,
 		"param_name": pc.ParamName,
 		"value":      pc.Value,
 	})
@@ -164,7 +175,6 @@ func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want) []
 				continue
 			}
 			recs = append(recs, FieldMatchRecommendation{
-				ID:          newRecID(),
 				Score:       score,
 				Description: fmt.Sprintf("%s.%s → %s.%s", source.Metadata.Name, sf.FieldName, target.Metadata.Name, tp),
 				Source:      sf,
