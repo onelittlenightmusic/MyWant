@@ -70,8 +70,10 @@ export function useFieldMatchProximity({ positionMap, wants, step, cellSize, ori
 
         lastPairRef.current = pairKey;
 
-        // Midpoint in canvas-space (unscaled pixels)
-        const aPos = positionMap.get(dragId) ?? overCell;
+        // Midpoint in canvas-space (unscaled pixels).
+        // Use overCell for the dragged card (its actual position updates after drop;
+        // using the drag cursor cell keeps the bubble stable across the drop event).
+        const aPos = overCell;
         const bPos = positionMap.get(nearId)!;
         const ax = (aPos.x + originX) * step + cellSize / 2;
         const ay = (aPos.y + originY) * step + cellSize / 2;
