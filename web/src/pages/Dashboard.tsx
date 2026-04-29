@@ -227,6 +227,8 @@ export const Dashboard: React.FC = () => {
   // Each tab tracks its own lastSeqRef. When the server seq advances, apply the new state.
   // This enables multi-tab sync: all tabs independently notice the seq change and apply it.
   const lastGuiSeqRef = useRef<number>(0);
+  const isIncomingRef = useRef(false);
+  const lastSyncedStateRef = useRef<Record<string, any>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -236,7 +238,11 @@ export const Dashboard: React.FC = () => {
         const { seq, state: cur } = await apiClient.getGUIState();
         if (cancelled) return;
         if (seq <= lastGuiSeqRef.current) return;
+        
+        // Set flag to prevent this incoming change from triggering a write-back
+        isIncomingRef.current = true;
         lastGuiSeqRef.current = seq;
+        lastSyncedStateRef.current = cur;
 
         // Apply canvas scale & position
         const savedScale = cur['canvas_scale'] as number | undefined;
@@ -282,39 +288,71 @@ export const Dashboard: React.FC = () => {
         } else if (sidebarOpen === false) {
           sidebar.clearSelection();
         }
+        
+        // Clear flag after React has had a chance to process the state updates
+        setTimeout(() => {
+          isIncomingRef.current = false;
+        }, 100);
       } catch {
         // server may be temporarily unavailable
       }
     };
 
     poll();
-    const id = setInterval(poll, 2_000);
+    const id = setInterval(poll, 1_000); // Increased frequency (1s)
     return () => { cancelled = true; clearInterval(id); };
   }, [wants, sidebar, setSidebarInitialTab, setSidebarTabVersion]);
 
-  // Write back GUI state on user actions (sidebar, filter, search, canvas scale).
-  // Updates lastGuiSeqRef so this tab doesn't re-apply its own write.
+  // Combined GUI write-back effect.
+  // Distinguishes between immediate actions (selection) and continuous ones (scale/pan).
+  const lastWriteRef = useRef<Record<string, any>>({});
   const guiWriteBackMountedRef = useRef(false);
+
   useEffect(() => {
     if (!guiWriteBackMountedRef.current) {
       guiWriteBackMountedRef.current = true;
       return;
     }
-    const timer = setTimeout(() => {
-      apiClient.updateGUIState({
-        source: 'frontend',
-        dashboard_status_filter: statusFilters[0] ?? '',
-        dashboard_search_query: searchQuery,
-        sidebar_open: !!sidebar.selectedItem,
-        sidebar_want_id: sidebar.selectedItem?.metadata?.id ?? '',
-        sidebar_active_tab: sidebarInitialTab,
-        canvas_scale: canvasScale,
-        canvas_center_x: canvasCenterX,
-        canvas_center_y: canvasCenterY,
-      }).then(({ seq }) => {
-        lastGuiSeqRef.current = seq;
-      }).catch(() => {});
-    }, 1000); // 1s debounce for persistent state
+
+    const nextState = {
+      dashboard_status_filter: statusFilters[0] ?? '',
+      dashboard_search_query: searchQuery,
+      sidebar_open: !!sidebar.selectedItem,
+      sidebar_want_id: sidebar.selectedItem?.metadata?.id ?? '',
+      sidebar_active_tab: sidebarInitialTab,
+      canvas_scale: canvasScale,
+      canvas_center_x: canvasCenterX,
+      canvas_center_y: canvasCenterY,
+    };
+
+    // Skip if state is identical to what we last wrote or what we just received from sync
+    const isSameAsLastWrite = JSON.stringify(nextState) === JSON.stringify(lastWriteRef.current);
+    const isSameAsSynced = JSON.stringify(nextState) === JSON.stringify(lastSyncedStateRef.current);
+    if (isSameAsLastWrite || (isIncomingRef.current && isSameAsSynced)) return;
+
+    // Selection or search query change: write IMMEDIATELY to "claim" the state
+    const isDiscreteAction = 
+      nextState.sidebar_want_id !== lastWriteRef.current.sidebar_want_id ||
+      nextState.sidebar_open !== lastWriteRef.current.sidebar_open ||
+      nextState.dashboard_search_query !== lastWriteRef.current.dashboard_search_query;
+
+    const performWrite = () => {
+      // Re-check synced state just in case it arrived during the debounce
+      if (isIncomingRef.current && JSON.stringify(nextState) === JSON.stringify(lastSyncedStateRef.current)) return;
+      
+      lastWriteRef.current = nextState;
+      apiClient.updateGUIState({ ...nextState, source: 'frontend' })
+        .then(({ seq }) => { lastGuiSeqRef.current = seq; })
+        .catch(() => {});
+    };
+
+    if (isDiscreteAction) {
+      performWrite();
+      return;
+    }
+
+    // Continuous actions (scale, pan): use debounce
+    const timer = setTimeout(performWrite, 800);
     return () => clearTimeout(timer);
   }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab, canvasScale, canvasCenterX, canvasCenterY]);
 
