@@ -9,6 +9,9 @@ wantType:
     version: '2.0'
     category: system
     pattern: independent
+    labels:
+      user-control: 'true'
+      full-screen-display: 'true'
 
   finalResultField: weather_text
 

@@ -136,12 +136,10 @@ const WeatherContentSection: React.FC<WantCardPluginProps> = ({ want, isChild, i
   const condition = (GetWeatherCondition(want)) as WeatherCondition;
   const config = WEATHER_CONFIGS[condition] ?? WEATHER_CONFIGS.default;
   const weatherText = (want.state?.current?.weather_text as string) || '';
-  const weatherDate = (want.state?.current?.weather_date as string) || '';
   const city = (want.state?.current?.weather_city as string) || (want.spec?.params?.weather_city as string) || 'Tokyo';
 
-  const compact = isChild || (isControl && !isFocused);
-  const mt = compact ? 'mt-2' : 'mt-4';
-
+  const show = !isControl || isFocused;
+  
   return (
     <>
       <style>{`
@@ -172,10 +170,9 @@ const WeatherContentSection: React.FC<WantCardPluginProps> = ({ want, isChild, i
         }
       `}</style>
       <div
-        className={`${mt} rounded-xl overflow-hidden relative`}
+        className="absolute inset-0 overflow-hidden"
         style={{
           background: config.gradient,
-          minHeight: compact ? '80px' : '120px',
         }}
       >
         {/* Animated particles */}
@@ -186,48 +183,26 @@ const WeatherContentSection: React.FC<WantCardPluginProps> = ({ want, isChild, i
         </div>
 
         {/* Content */}
-        <div className="relative z-10 p-3 flex flex-col h-full">
-          {weatherText ? (
-            <>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p
-                    className={`text-xs font-semibold uppercase tracking-wide opacity-80 ${config.textColor}`}
-                    style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}
-                  >
+        <div className="relative z-10 p-3 flex flex-col justify-between h-full">
+            <div className="flex items-start justify-between">
+                <span className={`text-xs font-bold ${config.textColor}`} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
                     {city}
-                  </p>
-                  <p
-                    className={`text-sm font-medium mt-1 ${config.textColor}`}
-                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)', maxWidth: '80%' }}
-                  >
-                    {weatherText}
-                  </p>
-                </div>
+                </span>
                 <span
                   className="text-3xl"
                   style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))', animation: 'weather-pulse 3s ease-in-out infinite' }}
                 >
                   {config.emoji}
                 </span>
-              </div>
-              {weatherDate && !compact && (
-                <p
-                  className={`text-xs opacity-60 mt-auto pt-2 ${config.textColor}`}
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
-                >
-                  {weatherDate}
-                </p>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full py-2">
-              <span className="text-2xl opacity-60 animate-pulse">{config.emoji}</span>
-              <span className={`ml-2 text-sm opacity-60 ${config.textColor}`} style={{ textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
-                取得中...
-              </span>
             </div>
-          )}
+            
+            {weatherText ? (
+                <div className={`text-sm font-medium ${config.textColor}`} style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>
+                    {weatherText}
+                </div>
+            ) : (
+                <div className={`text-sm opacity-60 ${config.textColor}`}>取得中...</div>
+            )}
         </div>
       </div>
     </>

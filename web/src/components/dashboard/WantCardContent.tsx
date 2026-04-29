@@ -194,6 +194,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const hasScheduling = want.spec?.when && want.spec.when.length > 0;
   const isInteractive = want.state?.current?.interactive === true;
   const isControl = labels['user-control'] === 'true';
+  const isFullScreen = labels['full-screen-display'] === 'true';
 
   // Responsive sizes
   const sizes = isChild ? {
@@ -222,7 +223,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
       <div className="flex flex-col h-full relative">
 
         {/* Status badge */}
-        {!isSelectMode && (
+        {!isSelectMode && !isFullScreen && (
           <div className="absolute top-3 right-3 z-20 pointer-events-none">
             <StatusBadge status={want.status} size="sm" />
           </div>
@@ -260,68 +261,70 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
         )}
 
         {/* Card header (type name + indicators) */}
-        <div className={classNames(
-          'order-2 mt-auto',
-          styles.controlCardHeader,
-          isControl && !isFocused ? styles.controlCardHeaderHidden : styles.controlCardHeaderVisible,
-        )}>
-          <div className={`backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 py-1' : 'px-3 sm:px-6 py-1'}`}>
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}>
-                  {labels['recipe-based'] === 'true'
-                    ? hasChildren
-                      ? <HeartInBottle className={`${isChild ? 'h-3 w-3 sm:h-3.5 sm:w-3.5' : 'h-2.5 w-2.5 sm:h-3.5 sm:w-3.5'} flex-shrink-0 text-pink-500`} />
-                      : <BottleOnly className={sizes.iconSize} />
-                    : <Heart className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
-                  }
-                  {wantType}
-                </h3>
-              </div>
-              <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
-                {isInteractive && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (!isSelectMode && onViewChat) onViewChat(want); }}
-                    className={classNames('flex items-center p-1 rounded-md transition-colors',
-                      isSelectMode ? 'cursor-default' : 'hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer')}
-                    title="Click to chat with agent">
-                    <MessageSquare className={`${sizes.iconSize} text-blue-600 dark:text-blue-400`} />
-                  </button>
-                )}
-                {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (!isSelectMode && onViewAgents) onViewAgents(want); }}
-                    className={classNames('flex items-center space-x-1 p-1 rounded-md transition-colors',
-                      isSelectMode ? 'cursor-default' : 'hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer')}
-                    title="Click to view agent details">
-                    <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`} />
-                    {want.current_agent && (
-                      <div className={`${sizes.agentDotSize} bg-green-500 rounded-full ${styles.pulseGlow}`} title="Agent running" />
-                    )}
-                    {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
-                      <span className={classNames(`${sizes.agentDotSize} rounded-full`,
-                        want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'achieved' && 'bg-green-500',
-                        want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
-                        want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && `bg-blue-500 ${styles.pulseGlow}`,
-                      )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
-                    )}
-                  </button>
-                )}
-                {hasScheduling && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); if (!isSelectMode) onView(want); }}
-                    className={classNames(
-                      'inline-flex items-center gap-1 font-medium rounded-full border hover:opacity-80 transition-opacity px-1.5 py-0.5 text-xs',
-                      'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700',
-                    )}
-                    title="Click to view scheduling settings">
-                    <Clock className={sizes.iconSize} />
-                  </button>
-                )}
+        {wantType !== 'weather' && (
+          <div className={classNames(
+            'order-2 mt-auto',
+            styles.controlCardHeader,
+            isControl && !isFocused ? styles.controlCardHeaderHidden : styles.controlCardHeaderVisible,
+          )}>
+            <div className={`backdrop-blur-[2px] transition-colors duration-200 ${isFocused ? 'bg-blue-200/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70'} ${isChild ? 'px-2 sm:px-4 py-1' : 'px-3 sm:px-6 py-1'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <h3 className={`${sizes.titleClass} text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors flex items-center gap-1.5`}>
+                    {labels['recipe-based'] === 'true'
+                      ? hasChildren
+                        ? <HeartInBottle className={`${isChild ? 'h-3 w-3 sm:h-3.5 sm:w-3.5' : 'h-2.5 w-2.5 sm:h-3.5 sm:w-3.5'} flex-shrink-0 text-pink-500`} />
+                        : <BottleOnly className={sizes.iconSize} />
+                      : <Heart className={`${sizes.iconSize} flex-shrink-0 text-pink-500`} />
+                    }
+                    {wantType}
+                  </h3>
+                </div>
+                <div className="flex items-center space-x-1 sm:space-x-2 ml-1 sm:ml-2">
+                  {isInteractive && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (!isSelectMode && onViewChat) onViewChat(want); }}
+                      className={classNames('flex items-center p-1 rounded-md transition-colors',
+                        isSelectMode ? 'cursor-default' : 'hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer')}
+                      title="Click to chat with agent">
+                      <MessageSquare className={`${sizes.iconSize} text-blue-600 dark:text-blue-400`} />
+                    </button>
+                  )}
+                  {(want.current_agent || (want.running_agents && want.running_agents.length > 0) || (want.history?.agentHistory && want.history.agentHistory.length > 0)) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (!isSelectMode && onViewAgents) onViewAgents(want); }}
+                      className={classNames('flex items-center space-x-1 p-1 rounded-md transition-colors',
+                        isSelectMode ? 'cursor-default' : 'hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer')}
+                      title="Click to view agent details">
+                      <Bot className={`${sizes.iconSize} text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300`} />
+                      {want.current_agent && (
+                        <div className={`${sizes.agentDotSize} bg-green-500 rounded-full ${styles.pulseGlow}`} title="Agent running" />
+                      )}
+                      {want.history?.agentHistory && want.history.agentHistory.length > 0 && (
+                        <span className={classNames(`${sizes.agentDotSize} rounded-full`,
+                          want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'achieved' && 'bg-green-500',
+                          want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'failed' && 'bg-red-500',
+                          want.history.agentHistory[want.history.agentHistory.length - 1]?.status === 'running' && `bg-blue-500 ${styles.pulseGlow}`,
+                        )} title={`Latest agent: ${want.history.agentHistory[want.history.agentHistory.length - 1]?.status || 'unknown'}`} />
+                      )}
+                    </button>
+                  )}
+                  {hasScheduling && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (!isSelectMode) onView(want); }}
+                      className={classNames(
+                        'inline-flex items-center gap-1 font-medium rounded-full border hover:opacity-80 transition-opacity px-1.5 py-0.5 text-xs',
+                        'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-700',
+                      )}
+                      title="Click to view scheduling settings">
+                      <Clock className={sizes.iconSize} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Card body */}
         <div className={isChild ? 'px-2 sm:px-4 pb-2 pt-2 order-1' : 'px-3 sm:px-6 pb-3 pt-3 order-1'}>
@@ -400,7 +403,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           )}
 
           {/* Final result display */}
-          {want.state?.final_result != null && want.state?.final_result !== '' && (
+          {want.state?.final_result != null && want.state?.final_result !== '' && !isFullScreen && (
             <FinalResultDisplay
               value={want.state!.final_result}
               isChild={isChild}
