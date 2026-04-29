@@ -29,6 +29,9 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/validate", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/export", s.exportWants).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/import", s.importWants).Methods("POST", "OPTIONS")
+	// Static sub-paths must be registered before /{id} to avoid being swallowed as id values
+	wants.HandleFunc("/field-match-recommendations", s.getFieldMatchRecommendations).Methods("GET", "OPTIONS")
+	wants.HandleFunc("/field-match-recommendations/apply", s.applyFieldMatchRecommendation).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
@@ -56,10 +59,6 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/using", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/labels/{key}", s.handleOptions).Methods("OPTIONS")
-
-	// Field match recommendations
-	wants.HandleFunc("/field-match-recommendations", s.getFieldMatchRecommendations).Methods("GET", "OPTIONS")
-	wants.HandleFunc("/field-match-recommendations/apply", s.applyFieldMatchRecommendation).Methods("POST", "OPTIONS")
 
 	// Agents CRUD
 	agents := api.PathPrefix("/agents").Subrouter()
