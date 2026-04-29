@@ -215,32 +215,36 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const offsetY = Math.max(0, (viewportSize.height - canvasH * scale) / 2);
 
   // Zoom keeping the viewport center fixed in canvas-coordinate space.
-  const applyScaleWithCenter = useCallback((newScale: number) => {
+  // focalX/focalY: viewport-space point to keep fixed during zoom (default: viewport center)
+  const applyScaleWithCenter = useCallback((newScale: number, focalX?: number, focalY?: number) => {
     const clamped = clampScale(newScale);
     const el = scrollRef.current;
     if (!el) { onScaleChange?.(clamped); return; }
     const cur = scaleRef.current;
+    if (clamped === cur) return;
+    scaleRef.current = clamped; // update immediately so rapid gestures read the right value
+
     const vw = el.clientWidth;
     const vh = el.clientHeight;
+    const fpx = focalX ?? vw / 2;
+    const fpy = focalY ?? vh / 2;
 
     const osx = Math.max(0, (vw - canvasW * cur) / 2);
     const osy = Math.max(0, (vh - canvasH * cur) / 2);
-    const cx = (el.scrollLeft - osx + vw / 2) / cur;
-    const cy = (el.scrollTop  - osy + vh / 2) / cur;
+    // Canvas-space coordinate under the focal point
+    const cx = (el.scrollLeft - osx + fpx) / cur;
+    const cy = (el.scrollTop  - osy + fpy) / cur;
 
     const animated = !isGestureZoomRef.current;
 
     onScaleChange?.(clamped);
 
     if (!animated) {
-      // Gesture zoom: snap scroll immediately in next frame
-      requestAnimationFrame(() => {
-        if (!scrollRef.current) return;
-        const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
-        const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
-        scrollRef.current.scrollLeft = cx * clamped + nextOsx - vw / 2;
-        scrollRef.current.scrollTop  = cy * clamped + nextOsy - vh / 2;
-      });
+      // Gesture zoom: apply scroll synchronously (no RAF) to avoid race with next touch event
+      const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
+      const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
+      el.scrollLeft = cx * clamped + nextOsx - fpx;
+      el.scrollTop  = cy * clamped + nextOsy - fpy;
       return;
     }
 
@@ -258,8 +262,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const ease = 1 - Math.pow(1 - t, 3);
       const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
       const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
-      const targetSl = cx * clamped + nextOsx - vw / 2;
-      const targetSt = cy * clamped + nextOsy - vh / 2;
+      const targetSl = cx * clamped + nextOsx - fpx;
+      const targetSt = cy * clamped + nextOsy - fpy;
       if (scrollRef.current) {
         scrollRef.current.scrollLeft = startSl + (targetSl - startSl) * ease;
         scrollRef.current.scrollTop  = startSt + (targetSt - startSt) * ease;
@@ -316,10 +320,13 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
+      // Pinch midpoint in viewport coords — use as focal point
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       if (lastPinchDist.current !== null) {
         const cur = scaleRef.current;
         const next = clampScale(Math.round(cur * (dist / lastPinchDist.current) * 100) / 100);
-        applyScaleRef.current(next);
+        applyScaleRef.current(next, midX, midY);
       }
       lastPinchDist.current = dist;
     };
