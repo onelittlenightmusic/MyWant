@@ -89,13 +89,22 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 
+  const scaleTextRef = useRef<HTMLSpanElement>(null);
   const [isGestureZoom, setIsGestureZoom] = useState(false);
   const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // RAF id for scroll animation
-  const scrollAnimRafRef = useRef<number | null>(null);
+  // RAF id for rendering loop during gesture
+  const gestureRafRef = useRef<number | null>(null);
 
   const lastPinchDist = useRef<number | null>(null);
   const lastPinchMid  = useRef<{ x: number; y: number } | null>(null);
+
+  // Gesture start anchors for jitter-free absolute calculation
+  const pinchStartScale = useRef<number>(1);
+  const pinchStartDist  = useRef<number>(1);
+  const pinchFocalCanvas = useRef<{ x: number; y: number } | null>(null);
+  
+  // Current values for RAF rendering
+  const gestureTarget = useRef({ scale: 1, midX: 0, midY: 0 });
 
   // Refs so touch/wheel handlers (registered once) can read latest layout values
   const canvasWRef = useRef(0);
@@ -103,6 +112,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   // Internal flag to skip transitions during manual DOM updates
   const isGestureZoomRef = useRef(false);
+
+  // Separate animation RAF for button zoom
+  const scrollAnimRafRef = useRef<number | null>(null);
 
   // Mouse-drag panning: track at document level so drag outside canvas still works
   useEffect(() => {
@@ -332,25 +344,77 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
+      
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
-      lastPinchMid.current = {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
-      };
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      lastPinchDist.current = dist;
+      lastPinchMid.current  = { x: midX, y: midY };
+
+      const scEl = scrollRef.current;
+      const cvEl = canvasRef.current;
+      if (scEl && cvEl) {
+        isGestureZoomRef.current = true;
+        setIsGestureZoom(true);
+
+        const curScale = scaleRef.current;
+        const cvRect = cvEl.getBoundingClientRect();
+        
+        pinchStartScale.current = curScale;
+        pinchStartDist.current  = dist;
+        pinchFocalCanvas.current = {
+          x: (midX - cvRect.left) / curScale,
+          y: (midY - cvRect.top)  / curScale,
+        };
+        
+        gestureTarget.current = { scale: curScale, midX, midY };
+
+        // Start high-frequency render loop
+        if (gestureRafRef.current) cancelAnimationFrame(gestureRafRef.current);
+        const renderLoop = () => {
+          const { scale: next, midX: curMidX, midY: curMidY } = gestureTarget.current;
+          const targetScEl = scrollRef.current;
+          const targetCvEl = canvasRef.current;
+          const targetSpEl = spacerRef.current;
+          
+          if (targetScEl && targetCvEl && targetSpEl) {
+            const cW = canvasWRef.current;
+            const cH = canvasHRef.current;
+            const vw = targetScEl.clientWidth;
+            const vh = targetScEl.clientHeight;
+            const scRect = targetScEl.getBoundingClientRect();
+
+            const nextOsx = Math.max(0, (vw - cW * next) / 2);
+            const nextOsy = Math.max(0, (vh - cH * next) / 2);
+
+            targetCvEl.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${next})`;
+            targetSpEl.style.width  = `${cW * next}px`;
+            targetSpEl.style.height = `${cH * next}px`;
+
+            const focalX = pinchFocalCanvas.current!.x;
+            const focalY = pinchFocalCanvas.current!.y;
+            targetScEl.scrollLeft = focalX * next + nextOsx - (curMidX - scRect.left);
+            targetScEl.scrollTop  = focalY * next + nextOsy - (curMidY - scRect.top);
+
+            // Update UI feedback (toolbar percentage) directly
+            if (scaleTextRef.current) {
+              scaleTextRef.current.textContent = `${Math.round(next * 100)}%`;
+            }
+          }
+          gestureRafRef.current = requestAnimationFrame(renderLoop);
+        };
+        gestureRafRef.current = requestAnimationFrame(renderLoop);
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       e.preventDefault();
-      isGestureZoomRef.current = true;
-      setIsGestureZoom(true);
+      
       if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-      gestureTimeoutRef.current = setTimeout(() => {
-        isGestureZoomRef.current = false;
-        setIsGestureZoom(false);
-      }, 300);
 
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
@@ -358,57 +422,35 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const curMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const curMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
-      if (lastPinchDist.current !== null && lastPinchMid.current !== null) {
-        const scEl = scrollRef.current;
-        if (scEl) {
-          const cur  = scaleRef.current;
-          // Avoid rounding during pinch for maximum smoothness
-          const next = clampScale(cur * (dist / lastPinchDist.current));
-          const cW   = canvasWRef.current;
-          const cH   = canvasHRef.current;
-
-          const rect    = scEl.getBoundingClientRect();
-          // Previous midpoint in container-relative coords (to compute which canvas point we're at)
-          const prevFpx = lastPinchMid.current.x - rect.left;
-          const prevFpy = lastPinchMid.current.y - rect.top;
-          // Current midpoint in container-relative coords (where we want that canvas point to appear)
-          const curFpx  = curMidX - rect.left;
-          const curFpy  = curMidY - rect.top;
-
-          const vw  = scEl.clientWidth;
-          const vh  = scEl.clientHeight;
-          const osx = Math.max(0, (vw - cW * cur)  / 2);
-          const osy = Math.max(0, (vh - cH * cur) / 2);
-
-          // Canvas-space coord under the PREVIOUS midpoint
-          const cx = (scEl.scrollLeft - osx + prevFpx) / cur;
-          const cy = (scEl.scrollTop  - osy + prevFpy) / cur;
-
-          const nextOsx = Math.max(0, (vw - cW * next) / 2);
-          const nextOsy = Math.max(0, (vh - cH * next) / 2);
-
-          // Apply DOM updates synchronously to avoid frame mismatch
-          if (canvasRef.current) {
-            canvasRef.current.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${next})`;
-          }
-          if (spacerRef.current) {
-            spacerRef.current.style.width  = `${cW * next}px`;
-            spacerRef.current.style.height = `${cH * next}px`;
-          }
-          // Place canvas coord at CURRENT midpoint (handles both zoom shift AND pan)
-          scEl.scrollLeft = cx * next + nextOsx - curFpx;
-          scEl.scrollTop  = cy * next + nextOsy - curFpy;
-
-          scaleRef.current = next;
-          onScaleChange?.(next);
-        }
+      if (pinchStartDist.current > 0 && pinchFocalCanvas.current) {
+        const next = clampScale(pinchStartScale.current * (dist / pinchStartDist.current));
+        // Only update the target values; the RAF render loop will pick them up
+        gestureTarget.current = { scale: next, midX: curMidX, midY: curMidY };
+        scaleRef.current = next;
       }
 
       lastPinchDist.current = dist;
       lastPinchMid.current  = { x: curMidX, y: curMidY };
     };
 
-    const onTouchEnd = () => { lastPinchDist.current = null; lastPinchMid.current = null; };
+    const onTouchEnd = () => {
+      if (isGestureZoomRef.current) {
+        if (gestureRafRef.current) {
+          cancelAnimationFrame(gestureRafRef.current);
+          gestureRafRef.current = null;
+        }
+        
+        onScaleChange?.(scaleRef.current);
+        
+        if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+        gestureTimeoutRef.current = setTimeout(() => {
+          isGestureZoomRef.current = false;
+          setIsGestureZoom(false);
+        }, 150);
+      }
+      lastPinchDist.current = null;
+      lastPinchMid.current = null;
+    };
 
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -472,6 +514,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   // Track viewport center of the selected tile for the overlay
   const updateTileCenter = useCallback(() => {
+    // Skip heavy overlay position updates during active gestures to maximize smoothness
+    if (isGestureZoomRef.current) return;
+    
     if (!floatCard || !selectedWant || !scrollRef.current) { setTileCenter(null); return; }
     const id = selectedWant.metadata?.id || selectedWant.id;
     const pos = id ? positionMap.get(id) : undefined;
@@ -593,6 +638,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             onClick={zoomOut} title="Zoom out"
           >−</button>
           <span
+            ref={scaleTextRef}
             className="pointer-events-auto text-white/70 text-xs font-mono w-12 text-center cursor-pointer hover:text-white transition-colors"
             onClick={() => applyScaleWithCenter(1.0)} title="Reset zoom"
           >{Math.round(scale * 100)}%</span>
@@ -630,6 +676,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               transform: `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`,
               transformOrigin: '0 0',
               transition: isGestureZoom ? undefined : 'transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              willChange: isGestureZoom ? 'transform' : undefined,
               position: 'absolute',
               left: 0,
               top: 0,
