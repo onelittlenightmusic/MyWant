@@ -9,8 +9,8 @@ interface FieldMatchBubbleProps {
   offsetY: number;
   scrollLeft: number;
   scrollTop: number;
-  /** Container bounding rect */
-  containerRect: DOMRect | null;
+  /** Called once per render to get the scroll container's bounding rect (avoids storing DOMRect in state) */
+  getContainerRect: () => DOMRect | null;
   onApply: (rec: FieldMatchRec) => Promise<void>;
   onDismiss: () => void;
 }
@@ -22,13 +22,14 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
   offsetY,
   scrollLeft,
   scrollTop,
-  containerRect,
+  getContainerRect,
   onApply,
   onDismiss,
 }) => {
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set());
 
+  const containerRect = getContainerRect();
   if (!containerRect) return null;
 
   // Convert canvas-space midpoint → viewport pixel

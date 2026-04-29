@@ -86,7 +86,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
-  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -726,7 +725,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       </div>
 
       {/* Scroll container: absolute fill so height is bounded by the outer div */}
-      <div ref={el => { (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el; if (el) setContainerRect(el.getBoundingClientRect()); }} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
+      <div ref={scrollRef} style={{ position: 'absolute', inset: 0, overflow: 'auto' }}>
         {/* Spacer drives scrollbars at scaled size, with min-size to enable centering. */}
         <div ref={spacerRef} style={{
           width: canvasW * scale,
@@ -882,7 +881,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
           offsetY={offsetY}
           scrollLeft={scrollRef.current?.scrollLeft ?? 0}
           scrollTop={scrollRef.current?.scrollTop ?? 0}
-          containerRect={containerRect}
+
           onApply={async (rec: FieldMatchRec) => {
             await fetch('/api/v1/wants/field-match-recommendations/apply', {
               method: 'POST',
@@ -895,6 +894,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             });
           }}
           onDismiss={() => dismissProximity(proximity.sourceId, proximity.targetId)}
+          getContainerRect={() => scrollRef.current?.getBoundingClientRect() ?? null}
         />
       )}
     </div>
