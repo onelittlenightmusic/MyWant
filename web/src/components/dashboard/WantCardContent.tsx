@@ -272,7 +272,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
 
           {/* Final result text area */}
           {want.state?.final_result != null && want.state?.final_result !== '' && !isFullScreen && (
-            <div className="flex-shrink-0 p-2 border-t border-gray-100 dark:border-gray-800/50 bg-white/30 dark:bg-gray-900/30">
+            <div className="flex-shrink-0 p-2 pt-0">
               <FinalResultDisplay
                 value={want.state!.final_result}
                 isChild={isChild}
