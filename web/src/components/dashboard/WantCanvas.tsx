@@ -89,13 +89,20 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const scaleRef = useRef(scale);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
 
-  // Tracks whether zoom is coming from a continuous gesture (wheel/pinch) to skip CSS transition
-  const isGestureZoomRef = useRef(false);
+  const [isGestureZoom, setIsGestureZoom] = useState(false);
   const gestureTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // RAF id for scroll animation
   const scrollAnimRafRef = useRef<number | null>(null);
 
   const lastPinchDist = useRef<number | null>(null);
+  const lastPinchMid  = useRef<{ x: number; y: number } | null>(null);
+
+  // Refs so touch/wheel handlers (registered once) can read latest layout values
+  const canvasWRef = useRef(0);
+  const canvasHRef = useRef(0);
+
+  // Internal flag to skip transitions during manual DOM updates
+  const isGestureZoomRef = useRef(false);
 
   // Mouse-drag panning: track at document level so drag outside canvas still works
   useEffect(() => {
@@ -209,6 +216,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   const canvasW = cols * STEP + GAP;
   const canvasH = rows * STEP + GAP;
+  canvasWRef.current = canvasW;
+  canvasHRef.current = canvasH;
 
   // Offsets used to center the grid if it's smaller than the viewport.
   const offsetX = Math.max(0, (viewportSize.width - canvasW * scale) / 2);
@@ -246,9 +255,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
       const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
       if (canvasRef.current) {
-        canvasRef.current.style.transform = `scale(${clamped})`;
-        canvasRef.current.style.left = `${nextOsx}px`;
-        canvasRef.current.style.top  = `${nextOsy}px`;
+        canvasRef.current.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${clamped})`;
       }
       if (spacerRef.current) {
         spacerRef.current.style.width  = `${canvasW * clamped}px`;
@@ -289,8 +296,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     scrollAnimRafRef.current = requestAnimationFrame(animScroll);
   }, [onScaleChange, canvasW, canvasH]);
 
-  const zoomIn  = () => applyScaleWithCenter(Math.round((scale + SCALE_STEP) * 10) / 10);
-  const zoomOut = () => applyScaleWithCenter(Math.round((scale - SCALE_STEP) * 10) / 10);
+  const zoomIn  = () => applyScaleWithCenter(Math.round((scaleRef.current + SCALE_STEP) * 10) / 10);
+  const zoomOut = () => applyScaleWithCenter(Math.round((scaleRef.current - SCALE_STEP) * 10) / 10);
 
   const applyScaleRef = useRef(applyScaleWithCenter);
   useEffect(() => { applyScaleRef.current = applyScaleWithCenter; }, [applyScaleWithCenter]);
@@ -305,12 +312,16 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
         // Zoom: keep viewport center fixed
         e.preventDefault();
         isGestureZoomRef.current = true;
+        setIsGestureZoom(true);
         if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-        gestureTimeoutRef.current = setTimeout(() => { isGestureZoomRef.current = false; }, 300);
+        gestureTimeoutRef.current = setTimeout(() => {
+          isGestureZoomRef.current = false;
+          setIsGestureZoom(false);
+        }, 300);
         const cur = scaleRef.current;
-        const factor = e.deltaY < 0 ? 1.1 : 0.9;
-        const next = clampScale(Math.round(cur * factor * 100) / 100);
-        applyScaleRef.current(next);
+        const factor = e.deltaY < 0 ? 1.05 : 0.95;
+        const next = clampScale(cur * factor);
+        applyScaleRef.current(next, e.clientX, e.clientY);
       } else if (e.shiftKey) {
         // Shift+Wheel → horizontal scroll (for mice without horizontal wheel)
         e.preventDefault();
@@ -324,29 +335,80 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastPinchDist.current = Math.sqrt(dx * dx + dy * dy);
+      lastPinchMid.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
     };
 
     const onTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 2) return;
       e.preventDefault();
       isGestureZoomRef.current = true;
+      setIsGestureZoom(true);
       if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
-      gestureTimeoutRef.current = setTimeout(() => { isGestureZoomRef.current = false; }, 300);
+      gestureTimeoutRef.current = setTimeout(() => {
+        isGestureZoomRef.current = false;
+        setIsGestureZoom(false);
+      }, 300);
+
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      // Pinch midpoint in viewport coords — use as focal point
-      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      if (lastPinchDist.current !== null) {
-        const cur = scaleRef.current;
-        const next = clampScale(Math.round(cur * (dist / lastPinchDist.current) * 100) / 100);
-        applyScaleRef.current(next, midX, midY);
+      const curMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const curMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      if (lastPinchDist.current !== null && lastPinchMid.current !== null) {
+        const scEl = scrollRef.current;
+        if (scEl) {
+          const cur  = scaleRef.current;
+          // Avoid rounding during pinch for maximum smoothness
+          const next = clampScale(cur * (dist / lastPinchDist.current));
+          const cW   = canvasWRef.current;
+          const cH   = canvasHRef.current;
+
+          const rect    = scEl.getBoundingClientRect();
+          // Previous midpoint in container-relative coords (to compute which canvas point we're at)
+          const prevFpx = lastPinchMid.current.x - rect.left;
+          const prevFpy = lastPinchMid.current.y - rect.top;
+          // Current midpoint in container-relative coords (where we want that canvas point to appear)
+          const curFpx  = curMidX - rect.left;
+          const curFpy  = curMidY - rect.top;
+
+          const vw  = scEl.clientWidth;
+          const vh  = scEl.clientHeight;
+          const osx = Math.max(0, (vw - cW * cur)  / 2);
+          const osy = Math.max(0, (vh - cH * cur) / 2);
+
+          // Canvas-space coord under the PREVIOUS midpoint
+          const cx = (scEl.scrollLeft - osx + prevFpx) / cur;
+          const cy = (scEl.scrollTop  - osy + prevFpy) / cur;
+
+          const nextOsx = Math.max(0, (vw - cW * next) / 2);
+          const nextOsy = Math.max(0, (vh - cH * next) / 2);
+
+          // Apply DOM updates synchronously to avoid frame mismatch
+          if (canvasRef.current) {
+            canvasRef.current.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${next})`;
+          }
+          if (spacerRef.current) {
+            spacerRef.current.style.width  = `${cW * next}px`;
+            spacerRef.current.style.height = `${cH * next}px`;
+          }
+          // Place canvas coord at CURRENT midpoint (handles both zoom shift AND pan)
+          scEl.scrollLeft = cx * next + nextOsx - curFpx;
+          scEl.scrollTop  = cy * next + nextOsy - curFpy;
+
+          scaleRef.current = next;
+          onScaleChange?.(next);
+        }
       }
+
       lastPinchDist.current = dist;
+      lastPinchMid.current  = { x: curMidX, y: curMidY };
     };
 
-    const onTouchEnd = () => { lastPinchDist.current = null; };
+    const onTouchEnd = () => { lastPinchDist.current = null; lastPinchMid.current = null; };
 
     el.addEventListener('wheel', onWheel, { passive: false });
     el.addEventListener('touchstart', onTouchStart, { passive: false });
@@ -421,8 +483,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     const tileTop  = (pos.y + originY) * STEP + GAP / 2;
 
     setTileCenter({
-      x: rect.left + offsetX + (tileLeft + CELL_SIZE / 2) * scale - el.scrollLeft,
-      y: rect.top  + offsetY + (tileTop  + CELL_SIZE / 2) * scale - el.scrollTop,
+      x: rect.left + (tileLeft + CELL_SIZE / 2) * scale + offsetX - el.scrollLeft,
+      y: rect.top  + (tileTop  + CELL_SIZE / 2) * scale + offsetY - el.scrollTop,
     });
   }, [floatCard, selectedWant, positionMap, scale, originX, originY, canvasW, canvasH, offsetX, offsetY]);
 
@@ -505,7 +567,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   return (
     <div
-      className="w-full flex-1 relative overflow-hidden"
+      className="w-full flex-1 relative overflow-hidden bg-[#0a0f1e]"
       style={{ minHeight: 0, height: 'calc(100vh - var(--header-height, 56px))' }}
     >
       {/* Zoom toolbar: fixed to the viewport, just inside the header edge.
@@ -565,12 +627,12 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               backgroundSize: `${STEP}px ${STEP}px`,
               backgroundPosition: `${GAP / 2}px ${GAP / 2}px`,
               cursor: dragWantId || isPanning ? 'grabbing' : 'grab',
-              transform: `scale(${scale})`,
+              transform: `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`,
               transformOrigin: '0 0',
-              transition: isGestureZoomRef.current ? undefined : 'transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+              transition: isGestureZoom ? undefined : 'transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
               position: 'absolute',
-              left: offsetX,
-              top: offsetY,
+              left: 0,
+              top: 0,
             }}
             onMouseDown={handleCanvasMouseDown}
             onClick={handleCanvasClick}

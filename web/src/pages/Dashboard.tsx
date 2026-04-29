@@ -304,16 +304,19 @@ export const Dashboard: React.FC = () => {
     }).then(({ seq }) => { lastGuiSeqRef.current = seq; }).catch(() => {});
   }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab]);
 
-  // Write-back for canvas scale — same pattern as other GUI state (no debounce, skip initial mount)
+  // Write-back for canvas scale — same pattern as other GUI state (skip initial mount, debounced)
   const canvasScaleWriteMountedRef = useRef(false);
   useEffect(() => {
     if (!canvasScaleWriteMountedRef.current) {
       canvasScaleWriteMountedRef.current = true;
       return;
     }
-    apiClient.updateGUIState({ canvas_scale: canvasScale })
-      .then(({ seq }) => { lastGuiSeqRef.current = seq; })
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      apiClient.updateGUIState({ canvas_scale: canvasScale })
+        .then(({ seq }) => { lastGuiSeqRef.current = seq; })
+        .catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [canvasScale]);
 
 
