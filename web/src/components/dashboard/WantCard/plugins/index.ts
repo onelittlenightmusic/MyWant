@@ -4,3 +4,4 @@ import './types/SliderCardPlugin';
 import './types/ChoiceCardPlugin';
 import './types/TimerCardPlugin';
 import './types/ReplayCardPlugin';
+import './types/WeatherCardPlugin';

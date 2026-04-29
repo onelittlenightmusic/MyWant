@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      name: "Tokyo Weather"
+      type: "weather"
+      labels:
+        role: demo
+        category: utility
+    spec:
+      params:
+        weather_city: "Tokyo"
+      when:
+        - every: "1 hour"
