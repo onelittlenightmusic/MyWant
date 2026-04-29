@@ -215,8 +215,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const offsetY = Math.max(0, (viewportSize.height - canvasH * scale) / 2);
 
   // Zoom keeping the viewport center fixed in canvas-coordinate space.
-  // focalX/focalY: viewport-space point to keep fixed during zoom (default: viewport center)
-  const applyScaleWithCenter = useCallback((newScale: number, focalX?: number, focalY?: number) => {
+  // focalX/focalY: CLIENT (viewport) coords of the fixed point during zoom (default: container center)
+  const applyScaleWithCenter = useCallback((newScale: number, focalClientX?: number, focalClientY?: number) => {
     const clamped = clampScale(newScale);
     const el = scrollRef.current;
     if (!el) { onScaleChange?.(clamped); return; }
@@ -226,8 +226,11 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
     const vw = el.clientWidth;
     const vh = el.clientHeight;
-    const fpx = focalX ?? vw / 2;
-    const fpy = focalY ?? vh / 2;
+
+    // Convert client coords → container-relative coords
+    const rect = el.getBoundingClientRect();
+    const fpx = focalClientX !== undefined ? focalClientX - rect.left : vw / 2;
+    const fpy = focalClientY !== undefined ? focalClientY - rect.top  : vh / 2;
 
     const osx = Math.max(0, (vw - canvasW * cur) / 2);
     const osy = Math.max(0, (vh - canvasH * cur) / 2);
@@ -237,16 +240,28 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
     const animated = !isGestureZoomRef.current;
 
-    onScaleChange?.(clamped);
-
     if (!animated) {
-      // Gesture zoom: apply scroll synchronously (no RAF) to avoid race with next touch event
+      // Gesture zoom: apply transform + scroll directly to DOM so there's no
+      // frame where scroll and transform are mismatched (which causes jitter).
       const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
       const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
+      if (canvasRef.current) {
+        canvasRef.current.style.transform = `scale(${clamped})`;
+        canvasRef.current.style.left = `${nextOsx}px`;
+        canvasRef.current.style.top  = `${nextOsy}px`;
+      }
+      if (spacerRef.current) {
+        spacerRef.current.style.width  = `${canvasW * clamped}px`;
+        spacerRef.current.style.height = `${canvasH * clamped}px`;
+      }
       el.scrollLeft = cx * clamped + nextOsx - fpx;
       el.scrollTop  = cy * clamped + nextOsy - fpy;
+      // Sync React state — re-render will write same values, so no visual jump
+      onScaleChange?.(clamped);
       return;
     }
+
+    onScaleChange?.(clamped);
 
     // Button zoom: animate scroll position over the same duration as the CSS transition
     const DURATION = 180;
