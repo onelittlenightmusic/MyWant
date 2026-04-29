@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/http"
 	"reflect"
 	"sort"
@@ -96,17 +97,43 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	want, _, found := s.globalBuilder.FindWantByID(pc.WantID)
-	if !found {
+	// Find under read-lock to get a snapshot, then build a new Want with the param applied
+	// rather than mutating the live pointer — avoids concurrent map write races.
+	s.wantsMu.RLock()
+	var foundWant *mywant.Want
+	for _, exec := range s.wants {
+		if exec.Builder != nil {
+			if w, _, ok := exec.Builder.FindWantByID(pc.WantID); ok {
+				foundWant = w
+				break
+			}
+		}
+	}
+	s.wantsMu.RUnlock()
+
+	if foundWant == nil {
+		if w, _, ok := s.globalBuilder.FindWantByID(pc.WantID); ok {
+			foundWant = w
+		}
+	}
+	if foundWant == nil {
 		s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("want %s not found", pc.WantID), "")
 		return
 	}
 
-	if want.Spec.Params == nil {
-		want.Spec.Params = make(map[string]any)
+	// Copy params map to avoid mutating the live want under concurrent requests.
+	newParams := make(map[string]any, len(foundWant.Spec.Params)+1)
+	maps.Copy(newParams, foundWant.Spec.Params)
+	newParams[pc.ParamName] = pc.Value
+
+	// Build a minimal updated want that UpdateWant can safely apply.
+	updated := &mywant.Want{
+		Metadata: foundWant.Metadata,
+		Spec:     foundWant.Spec,
 	}
-	want.Spec.Params[pc.ParamName] = pc.Value
-	s.globalBuilder.UpdateWant(want)
+	updated.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
+	updated.Spec.Params = newParams
+	s.globalBuilder.UpdateWant(updated)
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/field-match-recommendations/apply", pc.WantID, "success", http.StatusOK, "", fmt.Sprintf("Applied param %s=%v", pc.ParamName, pc.Value))
 	s.JSONResponse(w, http.StatusOK, map[string]any{
