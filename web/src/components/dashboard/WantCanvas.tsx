@@ -47,6 +47,9 @@ interface WantCanvasProps {
   onMoveWant: (wantId: string, x: number, y: number) => void;
   scale?: number;
   onScaleChange?: (scale: number) => void;
+  centerX?: number;
+  centerY?: number;
+  onCenterChange?: (x: number, y: number) => void;
   /** Pre-rendered card to show centered over the selected tile */
   floatCard?: React.ReactNode;
   /** Children of the selected want, grouped into the role overlay */
@@ -64,6 +67,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   onMoveWant,
   scale: scaleProp = 1.0,
   onScaleChange,
+  centerX,
+  centerY,
+  onCenterChange,
   floatCard,
   childWants = [],
   onDeselect: _onDeselect,
@@ -81,6 +87,69 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+
+  // Tracks the last applied center to avoid feedback loops
+  const lastAppliedCenterRef = useRef<{ x: number; y: number } | null>(null);
+  const isUserScrollingRef = useRef(false);
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Internal function to calculate current viewport center in canvas-space
+  const getCanvasCenter = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return null;
+    const s = scaleRef.current;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+    const osx = Math.max(0, (vw - canvasWRef.current * s) / 2);
+    const osy = Math.max(0, (vh - canvasHRef.current * s) / 2);
+    return {
+      x: (el.scrollLeft - osx + vw / 2) / s,
+      y: (el.scrollTop - osy + vh / 2) / s,
+    };
+  }, []);
+
+  // Update center to parent on scroll end
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      isUserScrollingRef.current = true;
+      if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+      scrollEndTimerRef.current = setTimeout(() => {
+        isUserScrollingRef.current = false;
+        const center = getCanvasCenter();
+        if (center) {
+          lastAppliedCenterRef.current = center;
+          onCenterChange?.(center.x, center.y);
+        }
+      }, 300);
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [getCanvasCenter, onCenterChange]);
+
+  // Apply external center changes (sync from other tabs)
+  useEffect(() => {
+    if (centerX === undefined || centerY === undefined) return;
+    if (isUserScrollingRef.current || isPanningRef.current || isGestureZoomRef.current) return;
+
+    // Skip if it's the same center we just reported
+    if (lastAppliedCenterRef.current &&
+        Math.abs(lastAppliedCenterRef.current.x - centerX) < 1 &&
+        Math.abs(lastAppliedCenterRef.current.y - centerY) < 1) return;
+
+    const el = scrollRef.current;
+    if (!el) return;
+    const s = scaleRef.current;
+    const vw = el.clientWidth;
+    const vh = el.clientHeight;
+    const osx = Math.max(0, (vw - canvasWRef.current * s) / 2);
+    const osy = Math.max(0, (vh - canvasHRef.current * s) / 2);
+
+    el.scrollLeft = centerX * s + osx - vw / 2;
+    el.scrollTop  = centerY * s + osy - vh / 2;
+    lastAppliedCenterRef.current = { x: centerX, y: centerY };
+  }, [centerX, centerY]);
 
   // Optimistic local overrides
   const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());

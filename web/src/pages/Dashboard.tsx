@@ -97,6 +97,8 @@ export const Dashboard: React.FC = () => {
   // Canvas mode (2D grid placement)
   const [canvasMode, setCanvasMode] = useState(false);
   const [canvasScale, setCanvasScale] = useState(1.0);
+  const [canvasCenterX, setCanvasCenterX] = useState<number | undefined>(undefined);
+  const [canvasCenterY, setCanvasCenterY] = useState<number | undefined>(undefined);
   const pendingCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const prevWantIdsRef = useRef<Set<string>>(new Set());
 
@@ -236,9 +238,13 @@ export const Dashboard: React.FC = () => {
         if (seq <= lastGuiSeqRef.current) return;
         lastGuiSeqRef.current = seq;
 
-        // Apply canvas scale
+        // Apply canvas scale & position
         const savedScale = cur['canvas_scale'] as number | undefined;
         if (savedScale !== undefined && savedScale > 0) setCanvasScale(savedScale);
+        const savedCenterX = cur['canvas_center_x'] as number | undefined;
+        const savedCenterY = cur['canvas_center_y'] as number | undefined;
+        if (savedCenterX !== undefined) setCanvasCenterX(savedCenterX);
+        if (savedCenterY !== undefined) setCanvasCenterY(savedCenterY);
 
         // Apply dashboard filters
         const statusFilter = cur['dashboard_status_filter'] as string | undefined;
@@ -286,7 +292,7 @@ export const Dashboard: React.FC = () => {
     return () => { cancelled = true; clearInterval(id); };
   }, [wants, sidebar, setSidebarInitialTab, setSidebarTabVersion]);
 
-  // Write back GUI state on user actions (sidebar open/close, filter, search).
+  // Write back GUI state on user actions (sidebar, filter, search, canvas scale).
   // Updates lastGuiSeqRef so this tab doesn't re-apply its own write.
   const guiWriteBackMountedRef = useRef(false);
   useEffect(() => {
@@ -294,30 +300,23 @@ export const Dashboard: React.FC = () => {
       guiWriteBackMountedRef.current = true;
       return;
     }
-    apiClient.updateGUIState({
-      source: 'frontend',
-      dashboard_status_filter: statusFilters[0] ?? '',
-      dashboard_search_query: searchQuery,
-      sidebar_open: !!sidebar.selectedItem,
-      sidebar_want_id: sidebar.selectedItem?.metadata?.id ?? '',
-      sidebar_active_tab: sidebarInitialTab,
-    }).then(({ seq }) => { lastGuiSeqRef.current = seq; }).catch(() => {});
-  }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab]);
-
-  // Write-back for canvas scale — same pattern as other GUI state (skip initial mount, debounced)
-  const canvasScaleWriteMountedRef = useRef(false);
-  useEffect(() => {
-    if (!canvasScaleWriteMountedRef.current) {
-      canvasScaleWriteMountedRef.current = true;
-      return;
-    }
     const timer = setTimeout(() => {
-      apiClient.updateGUIState({ canvas_scale: canvasScale })
-        .then(({ seq }) => { lastGuiSeqRef.current = seq; })
-        .catch(() => {});
-    }, 1000);
+      apiClient.updateGUIState({
+        source: 'frontend',
+        dashboard_status_filter: statusFilters[0] ?? '',
+        dashboard_search_query: searchQuery,
+        sidebar_open: !!sidebar.selectedItem,
+        sidebar_want_id: sidebar.selectedItem?.metadata?.id ?? '',
+        sidebar_active_tab: sidebarInitialTab,
+        canvas_scale: canvasScale,
+        canvas_center_x: canvasCenterX,
+        canvas_center_y: canvasCenterY,
+      }).then(({ seq }) => {
+        lastGuiSeqRef.current = seq;
+      }).catch(() => {});
+    }, 1000); // 1s debounce for persistent state
     return () => clearTimeout(timer);
-  }, [canvasScale]);
+  }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab, canvasScale, canvasCenterX, canvasCenterY]);
 
 
   const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); } else { setIsSelectMode(true); } };
@@ -1221,6 +1220,12 @@ export const Dashboard: React.FC = () => {
                 onMoveWant={handleCanvasMoveWant}
                 scale={canvasScale}
                 onScaleChange={setCanvasScale}
+                centerX={canvasCenterX}
+                centerY={canvasCenterY}
+                onCenterChange={(x, y) => {
+                  setCanvasCenterX(x);
+                  setCanvasCenterY(y);
+                }}
                 floatCard={selectedWant && (() => {
                   const selectedId = selectedWant.metadata?.id || selectedWant.id;
                   const handleFloatCardView = (w: Want) => {
