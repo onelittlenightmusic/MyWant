@@ -131,8 +131,13 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("status", "running")
 	{
 		cmd := mywant.GetCurrent(want, "process_command", "")
-		summary := fmt.Sprintf("process running: %s (PID %d, log: %s)", cmd, pid, logFile)
-		want.SetCurrent("launch_summary", summary)
+		summaryJSON, _ := json.Marshal(map[string]any{
+			"status":   "running",
+			"command":  cmd,
+			"pid":      pid,
+			"log_file": logFile,
+		})
+		want.SetCurrent("launch_summary", string(summaryJSON))
 	}
 
 	// Optional: extract a URL from the log using url_regex → store in result_field
@@ -319,20 +324,24 @@ func composeEnv(want *mywant.Want) []string {
 	return env
 }
 
-// composeRunningSummary returns a one-line summary of running compose services.
+// composeRunningSummary returns a JSON summary of running compose services.
 func composeRunningSummary(composeFile string) string {
 	out, err := exec.Command("docker", "compose", "-f", composeFile, "ps", "--format", "{{.Service}}:{{.State}}").Output()
-	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
-		return fmt.Sprintf("docker compose running (%s)", composeFile)
-	}
-	var parts []string
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			parts = append(parts, line)
+	var services []string
+	if err == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				services = append(services, line)
+			}
 		}
 	}
-	return "containers: " + strings.Join(parts, ", ")
+	summaryJSON, _ := json.Marshal(map[string]any{
+		"status":       "running",
+		"compose_file": composeFile,
+		"services":     services,
+	})
+	return string(summaryJSON)
 }
 
 // composeRecentLogs returns the last n lines from all compose services.
