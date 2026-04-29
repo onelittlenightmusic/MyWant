@@ -184,7 +184,7 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
         onTouchMove={longPress.onTouchMove}
         onTouchEnd={longPress.onTouchEnd}
         className={classNames(
-          `relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer ${CARD_FOCUS_BASE} min-h-[7rem]`,
+          `relative overflow-hidden rounded-md border hover:shadow-sm transition-all duration-300 cursor-pointer select-none ${CARD_FOCUS_BASE} min-h-[7rem]`,
           `${CARD_BORDER_BASE} hover:border-gray-300`,
           (isDragOverWant || isDragOver) && !isBeingProcessed && 'border-blue-600 border-2 bg-blue-100 dark:bg-blue-900/30',
           isHighlighted && styles.highlighted,
@@ -192,7 +192,7 @@ export const ChildWantCard: React.FC<ChildWantCardProps> = ({
           isBeingProcessed && 'opacity-50 pointer-events-none cursor-not-allowed',
           childBackgroundStyle.className,
         )}
-        style={{ ...childBackgroundStyle.style }}
+        style={{ ...childBackgroundStyle.style, WebkitTouchCallout: 'none' } as React.CSSProperties}
         onClick={handleClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
