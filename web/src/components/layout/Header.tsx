@@ -415,36 +415,35 @@ export const Header: React.FC<HeaderProps> = ({
             </Tooltip>
           )}
 
-          {/* List / Canvas view toggle */}
+          {/* List / Canvas toggle switch */}
           {onCanvasModeToggle && (
             <>
               <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
-              <Tooltip label="List view">
+              <Tooltip label={showCanvasMode ? 'Switch to List' : 'Switch to Canvas'}>
                 <button
-                  onClick={() => { if (showCanvasMode) onCanvasModeToggle(); }}
-                  className={classNames(
-                    'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
-                    !showCanvasMode
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  )}
+                  onClick={onCanvasModeToggle}
+                  className="flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 >
-                  <LayoutGrid className="h-4 w-4" />
-                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">List</span>
-                </button>
-              </Tooltip>
-              <Tooltip label="Canvas view">
-                <button
-                  onClick={() => { if (!showCanvasMode) onCanvasModeToggle(); }}
-                  className={classNames(
-                    'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
-                    showCanvasMode
-                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                  )}
-                >
-                  <Grid2X2 className="h-4 w-4" />
-                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Canvas</span>
+                  {/* Switch track */}
+                  <div className={classNames(
+                    'relative flex items-center rounded-full transition-colors duration-200',
+                    'w-8 h-4',
+                    showCanvasMode ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+                  )}>
+                    {/* Thumb with icon */}
+                    <div className={classNames(
+                      'absolute flex items-center justify-center w-3 h-3 rounded-full bg-white shadow transition-transform duration-200',
+                      showCanvasMode ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                    )}>
+                      {showCanvasMode
+                        ? <Grid2X2 className="w-2 h-2 text-blue-500" />
+                        : <LayoutGrid className="w-2 h-2 text-gray-400" />
+                      }
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">
+                    {showCanvasMode ? 'Canvas' : 'List'}
+                  </span>
                 </button>
               </Tooltip>
             </>
