@@ -170,7 +170,7 @@ const WeatherContentSection: React.FC<WantCardPluginProps> = ({ want, isChild, i
         }
       `}</style>
       <div
-        className="absolute inset-0 overflow-hidden"
+        className="flex-1 overflow-hidden relative rounded-xl"
         style={{
           background: config.gradient,
         }}
