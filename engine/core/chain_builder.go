@@ -142,6 +142,13 @@ type ChainBuilder struct {
 	// Always accessed inside reconcileMutex, no separate lock needed.
 	stateAccessIndex map[string][]string // "wantID.fieldName" -> []wantIDs
 
+	// Bidirectional peer indices derived from stateAccessIndex.
+	// fieldConsumerIndex[providerID] = set of wantIDs that consume at least one field from providerID.
+	// fieldProviderIndex[consumerID] = set of wantIDs that provide at least one field to consumerID.
+	// Both are rebuilt during buildStateAccessIndex and allow O(1) peer lookup in correlationPhase.
+	fieldConsumerIndex map[string]map[string]struct{} // providerID → set<consumerID>
+	fieldProviderIndex map[string]map[string]struct{} // consumerID → set<providerID>
+
 	// Global state (shared across all wants, persisted to disk)
 	globalState         sync.Map // key(string) -> value(any), key-level concurrency
 	globalStatePath     string   // ~/.mywant/global_state.yaml
@@ -215,6 +222,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		labelRegistry:          make(map[string]map[string]bool),
 		dirtyWantIDs:           make(map[string]struct{}),
 		stateAccessIndex:       make(map[string][]string),
+		fieldConsumerIndex:     make(map[string]map[string]struct{}),
+		fieldProviderIndex:     make(map[string]map[string]struct{}),
 	}
 
 	// Derive globalStatePath from memoryPath directory

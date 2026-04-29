@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Want } from '@/types/want';
 
 export interface FieldMatchRec {
@@ -27,25 +27,23 @@ interface Options {
   originY: number;
 }
 
-const PROXIMITY_GRID_DIST = 1.5; // grid units — adjacent counts as near
-const DEBOUNCE_MS = 400;
+const PROXIMITY_GRID_DIST = 1.5;
 
-export function useFieldMatchProximity({ positionMap, wants, step, cellSize, originX, originY }: Options) {
+export function useFieldMatchProximity({ positionMap, step, cellSize, originX, originY }: Options) {
   const [proximity, setProximity] = useState<ProximityState | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPairRef = useRef<string>('');
   const dismissedRef = useRef<Set<string>>(new Set());
 
-  const check = useCallback((dragId: string | null, overCell: { x: number; y: number } | null) => {
-    if (!dragId || !overCell) return;
-
-    // Find any non-dragged card that is within PROXIMITY_GRID_DIST of overCell
+  /**
+   * Call on drop. Finds the nearest card to droppedCell and immediately fetches recommendations.
+   * No debounce — the drop itself is the trigger.
+   */
+  const checkOnDrop = useCallback(async (dragId: string, droppedCell: { x: number; y: number }) => {
     let nearId: string | null = null;
     let nearDist = Infinity;
     for (const [id, pos] of positionMap.entries()) {
       if (id === dragId) continue;
-      const dx = pos.x - overCell.x;
-      const dy = pos.y - overCell.y;
+      const dx = pos.x - droppedCell.x;
+      const dy = pos.y - droppedCell.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist <= PROXIMITY_GRID_DIST && dist < nearDist) {
         nearDist = dist;
@@ -53,58 +51,45 @@ export function useFieldMatchProximity({ positionMap, wants, step, cellSize, ori
       }
     }
 
-    if (!nearId) { setProximity(null); return; }
+    if (!nearId) return;
 
     const pairKey = `${dragId}::${nearId}`;
     if (dismissedRef.current.has(pairKey)) return;
-    if (lastPairRef.current === pairKey) return; // already fetched
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/v1/wants/field-match-recommendations?source_id=${dragId}&target_id=${nearId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const recs: FieldMatchRec[] = data.recommendations ?? [];
-        if (recs.length === 0) return;
+    try {
+      const res = await fetch(`/api/v1/wants/field-match-recommendations?source_id=${dragId}&target_id=${nearId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const recs: FieldMatchRec[] = data.recommendations ?? [];
+      if (recs.length === 0) return;
 
-        lastPairRef.current = pairKey;
+      const aPos = droppedCell;
+      const bPos = positionMap.get(nearId)!;
+      const ax = (aPos.x + originX) * step + cellSize / 2;
+      const ay = (aPos.y + originY) * step + cellSize / 2;
+      const bx = (bPos.x + originX) * step + cellSize / 2;
+      const by = (bPos.y + originY) * step + cellSize / 2;
 
-        // Midpoint in canvas-space (unscaled pixels).
-        // Use overCell for the dragged card (its actual position updates after drop;
-        // using the drag cursor cell keeps the bubble stable across the drop event).
-        const aPos = overCell;
-        const bPos = positionMap.get(nearId)!;
-        const ax = (aPos.x + originX) * step + cellSize / 2;
-        const ay = (aPos.y + originY) * step + cellSize / 2;
-        const bx = (bPos.x + originX) * step + cellSize / 2;
-        const by = (bPos.y + originY) * step + cellSize / 2;
-
-        setProximity({ sourceId: dragId, targetId: nearId, recs, midX: (ax + bx) / 2, midY: (ay + by) / 2 });
-      } catch {
-        // network error — silently ignore
-      }
-    }, DEBOUNCE_MS);
+      setProximity({ sourceId: dragId, targetId: nearId, recs, midX: (ax + bx) / 2, midY: (ay + by) / 2 });
+    } catch {
+      // network error — silently ignore
+    }
   }, [positionMap, originX, originY, step, cellSize]);
 
+  /** Dismiss this pair — won't re-show until next drag session. */
   const dismiss = useCallback((sourceId: string, targetId: string) => {
     dismissedRef.current.add(`${sourceId}::${targetId}`);
     setProximity(null);
-    lastPairRef.current = '';
   }, []);
 
   const clear = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     setProximity(null);
-    lastPairRef.current = '';
   }, []);
 
-  // Reset dismissed set when wants change significantly (new drag session)
-  useEffect(() => {
+  /** Reset dismissed pairs at the start of each drag so the user can retry. */
+  const resetDismissed = useCallback(() => {
     dismissedRef.current = new Set();
-  }, [wants.length]);
+  }, []);
 
-  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
-
-  return { proximity, check, clear, dismiss };
+  return { proximity, checkOnDrop, clear, dismiss, resetDismissed };
 }

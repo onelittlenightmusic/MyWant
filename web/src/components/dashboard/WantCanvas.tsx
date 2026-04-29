@@ -85,7 +85,6 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const hasPannedRef  = useRef(false);
   const [isPanning, setIsPanning] = useState(false);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
-  const dragWantIdRef = useRef<string | null>(null); // sync ref to avoid stale closure in dragOver
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
@@ -301,8 +300,9 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const canvasW = cols * STEP + GAP;
   const canvasH = rows * STEP + GAP;
 
-  const { proximity, check: checkProximity, clear: clearProximity, dismiss: dismissProximity } =
+  const { proximity, checkOnDrop, clear: clearProximity, dismiss: dismissProximity, resetDismissed } =
     useFieldMatchProximity({ positionMap, wants, step: STEP, cellSize: CELL_SIZE, originX, originY });
+
   canvasWRef.current = canvasW;
   canvasHRef.current = canvasH;
 
@@ -663,9 +663,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     e.preventDefault();
     const { cx, cy } = cellFromEvent(e);
     setDragOverCell({ x: cx, y: cy });
-    // Use ref to avoid stale closure — state update from onDragStart may not have propagated yet
-    checkProximity(dragWantIdRef.current, { x: cx, y: cy });
-  }, [cellFromEvent, checkProximity]);
+  }, [cellFromEvent]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -678,14 +676,17 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     }
     setDragWantId(null);
     setDragOverCell(null);
-  }, [onMoveWant, isCellOccupied, cellFromEvent]);
+    // Check proximity at the drop position and fetch recommendations immediately
+    checkOnDrop(wantId, { x: cx, y: cy });
+  }, [onMoveWant, isCellOccupied, cellFromEvent, checkOnDrop]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
       setDragOverCell(null);
+      clearProximity();
     }
-  }, []);
+  }, [clearProximity]);
 
   return (
     <div
@@ -781,6 +782,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               );
             })()}
 
+
             {/* Want tiles */}
             {wants.map(want => {
               const id = want.metadata?.id || want.id;
@@ -813,6 +815,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                     isSelected && 'scale-[1.06] z-30',
                     isDragging && 'opacity-40',
                   )}
+
                   style={{
                     position: 'absolute',
                     left: (pos.x + originX) * STEP + GAP / 2,
@@ -836,10 +839,13 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                   onDragStart={e => {
                     e.dataTransfer.setData('application/mywant-canvas-id', id);
                     e.dataTransfer.effectAllowed = 'move';
-                    dragWantIdRef.current = id;
                     setDragWantId(id);
+                    resetDismissed();
                   }}
-                  onDragEnd={() => { dragWantIdRef.current = null; setDragWantId(null); setDragOverCell(null); }}
+                  onDragEnd={() => {
+                    setDragWantId(null);
+                    setDragOverCell(null);
+                  }}
                 >
                   <div
                     className={classNames('absolute top-0 left-0 right-0 z-20', active && 'animate-pulse')}

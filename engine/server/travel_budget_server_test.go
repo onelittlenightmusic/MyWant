@@ -134,9 +134,6 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	t.Logf("Budget ID: %s", budgetWant.Metadata.ID)
 	t.Logf("Hotel ID:  %s", hotelWant.Metadata.ID)
 
-	// Expected label: stateAccess/<parentID>.costs
-	expectedLabel := "stateAccess/" + parentID + ".costs"
-
 	verifyCorrelation := func(t *testing.T, w *mywant.Want, peerID string, label string) {
 		found := false
 		for _, entry := range w.Metadata.Correlation {
@@ -158,13 +155,13 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	}
 
 	t.Run("SiblingCorrelation", func(t *testing.T) {
-		verifyCorrelation(t, budgetWant, hotelWant.Metadata.ID, expectedLabel)
-		verifyCorrelation(t, hotelWant, budgetWant.Metadata.ID, expectedLabel)
+		verifyCorrelation(t, budgetWant, hotelWant.Metadata.ID, "stateAccess/sibling")
+		verifyCorrelation(t, hotelWant, budgetWant.Metadata.ID, "stateAccess/sibling")
 	})
 
 	t.Run("ParentCorrelation", func(t *testing.T) {
-		verifyCorrelation(t, budgetWant, parentID, expectedLabel)
-		verifyCorrelation(t, hotelWant, parentID, expectedLabel)
+		verifyCorrelation(t, budgetWant, parentID, "stateAccess/provider")
+		verifyCorrelation(t, hotelWant, parentID, "stateAccess/provider")
 	})
 
 	if !t.Failed() {

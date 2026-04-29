@@ -12,14 +12,28 @@ import (
 // moving beyond transient label-based correlation.
 // Called during reconcileWants() before correlationPhase().
 func (cb *ChainBuilder) buildStateAccessIndex() {
-	// 1. Clear existing index
+	// 1. Clear existing indices
 	cb.stateAccessIndex = make(map[string][]string)
+	cb.fieldConsumerIndex = make(map[string]map[string]struct{})
+	cb.fieldProviderIndex = make(map[string]map[string]struct{})
 
-	// Helper to register an accessor to a specific field
+	// Helper to register an accessor to a specific field and maintain bidirectional peer indices.
 	register := func(providerID, fieldName, accessorID string) {
 		key := fmt.Sprintf("%s.%s", providerID, fieldName)
 		cb.stateAccessIndex[key] = append(cb.stateAccessIndex[key], accessorID)
-		// log.Printf("[ACCESS-INDEX] Registered: field %s accessed by %s\n", key, accessorID)
+		if providerID == accessorID {
+			return // self-registration does not create a peer relationship
+		}
+		// fieldConsumerIndex: providerID → set of consumerIDs
+		if cb.fieldConsumerIndex[providerID] == nil {
+			cb.fieldConsumerIndex[providerID] = make(map[string]struct{})
+		}
+		cb.fieldConsumerIndex[providerID][accessorID] = struct{}{}
+		// fieldProviderIndex: consumerID → set of providerIDs
+		if cb.fieldProviderIndex[accessorID] == nil {
+			cb.fieldProviderIndex[accessorID] = make(map[string]struct{})
+		}
+		cb.fieldProviderIndex[accessorID][providerID] = struct{}{}
 	}
 
 	for _, rw := range cb.wants {
@@ -82,6 +96,55 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 		if def, ok := cb.wantTypeDefinitions[want.Metadata.Type]; ok {
 			for _, state := range def.State {
 				register(wantID, state.Name, wantID)
+			}
+		}
+	}
+
+	// D. Import-param references: if want B has an import-style param (e.g. choice_import_field)
+	// whose string value matches a state field declared by want A's type definition, treat B as
+	// a consumer of A's state. Also handle exposes.As global key references.
+	fieldToProviders := make(map[string][]string) // stateFieldName → []providerWantID
+	exposeKeyToProvider := make(map[string]string) // exposeAs key → providerWantID
+	for _, rw := range cb.wants {
+		w := rw.want
+		wID := w.Metadata.ID
+		if wID == "" {
+			continue
+		}
+		if def, ok := cb.wantTypeDefinitions[w.Metadata.Type]; ok {
+			for _, s := range def.State {
+				fieldToProviders[s.Name] = append(fieldToProviders[s.Name], wID)
+			}
+		}
+		for _, exp := range w.Spec.Exposes {
+			if exp.As != "" {
+				exposeKeyToProvider[exp.As] = wID
+			}
+		}
+	}
+	for _, rw := range cb.wants {
+		w := rw.want
+		wID := w.Metadata.ID
+		if wID == "" || w.Spec.Params == nil {
+			continue
+		}
+		for paramName, paramVal := range w.Spec.Params {
+			strVal, ok := paramVal.(string)
+			if !ok || strVal == "" {
+				continue
+			}
+			if !isCorrelationImportParam(paramName) {
+				continue
+			}
+			// Match against type-definition state field names
+			for _, providerID := range fieldToProviders[strVal] {
+				if providerID != wID {
+					register(providerID, strVal, wID)
+				}
+			}
+			// Match against expose global keys
+			if providerID, found := exposeKeyToProvider[strVal]; found && providerID != wID {
+				register(providerID, "expose/"+strVal, wID)
 			}
 		}
 	}
@@ -160,30 +223,18 @@ func (cb *ChainBuilder) correlationPhase() {
 			}
 		}
 
-		// ── 3. State Access Dependencies (using the structural Dictionary) ────
-		// Find all fields accessed by dirty, then find other wants accessing the SAME fields.
-		for fieldPath, accessors := range cb.stateAccessIndex {
-			// fieldPath is "providerID.fieldName"
-			isDirtyAccessor := false
-			for _, a := range accessors {
-				if a == dirtyID {
-					isDirtyAccessor = true
-					break
-				}
-			}
-
-			if isDirtyAccessor {
-				// Dirty accesses this field. All other accessors are correlated peers.
-				parts := strings.Split(fieldPath, ".")
-				providerID := parts[0]
-				for _, peerID := range accessors {
-					if peerID != dirtyID {
-						add(peerID, "stateAccess/"+fieldPath)
-					}
-				}
-				// Also correlate dirty with the provider of the field (if not self)
-				if providerID != dirtyID {
-					add(providerID, "stateAccess/"+fieldPath)
+		// ── 3. State Access Dependencies (bidirectional peer index) ──────────────
+		// Direct consumers: wants that read at least one field dirty provides.
+		for consumerID := range cb.fieldConsumerIndex[dirtyID] {
+			add(consumerID, "stateAccess/consumer")
+		}
+		// Direct providers: wants whose fields dirty reads.
+		// Also add co-consumers (siblings): other wants reading the same provider's fields.
+		for providerID := range cb.fieldProviderIndex[dirtyID] {
+			add(providerID, "stateAccess/provider")
+			for siblingID := range cb.fieldConsumerIndex[providerID] {
+				if siblingID != dirtyID {
+					add(siblingID, "stateAccess/sibling")
 				}
 			}
 		}
@@ -223,4 +274,14 @@ func correlationRate(labels []string) int {
 		}
 	}
 	return rate
+}
+
+// isCorrelationImportParam returns true if the param name looks like a field-import selector.
+// Mirrors the server-side isImportParam heuristic without a cross-package dependency.
+func isCorrelationImportParam(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.Contains(lower, "_import_field") ||
+		strings.Contains(lower, "_source_field") ||
+		strings.HasSuffix(lower, "_field") ||
+		strings.Contains(lower, "_from_field")
 }

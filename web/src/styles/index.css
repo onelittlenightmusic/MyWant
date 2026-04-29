@@ -227,3 +227,12 @@
 .animate-slide-down {
   animation: slide-down 0.2s ease-out forwards;
 }
+
+@keyframes fieldMatchDash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+.animate-field-match-dash {
+  animation: fieldMatchDash 0.5s linear infinite;
+}
