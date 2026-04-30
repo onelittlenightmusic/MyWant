@@ -76,7 +76,7 @@ class MyWantApiClient {
     });
 
     const isPollingUrl = (url?: string) =>
-      url?.includes('/api/v1/state') || url?.includes('/api/v1/hash') || url?.includes('/api/v1/gui/state');
+      url?.includes('/api/v1/gui/state') || url?.includes('/api/v1/wants/hashes');
 
     // Request interceptor
     this.client.interceptors.request.use(
