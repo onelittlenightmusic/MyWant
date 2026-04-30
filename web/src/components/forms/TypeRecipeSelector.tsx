@@ -4,7 +4,7 @@ import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
 import { getBackgroundStyle, getBackgroundOverlayClass } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
-import { suppressDragImage } from '@/utils/helpers';
+import { suppressDragImage, classNames } from '@/utils/helpers';
 
 export interface TypeRecipeSelectorItem {
   id: string;
@@ -49,6 +49,59 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   const searchInputRef = useRef<HTMLInputElement>(null);
   const collapsedButtonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Long press for touch drag
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartPosRef = useRef<{ x: number, y: number } | null>(null);
+
+  const handleTouchStart = (item: TypeRecipeSelectorItem, e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    touchTimerRef.current = setTimeout(() => {
+      // Long press triggered
+      if (window.navigator.vibrate) window.navigator.vibrate(40);
+
+      useWantStore.getState().setDraggingTemplate({
+        id: item.id,
+        type: item.type,
+        name: item.title
+      });
+      useWantStore.getState().setTouchPos({ x: touch.clientX, y: touch.clientY });
+
+      touchTimerRef.current = null;
+    }, 600); // 600ms for long press
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const { draggingTemplate, setTouchPos } = useWantStore.getState();
+
+    if (touchTimerRef.current && touchStartPosRef.current) {
+      const touch = e.touches[0];
+      const dist = Math.sqrt(
+        Math.pow(touch.clientX - touchStartPosRef.current.x, 2) +
+        Math.pow(touch.clientY - touchStartPosRef.current.y, 2)
+      );
+      if (dist > 15) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+    }
+
+    if (draggingTemplate) {
+      // If we are already dragging, prevent scrolling and update position
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches[0];
+      setTouchPos({ x: touch.clientX, y: touch.clientY });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+  };
 
   // Sync expansion state with selectedId changes
   useEffect(() => {
@@ -392,6 +445,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     type="button"
                     draggable
                     onClick={() => handleSelect(item)}
+                    onContextMenu={(e) => e.preventDefault()}
                     onDragStart={(e) => {
                       suppressDragImage(e);
                       e.dataTransfer.effectAllowed = 'copy';
@@ -412,6 +466,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       console.log('[DEBUG TypeRecipeSelector] dragend - want-type:', item.title);
                       useWantStore.getState().setDraggingTemplate(null);
                     }}
+                    onTouchStart={(e) => handleTouchStart(item, e)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -420,26 +477,31 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center ${
+                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center select-none ${
                       selectedId === item.id
                         ? 'border-gray-200 dark:border-gray-700 bg-blue-100 dark:bg-blue-900/30'
                         : isFocused
                         ? 'border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     } ${backgroundStyle.className}`}
-                    style={backgroundStyle.style}
+                    style={{
+                      ...backgroundStyle.style,
+                      WebkitTouchCallout: 'none',
+                      WebkitUserSelect: 'none',
+                      touchAction: 'pan-y'
+                    }}
                   >
                     {backgroundStyle.hasBackgroundImage && (
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
-                    <div className="flex items-start justify-between relative z-10 w-full">
-                      <div className="flex-1 flex items-start gap-1.5 min-w-0">
+                    <div className="flex items-start justify-between relative z-10 w-full select-none">
+                      <div className="flex-1 flex items-start gap-1.5 min-w-0 select-none">
                         {item.category && (
-                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" title={item.category}>
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5 select-none" title={item.category}>
                             {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
                           </span>
                         )}
-                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words select-none">{item.title}</h4>
                       </div>
                       {selectedId === item.id && (
                         <ChevronRight className="w-5 h-5 text-blue-500 flex-shrink-0 ml-2 mt-0.5" />
@@ -473,6 +535,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                     type="button"
                     draggable
                     onClick={() => handleSelect(item)}
+                    onContextMenu={(e) => e.preventDefault()}
                     onDragStart={(e) => {
                       suppressDragImage(e);
                       e.dataTransfer.effectAllowed = 'copy';
@@ -493,6 +556,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       console.log('[DEBUG TypeRecipeSelector] dragend - recipe:', item.title);
                       useWantStore.getState().setDraggingTemplate(null);
                     }}
+                    onTouchStart={(e) => handleTouchStart(item, e)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -501,26 +567,31 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                         handleKeyNavigation(e);
                       }
                     }}
-                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center ${
+                    className={`w-full text-left px-2 py-1 rounded-lg border transition-colors relative overflow-hidden h-[36px] flex items-center select-none ${
                       selectedId === item.id
                         ? 'border-gray-200 dark:border-gray-700 bg-green-100 dark:bg-green-900/30'
                         : isFocused
                         ? 'border-gray-200 dark:border-gray-700 bg-green-50 dark:bg-green-900/20'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:cursor-move'
                     } ${backgroundStyle.className}`}
-                    style={backgroundStyle.style}
+                    style={{
+                      ...backgroundStyle.style,
+                      WebkitTouchCallout: 'none',
+                      WebkitUserSelect: 'none',
+                      touchAction: 'pan-y'
+                    }}
                   >
                     {backgroundStyle.hasBackgroundImage && (
                       <div className={getBackgroundOverlayClass()}></div>
                     )}
-                    <div className="flex items-start justify-between relative z-10 w-full">
-                      <div className="flex-1 flex items-start gap-1.5 min-w-0">
+                    <div className="flex items-start justify-between relative z-10 w-full select-none">
+                      <div className="flex-1 flex items-start gap-1.5 min-w-0 select-none">
                         {item.category && (
-                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5" title={item.category}>
+                          <span className="inline-flex items-center text-gray-500 dark:text-gray-400 flex-shrink-0 mt-0.5 select-none" title={item.category}>
                             {categoryIcons[item.category] || <Tag className="h-3 w-3" />}
                           </span>
                         )}
-                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words">{item.title}</h4>
+                        <h4 className="text-sm sm:font-medium text-gray-900 dark:text-white line-clamp-2 break-words select-none">{item.title}</h4>
                       </div>
                       {selectedId === item.id && (
                         <ChevronRight className="w-5 h-5 text-green-500 flex-shrink-0 ml-2 mt-0.5" />

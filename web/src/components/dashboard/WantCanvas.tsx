@@ -744,6 +744,27 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const handleTouchDrop = (e: any) => {
+      const { template, clientX, clientY } = e.detail;
+      if (!template || !onTemplateDrop) return;
+
+      const rect = el.getBoundingClientRect();
+      const x = (clientX - rect.left) / scale - originX * STEP - GAP/2;
+      const y = (clientY - rect.top) / scale - originY * STEP - GAP/2;
+      const cx = Math.floor(x / STEP);
+      const cy = Math.floor(y / STEP);
+
+      onTemplateDrop(template.id, template.type, cx, cy);
+    };
+
+    el.addEventListener('mywant:template-touch-drop', handleTouchDrop);
+    return () => el.removeEventListener('mywant:template-touch-drop', handleTouchDrop);
+  }, [onTemplateDrop, scale, originX, originY]);
+
   return (
     <div
       className="w-full flex-1 relative overflow-hidden"
@@ -820,6 +841,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragLeave={handleDragLeave}
+            data-want-canvas="true"
           >
             {/* Drag-over highlight */}
             {dragOverCell && (() => {

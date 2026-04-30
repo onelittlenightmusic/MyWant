@@ -20,6 +20,7 @@ interface WantStore {
   error: string | null;
   draggingWant: string | null;
   draggingTemplate: DraggingTemplate | null;
+  touchPos: { x: number; y: number } | null;
   isOverTarget: boolean;
   highlightedLabel: { key: string; value: string } | null;
   blinkingWantId: string | null;
@@ -48,6 +49,7 @@ interface WantStore {
   startWants: (ids: string[]) => Promise<void>;
   setDraggingWant: (wantId: string | null) => void;
   setDraggingTemplate: (template: DraggingTemplate | null) => void;
+  setTouchPos: (pos: { x: number; y: number } | null) => void;
   setIsOverTarget: (isOver: boolean) => void;
   setHighlightedLabel: (label: { key: string; value: string } | null) => void;
   setBlinkingWantId: (wantId: string | null) => void;
@@ -70,6 +72,7 @@ export const useWantStore = create<WantStore>()(
     error: null,
     draggingWant: null,
     draggingTemplate: null,
+    touchPos: null,
     isOverTarget: false,
     highlightedLabel: null,
     blinkingWantId: null,
@@ -80,6 +83,7 @@ export const useWantStore = create<WantStore>()(
     // Actions
     setDraggingWant: (wantId: string | null) => set({ draggingWant: wantId }),
     setDraggingTemplate: (template: DraggingTemplate | null) => set({ draggingTemplate: template }),
+    setTouchPos: (pos: { x: number; y: number } | null) => set({ touchPos: pos }),
     setIsOverTarget: (isOver: boolean) => set({ isOverTarget: isOver }),
     setQuickActionsWantId: (wantId: string | null) => set({ quickActionsWantId: wantId }),
     setDeleteConfirmWantId: (wantId: string | null) => set({ deleteConfirmWantId: wantId }),

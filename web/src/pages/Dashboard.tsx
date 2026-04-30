@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Heart, StickyNote } from 'lucide-react';
+import { RefreshCw, ChevronDown, Heart, StickyNote, Zap } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -44,7 +44,7 @@ export const Dashboard: React.FC = () => {
   const { 
     wants, loading, error, fetchWants, deleteWant, deleteWants, 
     suspendWant, resumeWant, stopWant, startWant, clearError, 
-    draggingTemplate, setDraggingTemplate 
+    draggingTemplate, setDraggingTemplate, touchPos, setTouchPos
   } = useWantStore();
 
   const sidebar = useRightSidebarExclusivity<Want>();
@@ -101,6 +101,40 @@ export const Dashboard: React.FC = () => {
   const [canvasCenterY, setCanvasCenterY] = useState<number | undefined>(undefined);
   const pendingCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const prevWantIdsRef = useRef<Set<string>>(new Set());
+
+  // Global touch end handler for template drop
+  useEffect(() => {
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      if (!draggingTemplate || !touchPos) return;
+
+      const touch = e.changedTouches[0];
+      const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+      
+      // Check if dropped over canvas (look for data-want-canvas="true")
+      const canvasEl = targetEl?.closest('[data-want-canvas="true"]');
+      
+      if (canvasEl && canvasMode) {
+        // We need to calculate grid coordinates. 
+        // We use a CustomEvent to communicate with WantCanvas.
+        const dropEvent = new CustomEvent('mywant:template-touch-drop', {
+          detail: {
+            template: draggingTemplate,
+            clientX: touch.clientX,
+            clientY: touch.clientY
+          }
+        });
+        canvasEl.dispatchEvent(dropEvent);
+      }
+
+      setDraggingTemplate(null);
+      setTouchPos(null);
+    };
+
+    if (draggingTemplate && touchPos) {
+      window.addEventListener('touchend', handleGlobalTouchEnd);
+      return () => window.removeEventListener('touchend', handleGlobalTouchEnd);
+    }
+  }, [draggingTemplate, touchPos, canvasMode, setDraggingTemplate, setTouchPos]);
 
   // Only orphan (no ownerReferences) draft wants are shown as top-level DraftWantCards.
   // Draft wants that are children of another want (e.g. goal under whim) are rendered
@@ -1462,6 +1496,22 @@ export const Dashboard: React.FC = () => {
         className="hidden"
         accept=".yaml,.yml"
       />
+
+      {/* Mobile Touch Drag Ghost */}
+      {draggingTemplate && touchPos && (
+        <div 
+          className="fixed z-[9999] pointer-events-none bg-blue-600/90 text-white px-3 py-1.5 rounded-lg shadow-2xl flex items-center gap-2 animate-in fade-in zoom-in duration-200"
+          style={{ 
+            left: touchPos.x, 
+            top: touchPos.y, 
+            transform: 'translate(-50%, -120%)',
+            width: 'max-content'
+          }}
+        >
+          <Zap className="w-4 h-4 text-white" />
+          <span className="text-xs font-bold">{draggingTemplate.name}</span>
+        </div>
+      )}
     </>
   );
 };
