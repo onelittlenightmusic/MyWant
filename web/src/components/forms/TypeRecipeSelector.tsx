@@ -469,7 +469,6 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       });
                     }}
                     onDragEnd={() => {
-                      console.log('[DEBUG TypeRecipeSelector] dragend - want-type:', item.title);
                       useWantStore.getState().setDraggingTemplate(null);
                     }}
                     onTouchStart={(e) => handleTouchStart(item, e)}
@@ -559,7 +558,6 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
                       });
                     }}
                     onDragEnd={() => {
-                      console.log('[DEBUG TypeRecipeSelector] dragend - recipe:', item.title);
                       useWantStore.getState().setDraggingTemplate(null);
                     }}
                     onTouchStart={(e) => handleTouchStart(item, e)}

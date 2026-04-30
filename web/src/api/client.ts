@@ -77,19 +77,13 @@ class MyWantApiClient {
 
     // Request interceptor
     this.client.interceptors.request.use(
-      (config) => {
-        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
-        return config;
-      },
+      (config) => config,
       (error) => Promise.reject(error)
     );
 
     // Response interceptor
     this.client.interceptors.response.use(
-      (response) => {
-        console.log(`API Response: ${response.status} ${response.config.url}`);
-        return response;
-      },
+      (response) => response,
       (error: AxiosError) => {
         const apiError: ApiError = {
           message: error.message || 'An error occurred',
@@ -222,7 +216,6 @@ class MyWantApiClient {
   }
 
   async getWant(id: string): Promise<WantDetails> {
-    console.log('[DEBUG] apiClient.getWant called with ID:', id);
     return this.deduplicatedGet<WantDetails>(`/api/v1/wants/${id}`);
   }
 
