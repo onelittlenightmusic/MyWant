@@ -852,6 +852,57 @@ export const Dashboard: React.FC = () => {
     handleCreateWant();
   };
 
+  const handleCanvasTemplateDrop = async (tid: string, tt: 'want-type' | 'recipe', x: number, y: number) => {
+    try {
+      const { recipes } = useRecipeStore.getState();
+      let params = {}; 
+      let wantType = tid;
+      
+      if (tt === 'want-type') {
+        const wt = await apiClient.getWantType(tid);
+        if (wt) {
+          if (wt.examples && wt.examples.length > 0) params = wt.examples[0].want?.spec?.params || {};
+          else if (wt.parameters) { 
+            const d: any = {}; 
+            wt.parameters.forEach(p => { 
+              if (p.default !== undefined) d[p.name] = p.default; 
+              else if (p.example !== undefined) d[p.name] = p.example; 
+            }); 
+            params = d; 
+          }
+        }
+      } else {
+        const r = recipes.find(x => x.recipe?.metadata?.custom_type === tid);
+        if (r) { 
+          params = r.recipe.parameters || {}; 
+          wantType = r.recipe.metadata.custom_type || tid; 
+        }
+      }
+      
+      const name = generateUniqueWantName(tid, tt, new Set(wants.map(w => w.metadata?.name || '')));
+      const { createWant } = useWantStore.getState();
+      
+      await createWant({ 
+        metadata: { 
+          name, 
+          type: wantType, 
+          labels: { 
+            'mywant.io/type': wantType,
+            [CANVAS_LABEL_X]: String(x),
+            [CANVAS_LABEL_Y]: String(y)
+          } 
+        }, 
+        spec: { params } 
+      });
+      
+      setDraggingTemplate(null); 
+      showNotification(`✓ Created "${name}" on canvas`); 
+      await fetchWants();
+    } catch (e: any) { 
+      showNotification(`✗ Failed: ${e.message}`); 
+    }
+  };
+
   const handleUnparentWant = async (id: string) => {
     try {
       const w = wants.find(x => (x.metadata?.id === id) || (x.id === id));
@@ -1256,6 +1307,7 @@ export const Dashboard: React.FC = () => {
                 onViewWant={handleViewWant}
                 onCreateWant={handleCanvasCreateWant}
                 onMoveWant={handleCanvasMoveWant}
+                onTemplateDrop={handleCanvasTemplateDrop}
                 scale={canvasScale}
                 onScaleChange={setCanvasScale}
                 centerX={canvasCenterX}

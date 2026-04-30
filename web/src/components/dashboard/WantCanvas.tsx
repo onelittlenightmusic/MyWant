@@ -58,6 +58,8 @@ interface WantCanvasProps {
   /** Children of the selected want, grouped into the role overlay */
   childWants?: Want[];
   onDeselect?: () => void;
+  /** Called when a want template (type/recipe) is dropped from outside */
+  onTemplateDrop?: (templateId: string, itemType: 'want-type' | 'recipe', x: number, y: number) => void;
   /** Extra controls rendered in the top-left toolbar (e.g. list/canvas toggle) */
   toolbarContent?: React.ReactNode;
   /** wantId → correlation rate (0–N); populated when radar mode is active */
@@ -78,6 +80,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   floatCard,
   childWants = [],
   onDeselect: _onDeselect,
+  onTemplateDrop,
   toolbarContent,
   correlationHighlights,
 }) => {
@@ -694,25 +697,45 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   }, [positionMap]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    if (!e.dataTransfer.types.includes('application/mywant-canvas-id')) return;
+    const isWantMove = e.dataTransfer.types.includes('application/mywant-canvas-id');
+    const isTemplateDrop = e.dataTransfer.types.includes('application/mywant-template');
+
+    if (!isWantMove && !isTemplateDrop) return;
+
     e.preventDefault();
     const { cx, cy } = cellFromEvent(e);
     setDragOverCell({ x: cx, y: cy });
   }, [cellFromEvent]);
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    const templateDataRaw = e.dataTransfer.getData('application/mywant-template');
+    const wantIdMove = e.dataTransfer.getData('application/mywant-canvas-id');
+
+    if (!templateDataRaw && !wantIdMove) return;
+
     e.preventDefault();
-    const wantId = e.dataTransfer.getData('application/mywant-canvas-id');
-    if (!wantId) return;
     const { cx, cy } = cellFromEvent(e);
-    if (!isCellOccupied(cx, cy, wantId)) {
-      setLocalOverrides(prev => new Map(prev).set(wantId, { x: cx, y: cy }));
-      onMoveWant(wantId, cx, cy);
+
+    if (templateDataRaw) {
+      try {
+        const t = JSON.parse(templateDataRaw);
+        if (t.id && t.type && onTemplateDrop) {
+          onTemplateDrop(t.id, t.type, cx, cy);
+        }
+      } catch (err) {
+        console.error('[Canvas] Failed to parse template data:', err);
+      }
+    } else if (wantIdMove) {
+      if (!isCellOccupied(cx, cy, wantIdMove)) {
+        setLocalOverrides(prev => new Map(prev).set(wantIdMove, { x: cx, y: cy }));
+        onMoveWant(wantIdMove, cx, cy);
+      }
+      checkOnDrop(wantIdMove, { x: cx, y: cy });
     }
+
     setDragWantId(null);
     setDragOverCell(null);
-    checkOnDrop(wantId, { x: cx, y: cy });
-  }, [onMoveWant, isCellOccupied, cellFromEvent, checkOnDrop]);
+  }, [onMoveWant, isCellOccupied, cellFromEvent, checkOnDrop, onTemplateDrop]);
 
   const handleDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
