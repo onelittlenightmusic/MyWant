@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ProximityState, FieldMatchRec } from './hooks/useFieldMatchProximity';
+import { ProximityState, FieldMatchRec, ProximityDirection } from './hooks/useFieldMatchProximity';
 
 interface FieldMatchBubbleProps {
   proximity: ProximityState;
@@ -13,6 +13,30 @@ interface FieldMatchBubbleProps {
   getContainerRect: () => DOMRect | null;
   onApply: (rec: FieldMatchRec) => Promise<void>;
   onDismiss: () => void;
+}
+
+const DIRECTION_ARROW: Record<ProximityDirection, string> = {
+  left:  '◀',
+  right: '▶',
+  above: '▲',
+  below: '▼',
+};
+
+const DIRECTION_LABEL: Record<ProximityDirection, string> = {
+  left:  '横方向 · current',
+  right: '横方向 · current',
+  above: '縦方向 · plan / goal',
+  below: '縦方向 · plan / goal',
+};
+
+/** Returns one-letter badge + colour classes for a state label. */
+function labelBadge(label: string): { letter: string; classes: string } | null {
+  switch (label) {
+    case 'goal':    return { letter: 'G', classes: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+    case 'plan':    return { letter: 'P', classes: 'bg-purple-500/20 text-purple-300 border-purple-500/40' };
+    case 'current': return { letter: 'C', classes: 'bg-blue-500/20 text-blue-300 border-blue-500/40' };
+    default: return null;
+  }
 }
 
 export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
@@ -49,6 +73,11 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
     }
   };
 
+  const arrow = DIRECTION_ARROW[proximity.direction];
+  const axisLabel = DIRECTION_LABEL[proximity.direction];
+  const sourceName = proximity.recs[0]?.source.want_name ?? '';
+  const targetName = proximity.recs[0]?.target.want_name ?? '';
+
   return (
     <div
       className="fixed z-[200] pointer-events-auto"
@@ -63,13 +92,14 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
       {/* Bubble panel */}
       <div
         className="relative ml-4 mt-4 bg-gray-900/95 border border-blue-500/40 rounded-xl shadow-2xl backdrop-blur-sm"
-        style={{ minWidth: 220, maxWidth: 300 }}
+        style={{ minWidth: 240, maxWidth: 320 }}
       >
-        {/* Header */}
+        {/* Header — direction arrow + axis label */}
         <div className="flex items-center justify-between px-3 pt-2 pb-1 border-b border-white/10">
           <div className="flex items-center gap-1.5">
-            <span className="text-blue-400 text-xs">⟷</span>
+            <span className="text-blue-400 text-xs font-mono">{arrow}</span>
             <span className="text-white text-xs font-semibold">接続候補</span>
+            <span className="text-white/40 text-[10px]">{axisLabel}</span>
           </div>
           <button
             onClick={onDismiss}
@@ -77,67 +107,64 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
           >✕</button>
         </div>
 
-        {/* Recommendation list */}
-        <div className="p-2 space-y-1.5">
-          {proximity.recs.map(rec => {
+        {/* Source → Target with provider/consumer hint */}
+        <div className="px-3 pt-1.5 pb-1 flex items-center gap-1.5 text-[10px]">
+          <span className="text-white/70 font-medium">{sourceName}</span>
+          <span className="text-white/30">expose</span>
+          <span className="text-blue-400">→</span>
+          <span className="text-white/70 font-medium">{targetName}</span>
+          <span className="text-white/30">receive</span>
+        </div>
+
+        {/* Recommendation list — max 5, one line per item */}
+        <div className="px-2 pb-2 space-y-0.5">
+          {proximity.recs.slice(0, 5).map(rec => {
             const key = recKey(rec);
             const isApplied = applied.has(key);
             const isApplying = applying === key;
             const score = Math.round(rec.score * 100);
+            const badge = labelBadge(rec.source.label);
 
             return (
               <div
                 key={key}
-                className={`rounded-lg px-2.5 py-2 border transition-colors ${
+                className={`flex items-center gap-1.5 rounded px-1.5 py-1 transition-colors ${
                   isApplied
-                    ? 'bg-green-900/40 border-green-500/40'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    ? 'bg-green-900/40'
+                    : 'hover:bg-white/5'
                 }`}
               >
-                {/* Field path */}
-                <p className="text-[11px] text-white/80 font-mono leading-tight mb-1.5">
-                  <span className="text-blue-300">{rec.source.field_name}</span>
-                  <span className="text-white/40 mx-1">→</span>
-                  <span className="text-purple-300">{rec.target.param_name}</span>
-                </p>
+                {/* Label badge */}
+                {badge && (
+                  <span className={`shrink-0 text-[9px] px-1 py-0.5 rounded border font-bold leading-none ${badge.classes}`}>
+                    {badge.letter}
+                  </span>
+                )}
 
-                {/* Score + type + button */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                      rec.source.field_type === 'array'
-                        ? 'bg-blue-500/20 text-blue-300'
-                        : 'bg-gray-500/20 text-gray-300'
-                    }`}>
-                      {rec.source.field_type}
-                    </span>
-                    <span className="text-[10px] text-white/30">{score}%</span>
-                    {rec.source.is_final && (
-                      <span className="text-[10px] text-yellow-400/70">★</span>
-                    )}
-                  </div>
-                  {isApplied ? (
-                    <span className="text-[10px] text-green-400">✓ 適用済み</span>
-                  ) : (
-                    <button
-                      onClick={() => handleApply(rec)}
-                      disabled={isApplying}
-                      className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
-                    >
-                      {isApplying ? '...' : '適用'}
-                    </button>
-                  )}
-                </div>
+                {/* Field name */}
+                <span className="text-[11px] text-blue-300 font-mono truncate flex-1 min-w-0">
+                  {rec.source.field_name}
+                  {rec.source.is_final && <span className="text-yellow-400/70 ml-0.5">★</span>}
+                </span>
+
+                {/* Score */}
+                <span className="shrink-0 text-[10px] text-white/25">{score}%</span>
+
+                {/* Apply / Applied */}
+                {isApplied ? (
+                  <span className="shrink-0 text-[10px] text-green-400">✓</span>
+                ) : (
+                  <button
+                    onClick={() => handleApply(rec)}
+                    disabled={isApplying}
+                    className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors disabled:opacity-50"
+                  >
+                    {isApplying ? '…' : '適用'}
+                  </button>
+                )}
               </div>
             );
           })}
-        </div>
-
-        {/* Source → Target names */}
-        <div className="px-3 pb-2 flex items-center gap-1 text-[10px] text-white/30">
-          <span>{proximity.recs[0]?.source.want_name}</span>
-          <span>→</span>
-          <span>{proximity.recs[0]?.target.want_name}</span>
         </div>
       </div>
     </div>

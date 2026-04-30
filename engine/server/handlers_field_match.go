@@ -27,6 +27,7 @@ type FieldRef struct {
 	WantName  string `json:"want_name"`
 	FieldName string `json:"field_name"`
 	FieldType string `json:"field_type"` // "array", "string", "number", "bool", "object"
+	Label     string `json:"label"`      // "current", "plan", "goal", or "" (unlabeled)
 	IsFinal   bool   `json:"is_final"`   // true if this is the want type's finalResultField
 }
 
@@ -44,7 +45,13 @@ type ParamChange struct {
 	Value     any    `json:"value"`
 }
 
-// GET /api/v1/wants/field-match-recommendations?source_id=xxx&target_id=yyy
+// GET /api/v1/wants/field-match-recommendations?source_id=xxx&target_id=yyy&exposed_labels=current
+//
+// exposed_labels (optional, default "current"): comma-separated list of state labels
+// to expose from source. Valid values: "current", "plan", "goal". Unknown values are ignored.
+// This corresponds to the GPC spatial model:
+//   - horizontal drop (left/right) → exposed_labels=current
+//   - vertical drop (above/below)  → exposed_labels=plan,goal
 func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source_id")
 	targetID := r.URL.Query().Get("target_id")
@@ -52,6 +59,8 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 		s.JSONError(w, r, http.StatusBadRequest, "source_id and target_id are required", "")
 		return
 	}
+
+	exposedLabels := parseExposedLabels(r.URL.Query().Get("exposed_labels"))
 
 	sourceWant, _, sourceFound := s.globalBuilder.FindWantByID(sourceID)
 	targetWant, _, targetFound := s.globalBuilder.FindWantByID(targetID)
@@ -64,13 +73,52 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	recs := computeFieldMatchRecommendations(s, sourceWant, targetWant)
+	recs := computeFieldMatchRecommendations(s, sourceWant, targetWant, exposedLabels)
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"source_id":       sourceID,
 		"target_id":       targetID,
+		"exposed_labels":  exposedLabelsToStrings(exposedLabels),
 		"recommendations": recs,
 	})
+}
+
+// parseExposedLabels converts a comma-separated string like "plan,goal" into a set of StateLabel.
+// Empty or missing input defaults to {LabelCurrent} for backward compatibility.
+func parseExposedLabels(raw string) map[mywant.StateLabel]bool {
+	out := map[mywant.StateLabel]bool{}
+	if raw == "" {
+		out[mywant.LabelCurrent] = true
+		return out
+	}
+	for _, token := range strings.Split(raw, ",") {
+		switch strings.TrimSpace(strings.ToLower(token)) {
+		case "current":
+			out[mywant.LabelCurrent] = true
+		case "plan":
+			out[mywant.LabelPlan] = true
+		case "goal":
+			out[mywant.LabelGoal] = true
+		}
+	}
+	if len(out) == 0 {
+		out[mywant.LabelCurrent] = true
+	}
+	return out
+}
+
+func exposedLabelsToStrings(set map[mywant.StateLabel]bool) []string {
+	var out []string
+	if set[mywant.LabelGoal] {
+		out = append(out, "goal")
+	}
+	if set[mywant.LabelPlan] {
+		out = append(out, "plan")
+	}
+	if set[mywant.LabelCurrent] {
+		out = append(out, "current")
+	}
+	return out
 }
 
 // POST /api/v1/wants/field-match-recommendations/apply
@@ -155,11 +203,11 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// computeFieldMatchRecommendations scores all combinations of source current fields
-// against target *_import_field / *_source_* parameters.
-func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want) []FieldMatchRecommendation {
-	// Collect source current fields
-	sourceFields := collectSourceFields(s, source)
+// computeFieldMatchRecommendations scores all combinations of source state fields
+// (filtered by allowedLabels) against target *_import_field / *_source_* parameters.
+func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldMatchRecommendation {
+	// Collect source state fields whose label is in allowedLabels
+	sourceFields := collectSourceFields(s, source, allowedLabels)
 	// Collect target import-style parameters
 	targetParams := collectTargetImportParams(s, target)
 
@@ -196,9 +244,12 @@ func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want) []
 	return recs
 }
 
-// collectSourceFields enumerates fields from want.state.current,
-// annotating each with its runtime type and whether it is the finalResultField.
-func collectSourceFields(s *Server, want *mywant.Want) []FieldRef {
+// collectSourceFields enumerates state fields whose label is in allowedLabels,
+// annotating each with its runtime type, label, and whether it is the finalResultField.
+//
+// Unlabeled fields (LabelNone) are treated as LabelCurrent for backward compatibility
+// — they show up only when allowedLabels includes LabelCurrent.
+func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldRef {
 	typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
 	finalField := ""
 	if typeDef != nil {
@@ -208,22 +259,43 @@ func collectSourceFields(s *Server, want *mywant.Want) []FieldRef {
 	state := want.GetExplicitState()
 	var fields []FieldRef
 	for k, v := range state {
-		if strings.HasPrefix(k, "_") {
-			continue // skip internal fields
+		if strings.HasPrefix(k, "_") || k == "final_result" {
+			continue // skip internal/system fields; final_result is a system alias stored under
+			// globalState["wants"][name] (not globalState["final_result"]), so it cannot be
+			// read by independent wants via GetParentState — reference the finalResultField instead.
 		}
 		label, hasLabel := want.StateLabels[k]
-		if hasLabel && label != mywant.LabelCurrent {
-			continue // only current-labelled fields are readable outputs
+		// Treat unlabeled fields as "current" so legacy types still expose outputs.
+		effective := label
+		if !hasLabel || label == mywant.LabelNone {
+			effective = mywant.LabelCurrent
+		}
+		if !allowedLabels[effective] {
+			continue
 		}
 		fields = append(fields, FieldRef{
 			WantID:    want.Metadata.ID,
 			WantName:  want.Metadata.Name,
 			FieldName: k,
 			FieldType: runtimeTypeName(v),
+			Label:     stateLabelString(effective),
 			IsFinal:   k == finalField,
 		})
 	}
 	return fields
+}
+
+func stateLabelString(label mywant.StateLabel) string {
+	switch label {
+	case mywant.LabelCurrent:
+		return "current"
+	case mywant.LabelPlan:
+		return "plan"
+	case mywant.LabelGoal:
+		return "goal"
+	default:
+		return ""
+	}
 }
 
 // collectTargetImportParams returns parameter names from the target want type definition
@@ -266,6 +338,12 @@ func scoreMatch(sf FieldRef, targetParam string) float64 {
 	targetLower := strings.ToLower(targetParam)
 	if sf.FieldType == "array" && (strings.Contains(targetLower, "choice") || strings.Contains(targetLower, "list") || strings.Contains(targetLower, "import")) {
 		score += 0.4
+	}
+
+	// Label-to-param keyword match: a "plan"-labelled field matched against a param
+	// containing "plan" is a stronger semantic hit than a generic word match.
+	if sf.Label != "" && strings.Contains(targetLower, sf.Label) {
+		score += 0.3
 	}
 
 	// Name similarity: words in common between field name and param name

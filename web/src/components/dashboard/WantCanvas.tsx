@@ -907,7 +907,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
               }),
             });
           }}
-          onDismiss={() => dismissProximity(proximity.sourceId, proximity.targetId)}
+          onDismiss={() => dismissProximity(proximity.sourceId, proximity.targetId, proximity.direction)}
           getContainerRect={() => scrollRef.current?.getBoundingClientRect() ?? null}
         />
       )}
