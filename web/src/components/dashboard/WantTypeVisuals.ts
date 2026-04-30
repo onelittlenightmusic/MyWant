@@ -9,6 +9,17 @@ import {
 } from 'lucide-react';
 import { getBackgroundImage } from '@/utils/backgroundStyles';
 
+// ── Light-theme (canvas) pastel gradient backgrounds per category ────────────
+export const CATEGORY_BG_LIGHT: Record<string, string> = {
+  travel:      'linear-gradient(160deg, #bae6fd 0%, #e0f2fe 100%)',
+  mathematics: 'linear-gradient(160deg, #e9d5ff 0%, #f3e8ff 100%)',
+  math:        'linear-gradient(160deg, #e9d5ff 0%, #f3e8ff 100%)',
+  queue:       'linear-gradient(160deg, #a7f3d0 0%, #d1fae5 100%)',
+  approval:    'linear-gradient(160deg, #fde68a 0%, #fef3c7 100%)',
+  system:      'linear-gradient(160deg, #cbd5e1 0%, #f1f5f9 100%)',
+};
+export const DEFAULT_BG_LIGHT = 'linear-gradient(160deg, #e2e8f0 0%, #f8fafc 100%)';
+
 // ── Dark-theme (canvas) gradient backgrounds per category ───────────────────
 export const CATEGORY_BG_DARK: Record<string, string> = {
   travel:      'linear-gradient(160deg, #0284c7 0%, #0c4a6e 100%)',
@@ -72,6 +83,9 @@ export const PATTERN_ICON: Record<string, LucideIcon> = {
 export const getCategoryBgDark = (category: string): string =>
   CATEGORY_BG_DARK[category.toLowerCase()] ?? DEFAULT_BG_DARK;
 
+export const getCategoryBgLight = (category: string): string =>
+  CATEGORY_BG_LIGHT[category.toLowerCase()] ?? DEFAULT_BG_LIGHT;
+
 export const getCategoryIcon = (category: string): LucideIcon =>
   CATEGORY_ICON[category.toLowerCase()] ?? Tag;
 
@@ -96,6 +110,7 @@ export const getCardBackgroundStyle = (
   typeName: string,
   category: string,
   theme: 'dark' | 'light',
+  context: 'canvas' | 'sidebar' = 'sidebar',
 ): React.CSSProperties => {
   const bgImage = getBackgroundImage(typeName);
   if (bgImage) {
@@ -110,15 +125,25 @@ export const getCardBackgroundStyle = (
   if (theme === 'dark') {
     return { background: getCategoryBgDark(category) };
   }
-  // light: plain white — handled by Tailwind className on the wrapper
+  // light canvas: pastel category gradient
+  if (context === 'canvas') {
+    return { background: getCategoryBgLight(category) };
+  }
+  // light sidebar: plain white — handled by Tailwind className on the wrapper
   return {};
 };
 
 /**
  * Overlay rgba for the card (sits between background and content).
  */
-export const getCardOverlayBg = (typeName: string, theme: 'dark' | 'light'): string => {
+export const getCardOverlayBg = (
+  typeName: string,
+  theme: 'dark' | 'light',
+  context: 'canvas' | 'sidebar' = 'sidebar',
+): string => {
   const hasImage = !!getBackgroundImage(typeName);
   if (theme === 'dark') return hasImage ? 'rgba(15,23,42,0.45)' : 'rgba(0,0,0,0.12)';
+  // light canvas: subtle wash over the pastel gradient
+  if (context === 'canvas') return hasImage ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)';
   return hasImage ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.20)';
 };

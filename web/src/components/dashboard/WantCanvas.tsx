@@ -8,6 +8,7 @@ import { useConfigStore } from '@/stores/configStore';
 import { classNames } from '@/utils/helpers';
 import { WantCardFace } from './WantCardFace';
 import { getPatternColor } from './WantTypeVisuals';
+import { useColorMode } from '@/hooks/useColorMode';
 import { CanvasChildOverlay } from './CanvasChildOverlay';
 import { useFieldMatchProximity, FieldMatchRec } from './hooks/useFieldMatchProximity';
 import { FieldMatchBubble } from './FieldMatchBubble';
@@ -80,6 +81,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   toolbarContent,
   correlationHighlights,
 }) => {
+  const colorMode = useColorMode();
   const canvasRef = useRef<HTMLDivElement>(null);
   const spacerRef  = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -691,8 +693,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
 
   return (
     <div
-      className="w-full flex-1 relative overflow-hidden bg-[#0a0f1e]"
-      style={{ minHeight: 0, height: 'calc(100vh - var(--header-height, 56px))' }}
+      className="w-full flex-1 relative overflow-hidden"
+      style={{ backgroundColor: 'var(--canvas-bg)', minHeight: 0, height: 'calc(100vh - var(--header-height, 56px))' }}
     >
       {/* Zoom toolbar: fixed to the viewport, just inside the header edge.
            Uses --header-height CSS var set by Header component. */}
@@ -744,10 +746,10 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
             style={{
               width: canvasW,
               height: canvasH,
-              backgroundColor: '#0a0f1e',
+              backgroundColor: 'var(--canvas-bg)',
               backgroundImage: [
-                'linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px)',
-                'linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px)',
+                'linear-gradient(var(--canvas-grid) 1px, transparent 1px)',
+                'linear-gradient(90deg, var(--canvas-grid) 1px, transparent 1px)',
               ].join(', '),
               backgroundSize: `${STEP}px ${STEP}px`,
               backgroundPosition: `${GAP / 2}px ${GAP / 2}px`,
@@ -809,7 +811,8 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                   typeName={type}
                   displayName={name}
                   category={category}
-                  theme="dark"
+                  theme={colorMode}
+                  context="canvas"
                   iconSize={26}
                   className={classNames(
                     'rounded z-10 transition-transform duration-100',

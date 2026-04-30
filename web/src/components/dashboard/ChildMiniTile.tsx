@@ -3,6 +3,7 @@ import { Want } from '@/types/want';
 import { WantCardFace } from './WantCardFace';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { getStatusHexColor } from './WantCard/parts/StatusColor';
+import { useColorMode } from '@/hooks/useColorMode';
 
 export type ChildRole = 'thinker' | 'monitor' | 'doer' | 'other';
 
@@ -32,6 +33,7 @@ export const ChildMiniTile: React.FC<ChildMiniTileProps> = ({
   animationDelay = 0,
   onClick,
 }) => {
+  const colorMode = useColorMode();
   const wantTypes = useWantTypeStore(state => state.wantTypes);
   const type = want.metadata?.type || '';
   const category = useMemo(
@@ -62,7 +64,8 @@ export const ChildMiniTile: React.FC<ChildMiniTileProps> = ({
         typeName={type}
         displayName={name}
         category={category}
-        theme="dark"
+        theme={colorMode}
+        context="canvas"
         iconSize={20}
         className="rounded w-full h-full"
         style={{

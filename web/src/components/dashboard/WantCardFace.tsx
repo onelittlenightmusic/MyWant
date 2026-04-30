@@ -18,8 +18,10 @@ export interface WantCardFaceProps {
   typeName: string;
   displayName: string;
   category: string;
-  /** 'dark' = canvas tiles; 'light' = sidebar cards */
+  /** 'dark' = canvas tiles (dark mode); 'light' = light mode or sidebar */
   theme: 'dark' | 'light';
+  /** 'canvas' enables pastel gradients in light mode; 'sidebar' keeps plain white */
+  context?: 'canvas' | 'sidebar';
   iconSize?: number;
   // Container passthrough
   className?: string;
@@ -42,6 +44,7 @@ export const WantCardFace: React.FC<WantCardFaceProps> = ({
   displayName,
   category,
   theme,
+  context = 'sidebar',
   iconSize = 26,
   className,
   style,
@@ -56,8 +59,8 @@ export const WantCardFace: React.FC<WantCardFaceProps> = ({
   dataAttributes,
 }) => {
   const CatIcon = getCategoryIcon(category);
-  const bgStyle = getCardBackgroundStyle(typeName, category, theme);
-  const overlayBg = getCardOverlayBg(typeName, theme);
+  const bgStyle = getCardBackgroundStyle(typeName, category, theme, context);
+  const overlayBg = getCardOverlayBg(typeName, theme, context);
 
   const isLight = theme === 'light';
 

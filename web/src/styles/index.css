@@ -38,11 +38,15 @@
   :root {
     --progress-bg-light: rgba(255, 255, 255, 0.5);
     --progress-bg-dark: rgba(0, 0, 0, 0.2);
+    --canvas-bg: #f1f5f9;
+    --canvas-grid: rgba(100, 116, 139, 0.15);
   }
 
   .dark {
     --progress-bg-light: rgba(255, 255, 255, 0.15);
     --progress-bg-dark: rgba(0, 0, 0, 0.4);
+    --canvas-bg: #0a0f1e;
+    --canvas-grid: rgba(148, 163, 184, 0.07);
   }
 
   html {
