@@ -56,6 +56,7 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       iconSize={28}
       onClick={handleCardClick}
       tabIndex={0}
+      style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties}
       className={classNames(
         'card hover:shadow-md dark:hover:shadow-blue-900/20 transition-all duration-300 cursor-pointer group h-full flex flex-col min-h-[6rem] sm:min-h-[10rem] focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500 focus:ring-inset',
         selected ? 'border-blue-500 border-2 shadow-lg scale-[1.02] z-10' : 'border-gray-200 dark:border-gray-700',
@@ -67,14 +68,14 @@ export const WantTypeCard: React.FC<WantTypeCardProps> = ({
       }}
     >
       {/* Bottom bar (title + badges) — same as original WantTypeCard */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 mt-auto">
+      <div className="absolute bottom-0 left-0 right-0 z-20 mt-auto select-none">
         <div className={classNames(
           'backdrop-blur-[2px] transition-colors duration-200 px-3 sm:px-6 py-1.5 flex items-center justify-between',
           selected ? 'bg-blue-100/90 dark:bg-blue-900/70' : 'bg-white/60 dark:bg-gray-900/70',
         )}>
           <div className="flex-1 min-w-0">
             <h3
-              className="text-[9px] sm:text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5"
+              className="text-[9px] sm:text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors cursor-pointer flex items-center gap-1.5 select-none"
               onClick={(e) => { e.stopPropagation(); onView(wantType); }}
             >
               <Zap className="h-2 w-2 sm:h-3.5 sm:w-3.5 flex-shrink-0 text-yellow-500" />

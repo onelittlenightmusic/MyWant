@@ -68,7 +68,7 @@ export const WantCardFace: React.FC<WantCardFaceProps> = ({
     <div
       ref={divRef}
       className={classNames(
-        'relative overflow-hidden',
+        'relative overflow-hidden select-none',
         // Light theme base (matches original WantTypeCard)
         isLight && 'bg-white bg-opacity-70 dark:bg-gray-800 dark:bg-opacity-80',
         className,
@@ -101,7 +101,7 @@ export const WantCardFace: React.FC<WantCardFaceProps> = ({
         />
         <p
           className={classNames(
-            'font-semibold text-center leading-tight',
+            'font-semibold text-center leading-tight select-none',
             isLight
               ? 'text-gray-800 dark:text-gray-100'
               : 'text-white',
@@ -114,6 +114,7 @@ export const WantCardFace: React.FC<WantCardFaceProps> = ({
             WebkitBoxOrient: 'vertical' as const,
             textShadow: isLight ? undefined : '0 1px 3px rgba(0,0,0,0.7)',
             maxWidth: '100%',
+            WebkitUserSelect: 'none',
           }}
         >
           {displayName}
