@@ -133,8 +133,6 @@ export const AgentsPage: React.FC = () => {
         createButtonLabel="Add Agent"
         itemCount={agents.length}
         itemLabel="agent"
-        showSummary={sidebar.showSummary}
-        onSummaryToggle={sidebar.toggleSummary}
       />
 
       {/* Main content area with sidebar-aware layout */}

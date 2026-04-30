@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Heart, BarChart3, ListChecks, Map, Bot, Radar, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2 } from 'lucide-react';
+import { Plus, Heart, ListChecks, Map, Bot, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
@@ -16,8 +16,6 @@ interface HeaderProps {
   createButtonLabel?: string;
   itemCount?: number;
   itemLabel?: string;
-  showSummary?: boolean;
-  onSummaryToggle?: () => void;
   sidebarMinimized?: boolean;
   hideCreateButton?: boolean;
   showSelectMode?: boolean;
@@ -28,8 +26,6 @@ interface HeaderProps {
   onProviderChange?: (provider: string) => void;
   showMinimap?: boolean;
   onMinimapToggle?: () => void;
-  showRadarMode?: boolean;
-  onRadarModeToggle?: () => void;
   showGlobalState?: boolean;
   onGlobalStateToggle?: () => void;
   showCanvasMode?: boolean;
@@ -57,8 +53,6 @@ export const Header: React.FC<HeaderProps> = ({
   createButtonLabel = 'Add Want',
   itemCount,
   itemLabel,
-  showSummary = false,
-  onSummaryToggle,
   sidebarMinimized: _controlledMinimized,
   hideCreateButton = false,
   showSelectMode = false,
@@ -69,8 +63,6 @@ export const Header: React.FC<HeaderProps> = ({
   onProviderChange,
   showMinimap = false,
   onMinimapToggle,
-  showRadarMode = false,
-  onRadarModeToggle,
   showGlobalState = false,
   onGlobalStateToggle,
   showCanvasMode = false,
@@ -361,24 +353,6 @@ export const Header: React.FC<HeaderProps> = ({
             </Tooltip>
           )}
 
-          {/* Radar */}
-          {onRadarModeToggle && (
-            <Tooltip label={showRadarMode ? 'Radar ON' : 'Correlation Radar'} shortcut="x">
-              <button
-                onClick={onRadarModeToggle}
-                className={classNames(
-                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
-                  showRadarMode
-                    ? 'bg-orange-500/90 text-white hover:brightness-110'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                )}
-              >
-                <Radar className="h-4 w-4" />
-                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Radar</span>
-              </button>
-            </Tooltip>
-          )}
-
           {/* Select */}
           {onToggleSelectMode && (
             <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
@@ -393,24 +367,6 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <ListChecks className="h-4 w-4" />
                 <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Select</span>
-              </button>
-            </Tooltip>
-          )}
-
-          {/* Summary */}
-          {onSummaryToggle && (
-            <Tooltip label={showSummary ? 'Hide Summary' : 'Summary'} shortcut="s">
-              <button
-                onClick={onSummaryToggle}
-                className={classNames(
-                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
-                  showSummary
-                    ? 'bg-slate-600/90 text-white hover:brightness-110'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                )}
-              >
-                <BarChart3 className="h-4 w-4" />
-                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Stats</span>
               </button>
             </Tooltip>
           )}

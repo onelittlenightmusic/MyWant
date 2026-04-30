@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save } from 'lucide-react';
+import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save, BarChart3, Radar } from 'lucide-react';
 import { apiClient } from '@/api/client';
 import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { DetailsSidebar } from './DetailsSidebar';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
+import { SummarySidebarContent, SummarySidebarContentProps } from '@/components/sidebar/SummarySidebarContent';
 
 // --- Shared state renderers (mirrors WantDetailsSidebar) ---
 
@@ -372,10 +373,17 @@ const SECTION_CONTAINER_CLASS = 'border border-gray-200 dark:border-gray-700 rou
 
 const TABS = [
   { id: 'results', label: 'Memo', icon: StickyNote },
+  { id: 'stats', label: 'Stats', icon: BarChart3 },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-export const GlobalStateSidebar: React.FC = () => {
+interface GlobalStateSidebarProps {
+  summaryProps?: SummarySidebarContentProps;
+  radarMode?: boolean;
+  onRadarModeToggle?: () => void;
+}
+
+export const GlobalStateSidebar: React.FC<GlobalStateSidebarProps> = ({ summaryProps, radarMode, onRadarModeToggle }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [globalState, setGlobalState] = useState<Record<string, unknown>>({});
   const [globalParams, setGlobalParams] = useState<Record<string, unknown>>({});
@@ -498,12 +506,29 @@ export const GlobalStateSidebar: React.FC = () => {
               )
             )}
 
+            {activeTab === 'stats' && summaryProps && (
+              <SummarySidebarContent {...summaryProps} />
+            )}
+
             {activeTab === 'settings' && (
-              <SettingsTab
-                parameters={globalParams}
-                onUpdate={handleUpdateParameters}
-                loading={paramsLoading}
-              />
+              <div className="space-y-4">
+                {/* Radar toggle */}
+                {onRadarModeToggle && (
+                  <div className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50 px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <Radar className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">Correlation Radar</span>
+                    </div>
+                    <button
+                      onClick={onRadarModeToggle}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${radarMode ? 'bg-orange-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${radarMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                )}
+                <SettingsTab parameters={globalParams} onUpdate={handleUpdateParameters} loading={paramsLoading} />
+              </div>
             )}
           </div>
         </div>

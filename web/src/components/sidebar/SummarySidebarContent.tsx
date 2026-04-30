@@ -6,7 +6,7 @@ import { WantFilters } from '@/components/dashboard/WantFilters';
 import { classNames } from '@/utils/helpers';
 import { addLabelToRegistry } from '@/utils/labelUtils';
 
-interface SummarySidebarContentProps {
+export interface SummarySidebarContentProps {
   wants: Want[];
   loading: boolean;
   searchQuery: string;

@@ -1106,11 +1106,10 @@ export const Dashboard: React.FC = () => {
     if (showBatchConfirmation) setShowBatchConfirmation(false);
     else if (expandedChain.length > 0) setExpandedChain([]);
     else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
-    else if (sidebar.showSummary) sidebar.closeSummary();
     else if (sidebar.showForm) sidebar.closeForm();
     else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
-  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showSummary || sidebar.showForm || isSelectMode || expandedChain.length > 0 });
+  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || expandedChain.length > 0 });
 
   // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
   // Use capture phase to catch the event before other handlers
@@ -1267,8 +1266,6 @@ export const Dashboard: React.FC = () => {
         onCreateTargetWant={handleCreateTargetWant}
         isAddWantActive={sidebar.showForm && !initialFormTypeId && initialFormItemType === 'want-type' && !editingWant}
         isWhimActive={sidebar.showForm && initialFormTypeId === 'whim-target' && initialFormItemType === 'recipe' && !editingWant}
-        showSummary={sidebar.showSummary}
-        onSummaryToggle={sidebar.toggleSummary}
         showSelectMode={isSelectMode}
         onToggleSelectMode={handleToggleSelectMode}
         onInteractSubmit={handleInteractSubmit}
@@ -1277,8 +1274,6 @@ export const Dashboard: React.FC = () => {
         onProviderChange={setGooseProvider}
         showMinimap={minimapOpen}
         onMinimapToggle={() => setMinimapOpen(!minimapOpen)}
-        showRadarMode={radarMode}
-        onRadarModeToggle={() => setRadarMode(prev => !prev)}
         showGlobalState={sidebar.showMemo}
         onGlobalStateToggle={sidebar.toggleMemo}
         showCanvasMode={canvasMode}
@@ -1391,7 +1386,7 @@ export const Dashboard: React.FC = () => {
           ) : (
             <div className={classNames(
               "p-3 sm:p-6 flex flex-col flex-1 min-h-full pb-24",
-              (sidebar.showSummary || !!selectedWant || sidebar.showMemo) ? "lg:pb-24 pb-[50vh]" : "pb-24"
+              (!!selectedWant || sidebar.showMemo) ? "lg:pb-24 pb-[50vh]" : "pb-24"
             )}>
               <React.Fragment>
                 {error && <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-center"><div className="ml-3"><p className="text-sm text-red-700 dark:text-red-300">{error}</p></div><button onClick={clearError} className="ml-auto text-red-400 hover:text-red-600"><svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg></button></div>}
@@ -1410,14 +1405,13 @@ export const Dashboard: React.FC = () => {
         </div>
       </main>
       <RightSidebar
-        isOpen={sidebar.showSummary || !!selectedWant || sidebar.showMemo}
+        isOpen={!!selectedWant || sidebar.showMemo}
         onClose={() => {
           if (sidebar.showMemo) { sidebar.closeMemo(); return; }
-          if (sidebar.showSummary) { sidebar.closeSummary(); return; }
-          sidebar.clearSelection(); 
+          sidebar.clearSelection();
           setExpandedChain([]);
         }}
-        title={sidebar.showMemo ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : 'Summary')}
+        title={sidebar.showMemo ? 'Memo' : (selectedWant ? (selectedWant.metadata?.name || selectedWant.metadata?.id || 'Want Details') : '')}
         titleIcon={sidebar.showMemo ? StickyNote : (selectedWant ? Heart : undefined)}
         titleIconClassName={sidebar.showMemo ? 'text-green-500' : (selectedWant ? 'text-pink-500' : undefined)}
         backgroundStyle={!sidebar.showMemo && selectedWant ? { backgroundImage: `url(${wantBackgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' } : undefined}
@@ -1426,7 +1420,31 @@ export const Dashboard: React.FC = () => {
         instant
       >
         {sidebar.showMemo ? (
-          <GlobalStateSidebar />
+          <GlobalStateSidebar
+            summaryProps={{
+              wants,
+              loading,
+              searchQuery,
+              onSearchChange: setSearchQuery,
+              statusFilters,
+              onStatusFilter: setStatusFilters,
+              allLabels,
+              onLabelClick: handleLabelClick,
+              selectedLabel,
+              onClearSelectedLabel: () => { setSelectedLabel(null); setLabelOwners([]); setLabelUsers([]); },
+              labelOwners,
+              labelUsers,
+              onViewWant: handleViewWant,
+              onExportWants: handleExportWants,
+              onImportWants: () => fileInputRef.current?.click(),
+              isExporting,
+              isImporting,
+              fetchLabels,
+              fetchWants,
+            }}
+            radarMode={radarMode}
+            onRadarModeToggle={() => setRadarMode(prev => !prev)}
+          />
         ) : (
           <WantDetailsSidebar
             want={selectedWant}

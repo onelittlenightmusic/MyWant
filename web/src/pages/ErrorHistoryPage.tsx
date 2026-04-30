@@ -29,8 +29,6 @@ export const LogsPage: React.FC = () => {
       <Header
         title="Logs"
         onCreateWant={() => {}}
-        showSummary={showSummary}
-        onSummaryToggle={() => setShowSummary(!showSummary)}
         hideCreateButton={true}
       />
 

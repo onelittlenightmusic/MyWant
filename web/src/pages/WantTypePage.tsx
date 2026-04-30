@@ -132,8 +132,6 @@ export default function WantTypePage() {
         title="Want Types"
         itemCount={wantTypes.length}
         itemLabel="type"
-        showSummary={sidebar.showSummary}
-        onSummaryToggle={sidebar.toggleSummary}
       />
 
       {/* Main content area with sidebar-aware layout */}

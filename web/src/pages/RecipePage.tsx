@@ -225,8 +225,6 @@ export default function RecipePage() {
         createButtonLabel="Add Recipe"
         itemCount={recipes.length}
         itemLabel="recipe"
-        showSummary={sidebar.showSummary}
-        onSummaryToggle={sidebar.toggleSummary}
       />
 
       {/* Main content area with sidebar-aware layout */}
