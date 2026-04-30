@@ -70,7 +70,7 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       useWantStore.getState().setTouchPos({ x: touch.clientX, y: touch.clientY });
 
       touchTimerRef.current = null;
-    }, 600); // 600ms for long press
+    }, 200); // 200ms for long press
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -343,7 +343,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
 
   // Expanded view - show all options
   return (
-    <div className="space-y-2 flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div
+      className="space-y-2 flex-1 flex flex-col min-h-0 overflow-hidden"
+      style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' } as React.CSSProperties}
+    >
       {/* Search Input with Icon */}
       {showSearch && (
         <div className="relative flex-shrink-0">
@@ -423,7 +426,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
       )}
 
       {/* Scrollable Card List */}
-      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-950 min-h-0">
+      <div
+        className="space-y-2 flex-1 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-950 min-h-0"
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
+      >
         {/* Want Types Section */}
         {groupedItems.wantTypes.length > 0 && (
           <div>
