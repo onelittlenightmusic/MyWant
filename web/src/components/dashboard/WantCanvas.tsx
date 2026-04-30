@@ -305,6 +305,36 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const canvasW = cols * STEP + GAP;
   const canvasH = rows * STEP + GAP;
 
+  // Adjacent empty cells shown as drop-hint during drag
+  const recommendationHintCells = useMemo(() => {
+    if (!dragWantId) return [];
+    const occupied = new Set<string>();
+    positionMap.forEach((pos, id) => {
+      if (id !== dragWantId) occupied.add(`${pos.x},${pos.y}`);
+    });
+    const NEIGHBORS = [
+      { dx:  1, dy:  0, direction: 'right' as const },
+      { dx: -1, dy:  0, direction: 'left'  as const },
+      { dx:  0, dy:  1, direction: 'below' as const },
+      { dx:  0, dy: -1, direction: 'above' as const },
+    ];
+    const hints: Array<{ x: number; y: number; direction: 'left' | 'right' | 'above' | 'below' }> = [];
+    const seen = new Set<string>();
+    positionMap.forEach((pos, id) => {
+      if (id === dragWantId) return;
+      NEIGHBORS.forEach(({ dx, dy, direction }) => {
+        const nx = pos.x + dx;
+        const ny = pos.y + dy;
+        const key = `${nx},${ny}`;
+        if (!seen.has(key) && !occupied.has(key)) {
+          hints.push({ x: nx, y: ny, direction });
+          seen.add(key);
+        }
+      });
+    });
+    return hints;
+  }, [dragWantId, positionMap]);
+
   const { proximity, checkOnDrop, clear: clearProximity, dismiss: dismissProximity, resetDismissed } =
     useFieldMatchProximity({ positionMap, step: STEP, cellSize: CELL_SIZE, originX, originY });
 
@@ -784,6 +814,35 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
                 />
               );
             })()}
+
+            {/* Recommendation hint cells: adjacent to other wants during drag */}
+            {recommendationHintCells.map(({ x, y, direction }) => {
+              const isHorizontal = direction === 'left' || direction === 'right';
+              const arrow = { left: '◀', right: '▶', above: '▲', below: '▼' }[direction];
+              return (
+                <div
+                  key={`hint-${x},${y}`}
+                  className="absolute pointer-events-none rounded z-0"
+                  style={{
+                    left: (x + originX) * STEP + GAP / 2,
+                    top:  (y + originY) * STEP + GAP / 2,
+                    width: CELL_SIZE, height: CELL_SIZE,
+                    border: '1.5px dashed rgba(251,146,60,0.55)',
+                    backgroundColor: 'rgba(251,146,60,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                  }}
+                >
+                  <span style={{ fontSize: 16, color: 'rgba(251,146,60,0.65)', lineHeight: 1 }}>{arrow}</span>
+                  <span style={{ fontSize: 8, color: 'rgba(251,146,60,0.75)', fontWeight: 600, letterSpacing: '0.04em' }}>
+                    {isHorizontal ? 'current' : 'plan / goal'}
+                  </span>
+                </div>
+              );
+            })}
 
             {/* Want tiles */}
             {wants.map(want => {
