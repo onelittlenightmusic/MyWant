@@ -1,0 +1,56 @@
+wantType:
+  metadata:
+    name: button
+    title: Push Button
+    description: A physical-style push button that increments a counter each press and optionally propagates the count to a target parameter.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+  parameters:
+  - name: label
+    description: Text displayed on the button face
+    type: string
+    required: false
+    default: Push
+  - name: target_param
+    description: Name of the parent parameter to update with the pressed count on each press
+    type: string
+    required: false
+  state:
+  - name: pressed_count
+    description: Total number of times the button has been pressed
+    type: integer
+    label: current
+    persistent: true
+  - name: label
+    description: Button display label
+    type: string
+    label: current
+    persistent: true
+    initialValue: Push
+  - name: target_param
+    description: Target parent parameter name
+    type: string
+    label: current
+    persistent: true
+  - name: webhook_payload
+    description: Payload received via POST /api/v1/webhooks/{id}; consumed by Progress()
+    type: object
+    label: current
+  - name: webhook_received_at
+    description: Timestamp of the last received webhook
+    type: string
+    label: current
+  examples:
+  - title: Trigger button
+    description: A button that increments a trigger counter
+    want:
+      metadata:
+        name: my-trigger-button
+        type: button
+      spec:
+        params:
+          label: "Go!"
+          target_param: trigger_count
