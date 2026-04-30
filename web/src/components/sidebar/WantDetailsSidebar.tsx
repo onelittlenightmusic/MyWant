@@ -310,9 +310,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Auto refresh setup (only refresh specific want details, not the whole list)
   useEffect(() => {
     if (autoRefresh && wantId) {
-      const interval = setInterval(() => {
-        fetchWantDetails(wantId);
-        fetchWantResults(wantId);
+      const interval = setInterval(async () => {
+        const { updated } = await fetchWantDetails(wantId);
+        // Only re-fetch results when the want actually changed (not a 304).
+        // Results = GetAllState(), so they can't change without the want changing.
+        if (updated) fetchWantResults(wantId);
       }, POLLING_INTERVAL_MS);
 
       return () => clearInterval(interval);

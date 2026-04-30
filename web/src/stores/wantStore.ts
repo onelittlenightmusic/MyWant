@@ -35,7 +35,7 @@ interface WantStore {
   deleteWant: (id: string) => Promise<void>;
   deleteWants: (ids: string[]) => Promise<void>;
   selectWant: (want: Want | null) => void;
-  fetchWantDetails: (id: string) => Promise<void>;
+  fetchWantDetails: (id: string) => Promise<{ updated: boolean }>;
   fetchWantResults: (id: string) => Promise<void>;
   clearError: () => void;
   refreshWant: (id: string) => Promise<void>;
@@ -346,7 +346,7 @@ export const useWantStore = create<WantStore>()(
         const result = await apiClient.getWantConditional(id, isInitialLoad ? undefined : getWantETag(id));
         if (result.data === null) {
           // 304: cached detail is still valid — no state change needed
-          return;
+          return { updated: false };
         }
         if (result.etag) setWantETag(id, result.etag);
         // Also patch the wants list so the card status updates immediately.
@@ -354,11 +354,13 @@ export const useWantStore = create<WantStore>()(
         // already advanced wantETags to the new hash, causing the card to show stale status.
         useWantStore.getState().patchWant(result.data!);
         set({ selectedWantDetails: result.data, loading: false });
+        return { updated: true };
       } catch (error) {
         set({
           error: error instanceof Error ? error.message : 'Failed to fetch want details',
           loading: false
         });
+        return { updated: false };
       }
     },
 
