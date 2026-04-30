@@ -75,15 +75,26 @@ class MyWantApiClient {
       },
     });
 
+    const isPollingUrl = (url?: string) =>
+      url?.includes('/api/v1/state') || url?.includes('/api/v1/hash');
+
     // Request interceptor
     this.client.interceptors.request.use(
-      (config) => config,
+      (config) => {
+        if (!isPollingUrl(config.url))
+          console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
       (error) => Promise.reject(error)
     );
 
     // Response interceptor
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        if (!isPollingUrl(response.config.url))
+          console.log(`API Response: ${response.status} ${response.config.url}`);
+        return response;
+      },
       (error: AxiosError) => {
         const apiError: ApiError = {
           message: error.message || 'An error occurred',
