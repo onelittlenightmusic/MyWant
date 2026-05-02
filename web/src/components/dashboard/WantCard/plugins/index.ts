@@ -6,3 +6,4 @@ import './types/ButtonCardPlugin';
 import './types/TimerCardPlugin';
 import './types/ReplayCardPlugin';
 import './types/WeatherCardPlugin';
+import './types/SwitchCardPlugin';
