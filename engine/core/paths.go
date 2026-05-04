@@ -58,4 +58,7 @@ const (
 
 	// AchievementsDir contains achievement seed files (locked achievements + rules)
 	AchievementsDir = "yaml/achievements"
+
+	// SystemWantsFile defines system wants injected fresh on every server startup
+	SystemWantsFile = "yaml/system_wants.yaml"
 )

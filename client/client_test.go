@@ -30,7 +30,7 @@ func TestListWants(t *testing.T) {
 	c := NewClient(ts.URL)
 
 	// 3. Execute
-	resp, err := c.ListWants("", nil, nil, false)
+	resp, err := c.ListWants("", nil, nil, false, false)
 
 	// 4. Assert
 	assert.NoError(t, err)

@@ -827,8 +827,6 @@ func (cb *ChainBuilder) startPhase() {
 			}
 		}
 
-		// Initialize system scheduler if not already present
-		cb.initializeSystemScheduler()
 	} else {
 	}
 }

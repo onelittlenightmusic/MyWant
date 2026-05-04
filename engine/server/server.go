@@ -125,31 +125,19 @@ func New(config Config) *Server {
 	}
 
 	// Remove any stale system wants (they should not persist across restarts)
-	// and inject fresh ones so they are always available from the start.
+	// and inject fresh ones from yaml/system_wants.yaml.
+	systemWants, err := mywant.LoadSystemWantConfigs(mywant.SystemWantsFile)
+	if err != nil {
+		log.Printf("[WARN] Failed to load system wants: %v", err)
+	}
+	systemTypes := mywant.SystemWantTypes(systemWants)
 	filtered := initialConfig.Wants[:0]
 	for _, w := range initialConfig.Wants {
-		if w.Metadata.Type != "gui_state" && w.Metadata.Type != "capability_manager" {
+		if !systemTypes[w.Metadata.Type] {
 			filtered = append(filtered, w)
 		}
 	}
-	initialConfig.Wants = append(filtered,
-		&mywant.Want{
-			Metadata: mywant.Metadata{
-				ID:           "system-gui-state",
-				Name:         "system-gui-state",
-				Type:         "gui_state",
-				IsSystemWant: true,
-			},
-		},
-		&mywant.Want{
-			Metadata: mywant.Metadata{
-				ID:           "system-capability-manager",
-				Name:         "system-capability-manager",
-				Type:         "capability_manager",
-				IsSystemWant: true,
-			},
-		},
-	)
+	initialConfig.Wants = append(filtered, systemWants...)
 
 	globalBuilder.SetConfigInternal(initialConfig)
 	globalBuilder.SetServerMode(true)

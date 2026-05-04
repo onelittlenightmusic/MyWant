@@ -29,7 +29,7 @@ func completeWantIDs(cmd *cobra.Command, args []string, toComplete string) ([]st
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 	c := client.NewClient(viper.GetString("server"))
-	resp, err := c.ListWants("", []string{}, []string{}, false) // No filters for completion
+	resp, err := c.ListWants("", []string{}, []string{}, false, false) // No filters for completion
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
@@ -50,10 +50,11 @@ var listWantsCmd = &cobra.Command{
 		labels, _ := cmd.Flags().GetStringSlice("label")
 		using, _ := cmd.Flags().GetStringSlice("using")
 		all, _ := cmd.Flags().GetBool("all")
+		includeCancelled, _ := cmd.Flags().GetBool("include-cancelled")
 		watch, _ := cmd.Flags().GetBool("watch")
 
 		fetchAndPrint := func() {
-			resp, err := c.ListWants(wantType, labels, using, all)
+			resp, err := c.ListWants(wantType, labels, using, all || includeCancelled, all)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				os.Exit(1)
@@ -301,7 +302,8 @@ func init() {
 	listWantsCmd.Flags().StringP("type", "t", "", "Filter wants by type (e.g., reminder, flight, queue)")
 	listWantsCmd.Flags().StringSliceP("label", "l", []string{}, "Filter wants by labels (format: key=value, can be specified multiple times)")
 	listWantsCmd.Flags().StringSliceP("using", "u", []string{}, "Filter wants by using selectors (format: key=value, can be specified multiple times)")
-	listWantsCmd.Flags().BoolP("all", "a", false, "Include cancelled wants (superseded by rebook actions)")
+	listWantsCmd.Flags().BoolP("all", "A", false, "Include system wants and cancelled wants")
+	listWantsCmd.Flags().Bool("include-cancelled", false, "Include cancelled wants (superseded by rebook actions)")
 	listWantsCmd.Flags().BoolP("watch", "w", false, "Watch wants list for changes")
 	createWantCmd.Flags().StringP("file", "f", "", "Path to YAML/JSON config file")
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
