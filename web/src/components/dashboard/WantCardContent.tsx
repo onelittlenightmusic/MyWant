@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useReducer } from 'react';
 import { AlertTriangle, Bot, Heart, Clock, ThumbsUp, ThumbsDown, Copy, Check, MessageSquare } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -10,7 +10,7 @@ import styles from './WantCard.module.css';
 
 // Register all plugins (side-effect imports)
 import './WantCard/plugins';
-import { getWantCardPlugin } from './WantCard/plugins/registry';
+import { getWantCardPlugin, onPluginRegistered } from './WantCard/plugins/registry';
 
 // ── FinalResultDisplay ────────────────────────────────────────────────────────
 const FinalResultDisplay: React.FC<{
@@ -125,6 +125,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const wantType = want.metadata?.type || 'unknown';
   const labels = want.metadata?.labels || {};
   const config = useConfigStore(state => state.config);
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+  useEffect(() => onPluginRegistered(forceUpdate), []);
 
   const queueId = want.state?.current?.reaction_queue_id as string | undefined;
   const requireReaction = want.spec?.params?.require_reaction !== false;
@@ -271,7 +273,7 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
           )}
 
           {/* Final result text area */}
-          {want.state?.final_result != null && want.state?.final_result !== '' && !isFullScreen && (
+          {want.state?.final_result != null && want.state?.final_result !== '' && !isFullScreen && !plugin?.hideFinalResult && (
             <div className="flex-shrink-0 p-2 pt-0">
               <FinalResultDisplay
                 value={want.state!.final_result}

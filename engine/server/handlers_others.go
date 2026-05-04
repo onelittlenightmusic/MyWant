@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -550,6 +551,21 @@ func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.Wan
 }
 
 // Agents
+func (s *Server) registerAgentYAML(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Failed to read body", err.Error())
+		return
+	}
+	// Use a placeholder path so relative script paths resolve from custom-types dir
+	yamlPath := mywant.UserCustomTypesDir() + "/agent.yaml"
+	if err := s.agentRegistry.RegisterMRSAgentFromYAML(body, yamlPath); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid agent YAML", err.Error())
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "agent registered successfully"})
+}
+
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	var data struct {
 		Name         string   `json:"name"`

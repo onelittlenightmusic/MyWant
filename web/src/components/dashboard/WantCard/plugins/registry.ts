@@ -19,16 +19,25 @@ export interface WantCardPlugin {
   types: string[];
   /** Type-specific content rendered in the card body */
   ContentSection: React.ComponentType<WantCardPluginProps>;
+  /** When true, suppresses the default final result JSON display */
+  hideFinalResult?: boolean;
 }
 
 const pluginRegistry = new Map<string, WantCardPlugin>();
+const registryListeners = new Set<() => void>();
 
 export function registerWantCardPlugin(plugin: WantCardPlugin): void {
   for (const type of plugin.types) {
     pluginRegistry.set(type, plugin);
   }
+  registryListeners.forEach(fn => fn());
 }
 
 export function getWantCardPlugin(type: string): WantCardPlugin | undefined {
   return pluginRegistry.get(type);
+}
+
+export function onPluginRegistered(cb: () => void): () => void {
+  registryListeners.add(cb);
+  return () => registryListeners.delete(cb);
 }

@@ -348,87 +348,85 @@ func (r *AgentRegistry) LoadUserCustomAgents(dir string) error {
 			return nil
 		}
 
-		var wrapper mrsPluginWrapper
-		if err := yaml.Unmarshal(data, &wrapper); err != nil || wrapper.Agent == nil {
-			return nil // not an agent file, skip silently
+		if err := r.RegisterMRSAgentFromYAML(data, path); err != nil {
+			return nil // not an agent file or invalid, skip silently
 		}
-
-		def := wrapper.Agent
-		if def.Metadata.Capability == "" {
-			log.Printf("[AGENT] Warning: skipping MRS agent in %s: capability is required", path)
-			return nil
-		}
-
-		// Resolve script path relative to plugin directory
-		scriptPath := def.Script.Path
-		if !filepath.IsAbs(scriptPath) && !strings.HasPrefix(scriptPath, "~/") {
-			scriptPath = filepath.Join(filepath.Dir(path), scriptPath)
-		}
-		scriptPath = mrsExpandTilde(scriptPath)
-
-		agentName := def.Metadata.Name
-		if agentName == "" {
-			agentName = def.Metadata.Capability
-		}
-		capName := def.Metadata.Capability
-		timeoutSec := def.Script.TimeoutSeconds
-		if timeoutSec == 0 {
-			timeoutSec = 120
-		}
-
-		// Convert state_updates to StateDef slice and register in registry.
-		stateDefs := mrsStateUpdatesToDefs(def.StateUpdates)
-		if len(stateDefs) > 0 {
-			r.RegisterPluginStateUpdates(capName, stateDefs)
-		}
-		stateUpdates := def.StateUpdates // captured by closures below
-
-		switch strings.ToLower(def.Metadata.Type) {
-		case "do":
-			finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
-			r.RegisterCapability(Cap(capName))
-			agent := &DoAgent{
-				BaseAgent: *NewBaseAgent(agentName, []string{capName}, DoAgentType),
-				Action: func(ctx context.Context, want *Want) error {
-					args := mrsPluginBuildArgs(want)
-					skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
-					defer cancel()
-					want.DirectLog("[MRS-DO:%s] executing %s args=%v (timeout: %ds)", finalName, finalPath, args, finalTimeout)
-					raw, err := mrsRunScript(skillCtx, finalPath, args)
-					if err != nil {
-						want.DirectLog("[MRS-DO:%s] failed: %v", finalName, err)
-						return nil
-					}
-					mrsApplyStateUpdates(want, raw, stateUpdates)
-					return nil
-				},
-			}
-			r.RegisterAgent(agent)
-		default: // "monitor" or anything else
-			finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
-			r.RegisterCapability(Cap(capName))
-			agent := &MonitorAgent{
-				BaseAgent: *NewBaseAgent(agentName, []string{capName}, MonitorAgentType),
-				Monitor: func(ctx context.Context, want *Want) (bool, error) {
-					skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
-					defer cancel()
-					want.DirectLog("[MRS-MONITOR:%s] executing %s (timeout: %ds)", finalName, finalPath, finalTimeout)
-					raw, err := mrsRunScript(skillCtx, finalPath, nil)
-					if err != nil {
-						want.DirectLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
-						return false, nil
-					}
-					mrsApplyStateUpdates(want, raw, stateUpdates)
-					return true, nil // stop after successful run
-				},
-			}
-			r.RegisterAgent(agent)
-		}
-
-		log.Printf("[AGENT] Registered MRS plugin agent '%s' (capability=%s type=%s script=%s state_updates=%d)",
-			agentName, capName, def.Metadata.Type, scriptPath, len(stateUpdates))
 		return nil
 	})
+}
+
+// RegisterMRSAgentFromYAML parses a single agent.yaml and registers the agent.
+// yamlPath is used only for resolving relative script paths.
+func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath string) error {
+	var wrapper mrsPluginWrapper
+	if err := yaml.Unmarshal(yamlData, &wrapper); err != nil || wrapper.Agent == nil {
+		return fmt.Errorf("not a valid agent YAML")
+	}
+	def := wrapper.Agent
+	if def.Metadata.Capability == "" {
+		return fmt.Errorf("capability is required")
+	}
+	scriptPath := def.Script.Path
+	if !filepath.IsAbs(scriptPath) && !strings.HasPrefix(scriptPath, "~/") {
+		scriptPath = filepath.Join(filepath.Dir(yamlPath), scriptPath)
+	}
+	scriptPath = mrsExpandTilde(scriptPath)
+	agentName := def.Metadata.Name
+	if agentName == "" {
+		agentName = def.Metadata.Capability
+	}
+	capName := def.Metadata.Capability
+	timeoutSec := def.Script.TimeoutSeconds
+	if timeoutSec == 0 {
+		timeoutSec = 120
+	}
+	stateDefs := mrsStateUpdatesToDefs(def.StateUpdates)
+	if len(stateDefs) > 0 {
+		r.RegisterPluginStateUpdates(capName, stateDefs)
+	}
+	stateUpdates := def.StateUpdates
+	switch strings.ToLower(def.Metadata.Type) {
+	case "do":
+		finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
+		r.RegisterCapability(Cap(capName))
+		r.RegisterAgent(&DoAgent{
+			BaseAgent: *NewBaseAgent(agentName, []string{capName}, DoAgentType),
+			Action: func(ctx context.Context, want *Want) error {
+				args := mrsPluginBuildArgs(want)
+				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
+				defer cancel()
+				want.DirectLog("[MRS-DO:%s] executing %s args=%v", finalName, finalPath, args)
+				raw, err := mrsRunScript(skillCtx, finalPath, args)
+				if err != nil {
+					want.DirectLog("[MRS-DO:%s] failed: %v", finalName, err)
+					return nil
+				}
+				mrsApplyStateUpdates(want, raw, stateUpdates)
+				return nil
+			},
+		})
+	default:
+		finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
+		r.RegisterCapability(Cap(capName))
+		r.RegisterAgent(&MonitorAgent{
+			BaseAgent: *NewBaseAgent(agentName, []string{capName}, MonitorAgentType),
+			Monitor: func(ctx context.Context, want *Want) (bool, error) {
+				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
+				defer cancel()
+				want.DirectLog("[MRS-MONITOR:%s] executing %s", finalName, finalPath)
+				raw, err := mrsRunScript(skillCtx, finalPath, nil)
+				if err != nil {
+					want.DirectLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
+					return false, nil
+				}
+				mrsApplyStateUpdates(want, raw, stateUpdates)
+				return true, nil
+			},
+		})
+	}
+	log.Printf("[AGENT] Registered MRS plugin agent '%s' (capability=%s type=%s script=%s)",
+		agentName, capName, def.Metadata.Type, scriptPath)
+	return nil
 }
 
 // mrsStateUpdatesToDefs converts MRSStateUpdate declarations to StateDef entries

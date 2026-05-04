@@ -7,4 +7,3 @@ import './types/TimerCardPlugin';
 import './types/ReplayCardPlugin';
 import './types/WeatherCardPlugin';
 import './types/SwitchCardPlugin';
-import './types/RpgStageViewCardPlugin';

@@ -1,0 +1,33 @@
+wantType:
+  metadata:
+    name: rpg_stage_view
+    title: "RPG Stage View"
+    version: "1.0.0"
+    category: rpg
+    description: |
+      RPGサーバーのステージ状態をASCIIアートでwant card上に表示するモニター。
+      you（棒人間）・chap（ロボット棒人間）・扉の開閉・デバイスの状態を簡素に表示する。
+    pattern: independent
+
+  finalResultField: scene
+
+  requires:
+    - rpg_stage_view
+
+  state:
+    - { name: scene,  description: "ASCII art of the current stage", type: string, label: current, persistent: true, initialValue: "" }
+    - { name: stage,  description: "current stage ID",               type: string, label: current, persistent: true, initialValue: "" }
+
+  finalizeWhen:
+    achieved: { field: scene, operator: "!=", value: "" }
+
+  examples:
+    - name: rpg-stage-view
+      description: ステージの状態をwant cardにASCIIアートで表示する
+      want:
+        metadata:
+          name: rpg-stage-view
+          type: rpg_stage_view
+        spec:
+          params:
+            poll_interval_seconds: 5

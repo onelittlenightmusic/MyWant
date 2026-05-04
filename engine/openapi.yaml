@@ -848,6 +848,112 @@ paths:
         '204':
           description: Agent deleted
 
+  /api/v1/agents/register-yaml:
+    post:
+      summary: Hot-reload an agent from YAML without server restart
+      description: |
+        Accepts a raw agent YAML definition (same format as `~/.mywant/custom-types/<type>/agent.yaml`)
+        and registers or re-registers the agent at runtime. No server restart required.
+        If an agent with the same name already exists it is replaced in place.
+      operationId: registerAgentYAML
+      tags:
+        - Agents
+      requestBody:
+        required: true
+        content:
+          application/x-yaml:
+            schema:
+              type: string
+              description: Agent YAML definition
+            example: |
+              agent:
+                metadata:
+                  name: my_agent
+                  capability: my_capability
+                  type: monitor
+                script:
+                  path: ./main.py
+                  timeout_seconds: 30
+                state_updates:
+                  - { name: value, type: object, label: current, persistent: true, onFetchData: "value" }
+      responses:
+        '200':
+          description: Agent registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: agent registered successfully
+        '400':
+          description: Invalid agent YAML
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/plugins:
+    get:
+      summary: List available JIT-compiled card plugins
+      description: |
+        Returns a list of plugin JS URLs, one per `~/.mywant/custom-types/*/view/plugin.{jsx,tsx,js,ts}` file found.
+        The frontend dynamically imports these URLs on startup to register external want card renderers.
+      operationId: listPlugins
+      tags:
+        - Plugins
+      responses:
+        '200':
+          description: Array of plugin script URLs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: uri
+                example:
+                  - /api/v1/plugins/rpg-observe.js
+
+  /api/v1/plugins/{filename}:
+    get:
+      summary: Serve a JIT-compiled card plugin as ESM
+      description: |
+        Compiles the matching `plugin.{jsx,tsx,js,ts}` file on demand using esbuild (JSX → ESM, ES2020 target).
+        The result is cached by source MD5 so repeated requests are free.
+        Plugins receive `window.React` and `window.__mywant.registerPlugin` as globals.
+      operationId: servePlugin
+      tags:
+        - Plugins
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Plugin filename, e.g. `rpg-observe.js`
+          example: rpg-observe.js
+      responses:
+        '200':
+          description: Compiled ESM plugin script
+          content:
+            application/javascript:
+              schema:
+                type: string
+        '404':
+          description: Plugin source not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Compilation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/capabilities:
     get:
       summary: List all capabilities
@@ -2403,5 +2509,15 @@ tags:
     description: Want execution status and results monitoring
   - name: Webhooks
     description: Webhook endpoint management
+  - name: Agents
+    description: Agent registration and management
+  - name: Capabilities
+    description: Agent capability registry
+  - name: WantTypes
+    description: Want type definitions and examples
+  - name: Labels
+    description: Label management for wants
+  - name: Plugins
+    description: JIT-compiled frontend card plugins served as ESM modules
   - name: System
     description: System administration and configuration

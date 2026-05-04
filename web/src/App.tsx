@@ -10,11 +10,23 @@ import { AchievementsPage } from '@/pages/AchievementsPage';
 import { useConfigStore } from '@/stores/configStore';
 import { Layout } from '@/components/layout/Layout';
 
+async function loadExternalPlugins() {
+  try {
+    const res = await fetch('/api/v1/plugins')
+    if (!res.ok) return
+    const urls: string[] = await res.json()
+    await Promise.allSettled(urls.map(url => import(/* @vite-ignore */ url)))
+  } catch {
+    // External plugins unavailable — continue without them
+  }
+}
+
 function App() {
   const fetchConfig = useConfigStore(state => state.fetchConfig);
 
   useEffect(() => {
     fetchConfig();
+    loadExternalPlugins();
   }, [fetchConfig]);
 
   return (

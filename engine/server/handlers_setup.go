@@ -64,6 +64,7 @@ func (s *Server) setupRoutes() {
 	agents := api.PathPrefix("/agents").Subrouter()
 	agents.HandleFunc("", s.createAgent).Methods("POST")
 	agents.HandleFunc("", s.listAgents).Methods("GET")
+	agents.HandleFunc("/register-yaml", s.registerAgentYAML).Methods("POST", "OPTIONS")
 	agents.HandleFunc("/{name}", s.getAgent).Methods("GET")
 	agents.HandleFunc("/{name}", s.deleteAgent).Methods("DELETE")
 
@@ -202,6 +203,10 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}", s.deleteAchievement).Methods("DELETE", "OPTIONS")
 	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
 	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
+
+	// External card plugins — compiled on-the-fly from ~/.mywant/custom-types/*/view/plugin.*
+	api.HandleFunc("/plugins", s.listPlugins).Methods("GET", "OPTIONS")
+	api.HandleFunc("/plugins/{filename}", s.servePlugin).Methods("GET", "OPTIONS")
 
 	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
