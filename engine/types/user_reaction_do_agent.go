@@ -14,16 +14,18 @@ func init() {
 
 func performAutoApproval(ctx context.Context, want *Want) error {
 	want.StoreLog("[SILENCER:DO] Starting auto-approval check")
-	
+
 	reactionID := GetCurrent(want, "target_reaction_id", "")
-	
+
 	if reactionID == "" {
 		want.StoreLog("[SILENCER:DO] No target reaction ID found")
 		return nil
 	}
 
 	httpClient := want.GetHTTPClient()
-	if httpClient == nil { return fmt.Errorf("no http client") }
+	if httpClient == nil {
+		return fmt.Errorf("no http client")
+	}
 
 	requestBody := map[string]any{
 		"approved": true,
@@ -32,10 +34,14 @@ func performAutoApproval(ctx context.Context, want *Want) error {
 
 	path := fmt.Sprintf("/api/v1/reactions/%s", reactionID)
 	resp, err := httpClient.PUT(path, requestBody)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 { return fmt.Errorf("status %d", resp.StatusCode) }
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("status %d", resp.StatusCode)
+	}
 
 	want.StoreLog("[SILENCER:DO] Approved reaction %s", reactionID)
 	want.SetCurrent("target_reaction_id", "")

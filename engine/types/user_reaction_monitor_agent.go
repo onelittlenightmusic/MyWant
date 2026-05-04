@@ -17,13 +17,15 @@ func init() {
 
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 	phase := GetCurrent(want, "reminder_phase", "")
-	
+
 	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
 		return true, nil
 	}
 
 	err := monitorUserReactions(ctx, want)
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 
 	userReaction := GetCurrent(want, "user_reaction", map[string]any{})
 	if len(userReaction) > 0 {
@@ -37,21 +39,31 @@ func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 }
 
 func monitorUserReactions(ctx context.Context, want *Want) error {
-	if want.Metadata.Type != "reminder" { return nil }
+	if want.Metadata.Type != "reminder" {
+		return nil
+	}
 
 	phase := GetCurrent(want, "reminder_phase", "")
 	requireReaction := GetGoal(want, "require_reaction", false)
 	queueID := GetCurrent(want, "reaction_queue_id", "")
 
-	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching { return nil }
-	if !requireReaction || queueID == "" { return nil }
+	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
+		return nil
+	}
+	if !requireReaction || queueID == "" {
+		return nil
+	}
 
 	httpClient := want.GetHTTPClient()
-	if httpClient == nil { return nil }
+	if httpClient == nil {
+		return nil
+	}
 
 	path := fmt.Sprintf("/api/v1/reactions/%s", queueID)
 	resp, err := httpClient.GET(path)
-	if err != nil { return nil }
+	if err != nil {
+		return nil
+	}
 	defer resp.Body.Close()
 
 	var result struct {
@@ -59,8 +71,12 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 		Reactions []ReactionData `json:"reactions"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil { return nil }
-	if len(result.Reactions) == 0 { return nil }
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil
+	}
+	if len(result.Reactions) == 0 {
+		return nil
+	}
 
 	reaction := result.Reactions[0]
 	reactionData := map[string]any{

@@ -70,13 +70,13 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 		},
 		Spec: mywant.WantSpec{
 			Params: map[string]any{
-				"prefix": "int-test",
-				"budget": 3000.0,
-				"currency": "USD",
+				"prefix":          "int-test",
+				"budget":          3000.0,
+				"currency":        "USD",
 				"restaurant_type": "fine dining",
-				"hotel_type": "luxury",
+				"hotel_type":      "luxury",
 				"restaurant_cost": 350.0,
-				"hotel_cost": 900.0,
+				"hotel_cost":      900.0,
 			},
 			Recipe: "travel-budget",
 		},

@@ -32,7 +32,7 @@ func executeReservation(want *Want, agentName string, schedule interface{}, form
 	activity, logMsg := formatter(schedule, false)
 	want.SetAgentActivity(agentName, activity)
 	want.StoreLog("%s", logMsg)
-	
+
 	return nil
 }
 

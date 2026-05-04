@@ -104,7 +104,7 @@ type Metadata struct {
 	OrderKey        string             `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
 	Correlation     []CorrelationEntry `json:"correlation,omitempty" yaml:"correlation,omitempty"`   // Inter-Want correlation (computed by correlationPhase, read-only at runtime)
 	Series          string             `json:"series,omitempty" yaml:"series,omitempty"`             // Stable lineage ID shared across cancel+rebook cycles; auto-assigned on creation
-	Version         int                `json:"version,omitempty" yaml:"version,omitempty"`            // 1-based counter; incremented each time a want replaces a cancelled predecessor in the same series
+	Version         int                `json:"version,omitempty" yaml:"version,omitempty"`           // 1-based counter; incremented each time a want replaces a cancelled predecessor in the same series
 }
 
 // newSeriesID generates a new random UUID-format series identifier.
@@ -420,15 +420,15 @@ func NewWantWithLocals(
 
 // Want represents a processing unit in the chain
 type Want struct {
-	Metadata    Metadata                `json:"metadata" yaml:"metadata"`
-	Spec        WantSpec                `json:"spec" yaml:"spec"`
-	Status      WantStatus              `json:"status,omitempty" yaml:"status,omitempty"`
+	Metadata        Metadata              `json:"metadata" yaml:"metadata"`
+	Spec            WantSpec              `json:"spec" yaml:"spec"`
+	Status          WantStatus            `json:"status,omitempty" yaml:"status,omitempty"`
 	State           sync.Map              `json:"-" yaml:"-"`
 	stateTimestamps sync.Map              `json:"-" yaml:"-"` // key → time.Time, updated on every StoreState call
 	StateLabels     map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
-	HiddenState map[string]any          `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
-	History     WantHistory             `json:"history" yaml:"-"`
-	Hash        string                  `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
+	HiddenState     map[string]any        `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
+	History         WantHistory           `json:"history" yaml:"-"`
+	Hash            string                `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// History ring buffers - private, lock-free concurrent stores (populated at runtime, not serialized)
 	// History tracking (ring buffers)
@@ -454,7 +454,6 @@ type Want struct {
 	// value "running": agent is currently executing (transient — cleared when done).
 	// value "done":    agent completed successfully and must not run again (permanent until Init).
 	agentRunGuard sync.Map `json:"-" yaml:"-"`
-
 
 	// Background agents for long-running operations
 	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
@@ -1340,6 +1339,7 @@ func (n *Want) IsSuspended() bool {
 func (n *Want) SetSuspended(suspended bool) {
 	n.suspended.Store(suspended)
 }
+
 // StoreState writes a key-value pair directly into this want's State and stages it
 // for history recording in the next EndProgressCycle() call.
 //
@@ -1408,8 +1408,12 @@ func (n *Want) DeleteState(key string) {
 //	EndProgressCycle() → dumps all pending together → both recorded
 func (n *Want) MergeState(updates map[string]any) {
 	extractMap := func(v any) (map[string]any, bool) {
-		if m, ok := v.(map[string]any); ok { return m, true }
-		if m, ok := v.(map[string]interface{}); ok { return m, true }
+		if m, ok := v.(map[string]any); ok {
+			return m, true
+		}
+		if m, ok := v.(map[string]interface{}); ok {
+			return m, true
+		}
 		return nil, false
 	}
 
@@ -1430,8 +1434,12 @@ func (n *Want) MergeState(updates map[string]any) {
 		if oldVal, ok := n.State.Load(key); ok {
 			if oldMap, isOldMap := extractMap(oldVal); isOldMap {
 				merged = make(map[string]any, len(oldMap)+len(valueMap))
-				for k, v := range oldMap { merged[k] = v }
-				for k, v := range valueMap { merged[k] = v }
+				for k, v := range oldMap {
+					merged[k] = v
+				}
+				for k, v := range valueMap {
+					merged[k] = v
+				}
 			} else {
 				merged = valueMap
 			}
@@ -1524,7 +1532,7 @@ func (n *Want) AddChildWant(child *Want) error {
 }
 
 // HasParent returns true if this want has a parent coordinator.
- func (n *Want) HasParent() bool {
+func (n *Want) HasParent() bool {
 
 	return n.getParentWant() != nil
 }
@@ -1770,7 +1778,7 @@ func (n *Want) storeState(key string, value any) {
 	n.StoreState(key, value)
 }
 
-// StoreStateMulti writes multiple key-value pairs into the want's state. 
+// StoreStateMulti writes multiple key-value pairs into the want's state.
 // This is a package-level helper for system-internal use (e.g. restoring state).
 // Deprecated: For logic within Progress(), use SetCurrent, SetGoal, etc.
 func StoreStateMulti(wp WantPointer, updates map[string]any) {

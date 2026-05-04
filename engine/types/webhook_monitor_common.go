@@ -9,7 +9,7 @@ import (
 // PollWebhook contains common polling logic shared by all webhook monitor agents.
 func PollWebhook(ctx context.Context, want *Want, cfg WebhookWantConfig) (shouldStop bool, err error) {
 	status := GetCurrent(want, "status", "active")
-	
+
 	if status == "stopped" {
 		return true, nil
 	}

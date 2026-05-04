@@ -362,7 +362,7 @@ func stopDebugRecording(ctx context.Context, want *mywant.Want) error {
 	want.SetCurrent("debug_recording_active", false)
 	want.SetPlan("stop_debug_recording_requested", false)
 	want.SetCurrent("action_by_agent", playwrightRecordAgentName)
-	
+
 	if targetObject != nil {
 		want.SetCurrent("target_object", targetObject)
 	}
@@ -455,7 +455,7 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 			}
 			// Replay complete
 			replayResultJSON, _ := json.Marshal(inner.Result)
-			
+
 			want.SetCurrent("replay_active", false)
 			want.SetCurrent("replay_session_id", "")
 			want.SetCurrent("replay_iframe_url", "")
@@ -486,7 +486,6 @@ func pollReplay(ctx context.Context, want *mywant.Want) (bool, error) {
 
 	return false, nil
 }
-
 
 // moveReplayScreenshot moves the MCP-written screenshot to ~/.mywant/screenshots/<wantID>.png.
 // Returns the API URL path for serving the image.

@@ -28,17 +28,17 @@ func init() {
 		RegisterMonitorAgentType(ccMonitorAgentName, []Capability{
 			{Name: "claude_code_session_monitoring", Gives: []string{"claude_code_session_monitoring"}, Description: "Monitors Claude Code session files for state changes"},
 		}, claudeCodeSessionMonitor)
-	
+
 		// Webhook MonitorAgent: reuses PollWebhook with cc-prefixed state keys.
 		// Identical to monitor_teams_webhook / monitor_slack_webhook pattern.
 		RegisterMonitorAgent(ccWebhookMonitorAgentName, func(ctx context.Context, want *Want) (bool, error) {
 			return PollWebhook(ctx, want, ccWebhookConfig)
 		})
-	
+
 		RegisterThinkAgentType(ccThinkAgentName, []Capability{
 			{Name: "claude_code_watching", Gives: []string{"claude_code_watching"}, Description: "Decides when to trigger requests based on session observations"},
 		}, claudeCodeWatcherThink)
-	
+
 		RegisterDoAgentType(ccDoAgentName, []Capability{
 			{Name: "claude_code_requesting", Gives: []string{"claude_code_requesting"}, Description: "Sends requests to Claude Code via CLI"},
 		}, claudeCodeRequester)

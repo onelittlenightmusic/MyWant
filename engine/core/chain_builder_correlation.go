@@ -103,7 +103,7 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 	// D. Import-param references: if want B has an import-style param (e.g. choice_import_field)
 	// whose string value matches a state field declared by want A's type definition, treat B as
 	// a consumer of A's state. Also handle exposes.As global key references.
-	fieldToProviders := make(map[string][]string) // stateFieldName → []providerWantID
+	fieldToProviders := make(map[string][]string)  // stateFieldName → []providerWantID
 	exposeKeyToProvider := make(map[string]string) // exposeAs key → providerWantID
 	for _, rw := range cb.wants {
 		w := rw.want

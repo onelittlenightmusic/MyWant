@@ -61,9 +61,9 @@ func TestParseArriveBy_InvalidFormat(t *testing.T) {
 
 func TestParseHHMM(t *testing.T) {
 	cases := []struct {
-		input       string
+		input        string
 		wantH, wantM int
-		wantErr     bool
+		wantErr      bool
 	}{
 		{"07:30", 7, 30, false},
 		{"00:00", 0, 0, false},
@@ -258,10 +258,10 @@ func TestParseBriefingRoutes_NoRoutes(t *testing.T) {
 func TestParseOTPResult_Direct(t *testing.T) {
 	baseMs := int64(1704851460000) // 2024-01-10 08:31:00 JST
 	it := otpItinerary{
-		Duration:            1740, // 29 min
-		StartTime:           baseMs,
-		EndTime:             baseMs + 1740*1000,
-		NumberOfTransfers:   0,
+		Duration:          1740, // 29 min
+		StartTime:         baseMs,
+		EndTime:           baseMs + 1740*1000,
+		NumberOfTransfers: 0,
 		Legs: []otpLeg{
 			{Mode: "WALK", TransitLeg: false},
 			{
@@ -292,10 +292,10 @@ func TestParseOTPResult_Direct(t *testing.T) {
 func TestParseOTPResult_WithTransfer(t *testing.T) {
 	baseMs := int64(1704851460000)
 	it := otpItinerary{
-		Duration:            5400, // 90 min
-		StartTime:           baseMs,
-		EndTime:             baseMs + 5400*1000,
-		NumberOfTransfers:   1,
+		Duration:          5400, // 90 min
+		StartTime:         baseMs,
+		EndTime:           baseMs + 5400*1000,
+		NumberOfTransfers: 1,
 		Legs: []otpLeg{
 			{
 				Mode:       "RAIL",
@@ -435,18 +435,18 @@ func newTransitWant(params map[string]any) *TransitWant {
 	tw.Init()
 	tw.Locals = &TransitLocals{}
 	tw.StateLabels = map[string]StateLabel{
-		"transit_status":       LabelCurrent,
+		"transit_status":        LabelCurrent,
 		"recommended_departure": LabelCurrent,
-		"estimated_arrival":    LabelCurrent,
-		"duration_minutes":     LabelCurrent,
-		"first_vehicle":        LabelCurrent,
-		"boarding_stop":        LabelCurrent,
-		"transfers":            LabelCurrent,
-		"route_name":           LabelCurrent,
-		"transit_result":       LabelCurrent,
-		"queried_at":           LabelCurrent,
-		"error":                LabelCurrent,
-		"achieving_percentage": LabelCurrent,
+		"estimated_arrival":     LabelCurrent,
+		"duration_minutes":      LabelCurrent,
+		"first_vehicle":         LabelCurrent,
+		"boarding_stop":         LabelCurrent,
+		"transfers":             LabelCurrent,
+		"route_name":            LabelCurrent,
+		"transit_result":        LabelCurrent,
+		"queried_at":            LabelCurrent,
+		"error":                 LabelCurrent,
+		"achieving_percentage":  LabelCurrent,
 	}
 	return tw
 }

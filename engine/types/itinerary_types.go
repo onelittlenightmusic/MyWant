@@ -90,13 +90,20 @@ func (o *ItineraryWant) Progress() {
 }
 
 func (o *ItineraryWant) mergeCurrent(updates map[string]any) {
-	if len(updates) == 0 { return }
+	if len(updates) == 0 {
+		return
+	}
 	current := GetCurrent(o, "current", map[string]any{})
-	
+
 	changed := false
 	for k, v := range updates {
-		if !reflect.DeepEqual(current[k], v) { current[k] = v; changed = true }
+		if !reflect.DeepEqual(current[k], v) {
+			current[k] = v
+			changed = true
+		}
 	}
-	
-	if changed { o.SetCurrent("current", current) }
+
+	if changed {
+		o.SetCurrent("current", current)
+	}
 }

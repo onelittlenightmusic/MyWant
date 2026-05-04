@@ -91,7 +91,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 			activity := fmt.Sprintf("Flight status updated: %s → %s for flight %s (%s)",
 				oldStatus, newStatus, reservation.FlightNumber, reservation.StatusMessage)
 			want.SetAgentActivity(agentName, activity)
-			
+
 			schedule := FlightSchedule{
 				DepartureTime:   reservation.DepartureTime,
 				ArrivalTime:     reservation.ArrivalTime,
@@ -100,7 +100,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 			}
 			want.SetCurrent("reservation_name", schedule.ReservationName)
 			want.SetCurrent("agent_result", schedule)
-			
+
 			statusHistoryStrs := make([]string, 0)
 			for _, change := range statusChangeHistory {
 				historyEntry := fmt.Sprintf("%s: %s -> %s (%s)",
@@ -112,7 +112,7 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 			}
 			want.SetCurrent("status_history", statusHistoryStrs)
 		}
-		
+
 		want.SetCurrent("monitor_state_hash", currentStateHash)
 
 		// Stop monitoring if confirmed or cancelled
@@ -126,15 +126,21 @@ func monitorFlightStatus(ctx context.Context, want *Want) (bool, error) {
 
 func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	colonIdx := findFirstColon(entry)
-	if colonIdx < 0 || colonIdx+2 >= len(entry) { return StatusChange{}, false }
+	if colonIdx < 0 || colonIdx+2 >= len(entry) {
+		return StatusChange{}, false
+	}
 	timestampStr := entry[:colonIdx]
 	rest := strings.TrimSpace(entry[colonIdx+1:])
 	arrowIdx := strings.Index(rest, " -> ")
-	if arrowIdx < 0 { return StatusChange{}, false }
+	if arrowIdx < 0 {
+		return StatusChange{}, false
+	}
 	oldStatus := strings.TrimSpace(rest[:arrowIdx])
 	afterArrow := strings.TrimSpace(rest[arrowIdx+4:])
 	parenIdx := strings.Index(afterArrow, "(")
-	if parenIdx < 0 { return StatusChange{}, false }
+	if parenIdx < 0 {
+		return StatusChange{}, false
+	}
 	newStatus := strings.TrimSpace(afterArrow[:parenIdx])
 	detailsPart := strings.TrimSpace(afterArrow[parenIdx:])
 	if len(detailsPart) < 2 || !strings.HasPrefix(detailsPart, "(") || !strings.HasSuffix(detailsPart, ")") {
@@ -142,13 +148,17 @@ func parseStatusHistoryEntry(entry string) (StatusChange, bool) {
 	}
 	details := strings.TrimSpace(detailsPart[1 : len(detailsPart)-1])
 	parsedTime, err := time.Parse("15:04:05", timestampStr)
-	if err != nil { parsedTime = time.Now() }
+	if err != nil {
+		parsedTime = time.Now()
+	}
 	return StatusChange{Timestamp: parsedTime, OldStatus: oldStatus, NewStatus: newStatus, Details: details}, true
 }
 
 func findFirstColon(s string) int {
 	for i, ch := range s {
-		if ch == ':' { return i }
+		if ch == ':' {
+			return i
+		}
 	}
 	return -1
 }

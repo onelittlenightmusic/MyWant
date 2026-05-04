@@ -48,4 +48,3 @@ func (c *ChoiceWant) Progress() {
 		c.PropagateParameter(targetParam, selected)
 	}
 }
-

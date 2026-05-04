@@ -149,7 +149,7 @@ func (g *Numbers) Progress() {
 			}
 		}
 		g.StoreLog("[NUMBERS-EXEC] Progress: currentCount=%d/%d (%.1f%%)", locals.currentCount, paramCount, float64(locals.currentCount)*100/float64(paramCount))
-		
+
 		g.SetCurrent("total_processed", locals.currentCount)
 		g.SetCurrent("average_wait_time", 0.0) // Generators don't have wait time
 		g.SetCurrent("total_wait_time", 0.0)
@@ -321,7 +321,7 @@ func (q *Queue) OnEnded(packet mywant.Packet, locals *QueueLocals) error {
 	if locals.processedCount > 0 {
 		avgWaitTime = locals.waitTimeSum / float64(locals.processedCount)
 	}
-	
+
 	q.SetCurrent("average_wait_time", avgWaitTime)
 	q.SetCurrent("total_processed", locals.processedCount)
 	q.SetCurrent("total_wait_time", locals.waitTimeSum)
@@ -416,7 +416,7 @@ func (c *Combiner) Progress() {
 func (c *Combiner) OnEnded(packet mywant.Packet, locals *CombinerLocals) error {
 	// Extract combiner-specific statistics from state
 	processed := mywant.GetCurrent(c, "processed", 0)
-	
+
 	c.SetCurrent("total_processed", processed)
 	c.SetCurrent("average_wait_time", 0.0) // Combiners don't add wait time
 	c.SetCurrent("total_wait_time", 0.0)

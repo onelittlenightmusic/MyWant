@@ -16,7 +16,7 @@ func init() {
 			{Name: "capability_management", Gives: []string{"capability_management"},
 				Description: "Evaluates achievement rules and dynamically awards achievements and capabilities"},
 		}, capabilityManagerThink)
-	
+
 		// Hook: when an achievement is unlocked, link it into AgentRegistry.
 		// available_capabilities is now computed on-demand from the achievement store,
 		// so no global state update is needed here.

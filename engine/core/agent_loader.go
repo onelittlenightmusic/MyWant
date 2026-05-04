@@ -42,7 +42,7 @@ type MRSScriptDef struct {
 type MRSStateUpdate struct {
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"`
-	Label       string `yaml:"label"`      // current | goal | plan | internal
+	Label       string `yaml:"label"` // current | goal | plan | internal
 	Persistent  bool   `yaml:"persistent"`
 	OnFetchData string `yaml:"onFetchData"` // JSON path into script output (e.g. "routes[0].summary")
 }

@@ -46,11 +46,16 @@ func executeHotelReservation(ctx context.Context, want *Want) error {
 func generateHotelCost(hotelType string) float64 {
 	var minCost, maxCost float64
 	switch hotelType {
-	case "budget": minCost, maxCost = 50.0, 120.0
-	case "standard": minCost, maxCost = 250.0, 400.0  // always over 200 budget
-	case "discounted": minCost, maxCost = 80.0, 150.0 // always under 200 budget (hotel_discount capability)
-	case "boutique": minCost, maxCost = 200.0, 450.0
-	default: minCost, maxCost = 400.0, 1200.0
+	case "budget":
+		minCost, maxCost = 50.0, 120.0
+	case "standard":
+		minCost, maxCost = 250.0, 400.0 // always over 200 budget
+	case "discounted":
+		minCost, maxCost = 80.0, 150.0 // always under 200 budget (hotel_discount capability)
+	case "boutique":
+		minCost, maxCost = 200.0, 450.0
+	default:
+		minCost, maxCost = 400.0, 1200.0
 	}
 	cost := minCost + rand.Float64()*(maxCost-minCost)
 	return math.Round(cost*100) / 100
@@ -71,15 +76,15 @@ func generateHotelSchedule(want *Want) HotelSchedule {
 	serviceTier := GetCurrent(want, "service_tier", "premium")
 
 	schedule := HotelSchedule{
-		CheckInTime:       checkInTime,
-		CheckOutTime:      checkOutTime,
-		HotelName:         hotelName,
-		HotelType:         hotelType,
-		ReservationName:   fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
-		Cost:              hotelCost,
-		PremiumLevel:      premiumLevel,
-		ServiceTier:       serviceTier,
-		PremiumAmenities:  []string{"spa_access", "concierge_service", "room_upgrade"},
+		CheckInTime:      checkInTime,
+		CheckOutTime:     checkOutTime,
+		HotelName:        hotelName,
+		HotelType:        hotelType,
+		ReservationName:  fmt.Sprintf("%s (%s hotel)", hotelName, hotelType),
+		Cost:             hotelCost,
+		PremiumLevel:     premiumLevel,
+		ServiceTier:      serviceTier,
+		PremiumAmenities: []string{"spa_access", "concierge_service", "room_upgrade"},
 	}
 
 	want.SetCurrent("hotel_name", hotelName)

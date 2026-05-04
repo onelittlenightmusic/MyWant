@@ -71,7 +71,7 @@ type ParamEntry struct {
 type ExposeEntry struct {
 	Param        string `json:"param,omitempty" yaml:"param,omitempty"`               // local param key to receive from upper scope
 	CurrentState string `json:"currentState,omitempty" yaml:"currentState,omitempty"` // local state key to expose to parent
-	As           string `json:"as" yaml:"as"`                                          // name in the upper scope
+	As           string `json:"as" yaml:"as"`                                         // name in the upper scope
 }
 
 // NotificationFilter allows filtering received notifications

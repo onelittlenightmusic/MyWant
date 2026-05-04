@@ -1,4 +1,5 @@
 package types
+
 import (
 	"encoding/json"
 	"fmt"
@@ -320,7 +321,9 @@ func (h *HotelWant) tryAgentExecution() any {
 
 func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule {
 	hl, ok := locals.(*HotelWantLocals)
-	if !ok { return nil }
+	if !ok {
+		return nil
+	}
 	baseDate := time.Now().AddDate(0, 0, 1)
 	hotelName := generateRealisticHotelName(hl.HotelType)
 	eventName := fmt.Sprintf("%s (%s hotel)", hotelName, hl.HotelType)
@@ -337,7 +340,13 @@ func (h *HotelWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSc
 
 func (h *HotelWant) SetSchedule(schedule any) {
 	s, ok := schedule.(HotelSchedule)
-	if !ok { if sp, ok := schedule.(*HotelSchedule); ok { s = *sp } else { return } }
+	if !ok {
+		if sp, ok := schedule.(*HotelSchedule); ok {
+			s = *sp
+		} else {
+			return
+		}
+	}
 	h.SetCurrent("hotel_name", s.HotelName)
 	h.SetCurrent("cost", s.Cost)
 	h.SetCurrent("reservation_name", s.ReservationName)
@@ -395,7 +404,9 @@ func (b *BuffetWant) tryAgentExecution() any {
 
 func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelSchedule {
 	bl, ok := locals.(*BuffetWantLocals)
-	if !ok { return nil }
+	if !ok {
+		return nil
+	}
 	baseDate := time.Now().AddDate(0, 0, 2)
 	buffetName := generateRealisticBuffetName(bl.BuffetType)
 	eventName := fmt.Sprintf("%s (%s buffet)", buffetName, bl.BuffetType)
@@ -414,7 +425,13 @@ func (b *BuffetWant) generateSchedule(locals TravelWantLocalsInterface) *TravelS
 
 func (b *BuffetWant) SetSchedule(schedule any) {
 	s, ok := schedule.(BuffetSchedule)
-	if !ok { if sp, ok := schedule.(*BuffetSchedule); ok { s = *sp } else { return } }
+	if !ok {
+		if sp, ok := schedule.(*BuffetSchedule); ok {
+			s = *sp
+		} else {
+			return
+		}
+	}
 	b.SetCurrent("reservation_name", s.ReservationName)
 	b.SetCurrent("cost", s.Cost)
 	b.ProvideDone()
@@ -580,4 +597,3 @@ func (f *FlightWant) Progress() {
 		f.SetCurrent("agent_result", nil)
 	}
 }
-

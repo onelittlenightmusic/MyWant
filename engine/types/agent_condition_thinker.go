@@ -94,26 +94,41 @@ func conditionThinkerThink(ctx context.Context, want *Want) error {
 
 // toFloat64 converts various numeric types to float64.
 func toFloat64(v any) float64 {
-	if v == nil { return 0 }
+	if v == nil {
+		return 0
+	}
 	switch n := v.(type) {
-	case float64: return n
-	case float32: return float64(n)
-	case int: return float64(n)
-	case int64: return float64(n)
-	case int32: return float64(n)
-	case uint: return float64(n)
-	case uint64: return float64(n)
+	case float64:
+		return n
+	case float32:
+		return float64(n)
+	case int:
+		return float64(n)
+	case int64:
+		return float64(n)
+	case int32:
+		return float64(n)
+	case uint:
+		return float64(n)
+	case uint64:
+		return float64(n)
 	}
 	return 0
 }
 
 func extractTargetBudget(targetBudgetsRaw any, wantName string) (float64, bool) {
 	tb, ok := targetBudgetsRaw.(map[string]any)
-	if !ok { return 0, false }
+	if !ok {
+		return 0, false
+	}
 	entry, ok := tb[wantName]
-	if !ok { return 0, false }
+	if !ok {
+		return 0, false
+	}
 	entryMap, ok := entry.(map[string]any)
-	if !ok { return 0, false }
+	if !ok {
+		return 0, false
+	}
 	budget := toFloat64(entryMap["target_budget"])
 	return budget, budget > 0
 }

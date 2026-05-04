@@ -27,7 +27,9 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	want.SetGoal("budget_limit", budgetVal)
 
 	cb := GetGlobalChainBuilder()
-	if cb == nil { return nil }
+	if cb == nil {
+		return nil
+	}
 
 	// ── Phase 1: Compute and propagate per-want target budgets ──────────────
 	itinerary := GetParentState(want, "itinerary", map[string]any{})
@@ -86,7 +88,7 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	want.SetCurrent("total_spent", totalCost)
 	want.SetCurrent("remaining_budget", remaining)
 	want.SetCurrent("budget_exceeded", exceeded)
-	
+
 	summary := fmt.Sprintf("Budget: %.2f, Spent: %.2f, Remaining: %.2f (%d costs reported)",
 		budgetVal, totalCost, remaining, len(costs))
 	want.SetCurrent("budget_summary", summary)

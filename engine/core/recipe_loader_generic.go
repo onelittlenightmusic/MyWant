@@ -57,13 +57,13 @@ type RecipeExampleDef struct {
 
 // RecipeContent contains the actual recipe data
 type RecipeContent struct {
-	Metadata              GenericRecipeMetadata  `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Wants                 []RecipeWant           `yaml:"wants,omitempty" json:"wants,omitempty"`
-	Parameters            map[string]any         `yaml:"parameters,omitempty" json:"parameters,omitempty"`
-	ParameterDescriptions map[string]string      `yaml:"parameter_descriptions,omitempty" json:"parameter_descriptions,omitempty"`
-	Result                *RecipeResult          `yaml:"result,omitempty" json:"result,omitempty"`
-	Example               *RecipeExample         `yaml:"example,omitempty" json:"example,omitempty"`
-	Examples              []RecipeExampleDef     `yaml:"examples,omitempty" json:"examples,omitempty"`
+	Metadata              GenericRecipeMetadata `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Wants                 []RecipeWant          `yaml:"wants,omitempty" json:"wants,omitempty"`
+	Parameters            map[string]any        `yaml:"parameters,omitempty" json:"parameters,omitempty"`
+	ParameterDescriptions map[string]string     `yaml:"parameter_descriptions,omitempty" json:"parameter_descriptions,omitempty"`
+	Result                *RecipeResult         `yaml:"result,omitempty" json:"result,omitempty"`
+	Example               *RecipeExample        `yaml:"example,omitempty" json:"example,omitempty"`
+	Examples              []RecipeExampleDef    `yaml:"examples,omitempty" json:"examples,omitempty"`
 	// State defines coordinator-level state fields that will be added to Target's ProvidedStateFields
 	State []StateDef `yaml:"state,omitempty" json:"state,omitempty"`
 	// FinalResultField defines the default state key for the recipe's final_result

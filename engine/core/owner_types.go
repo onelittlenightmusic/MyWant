@@ -540,13 +540,13 @@ drained:
 		directions, directionsFound := t.getState("directions")
 		plannedCount, _ := t.GetStateInt("planned_count", 0)
 		goalAchieved, _ := t.GetStateBool("goal_achieved", false)
-		
+
 		// If we have directions or a non-zero planned count, we are not done
 		// unless goal_achieved is explicitly true.
-		// For dynamic targets (direction_map present), we also wait until 
+		// For dynamic targets (direction_map present), we also wait until
 		// directions state is at least initialized.
 		_, hasDirectionMap := t.GetParameter("direction_map")
-		
+
 		if hasDirectionMap && !directionsFound && !goalAchieved {
 			t.storeState("achieving_percentage", 10.0)
 			allComplete = false

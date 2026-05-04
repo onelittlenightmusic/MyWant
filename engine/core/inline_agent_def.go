@@ -3,18 +3,18 @@ package mywant
 // InlineAgentDef defines an executable agent with inline script embedded in a YAML want type definition.
 type InlineAgentDef struct {
 	Name       string `json:"name" yaml:"name"`
-	Type       string `json:"type" yaml:"type"`                               // "think", "do", "monitor"
-	Runtime    string `json:"runtime" yaml:"runtime"`                         // "rego", "shell", "python"
-	Script     string `json:"script,omitempty" yaml:"script,omitempty"`       // inline script content
+	Type       string `json:"type" yaml:"type"`                                 // "think", "do", "monitor"
+	Runtime    string `json:"runtime" yaml:"runtime"`                           // "rego", "shell", "python"
+	Script     string `json:"script,omitempty" yaml:"script,omitempty"`         // inline script content
 	ScriptFile string `json:"scriptFile,omitempty" yaml:"scriptFile,omitempty"` // path to external script file (relative to working dir)
-	Interval   int    `json:"interval,omitempty" yaml:"interval,omitempty"`   // execution interval in seconds; 0 = default
+	Interval   int    `json:"interval,omitempty" yaml:"interval,omitempty"`     // execution interval in seconds; 0 = default
 }
 
 // ConditionDef defines a single declarative state condition (field operator value).
 type ConditionDef struct {
 	Field    string `json:"field" yaml:"field"`       // current-labeled state field name
 	Operator string `json:"operator" yaml:"operator"` // ==, !=, >, >=, <, <=
-	Value    any    `json:"value" yaml:"value"`        // comparison value
+	Value    any    `json:"value" yaml:"value"`       // comparison value
 }
 
 // AchievedWhenDef is an alias kept for backward compatibility. Use ConditionDef directly.
@@ -24,7 +24,7 @@ type AchievedWhenDef = ConditionDef
 // Both fields are optional; omitting one means that outcome is never triggered declaratively.
 type FinalizeWhen struct {
 	Achieved *ConditionDef `json:"achieved,omitempty" yaml:"achieved,omitempty"` // transition to WantStatusAchieved
-	Failed   *ConditionDef `json:"failed,omitempty" yaml:"failed,omitempty"`   // transition to WantStatusFailed
+	Failed   *ConditionDef `json:"failed,omitempty" yaml:"failed,omitempty"`     // transition to WantStatusFailed
 }
 
 // LifecycleHookDef defines actions executed at a want lifecycle event (onInitialize, onDelete, onAchieved).

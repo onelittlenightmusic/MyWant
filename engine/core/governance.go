@@ -14,7 +14,7 @@ const (
 // GovernanceEngine enforces state access policies based on roles and labels.
 type GovernanceEngine struct{}
 
-// CanWriteParentState determines if a child with a given role is authorized 
+// CanWriteParentState determines if a child with a given role is authorized
 // to write to a parent's state field with a specific label.
 func (g *GovernanceEngine) CanWriteParentState(role ChildRole, label StateLabel) bool {
 	if role == RoleAdmin {

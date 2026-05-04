@@ -613,4 +613,3 @@ func (w *Want) DumpStateForAgent(agentType string) {
 func (w *Want) HasPendingAgentStateChanges() bool {
 	return false
 }
-

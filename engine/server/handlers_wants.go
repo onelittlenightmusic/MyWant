@@ -260,9 +260,15 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	// Compute collection ETag before building full responses
 	rawHashes := make([]string, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
-		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled { continue }
-		if !want.MatchesFilters(filters) { continue }
+		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
+			continue
+		}
+		if !want.MatchesFilters(filters) {
+			continue
+		}
 		rawHashes = append(rawHashes, mywant.CalculateWantHash(want))
 	}
 	collectionHash := computeCollectionHash(rawHashes)
@@ -276,17 +282,29 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 
 	allWants := make([]wantAPIResponse, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant { continue }
-		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled { continue }
-		if !want.MatchesFilters(filters) { continue }
+		if !includeSystemWants && want.Metadata.IsSystemWant {
+			continue
+		}
+		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
+			continue
+		}
+		if !want.MatchesFilters(filters) {
+			continue
+		}
 		allWants = append(allWants, buildWantAPIResponse(want, false))
 	}
 
 	sort.Slice(allWants, func(i, j int) bool {
 		keyI, keyJ := allWants[i].Metadata.OrderKey, allWants[j].Metadata.OrderKey
-		if keyI == "" { keyI = allWants[i].Metadata.ID }
-		if keyJ == "" { keyJ = allWants[j].Metadata.ID }
-		if keyI != keyJ { return keyI < keyJ }
+		if keyI == "" {
+			keyI = allWants[i].Metadata.ID
+		}
+		if keyJ == "" {
+			keyJ = allWants[j].Metadata.ID
+		}
+		if keyI != keyJ {
+			return keyI < keyJ
+		}
 		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
 	})
 
@@ -371,7 +389,9 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 	s.wantsMu.RLock()
 	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants { executions = append(executions, exec) }
+	for _, exec := range s.wants {
+		executions = append(executions, exec)
+	}
 	s.wantsMu.RUnlock()
 
 	serveWantResponse := func(want *mywant.Want) {
@@ -422,20 +442,30 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 			if want, _, found := execution.Builder.FindWantByID(wantID); found {
 				targetExecution, foundWant = execution, want
 				for j, cw := range execution.Config.Wants {
-					if cw.Metadata.ID == wantID { targetWantIndex = j; break }
+					if cw.Metadata.ID == wantID {
+						targetWantIndex = j
+						break
+					}
 				}
 				break
 			}
 		}
 		for j, cw := range execution.Config.Wants {
-			if cw.Metadata.ID == wantID { targetExecution, foundWant, targetWantIndex = execution, cw, j; break }
+			if cw.Metadata.ID == wantID {
+				targetExecution, foundWant, targetWantIndex = execution, cw, j
+				break
+			}
 		}
-		if foundWant != nil { break }
+		if foundWant != nil {
+			break
+		}
 	}
 	s.wantsMu.RUnlock()
 
 	if foundWant == nil && s.globalBuilder != nil {
-		if want, _, found := s.globalBuilder.FindWantByID(wantID); found { foundWant = want }
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			foundWant = want
+		}
 	}
 
 	if foundWant == nil {
@@ -455,9 +485,14 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetExecution != nil {
-		if targetWantIndex >= 0 { targetExecution.Config.Wants[targetWantIndex] = updatedWant
-		} else { targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant) }
-		if targetExecution.Builder != nil { targetExecution.Builder.UpdateWant(updatedWant) }
+		if targetWantIndex >= 0 {
+			targetExecution.Config.Wants[targetWantIndex] = updatedWant
+		} else {
+			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
+		}
+		if targetExecution.Builder != nil {
+			targetExecution.Builder.UpdateWant(updatedWant)
+		}
 	} else if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
 	}
@@ -475,17 +510,24 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	for eid, exec := range s.wants {
 		if exec.Builder != nil {
 			for _, want := range exec.Builder.GetAllWantStates() {
-				if want.Metadata.ID == wantID { targetBuilder, targetExecutionID = exec.Builder, eid; break }
+				if want.Metadata.ID == wantID {
+					targetBuilder, targetExecutionID = exec.Builder, eid
+					break
+				}
 			}
 		}
-		if targetBuilder != nil { break }
+		if targetBuilder != nil {
+			break
+		}
 	}
 	s.wantsMu.RUnlock()
 
 	if targetBuilder != nil {
 		targetBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
 		s.wantsMu.Lock()
-		if exec, ok := s.wants[targetExecutionID]; ok && len(exec.Config.Wants) == 0 { delete(s.wants, targetExecutionID) }
+		if exec, ok := s.wants[targetExecutionID]; ok && len(exec.Config.Wants) == 0 {
+			delete(s.wants, targetExecutionID)
+		}
 		s.wantsMu.Unlock()
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -540,10 +582,14 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, wantID, operation string) {
 	var err error
 	switch operation {
-	case "suspend": err = s.globalBuilder.QueueWantSuspend([]string{wantID})
-	case "resume":  err = s.globalBuilder.QueueWantResume([]string{wantID})
-	case "stop":    err = s.globalBuilder.QueueWantStop([]string{wantID})
-	case "start":   err = s.globalBuilder.QueueWantStart([]string{wantID})
+	case "suspend":
+		err = s.globalBuilder.QueueWantSuspend([]string{wantID})
+	case "resume":
+		err = s.globalBuilder.QueueWantResume([]string{wantID})
+	case "stop":
+		err = s.globalBuilder.QueueWantStop([]string{wantID})
+	case "start":
+		err = s.globalBuilder.QueueWantStart([]string{wantID})
 	case "restart":
 		err = s.globalBuilder.QueueWantRestart([]string{wantID})
 	}
@@ -560,18 +606,30 @@ func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, w
 	})
 }
 
-func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) { s.handleBatchOperation(w, r, "suspend") }
-func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request)  { s.handleBatchOperation(w, r, "resume") }
-func (s *Server) stopWants(w http.ResponseWriter, r *http.Request)    { s.handleBatchOperation(w, r, "stop") }
-func (s *Server) startWants(w http.ResponseWriter, r *http.Request)   { s.handleBatchOperation(w, r, "start") }
+func (s *Server) suspendWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "suspend")
+}
+func (s *Server) resumeWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "resume")
+}
+func (s *Server) stopWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "stop")
+}
+func (s *Server) startWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "start")
+}
 func (s *Server) restartWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	s.handleSingleLifecycle(w, r, vars["id"], "restart")
 }
-func (s *Server) restartWants(w http.ResponseWriter, r *http.Request) { s.handleBatchOperation(w, r, "restart") }
+func (s *Server) restartWants(w http.ResponseWriter, r *http.Request) {
+	s.handleBatchOperation(w, r, "restart")
+}
 
 func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, operation string) {
-	var body struct { IDs []string `json:"ids"` }
+	var body struct {
+		IDs []string `json:"ids"`
+	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
@@ -579,11 +637,16 @@ func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, op
 
 	var err error
 	switch operation {
-	case "delete":  err = s.globalBuilder.QueueWantDelete(body.IDs)
-	case "suspend": err = s.globalBuilder.QueueWantSuspend(body.IDs)
-	case "resume":  err = s.globalBuilder.QueueWantResume(body.IDs)
-	case "stop":    err = s.globalBuilder.QueueWantStop(body.IDs)
-	case "start":   err = s.globalBuilder.QueueWantStart(body.IDs)
+	case "delete":
+		err = s.globalBuilder.QueueWantDelete(body.IDs)
+	case "suspend":
+		err = s.globalBuilder.QueueWantSuspend(body.IDs)
+	case "resume":
+		err = s.globalBuilder.QueueWantResume(body.IDs)
+	case "stop":
+		err = s.globalBuilder.QueueWantStop(body.IDs)
+	case "start":
+		err = s.globalBuilder.QueueWantStart(body.IDs)
 	case "restart":
 		err = s.globalBuilder.QueueWantRestart(body.IDs)
 	}
@@ -615,7 +678,7 @@ func (s *Server) getWantStatus(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getWantResults(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
-		s.JSONResponse(w, http.StatusOK, map[string]any{ "data": want.GetAllState() })
+		s.JSONResponse(w, http.StatusOK, map[string]any{"data": want.GetAllState()})
 		return
 	}
 	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
@@ -642,10 +705,14 @@ func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {
 
 	var prevKey, nextKey string
 	if req.PreviousWantID != "" {
-		if pw, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID); found && pw != nil { prevKey = pw.Metadata.OrderKey }
+		if pw, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID); found && pw != nil {
+			prevKey = pw.Metadata.OrderKey
+		}
 	}
 	if req.NextWantID != "" {
-		if nw, _, found := s.globalBuilder.FindWantByID(req.NextWantID); found && nw != nil { nextKey = nw.Metadata.OrderKey }
+		if nw, _, found := s.globalBuilder.FindWantByID(req.NextWantID); found && nw != nil {
+			nextKey = nw.Metadata.OrderKey
+		}
 	}
 
 	newOrderKey := mywant.GenerateOrderKeyBetween(prevKey, nextKey)

@@ -79,7 +79,6 @@ func knowledgeUpdate(ctx context.Context, want *mywant.Want) error {
 	updates := mywant.GetCurrent(want, "discovered_updates", []any{})
 	updatesJSON, _ := json.MarshalIndent(updates, "", "  ")
 
-
 	want.StoreLog("[KNOWLEDGE-AGENT] Updating document: %s (provider: %s)", path, provider)
 
 	// 1. Read existing content if file exists

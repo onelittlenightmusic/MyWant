@@ -164,7 +164,7 @@ func createFlight(ctx context.Context, want *Want) error {
 	want.SetCurrent("status_message", "Flight reservation created and awaiting confirmation")
 	want.SetCurrent("created_at", reservation.CreatedAt.Format(time.RFC3339))
 	want.SetCurrent("updated_at", reservation.UpdatedAt.Format(time.RFC3339))
-	
+
 	want.SetCurrent("agent_result", FlightSchedule{
 		DepartureTime:   reservation.DepartureTime,
 		ArrivalTime:     reservation.ArrivalTime,
@@ -210,7 +210,7 @@ func cancelFlight(ctx context.Context, want *Want) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to cancel flight: status %d, body: %s", resp.StatusCode, string(body))
 	}
-	
+
 	want.SetCurrent("flight_status", "canceled")
 	want.SetCurrent("status_message", "Flight canceled by agent")
 	want.SetCurrent("canceled_at", time.Now().Format(time.RFC3339))

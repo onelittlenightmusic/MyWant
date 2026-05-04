@@ -126,7 +126,7 @@ var stateGetCmd = &cobra.Command{
 Examples:
   mywant state get abc123
   mywant state get abc123 --json`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		wantID := args[0]
@@ -163,7 +163,7 @@ Examples:
   mywant state set abc123 status "in_progress"
   mywant state set abc123 price 45000
   mywant state set abc123 approved true`,
-	Args: cobra.ExactArgs(3),
+	Args:              cobra.ExactArgs(3),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		wantID, key, rawVal := args[0], args[1], args[2]
@@ -193,7 +193,7 @@ var stateDeleteCmd = &cobra.Command{
 Examples:
   mywant state delete abc123 tmp_key
   mywant state del abc123 debug_info`,
-	Args: cobra.ExactArgs(2),
+	Args:              cobra.ExactArgs(2),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		wantID, key := args[0], args[1]
@@ -217,7 +217,7 @@ var stateClearCmd = &cobra.Command{
 Examples:
   mywant state clear abc123
   mywant state clear global`,
-	Args: cobra.ExactArgs(1),
+	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		target := args[0]

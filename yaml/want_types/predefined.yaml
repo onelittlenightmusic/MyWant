@@ -46,3 +46,9 @@ predefined:
       label: goal
       persistent: true
       initialValue: ""
+    - name: desired_dispatch
+      description: Dispatch requests proposed by a thinker child
+      type: object
+      label: plan
+      persistent: false
+      initialValue: null

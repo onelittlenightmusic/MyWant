@@ -36,8 +36,8 @@ func (h *paramExposeHandler) OnEvent(ctx context.Context, event WantEvent) Event
 // propagates the value directly to global state as a flat key.
 // Used for exposes entries with CurrentState field on top-level (no parent) wants.
 type globalStateExposeHandler struct {
-	want     *Want
-	localKey string // state key in this want (ExposeEntry.CurrentState)
+	want      *Want
+	localKey  string // state key in this want (ExposeEntry.CurrentState)
 	globalKey string // key to store in global state (ExposeEntry.As)
 }
 

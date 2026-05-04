@@ -326,9 +326,9 @@ Example:
 }
 
 var deleteTypeCmd = &cobra.Command{
-	Use:               "delete [name]",
-	Aliases:           []string{"d", "rm"},
-	Short:             "Delete a YAML-only want type (hot-reload)",
+	Use:     "delete [name]",
+	Aliases: []string{"d", "rm"},
+	Short:   "Delete a YAML-only want type (hot-reload)",
 	Long: `Remove a YAML-only want type from the server without restarting.
 The persisted YAML file in yaml/want_types/custom/ is also deleted.
 Go-backed types cannot be deleted via this command.

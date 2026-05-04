@@ -249,13 +249,17 @@ func (r *ReminderWant) calculateTimeRemaining(locals *ReminderLocals) string {
 	case ReminderPhaseWaiting:
 		if !locals.ReachingTime.IsZero() {
 			duration := locals.ReachingTime.Sub(now)
-			if duration < 0 { return "0s" }
+			if duration < 0 {
+				return "0s"
+			}
 			return formatDuration(duration)
 		}
 	case ReminderPhaseReaching:
 		if !locals.EventTime.IsZero() {
 			duration := locals.EventTime.Sub(now)
-			if duration < 0 { return "0s" }
+			if duration < 0 {
+				return "0s"
+			}
 			return formatDuration(duration)
 		}
 	case ReminderPhaseCompleted, ReminderPhaseFailed:
@@ -265,25 +269,37 @@ func (r *ReminderWant) calculateTimeRemaining(locals *ReminderLocals) string {
 }
 
 func formatDuration(d time.Duration) string {
-	if d < 0 { return "0s" }
+	if d < 0 {
+		return "0s"
+	}
 	d = d.Round(time.Second)
-	if d < time.Minute { return fmt.Sprintf("%ds", int(d.Seconds())) }
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
 	if d < time.Hour {
 		min := int(d.Minutes())
 		sec := int(d.Seconds()) % 60
-		if sec == 0 { return fmt.Sprintf("%dm", min) }
+		if sec == 0 {
+			return fmt.Sprintf("%dm", min)
+		}
 		return fmt.Sprintf("%dm%ds", min, sec)
 	}
 	h := int(d.Hours())
 	m := int(d.Minutes()) % 60
 	s := int(d.Seconds()) % 60
-	if m == 0 && s == 0 { return fmt.Sprintf("%dh", h) }
-	if s == 0 { return fmt.Sprintf("%dh%dm", h, m) }
+	if m == 0 && s == 0 {
+		return fmt.Sprintf("%dh", h)
+	}
+	if s == 0 {
+		return fmt.Sprintf("%dh%dm", h, m)
+	}
 	return fmt.Sprintf("%dh%dm%ds", h, m, s)
 }
 
 func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
-	if locals.ReachingTime.IsZero() { return }
+	if locals.ReachingTime.IsZero() {
+		return
+	}
 	if time.Now().After(locals.ReachingTime) {
 		r.SetCurrent("reminder_phase", ReminderPhaseReaching)
 		locals.ReactionQueueId = ""
@@ -296,8 +312,12 @@ func (r *ReminderWant) handlePhaseWaiting(locals *ReminderLocals) {
 }
 
 func (r *ReminderWant) emitReactionPacketIfNeeded(locals *ReminderLocals) {
-	if !locals.RequireReaction || locals.ReactionPacketEmitted { return }
-	if locals.ReactionQueueId == "" { return }
+	if !locals.RequireReaction || locals.ReactionPacketEmitted {
+		return
+	}
+	if locals.ReactionQueueId == "" {
+		return
+	}
 	out := NewDataObject("reaction_request")
 	out.Set("reaction_id", locals.ReactionQueueId)
 	out.Set("reaction_type", locals.ReactionType)
@@ -366,7 +386,9 @@ func (r *ReminderWant) processReaction(locals *ReminderLocals, reactionMap map[s
 		r.SetCurrent("user_reaction", reactionMap)
 		locals.ReactionPacketEmitted = false
 		r.SetCurrent("achieving_percentage", 100)
-		if phase == ReminderPhaseCompleted { r.ProvideDone() }
+		if phase == ReminderPhaseCompleted {
+			r.ProvideDone()
+		}
 		r.ExecuteAgents()
 	}
 }
@@ -394,25 +416,38 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 
 func parseDurationString(s string) (time.Duration, error) {
 	var unit time.Duration
-	if len(s) < 2 { return 0, fmt.Errorf("invalid duration format: %s", s) }
+	if len(s) < 2 {
+		return 0, fmt.Errorf("invalid duration format: %s", s)
+	}
 	var numStr string
 	for i, c := range s {
-		if c >= '0' && c <= '9' { numStr += string(c) } else {
+		if c >= '0' && c <= '9' {
+			numStr += string(c)
+		} else {
 			s = s[i:]
 			break
 		}
 	}
-	if numStr == "" { return 0, fmt.Errorf("no number found in duration: %s", s) }
+	if numStr == "" {
+		return 0, fmt.Errorf("no number found in duration: %s", s)
+	}
 	s = strings.TrimSpace(s)
 	switch s {
-	case "second", "seconds": unit = time.Second
-	case "minute", "minutes": unit = time.Minute
-	case "hour", "hours": unit = time.Hour
-	case "day", "days": unit = 24 * time.Hour
-	default: return 0, fmt.Errorf("unknown duration unit: %s", s)
+	case "second", "seconds":
+		unit = time.Second
+	case "minute", "minutes":
+		unit = time.Minute
+	case "hour", "hours":
+		unit = time.Hour
+	case "day", "days":
+		unit = 24 * time.Hour
+	default:
+		return 0, fmt.Errorf("unknown duration unit: %s", s)
 	}
 	var num int
 	_, err := fmt.Sscanf(numStr, "%d", &num)
-	if err != nil { return 0, fmt.Errorf("invalid number in duration: %s", numStr) }
+	if err != nil {
+		return 0, fmt.Errorf("invalid number in duration: %s", numStr)
+	}
 	return time.Duration(num) * unit, nil
 }

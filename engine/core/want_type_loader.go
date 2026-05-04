@@ -28,12 +28,12 @@ type WantTypeDefinition struct {
 	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
 	GlobalOverrideFrom  string                 `json:"globalOverrideFrom,omitempty" yaml:"globalOverrideFrom,omitempty"`   // Global param key whose object fields override ALL params (highest priority)
 	Agents              []AgentDef             `json:"agents" yaml:"agents"`
-	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"`     // executable inline agent definitions
-	FinalizeWhen        *FinalizeWhen          `json:"finalizeWhen,omitempty" yaml:"finalizeWhen,omitempty"`     // declarative termination conditions (achieved + failed)
-	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"`     // Deprecated: use finalizeWhen.achieved
-	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"`     // actions to run when want is initialized
-	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`             // actions to run when want is deleted
-	OnAchieved          *LifecycleHookDef      `json:"onAchieved,omitempty" yaml:"onAchieved,omitempty"`         // actions to run each Progress() tick while achieved
+	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"` // executable inline agent definitions
+	FinalizeWhen        *FinalizeWhen          `json:"finalizeWhen,omitempty" yaml:"finalizeWhen,omitempty"` // declarative termination conditions (achieved + failed)
+	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"` // Deprecated: use finalizeWhen.achieved
+	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"` // actions to run when want is initialized
+	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`         // actions to run when want is deleted
+	OnAchieved          *LifecycleHookDef      `json:"onAchieved,omitempty" yaml:"onAchieved,omitempty"`     // actions to run each Progress() tick while achieved
 	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
 	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
 	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`
@@ -58,7 +58,7 @@ type ParameterDef struct {
 	Description                string          `json:"description" yaml:"description"`
 	Type                       string          `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
 	Default                    any             `json:"default,omitempty" yaml:"default,omitempty"`
-	DefaultGlobalParameter     string          `json:"defaultGlobalParameter,omitempty" yaml:"defaultGlobalParameter,omitempty"`     // Global parameter key used as last-resort fallback
+	DefaultGlobalParameter     string          `json:"defaultGlobalParameter,omitempty" yaml:"defaultGlobalParameter,omitempty"`         // Global parameter key used as last-resort fallback
 	DefaultGlobalParameterFrom string          `json:"defaultGlobalParameterFrom,omitempty" yaml:"defaultGlobalParameterFrom,omitempty"` // Read this param's value as the global parameter key
 	Required                   bool            `json:"required" yaml:"required"`
 	Validation                 ValidationRules `json:"validation,omitempty" yaml:"validation,omitempty"`
@@ -83,7 +83,7 @@ type StateDef struct {
 	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
 	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
 	OnFetchData  string `json:"onFetchData,omitempty" yaml:"onFetchData,omitempty"` // JSON path to extract from json_data (e.g. "routes[0].departure")
-	FetchFrom    string `json:"fetchFrom,omitempty" yaml:"fetchFrom,omitempty"`       // state field name to use as JSON source for onFetchData extraction (processed in EndProgressCycle)
+	FetchFrom    string `json:"fetchFrom,omitempty" yaml:"fetchFrom,omitempty"`     // state field name to use as JSON source for onFetchData extraction (processed in EndProgressCycle)
 }
 
 // MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.
@@ -504,6 +504,7 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 
 	return nil
 }
+
 // RegisterDefinition adds or replaces a want type definition at runtime without loading from file.
 // Used by the hot-reload API to register new types dynamically.
 func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {

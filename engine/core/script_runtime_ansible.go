@@ -14,9 +14,9 @@ import (
 //
 // State I/O contract:
 //   - Input:  MYWANT_GOAL_FILE, MYWANT_CURRENT_FILE, MYWANT_PLAN_FILE, MYWANT_INPUT_FILE
-//             point to JSON files written by writeStateFiles.
+//     point to JSON files written by writeStateFiles.
 //   - Output: playbook writes {"current_updates": {...}} to MYWANT_OUTPUT_FILE.
-//             If the file is not written, no state updates are applied.
+//     If the file is not written, no state updates are applied.
 //
 // launch_env_* current-state keys are automatically expanded to real environment
 // variables (e.g. launch_env_OTP_DATA_DIR → OTP_DATA_DIR=value) so that

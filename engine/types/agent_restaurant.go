@@ -46,10 +46,14 @@ func executeRestaurantReservation(ctx context.Context, want *Want) error {
 func generateRestaurantCost(cuisineType string) float64 {
 	var minCost, maxCost float64
 	switch cuisineType {
-	case "casual": minCost, maxCost = 25.0, 60.0
-	case "fine dining": minCost, maxCost = 150.0, 400.0
-	case "bistro": minCost, maxCost = 45.0, 95.0
-	default: minCost, maxCost = 40.0, 120.0
+	case "casual":
+		minCost, maxCost = 25.0, 60.0
+	case "fine dining":
+		minCost, maxCost = 150.0, 400.0
+	case "bistro":
+		minCost, maxCost = 45.0, 95.0
+	default:
+		minCost, maxCost = 40.0, 120.0
 	}
 	cost := minCost + rand.Float64()*(maxCost-minCost)
 	return math.Round(cost*100) / 100

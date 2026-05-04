@@ -27,7 +27,7 @@ func main() {
 				Spec: mywant.WantSpec{
 					Params: map[string]any{
 						"count": 100,
-						"rate": 1.0,
+						"rate":  1.0,
 					},
 				},
 			},

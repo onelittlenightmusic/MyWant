@@ -239,4 +239,3 @@ func TestFinalResultFieldNestedDotNotation(t *testing.T) {
 		t.Error("Expected final_result NOT to be set when nested key is missing")
 	}
 }
-

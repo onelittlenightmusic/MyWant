@@ -42,11 +42,11 @@ type otpPlan struct {
 }
 
 type otpItinerary struct {
-	Duration            int      `json:"duration"`            // seconds
-	StartTime           int64    `json:"startTime"`           // Unix ms
-	EndTime             int64    `json:"endTime"`             // Unix ms
-	NumberOfTransfers   int      `json:"numberOfTransfers"`
-	Legs                []otpLeg `json:"legs"`
+	Duration          int      `json:"duration"`  // seconds
+	StartTime         int64    `json:"startTime"` // Unix ms
+	EndTime           int64    `json:"endTime"`   // Unix ms
+	NumberOfTransfers int      `json:"numberOfTransfers"`
+	Legs              []otpLeg `json:"legs"`
 }
 
 type otpLeg struct {

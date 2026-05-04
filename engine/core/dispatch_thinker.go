@@ -30,7 +30,7 @@ type DirectionRequest struct {
 	Name        string         `json:"name"`
 	Params      map[string]any `json:"params"`
 	Series      string         `json:"series,omitempty"`
-	Version     int           `json:"version,omitempty"`
+	Version     int            `json:"version,omitempty"`
 	RequesterID string         `json:"requester_id,omitempty"`
 }
 
