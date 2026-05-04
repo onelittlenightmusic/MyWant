@@ -61,16 +61,23 @@ func parallelizeDispatcherThink(ctx context.Context, want *Want) error {
 	if !ok || rawDispatched == nil {
 		return nil
 	}
-	dispatchedMap, ok := rawDispatched.(map[string]any)
-	if !ok {
-		return nil
-	}
 
 	doneCount := 0
-	for _, v := range dispatchedMap {
-		if id, ok := v.(string); ok && id == "DONE" {
-			doneCount++
+	switch dm := rawDispatched.(type) {
+	case map[string]string:
+		for _, v := range dm {
+			if v == "DONE" {
+				doneCount++
+			}
 		}
+	case map[string]any:
+		for _, v := range dm {
+			if id, ok := v.(string); ok && id == "DONE" {
+				doneCount++
+			}
+		}
+	default:
+		return nil
 	}
 	want.StoreLog("[Parallelize] %d/%d siblings done", doneCount, dispatchCount)
 

@@ -32,10 +32,10 @@ type Server struct {
 	errorHistory         []ErrorHistoryEntry              // Store error history
 	errorMu              sync.Mutex                       // Protects errorHistory slice
 	router               *mux.Router
-	reactionQueueManager *types.ReactionQueueManager      // Reaction queue manager for reminder wants
-	interactionManager   *mywant.InteractionManager       // Interactive want creation manager
-	httpServer           *http.Server                     // HTTP server instance
-	otelShutdown         func(context.Context) error      // OpenTelemetry shutdown hook
+	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
+	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
+	httpServer           *http.Server                // HTTP server instance
+	otelShutdown         func(context.Context) error // OpenTelemetry shutdown hook
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -98,6 +98,11 @@ func New(config Config) *Server {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}
 
+	// Seed locked achievements and rules from yaml/achievements/
+	if err := mywant.LoadAchievementConfigs(mywant.AchievementsDir); err != nil {
+		log.Printf("[WARN] Failed to load achievement configs: %v", err)
+	}
+
 	// Load data type definitions (JSON Schema)
 	dataTypeLoader := mywant.NewDataTypeLoader()
 	if err := dataTypeLoader.LoadFromDir(mywant.DataTypesDir); err != nil {
@@ -119,22 +124,32 @@ func New(config Config) *Server {
 		}
 	}
 
-	// Remove any stale gui_state wants (they should not persist across restarts)
-	// and inject a fresh one so it is always available from the start.
+	// Remove any stale system wants (they should not persist across restarts)
+	// and inject fresh ones so they are always available from the start.
 	filtered := initialConfig.Wants[:0]
 	for _, w := range initialConfig.Wants {
-		if w.Metadata.Type != "gui_state" {
+		if w.Metadata.Type != "gui_state" && w.Metadata.Type != "capability_manager" {
 			filtered = append(filtered, w)
 		}
 	}
-	initialConfig.Wants = append(filtered, &mywant.Want{
-		Metadata: mywant.Metadata{
-			ID:           "system-gui-state",
-			Name:         "system-gui-state",
-			Type:         "gui_state",
-			IsSystemWant: true,
+	initialConfig.Wants = append(filtered,
+		&mywant.Want{
+			Metadata: mywant.Metadata{
+				ID:           "system-gui-state",
+				Name:         "system-gui-state",
+				Type:         "gui_state",
+				IsSystemWant: true,
+			},
 		},
-	})
+		&mywant.Want{
+			Metadata: mywant.Metadata{
+				ID:           "system-capability-manager",
+				Name:         "system-capability-manager",
+				Type:         "capability_manager",
+				IsSystemWant: true,
+			},
+		},
+	)
 
 	globalBuilder.SetConfigInternal(initialConfig)
 	globalBuilder.SetServerMode(true)

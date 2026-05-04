@@ -55,4 +55,7 @@ const (
 
 	// MemoryDir contains memory persistence files (not moved)
 	MemoryDir = "engine/memory"
+
+	// AchievementsDir contains achievement seed files (locked achievements + rules)
+	AchievementsDir = "yaml/achievements"
 )

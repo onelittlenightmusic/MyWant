@@ -13,23 +13,82 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// AchievementConfigFile defines the format for YAML seed files in yaml/achievements/.
+type AchievementConfigFile struct {
+	Achievements []Achievement     `yaml:"achievements"`
+	Rules        []AchievementRule `yaml:"rules"`
+}
+
+// LoadAchievementConfigs reads all *.yaml files from dir and seeds locked achievements
+// and rules that don't already exist in the store. Safe to call on every server start.
+func LoadAchievementConfigs(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	m := GetAchievementManager()
+	seeded := 0
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("[AchievementStore] failed to read %s: %v", path, err)
+			continue
+		}
+		var cfg AchievementConfigFile
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			log.Printf("[AchievementStore] failed to parse %s: %v", path, err)
+			continue
+		}
+		for _, a := range cfg.Achievements {
+			if _, exists := m.FindByAgentAndTitle(a.AgentName, a.Title); exists {
+				continue
+			}
+			if a.AwardedBy == "" {
+				a.AwardedBy = "system"
+			}
+			m.Add(a)
+			seeded++
+		}
+		for _, r := range cfg.Rules {
+			if r.ID != "" {
+				if _, exists := m.GetRule(r.ID); exists {
+					continue
+				}
+			}
+			m.AddRule(r)
+			seeded++
+		}
+	}
+	if seeded > 0 {
+		log.Printf("[AchievementStore] Seeded %d items from %s", seeded, dir)
+	}
+	return nil
+}
+
 // Achievement represents a single earned title for an agent.
 type Achievement struct {
-	ID                string         `yaml:"id"                          json:"id"`
-	Title             string         `yaml:"title"                       json:"title"`
-	Description       string         `yaml:"description"                 json:"description"`
-	AgentName         string         `yaml:"agentName"                   json:"agentName"`
-	WantID            string         `yaml:"wantID"                      json:"wantID"`
-	WantName          string         `yaml:"wantName"                    json:"wantName"`
-	Category          string         `yaml:"category"                    json:"category"` // execution / quality / specialization
-	Level             int            `yaml:"level"                       json:"level"`    // 1=bronze 2=silver 3=gold
-	EarnedAt          time.Time      `yaml:"earnedAt"                    json:"earnedAt"`
-	AwardedBy         string         `yaml:"awardedBy"                   json:"awardedBy"` // system / capability_manager / human
-	UnlocksCapability string         `yaml:"unlocksCapability,omitempty" json:"unlocksCapability,omitempty"`
+	ID                string    `yaml:"id"                          json:"id"`
+	Title             string    `yaml:"title"                       json:"title"`
+	Description       string    `yaml:"description"                 json:"description"`
+	AgentName         string    `yaml:"agentName"                   json:"agentName"`
+	WantID            string    `yaml:"wantID"                      json:"wantID"`
+	WantName          string    `yaml:"wantName"                    json:"wantName"`
+	Category          string    `yaml:"category"                    json:"category"` // execution / quality / specialization
+	Level             int       `yaml:"level"                       json:"level"`    // 1=bronze 2=silver 3=gold
+	EarnedAt          time.Time `yaml:"earnedAt"                    json:"earnedAt"`
+	AwardedBy         string    `yaml:"awardedBy"                   json:"awardedBy"` // system / capability_manager / human
+	UnlocksCapability string    `yaml:"unlocksCapability,omitempty" json:"unlocksCapability,omitempty"`
 	// Unlocked controls whether the achievement's capability is active.
 	// Achievements start locked (false) and must be explicitly unlocked to take effect.
-	Unlocked          bool           `yaml:"unlocked"                    json:"unlocked"`
-	Metadata          map[string]any `yaml:"metadata,omitempty"          json:"metadata,omitempty"`
+	Unlocked bool           `yaml:"unlocked"                    json:"unlocked"`
+	Metadata map[string]any `yaml:"metadata,omitempty"          json:"metadata,omitempty"`
 }
 
 // AchievementCondition defines when an achievement should be auto-awarded.
@@ -61,7 +120,7 @@ type AchievementRule struct {
 
 // AchievementStore is the root document persisted to ~/.mywant/achievements.yaml.
 type AchievementStore struct {
-	Achievements []Achievement    `yaml:"achievements"`
+	Achievements []Achievement     `yaml:"achievements"`
 	Rules        []AchievementRule `yaml:"rules"`
 }
 
@@ -79,12 +138,12 @@ var (
 )
 
 type achievementManager struct {
-	mu           sync.RWMutex
-	path         string
-	lastHash     string
-	store        AchievementStore
-	hooks        []OnAchievementAddedFunc
-	deleteHooks  []OnAchievementDeletedFunc
+	mu          sync.RWMutex
+	path        string
+	lastHash    string
+	store       AchievementStore
+	hooks       []OnAchievementAddedFunc
+	deleteHooks []OnAchievementDeletedFunc
 }
 
 // GetAchievementManager returns the singleton achievement manager.
@@ -426,15 +485,17 @@ func (m *achievementManager) DeleteRule(id string) bool {
 
 // ── Package-level functions ───────────────────────────────────────────────────
 
-func AddAchievement(a Achievement) Achievement              { return GetAchievementManager().Add(a) }
-func ListAchievements() []Achievement                       { return GetAchievementManager().List() }
-func GetAchievement(id string) (*Achievement, bool)         { return GetAchievementManager().Get(id) }
-func DeleteAchievement(id string) bool                      { return GetAchievementManager().Delete(id) }
-func UpdateAchievement(id string, u Achievement) bool       { return GetAchievementManager().Update(id, u) }
-func LockAchievement(id string) (*Achievement, bool)        { return GetAchievementManager().Lock(id) }
-func UnlockAchievement(id string) (*Achievement, bool)      { return GetAchievementManager().Unlock(id) }
-func ListAchievementsByAgent(n string) []Achievement        { return GetAchievementManager().ListByAgent(n) }
-func HasAchievement(agentName, title string) bool                        { return GetAchievementManager().HasAchievement(agentName, title) }
+func AddAchievement(a Achievement) Achievement         { return GetAchievementManager().Add(a) }
+func ListAchievements() []Achievement                  { return GetAchievementManager().List() }
+func GetAchievement(id string) (*Achievement, bool)    { return GetAchievementManager().Get(id) }
+func DeleteAchievement(id string) bool                 { return GetAchievementManager().Delete(id) }
+func UpdateAchievement(id string, u Achievement) bool  { return GetAchievementManager().Update(id, u) }
+func LockAchievement(id string) (*Achievement, bool)   { return GetAchievementManager().Lock(id) }
+func UnlockAchievement(id string) (*Achievement, bool) { return GetAchievementManager().Unlock(id) }
+func ListAchievementsByAgent(n string) []Achievement   { return GetAchievementManager().ListByAgent(n) }
+func HasAchievement(agentName, title string) bool {
+	return GetAchievementManager().HasAchievement(agentName, title)
+}
 func FindAchievementByAgentAndTitle(agentName, title string) (*Achievement, bool) {
 	return GetAchievementManager().FindByAgentAndTitle(agentName, title)
 }
@@ -465,8 +526,12 @@ func ReplayUnlockedAchievements() {
 	}
 }
 
-func AddAchievementRule(r AchievementRule) AchievementRule    { return GetAchievementManager().AddRule(r) }
-func ListAchievementRules() []AchievementRule                  { return GetAchievementManager().ListRules() }
-func GetAchievementRule(id string) (*AchievementRule, bool)   { return GetAchievementManager().GetRule(id) }
-func DeleteAchievementRule(id string) bool                     { return GetAchievementManager().DeleteRule(id) }
-func UpdateAchievementRule(id string, r AchievementRule) bool { return GetAchievementManager().UpdateRule(id, r) }
+func AddAchievementRule(r AchievementRule) AchievementRule { return GetAchievementManager().AddRule(r) }
+func ListAchievementRules() []AchievementRule              { return GetAchievementManager().ListRules() }
+func GetAchievementRule(id string) (*AchievementRule, bool) {
+	return GetAchievementManager().GetRule(id)
+}
+func DeleteAchievementRule(id string) bool { return GetAchievementManager().DeleteRule(id) }
+func UpdateAchievementRule(id string, r AchievementRule) bool {
+	return GetAchievementManager().UpdateRule(id, r)
+}
