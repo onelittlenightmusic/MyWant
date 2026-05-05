@@ -540,7 +540,7 @@ func (w *WantTypeLoader) UnregisterDefinition(name string) error {
 	if def.Metadata.SystemType {
 		return fmt.Errorf("want type %q is a system type and cannot be deleted", name)
 	}
-	if len(def.InlineAgents) == 0 {
+	if len(def.InlineAgents) == 0 && len(def.Requires) == 0 {
 		return fmt.Errorf("want type %q is backed by Go code and cannot be deleted via API", name)
 	}
 	delete(w.definitions, name)

@@ -21,8 +21,10 @@ func (s *Server) registerWantType(w http.ResponseWriter, r *http.Request) {
 		return // error already written
 	}
 
-	// Reject if a Go-backed type with the same name already exists (cannot override compiled types).
-	if existing := s.wantTypeLoader.GetDefinition(def.Metadata.Name); existing != nil && len(existing.InlineAgents) == 0 {
+	// Reject only if the type is truly Go-backed: no inline agents AND no external requires.
+	// YAML-defined types that use external agents via "requires" have no inlineAgents but are not Go-backed.
+	if existing := s.wantTypeLoader.GetDefinition(def.Metadata.Name); existing != nil &&
+		len(existing.InlineAgents) == 0 && len(existing.Requires) == 0 {
 		http.Error(w, fmt.Sprintf("want type %q is backed by Go code and cannot be overridden via API", def.Metadata.Name), http.StatusConflict)
 		return
 	}

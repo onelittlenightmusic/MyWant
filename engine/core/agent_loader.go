@@ -420,7 +420,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 					return false, nil
 				}
 				mrsApplyStateUpdates(want, raw, stateUpdates)
-				return true, nil
+				return false, nil
 			},
 		})
 	}
