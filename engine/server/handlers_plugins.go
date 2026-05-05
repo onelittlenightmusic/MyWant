@@ -67,7 +67,9 @@ func (s *Server) listPlugins(w http.ResponseWriter, r *http.Request) {
 
 	var urls []string
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		// Follow symlinks: use os.Stat instead of entry.IsDir so symlinked dirs are included.
+		info, err := os.Stat(filepath.Join(base, entry.Name()))
+		if err != nil || !info.IsDir() {
 			continue
 		}
 		if _, err := findPluginFile(entry.Name()); err == nil {
