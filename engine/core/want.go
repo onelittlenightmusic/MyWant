@@ -606,6 +606,7 @@ func (n *Want) SetStatus(status WantStatus) {
 			// Use StoreState (not MergeState) to ensure it's a confirmed value that won't be overwritten
 			// MergeState adds to pendingStateChanges which can be overwritten by later StoreState calls
 			n.storeState("achieving_percentage", 100.0)
+			n.storeState("achieved", true)
 
 			n.NotifyCompletion()
 			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
@@ -2569,6 +2570,7 @@ func (n *Want) Init() {
 	n.storeState(StateFieldActionByAgent, "")
 	n.storeState(StateFieldAchievingPercent, 0)
 	n.storeState(StateFieldCompleted, false)
+	n.storeState("achieved", false)
 
 	n.SetStatus(WantStatusIdle) // Transition to idle after initialization
 }
