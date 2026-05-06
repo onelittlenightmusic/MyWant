@@ -327,7 +327,7 @@ func (r *AgentRegistry) genericMonitorAction(ctx context.Context, want *Want) (b
 // (MRS plugin agent definitions) and registers each one as a script-backed agent.
 // This is called alongside LoadAgents to pick up agents from ~/.mywant/custom-types/.
 func (r *AgentRegistry) LoadUserCustomAgents(dir string) error {
-	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	return WalkFollowingSymlinks(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // best-effort
 		}
