@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -112,16 +113,28 @@ func (s *ScriptableWant) interpolate(tmpl string) string {
 	return interpolateRe.ReplaceAllStringFunc(tmpl, func(m string) string {
 		key := m[2 : len(m)-1] // strip ${ and }
 		if v := GetCurrent[any](&s.Want, key, nil); v != nil {
-			return fmt.Sprintf("%v", v)
+			return toTemplateString(v)
 		}
 		if pv, ok := s.GetParameter(key); ok {
-			return fmt.Sprintf("%v", pv)
+			return toTemplateString(pv)
 		}
 		if ev := os.Getenv(key); ev != "" {
 			return ev
 		}
 		return m // keep placeholder if not resolved
 	})
+}
+
+// toTemplateString converts a value to a string for template substitution.
+// Maps and slices are JSON-encoded so they embed correctly in JSON templates.
+func toTemplateString(v any) string {
+	switch v.(type) {
+	case map[string]any, []any:
+		if b, err := json.Marshal(v); err == nil {
+			return string(b)
+		}
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 // IsAchieved evaluates the declarative achieved condition.
