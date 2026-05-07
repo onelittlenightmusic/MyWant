@@ -178,7 +178,10 @@ export const Dashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilters, setStatusFilters] = useState<WantExecutionStatus[]>([]);
   const [filteredWants, setFilteredWants] = useState<Want[]>([]);
-  const flattenedWants = filteredWants.flatMap((pw: any) => [pw, ...(pw.children || [])]);
+  // Use filteredWants for navigation when the WantGrid has populated it; fall
+  // back to the raw store `wants` so keyboard/gamepad navigation works
+  // immediately on page load before the first filter callback fires.
+  const flattenedWants = (filteredWants.length > 0 ? filteredWants : wants).flatMap((pw: any) => [pw, ...(pw.children || [])]);
   const hierarchicalWants = flattenedWants.map(w => ({ id: w.metadata?.id || w.id || '', parentId: w.metadata?.ownerReferences?.[0]?.id }));
   const currentHierarchicalWant = selectedWant ? { id: selectedWant.metadata?.id || selectedWant.id || '', parentId: selectedWant.metadata?.ownerReferences?.[0]?.id } : null;
 
@@ -1101,7 +1104,7 @@ export const Dashboard: React.FC = () => {
   // - Summary Mode: Summary panel open, all shortcuts enabled (sidebar.showSummary=true)
   // ============================================================
 
-  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm && filteredWants.length > 0 });
+  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm && wants.length > 0 });
 
   const handleEscapeKey = () => {
     if (showBatchConfirmation) setShowBatchConfirmation(false);

@@ -96,11 +96,29 @@ let _captureListener: GamepadActionListener | null = null;
 let _rafHandle: number | null = null;
 const _trackStates = new Map<string, TrackState>();
 
+// Flag used inside _emit to detect whether a listener consumed a tab action
+// with an explicit custom callback.  Prevents _focusNext from running when a
+// consumer provides its own onTabForward / onTabBackward handler.
+let _tabActionConsumed = false;
+
 function _emit(action: GamepadActionType): void {
   if (_captureListener) {
     _captureListener(action);
     return;
   }
+
+  // For tab-like actions, fire all listeners first (so custom callbacks can
+  // set _tabActionConsumed), then — if no listener consumed it — do the
+  // default DOM-focus simulation exactly once.
+  if (action === 'tab-forward' || action === 'tab-backward') {
+    _tabActionConsumed = false;
+    _listeners.forEach(fn => fn(action));
+    if (!_tabActionConsumed) {
+      _focusNext(action === 'tab-backward');
+    }
+    return;
+  }
+
   _listeners.forEach(fn => fn(action));
 }
 
@@ -230,23 +248,36 @@ function _isInSidebar(target?: HTMLElement | null): boolean {
 // ─── Tab focus simulation ─────────────────────────────────────────────────────
 // Used by gamepad L/R bumper buttons to replicate browser Tab / Shift+Tab
 // behaviour when no explicit onTabForward/onTabBackward callback is provided.
+// Called at most ONCE per button press (guarded by _tabActionConsumed flag in
+// _emit, so multiple registered listeners never multiply this call).
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function _focusNext(reverse: boolean): void {
+  // Use getBoundingClientRect for visibility check — more reliable than
+  // offsetParent which returns null for position:fixed ancestors.
   const candidates = Array.from(
     document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter(el => el.offsetParent !== null && !el.closest('[aria-hidden="true"]'));
+  ).filter(el => {
+    if (el.closest('[aria-hidden="true"]')) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  });
 
   if (candidates.length === 0) return;
 
-  const activeIdx = candidates.indexOf(document.activeElement as HTMLElement);
+  const active = document.activeElement as HTMLElement | null;
+  const activeIdx = active ? candidates.indexOf(active) : -1;
   const nextIdx = reverse
     ? (activeIdx <= 0 ? candidates.length - 1 : activeIdx - 1)
     : (activeIdx < 0 ? 0 : (activeIdx + 1) % candidates.length);
 
-  candidates[nextIdx]?.focus();
+  const target = candidates[nextIdx];
+  if (target) {
+    target.focus();
+    target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+  }
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -442,12 +473,10 @@ export function useInputActions({
         case 'menu-toggle':  onMenuToggleRef.current?.();  break;
         case 'context-menu': onContextMenuRef.current?.(); break;
         case 'tab-forward':
-          if (onTabForwardRef.current) { onTabForwardRef.current(); }
-          else { _focusNext(false); }
+          if (onTabForwardRef.current) { _tabActionConsumed = true; onTabForwardRef.current(); }
           break;
         case 'tab-backward':
-          if (onTabBackwardRef.current) { onTabBackwardRef.current(); }
-          else { _focusNext(true); }
+          if (onTabBackwardRef.current) { _tabActionConsumed = true; onTabBackwardRef.current(); }
           break;
       }
     };
