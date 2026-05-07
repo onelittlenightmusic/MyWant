@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"mywant/client/cmd/mywant/commands"
 
@@ -64,10 +66,49 @@ func main() {
 
 	rootCmd.AddCommand(commands.GuiCmd)
 
+	rootCmd.AddCommand(commands.PluginCmd)
+
+	// kubectl-style plugin dispatch: if the first arg is not a known command,
+	// look for mywant-<arg> in PATH and exec it.
+	if len(os.Args) > 1 {
+		firstArg := os.Args[1]
+		if !strings.HasPrefix(firstArg, "-") && !isKnownCommand(rootCmd, firstArg) {
+			pluginName := "mywant-" + firstArg
+			if pluginPath, err := exec.LookPath(pluginName); err == nil {
+				pluginCmd := exec.Command(pluginPath, os.Args[2:]...)
+				pluginCmd.Stdin = os.Stdin
+				pluginCmd.Stdout = os.Stdout
+				pluginCmd.Stderr = os.Stderr
+				if err := pluginCmd.Run(); err != nil {
+					if exitErr, ok := err.(*exec.ExitError); ok {
+						os.Exit(exitErr.ExitCode())
+					}
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
+				os.Exit(0)
+			}
+		}
+	}
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func isKnownCommand(root *cobra.Command, name string) bool {
+	for _, cmd := range root.Commands() {
+		if cmd.Name() == name {
+			return true
+		}
+		for _, alias := range cmd.Aliases {
+			if alias == name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func init() {

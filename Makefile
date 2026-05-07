@@ -41,6 +41,7 @@ build-cli:
 	@mkdir -p bin
 	go build -C client -o ../bin/mywant ./cmd/mywant
 
+
 build-playwright-app:
 	@echo "🎭 Building Playwright MCP App Server..."
 	@cd mcp/playwright-app && npm install && npm run build
