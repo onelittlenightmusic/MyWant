@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -151,6 +154,17 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 			want.SetCurrent(resultField, url)
 		} else {
 			want.DirectLog("[LAUNCH] Warning: url_regex did not match within %d retries", maxRetries)
+			// Fallback: query a local JSON API for the URL (e.g. ngrok at localhost:4040).
+			// Configured via fallback_url_api param — a URL whose JSON response contains the
+			// target URL anywhere in its structure.
+			if apiURL := mywant.GetCurrent(want, "fallback_url_api", ""); apiURL != "" {
+				if url := queryFallbackURLAPI(want, apiURL); url != "" {
+					want.DirectLog("[LAUNCH] Captured URL from fallback API: %s → %s", url, resultField)
+					want.SetCurrent(resultField, url)
+				} else {
+					want.DirectLog("[LAUNCH] Fallback API also returned no URL")
+				}
+			}
 		}
 	}
 
@@ -351,4 +365,51 @@ func composeRecentLogs(composeFile string, lines int) string {
 		return fmt.Sprintf("(failed to get compose logs: %v)", err)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// queryFallbackURLAPI fetches apiURL as JSON and returns the first https?:// URL found
+// anywhere in the response. Used as a fallback when url_regex scan of the log file fails
+// (e.g. when ngrok is already running and exposes its tunnel at localhost:4040/api/tunnels).
+func queryFallbackURLAPI(want *mywant.Want, apiURL string) string {
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		want.DirectLog("[LAUNCH] Fallback API request failed: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ""
+	}
+	// Unmarshal as generic JSON and search recursively for any https?:// string value.
+	var data any
+	if err := json.Unmarshal(body, &data); err != nil {
+		return ""
+	}
+	return findFirstURL(data)
+}
+
+// findFirstURL recursively walks a JSON structure and returns the first string value
+// that looks like an http(s) URL.
+func findFirstURL(v any) string {
+	switch val := v.(type) {
+	case string:
+		if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
+			return val
+		}
+	case map[string]any:
+		for _, child := range val {
+			if url := findFirstURL(child); url != "" {
+				return url
+			}
+		}
+	case []any:
+		for _, child := range val {
+			if url := findFirstURL(child); url != "" {
+				return url
+			}
+		}
+	}
+	return ""
 }
