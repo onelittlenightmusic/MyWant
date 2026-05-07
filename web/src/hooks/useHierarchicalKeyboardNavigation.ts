@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useInputActions } from './useInputActions';
 
 export interface HierarchicalItem {
   id: string;
@@ -17,19 +17,16 @@ interface UseHierarchicalKeyboardNavigationProps<T extends HierarchicalItem> {
 }
 
 /**
- * Hook for hierarchical keyboard navigation with arrow keys and space
- * - Arrow Right: If parent expanded, move to first child; else move to next sibling or next top-level
- * - Arrow Left: Move to previous sibling; if first child, move to parent; if top-level, move to previous top-level
- * - Arrow Up: Move to previous top-level item
- * - Arrow Down: Move to next top-level item
- * - Space: Toggle expand/collapse on current parent item (only works on parents with children)
+ * Hook for hierarchical keyboard / gamepad navigation.
  *
- * @param items - All items in flat list
- * @param currentItem - Currently selected item
- * @param onNavigate - Callback when navigation occurs with new item
- * @param onToggleExpand - Callback to toggle expand/collapse
- * @param expandedItems - Set of expanded parent IDs for checking expansion state
- * @param enabled - Whether keyboard navigation is enabled (default: true)
+ * Arrow key / D-pad / left-stick mapping:
+ *   Right  – if parent is expanded move to first child; else move to next top-level
+ *   Left   – move to previous sibling; if first child, move to parent; if top-level, move to previous top-level
+ *   Down   – next top-level item
+ *   Up     – previous top-level item
+ *   Space / Gamepad X – toggle expand/collapse (or call onSelect when provided)
+ *   Home   – first item
+ *   End    – last item
  */
 export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   items,
@@ -41,274 +38,141 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   lastSelectedItemId,
   enabled = true
 }: UseHierarchicalKeyboardNavigationProps<T>) => {
-  useEffect(() => {
-    if (!enabled || items.length === 0) return;
+  useInputActions({
+    enabled: enabled && items.length > 0,
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in an input
-      const target = e.target as HTMLElement;
-      const isInputElement =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
+    onNavigate: (dir) => {
+      // Determine the reference item for navigation (current or last selected)
+      let refItem: T | null = currentItem;
+      if (!refItem && lastSelectedItemId) {
+        refItem = items.find(i => i.id === lastSelectedItemId) ?? null;
+      }
 
-      if (isInputElement) return;
-
-      // Don't intercept if focus is inside a sidebar
-      if (target.closest('[data-sidebar="true"]')) return;
+      // If no reference, default to first / last item
+      if (!refItem) {
+        if (dir === 'up') {
+          onNavigate(items[items.length - 1]);
+        } else {
+          onNavigate(items[0]);
+        }
+        return;
+      }
 
       let nextItem: T | null = null;
-      let shouldNavigate = false;
 
-      // Determine the reference item for navigation (current or last selected)
-      let refItem = currentItem;
-      if (!refItem && lastSelectedItemId && items.length > 0) {
-        refItem = items.find(item => item.id === lastSelectedItemId) || null;
-      }
-
-      // If still no refItem, and we press an arrow key, default to the first/last item
-      if (!refItem && items.length > 0) {
-        const topLevel = getTopLevelItems(items);
-        switch (e.key) {
-          case 'ArrowRight':
-          case 'ArrowDown':
-          case 'ArrowLeft':
-            if (typeof e.preventDefault === 'function') e.preventDefault();
-            onNavigate(items[0]);
-            return;
-          case 'ArrowUp':
-            if (typeof e.preventDefault === 'function') e.preventDefault();
-            onNavigate(items[items.length - 1]);
-            return;
-        }
-      }
-
-      // If we have no items at all, don't proceed
-      if (!refItem) return;
-
-      switch (e.key) {
-        case 'ArrowRight':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
+      switch (dir) {
+        case 'right': {
           if (!refItem.parentId) {
-            // Current item is top-level (parent)
-            const hasChildren = items.some(item => item.parentId === refItem!.id);
+            const hasChildren = items.some(i => i.parentId === refItem!.id);
             const isExpanded = expandedItems?.has(refItem!.id);
-
-            if (hasChildren && isExpanded) {
-              // Parent is expanded, move to first child
-              nextItem = getFirstChild(items, refItem);
-            } else {
-              // Parent is not expanded or has no children, move to next top-level
-              nextItem = getNextTopLevel(items, refItem);
-            }
+            nextItem = (hasChildren && isExpanded)
+              ? getFirstChild(items, refItem)
+              : getNextTopLevel(items, refItem);
           } else {
-            // Current item is a child, move to next sibling
             nextItem = getNextSibling(items, refItem);
             if (!nextItem) {
-              // No next sibling, move to next parent's sibling
               const parent = getParent(items, refItem);
-              if (parent) {
-                nextItem = getNextSibling(items, parent);
-              }
+              if (parent) nextItem = getNextSibling(items, parent);
             }
           }
-          shouldNavigate = !!nextItem;
           break;
-
-        case 'ArrowLeft':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
+        }
+        case 'left': {
           if (refItem.parentId) {
-            // Current item is a child
-            nextItem = getPreviousSibling(items, refItem);
-            if (!nextItem) {
-              // No previous sibling, move to parent
-              nextItem = getParent(items, refItem);
-            }
+            nextItem = getPreviousSibling(items, refItem) ?? getParent(items, refItem);
           } else {
-            // Current item is top-level, move to previous top-level item
             nextItem = getPreviousTopLevel(items, refItem);
           }
-          shouldNavigate = !!nextItem;
           break;
-
-        case 'ArrowDown':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          // Down arrow: navigate to next top-level want
+        }
+        case 'down':
           nextItem = getNextTopLevel(items, refItem);
-          shouldNavigate = !!nextItem;
           break;
-
-        case 'ArrowUp':
-          if (typeof e.preventDefault === 'function') e.preventDefault();
-          // Up arrow: navigate to previous top-level want
+        case 'up':
           nextItem = getPreviousTopLevel(items, refItem);
-          shouldNavigate = !!nextItem;
           break;
-
-        case ' ':
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          // Space: Toggle selection if onSelect provided, else toggle expand/collapse
-          if (currentItem) {
-            if (onSelect) {
-              onSelect(currentItem.id);
-            } else {
-              // Check if current item is a parent (has children)
-              const hasChildren = items.some(item => item.parentId === currentItem.id);
-              if (hasChildren && onToggleExpand) {
-                onToggleExpand(currentItem.id);
-              }
-            }
-          }
-          return;  // Don't navigate, just toggle
-
-        case 'Home':
-          e.preventDefault();
-          if (items.length > 0) {
-            nextItem = items[0];
-            shouldNavigate = true;
-          }
+        case 'home':
+          nextItem = items[0] ?? null;
           break;
-
-        case 'End':
-          e.preventDefault();
-          if (items.length > 0) {
-            nextItem = items[items.length - 1];
-            shouldNavigate = true;
-          }
+        case 'end':
+          nextItem = items[items.length - 1] ?? null;
           break;
-
-        default:
-          return;
       }
 
-      if (shouldNavigate && nextItem) {
-        onNavigate(nextItem);
+      if (!nextItem) return;
+      onNavigate(nextItem);
 
-        const targetId = nextItem.id;
+      const targetId = nextItem.id;
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const el = document.querySelector(`[data-keyboard-nav-id="${targetId}"]`);
+          if (el instanceof HTMLElement) {
+            el.focus();
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 0);
+      });
+    },
 
-        // Use requestAnimationFrame and a small timeout to ensure React has fully updated the DOM
-        // before attempting to scroll and focus. This prevents animation artifacts.
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            const selectedElement = document.querySelector(`[data-keyboard-nav-id="${targetId}"]`);
-            if (selectedElement && selectedElement instanceof HTMLElement) {
-              selectedElement.focus();
-              selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 0);
-        });
+    onToggle: () => {
+      if (!currentItem) return;
+      if (onSelect) {
+        onSelect(currentItem.id);
+      } else {
+        const hasChildren = items.some(i => i.parentId === currentItem.id);
+        if (hasChildren && onToggleExpand) {
+          onToggleExpand(currentItem.id);
+        }
       }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [items, currentItem, onNavigate, onToggleExpand, expandedItems, lastSelectedItemId, enabled]);
+    },
+  });
 };
 
-// Helper functions for hierarchical navigation
+// ─── Hierarchy helpers ────────────────────────────────────────────────────────
 
-/**
- * Get all siblings of an item (items at same parent level)
- */
-function getSiblings<T extends HierarchicalItem>(items: T[], item: T | null): T[] {
-  if (!item) return [];
-  const parentId = item.parentId;
-  return items.filter(i => i.parentId === parentId);
+function getSiblings<T extends HierarchicalItem>(items: T[], item: T): T[] {
+  return items.filter(i => i.parentId === item.parentId);
 }
 
-/**
- * Get the next sibling item
- */
 function getNextSibling<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
-  if (!item) return items.length > 0 ? items[0] : null;
-
+  if (!item) return items[0] ?? null;
   const siblings = getSiblings(items, item);
-  if (siblings.length === 0) return null;
-
-  const currentIndex = siblings.findIndex(s => s.id === item.id);
-  if (currentIndex < siblings.length - 1) {
-    return siblings[currentIndex + 1];
-  }
-  return null;
+  const idx = siblings.findIndex(s => s.id === item.id);
+  return idx < siblings.length - 1 ? siblings[idx + 1] : null;
 }
 
-/**
- * Get the previous sibling item
- */
 function getPreviousSibling<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
   if (!item) return null;
-
   const siblings = getSiblings(items, item);
-  if (siblings.length === 0) return null;
-
-  const currentIndex = siblings.findIndex(s => s.id === item.id);
-  if (currentIndex > 0) {
-    return siblings[currentIndex - 1];
-  }
-  return null;
+  const idx = siblings.findIndex(s => s.id === item.id);
+  return idx > 0 ? siblings[idx - 1] : null;
 }
 
-/**
- * Get the first child of an item
- */
 function getFirstChild<T extends HierarchicalItem>(items: T[], item: T): T | null {
-  return items.find(i => i.parentId === item.id) || null;
+  return items.find(i => i.parentId === item.id) ?? null;
 }
 
-/**
- * Get the parent of an item
- */
 function getParent<T extends HierarchicalItem>(items: T[], item: T): T | null {
   if (!item.parentId) return null;
-  return items.find(i => i.id === item.parentId) || null;
+  return items.find(i => i.id === item.parentId) ?? null;
 }
 
-/**
- * Get all top-level items (items without a parent)
- */
 function getTopLevelItems<T extends HierarchicalItem>(items: T[]): T[] {
   return items.filter(i => !i.parentId);
 }
 
-/**
- * Get the next top-level item
- */
 function getNextTopLevel<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
   if (!item) return null;
-
-  // If current item is not top-level, find its parent
-  let topLevelItem = item;
-  if (item.parentId) {
-    topLevelItem = getParent(items, item) || item;
-  }
-
-  const topLevelItems = getTopLevelItems(items);
-  const currentIndex = topLevelItems.findIndex(i => i.id === topLevelItem.id);
-
-  if (currentIndex < topLevelItems.length - 1) {
-    return topLevelItems[currentIndex + 1];
-  }
-  return null;
+  let ref = item.parentId ? (getParent(items, item) ?? item) : item;
+  const topLevel = getTopLevelItems(items);
+  const idx = topLevel.findIndex(i => i.id === ref.id);
+  return idx < topLevel.length - 1 ? topLevel[idx + 1] : null;
 }
 
-/**
- * Get the previous top-level item
- */
 function getPreviousTopLevel<T extends HierarchicalItem>(items: T[], item: T | null): T | null {
   if (!item) return null;
-
-  // If current item is not top-level, find its parent
-  let topLevelItem = item;
-  if (item.parentId) {
-    topLevelItem = getParent(items, item) || item;
-  }
-
-  const topLevelItems = getTopLevelItems(items);
-  const currentIndex = topLevelItems.findIndex(i => i.id === topLevelItem.id);
-
-  if (currentIndex > 0) {
-    return topLevelItems[currentIndex - 1];
-  }
-  return null;
+  let ref = item.parentId ? (getParent(items, item) ?? item) : item;
+  const topLevel = getTopLevelItems(items);
+  const idx = topLevel.findIndex(i => i.id === ref.id);
+  return idx > 0 ? topLevel[idx - 1] : null;
 }

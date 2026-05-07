@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useInputActions } from './useInputActions';
 
 interface UseKeyboardNavigationProps {
   itemCount: number;
@@ -8,13 +8,10 @@ interface UseKeyboardNavigationProps {
 }
 
 /**
- * Hook for keyboard navigation with arrow keys
- * Supports Arrow Up/Down for vertical navigation and Arrow Left/Right for grid navigation
+ * Hook for flat-list navigation via keyboard (arrow keys / Home / End) and
+ * Gamepad (D-pad / left analog stick).
  *
- * @param itemCount - Total number of items
- * @param currentIndex - Current selected item index (-1 if none selected)
- * @param onNavigate - Callback when navigation occurs with new index
- * @param enabled - Whether keyboard navigation is enabled (default: true)
+ * Selects the next/previous item and scrolls it into the center of the viewport.
  */
 export const useKeyboardNavigation = ({
   itemCount,
@@ -22,94 +19,42 @@ export const useKeyboardNavigation = ({
   onNavigate,
   enabled = true
 }: UseKeyboardNavigationProps) => {
-  useEffect(() => {
-    if (!enabled || itemCount === 0) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing in an input
-      const target = e.target as HTMLElement;
-      const isInputElement =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable;
-
-      if (isInputElement) return;
-
-      // Don't intercept if focus is inside a sidebar
-      if (target.closest('[data-sidebar="true"]')) return;
-
+  useInputActions({
+    enabled: enabled && itemCount > 0,
+    onNavigate: (dir) => {
       let newIndex = currentIndex;
-      let shouldNavigate = false;
 
-      switch (e.key) {
-        case 'ArrowDown':
-          e.preventDefault();
+      switch (dir) {
+        case 'down':
+        case 'right':
           newIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, itemCount - 1);
-          shouldNavigate = true;
           break;
-
-        case 'ArrowUp':
-          e.preventDefault();
-          if (currentIndex > 0) {
-            newIndex = currentIndex - 1;
-            shouldNavigate = true;
-          }
+        case 'up':
+        case 'left':
+          if (currentIndex > 0) newIndex = currentIndex - 1;
+          else return;
           break;
-
-        case 'ArrowRight':
-          e.preventDefault();
-          newIndex = currentIndex === -1 ? 0 : Math.min(currentIndex + 1, itemCount - 1);
-          shouldNavigate = true;
+        case 'home':
+          newIndex = 0;
           break;
-
-        case 'ArrowLeft':
-          e.preventDefault();
-          if (currentIndex > 0) {
-            newIndex = currentIndex - 1;
-            shouldNavigate = true;
-          }
+        case 'end':
+          newIndex = itemCount - 1;
           break;
-
-        case 'Home':
-          e.preventDefault();
-          if (itemCount > 0) {
-            newIndex = 0;
-            shouldNavigate = true;
-          }
-          break;
-
-        case 'End':
-          e.preventDefault();
-          if (itemCount > 0) {
-            newIndex = itemCount - 1;
-            shouldNavigate = true;
-          }
-          break;
-
         default:
           return;
       }
 
-      if (shouldNavigate) {
-        onNavigate(newIndex);
+      onNavigate(newIndex);
 
-        // Use requestAnimationFrame and a small timeout to ensure React has fully updated the DOM
-        // before attempting to scroll and focus. This prevents animation artifacts.
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            // Find the element that is now selected (marked by selected state in parent)
-            const selectedElement = document.querySelector('[data-keyboard-nav-selected="true"]');
-            if (selectedElement && selectedElement instanceof HTMLElement) {
-              selectedElement.focus();
-              // Use 'center' to ensure the selected element is clearly visible in the center of the viewport
-              selectedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 0);
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [itemCount, currentIndex, onNavigate, enabled]);
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const el = document.querySelector('[data-keyboard-nav-selected="true"]');
+          if (el instanceof HTMLElement) {
+            el.focus();
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 0);
+      });
+    },
+  });
 };
