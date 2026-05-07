@@ -17,7 +17,7 @@ import (
 func setupTestServer() *Server {
 	config := Config{Port: 0, Host: "localhost", Debug: true}
 	// Create dummy directories if they don't exist to avoid loader errors
-	os.MkdirAll("yaml/want_types", 0755)
+	os.MkdirAll("engine/bundled/want_types", 0755)
 	os.MkdirAll("yaml/recipes", 0755)
 
 	server := New(config)

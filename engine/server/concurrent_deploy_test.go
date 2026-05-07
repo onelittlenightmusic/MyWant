@@ -20,7 +20,7 @@ import (
 // TestConcurrentPrimeSieveDeployment tests deploying 10 prime sieve recipes in parallel
 func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 	// Setup test server
-	config := Config{Port: 0, Host: "localhost", Debug: true, WantTypesDir: "../../yaml/want_types"}
+	config := Config{Port: 0, Host: "localhost", Debug: true, WantTypesDir: "../../engine/bundled/want_types"}
 	os.MkdirAll("yaml/recipes", 0755)
 
 	server := New(config)

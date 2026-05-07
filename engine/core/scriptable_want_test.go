@@ -5,14 +5,14 @@ import (
 )
 
 func TestInlineAgentYAMLLoading(t *testing.T) {
-	loader := NewWantTypeLoader("../../yaml/want_types")
+	loader := NewWantTypeLoader("../../engine/bundled/want_types")
 	if err := loader.LoadAllWantTypes(); err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
 
 	def := loader.GetDefinition("echo_monitor")
 	if def == nil {
-		t.Fatal("echo_monitor type not found in yaml/want_types")
+		t.Fatal("echo_monitor type not found in engine/bundled/want_types")
 	}
 
 	t.Logf("Loaded: %s", def.Metadata.Name)
@@ -36,7 +36,7 @@ func TestInlineAgentYAMLLoading(t *testing.T) {
 }
 
 func TestScriptableWantFactory(t *testing.T) {
-	loader := NewWantTypeLoader("../../yaml/want_types")
+	loader := NewWantTypeLoader("../../engine/bundled/want_types")
 	if err := loader.LoadAllWantTypes(); err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
