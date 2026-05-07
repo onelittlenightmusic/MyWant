@@ -1,4 +1,4 @@
-.PHONY: clean build build-gui build-cli build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -132,6 +132,12 @@ build-mock:
 	@mkdir -p bin
 	@cd tools/mock && go build -o ../../bin/flight-server
 
+# Build the mock CLI plugin (mywant-mock)
+build-mock-plugin:
+	@echo "🏗️  Building mock plugin (mywant-mock)..."
+	@mkdir -p bin
+	@cd tools/mock-plugin && go build -o ../../bin/mywant-mock
+
 # Run the mock flight server
 run-mock: build-mock
 	@./bin/flight-server
@@ -163,7 +169,8 @@ help:
 	@echo "🔨 Build:"
 	@echo "  build                     - Build mywant library (with quality checks)"
 	@echo "  test-build                - Quick build test"
-	@echo "  build-mock                - Build mock flight server"
+	@echo "  build-mock                - Build mock flight server (bin/flight-server)"
+	@echo "  build-mock-plugin         - Build mock CLI plugin (bin/mywant-mock)"
 	@echo "  build-playwright-app      - Build Playwright MCP App Server (Node.js)"
 	@echo "  install-playwright-browsers - Install Chromium for Playwright (first-time setup)"
 	@echo ""
@@ -190,12 +197,14 @@ help:
 	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"
-	@echo "  run-mock         - Start mock flight server"
-	@echo "  restart-all      - Kill and restart frontend, backend, and mock server"
+	@echo "  run-mock         - Start mock flight server directly (for development)"
+	@echo "  restart-all      - Rebuild and restart the MyWant server"
 	@echo ""
-	@echo "🔧 Gmail MCP Troubleshooting:"
-	@echo "  fix-mcp          - Quick fix: Reset Gmail MCP (kill processes, clear cache)"
-	@echo "  troubleshoot-mcp - Full diagnostic: Check config, test Goose, analyze logs"
+	@echo "  Mock flight management (via plugin):"
+	@echo "    mywant mock flight start   - Start mock flight server"
+	@echo "    mywant mock flight stop    - Stop mock flight server"
+	@echo "    mywant mock flight status  - Show status"
+	@echo "    mywant mock list           - List all mock servers"
 	@echo ""
 	@echo "🧹 Utility:"
 	@echo "  clean - Clean build artifacts"
@@ -203,12 +212,11 @@ help:
 
 all: build
 
-# Kill and restart processes using mywant
+# Kill and restart the MyWant server (mock flight server is managed separately via mywant mock)
 restart-all:
-	@echo "🔄 Restarting MyWant server and mock server..."
+	@echo "🔄 Restarting MyWant server..."
 	@echo "🛑 Stopping existing processes..."
 	@./bin/mywant stop 2>/dev/null || echo "  Server not running"
-	@pkill -f "./bin/flight-server" 2>/dev/null || echo "  Mock server not running"
 	@echo "🧹 Cleaning logs..."
 	@rm -f ~/.mywant/server.log
 	@echo ""
@@ -216,24 +224,19 @@ restart-all:
 	@go clean -cache
 	@$(MAKE) build-gui
 	@$(MAKE) build-cli
-	@mkdir -p ~/.mywant
 	@$(MAKE) build-mock
+	@$(MAKE) build-mock-plugin
+	@mkdir -p ~/.mywant
 	@echo "🚀 Starting MyWant server via mywant..."
 	@nohup ./bin/mywant start -D --port 8080 --host 0.0.0.0 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
-	@echo ""
-	@echo "✈️  Starting mock flight server..."
-	@nohup ./bin/flight-server > ~/.mywant/flight-server.log 2>&1 &
-	@sleep 1
-	@echo "✅ Mock server started (PID: $$(pgrep -f './bin/flight-server'))"
-	@echo "✅ All processes started!"
 	@echo "🌐 URL: http://0.0.0.0:8080"
-	@echo "✈️  Mock Server: http://localhost:8090"
 	@echo ""
 	@echo "📋 Server management:"
-	@echo "  Stop: ./bin/mywant stop"
+	@echo "  Stop:        ./bin/mywant stop"
 	@echo "  View status: ./bin/mywant ps"
+	@echo "  Mock flight: ./bin/mywant-mock flight start"
 
 # Gmail MCP troubleshooting targets
 troubleshoot-mcp:

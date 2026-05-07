@@ -215,7 +215,7 @@ func buildInteractRecommendPrompt(params map[string]interface{}) string {
 
 	return fmt.Sprintf(`You are a MyWant configuration assistant. MyWant is a declarative workflow system where users define "wants" (goals) using YAML.
 
-Available want types include: gmail, morning_briefing, reminder, hotel, flight, restaurant, weather, transit, knowledge, slack_post, budget, itinerary, execution_result, docker_run, opa_llm_planner, python_thinker, teams_webhook, slack_webhook, ngrok, cloudflare_tunnel.
+Available want types include: reminder, hotel, flight, restaurant, weather, budget, itinerary, execution_result, docker_run, opa_llm_planner, python_thinker, teams_webhook, slack_webhook, ngrok, cloudflare_tunnel.
 
 Conversation history: %s
 
