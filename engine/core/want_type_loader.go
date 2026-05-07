@@ -39,6 +39,7 @@ type WantTypeDefinition struct {
 	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
 	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`
 	SeeAlso             []string               `json:"seeAlso" yaml:"seeAlso"`
+	GoType              string                 `json:"goType,omitempty" yaml:"goType,omitempty"` // delegate to this registered Go implementation (e.g. "webhook_receiver")
 }
 
 // WantTypeMetadata contains want type identity and classification

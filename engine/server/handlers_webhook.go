@@ -19,24 +19,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// --- Teams state config ---
-
-var teamsStateCfg = webhookStateConfig{
-	LatestMessageKey: "teams_latest_message",
-	MessagesKey:      "teams_messages",
-	MessageCountKey:  "teams_message_count",
-	LogPrefix:        "[TEAMS-WEBHOOK]",
-}
-
-// --- Slack state config ---
-
-var slackStateCfg = webhookStateConfig{
-	LatestMessageKey: "slack_latest_message",
-	MessagesKey:      "slack_messages",
-	MessageCountKey:  "slack_message_count",
-	LogPrefix:        "[SLACK-WEBHOOK]",
-}
-
 // receiveWebhook handles POST /api/v1/webhooks/{id}
 func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -67,21 +49,7 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Detect Teams payload by channelId == "msteams"
-	if channelID, ok := payload["channelId"].(string); ok && channelID == "msteams" {
-		s.handleTeamsWebhook(w, r, want, body, payload)
-		return
-	}
-
-	// Detect Slack payload by type field
-	if payloadType, ok := payload["type"].(string); ok {
-		if payloadType == "url_verification" || payloadType == "event_callback" {
-			s.handleSlackWebhook(w, r, want, body, payload)
-			return
-		}
-	}
-
-	// Claude Code webhook: store as structured message in FIFO buffer
+	// Claude Code webhook: structured message handling
 	if want.Metadata.Type == "claude_code_thread" {
 		text, _ := payload["text"].(string)
 		sender, _ := payload["sender"].(string)
@@ -95,17 +63,64 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generic webhook: store payload as-is
-	mywant.StoreStateMulti(want, map[string]any{
-		"webhook_payload":     payload,
-		"webhook_received_at": time.Now().Format(time.RFC3339),
-		"action_by_agent":     "webhook_handler",
-	})
+	// Generic webhook receiver: handle challenge, verify, and store raw payload.
+	// verify_type / challenge_field / secret_param are want params so that platform-specific
+	// YAML types (teams_notify, slack_notify, …) supply their own defaults without Go changes.
+	s.handleWebhookReceiver(w, r, want, body, payload)
+}
 
-	log.Printf("[WEBHOOK] Received generic webhook for want %s\n", wantID)
-	s.JSONResponse(w, http.StatusOK, map[string]string{
-		"status": "received",
-	})
+// handleWebhookReceiver is the single generic handler for all webhook_receiver-based want types.
+// It handles URL verification challenges, HMAC / Slack-signing verification, and raw payload storage.
+func (s *Server) handleWebhookReceiver(w http.ResponseWriter, r *http.Request, want *mywant.Want, body []byte, payload map[string]any) {
+	// Handle challenge before signature check (e.g. Slack URL verification)
+	challengeField := want.GetStringParam("challenge_field", "")
+	if challengeField != "" {
+		if payloadType, _ := payload["type"].(string); payloadType == "url_verification" {
+			challenge, _ := payload[challengeField].(string)
+			w.Header().Set("Content-Type", "text/plain")
+			fmt.Fprint(w, challenge)
+			return
+		}
+	}
+
+	// Signature verification driven by verify_type param
+	verifyType := want.GetStringParam("verify_type", "none")
+	secretParam := want.GetStringParam("secret_param", "webhook_secret")
+	secret := want.GetStringParam(secretParam, "")
+	if secret != "" {
+		switch verifyType {
+		case "hmac_sha256":
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "HMAC ") {
+				sig := strings.TrimPrefix(authHeader, "HMAC ")
+				if !verifyTeamsHMAC(body, sig, secret) {
+					http.Error(w, `{"error":"invalid signature"}`, http.StatusUnauthorized)
+					return
+				}
+			}
+		case "slack_signing":
+			slackSig := r.Header.Get("X-Slack-Signature")
+			slackTS := r.Header.Get("X-Slack-Request-Timestamp")
+			if slackSig != "" && slackTS != "" {
+				if !verifySlackSignature(body, slackSig, slackTS, secret) {
+					http.Error(w, `{"error":"invalid signature"}`, http.StatusUnauthorized)
+					return
+				}
+			}
+		}
+	}
+
+	// Store raw payload in FIFO buffer using state_prefix param
+	statePrefix := want.GetStringParam("state_prefix", "webhook")
+	cfg := webhookStateConfig{
+		LatestMessageKey: statePrefix + "_latest_message",
+		MessagesKey:      statePrefix + "_messages",
+		MessageCountKey:  statePrefix + "_message_count",
+		LogPrefix:        "[WEBHOOK-RECEIVER:" + statePrefix + "]",
+	}
+	storeRawWebhookPayload(want, payload, cfg)
+
+	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
 }
 
 // findWantAndActionByWebhookID detects -start / -stop / -debug-start / -debug-stop suffixes
@@ -211,54 +226,6 @@ func (s *Server) findWantByIDOrName(idOrName string) *mywant.Want {
 	return nil
 }
 
-// --- Teams Webhook Handler ---
-
-func (s *Server) handleTeamsWebhook(w http.ResponseWriter, r *http.Request, want *mywant.Want, body []byte, payload map[string]any) {
-	// HMAC-SHA256 signature verification
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" && strings.HasPrefix(authHeader, "HMAC ") {
-		signature := strings.TrimPrefix(authHeader, "HMAC ")
-		secret, _ := want.GetStateString("webhook_secret", "")
-		if secret != "" {
-			if !verifyTeamsHMAC(body, signature, secret) {
-				http.Error(w, `{"error":"invalid signature"}`, http.StatusUnauthorized)
-				return
-			}
-		}
-	}
-
-	// Extract message fields from Teams payload
-	sender := ""
-	if from, ok := payload["from"].(map[string]any); ok {
-		if name, ok := from["name"].(string); ok {
-			sender = name
-		}
-	}
-	text, _ := payload["text"].(string)
-	timestamp, _ := payload["timestamp"].(string)
-	if timestamp == "" {
-		timestamp = time.Now().Format(time.RFC3339)
-	}
-	channelID := ""
-	if conversation, ok := payload["conversation"].(map[string]any); ok {
-		if id, ok := conversation["id"].(string); ok {
-			channelID = id
-		}
-	}
-
-	storeWebhookMessage(want, webhookMessage{
-		Sender:    sender,
-		Text:      text,
-		Timestamp: timestamp,
-		ChannelID: channelID,
-	}, teamsStateCfg)
-
-	json.NewEncoder(w).Encode(map[string]string{
-		"type": "message",
-		"text": "Received",
-	})
-}
-
 // verifyTeamsHMAC verifies the HMAC-SHA256 signature from Teams
 func verifyTeamsHMAC(body []byte, signature string, secret string) bool {
 	secretBytes, err := base64.StdEncoding.DecodeString(secret)
@@ -272,83 +239,6 @@ func verifyTeamsHMAC(body []byte, signature string, secret string) bool {
 	expectedSignature := base64.StdEncoding.EncodeToString(expectedMAC)
 
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
-}
-
-// --- Slack Webhook Handler ---
-
-func (s *Server) handleSlackWebhook(w http.ResponseWriter, r *http.Request, want *mywant.Want, body []byte, payload map[string]any) {
-	payloadType, _ := payload["type"].(string)
-
-	// Handle URL verification challenge (must respond before signature check
-	// so that Slack can verify the endpoint during initial setup)
-	if payloadType == "url_verification" {
-		challenge, _ := payload["challenge"].(string)
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, challenge)
-		return
-	}
-
-	// Slack signature verification (event_callback and other events)
-	slackSignature := r.Header.Get("X-Slack-Signature")
-	slackTimestamp := r.Header.Get("X-Slack-Request-Timestamp")
-	if slackSignature != "" && slackTimestamp != "" {
-		secret, _ := want.GetStateString("webhook_secret", "")
-		if secret != "" {
-			if !verifySlackSignature(body, slackSignature, slackTimestamp, secret) {
-				http.Error(w, `{"error":"invalid signature"}`, http.StatusUnauthorized)
-				return
-			}
-		}
-	}
-
-	// Handle event_callback
-	if payloadType != "event_callback" {
-		http.Error(w, `{"error":"unsupported payload type"}`, http.StatusBadRequest)
-		return
-	}
-
-	event, ok := payload["event"].(map[string]any)
-	if !ok {
-		http.Error(w, `{"error":"missing event field"}`, http.StatusBadRequest)
-		return
-	}
-
-	// Only process message events (skip subtypes like bot_message, message_changed, etc.)
-	eventType, _ := event["type"].(string)
-	if eventType != "message" {
-		json.NewEncoder(w).Encode(map[string]string{"status": "ignored"})
-		return
-	}
-	if _, hasSubtype := event["subtype"]; hasSubtype {
-		json.NewEncoder(w).Encode(map[string]string{"status": "ignored"})
-		return
-	}
-
-	user, _ := event["user"].(string)
-	text, _ := event["text"].(string)
-	channel, _ := event["channel"].(string)
-	ts, _ := event["ts"].(string)
-
-	timestamp := ts
-	if ts != "" {
-		// Convert Slack timestamp (e.g. "1234567890.123456") to RFC3339
-		parts := strings.Split(ts, ".")
-		if sec, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
-			timestamp = time.Unix(sec, 0).Format(time.RFC3339)
-		}
-	}
-	if timestamp == "" {
-		timestamp = time.Now().Format(time.RFC3339)
-	}
-
-	storeWebhookMessage(want, webhookMessage{
-		Sender:    user,
-		Text:      text,
-		Timestamp: timestamp,
-		ChannelID: channel,
-	}, slackStateCfg)
-
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 // verifySlackSignature verifies the Slack request signature.
@@ -382,6 +272,7 @@ func abs(n int64) int64 {
 // --- List Webhook Endpoints ---
 
 // listWebhookEndpoints handles GET /api/v1/webhooks
+// Any want that has a non-empty "webhook_url" state is treated as an active endpoint.
 func (s *Server) listWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -397,23 +288,23 @@ func (s *Server) listWebhookEndpoints(w http.ResponseWriter, r *http.Request) {
 
 	allWants := s.globalBuilder.GetAllWantStates()
 	for _, want := range allWants {
-		for _, wt := range webhookTypes {
-			if want.Metadata.Type == wt {
-				statusKey := strings.Replace(wt, " ", "_", 1) + "_status"
-				status := "active"
-				if st, ok := want.GetStateString(statusKey, ""); ok && st != "" {
-					status = st
-				}
-				endpoints = append(endpoints, webhookEndpoint{
-					WantID:   want.Metadata.ID,
-					WantName: want.Metadata.Name,
-					WantType: want.Metadata.Type,
-					URL:      fmt.Sprintf("/api/v1/webhooks/%s", want.Metadata.Name),
-					Status:   status,
-				})
-				break
-			}
+		webhookURL, hasURL := want.GetStateString("webhook_url", "")
+		if !hasURL || webhookURL == "" {
+			continue
 		}
+		statePrefix := want.GetStringParam("state_prefix", "webhook")
+		statusKey := statePrefix + "_webhook_status"
+		status := "active"
+		if st, ok := want.GetStateString(statusKey, ""); ok && st != "" {
+			status = st
+		}
+		endpoints = append(endpoints, webhookEndpoint{
+			WantID:   want.Metadata.ID,
+			WantName: want.Metadata.Name,
+			WantType: want.Metadata.Type,
+			URL:      webhookURL,
+			Status:   status,
+		})
 	}
 
 	if endpoints == nil {

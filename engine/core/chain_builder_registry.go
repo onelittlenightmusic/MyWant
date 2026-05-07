@@ -76,6 +76,13 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
 			cb.RegisterWantType(wantType, createGenericFactory(wantType))
 		}
+	} else if def.GoType != "" {
+		// YAML type backed by a named Go implementation (e.g. goType: webhook_receiver).
+		// Uses the base Go type's factory so platform-specific YAML types can share one
+		// implementation without duplicating Go code.
+		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
+			cb.RegisterWantType(wantType, createGenericFactory(def.GoType))
+		}
 	} else {
 		// YAML-only type: no Go implementation found.
 		// Use ScriptableWant factory for all cases — inline agents, lifecycle hooks,
