@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, Search } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest, WhenSpec } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -25,6 +25,7 @@ import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useRecipeStore } from '@/stores/recipeStore';
 import { ApiError } from '@/types/api';
 import { Recommendation, ConfigModifications } from '@/types/interact';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface WantFormProps {
   isOpen: boolean;
@@ -505,6 +506,47 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   };
 
+
+  // ── Gamepad input for Add Want sidebar ───────────────────────────────────────
+  const isTypeSelectionPhase = isOpen && !selectedTypeId && editMode === 'form';
+
+  // Confirm action: type phase → select focused item; params phase → Enter/click on active element
+  const handleGamepadConfirm = useCallback(() => {
+    if (isTypeSelectionPhase) {
+      typeSelectorRef.current?.confirmFocused();
+    } else {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return;
+      if (el.tagName === 'BUTTON' || el.getAttribute('role') === 'button') {
+        el.click();
+      } else {
+        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+      }
+    }
+  }, [isTypeSelectionPhase]);
+
+  // Cancel action: params phase → Escape on active input or close form; type phase → close form
+  const handleGamepadCancel = useCallback(() => {
+    const el = document.activeElement as HTMLElement | null;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    } else {
+      onClose();
+    }
+  }, [onClose]);
+
+  useInputActions({
+    enabled: isOpen && editMode === 'form',
+    gamepadOnly: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onNavigate: isTypeSelectionPhase ? (dir) => {
+      if (dir === 'right' || dir === 'down') typeSelectorRef.current?.navigateNext();
+      else if (dir === 'left' || dir === 'up') typeSelectorRef.current?.navigatePrev();
+    } : undefined,
+    onConfirm: handleGamepadConfirm,
+    onCancel: handleGamepadCancel,
+  });
 
   const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;

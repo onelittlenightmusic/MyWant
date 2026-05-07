@@ -30,6 +30,12 @@ interface TypeRecipeSelectorProps {
 export interface TypeRecipeSelectorRef {
   focusSearch: () => void;
   focus: () => void;
+  /** Move focus to next item in the filtered list (wraps around) */
+  navigateNext: () => void;
+  /** Move focus to previous item in the filtered list (wraps around) */
+  navigatePrev: () => void;
+  /** Select the currently highlighted item (no-op if none highlighted) */
+  confirmFocused: () => void;
 }
 
 export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSelectorProps>(({
@@ -49,6 +55,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
   const searchInputRef = useRef<HTMLInputElement>(null);
   const collapsedButtonRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Stable refs for use inside useImperativeHandle (avoids stale closures)
+  const filteredItemsRef = useRef<TypeRecipeSelectorItem[]>([]);
+  const focusedIndexRef = useRef<number>(-1);
+  const handleSelectRef = useRef<(item: TypeRecipeSelectorItem) => void>(() => {});
 
   // Long press for touch drag
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,7 +129,30 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
     },
     focus: () => {
       collapsedButtonRef.current?.focus();
-    }
+    },
+    navigateNext: () => {
+      const total = filteredItemsRef.current.length;
+      if (total === 0) return;
+      setFocusedIndex(i => {
+        const next = i < total - 1 ? i + 1 : 0;
+        itemRefs.current[next]?.focus();
+        return next;
+      });
+    },
+    navigatePrev: () => {
+      const total = filteredItemsRef.current.length;
+      if (total === 0) return;
+      setFocusedIndex(i => {
+        const prev = i > 0 ? i - 1 : total - 1;
+        itemRefs.current[prev]?.focus();
+        return prev;
+      });
+    },
+    confirmFocused: () => {
+      const idx = focusedIndexRef.current;
+      const item = filteredItemsRef.current[idx];
+      if (item) handleSelectRef.current(item);
+    },
   }));
 
   const categoryIcons: Record<string, React.ReactNode> = {
@@ -198,6 +231,10 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
     return filtered;
   }, [items, searchQuery, selectedCategory]);
 
+  // Keep stable refs in sync (for useImperativeHandle)
+  filteredItemsRef.current = filteredItems;
+  focusedIndexRef.current = focusedIndex;
+
   // Group items by type
   const groupedItems = useMemo(() => {
     return {
@@ -216,6 +253,9 @@ export const TypeRecipeSelector = forwardRef<TypeRecipeSelectorRef, TypeRecipeSe
     setIsExpanded(false);
     setFocusedIndex(-1);
   }, [onSelect]);
+
+  // Keep handleSelect ref in sync (after definition, before useImperativeHandle uses it)
+  handleSelectRef.current = handleSelect;
 
   const handleToggleExpand = useCallback(() => {
     setIsExpanded(prev => {
