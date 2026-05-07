@@ -1104,7 +1104,7 @@ export const Dashboard: React.FC = () => {
   // - Summary Mode: Summary panel open, all shortcuts enabled (sidebar.showSummary=true)
   // ============================================================
 
-  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm && wants.length > 0 });
+  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm });
 
   const handleEscapeKey = () => {
     if (showBatchConfirmation) setShowBatchConfirmation(false);

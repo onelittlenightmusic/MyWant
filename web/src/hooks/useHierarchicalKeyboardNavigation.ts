@@ -39,22 +39,31 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
   enabled = true
 }: UseHierarchicalKeyboardNavigationProps<T>) => {
   useInputActions({
-    enabled: enabled && items.length > 0,
+    enabled,
 
     onNavigate: (dir) => {
+      if (items.length === 0) return;
       // Determine the reference item for navigation (current or last selected)
       let refItem: T | null = currentItem;
       if (!refItem && lastSelectedItemId) {
         refItem = items.find(i => i.id === lastSelectedItemId) ?? null;
       }
 
-      // If no reference, default to first / last item
+      // If no reference, default to first / last item and still focus the card
       if (!refItem) {
-        if (dir === 'up') {
-          onNavigate(items[items.length - 1]);
-        } else {
-          onNavigate(items[0]);
-        }
+        const fallback = dir === 'up' ? items[items.length - 1] : items[0];
+        if (!fallback) return;
+        onNavigate(fallback);
+        const fallbackId = fallback.id;
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const el = document.querySelector(`[data-keyboard-nav-id="${fallbackId}"]`);
+            if (el instanceof HTMLElement) {
+              el.focus();
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 0);
+        });
         return;
       }
 
