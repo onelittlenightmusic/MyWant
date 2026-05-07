@@ -54,7 +54,7 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 				"prefix":       fmt.Sprintf("prime-%d", idx),
 			}
 
-			recipeConfig, err := mywant.LoadRecipe("../../yaml/recipes/prime-sieve.yaml", params)
+			recipeConfig, err := mywant.LoadRecipe("../../engine/bundled/recipes/prime-sieve.yaml", params)
 			if err != nil {
 				deploymentErrors <- fmt.Errorf("instance %d: failed to load recipe: %v", idx, err)
 				return

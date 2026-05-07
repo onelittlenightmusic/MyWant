@@ -43,7 +43,7 @@ func main() {
 				"prefix":       fmt.Sprintf("prime-%d", idx),
 			}
 
-			recipeConfig, err := LoadRecipe("../yaml/recipes/prime-sieve.yaml", params)
+			recipeConfig, err := LoadRecipe("bundled/recipes/prime-sieve.yaml", params)
 			if err != nil {
 				errors <- fmt.Errorf("instance %d: failed to instantiate: %v", idx, err)
 				return

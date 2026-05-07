@@ -9,4 +9,4 @@ spec:
   params:
     start_number: 2
     end_number: 100
-  recipe: yaml/recipes/prime-sieve.yaml
+  recipe: engine/bundled/recipes/prime-sieve.yaml
