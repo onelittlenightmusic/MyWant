@@ -7,22 +7,57 @@ export type NavigationDirection = 'up' | 'down' | 'left' | 'right' | 'home' | 'e
 export interface UseInputActionsOptions {
   /** Called when a directional navigation input is received */
   onNavigate?: (direction: NavigationDirection) => void;
-  /** Called on Enter key or Gamepad A button */
+  /** Called on Enter key or Gamepad A button (index 0) */
   onConfirm?: () => void;
-  /** Called on Escape key or Gamepad B button */
+  /** Called on Escape key or Gamepad B button (index 1) */
   onCancel?: () => void;
-  /** Called on Space key or Gamepad X button */
+  /** Called on Space key or Gamepad X button (index 2) */
   onToggle?: () => void;
+  /** Called on Alt+Space or Gamepad Select button (index 8) */
+  onMenuToggle?: () => void;
+  /**
+   * Called on Shift+Space or Gamepad Start button (index 9).
+   * Intended for a context-menu / right-click equivalent overlay.
+   */
+  onContextMenu?: () => void;
+  /**
+   * Called on Tab key or Gamepad R bumper (index 5).
+   * When no callback is provided the R bumper simulates a Tab keypress
+   * (moves DOM focus to the next focusable element).
+   */
+  onTabForward?: () => void;
+  /**
+   * Called on Shift+Tab or Gamepad L bumper (index 4).
+   * When no callback is provided the L bumper simulates Shift+Tab
+   * (moves DOM focus to the previous focusable element).
+   */
+  onTabBackward?: () => void;
   enabled?: boolean;
   /** Skip if an <input>/<textarea>/contentEditable is focused. Default: true */
   ignoreWhenInputFocused?: boolean;
   /** Skip if focus is inside a [data-sidebar="true"] element. Default: true */
   ignoreWhenInSidebar?: boolean;
+  /**
+   * When true, this handler intercepts all input before other useInputActions
+   * instances (keyboard: capture phase + stopImmediatePropagation; gamepad:
+   * exclusive dispatch).  Use for modal/menu navigation that must take priority
+   * over page-level handlers.
+   */
+  captureInput?: boolean;
 }
 
 // ─── Gamepad singleton ────────────────────────────────────────────────────────
 
-type GamepadActionType = NavigationDirection | 'confirm' | 'cancel' | 'toggle';
+type GamepadActionType =
+  | NavigationDirection
+  | 'confirm'
+  | 'cancel'
+  | 'toggle'
+  | 'menu-toggle'
+  | 'context-menu'
+  | 'tab-forward'
+  | 'tab-backward';
+
 type GamepadActionListener = (action: GamepadActionType) => void;
 
 // Repeat timing constants (ms) – mimics OS key-repeat behaviour
@@ -32,13 +67,17 @@ const AXIS_DEADZONE = 0.5;
 
 // Standard Gamepad API button indices
 const BUTTON_MAP: Readonly<Record<number, GamepadActionType>> = {
-  0: 'confirm',  // A / Cross
-  1: 'cancel',   // B / Circle
-  2: 'toggle',   // X / Square
-  12: 'up',      // D-pad Up
-  13: 'down',    // D-pad Down
-  14: 'left',    // D-pad Left
-  15: 'right',   // D-pad Right
+  0: 'confirm',       // A / Cross
+  1: 'cancel',        // B / Circle
+  2: 'toggle',        // X / Square
+  4: 'tab-backward',  // L Bumper (LB / L1)
+  5: 'tab-forward',   // R Bumper (RB / R1)
+  8: 'menu-toggle',   // Select / Back / View / Share
+  9: 'context-menu',  // Start / Options / Menu
+  12: 'up',           // D-pad Up
+  13: 'down',         // D-pad Down
+  14: 'left',         // D-pad Left
+  15: 'right',        // D-pad Right
 };
 
 const NAV_ACTIONS = new Set<GamepadActionType>(['up', 'down', 'left', 'right']);
@@ -52,10 +91,16 @@ interface TrackState {
 // Module-level singleton — only one RAF loop runs regardless of how many hook
 // instances are active.
 const _listeners = new Set<GamepadActionListener>();
+// When set, only this listener receives gamepad events (all others are bypassed).
+let _captureListener: GamepadActionListener | null = null;
 let _rafHandle: number | null = null;
 const _trackStates = new Map<string, TrackState>();
 
 function _emit(action: GamepadActionType): void {
+  if (_captureListener) {
+    _captureListener(action);
+    return;
+  }
   _listeners.forEach(fn => fn(action));
 }
 
@@ -182,53 +227,99 @@ function _isInSidebar(target?: HTMLElement | null): boolean {
   return !!el?.closest('[data-sidebar="true"]');
 }
 
+// ─── Tab focus simulation ─────────────────────────────────────────────────────
+// Used by gamepad L/R bumper buttons to replicate browser Tab / Shift+Tab
+// behaviour when no explicit onTabForward/onTabBackward callback is provided.
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function _focusNext(reverse: boolean): void {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+  ).filter(el => el.offsetParent !== null && !el.closest('[aria-hidden="true"]'));
+
+  if (candidates.length === 0) return;
+
+  const activeIdx = candidates.indexOf(document.activeElement as HTMLElement);
+  const nextIdx = reverse
+    ? (activeIdx <= 0 ? candidates.length - 1 : activeIdx - 1)
+    : (activeIdx < 0 ? 0 : (activeIdx + 1) % candidates.length);
+
+  candidates[nextIdx]?.focus();
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
  * Unified keyboard + Gamepad API input handler.
  *
  * Keyboard mapping:
- *   Arrow keys → onNavigate   (up / down / left / right)
- *   Home / End → onNavigate   (home / end)
- *   Enter      → onConfirm
- *   Escape     → onCancel
- *   Space      → onToggle
+ *   Arrow keys   → onNavigate (up / down / left / right)
+ *   Home / End   → onNavigate (home / end)
+ *   Enter        → onConfirm
+ *   Escape       → onCancel
+ *   Space        → onToggle
+ *   Alt+Space    → onMenuToggle
+ *   Shift+Space  → onContextMenu
+ *   Tab          → onTabForward  (no preventDefault — browser focus also moves)
+ *   Shift+Tab    → onTabBackward (no preventDefault)
  *
  * Gamepad mapping (Standard Gamepad layout):
- *   D-pad / Left analog stick → onNavigate
- *   A button (index 0)        → onConfirm
- *   B button (index 1)        → onCancel
- *   X button (index 2)        → onToggle
+ *   D-pad / Left stick  → onNavigate
+ *   A (0)               → onConfirm
+ *   B (1)               → onCancel
+ *   X (2)               → onToggle
+ *   L Bumper (4)        → onTabBackward / simulate Shift+Tab
+ *   R Bumper (5)        → onTabForward  / simulate Tab
+ *   Select (8)          → onMenuToggle
+ *   Start (9)           → onContextMenu
  *
- * Navigation inputs have key-repeat behaviour: first event fires immediately,
- * then repeats after 400 ms at 120 ms intervals while held.
+ * Navigation inputs have key-repeat behaviour (400 ms initial, 120 ms repeat).
+ *
+ * Set captureInput: true to give this handler exclusive priority — keyboard
+ * events are intercepted in the capture phase (stopImmediatePropagation) and
+ * all gamepad events go only to this handler while active.
  */
 export function useInputActions({
   onNavigate,
   onConfirm,
   onCancel,
   onToggle,
+  onMenuToggle,
+  onContextMenu,
+  onTabForward,
+  onTabBackward,
   enabled = true,
   ignoreWhenInputFocused = true,
   ignoreWhenInSidebar = true,
+  captureInput = false,
 }: UseInputActionsOptions): void {
   // Refs let us update callbacks without re-subscribing to events.
-  const onNavigateRef = useRef(onNavigate);
-  const onConfirmRef  = useRef(onConfirm);
-  const onCancelRef   = useRef(onCancel);
-  const onToggleRef   = useRef(onToggle);
-  const enabledRef    = useRef(enabled);
+  const onNavigateRef    = useRef(onNavigate);
+  const onConfirmRef     = useRef(onConfirm);
+  const onCancelRef      = useRef(onCancel);
+  const onToggleRef      = useRef(onToggle);
+  const onMenuToggleRef  = useRef(onMenuToggle);
+  const onContextMenuRef = useRef(onContextMenu);
+  const onTabForwardRef  = useRef(onTabForward);
+  const onTabBackwardRef = useRef(onTabBackward);
+  const enabledRef       = useRef(enabled);
 
-  // Keep refs current on every render (no deps needed — runs every render).
-  onNavigateRef.current = onNavigate;
-  onConfirmRef.current  = onConfirm;
-  onCancelRef.current   = onCancel;
-  onToggleRef.current   = onToggle;
-  enabledRef.current    = enabled;
+  // Keep refs current on every render.
+  onNavigateRef.current    = onNavigate;
+  onConfirmRef.current     = onConfirm;
+  onCancelRef.current      = onCancel;
+  onToggleRef.current      = onToggle;
+  onMenuToggleRef.current  = onMenuToggle;
+  onContextMenuRef.current = onContextMenu;
+  onTabForwardRef.current  = onTabForward;
+  onTabBackwardRef.current = onTabBackward;
+  enabledRef.current       = enabled;
 
-  // ── Keyboard ──────────────────────────────────────────────────────────────
+  // ── Normal (bubble-phase) keyboard handler — active when captureInput is false ──
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || captureInput) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
@@ -244,15 +335,30 @@ export function useInputActions({
         case 'ArrowRight': e.preventDefault(); onNavigateRef.current?.('right'); break;
         case 'Home':       e.preventDefault(); onNavigateRef.current?.('home');  break;
         case 'End':        e.preventDefault(); onNavigateRef.current?.('end');   break;
-        // Action keys — only preventDefault when we actually handle them
+        // Enter / Escape — only preventDefault when we handle them
         case 'Enter':
           if (onConfirmRef.current) { e.preventDefault(); onConfirmRef.current(); }
           break;
         case 'Escape':
           if (onCancelRef.current) { e.preventDefault(); onCancelRef.current(); }
           break;
+        // Space variants — priority: Alt > Shift > plain
         case ' ':
-          if (onToggleRef.current) { e.preventDefault(); onToggleRef.current(); }
+          if (e.altKey) {
+            if (onMenuToggleRef.current) { e.preventDefault(); e.stopImmediatePropagation(); onMenuToggleRef.current(); }
+          } else if (e.shiftKey) {
+            if (onContextMenuRef.current) { e.preventDefault(); onContextMenuRef.current(); }
+          } else {
+            if (onToggleRef.current) { e.preventDefault(); onToggleRef.current(); }
+          }
+          break;
+        // Tab / Shift+Tab — no preventDefault so browser focus still moves
+        case 'Tab':
+          if (e.shiftKey) {
+            onTabBackwardRef.current?.();
+          } else {
+            onTabForwardRef.current?.();
+          }
           break;
         default:
           return;
@@ -261,16 +367,65 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
-  // ── Gamepad ───────────────────────────────────────────────────────────────
+  // ── Capture-phase keyboard handler — active when captureInput is true ────────
+  useEffect(() => {
+    if (!enabled || !captureInput) return;
+
+    const handleKeyDownCapture = (e: KeyboardEvent) => {
+      if (!enabledRef.current) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+
+      let handled = false;
+      switch (e.key) {
+        case 'ArrowUp':    handled = true; onNavigateRef.current?.('up');    break;
+        case 'ArrowDown':  handled = true; onNavigateRef.current?.('down');  break;
+        case 'ArrowLeft':  handled = true; onNavigateRef.current?.('left');  break;
+        case 'ArrowRight': handled = true; onNavigateRef.current?.('right'); break;
+        case 'Home':       handled = true; onNavigateRef.current?.('home');  break;
+        case 'End':        handled = true; onNavigateRef.current?.('end');   break;
+        case 'Enter':  if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
+        case 'Escape': if (onCancelRef.current)   { handled = true; onCancelRef.current();   } break;
+        case ' ':
+          if (e.altKey) {
+            if (onMenuToggleRef.current)  { handled = true; onMenuToggleRef.current(); }
+          } else if (e.shiftKey) {
+            if (onContextMenuRef.current) { handled = true; onContextMenuRef.current(); }
+          } else {
+            if (onToggleRef.current)      { handled = true; onToggleRef.current(); }
+          }
+          break;
+        case 'Tab':
+          if (e.shiftKey) { onTabBackwardRef.current?.(); }
+          else            { onTabForwardRef.current?.();  }
+          // Never stopImmediatePropagation for Tab — browser focus must still move
+          return;
+        default:
+          return;
+      }
+
+      if (handled) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDownCapture, true);
+    return () => window.removeEventListener('keydown', handleKeyDownCapture, true);
+  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+
+  // ── Gamepad ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!enabled) return;
 
     const handleGamepadAction = (action: GamepadActionType) => {
       if (!enabledRef.current) return;
-      if (ignoreWhenInputFocused && _isInputFocused()) return;
-      if (ignoreWhenInSidebar && _isInSidebar()) return;
+      if (!captureInput) {
+        if (ignoreWhenInputFocused && _isInputFocused()) return;
+        if (ignoreWhenInSidebar && _isInSidebar()) return;
+      }
 
       switch (action) {
         case 'up':
@@ -281,13 +436,28 @@ export function useInputActions({
         case 'end':
           onNavigateRef.current?.(action);
           break;
-        case 'confirm': onConfirmRef.current?.();  break;
-        case 'cancel':  onCancelRef.current?.();   break;
-        case 'toggle':  onToggleRef.current?.();   break;
+        case 'confirm':      onConfirmRef.current?.();     break;
+        case 'cancel':       onCancelRef.current?.();      break;
+        case 'toggle':       onToggleRef.current?.();      break;
+        case 'menu-toggle':  onMenuToggleRef.current?.();  break;
+        case 'context-menu': onContextMenuRef.current?.(); break;
+        case 'tab-forward':
+          if (onTabForwardRef.current) { onTabForwardRef.current(); }
+          else { _focusNext(false); }
+          break;
+        case 'tab-backward':
+          if (onTabBackwardRef.current) { onTabBackwardRef.current(); }
+          else { _focusNext(true); }
+          break;
       }
     };
 
     _registerListener(handleGamepadAction);
-    return () => _unregisterListener(handleGamepadAction);
-  }, [enabled, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+    if (captureInput) _captureListener = handleGamepadAction;
+
+    return () => {
+      _unregisterListener(handleGamepadAction);
+      if (_captureListener === handleGamepadAction) _captureListener = null;
+    };
+  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 }

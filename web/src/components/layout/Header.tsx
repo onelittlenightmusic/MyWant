@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Plus, Heart, ListChecks, Map, Bot, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
 import { SettingsModal } from '@/components/modals/SettingsModal';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface HeaderProps {
   onCreateWant: () => void;
@@ -32,17 +33,26 @@ interface HeaderProps {
   onCanvasModeToggle?: () => void;
 }
 
-const menuItems = [
-  { id: 'wants', label: 'Wants', icon: Heart, href: '/dashboard' },
-  { id: 'agents', label: 'Agents', icon: Bot, href: '/agents' },
+// All navigable menu entries in display order.
+// href: null means it triggers a modal (Settings).
+interface NavEntry {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string | null;
+}
+
+const NAV_ENTRIES: NavEntry[] = [
+  { id: 'wants',        label: 'Wants',        icon: Heart,      href: '/dashboard' },
+  { id: 'agents',       label: 'Agents',        icon: Bot,        href: '/agents' },
+  { id: 'wantTypes',    label: 'Want Types',    icon: Zap,        href: '/want-types' },
+  { id: 'recipes',      label: 'Recipes',       icon: BookOpen,   href: '/recipes' },
+  { id: 'achievements', label: 'Achievements',  icon: Trophy,     href: '/achievements' },
+  { id: 'logs',         label: 'Logs',          icon: Activity,   href: '/logs' },
+  { id: 'settings',     label: 'Settings',      icon: Settings,   href: null },
 ];
 
-const advancedItems = [
-  { id: 'wantTypes', label: 'Want Types', icon: Zap, href: '/want-types' },
-  { id: 'recipes', label: 'Recipes', icon: BookOpen, href: '/recipes' },
-  { id: 'achievements', label: 'Achievements', icon: Trophy, href: '/achievements' },
-  { id: 'logs', label: 'Logs', icon: Activity, href: '/logs' },
-];
+const MAIN_IDS  = new Set(['wants', 'agents']);
 
 export const Header: React.FC<HeaderProps> = ({
   onCreateWant,
@@ -70,15 +80,22 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const config = useConfigStore(state => state.config);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isBottom = config?.header_position === 'bottom';
   const [menuOpen, setMenuOpen] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLElement>(null);
+
+  // Reset focused item index whenever the menu closes.
+  useEffect(() => {
+    if (!menuOpen) setFocusedIdx(-1);
+  }, [menuOpen]);
 
   // Set CSS variable for header height so sidebars can offset accordingly
   useEffect(() => {
@@ -121,7 +138,7 @@ export const Header: React.FC<HeaderProps> = ({
     if (window.innerWidth < 1024) {
       if (!showBubbleOnMobile) {
         setShowBubbleOnMobile(true);
-        setShowProviderSelect(true); // Always show provider select when opening bubble on mobile
+        setShowProviderSelect(true);
       } else {
         setShowBubbleOnMobile(false);
         setShowProviderSelect(false);
@@ -138,13 +155,64 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  // Dismiss keyboard on iOS when closing the menu
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     menuJustClosedRef.current = true;
     setTimeout(() => { menuJustClosedRef.current = false; }, 400);
     (document.activeElement as HTMLElement)?.blur();
     setMenuOpen(false);
-  };
+  }, []);
+
+  const openMenu = useCallback(() => {
+    setMenuOpen(true);
+  }, []);
+
+  const toggleMenu = useCallback(() => {
+    setMenuOpen(prev => !prev);
+  }, []);
+
+  // Confirm the currently focused menu item.
+  const confirmFocusedItem = useCallback(() => {
+    if (focusedIdx < 0 || focusedIdx >= NAV_ENTRIES.length) return;
+    const entry = NAV_ENTRIES[focusedIdx];
+    if (entry.href) {
+      navigate(entry.href);
+    } else if (entry.id === 'settings') {
+      setIsSettingsOpen(true);
+    }
+    closeMenu();
+  }, [focusedIdx, navigate, closeMenu]);
+
+  // ── Unified keyboard + gamepad input ─────────────────────────────────────────
+  useInputActions({
+    // Alt+Space / Select button always toggles the menu regardless of whether
+    // it is open or closed.
+    onMenuToggle: toggleMenu,
+
+    // While the menu is open, navigate through items.
+    onNavigate: menuOpen ? (dir) => {
+      if (dir === 'up') {
+        setFocusedIdx(i => (i <= 0 ? NAV_ENTRIES.length - 1 : i - 1));
+      } else if (dir === 'down') {
+        setFocusedIdx(i => (i < 0 ? 0 : (i + 1) % NAV_ENTRIES.length));
+      } else if (dir === 'home') {
+        setFocusedIdx(0);
+      } else if (dir === 'end') {
+        setFocusedIdx(NAV_ENTRIES.length - 1);
+      }
+    } : undefined,
+
+    // Confirm/cancel are only meaningful while the menu is open.
+    onConfirm: menuOpen ? confirmFocusedItem : undefined,
+    onCancel:  menuOpen ? closeMenu          : undefined,
+
+    // Capture all input while the menu is open so page navigation is suppressed.
+    captureInput: menuOpen,
+
+    // Guards: the menu itself is not inside a data-sidebar element, and we want
+    // the handler to work regardless of focus position.
+    ignoreWhenInputFocused: true,
+    ignoreWhenInSidebar: false,
+  });
 
   return (
     <>
@@ -161,7 +229,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Hamburger menu button — opens on hover */}
           <div className="relative self-stretch -my-2 sm:-my-4" onMouseEnter={handleMenuMouseEnter} onMouseLeave={handleMenuMouseLeave}>
             <button
-              onClick={() => menuOpen ? closeMenu() : setMenuOpen(true)}
+              onClick={() => menuOpen ? closeMenu() : openMenu()}
               className={classNames(
                 "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none min-w-[56px] sm:min-w-[64px]",
                 menuOpen
@@ -169,6 +237,8 @@ export const Header: React.FC<HeaderProps> = ({
                   : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               )}
               aria-label="Toggle menu"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
             >
               {menuOpen ? (
                 <X className="h-4 w-4" />
@@ -185,67 +255,100 @@ export const Header: React.FC<HeaderProps> = ({
               <div className={classNames(
                 "absolute left-0 w-48 z-50",
                 isBottom ? "bottom-full pb-2" : "top-full pt-2"
-              )}>
+              )}
+              role="menu"
+              >
                 {/* Transparent bridge to prevent mouseleave when moving to menu */}
                 <div className="absolute inset-x-0 h-2 bg-transparent" style={isBottom ? { bottom: 0 } : { top: 0 }} />
-                
+
                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg overflow-hidden">
-                  <nav className="p-2 space-y-1">
-                  {menuItems.map(item => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.href;
-                    return (
-                      <Link
-                        key={item.id}
-                        to={item.href}
-                        onClick={closeMenu}
-                        onMouseDown={(e) => e.preventDefault()}
-                        className={classNames(
-                          'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
-                        )}
-                      >
-                        <Icon className="h-4 w-4 mr-3" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </nav>
-                <div className="border-t border-gray-200 dark:border-gray-800 p-2 space-y-1">
-                  <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Advanced</p>
-                  {advancedItems.map(item => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.href;
-                    return (
-                      <Link
-                        key={item.id}
-                        to={item.href}
-                        onClick={closeMenu}
-                        onMouseDown={(e) => e.preventDefault()}
-                        className={classNames(
-                          'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                          isActive
-                            ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200'
-                        )}
-                      >
-                        <Icon className="h-4 w-4 mr-3" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                  <button
-                    onClick={() => { setIsSettingsOpen(true); closeMenu(); }}
-                    className="w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-                  >
-                    <Settings className="h-4 w-4 mr-3" />
-                    Settings
-                  </button>
+                  {/* Main items */}
+                  <nav className="p-2 space-y-1" aria-label="Main navigation">
+                    {NAV_ENTRIES.filter(e => MAIN_IDS.has(e.id)).map((entry) => {
+                      const globalIdx = NAV_ENTRIES.findIndex(e => e.id === entry.id);
+                      const isActive = location.pathname === entry.href;
+                      const isFocused = focusedIdx === globalIdx;
+                      const Icon = entry.icon;
+                      return (
+                        <Link
+                          key={entry.id}
+                          to={entry.href!}
+                          onClick={closeMenu}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setFocusedIdx(globalIdx)}
+                          role="menuitem"
+                          data-menu-idx={globalIdx}
+                          className={classNames(
+                            'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
+                            isFocused && !isActive && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          )}
+                        >
+                          <Icon className="h-4 w-4 mr-3" />
+                          {entry.label}
+                        </Link>
+                      );
+                    })}
+                  </nav>
+
+                  {/* Advanced items */}
+                  <div className="border-t border-gray-200 dark:border-gray-800 p-2 space-y-1">
+                    <p className="px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-500 uppercase tracking-wider">Advanced</p>
+                    {NAV_ENTRIES.filter(e => !MAIN_IDS.has(e.id) && e.id !== 'settings').map((entry) => {
+                      const globalIdx = NAV_ENTRIES.findIndex(e => e.id === entry.id);
+                      const isActive = location.pathname === entry.href;
+                      const isFocused = focusedIdx === globalIdx;
+                      const Icon = entry.icon;
+                      return (
+                        <Link
+                          key={entry.id}
+                          to={entry.href!}
+                          onClick={closeMenu}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onMouseEnter={() => setFocusedIdx(globalIdx)}
+                          role="menuitem"
+                          data-menu-idx={globalIdx}
+                          className={classNames(
+                            'flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
+                            isFocused && !isActive && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          )}
+                        >
+                          <Icon className="h-4 w-4 mr-3" />
+                          {entry.label}
+                        </Link>
+                      );
+                    })}
+
+                    {/* Settings */}
+                    {(() => {
+                      const settingsEntry = NAV_ENTRIES.find(e => e.id === 'settings')!;
+                      const globalIdx = NAV_ENTRIES.findIndex(e => e.id === 'settings');
+                      const isFocused = focusedIdx === globalIdx;
+                      return (
+                        <button
+                          onClick={() => { setIsSettingsOpen(true); closeMenu(); }}
+                          onMouseEnter={() => setFocusedIdx(globalIdx)}
+                          role="menuitem"
+                          data-menu-idx={globalIdx}
+                          className={classNames(
+                            'w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                            'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
+                            isFocused && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          )}
+                        >
+                          <settingsEntry.icon className="h-4 w-4 mr-3" />
+                          {settingsEntry.label}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
             )}
           </div>
 

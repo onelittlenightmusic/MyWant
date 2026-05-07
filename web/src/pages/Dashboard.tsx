@@ -11,6 +11,7 @@ import { smartPollWants, seedWantETags } from '@/stores/wantHashCache';
 import { POLLING_INTERVAL_MS } from '@/constants/polling';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useInputActions } from '@/hooks/useInputActions';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
@@ -1110,6 +1111,17 @@ export const Dashboard: React.FC = () => {
     else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
   useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || expandedChain.length > 0 });
+
+  // Context menu (Shift+Space / Gamepad Start) — toggle QuickActions overlay for selected want
+  useInputActions({
+    enabled: !sidebar.showForm,
+    onContextMenu: () => {
+      const id = selectedWant?.metadata?.id || selectedWant?.id;
+      if (!id) return;
+      const { quickActionsWantId, setQuickActionsWantId } = useWantStore.getState();
+      setQuickActionsWantId(quickActionsWantId === id ? null : id);
+    },
+  });
 
   // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
   // Use capture phase to catch the event before other handlers
