@@ -8,8 +8,7 @@ import { RightSidebar } from '@/components/layout/RightSidebar';
 import { YamlEditor } from './YamlEditor';
 import { LabelAutocomplete } from './LabelAutocomplete';
 import { LabelSelectorAutocomplete } from './LabelSelectorAutocomplete';
-import { TypeRecipeSelector, TypeRecipeSelectorRef } from './TypeRecipeSelector';
-import { WantInventoryPicker, WantSlot } from './WantInventoryPicker';
+import { WantInventoryPicker, WantInventoryPickerRef, WantSlot } from './WantInventoryPicker';
 import { RecommendationSelector } from '@/components/interact/RecommendationSelector';
 import { LabelsSection } from './sections/LabelsSection';
 import { DependenciesSection } from './sections/DependenciesSection';
@@ -59,8 +58,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
   const { recipes, fetchRecipes } = useRecipeStore();
 
-  // Ref for TypeRecipeSelector
-  const typeSelectorRef = useRef<TypeRecipeSelectorRef>(null);
+  const inventoryPickerRef = useRef<WantInventoryPickerRef>(null);
 
   // Refs for form fields navigation
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -166,7 +164,7 @@ export const WantForm: React.FC<WantFormProps> = ({
         e.preventDefault();
         // Focus search input
         setTimeout(() => {
-          typeSelectorRef.current?.focusSearch();
+          inventoryPickerRef.current?.focusSearch();
         }, 0);
       }
     };
@@ -513,7 +511,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   // Confirm action: type phase → select focused item; params phase → Enter/click on active element
   const handleGamepadConfirm = useCallback(() => {
     if (isTypeSelectionPhase) {
-      typeSelectorRef.current?.confirmFocused();
+      inventoryPickerRef.current?.confirmFocused();
     } else {
       const el = document.activeElement as HTMLElement | null;
       if (!el) return;
@@ -541,8 +539,9 @@ export const WantForm: React.FC<WantFormProps> = ({
     ignoreWhenInputFocused: false,
     ignoreWhenInSidebar: false,
     onNavigate: isTypeSelectionPhase ? (dir) => {
-      if (dir === 'right' || dir === 'down') typeSelectorRef.current?.navigateNext();
-      else if (dir === 'left' || dir === 'up') typeSelectorRef.current?.navigatePrev();
+      if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') {
+        inventoryPickerRef.current?.navigate(dir);
+      }
     } : undefined,
     onConfirm: handleGamepadConfirm,
     onCancel: handleGamepadCancel,
@@ -740,6 +739,7 @@ export const WantForm: React.FC<WantFormProps> = ({
               /* No type selected — Minecraft-style inventory picker */
               <div className="flex-1 min-h-0">
                 <WantInventoryPicker
+                  ref={inventoryPickerRef}
                   wantTypes={userFacingWantTypes}
                   recipes={recipes}
                   onSelect={(id, itemType) => {

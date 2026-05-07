@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Search, Zap, Package, Plane, Calculator, Layers, CheckCircle, Monitor } from 'lucide-react';
 import { WantTypeListItem } from '@/types/wantType';
 import { GenericRecipe } from '@/types/recipe';
@@ -109,6 +109,14 @@ interface WantInventoryPickerProps {
   onSelect: (id: string, itemType: 'want-type' | 'recipe') => void;
 }
 
+export interface WantInventoryPickerRef {
+  navigate: (dir: 'up' | 'down' | 'left' | 'right') => void;
+  confirmFocused: () => void;
+  focusSearch: () => void;
+}
+
+const GRID_COLS = 6;
+
 interface TooltipState {
   item: SlotItem;
   x: number;
@@ -116,15 +124,20 @@ interface TooltipState {
   above: boolean;
 }
 
-export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
+export const WantInventoryPicker = forwardRef<WantInventoryPickerRef, WantInventoryPickerProps>(
+function WantInventoryPicker({
   wantTypes,
   recipes,
   onSelect,
-}) => {
+}, ref) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('category');
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const slotButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const renderedItemsRef = useRef<SlotItem[]>([]);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -195,6 +208,43 @@ export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
     return Array.from(map.entries()).map(([label, groupItems]) => ({ label, items: groupItems }));
   }, [filteredItems, sortMode]);
 
+  // Flat list in rendered order (row-major across groups) — used for D-pad navigation
+  const renderedItems = useMemo(() => groups.flatMap(g => g.items), [groups]);
+  renderedItemsRef.current = renderedItems;
+  slotButtonRefs.current.length = renderedItems.length;
+
+  useImperativeHandle(ref, () => ({
+    focusSearch: () => { searchRef.current?.focus(); },
+    navigate: (dir) => {
+      const items = renderedItemsRef.current;
+      const total = items.length;
+      if (total === 0) return;
+      const currentIdx = slotButtonRefs.current.findIndex(el => el === document.activeElement);
+      let next: number;
+      if (currentIdx < 0) {
+        next = (dir === 'up' || dir === 'left') ? total - 1 : 0;
+      } else if (dir === 'right') {
+        next = (currentIdx + 1) % total;
+      } else if (dir === 'left') {
+        next = currentIdx === 0 ? total - 1 : currentIdx - 1;
+      } else if (dir === 'down') {
+        const c = currentIdx + GRID_COLS;
+        next = c < total ? c : currentIdx;
+      } else {
+        const c = currentIdx - GRID_COLS;
+        next = c >= 0 ? c : currentIdx;
+      }
+      slotButtonRefs.current[next]?.focus();
+    },
+    confirmFocused: () => {
+      const idx = slotButtonRefs.current.findIndex(el => el === document.activeElement);
+      if (idx >= 0) {
+        const item = renderedItemsRef.current[idx];
+        if (item) onSelectRef.current(item.id, item.type);
+      }
+    },
+  }), []);
+
   const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>, item: SlotItem) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
@@ -209,10 +259,11 @@ export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
 
   const handleMouseLeave = useCallback(() => setTooltip(null), []);
 
-  const renderSlot = (item: SlotItem) => (
+  const renderSlot = (item: SlotItem, flatIndex: number) => (
     <div key={item.id} className="flex flex-col items-center gap-0.5">
       <button
         type="button"
+        ref={el => { slotButtonRefs.current[flatIndex] = el; }}
         draggable
         onClick={() => onSelect(item.id, item.type)}
         onMouseEnter={e => handleMouseEnter(e, item)}
@@ -325,22 +376,25 @@ export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
           </p>
         ) : (
           <div className="space-y-3">
-            {groups.map(({ label, items: groupItems }, gi) => (
-              <div key={label ?? gi}>
-                {label !== null && (
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                      {label}
-                    </span>
-                    <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                    <span className="text-[9px] text-gray-400">{groupItems.length}</span>
+            {(() => {
+              let slotCounter = 0;
+              return groups.map(({ label, items: groupItems }, gi) => (
+                <div key={label ?? gi}>
+                  {label !== null && (
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                        {label}
+                      </span>
+                      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                      <span className="text-[9px] text-gray-400">{groupItems.length}</span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {groupItems.map(item => renderSlot(item, slotCounter++))}
                   </div>
-                )}
-                <div className="grid grid-cols-6 gap-1.5">
-                  {groupItems.map(renderSlot)}
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         )}
       </div>
@@ -371,4 +425,4 @@ export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
       )}
     </div>
   );
-};
+});
