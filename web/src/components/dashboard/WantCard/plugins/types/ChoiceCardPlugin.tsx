@@ -15,6 +15,12 @@ const ChoiceContentSection: React.FC<WantCardPluginProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Keep highlighted item centered in the dropdown list
+  useEffect(() => {
+    itemRefs.current[highlightedIndex]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightedIndex]);
 
   useEffect(() => { setLocalValue(choiceSelected); }, [choiceSelected]);
 
@@ -131,6 +137,7 @@ const ChoiceContentSection: React.FC<WantCardPluginProps> = ({
             {choices.map((choice: any, idx: number) => (
               <button
                 key={idx}
+                ref={el => { itemRefs.current[idx] = el; }}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleSelect(choice); }}
                 onMouseEnter={() => setHighlightedIndex(idx)}
