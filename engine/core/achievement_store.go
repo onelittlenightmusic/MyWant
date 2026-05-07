@@ -3,6 +3,7 @@ package mywant
 import (
 	"crypto/md5"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -534,4 +535,53 @@ func GetAchievementRule(id string) (*AchievementRule, bool) {
 func DeleteAchievementRule(id string) bool { return GetAchievementManager().DeleteRule(id) }
 func UpdateAchievementRule(id string, r AchievementRule) bool {
 	return GetAchievementManager().UpdateRule(id, r)
+}
+
+// LoadAchievementConfigsFromFS loads achievement seed files from an embedded fs.FS.
+// fsRoot is the subdirectory within fsys (e.g. "achievements").
+func LoadAchievementConfigsFromFS(fsys fs.FS, fsRoot string) error {
+	m := GetAchievementManager()
+	seeded := 0
+	err := fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if filepath.Ext(d.Name()) != ".yaml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			log.Printf("[AchievementStore] failed to read embedded %s: %v", path, readErr)
+			return nil
+		}
+		var cfg AchievementConfigFile
+		if yamlErr := yaml.Unmarshal(data, &cfg); yamlErr != nil {
+			log.Printf("[AchievementStore] failed to parse embedded %s: %v", path, yamlErr)
+			return nil
+		}
+		for _, a := range cfg.Achievements {
+			if _, exists := m.FindByAgentAndTitle(a.AgentName, a.Title); exists {
+				continue
+			}
+			if a.AwardedBy == "" {
+				a.AwardedBy = "system"
+			}
+			m.Add(a)
+			seeded++
+		}
+		for _, r := range cfg.Rules {
+			if r.ID != "" {
+				if _, exists := m.GetRule(r.ID); exists {
+					continue
+				}
+			}
+			m.AddRule(r)
+			seeded++
+		}
+		return nil
+	})
+	if seeded > 0 {
+		log.Printf("[AchievementStore] Seeded %d items from embedded FS", seeded)
+	}
+	return err
 }

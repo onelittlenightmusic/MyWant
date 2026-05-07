@@ -2,13 +2,14 @@ package server
 
 import (
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
-	"mywant/engine/core"
-
+	mywant "mywant/engine/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -269,5 +270,44 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 	}
 
 	log.Printf("[SERVER] Successfully loaded %d/%d recipe files\n", loadedCount, len(recipes))
+	return nil
+}
+
+// loadRecipeFilesIntoRegistryFromFS loads recipe files from an embedded fs.FS into the registry.
+// fsRoot is the subdirectory within fsys (e.g. "recipes").
+func loadRecipeFilesIntoRegistryFromFS(fsys fs.FS, fsRoot string, registry *mywant.CustomTargetTypeRegistry) error {
+	loadedCount := 0
+	err := fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			log.Printf("[SERVER] Warning: Failed to read embedded recipe %s: %v\n", path, readErr)
+			return nil
+		}
+		var recipe mywant.GenericRecipe
+		if yamlErr := yaml.Unmarshal(data, &recipe); yamlErr != nil {
+			log.Printf("[SERVER] Warning: Failed to parse embedded recipe %s: %v\n", path, yamlErr)
+			return nil
+		}
+		recipeID := uuid.New().String()
+		recipe.Recipe.Metadata.ID = recipeID
+		if regErr := registry.CreateRecipe(recipeID, &recipe); regErr != nil {
+			log.Printf("[SERVER] Warning: Failed to register embedded recipe %s: %v\n", recipeID, regErr)
+			return nil
+		}
+		log.Printf("[SERVER] ✅ Loaded embedded recipe: %s (ID: %s)\n", recipe.Recipe.Metadata.Name, recipeID)
+		loadedCount++
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to walk embedded recipes: %w", err)
+	}
+	log.Printf("[SERVER] Successfully loaded %d embedded recipe files\n", loadedCount)
 	return nil
 }

@@ -1,0 +1,79 @@
+recipe:
+  # Recipe metadata - defines Level 1 approval system
+  metadata:
+    name: "Level 1 Approval"
+    description: "Level 1 approval workflow coordinator with Level 2 approval as child"
+    custom_type: "level 1 approval"
+    category: "approval"
+    version: "1.0.0"
+
+  # Recipe parameters - configurable values for approval process
+  parameters:
+    approval_id: "approval-001"
+    coordinator_type: "level1"
+    level2_authority: "senior_manager"
+
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    approval_id: "Unique identifier for this approval request"
+    coordinator_type: "Type of coordinator (level1 for first approval level)"
+    level2_authority: "Authority or role for level 2 approval decision"
+
+  wants:
+    # Evidence Provider for Level 1 - provides evidence data
+    - metadata:
+        type: evidence
+        labels:
+          role: evidence-provider
+          approval_level: "1"
+      spec:
+        params:
+          evidence_type: "document"
+          approval_id: approval_id
+
+    # Description Provider for Level 1 - provides description data
+    - metadata:
+        type: description
+        labels:
+          role: description-provider
+          approval_level: "1"
+      spec:
+        params:
+          description_format: "Level 1 Approval: %s"
+          approval_id: approval_id
+
+    # Level 2 Approval as child - created after Level 1 completes
+    # This is a custom target type that will load approval-level-2.yaml recipe
+    - metadata:
+        type: "level 2 approval"  # Matches custom_type in approval-level-2.yaml
+        labels:
+          role: approval-target
+          approval_level: "2"
+          parent_approval_level: "1"
+      spec:
+        params:
+          approval_id: approval_id
+          coordinator_type: "approval"
+          coordinator_level: 2
+          level2_authority: level2_authority
+
+  finalResultField: "level 2 approval_final_result"
+
+  # Recipe result definition
+  result:
+    - want_name: "level 2 approval"
+      state_field: "final_result"
+      description: "Level 2 approval status"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "approval-level-1-demo"
+          type: "level 1 approval"
+          labels:
+            recipe: "Level 1 Approval"
+        spec:
+          params:
+            approval_id: "approval-001"
+            coordinator_type: "level1"
+            level2_authority: "senior_manager"

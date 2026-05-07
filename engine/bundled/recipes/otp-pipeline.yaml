@@ -1,0 +1,203 @@
+recipe:
+  metadata:
+    name: "OTP Pipeline"
+    description: |
+      OPA Regoポリシーで依存関係を管理するOpenTripPlannerセットアップパイプライン。
+
+      ファイルダウンロード・設定生成はレシピに静的wantとして定義し並行実行。
+      build_graph と start_server の dispatch のみ Rego が制御する。
+      provider_state_map により静的wantの達成がRegoから参照可能なstateに反映される:
+        1. ensure_osm / ensure_gtfs_* / build_config (静的、並行) → osm_done等を更新
+        2. build_graph  (Regoがosm_done/gtfs_done/build_config_doneを確認してから推奨)
+        3. start_server (Regoがgraph_doneを確認してから推奨)
+
+      GTFSフィード追加時は wants に ensure_gtfs_<name> を追加し、
+      provider_state_map と state に対応エントリを追加するだけでよい。
+
+      グローバルパラメータ:
+        otp_data_dir          : データディレクトリ (ensure_file, otp_build_config, otp_serverが参照)
+        opa_llm_planner_command: opa-llm-planner バイナリパス
+    custom_type: "otp pipeline"
+    category: "infrastructure"
+    version: "5.0.0"
+
+  parameters:
+    prefix: "otp"
+    policy_dir: "yaml/policies/otp"
+    use_llm: false
+
+    direction_map: >-
+      {
+        "build_graph": {
+          "type": "file_exists",
+          "params": {
+            "filename": "graph.obj",
+            "method": "docker_build",
+            "docker_image": "docker.io/opentripplanner/opentripplanner:2.6.0",
+            "docker_container_name": "otp-builder",
+            "docker_command_args": "[\"--build\", \"--save\"]",
+            "docker_env": "{\"JAVA_OPTIONS\": \"-Xmx6G\"}"
+          },
+          "using": [{"role": "otp_provider"}],
+          "sets": {"graph_done": true}
+        },
+        "start_server": {
+          "type": "otp_server",
+          "params": {"server_memory": "-Xmx4G", "server_port": "8082"},
+          "using": [{"direction": "build_graph"}],
+          "sets": {"server_running": true}
+        }
+      }
+
+    # 静的wantの達成をRegoが参照できるstateフラグにマッピング
+    # キー: 子wantのname (recipe内のmetadata.name)
+    # 値: 親wantのcurrent stateに書き込むフラグ名
+    provider_state_map: >-
+      {
+        "ensure-osm":               "osm_done",
+        "ensure-gtfs-toei-bus":     "gtfs_toei_bus_done",
+        "ensure-gtfs-toei-train":   "gtfs_toei_train_done",
+        "ensure-gtfs-tokyo-metro":  "gtfs_tokyo_metro_done",
+        "build-config":             "build_config_done"
+      }
+
+  state:
+    # ── Goal ──────────────────────────────────────────────────────────────────
+    - name: otp_ready
+      description: OTPパイプラインの完了目標
+      type: bool
+      persistent: true
+      initialValue: true
+      label: goal
+
+    # ── Current: Regoがall_providers_doneを計算するためのキーリスト ──────────
+    - name: provider_keys
+      description: provider_state_mapのstateフラグ名リスト（Regoがeveryでチェック）
+      type: object
+      persistent: false
+      initialValue: []
+      label: current
+
+    # ── Current: 個別プロバイダー達成フラグ（モニタリング・可視化用） ─────────
+    - name: osm_done
+      description: OSMファイルダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: gtfs_toei_bus_done
+      description: 都営バスGTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: gtfs_toei_train_done
+      description: 都営電車GTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: gtfs_tokyo_metro_done
+      description: 東京メトロGTFSダウンロード完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: build_config_done
+      description: build-config.json生成完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    # ── Current: ビルド・起動 ─────────────────────────────────────────────────
+    - name: graph_done
+      description: graph.objビルド完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    - name: server_running
+      description: OTPサーバー起動完了フラグ
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+    # ── Planner state ─────────────────────────────────────────────────────────
+    - name: directions
+      description: Regoが出力した次のアクション一覧
+      type: object
+      persistent: true
+      initialValue: []
+      label: current
+
+  wants:
+    # ── 静的ダウンロード・設定生成（並行実行） ────────────────────────────────
+    - metadata:
+        name: "ensure-osm"
+        type: file_exists
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          filename: "map.osm.pbf"
+          url: "https://download.bbbike.org/osm/bbbike/Tokyo/Tokyo.osm.pbf"
+
+    - metadata:
+        name: "ensure-gtfs-toei-bus"
+        type: file_exists
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          filename: "toei-bus.zip"
+          url: "https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
+
+    - metadata:
+        name: "ensure-gtfs-toei-train"
+        type: file_exists
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          filename: "toei-train.zip"
+          url: "https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
+
+    - metadata:
+        name: "ensure-gtfs-tokyo-metro"
+        type: file_exists
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          filename: "tokyo-metro.zip"
+          url: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}"
+
+    - metadata:
+        name: "build-config"
+        type: otp_config
+        labels:
+          role: otp_provider
+      spec:
+        params:
+          gtfs_feeds: >-
+            [{"url":"https://api-public.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip","filename":"toei-bus.zip"},
+             {"url":"https://api-public.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip","filename":"toei-train.zip"},
+             {"url":"https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip?acl:consumerKey=${OPDT_ACCESS_TOKEN}","filename":"tokyo-metro.zip"}]
+
+    # ── Regoプランナー ────────────────────────────────────────────────────────
+    - metadata:
+        type: itinerary
+        labels:
+          role: planner
+      spec:
+        params:
+          policy_dir: policy_dir
+          direction_map: direction_map
+          use_llm: use_llm

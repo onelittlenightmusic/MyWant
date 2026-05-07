@@ -1,0 +1,85 @@
+recipe:
+  # Recipe metadata - defines this as a custom target type with full agent integration
+  metadata:
+    name: "Travel Agent System"
+    description: "Complete travel planning system with agent integration for all components"
+    custom_type: "agent travel system"
+    category: "travel"
+    version: "2.0.0"
+
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "travel"
+    display_name: "Full Agent-Enabled Travel System"
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    buffet_type: "international"
+    dinner_duration: 2.0
+    state_history_skip_count: 1
+
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    display_name: "Display name for the travel system"
+    restaurant_type: "Type of restaurant to book with agent support"
+    hotel_type: "Type of hotel accommodation with agent support"
+    buffet_type: "Type of buffet for breakfast with agent support"
+    dinner_duration: "Expected duration of dinner in hours"
+    state_history_skip_count: "Number of state history entries to skip for performance"
+
+  wants:
+    # Dinner restaurant reservation with agent support
+    - metadata:
+        type: restaurant
+        labels:
+          child-role: doer
+          category: dining
+      spec:
+        params:
+          restaurant_type: restaurant_type
+          duration_hours: dinner_duration
+          state_history_skip_count: state_history_skip_count
+
+    # Hotel accommodation booking with agent support
+    - metadata:
+        type: hotel
+        labels:
+          child-role: doer
+          category: accommodation
+      spec:
+        params:
+          hotel_type: hotel_type
+
+    # Morning breakfast buffet with agent support
+    - metadata:
+        type: buffet
+        labels:
+          child-role: doer
+          category: dining
+      spec:
+        params:
+          buffet_type: buffet_type
+
+  finalResultField: restaurant_final_result
+
+  # Recipe result definition - specifies how to compute travel planning results
+  result:
+    - want_name: "restaurant"
+      state_field: "final_result"
+      description: "Restaurant reservation result"
+    - want_name: "hotel"
+      state_field: "final_result"
+      description: "Hotel booking result"
+    - want_name: "buffet"
+      state_field: "final_result"
+      description: "Buffet reservation result"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "travel-agent-demo"
+          type: "agent travel system"
+          labels:
+            recipe: "Travel Agent System"
+        spec:
+          params: {}

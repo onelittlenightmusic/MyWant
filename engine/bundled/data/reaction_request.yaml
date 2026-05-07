@@ -1,0 +1,13 @@
+title: reaction_request
+description: "A reaction request packet for silencer/reminder coordination"
+type: object
+properties:
+  reaction_id:
+    type: string
+    description: "ID of the reaction queue entry"
+  reaction_type:
+    type: string
+    description: "Type of reaction (internal, external)"
+    default: "internal"
+required:
+  - reaction_id

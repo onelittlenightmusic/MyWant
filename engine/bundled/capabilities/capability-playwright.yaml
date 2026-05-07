@@ -1,0 +1,4 @@
+capabilities:
+  - name: playwright_recording
+    gives:
+      - playwright_recording

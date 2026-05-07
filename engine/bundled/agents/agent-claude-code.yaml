@@ -1,0 +1,45 @@
+agents:
+  - name: claude_code_session_monitor
+    runtime: localGo
+    type: monitor
+    description: |
+      Monitors Claude Code session files for state changes.
+      Reads session JSONL files and writes observed facts to Current state:
+      current_session_state, latest_output, pattern_matched, has_new_response.
+    version: '1.0'
+    capabilities:
+      - claude_code_session_monitoring
+    configuration:
+      default_poll_interval: 3s
+
+  - name: claude_code_watcher_think
+    runtime: localGo
+    type: think
+    description: |
+      Reads observations from MonitorAgent (Current) and makes decisions (Plan).
+      Determines when to trigger requests based on trigger_on condition,
+      checks idempotency logs, and proposes next_action to Want.Progress().
+    version: '1.0'
+    capabilities:
+      - claude_code_watching
+
+  - name: claude_code_requester
+    runtime: localGo
+    type: do
+    description: |
+      Sends requests to Claude Code via the claude CLI.
+      Uses --print --output-format json for non-interactive execution.
+      Maintains idempotency logs in ~/.mywant/claude_code_requests/.
+    version: '1.0'
+    capabilities:
+      - claude_code_requesting
+    actions:
+      - name: send_request
+        description: Send a prompt to a Claude Code session
+        parameters:
+          session_id:
+            type: string
+            description: Claude Code session ID
+          auto_request:
+            type: string
+            description: Prompt to send

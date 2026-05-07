@@ -1,0 +1,25 @@
+# RPG achievement seeds.
+# Loaded at server startup: achievements start locked; AchievementRules unlock them
+# automatically when the completion conditions are met by capability_manager.
+achievements:
+  - agentName: rpg_try_keys_agent
+    title: discovered_parallelize
+    description: "同じパターンを5回繰り返し、parallelize を発見した"
+    category: specialization
+    level: 2
+    unlocked: false
+    unlocksCapability: parallelize_dispatch
+    awardedBy: system
+
+rules:
+  - id: rule-rpg-discovered-parallelize
+    active: true
+    condition:
+      agentCapability: rpg_try_keys
+      completedCount: 5
+    award:
+      title: discovered_parallelize
+      description: "5回の rpg_try_keys を完了し、parallelize を発見した"
+      level: 2
+      category: specialization
+      unlocksCapability: parallelize_dispatch

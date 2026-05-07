@@ -1,0 +1,21 @@
+agents:
+  - name: mcp_server_do
+    runtime: localGo
+    type: do
+    description: Manages the lifecycle of MCP server processes (starting and stopping).
+    version: '1.0'
+    capabilities:
+      - mcp_server_management
+    role: action
+
+  - name: mcp_server_monitor
+    runtime: localGo
+    type: monitor
+    description: Monitors the status and health of running MCP server processes.
+    version: '1.0'
+    capabilities:
+      - mcp_server_monitoring
+    role: monitor
+    monitoring:
+      target: server_process_id
+      check_interval: 10 seconds

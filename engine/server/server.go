@@ -62,13 +62,26 @@ func New(config Config) *Server {
 
 	agentRegistry := mywant.NewAgentRegistry()
 
-	// Load capabilities and agents from directories if they exist
-	if err := agentRegistry.LoadCapabilities(mywant.CapabilitiesDir + "/"); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+	// Load capabilities: filesystem if present, otherwise embedded FS
+	if _, err := os.Stat(mywant.CapabilitiesDir); os.IsNotExist(err) {
+		if err := agentRegistry.LoadCapabilitiesFromFS(bundled.BuiltinFS, "capabilities"); err != nil {
+			log.Printf("[SERVER] Warning: Failed to load embedded capabilities: %v\n", err)
+		}
+	} else {
+		if err := agentRegistry.LoadCapabilities(mywant.CapabilitiesDir + "/"); err != nil {
+			log.Printf("[SERVER] Warning: Failed to load capabilities: %v\n", err)
+		}
 	}
 
-	if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
-		log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+	// Load agents: filesystem if present, otherwise embedded FS
+	if _, err := os.Stat(mywant.AgentsDir); os.IsNotExist(err) {
+		if err := agentRegistry.LoadAgentsFromFS(bundled.BuiltinFS, "agents"); err != nil {
+			log.Printf("[SERVER] Warning: Failed to load embedded agents: %v\n", err)
+		}
+	} else {
+		if err := agentRegistry.LoadAgents(mywant.AgentsDir + "/"); err != nil {
+			log.Printf("[SERVER] Warning: Failed to load agents: %v\n", err)
+		}
 	}
 
 	// Load MRS plugin agents from ~/.mywant/custom-types/ (best-effort)
@@ -78,11 +91,14 @@ func New(config Config) *Server {
 
 	recipeRegistry := mywant.NewCustomTargetTypeRegistry()
 
-	// Load recipes from recipes/ directory as custom types
-	_ = mywant.ScanAndRegisterCustomTypes(mywant.RecipesDir, recipeRegistry)
-
-	// Also load the recipe files themselves into the recipe registry
-	_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
+	// Load built-in recipes: use filesystem if available, otherwise fall back to embedded FS
+	if _, err := os.Stat(mywant.RecipesDir); os.IsNotExist(err) {
+		_ = mywant.ScanAndRegisterCustomTypesFromFS(bundled.BuiltinFS, "recipes", recipeRegistry)
+		_ = loadRecipeFilesIntoRegistryFromFS(bundled.BuiltinFS, "recipes", recipeRegistry)
+	} else {
+		_ = mywant.ScanAndRegisterCustomTypes(mywant.RecipesDir, recipeRegistry)
+		_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
+	}
 
 	// Load user-saved recipes from ~/.mywant/recipes/
 	userRecipesDir := mywant.UserRecipesDir()
@@ -94,20 +110,32 @@ func New(config Config) *Server {
 	if config.WantTypesDir != "" {
 		wantTypesDir = config.WantTypesDir
 	}
-	wantTypeLoader := mywant.NewWantTypeLoader(wantTypesDir).WithFallbackFS(bundled.WantTypes)
+	wantTypeLoader := mywant.NewWantTypeLoader(wantTypesDir).WithFallbackFS(bundled.BuiltinFS)
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}
 
-	// Seed locked achievements and rules from yaml/achievements/
-	if err := mywant.LoadAchievementConfigs(mywant.AchievementsDir); err != nil {
-		log.Printf("[WARN] Failed to load achievement configs: %v", err)
+	// Seed achievements: filesystem if present, otherwise embedded FS
+	if _, err := os.Stat(mywant.AchievementsDir); os.IsNotExist(err) {
+		if err := mywant.LoadAchievementConfigsFromFS(bundled.BuiltinFS, "achievements"); err != nil {
+			log.Printf("[WARN] Failed to load embedded achievement configs: %v", err)
+		}
+	} else {
+		if err := mywant.LoadAchievementConfigs(mywant.AchievementsDir); err != nil {
+			log.Printf("[WARN] Failed to load achievement configs: %v", err)
+		}
 	}
 
-	// Load data type definitions (JSON Schema)
+	// Load data type definitions: filesystem if present, otherwise embedded FS
 	dataTypeLoader := mywant.NewDataTypeLoader()
-	if err := dataTypeLoader.LoadFromDir(mywant.DataTypesDir); err != nil {
-		log.Printf("[WARN] Failed to load data types: %v", err)
+	if _, err := os.Stat(mywant.DataTypesDir); os.IsNotExist(err) {
+		if err := dataTypeLoader.LoadFromFS(bundled.BuiltinFS, "data"); err != nil {
+			log.Printf("[WARN] Failed to load embedded data types: %v", err)
+		}
+	} else {
+		if err := dataTypeLoader.LoadFromDir(mywant.DataTypesDir); err != nil {
+			log.Printf("[WARN] Failed to load data types: %v", err)
+		}
 	}
 	mywant.SetGlobalDataTypeLoader(dataTypeLoader)
 
@@ -127,7 +155,12 @@ func New(config Config) *Server {
 
 	// Remove any stale system wants (they should not persist across restarts)
 	// and inject fresh ones from yaml/system_wants.yaml.
-	systemWants, err := mywant.LoadSystemWantConfigs(mywant.SystemWantsFile)
+	var systemWants []*mywant.Want
+	if _, statErr := os.Stat(mywant.SystemWantsFile); os.IsNotExist(statErr) {
+		systemWants, err = mywant.LoadSystemWantConfigsFromFS(bundled.BuiltinFS, "system_wants.yaml")
+	} else {
+		systemWants, err = mywant.LoadSystemWantConfigs(mywant.SystemWantsFile)
+	}
 	if err != nil {
 		log.Printf("[WARN] Failed to load system wants: %v", err)
 	}

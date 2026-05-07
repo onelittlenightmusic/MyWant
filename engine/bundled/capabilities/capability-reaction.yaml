@@ -1,0 +1,5 @@
+capabilities:
+  - name: reaction_auto_approval
+    gives:
+      - reaction_auto_approval
+    description: "Ability to automatically approve or reject user reactions."

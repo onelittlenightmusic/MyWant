@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -110,10 +111,10 @@ func loadAgentSpec() (*openapi3.T, error) {
 	return nil, fmt.Errorf("failed to load agent OpenAPI spec from paths %v: %w", specPaths, lastErr)
 }
 func validateCapabilityWithSpec(yamlData []byte, filename string) error {
-	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
-		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
+		// Spec not found (e.g. Homebrew install) — skip validation; built-ins are pre-validated.
+		return nil
 	}
 	ctx := context.Background()
 	err = spec.Validate(ctx)
@@ -184,10 +185,9 @@ func (r *AgentRegistry) LoadAgents(path string) error {
 	return nil
 }
 func validateAgentWithSpec(yamlData []byte, filename string) error {
-	// Load the OpenAPI spec for agents and capabilities
 	spec, err := loadAgentSpec()
 	if err != nil {
-		return fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
+		return nil // Spec not found — skip validation; built-ins are pre-validated.
 	}
 	ctx := context.Background()
 	err = spec.Validate(ctx)
@@ -529,4 +529,98 @@ func mrsRunScript(ctx context.Context, scriptPath string, args []string) (map[st
 		return nil, fmt.Errorf("skill produced no JSON output")
 	}
 	return finalResult, nil
+}
+
+// LoadCapabilitiesFromFS loads capability YAML files from an embedded fs.FS.
+// fsRoot is the subdirectory within fsys (e.g. "capabilities").
+func (r *AgentRegistry) LoadCapabilitiesFromFS(fsys fs.FS, fsRoot string) error {
+	return fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if !strings.HasPrefix(d.Name(), "capability-") {
+			return nil
+		}
+		ext := filepath.Ext(d.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			ErrorLog("[AGENT] Failed to read embedded capability %s: %v", path, readErr)
+			return nil
+		}
+		var capYAML CapabilityYAML
+		if yamlErr := yaml.Unmarshal(data, &capYAML); yamlErr != nil {
+			ErrorLog("[AGENT] Failed to parse embedded capability %s: %v", path, yamlErr)
+			return nil
+		}
+		for _, cap := range capYAML.Capabilities {
+			InfoLog("[AGENT] Registering embedded capability: %s", cap.Name)
+			r.RegisterCapability(cap)
+		}
+		return nil
+	})
+}
+
+// LoadAgentsFromFS loads agent YAML files from an embedded fs.FS.
+// fsRoot is the subdirectory within fsys (e.g. "agents").
+func (r *AgentRegistry) LoadAgentsFromFS(fsys fs.FS, fsRoot string) error {
+	return fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if !strings.HasPrefix(d.Name(), "agent-") {
+			return nil
+		}
+		ext := filepath.Ext(d.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			ErrorLog("[AGENT] Failed to read embedded agent %s: %v", path, readErr)
+			return nil
+		}
+		var agentYAML AgentYAML
+		if yamlErr := yaml.Unmarshal(data, &agentYAML); yamlErr != nil {
+			ErrorLog("[AGENT] Failed to parse embedded agent %s: %v", path, yamlErr)
+			return nil
+		}
+		for _, agentDef := range agentYAML.Agents {
+			baseAgent := BaseAgent{
+				Name:         agentDef.Name,
+				Capabilities: agentDef.Capabilities,
+				Runtime:      AgentRuntime(agentDef.Runtime),
+			}
+			if baseAgent.Runtime == "" {
+				baseAgent.Runtime = LocalGoRuntime
+			}
+			var agent Agent
+			switch strings.ToLower(agentDef.Type) {
+			case "do":
+				baseAgent.Type = DoAgentType
+				doAgent := &DoAgent{BaseAgent: baseAgent}
+				r.setAgentAction(doAgent)
+				agent = doAgent
+			case "monitor", "poll":
+				baseAgent.Type = MonitorAgentType
+				monAgent := &MonitorAgent{BaseAgent: baseAgent}
+				r.setAgentMonitor(monAgent)
+				agent = monAgent
+			case "think":
+				baseAgent.Type = ThinkAgentType
+				thinkAgent := &ThinkAgent{BaseAgent: baseAgent}
+				r.setAgentThink(thinkAgent)
+				agent = thinkAgent
+			default:
+				ErrorLog("[AGENT] Unknown agent type '%s' in embedded %s", agentDef.Type, path)
+				continue
+			}
+			r.RegisterAgent(agent)
+			r.BuildAgentSpecFromCapabilities(agentDef.Name, agentDef.Capabilities)
+			InfoLog("[AGENT] Registered embedded agent: %s", agentDef.Name)
+		}
+		return nil
+	})
 }

@@ -1,0 +1,16 @@
+title: evidence_data
+description: "Evidence artifact for approval workflows"
+type: object
+properties:
+  content:
+    type: string
+    description: "Evidence content or summary"
+  evidence_type:
+    type: string
+    description: "Type of evidence (audit_report, document, certification)"
+    default: "document"
+  provided_at:
+    type: string
+    description: "Timestamp when evidence was provided"
+required:
+  - content

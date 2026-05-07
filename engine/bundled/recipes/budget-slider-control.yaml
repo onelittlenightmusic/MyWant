@@ -1,0 +1,143 @@
+recipe:
+  metadata:
+    name: "Budget Slider Control"
+    description: "Travel budget system with interactive slider to dynamically adjust the budget limit in real-time"
+    custom_type: "budget slider control"
+    category: "travel"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "budget-ctrl"
+    initial_budget: 5000.0
+    currency: USD
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    restaurant_cost: 300.0
+    hotel_cost: 800.0
+    budget_min: 1000.0
+    budget_max: 20000.0
+    budget_step: 500.0
+
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    initial_budget: "Initial budget amount (also controls slider default position)"
+    currency: "Currency code for budget tracking (USD, EUR, JPY)"
+    restaurant_type: "Type of restaurant to book"
+    hotel_type: "Type of hotel accommodation"
+    restaurant_cost: "Estimated restaurant cost"
+    hotel_cost: "Estimated hotel cost"
+    budget_min: "Minimum value for the budget slider"
+    budget_max: "Maximum value for the budget slider"
+    budget_step: "Step increment for the budget slider"
+
+  wants:
+    # Slider control — user drags this to change the budget limit in real-time.
+    # target_param: "budget" is a literal string (not a recipe param reference),
+    # so it is NOT substituted. slider.Progress() calls PropagateParameter("budget", value)
+    # → coordinator.UpdateParameter("budget", value).
+    - metadata:
+        type: slider
+        labels:
+          role: control
+          user-control: "true"
+      spec:
+        params:
+          target_param: "budget"
+          default: initial_budget
+          min: budget_min
+          max: budget_max
+          step: budget_step
+
+    # Budget tracker — subscribes to coordinator's "budget" param via exposes.
+    # When the slider updates coordinator.budget, the paramExposeHandler fires and
+    # calls budget.UpdateParameter("budget", newValue), so BudgetThinker picks up
+    # the new limit on its next tick.
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+          category: finance
+      spec:
+        params:
+          budget: initial_budget
+          currency: currency
+        exposes:
+          - param: budget
+            as: budget
+
+    # Restaurant reservation with cost reporting
+    - metadata:
+        type: restaurant
+        labels:
+          role: scheduler
+          category: dining
+      spec:
+        params:
+          restaurant_type: restaurant_type
+          cost: restaurant_cost
+
+    # Hotel reservation with cost reporting
+    - metadata:
+        type: hotel
+        labels:
+          role: scheduler
+          category: accommodation
+      spec:
+        params:
+          hotel_type: hotel_type
+          cost: hotel_cost
+
+  state:
+    - name: costs
+      description: "Map of child want names to their reported costs"
+      type: map
+      label: current
+    - name: itinerary
+      description: "Map of child want names to their itinerary entries (written by condition_thinker)"
+      type: map
+      label: current
+    - name: wants
+      description: "Map of child want names to their final_result values (written on achievement)"
+      type: map
+      label: current
+    - name: target_budgets
+      description: "Per-want target budgets computed by budget_thinker"
+      type: map
+      label: plan
+    - name: _child_updated
+      description: "Name of the most recently updated child want"
+      type: string
+      label: current
+    - name: total_cost
+      description: "Total aggregated cost"
+      type: float64
+      label: current
+    - name: remaining_budget
+      description: "Budget minus total cost"
+      type: float64
+      label: current
+    - name: budget_budget_summary
+      description: "Budget tracking summary from budget want"
+      type: string
+      label: current
+    - name: restaurant_final_result
+      description: "Restaurant reservation result"
+      type: string
+      label: current
+    - name: hotel_final_result
+      description: "Hotel booking result"
+      type: string
+      label: current
+
+  finalResultField: budget_budget_summary
+
+  result:
+    - want_name: "budget"
+      state_field: "budget_summary"
+      description: "Budget tracking summary"
+    - want_name: "restaurant"
+      state_field: "final_result"
+      description: "Restaurant reservation result"
+    - want_name: "hotel"
+      state_field: "final_result"
+      description: "Hotel booking result"

@@ -1,0 +1,67 @@
+recipe:
+  # Recipe metadata - defines Level 2 approval system
+  metadata:
+    name: "Level 2 Approval"
+    description: "Level 2 approval workflow coordinator"
+    custom_type: "level 2 approval"
+    category: "approval"
+    version: "1.0.0"
+
+  # Recipe parameters - configurable values for Level 2 approval
+  parameters:
+    approval_id: "approval-001"
+    coordinator_type: "level2"
+    level2_authority: "senior_manager"
+
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    approval_id: "Unique identifier for this approval request"
+    coordinator_type: "Type of coordinator (level2 for second approval level)"
+    level2_authority: "Authority or role for level 2 approval decision"
+
+  wants:
+    # Evidence Provider for Level 2
+    - metadata:
+        type: evidence
+        labels:
+          role: evidence-provider
+          approval_level: "2"
+      spec:
+        params:
+          evidence_type: "document"
+          approval_id: approval_id
+
+    # Description Provider for Level 2
+    - metadata:
+        type: description
+        labels:
+          role: description-provider
+          approval_level: "2"
+      spec:
+        params:
+          description_format: "Level 2 Approval: %s"
+          approval_id: approval_id
+
+  finalResultField: evidence_evidence_provided
+
+  # Recipe result definition
+  result:
+    - want_name: "evidence"
+      state_field: "evidence_provided"
+      description: "Evidence has been provided"
+    - want_name: "description"
+      state_field: "description_provided"
+      description: "Description has been provided"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "approval-level-2-demo"
+          type: "level 2 approval"
+          labels:
+            recipe: "Level 2 Approval"
+        spec:
+          params:
+            approval_id: "approval-001"
+            coordinator_type: "level2"
+            level2_authority: "senior_manager"

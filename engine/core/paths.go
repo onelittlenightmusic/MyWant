@@ -69,39 +69,25 @@ func UserCustomTypesDir() string {
 // YAML directory structure constants
 // These constants define the paths to all YAML configuration files
 // ensuring consistency across the application.
+// Bundled directory root — all built-in YAML lives here so go:embed can reach it.
+// Dev builds (running from repo root) find the files on disk; Homebrew installs use
+// the embedded FS fallback in engine/bundled/bundled.go.
+const bundledRoot = "engine/bundled"
+
 const (
-	// YamlBaseDir is the root directory for all YAML configuration files
+	// YamlBaseDir is the legacy root; prefer bundledRoot for new code.
 	YamlBaseDir = "yaml"
 
-	// RecipesDir contains recipe template files
-	RecipesDir = "yaml/recipes"
-
-	// AgentsDir contains agent definition files
-	AgentsDir = "yaml/agents"
-
-	// ConfigDir contains user configuration files
-	ConfigDir = "yaml/config"
-
-	// CapabilitiesDir contains capability definition files
-	CapabilitiesDir = "yaml/capabilities"
-
-	// WantTypesDir contains want type definition files.
-	// In development (running from repo root), this resolves to engine/bundled/want_types.
-	// Homebrew installs use the embedded FS fallback instead.
-	WantTypesDir = "engine/bundled/want_types"
-
-	// DataTypesDir contains data type definition files (JSON Schema format)
-	DataTypesDir = "yaml/data"
-
-	// SpecDir contains OpenAPI specification files
-	SpecDir = "yaml/spec"
+	RecipesDir      = bundledRoot + "/recipes"
+	AgentsDir       = bundledRoot + "/agents"
+	ConfigDir       = "yaml/config" // user config — never embedded
+	CapabilitiesDir = bundledRoot + "/capabilities"
+	WantTypesDir    = bundledRoot + "/want_types"
+	DataTypesDir    = bundledRoot + "/data"
+	SpecDir         = bundledRoot + "/spec"
+	AchievementsDir = bundledRoot + "/achievements"
+	SystemWantsFile = bundledRoot + "/system_wants.yaml"
 
 	// MemoryDir contains memory persistence files (not moved)
 	MemoryDir = "engine/memory"
-
-	// AchievementsDir contains achievement seed files (locked achievements + rules)
-	AchievementsDir = "yaml/achievements"
-
-	// SystemWantsFile defines system wants injected fresh on every server startup
-	SystemWantsFile = "yaml/system_wants.yaml"
 )

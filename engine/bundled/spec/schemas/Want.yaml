@@ -1,0 +1,19 @@
+type: object
+description: Individual processing unit configuration
+required:
+  - metadata
+  - spec
+properties:
+  metadata:
+    $ref: '#/components/schemas/Metadata'
+  spec:
+    $ref: '#/components/schemas/WantSpec'
+  stats:
+    $ref: '#/components/schemas/WantStats'
+  status:
+    $ref: '#/components/schemas/WantStatus'
+  state:
+    type: object
+    description: Runtime state information (map[string]interface{})
+    additionalProperties: true
+additionalProperties: false

@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -764,6 +765,47 @@ func ScanAndRegisterCustomTypes(recipeDir string, registry *CustomTargetTypeRegi
 	}
 
 	InfoLog("[RECIPE] ✅ Registered %d custom types from recipes\n", customTypeCount)
+	return nil
+}
+
+// ScanAndRegisterCustomTypesFromFS scans recipes from an embedded fs.FS and registers any
+// that declare a customType field. fsRoot is the subdirectory within fsys (e.g. "recipes").
+func ScanAndRegisterCustomTypesFromFS(fsys fs.FS, fsRoot string, registry *CustomTargetTypeRegistry) error {
+	customTypeCount := 0
+	err := fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			InfoLog("[RECIPE] ⚠️  Warning: failed to read embedded recipe %s: %v\n", path, readErr)
+			return nil
+		}
+		var recipe GenericRecipe
+		if yamlErr := yaml.Unmarshal(data, &recipe); yamlErr != nil {
+			InfoLog("[RECIPE] ⚠️  Warning: failed to parse embedded recipe %s: %v\n", path, yamlErr)
+			return nil
+		}
+		if recipe.Recipe.Metadata.CustomType == "" {
+			return nil
+		}
+		defaultParams := recipe.Recipe.Parameters
+		if defaultParams == nil {
+			defaultParams = make(map[string]any)
+		}
+		RegisterCustomTargetType(registry, recipe.Recipe.Metadata.CustomType, recipe.Recipe.Metadata.Description, path, defaultParams)
+		InfoLog("[RECIPE] 🎯 Registered embedded custom type '%s' from %s\n", recipe.Recipe.Metadata.CustomType, path)
+		customTypeCount++
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to scan embedded recipes: %w", err)
+	}
+	InfoLog("[RECIPE] ✅ Registered %d custom types from embedded recipes\n", customTypeCount)
 	return nil
 }
 

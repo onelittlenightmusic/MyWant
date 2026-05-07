@@ -1,0 +1,5 @@
+capabilities:
+  - name: docker_management
+    gives:
+      -
+      - docker_management

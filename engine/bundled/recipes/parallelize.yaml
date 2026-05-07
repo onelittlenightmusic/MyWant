@@ -1,0 +1,51 @@
+recipe:
+  metadata:
+    name: "Parallelize"
+    description: |
+      Generic parallel executor that dispatches N sibling wants of the same type.
+
+      A parallelize_dispatcher thinker reads child_params and calls ProposeDispatch
+      once per entry. The parent coordinator's DispatchThinker creates each sibling
+      want and tracks completion. The parent is achieved when all siblings finish.
+    custom_type: "parallelize"
+    category: "system"
+    version: "1.0.0"
+
+  parameters:
+    child_type: ""
+    child_params: []
+
+  parameter_descriptions:
+    child_type: "Want type of each sibling to dispatch (required)"
+    child_params: "List of param objects passed to each dispatched want. Example: [{target: hall-door-03}, {target: hall-door-04}]"
+
+  wants:
+    - metadata:
+        type: parallelize_dispatcher
+        labels:
+          child-role: thinker
+      spec:
+        params:
+          child_params: child_params
+          child_type: child_type
+
+  example:
+    wants:
+      - metadata:
+          name: "open-all-hall-doors"
+          type: "parallelize"
+          description: "全ホールドアを開錠"
+          labels:
+            recipe: "Parallelize"
+        spec:
+          params:
+            child_type: rpg_try_keys
+            child_params:
+              - {target: hall-door-03}
+              - {target: hall-door-04}
+              - {target: hall-door-05}
+              - {target: hall-door-06}
+              - {target: hall-door-07}
+              - {target: hall-door-08}
+              - {target: hall-door-09}
+              - {target: hall-door-10}

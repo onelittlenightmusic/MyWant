@@ -1,0 +1,52 @@
+agents:
+  - name: discovery_agent
+    runtime: localGo
+    type: do
+    description: Discovers available MCP tools and resources for dynamic want evolution.
+    version: '1.0'
+    capabilities:
+      - mcp_dynamic_discovery
+    role: action
+    state_updates:
+      - name: discovered_tools
+        type: array
+        description: List of discovered MCP tools
+
+  - name: developer_agent
+    runtime: localGo
+    type: do
+    description: Generates Go code or logic for interacting with discovered MCP tools.
+    version: '1.0'
+    capabilities:
+      - mcp_dynamic_developer
+    role: action
+    state_updates:
+      - name: generated_code
+        type: string
+        description: Generated Go code
+
+  - name: compiler_agent
+    runtime: localGo
+    type: do
+    description: Compiles generated Go code into WASM modules.
+    version: '1.0'
+    capabilities:
+      - mcp_dynamic_compiler
+    role: action
+    state_updates:
+      - name: wasm_path
+        type: string
+        description: Path to the compiled WASM module
+
+  - name: validator_agent
+    runtime: localGo
+    type: do
+    description: Validates the functionality of generated and compiled WASM modules.
+    version: '1.0'
+    capabilities:
+      - mcp_dynamic_validator
+    role: action
+    state_updates:
+      - name: validation_status
+        type: string
+        description: Status of the validation (success, failure)

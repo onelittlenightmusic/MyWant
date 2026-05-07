@@ -1,0 +1,49 @@
+recipe:
+  metadata:
+    name: "Morning Briefing"
+    description: "毎朝指定時刻に天気・乗換案内をSlackに投稿する朝のブリーフィング"
+    custom_type: "morning briefing"
+    category: "productivity"
+    version: "3.0.0"
+
+  parameters:
+    slack_webhook_url: ""
+    google_maps_api_key: ""
+
+  parameter_descriptions:
+    slack_webhook_url: "Slack Incoming Webhook URL"
+    google_maps_api_key: "Google Maps API キー (交通情報用)"
+
+  wants:
+    # コーディネーター: when で毎朝リセット、OPA + DispatchThinker が全フローを制御
+    - metadata:
+        name: my-morning-briefing
+        type: briefing
+        labels:
+          category: productivity
+      spec:
+        when:
+          - at: "07:30"
+        params:
+          direction_map: >-
+            {
+              "fetch_weather": {
+                "type": "weather",
+                "params": {"weather_city": "Tokyo"}
+              },
+              "fetch_transit": {
+                "type": "transit",
+                "params": {
+                  "name": "オフィス(新宿)",
+                  "origin": "渋谷駅",
+                  "destination": "新宿駅",
+                  "arrive_by": "09:00",
+                  "days": "mon,tue,wed,thu,fri"
+                }
+              },
+              "post_slack": {
+                "type": "slack_post",
+                "params": {"source_want": "my-morning-briefing"},
+                "sets": {"briefing_done": true}
+              }
+            }

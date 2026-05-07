@@ -2,8 +2,8 @@ package bundled
 
 import "embed"
 
-// WantTypes is the embedded filesystem containing built-in want type definitions.
-// Populated at build time from engine/bundled/want_types/.
+// BuiltinFS is the embedded filesystem containing all built-in YAML definitions.
+// Populated at build time from engine/bundled/.
 //
-//go:embed want_types
-var WantTypes embed.FS
+//go:embed want_types recipes agents capabilities achievements data spec system_wants.yaml
+var BuiltinFS embed.FS

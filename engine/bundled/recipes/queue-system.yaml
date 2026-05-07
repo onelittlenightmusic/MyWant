@@ -1,0 +1,83 @@
+recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Queue System"
+    description: "Queue system simulation with wait time analysis"
+    custom_type: "wait time in queue system"
+    category: "queue"
+    version: "1.0.0"
+    
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "queue-system"
+    count: 1000
+    rate: 10.0
+    service_time: 0.05
+    deterministic: false
+
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    count: "Total number of items to generate for the queue system"
+    rate: "Generation rate in items per second"
+    service_time: "Average time to service each item in the queue"
+    deterministic: "Use deterministic timing or variable timing for queue processing"
+
+  wants:
+    # Generator want - explicitly define all labels in recipe
+    - metadata:
+        type: qnet numbers
+        labels:
+          role: source               # Explicitly defined, not auto-generated
+          category: queue-producer   # Recipe-specific connection label
+          component: generator       # Additional semantic label
+      spec:
+        params:
+          count: count
+          rate: rate
+          deterministic: deterministic
+
+    # Queue want - explicitly define all labels in recipe
+    - metadata:
+        type: qnet queue
+        labels:
+          role: processor           # Explicitly defined, not auto-generated
+          category: queue-processor # Recipe-specific semantic label
+          component: main-queue     # Additional semantic label
+      spec:
+        params:
+          service_time: service_time
+          deterministic: deterministic
+          count: count
+        using:
+          - category: queue-producer  # Connect to generator via recipe-defined label
+
+  finalResultField: queue_average_wait_time
+
+  # Recipe result definition - specifies which want and state field to use for result
+  result:
+    - want_name: "queue"
+      state_field: "average_wait_time"
+      description: "Average wait time in the queue system"
+    - want_name: "numbers"
+      state_field: "total_processed"
+      description: "Items generated"
+    - want_name: "queue"
+      state_field: "."
+      description: "All metrics from queue system"
+
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "queue-system-demo"
+          type: "wait time in queue system"
+          labels:
+            recipe: "Queue System"
+        spec:
+          params:
+            prefix: "queue-system"
+            count: 1000
+            rate: 10.0
+            service_time: 0.05
+            deterministic: false

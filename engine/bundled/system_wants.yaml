@@ -1,0 +1,18 @@
+# System wants injected on every server startup.
+# These are filtered out of persisted state and re-created fresh each time,
+# ensuring consistent IDs and IsSystemWant=true regardless of memory.yaml content.
+system_wants:
+  - id: system-gui-state
+    name: system-gui-state
+    type: gui_state
+
+  - id: system-capability-manager
+    name: system-capability-manager
+    type: capability_manager
+
+  - id: system-scheduler
+    name: system-scheduler
+    type: scheduler
+    spec:
+      params:
+        scan_interval: 60

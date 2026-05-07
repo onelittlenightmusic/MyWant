@@ -1,0 +1,5 @@
+capabilities:
+  - name: command_execution
+    gives:
+      - command_execution
+      - execute_shell_command

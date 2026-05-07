@@ -1,0 +1,162 @@
+recipe:
+  metadata:
+    name: "Achievement Selection Demo"
+    description: |
+      Verification scenario 3: Agent selection based on achievements.
+
+      Demonstrates how the hotel_discount capability — unlocked when an agent earns
+      the "割引の達人" achievement — causes the OPA planner to route hotel bookings to
+      a discounted tier (80–150 USD) instead of standard (250–400 USD).
+      With a budget of 200 USD, only the discounted route keeps costs within budget,
+      allowing the Budget want to achieve.
+
+      Setup:
+        1. Deploy this recipe (capability_manager + itinerary + budget start together).
+        2. Confirm without achievement: hotel booked at standard price (250–400 USD),
+           budget exceeded → Budget stays "reaching".
+        3. Award the "割引の達人" achievement (unlocksCapability="hotel_discount") via CLI:
+             mywant achievements create --title "割引の達人" --agent agent_premium \
+               --level 2 --category hotel --unlocks hotel_discount
+        4. Redeploy: OPA detects hotel_discount → books discounted hotel (80–150 USD)
+           → budget satisfied → Budget achieves.
+
+      Expected outcome:
+        - Without hotel_discount → hotel_type="standard" (250–400 USD) → budget exceeded
+        - With    hotel_discount → hotel_type="discounted" (80–150 USD)  → budget achieved
+    custom_type: "achievement selection demo"
+    category: "achievement"
+    version: "2.0.0"
+
+  parameters:
+    prefix: "ach-selection"
+    destination: "Tokyo"
+    budget_target: 200
+    policy_dir: "yaml/policies/achievement"
+    use_llm: false
+    direction_map: >-
+      {
+        "reserve_hotel_discounted": {
+          "type": "hotel",
+          "params": {"hotel_type": "discounted"},
+          "sets": {"hotel_reserved": true},
+          "cost_field": "hotel_cost"
+        },
+        "reserve_hotel_standard": {
+          "type": "hotel",
+          "params": {"hotel_type": "standard"},
+          "sets": {"hotel_reserved": true},
+          "cost_field": "hotel_cost"
+        }
+      }
+
+  parameter_descriptions:
+    prefix: "Name prefix for generated wants"
+    destination: "Trip destination"
+    budget_target: "Budget ceiling in USD (200 = between standard 250–400 and discounted 80–150)"
+    policy_dir: "Path to the OPA policy directory"
+    use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+    direction_map: "JSON map of OPA action names to hotel want configurations"
+
+  state:
+    - name: available_capabilities
+      description: Computed on-demand from unlocked achievements — not persisted
+      type: array
+      persistent: false
+      initialValue: []
+      label: current
+    - name: hotel_reserved
+      description: Whether hotel has been reserved
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+    - name: hotel_cost
+      description: Last reported hotel cost
+      type: float64
+      persistent: true
+      initialValue: 0
+      label: current
+    - name: costs
+      description: Map of child want costs
+      type: object
+      persistent: true
+      initialValue: {}
+      label: current
+    - name: goal_achieved
+      description: Planning completion status
+      type: bool
+      persistent: true
+      initialValue: false
+      label: current
+
+  wants:
+    # Capability manager — auto-evaluates achievement rules each tick
+    - metadata:
+        type: capability_manager
+        labels:
+          role: manager
+          scenario: achievement-selection
+      spec:
+        params: {}
+
+    # Itinerary — OPA-driven planner with hotel_discount-aware routing
+    - metadata:
+        type: itinerary
+        labels:
+          role: planner
+          scenario: achievement-selection
+      spec:
+        params:
+          goal:
+            id: "goal-selection"
+            trip:
+              destination: destination
+              require_hotel: true
+              require_dinner: false
+              require_transport: false
+            budget_target: budget_target
+          current:
+            hotel_reserved: false
+            hotel_cost: 0
+          use_llm: use_llm
+          policy_dir: policy_dir
+          direction_map: direction_map
+
+    # Budget tracker — achieves only when cost is within budget_target
+    - metadata:
+        type: budget
+        labels:
+          role: tracker
+          scenario: achievement-selection
+      spec:
+        params:
+          budget: budget_target
+          currency: USD
+
+  example:
+    wants:
+      - metadata:
+          name: "achievement-selection-demo"
+          type: "achievement selection demo"
+          labels:
+            recipe: "Achievement Selection Demo"
+        spec:
+          params:
+            destination: "Tokyo"
+            budget_target: 200
+            use_llm: false
+            direction_map: >-
+              {
+                "reserve_hotel_discounted": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "discounted"},
+                  "sets": {"hotel_reserved": true},
+                  "cost_field": "hotel_cost"
+                },
+                "reserve_hotel_standard": {
+                  "type": "hotel",
+                  "params": {"hotel_type": "standard"},
+                  "sets": {"hotel_reserved": true},
+                  "cost_field": "hotel_cost"
+                }
+              }

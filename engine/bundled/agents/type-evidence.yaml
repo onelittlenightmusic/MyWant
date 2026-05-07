@@ -1,0 +1,52 @@
+metadata:
+  name: evidence
+  title: Evidence Provider
+  description: Provides evidence data for approval processes. Requires output connections (coordinators) before providing data to ensure data synchronization.
+  version: "1.0.0"
+  category: approval
+  pattern: generator
+
+parameters:
+  - name: evidence_type
+    description: Type of evidence being provided
+    type: string
+    required: true
+    example: "document"
+  - name: approval_id
+    description: ID of the approval this evidence supports
+    type: string
+    required: true
+
+state:
+  - name: evidence_provided
+    description: Whether evidence has been provided to coordinators
+    type: bool
+    persistent: true
+    initialValue: false
+
+connectivity:
+  inputs: []
+  outputs:
+    - name: coordinator
+      type: want
+      description: Connected coordinator wants that will receive evidence
+      multiple: true
+
+require:
+  type: "users"
+  users:
+    - name: coordinator
+      type: want
+      description: Must have at least one coordinator output connection
+      required: true
+      multiple: false
+
+agents: []
+constraints: []
+examples: []
+relatedTypes:
+  - description
+  - coordinator
+seeAlso:
+  - description
+  - coordinator

@@ -1,0 +1,16 @@
+agents:
+  - name: agent_buffet_premium
+    runtime: localGo
+    type: do
+    capabilities:
+      - buffet_agency
+    uses:
+      - xxx
+
+  - name: buffet_monitor
+    runtime: localGo
+    type: monitor
+    capabilities:
+      - buffet_agency
+    uses:
+      - xxx

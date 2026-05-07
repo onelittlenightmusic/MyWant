@@ -1,0 +1,6 @@
+agents:
+  - name: condition_thinker
+    type: think
+    capabilities:
+      - condition_thinking
+    description: "Watches the want cost field and propagates updates to parent want costs map."

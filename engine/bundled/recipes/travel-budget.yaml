@@ -1,0 +1,119 @@
+recipe:
+  metadata:
+    name: "Travel Budget System"
+    description: "Travel planning with budget tracking - aggregates costs from restaurant and hotel reservations"
+    custom_type: "travel budget system"
+    category: "travel"
+    version: "1.0.0"
+
+  parameters:
+    prefix: "budget-travel"
+    budget: 5000.0
+    currency: USD
+    restaurant_type: "fine dining"
+    hotel_type: "luxury"
+    restaurant_cost: 300.0
+    hotel_cost: 800.0
+
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    budget: "Total travel budget amount"
+    currency: "Currency code for budget tracking"
+    restaurant_type: "Type of restaurant to book"
+    hotel_type: "Type of hotel accommodation"
+    restaurant_cost: "Estimated restaurant cost"
+    hotel_cost: "Estimated hotel cost"
+
+  wants:
+    # Budget tracker - aggregates costs from child wants
+    - metadata:
+        type: budget
+        labels:
+          child-role: thinker
+          category: finance
+      spec:
+        params:
+          budget: budget
+          currency: currency
+
+    # Restaurant reservation with cost reporting
+    - metadata:
+        type: restaurant
+        labels:
+          child-role: doer
+          category: dining
+      spec:
+        params:
+          restaurant_type: restaurant_type
+          cost: restaurant_cost
+
+    # Hotel reservation with cost reporting
+    - metadata:
+        type: hotel
+        labels:
+          child-role: doer
+          category: accommodation
+      spec:
+        params:
+          hotel_type: hotel_type
+          cost: hotel_cost
+
+  # Coordinator-level state fields: MergeParentState aggregation + computeTemplateResult output
+  state:
+    - name: costs
+      description: "Map of child want names to their reported costs"
+      type: map
+      label: current
+    - name: itinerary
+      description: "Map of child want names to their itinerary entries (written by condition_thinker)"
+      type: map
+      label: current
+    - name: wants
+      description: "Map of child want names to their final_result values (written on achievement)"
+      type: map
+      label: current
+    - name: target_budgets
+      description: "Per-want target budgets computed by budget_thinker"
+      type: map
+      label: plan
+    - name: _child_updated
+      description: "Name of the most recently updated child want"
+      type: string
+      label: current
+    - name: total_cost
+      description: "Total aggregated cost"
+      type: float64
+      label: plan
+    - name: remaining_budget
+      description: "Budget minus total cost"
+      type: float64
+      label: plan
+    - name: budget_budget_summary
+      description: "Budget tracking summary from budget want"
+      type: string
+      label: plan
+    - name: restaurant_final_result
+      description: "Restaurant reservation result"
+      type: string
+      label: current
+    - name: hotel_final_result
+      description: "Hotel booking result"
+      type: string
+      label: current
+    - name: desired_dispatch
+      description: "Queue for dynamic want creation"
+      type: object
+      label: plan
+
+  finalResultField: budget_budget_summary
+
+  result:
+    - want_name: "budget"
+      state_field: "budget_summary"
+      description: "Budget tracking summary"
+    - want_name: "restaurant"
+      state_field: "final_result"
+      description: "Restaurant reservation result"
+    - want_name: "hotel"
+      state_field: "final_result"
+      description: "Hotel booking result"

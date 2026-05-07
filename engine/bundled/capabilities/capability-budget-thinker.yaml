@@ -1,0 +1,43 @@
+capabilities:
+  - name: budget_thinking
+    gives:
+      - budget_thinking
+    description: "Allocates per-want target budgets from itinerary, then aggregates reported costs."
+    stateAccess:
+      - name: budget
+        type: float64
+        description: Total budget amount
+        accessType: read
+      - name: costs
+        type: map
+        description: Map of child want names to their reported costs
+        accessType: update
+      - name: total_cost
+        type: float64
+        description: Sum of all reported costs
+        accessType: update
+      - name: remaining_budget
+        type: float64
+        description: Budget minus total cost
+        accessType: update
+      - name: budget_exceeded
+        type: boolean
+        description: Whether total cost exceeds budget
+        accessType: update
+      - name: budget_summary
+        type: string
+        description: Human-readable budget tracking summary
+        accessType: update
+    parentStateAccess:
+      - name: itinerary
+        type: map
+        description: Map of want names to type/name entries registered by ConditionThinkers
+        accessType: read
+      - name: target_budgets
+        type: map
+        description: Map of want names to their allocated budget (written by BudgetThinker)
+        accessType: update
+      - name: costs
+        type: map
+        description: Costs map aggregated from child wants via ConditionThinker
+        accessType: read

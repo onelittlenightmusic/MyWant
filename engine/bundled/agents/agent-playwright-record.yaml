@@ -1,0 +1,15 @@
+agents:
+  - name: playwright_record_monitor
+    runtime: localGo
+    type: monitor
+    description: >
+      Records user browser interactions via Playwright MCP App Server and saves
+      the recorded session as a Playwright .spec.ts test script in want state.
+      Activated by start/stop webhook signals from the frontend.
+    version: '1.0'
+    capabilities:
+      - playwright_recording
+    role: monitor
+    monitoring:
+      target: recording_active
+      check_interval: 3 seconds

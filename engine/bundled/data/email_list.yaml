@@ -1,0 +1,11 @@
+title: email_list
+description: "A list of email messages from Gmail"
+type: object
+properties:
+  emails:
+    type: array
+    description: "Array of email message objects"
+    items:
+      type: object
+required:
+  - emails

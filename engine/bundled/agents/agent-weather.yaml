@@ -1,0 +1,28 @@
+agents:
+  - name: agent_weather
+    runtime: localGo
+    type: do
+    description: Fetches weather information for a city using wttr.in (no key) or OpenWeatherMap
+    version: '1.0'
+    capabilities:
+      - weather_agency
+    role: action
+    actions:
+      - name: fetch_weather
+        description: Fetches weather text for the configured city
+        parameters:
+          weather_city:
+            type: string
+            description: City name (e.g. Tokyo)
+            default: Tokyo
+          openweathermap_api_key:
+            type: string
+            description: OpenWeatherMap API key. Falls back to OPENWEATHERMAP_API_KEY env var. If absent, uses wttr.in.
+            required: false
+        state_updates:
+          - name: weather_text
+            type: string
+            description: One-line weather summary
+          - name: weather_date
+            type: string
+            description: Date when weather was fetched (YYYY-MM-DD)

@@ -1,0 +1,21 @@
+title: webhook_message
+description: "An incoming webhook message from Slack or Teams"
+type: object
+properties:
+  text:
+    type: string
+    description: "Message text content"
+  user:
+    type: string
+    description: "Sender user name or ID"
+  channel:
+    type: string
+    description: "Channel or conversation ID"
+  timestamp:
+    type: string
+    description: "Message timestamp"
+  raw:
+    type: object
+    description: "Full raw message payload from the webhook provider"
+required:
+  - text

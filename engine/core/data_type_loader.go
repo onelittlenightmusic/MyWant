@@ -3,6 +3,7 @@ package mywant
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
@@ -219,4 +220,52 @@ func wrapRaw(raw any) *DataObject {
 		dataMap = make(map[string]any)
 	}
 	return &DataObject{typeName: "", data: dataMap}
+}
+
+// LoadFromFS loads data type YAML files from an embedded fs.FS.
+// fsRoot is the subdirectory within fsys (e.g. "data").
+func (l *DataTypeLoader) LoadFromFS(fsys fs.FS, fsRoot string) error {
+	return fs.WalkDir(fsys, fsRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		ext := filepath.Ext(d.Name())
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		data, readErr := fs.ReadFile(fsys, path)
+		if readErr != nil {
+			WarnLog("[DATA-TYPE-LOADER] Failed to read embedded %s: %v", path, readErr)
+			return nil
+		}
+		var yamlMap map[string]any
+		if yamlErr := yaml.Unmarshal(data, &yamlMap); yamlErr != nil {
+			WarnLog("[DATA-TYPE-LOADER] Failed to unmarshal embedded %s: %v", path, yamlErr)
+			return nil
+		}
+		jsonBytes, jsonErr := json.Marshal(yamlMap)
+		if jsonErr != nil {
+			WarnLog("[DATA-TYPE-LOADER] Failed to marshal embedded %s: %v", path, jsonErr)
+			return nil
+		}
+		var schema jsonschema.Schema
+		if jsonErr2 := json.Unmarshal(jsonBytes, &schema); jsonErr2 != nil {
+			WarnLog("[DATA-TYPE-LOADER] Failed to unmarshal JSON schema from embedded %s: %v", path, jsonErr2)
+			return nil
+		}
+		typeName := schema.Title
+		if typeName == "" {
+			return nil
+		}
+		resolved, resolveErr := schema.Resolve(nil)
+		if resolveErr != nil {
+			WarnLog("[DATA-TYPE-LOADER] Failed to resolve embedded schema %q: %v", typeName, resolveErr)
+			return nil
+		}
+		l.mu.Lock()
+		l.schemas[typeName] = &resolvedEntry{schema: &schema, resolved: resolved}
+		l.mu.Unlock()
+		InfoLog("[DATA-TYPE-LOADER] Loaded embedded schema %q", typeName)
+		return nil
+	})
 }

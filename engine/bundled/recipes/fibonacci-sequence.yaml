@@ -1,0 +1,75 @@
+recipe:
+  # Recipe metadata - defines this as a custom target type
+  metadata:
+    name: "Fibonacci Sequence"
+    description: "Fibonacci sequence generator and filter"
+    custom_type: "fibonacci sequence"
+    category: "mathematics"
+    version: "1.0.0"
+    
+  # Recipe parameters - these are the configurable values
+  parameters:
+    prefix: "fibonacci"
+    display_name: "Fibonacci Sequence Generator"
+    count: 10
+    min_value: 0
+    max_value: 1000000
+
+  # Parameter descriptions - explain what each parameter does
+  parameter_descriptions:
+    prefix: "Prefix used for naming wants in the generated deployment"
+    display_name: "Display name for the recipe instance"
+    count: "Number of fibonacci numbers to generate in the sequence"
+    min_value: "Minimum value for filtering the fibonacci sequence"
+    max_value: "Maximum value for filtering the fibonacci sequence"
+
+  wants:
+    # Fibonacci number generator - generates fibonacci sequence
+    - metadata:
+        type: fibonacci numbers
+        labels:
+          role: generator
+          component: source
+      spec:
+        params:
+          count: count
+
+    # Fibonacci filter - filters fibonacci numbers by range
+    - metadata:
+        type: fibonacci filter
+        labels:
+          role: filter
+          component: processor
+      spec:
+        params:
+          min_value: min_value
+          max_value: max_value
+        using:
+          - role: generator
+
+  finalResultField: "fibonacci filter_filtered"
+
+  # Recipe result definition - specifies how to compute fibonacci results
+  result:
+    - want_name: "fibonacci filter"
+      state_field: ".filtered"
+      description: "Filtered fibonacci numbers in range"
+    - want_name: "fibonacci filter"
+      state_field: ".count"
+      description: "Count of filtered fibonacci numbers"
+  # Example deployment - one-click deployment configuration
+  example:
+    wants:
+      - metadata:
+          name: "fibonacci-sequence-demo"
+          type: "fibonacci sequence"
+          labels:
+            recipe: "Fibonacci Sequence
+"
+        spec:
+          params:
+            prefix: "fibonacci"
+            display_name: "Fibonacci Sequence Generator"
+            count: 10
+            min_value: 0
+            max_value: 1000000

@@ -1,0 +1,52 @@
+metadata:
+  name: description
+  title: Description Provider
+  description: Provides description data for approval processes. Requires output connections (coordinators) before providing data to ensure data synchronization.
+  version: "1.0.0"
+  category: approval
+  pattern: generator
+
+parameters:
+  - name: description_format
+    description: Format string for the description (can include %s placeholder for approval_id)
+    type: string
+    required: true
+    example: "Level 1 Approval: %s"
+  - name: approval_id
+    description: ID of the approval this description supports
+    type: string
+    required: true
+
+state:
+  - name: description_provided
+    description: Whether description has been provided to coordinators
+    type: bool
+    persistent: true
+    initialValue: false
+
+connectivity:
+  inputs: []
+  outputs:
+    - name: coordinator
+      type: want
+      description: Connected coordinator wants that will receive description
+      multiple: true
+
+require:
+  type: "users"
+  users:
+    - name: coordinator
+      type: want
+      description: Must have at least one coordinator output connection
+      required: true
+      multiple: false
+
+agents: []
+constraints: []
+examples: []
+relatedTypes:
+  - evidence
+  - coordinator
+seeAlso:
+  - evidence
+  - coordinator

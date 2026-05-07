@@ -1,0 +1,9 @@
+agents:
+  - name: launch_manager
+    runtime: localGo
+    type: do
+    capabilities:
+      - launch_management
+      - live_server_management
+      - docker_management
+    description: "Unified lifecycle manager for processes and Docker Compose stacks. Handles launch_plan (managed_launch), process_plan (managed_process), and docker_plan (docker_run)."

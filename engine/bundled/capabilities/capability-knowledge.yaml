@@ -1,0 +1,7 @@
+capabilities:
+  - name: knowledge_monitoring
+    gives:
+      - knowledge_monitoring
+  - name: knowledge_updating
+    gives:
+      - knowledge_updating
