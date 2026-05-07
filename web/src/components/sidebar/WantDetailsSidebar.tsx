@@ -429,6 +429,34 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
 
+  // Ref used by the gamepad hook below to access tabs/index defined after the
+  // early return, without violating Rules of Hooks.
+  const gamepadTabRef = useRef<{
+    tabs: Array<{ id: string }>;
+    currentTabIndex: number;
+    handleTabChange: (id: string) => void;
+  } | null>(null);
+
+  // Gamepad L/R bumpers switch sidebar tabs. Must be before early return.
+  // Keyboard Tab is handled by the raw keydown listener; gamepadOnly avoids conflict.
+  useInputActions({
+    gamepadOnly: true,
+    ignoreWhenInputFocused: false,
+    enabled: !!want,
+    onTabForward: () => {
+      const ctx = gamepadTabRef.current;
+      if (!ctx) return;
+      const nextIndex = (ctx.currentTabIndex + 1) % ctx.tabs.length;
+      ctx.handleTabChange(ctx.tabs[nextIndex].id);
+    },
+    onTabBackward: () => {
+      const ctx = gamepadTabRef.current;
+      if (!ctx) return;
+      const nextIndex = (ctx.currentTabIndex - 1 + ctx.tabs.length) % ctx.tabs.length;
+      ctx.handleTabChange(ctx.tabs[nextIndex].id);
+    },
+  });
+
   if (!want) {
     if (summaryProps) {
       return (
@@ -475,20 +503,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   const prevTabId = tabs[prevTabIndex]?.id;
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
 
-  // Gamepad L/R bumpers switch sidebar tabs (keyboard Tab is handled by the raw
-  // keydown listener below; gamepadOnly prevents double-firing on keyboard).
-  useInputActions({
-    gamepadOnly: true,
-    ignoreWhenInputFocused: false,
-    onTabForward: () => {
-      const nextIndex = (currentTabIndex + 1) % tabs.length;
-      handleTabChange(tabs[nextIndex].id);
-    },
-    onTabBackward: () => {
-      const nextIndex = (currentTabIndex - 1 + tabs.length) % tabs.length;
-      handleTabChange(tabs[nextIndex].id);
-    },
-  });
+  // Keep the gamepad hook's context ref up-to-date with current render values.
+  gamepadTabRef.current = { tabs, currentTabIndex, handleTabChange };
 
   return (
     <>
