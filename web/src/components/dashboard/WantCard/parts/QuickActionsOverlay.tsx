@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Play, PlayCircle, Square, Trash2, Pause, RotateCcw, Settings, X } from 'lucide-react';
 import { Want } from '@/types/want';
 import { classNames } from '@/utils/helpers';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface ActionButtonProps {
   icon: React.ReactNode;
@@ -59,11 +60,12 @@ export const QuickActionsOverlay: React.FC<QuickActionsOverlayProps> = ({
 }) => {
   const status = want.status;
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  // Escape/B → close (keyboard + gamepad unified)
+  useInputActions({
+    captureInput: true,
+    ignoreWhenInputFocused: false,
+    onCancel: onClose,
+  });
 
   // Status checks
   const isRunning = status === 'reaching' || status === 'reaching_with_warning' || status === 'waiting_user_action';

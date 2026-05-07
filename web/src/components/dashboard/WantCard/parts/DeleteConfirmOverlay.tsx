@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface DeleteConfirmOverlayProps {
   onConfirm: () => void;
@@ -8,9 +9,19 @@ interface DeleteConfirmOverlayProps {
 }
 
 export const DeleteConfirmOverlay: React.FC<DeleteConfirmOverlayProps> = ({ onConfirm, onCancel }) => {
+  // Enter/A → confirm, Escape/B → cancel (keyboard + gamepad unified)
+  useInputActions({
+    captureInput: true,
+    ignoreWhenInputFocused: false,
+    onConfirm,
+    onCancel,
+  });
+
+  // y/n letter shortcuts — captureInput only stops propagation for mapped keys,
+  // so these bubble-phase handlers still fire for unmapped y/n keys.
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key.toLowerCase() === 'n') { e.preventDefault(); onCancel(); }
+      if (e.key.toLowerCase() === 'n') { e.preventDefault(); onCancel(); }
       else if (e.key.toLowerCase() === 'y') { e.preventDefault(); onConfirm(); }
     };
     document.addEventListener('keydown', handleKey);
