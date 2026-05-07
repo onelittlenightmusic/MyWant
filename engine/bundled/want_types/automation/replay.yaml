@@ -1,0 +1,293 @@
+wantType:
+  metadata:
+    name: replay
+    title: Browser Replayed
+    description: |
+      Records user browser interactions via an embedded Playwright browser session
+      and stores the recording as a Playwright .spec.ts test script.
+
+      When the want is created, two webhook endpoints are registered in state:
+        - startWebhookId  → POST /api/v1/webhooks/{want_id}-start  to begin recording
+        - stopWebhookId   → POST /api/v1/webhooks/{want_id}-stop   to finish recording
+
+      The frontend "Record" button calls the start endpoint. An iframe is then shown
+      with the Playwright MCP App Server UI, where the user interacts with a real browser.
+      Clicking "Finish" (in the iframe or via the stop endpoint) saves the generated
+      Playwright script to `replay_script` / `final_result`.
+
+      The "Record in debug" button attaches to an existing Chrome running with
+      --remote-debugging-port (configurable via debug_chrome_host / debug_chrome_port).
+      No iframe is shown; a Finish button appears in the card instead.
+    version: '1.0'
+    category: automation
+    pattern: independent
+
+  parameters:
+  - name: target_url
+    description: Starting URL opened when recording begins (both normal and debug mode)
+    type: string
+    required: false
+    default: "https://example.com"
+    example: "https://myapp.example.com/login"
+
+  - name: debug_chrome_host
+    description: Hostname or IP address of the Chrome running with --remote-debugging-port. Used only by "Record in debug" mode.
+    type: string
+    required: false
+    default: "localhost"
+    example: "192.168.1.100"
+
+  - name: debug_chrome_port
+    description: Remote debugging port of the debug Chrome instance.
+    type: string
+    required: false
+    default: "9222"
+    example: "9222"
+
+  state:
+  - name: target_url
+    description: Starting URL for recording/replay (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'https://example.com'
+
+  - name: debug_chrome_host
+    description: Chrome debug host (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'localhost'
+
+  - name: debug_chrome_port
+    description: Chrome debug port (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: '9222'
+
+  - name: recording_active
+    description: True while a Playwright recording session is in progress
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+
+  - name: recording_iframe_url
+    description: URL of the Playwright App Server UI to embed in an iframe
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_script
+    description: The recorded Playwright .spec.ts script
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: final_result
+    description: Mirrors replay_script once recording completes (set via FinalResultField)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debug_recording_active
+    description: True while a debug Chrome recording session is in progress
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+
+  - name: replay_active
+    description: True while replay is executing in the background
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+
+  - name: replay_iframe_url
+    description: URL of the MCP App UI iframe showing the replay
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_result
+    description: JSON result captured after replay (selected_text, active_element, url)
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_error
+    description: Error message if replay failed
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debug_recording_error
+    description: Error message if debug recording failed
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_screenshot_url
+    description: API URL of the screenshot taken at the end of replay
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_actions
+    description: JSON array of raw recorded action strings used for replay
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_start_url
+    description: Starting URL for replay execution
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: recording_session_id
+    description: Session ID of the active normal recording
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debug_recording_session_id
+    description: Session ID of the active debug recording
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replay_session_id
+    description: Session ID of the active replay
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: target_object
+    description: Target object captured at the end of debug recording
+    type: object
+    persistent: true
+    label: current
+    initialValue: {}
+
+  - name: action_by_agent
+    description: Name of the agent that last updated state
+    type: string
+    persistent: false
+    label: current
+    initialValue: ''
+
+  - name: startWebhookId
+    description: Webhook ID for starting a recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: stopWebhookId
+    description: Webhook ID for stopping a recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debugStartWebhookId
+    description: Webhook ID for starting a debug Chrome recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: debugStopWebhookId
+    description: Webhook ID for stopping a debug Chrome recording session
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: replayWebhookId
+    description: Webhook ID for triggering a replay execution
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+
+  - name: start_recording_requested
+    description: Signal to start a normal recording session (set by webhook, consumed by agent)
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: stop_recording_requested
+    description: Signal to stop a normal recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: start_debug_recording_requested
+    description: Signal to start a debug Chrome recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: stop_debug_recording_requested
+    description: Signal to stop a debug Chrome recording session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  - name: start_replay_requested
+    description: Signal to start a replay session
+    type: bool
+    persistent: false
+    label: plan
+    initialValue: false
+
+  requires:
+    - playwright_recording
+
+  finalResultField: replay_script
+
+  examples:
+  - name: Simple Browser Recording
+    description: Records interactions on the default example site
+    want:
+      metadata:
+        name: record_example
+        type: replay
+      spec:
+        params:
+          target_url: "https://www.google.com"
+          debug_chrome_host: "192.168.2.212"
+          debug_chrome_port: "9222"
+
+  - name: Simple Browser Recording with Local Debug Chrome
+    description: Records a login flow for automated replay testing
+    want:
+      metadata:
+        name: record_login_flow
+        type: replay
+      spec:
+        params:
+          target_url: "https://www.google.com"
+          debug_chrome_host: "127.0.0.1"
+          debug_chrome_port: "9222"

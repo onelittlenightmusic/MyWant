@@ -1,0 +1,85 @@
+wantType:
+  metadata:
+    name: slack_post
+    title: Slack Posted
+    description: Posts a message to Slack via Incoming Webhook. Receives the message as a param from parent want.
+    version: '1.0'
+    category: utility
+    pattern: independent
+  finalResultField: last_posted_at
+
+  parameters:
+    - name: message
+      description: The message text to post to Slack
+      type: string
+      required: true
+
+    - name: slack_webhook_url
+      description: Slack Incoming Webhook URL. Falls back to SLACK_WEBHOOK_URL env var.
+      type: string
+      required: false
+
+  state:
+    - name: slack_webhook_url
+      description: Slack Incoming Webhook URL (copied from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: source_want
+      description: Name of the sibling Want to read the message from (promoted from param by Initialize)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: message
+      description: Static message text to post (promoted from param by Initialize; used when source_want is empty)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: last_message
+      description: Message text that was posted
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: last_posted_at
+      description: Timestamp of successful post (RFC3339)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: last_posted_date
+      description: Date of successful post (YYYY-MM-DD)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: briefing_status
+      description: Posting status (done, failed)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  agents:
+    - name: agent_slack_post
+      role: action
+      description: Posts the message to Slack Incoming Webhook
+
+  requires:
+    - slack_post_agency

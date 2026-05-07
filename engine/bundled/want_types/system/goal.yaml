@@ -1,0 +1,236 @@
+wantType:
+  metadata:
+    name: goal
+    title: Goal
+    description: |
+      Represents a user's high-level goal that gets automatically decomposed into
+      concrete sub-wants by the GoalThinker ThinkAgent.
+
+      The agent calls a Python LLM script to break down the goal text into a set of
+      actionable sub-wants (knowledge, reminder, or nested goal). The user reviews
+      the proposed breakdown via a reaction queue before the child wants are spawned.
+
+      After approval, the agent monitors cc_messages for follow-up conversation that
+      may trigger a replan (re_planning phase). Each replan produces a new proposed
+      breakdown subject to user approval.
+
+      Phases:
+        decomposing       → Python script runs, breakdown produced, queue created
+        awaiting_approval → User approves or rejects via reaction queue
+        monitoring        → Child wants running, watching for cc_message_count changes
+        re_planning       → New breakdown produced based on conversation, queue created
+    version: '1.0'
+    category: system
+    pattern: coordinator
+
+  parameters:
+  - name: goal_text
+    description: The user's goal expressed in natural language
+    type: string
+    required: false
+    example: "Plan a weekend trip to Kyoto"
+
+  - name: initial_breakdown
+    description: |
+      Static breakdown provided as a list, bypassing LLM decomposition.
+      Each item: {name, type, description, params, using (optional)}.
+      When provided, goal_text is optional.
+    type: object
+    required: false
+
+  - name: auto_approve
+    description: |
+      When true, skip the reaction queue approval step and commit the breakdown directly.
+      Intended for automated/infrastructure use cases where no user interaction is needed.
+    type: bool
+    default: false
+    required: false
+
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary
+    type: string
+    defaultGlobalParameter: opa_llm_planner_command
+    required: false
+
+  - name: policy_dir
+    description: Directory containing OPA .rego policy files for goal planning
+    type: string
+    default: "yaml/policies/goal"
+    required: false
+
+  - name: use_llm
+    description: Enable LLM-augmented planning
+    type: bool
+    defaultGlobalParameter: opa_llm_use_llm
+    required: false
+
+  - name: llm_provider
+    description: LLM provider name (e.g. anthropic)
+    type: string
+    defaultGlobalParameter: llm_provider
+    required: false
+
+  state:
+  - name: goal_text
+    description: The user's goal text (copied from param by Initialize)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: goal
+
+  - name: phase
+    description: |
+      Current lifecycle phase of the goal want:
+        decomposing, awaiting_approval, monitoring, re_planning
+    type: string
+    persistent: true
+    initialValue: decomposing
+    label: current
+
+  - name: proposed_breakdown
+    description: List of proposed sub-want items pending user approval
+    type: object
+    persistent: true
+    initialValue: []
+    label: current
+
+  - name: proposed_recommendations
+    description: List of creative recommendations pending user selection
+    type: object
+    persistent: true
+    initialValue: []
+    label: current
+
+  - name: selected_recommendation_id
+    description: ID of the recommendation selected by the user in the ideating phase
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: proposed_response
+    description: Brief explanation from the AI about the proposed breakdown
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: reaction_queue_id
+    description: ID of the reaction queue created for user approval
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: interactive
+    description: Whether this want supports interactive chat (enables Chat tab in UI)
+    type: bool
+    persistent: false
+    initialValue: true
+    label: current
+
+  - name: cc_messages
+    description: FIFO buffer of last 20 incoming chat messages
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_responses
+    description: FIFO buffer of last 20 AI responses (paired with cc_messages)
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_message_count
+    description: Total number of chat messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: targets
+    description: Approved breakdown items stored as goal state for OPA planning
+    type: object
+    persistent: true
+    initialValue: []
+    label: goal
+
+  - name: directions
+    description: Direction list produced by OPA ThinkAgent on each replan
+    type: object
+    persistent: true
+    initialValue: []
+    label: plan
+
+  - name: opa_input_hash
+    description: Hash of goal+current used by OPA thinker for change detection
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: direction_map_json
+    description: JSON string of direction_map built from approved breakdown
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: auto_approve
+    description: When true, skip reaction queue and commit breakdown directly (copied from param)
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  - name: initial_breakdown
+    description: Static breakdown list provided as param, bypassing LLM decomposition
+    type: object
+    persistent: false
+    initialValue: null
+    label: current
+
+  - name: opa_llm_planner_command
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'opa-llm-planner'
+    label: current
+
+  - name: policy_dir
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'yaml/policies/goal'
+    label: current
+
+  - name: use_llm
+    description: Copied from param by Initialize
+    type: bool
+    persistent: false
+    initialValue: true
+    label: current
+
+  - name: llm_provider
+    description: Copied from param by Initialize
+    type: string
+    persistent: false
+    initialValue: 'anthropic'
+    label: current
+
+  examples:
+  - name: Weekend Trip Planning
+    description: Decompose a travel planning goal into actionable sub-wants
+    want:
+      metadata:
+        name: kyoto-trip-goal
+        type: goal
+      spec:
+        params:
+          goal_text: "Plan a weekend trip to Kyoto next month"
+
+  requires:
+    - goal_thinking
+    - opa_llm_planning

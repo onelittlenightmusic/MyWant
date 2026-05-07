@@ -1,0 +1,56 @@
+wantType:
+  metadata:
+    name: switch
+    title: Toggle Switch
+    description: A toggle switch that sends on/off webhook events. Useful for controlling devices or triggering activate/deactivate actions.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+  parameters:
+  - name: label
+    description: Text displayed below the switch
+    type: string
+    required: false
+    default: Switch
+  - name: target_param
+    description: Name of the parent parameter to update with the on/off state
+    type: string
+    required: false
+  state:
+  - name: on
+    description: Current switch state (true = on, false = off)
+    type: boolean
+    label: current
+    persistent: true
+    initialValue: false
+  - name: label
+    description: Switch display label
+    type: string
+    label: current
+    persistent: true
+    initialValue: Switch
+  - name: target_param
+    description: Target parent parameter name
+    type: string
+    label: current
+    persistent: true
+  - name: webhook_payload
+    description: Payload received via POST /api/v1/webhooks/{id}; consumed by Progress()
+    type: object
+    label: current
+  - name: webhook_received_at
+    description: Timestamp of the last received webhook
+    type: string
+    label: current
+  examples:
+  - title: Generator switch
+    description: A switch that toggles a generator on/off
+    want:
+      metadata:
+        name: generator-switch
+        type: switch
+      spec:
+        params:
+          label: "Generator"

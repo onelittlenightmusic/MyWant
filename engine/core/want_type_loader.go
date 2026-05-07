@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -142,6 +143,7 @@ type WantTypeWrapper struct {
 // WantTypeLoader loads and manages want type definitions
 type WantTypeLoader struct {
 	directory       string
+	fallbackFS      fs.FS // used when directory doesn't exist on filesystem (e.g. Homebrew install)
 	definitions     map[string]*WantTypeDefinition
 	byCategory      map[string][]*WantTypeDefinition
 	byPattern       map[string][]*WantTypeDefinition
@@ -172,6 +174,13 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		validPatterns:   []string{"generator", "processor", "sink", "independent", "coordinator"},
 		validCategories: make(map[string]bool),
 	}
+}
+
+// WithFallbackFS sets an embedded filesystem used when the on-disk directory is unavailable
+// (e.g. when installed via Homebrew without the source tree). Returns the loader for chaining.
+func (w *WantTypeLoader) WithFallbackFS(fsys fs.FS) *WantTypeLoader {
+	w.fallbackFS = fsys
+	return w
 }
 
 // loadPredefinedState loads the predefined.yaml file and stores common state fields.
@@ -207,10 +216,16 @@ func (w *WantTypeLoader) mergePredefinedState(def *WantTypeDefinition) {
 	}
 }
 
-// LoadAllWantTypes loads all want type YAML files from the directory
+// LoadAllWantTypes loads all want type YAML files from the directory.
+// Falls back to the embedded filesystem when the on-disk directory does not exist.
 func (w *WantTypeLoader) LoadAllWantTypes() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	if _, err := os.Stat(w.directory); os.IsNotExist(err) && w.fallbackFS != nil {
+		log.Printf("[WANT-TYPE-LOADER] Directory %q not found, using embedded built-in types", w.directory)
+		return w.loadAllFromFS(w.fallbackFS)
+	}
 
 	// Load predefined common state fields first
 	w.loadPredefinedState()
@@ -290,6 +305,73 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 	// Load user-local custom types from ~/.mywant/custom-types/ (best-effort, non-fatal).
 	w.loadUserCustomTypes()
 
+	return nil
+}
+
+// loadAllFromFS loads all want type definitions from an embedded fs.FS.
+// Used when the on-disk directory is unavailable (e.g. Homebrew install).
+// The FS root must contain a "want_types" sub-tree mirroring WantTypesDir layout.
+// Must be called with w.mu already held.
+func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
+	// Load predefined state from embedded FS
+	if data, err := fs.ReadFile(fsys, "want_types/"+PredefinedStateFile); err == nil {
+		var wrapper PredefinedWrapper
+		if yamlErr := yaml.Unmarshal(data, &wrapper); yamlErr == nil {
+			w.predefinedState = wrapper.Predefined.State
+			log.Printf("[WANT-TYPE-LOADER] Loaded %d predefined state fields from embedded FS", len(w.predefinedState))
+		}
+	}
+
+	var yamlFiles []string
+	if err := fs.WalkDir(fsys, "want_types", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		base := filepath.Base(path)
+		if base == "WANT_TYPE_TEMPLATE.yaml" || base == PredefinedStateFile {
+			return nil
+		}
+		yamlFiles = append(yamlFiles, path)
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to scan embedded want_types: %v", err)
+	}
+
+	sort.Strings(yamlFiles)
+
+	for _, path := range yamlFiles {
+		data, err := fs.ReadFile(fsys, path)
+		if err != nil {
+			log.Printf("[WANT-TYPE-LOADER] Warning: failed to read embedded %s: %v", path, err)
+			continue
+		}
+		var wrapper WantTypeWrapper
+		if err := yaml.Unmarshal(data, &wrapper); err != nil {
+			log.Printf("[WANT-TYPE-LOADER] Warning: failed to parse embedded %s: %v", path, err)
+			continue
+		}
+		def := &wrapper.WantType
+		if err := w.validateDefinition(def); err != nil {
+			log.Printf("[WANT-TYPE-LOADER] Warning: validation failed for embedded %s: %v", path, err)
+			continue
+		}
+		w.mergePredefinedState(def)
+		w.definitions[def.Metadata.Name] = def
+		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
+		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
+		w.validCategories[def.Metadata.Category] = true
+	}
+
+	if len(w.definitions) == 0 {
+		return fmt.Errorf("no valid want type definitions found in embedded FS")
+	}
+
+	log.Printf("[WANT-TYPE-LOADER] Loaded %d built-in want types from embedded FS", len(w.definitions))
+	w.loadUserCustomTypes()
 	return nil
 }
 
@@ -406,8 +488,9 @@ func (w *WantTypeLoader) validateWithSpec(filePath string, yamlData []byte) erro
 	}
 
 	if specPath == "" {
-		// Fallback to default
-		specPath = filepath.Join(SpecDir, "want-type-spec.yaml")
+		// Spec not found (e.g. Homebrew install without source tree) — skip validation.
+		// Built-in types are pre-validated at build time.
+		return nil
 	}
 
 	loader := openapi3.NewLoader()

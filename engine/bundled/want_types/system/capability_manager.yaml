@@ -1,0 +1,36 @@
+wantType:
+  metadata:
+    name: capability_manager
+    title: "Capability Manager"
+    version: "1.0.0"
+    category: system
+    description: |
+      Monitors all want completions, evaluates achievement rules, and dynamically
+      awards achievements and unlocks capabilities for agents.
+    pattern: coordinator
+    system_type: true
+  requires:
+    - capability_management
+  state:
+    - name: evaluated_at
+      description: Timestamp of the last evaluation cycle
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: total_awarded
+      description: Total number of achievements awarded in this session
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+  examples:
+    - name: capability-manager
+      description: Evaluates achievement rules and unlocks capabilities
+      want:
+        metadata:
+          name: capability-manager
+          type: capability_manager
+        spec:
+          params:
+            poll_interval_seconds: 30

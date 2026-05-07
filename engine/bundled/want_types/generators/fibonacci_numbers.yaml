@@ -1,0 +1,171 @@
+wantType:
+  metadata:
+    name: fibonacci numbers
+    title: fibonacci numbers
+    description: 'Generator that produces Fibonacci sequence numbers. Generates a
+      configurable
+
+      number of Fibonacci values starting from 0, 1 and continuing the sequence
+
+      where each number is the sum of the previous two.
+
+
+      This is a pure generator (no inputs) that produces integer output values.
+
+      Useful for testing pipeline systems with mathematical sequences.
+
+      '
+    version: '1.0'
+    category: mathematics
+    pattern: generator
+  finalResultField: sent_count
+  parameters:
+  - name: count
+    description: Number of Fibonacci values to generate
+    type: int
+    default: 20
+    required: false
+    validation:
+      min: 1
+      max: 10000
+    example: 50
+  state:
+  - name: count
+    description: Number of Fibonacci values to generate (promoted from param by Initialize)
+    type: int
+    persistent: false
+    label: current
+    initialValue: 20
+  - name: a
+    description: Current Fibonacci number (n-1)
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: b
+    description: Next Fibonacci number (n)
+    type: int
+    persistent: true
+    label: current
+    initialValue: 1
+  - name: sent_count
+    description: Number of values sent so far
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: completed
+    description: Whether generation cycle has completed
+    type: bool
+    persistent: true
+    label: current
+    example: true
+    initialValue: false
+  - name: achieved
+    description: Whether the goal has been achieved
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+  - name: generated_count
+    description: Number of values generated in this cycle
+    type: int
+    persistent: true
+    label: current
+    example: 20
+    initialValue: 0
+  - name: max_value_generated
+    description: Largest Fibonacci number generated
+    type: int
+    persistent: true
+    label: current
+    example: 4181
+    initialValue: 0
+  agents: []
+  constraints:
+  - description: Count must be positive
+    validation: count > 0
+  - description: Count must be within reasonable bounds
+    validation: count <= 10000
+  - description: Generator is deterministic
+    validation: Same count parameter always produces same sequence
+  examples:
+  - name: Small Fibonacci Sequence
+    description: Generate first 10 Fibonacci numbers
+    expectedBehavior: '1. Generator starts execution
+
+      2. Produces: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
+
+      3. Closes output channel
+
+      4. Sets completed flag in state
+
+      5. Ready to process results
+
+      '
+    want:
+      metadata:
+        name: small-fibonacci-sequence
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 10
+  - name: Large Fibonacci Sequence
+    description: Generate 100 Fibonacci numbers for testing throughput
+    expectedBehavior: '1. Generator produces 100 Fibonacci values
+
+      2. Values grow exponentially (up to ~3.5 billion)
+
+      3. Useful for testing processor capacity
+
+      4. Sink can count/aggregate the stream
+
+      '
+    want:
+      metadata:
+        name: large-fibonacci-sequence
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 100
+  - name: Single Number
+    description: Generate just the first Fibonacci number (0)
+    expectedBehavior: '1. Generator produces just 0
+
+      2. Immediately completes
+
+      3. Useful for testing pipeline initialization
+
+      '
+    want:
+      metadata:
+        name: single-number
+        type: fibonacci numbers
+        labels: {}
+      spec:
+        params:
+          count: 1
+  relatedTypes:
+  - fibonacci filter
+  - prime numbers
+  - numbers
+  - queue
+  - sink
+  seeAlso:
+  - Generator pattern documentation
+  - Pipeline architecture for data processing
+  - Fibonacci sequence mathematical background
+  require:
+    type: users
+    users:
+    - name: fibonacci_stream
+      type: want
+      description: Stream of integer Fibonacci numbers

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
+	"mywant/engine/bundled"
 	types "mywant/engine/types"
 
 	"github.com/gorilla/mux"
@@ -93,7 +94,7 @@ func New(config Config) *Server {
 	if config.WantTypesDir != "" {
 		wantTypesDir = config.WantTypesDir
 	}
-	wantTypeLoader := mywant.NewWantTypeLoader(wantTypesDir)
+	wantTypeLoader := mywant.NewWantTypeLoader(wantTypesDir).WithFallbackFS(bundled.WantTypes)
 	if err := wantTypeLoader.LoadAllWantTypes(); err != nil {
 		log.Printf("[WARN] Failed to load want types: %v", err)
 	}

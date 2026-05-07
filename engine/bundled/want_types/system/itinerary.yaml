@@ -1,0 +1,159 @@
+wantType:
+  metadata:
+    name: itinerary
+    title: Itinerary
+    description: |
+      Combines OPA LLM planning with dynamic travel want dispatch in a single want.
+
+      The OPA LLM ThinkAgent evaluates goal vs current state and writes an actions
+      list to this want's own state. Progress() reads that list and dynamically
+      creates the appropriate travel wants (hotel, restaurant, etc.).
+
+      When each travel want completes, the current state is updated, the ThinkAgent
+      replans, and the cycle continues until no more actions are needed.
+    version: '1.0'
+    category: travel
+    pattern: coordinator
+    labels:
+      child-role: thinker
+
+  parameters:
+  - name: goal
+    description: |
+      Goal state as a YAML map or JSON object.
+      Copied to the "goal" state field on initialization so the ThinkAgent can read it.
+    type: object
+    default: {}
+    required: false
+    example: '{"trip": {"destination": "Tokyo", "require_hotel": true}}'
+
+  - name: current
+    description: |
+      Initial current state as a YAML map or JSON object.
+      Copied to the "current" state field on initialization.
+    type: object
+    default: {}
+    required: false
+    example: '{"hotel_reserved": false, "dinner_reserved": false}'
+
+  - name: direction_map
+    description: |
+      JSON string mapping OPA direction names to want configuration.
+      Each entry specifies the want type to create, optional params, and
+      optional "sets" to merge into current state when the want completes.
+
+      Example:
+        {
+          "reserve_hotel":  {"type": "hotel",      "params": {"hotel_type": "standard"},       "sets": {"hotel_reserved": true}},
+          "reserve_dinner": {"type": "restaurant", "params": {"restaurant_type": "fine dining"}, "sets": {"dinner_reserved": true}}
+        }
+    type: string
+    default: "{}"
+    required: true
+    example: '{"reserve_hotel": {"type": "hotel", "sets": {"hotel_reserved": true}}}'
+
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary
+    type: string
+    defaultGlobalParameter: opa_llm_planner_command
+    required: false
+
+  - name: policy_dir
+    description: Directory containing OPA .rego policy files
+    type: string
+    defaultGlobalParameter: opa_llm_policy_dir
+    required: false
+
+  - name: use_llm
+    description: Enable LLM-augmented planning via --llm flag
+    type: bool
+    defaultGlobalParameter: opa_llm_use_llm
+    required: false
+
+  - name: llm_provider
+    description: LLM provider name (e.g. anthropic, openai)
+    type: string
+    defaultGlobalParameter: llm_provider
+    required: false
+
+  state:
+  - name: goal
+    description: Target goal state (read by ThinkAgent)
+    type: object
+    persistent: true
+    initialValue: {}
+    label: goal
+
+  - name: current
+    description: Current observed state (updated when travel wants complete)
+    type: object
+    persistent: true
+    initialValue: {}
+    label: current
+
+  - name: direction_map
+    description: JSON string mapping OPA direction names to want configuration (promoted from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: '{}'
+
+
+  - name: directions
+    description: Direction list produced by ThinkAgent on each replan
+    type: object
+    persistent: true
+    initialValue: []
+    label: plan
+
+  - name: opa_input_hash
+    description: Hash of goal+current used by OPA thinker for change detection
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+
+  - name: goal_achieved
+    description: True when the planner has no more directions to suggest
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+
+  - name: costs
+    description: Map of direction name → actual cost
+    type: object
+    persistent: true
+    initialValue: {}
+    label: current
+
+  - name: opa_llm_planner_command
+    description: Path or name of the opa-llm-planner binary (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: "opa-llm-planner"
+
+  - name: policy_dir
+    description: Directory containing OPA policy files (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: ""
+
+  - name: use_llm
+    description: Whether to use LLM-augmented planning (copied from param by Initialize)
+    type: bool
+    persistent: false
+    label: current
+    initialValue: true
+
+  - name: llm_provider
+    description: LLM provider name (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: "anthropic"
+
+  requires:
+    - opa_llm_planning

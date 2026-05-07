@@ -1,0 +1,72 @@
+wantType:
+  metadata:
+    name: email_dynamic
+    title: Email Found Dynamically
+    description: |
+      A self-evolving Gmail want that discovers tools and generates its own
+      parsing logic into a WASM plugin.
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: mcp_result
+
+  parameters:
+  - name: prompt
+    description: Natural language instruction for Gmail operation.
+    type: string
+    required: true
+    example: "Search for unread emails"
+
+  state:
+  - name: phase
+    description: Current evolution phase (discovery, coding, compiling, validation, stable)
+    type: string
+    persistent: true
+    label: current
+    initialValue: "discovery"
+
+  - name: wasm_path
+    description: Path to the generated WASM binary
+    type: string
+    persistent: true
+    label: current
+
+  - name: final_result
+    description: Result of the execution
+    type: any
+    persistent: true
+    label: current
+
+  - name: last_logged_phase
+    description: Last phase logged to history
+    type: string
+    persistent: true
+    label: current
+
+  - name: error_feedback
+    description: Feedback from compiler or validator
+    type: string
+    persistent: true
+    label: current
+
+  - name: source_code
+    description: Generated Go source code
+    type: string
+    persistent: true
+    label: current
+
+  - name: validation_success
+    description: Whether validation succeeded
+    type: bool
+    persistent: true
+    label: current
+
+  require:
+    type: none
+
+  requires:
+    - mcp_dynamic_discovery
+    - mcp_dynamic_developer
+    - mcp_dynamic_compiler
+    - mcp_dynamic_validator

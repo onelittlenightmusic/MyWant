@@ -1,0 +1,449 @@
+wantType:
+  metadata:
+    name: flight
+    title: Flight Reservation
+    description: 'Flight booking want type for travel planning. Books flights with
+      configurable
+
+      class options (economy, business, first), departure dates, and durations.
+
+      This independent want monitors flight status for potential delays and
+
+      supports automatic rebooking if flights are delayed. Integrates with
+
+      agent systems for dynamic flight modification.
+
+      '
+    version: '1.0'
+    category: travel
+    pattern: independent
+    labels:
+      child-role: doer
+  finalResultField: reservation_name
+  parameters:
+  - name: flight_type
+    description: Flight class (economy, business, first)
+    type: string
+    default: economy
+    required: false
+    validation:
+      enum:
+      - economy
+      - business
+      - first
+    example: business
+  - name: duration_hours
+    description: Estimated flight duration in hours
+    type: float64
+    default: 12.0
+    required: false
+    validation:
+      min: 0.5
+      max: 24
+    example: 8.5
+  - name: departure_date
+    description: Departure date in YYYY-MM-DD format
+    type: string
+    default: '2024-01-01'
+    required: false
+    example: '2024-12-25'
+  - name: server_url
+    description: URL of the flight booking API server
+    type: string
+    default: 'http://localhost:8090'
+    required: false
+    example: 'http://localhost:8090'
+  - name: from
+    description: Departure city/airport
+    type: string
+    default: 'New York'
+    required: false
+    example: 'New York'
+  - name: to
+    description: Arrival city/airport
+    type: string
+    default: 'Los Angeles'
+    required: false
+    example: 'Los Angeles'
+  - name: flight_number
+    description: Desired flight number
+    type: string
+    default: 'AA123'
+    required: false
+    example: 'AA123'
+  - name: departure_time
+    description: Departure time in RFC3339 format
+    type: string
+    default: ''
+    required: false
+  state:
+  - name: server_url
+    description: Flight API server URL (copied from param by Initialize)
+    type: string
+    persistent: false
+    label: current
+    initialValue: 'http://localhost:8090'
+  - name: cost
+    description: Reported cost for this booking
+    type: float64
+    persistent: true
+    label: current
+    example: 1200.0
+    initialValue: 0.0
+  - name: actual_cost
+    description: Reported cost for this booking (GCP)
+    type: float64
+    persistent: true
+    initialValue: 0.0
+    label: current
+  - name: flight_type
+    description: Class of flight booked
+    type: string
+    persistent: true
+    label: current
+    example: business
+    initialValue: ''
+  - name: departure_date
+    description: Departure date of flight
+    type: string
+    persistent: true
+    label: current
+    example: '2024-12-25'
+    initialValue: ''
+  - name: duration_hours
+    description: Flight duration in hours
+    type: float64
+    persistent: true
+    label: current
+    example: 8.5
+    initialValue: 0.0
+  - name: flight_number
+    description: Booked flight number
+    type: string
+    persistent: true
+    label: current
+    example: AA123
+    initialValue: ''
+  - name: departure_time
+    description: Scheduled departure time
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: arrival_time
+    description: Expected arrival time
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: reservation_name
+    description: Human-readable reservation identifier
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: flight_action
+    description: Pending flight action (book_flight, cancel_flight, modify_flight)
+    type: string
+    persistent: true
+    label: plan
+    initialValue: ''
+  - name: flight_status
+    description: Current flight status (pending, created, confirmed, booked, completed, cancelled)
+    type: string
+    persistent: true
+    label: current
+    example: created
+    initialValue: ''
+  - name: good_to_reserve
+    description: Coordination flag from parent to allow booking
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: completed
+    description: Whether reservation has been completed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: cancelled
+    description: Whether reservation has been cancelled
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: last_logged_phase
+    description: Last phase logged by the agent
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: agent_execution_status
+    description: Status of agent execution (completed, failed, pending)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: agent_execution_error
+    description: Error message if agent execution failed
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: agent_result
+    description: Result returned by the agent
+    type: any
+    persistent: true
+    initialValue: null
+    label: current
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+  - name: flight_id
+    description: Flight reservation ID from booking API
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: from
+    description: Departure city/airport
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: to
+    description: Arrival city/airport
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_message
+    description: Human-readable status description
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: created_at
+    description: Reservation creation timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: updated_at
+    description: Reservation last update timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: canceled_at
+    description: Reservation cancellation timestamp
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: execution_source
+    description: Source of execution (agent, local)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: total_processed
+    description: Number of bookings processed
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+  - name: schedule_date
+    description: Date of the flight schedule
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_changed
+    description: Whether flight status has changed
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: status_changed_at
+    description: Timestamp when status last changed
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: status_change_history_count
+    description: Number of status changes recorded
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+  - name: status_history
+    description: History of flight status changes
+    type: array
+    persistent: true
+    label: current
+  - name: premium_level
+    description: Premium service level if applicable
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: service_tier
+    description: Service tier for premium bookings
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: premium_amenities
+    description: List of premium amenities included
+    type: array
+    persistent: true
+    label: current
+  - name: premium_processed
+    description: Whether premium processing was applied
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: _previous_flight_id
+    description: Flight ID of the previously cancelled flight (for rebooking)
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: _previous_flight_status
+    description: Status of the previously cancelled flight
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: attempted
+    description: Whether a booking attempt has been made
+    type: bool
+    persistent: true
+    initialValue: false
+    label: current
+  - name: monitor_state_hash
+    description: MD5 hash of last known flight state for change detection
+    type: string
+    persistent: true
+    initialValue: ''
+    label: current
+  - name: thinker.goal_initialized
+    description: Whether the condition thinker has initialized the goal
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.itinerary_done
+    description: Whether the condition thinker has registered with parent itinerary
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.plan_set
+    description: Whether the condition thinker has set the execution plan
+    type: bool
+    persistent: true
+    label: current
+    initialValue: false
+  - name: thinker.ticks_waited
+    description: Number of ticks waited for budget coordination
+    type: int
+    persistent: true
+    label: current
+    initialValue: 0
+  agents:
+  - name: agent_flight_api
+    role: action
+    description: Books flights and handles cancellations/modifications
+    example: agent_flight_api communicates with flight API for bookings
+  constraints:
+  - description: Flight type must be valid
+    validation: flight_type in [economy, business, first]
+  - description: Duration must be positive
+    validation: duration_hours > 0
+  - description: Duration must be realistic
+    validation: duration_hours <= 24
+    examples:
+    - name: Economy Flight
+      description: Book economy class flight
+      expectedBehavior: '1. Flight want books economy class
+        2. Schedules departure on specified date
+        3. Estimates 10 hour flight duration
+        4. Assigns flight number and times
+        5. Monitors for status changes
+        6. Can auto-rebook if delayed
+        '
+      want:
+        metadata:
+          name: economy-flight
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: economy
+            duration_hours: 10.0
+            departure_date: '2024-12-25'
+          requires:
+            - agent_flight_api
+    - name: Business Class Flight
+      description: Premium business class booking
+      expectedBehavior: '1. Flight want books business class
+        2. Applies premium amenities and services
+        3. Priority boarding included
+        4. Monitors actively for delays
+        5. Auto-rebook to next available if delayed
+        '
+      want:
+        metadata:
+          name: business-class-flight
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: business
+            duration_hours: 8.5
+            departure_date: '2024-12-24'
+          requires:
+            - agent_flight_api
+    - name: First Class Long Haul
+      description: First class international flight
+      expectedBehavior: '1. Flight want books first class
+        2. Premium seating and meals included
+        3. Dedicated concierge support
+        4. Monitors with shorter check intervals
+        5. Immediate rebooking on any delay
+        '
+      want:
+        metadata:
+          name: first-class-long-haul
+          type: flight
+          labels: {}
+        spec:
+          params:
+            flight_type: first
+            duration_hours: 15.0
+            departure_date: '2025-01-01'
+          requires:
+            - agent_flight_api
+    relatedTypes:
+    - flight_alt
+    - hotel
+    - restaurant
+    - buffet
+    - travel_coordinator
+    seeAlso:
+    - Flight booking API integration
+    - Delay monitoring and auto-rebooking
+    - Travel coordinator flight integration
+    connect:
+      type: none
+
+  requires:
+    - flight_api_agency
+    - condition_thinking

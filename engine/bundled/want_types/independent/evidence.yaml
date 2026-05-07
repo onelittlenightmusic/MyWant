@@ -1,0 +1,164 @@
+wantType:
+  metadata:
+    name: evidence
+    title: Evidence
+    description: 'Independent want that provides evidence data for multi-level approval
+
+      processes. Generates and outputs evidence artifacts that support
+
+      approval decisions, working alongside description wants.
+
+      This is a generator that produces ApprovalData containing evidence
+
+      information, supporting complex approval workflows with evidence trails.
+
+      '
+    version: '1.0'
+    category: approval
+    pattern: independent
+  finalResultField: evidence
+  parameters:
+  - name: evidence_type
+    description: Classification of evidence (document, report, certification, audit)
+    type: string
+    default: document
+    required: false
+    validation:
+      enum:
+      - document
+      - report
+      - certification
+      - audit
+      - screenshot
+    example: audit
+  - name: approval_id
+    description: ID of the approval process this evidence supports
+    type: string
+    default: ''
+    required: false
+    example: APR-2024-001
+  state:
+  - name: evidence_provided
+    description: Whether evidence has been generated and sent
+    type: bool
+    persistent: true
+    label: current
+    example: true
+    initialValue: false
+  - name: evidence_type
+    description: Type of evidence provided
+    type: string
+    persistent: true
+    label: current
+    example: audit
+    initialValue: ''
+  - name: approval_id
+    description: Associated approval process ID
+    type: string
+    persistent: true
+    label: current
+    example: APR-2024-001
+    initialValue: ''
+  - name: evidence_provided_at
+    description: Timestamp when evidence was generated
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: evidence
+    description: Generated evidence text
+    type: string
+    persistent: true
+    label: current
+    initialValue: ''
+  - name: achieving_percentage
+    description: Progress percentage toward completion
+    type: int
+    persistent: false
+    label: current
+    initialValue: 0
+  - name: total_processed
+    description: Count of evidence packets generated
+    type: int
+    persistent: true
+    label: current
+    example: 1
+    initialValue: 0
+  agents: []
+  constraints:
+  - description: Evidence type must be valid
+    validation: evidence_type in [document, report, certification, audit, screenshot]
+  - description: Evidence must be provided exactly once per cycle
+    validation: evidence_provided flag prevents duplication
+  examples:
+  - name: Audit Evidence
+    description: Provide audit report as evidence for approval
+    expectedBehavior: '1. Evidence want generates audit report evidence
+
+      2. Creates ApprovalData with evidence details
+
+      3. Broadcasts to all output channels
+
+      4. Sends to approval coordinator
+
+      5. Flags evidence as provided to prevent re-sending
+
+      '
+    want:
+      metadata:
+        name: audit-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: audit
+          approval_id: APR-2024-001
+  - name: Document Evidence
+    description: Provide supporting document evidence
+    expectedBehavior: '1. Evidence wants generates document evidence
+
+      2. Sends alongside description want
+
+      3. Provides supporting documentation
+
+      4. Marked as provided in state
+
+      '
+    want:
+      metadata:
+        name: document-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: document
+          approval_id: REQ-2024-042
+  - name: Certification Evidence
+    description: Provide certification as approval evidence
+    expectedBehavior: '1. Evidence generates certification evidence
+
+      2. Works with description to provide complete context
+
+      3. Supports multi-level approval workflow
+
+      4. Persists evidence timestamp in state
+
+      '
+    want:
+      metadata:
+        name: certification-evidence
+        type: evidence
+        labels: {}
+      spec:
+        params:
+          evidence_type: certification
+          approval_id: CERT-2024-X
+  relatedTypes:
+  - description
+  - coordinator
+  seeAlso:
+  - Approval process documentation
+  - Evidence trail and audit compliance
+  - Multi-level coordinator system
+  require:
+    type: none

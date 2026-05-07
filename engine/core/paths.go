@@ -85,8 +85,10 @@ const (
 	// CapabilitiesDir contains capability definition files
 	CapabilitiesDir = "yaml/capabilities"
 
-	// WantTypesDir contains want type definition files
-	WantTypesDir = "yaml/want_types"
+	// WantTypesDir contains want type definition files.
+	// In development (running from repo root), this resolves to engine/bundled/want_types.
+	// Homebrew installs use the embedded FS fallback instead.
+	WantTypesDir = "engine/bundled/want_types"
 
 	// DataTypesDir contains data type definition files (JSON Schema format)
 	DataTypesDir = "yaml/data"
