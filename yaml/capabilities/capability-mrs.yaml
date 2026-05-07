@@ -1,8 +1,0 @@
-capabilities:
-  - name: monitor_mrs_agent
-    gives:
-      - monitor_mrs_agent
-
-  - name: do_mrs_agent
-    gives:
-      - do_mrs_agent

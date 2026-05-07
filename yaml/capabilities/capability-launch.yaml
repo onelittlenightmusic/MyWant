@@ -1,5 +1,0 @@
-capabilities:
-  - name: launch_management
-    gives:
-      -
-      - launch_management

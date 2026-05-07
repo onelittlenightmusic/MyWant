@@ -1,5 +1,0 @@
-capabilities:
-  - name: live_server_management
-    gives:
-      -
-      - live_server_management

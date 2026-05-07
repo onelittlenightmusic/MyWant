@@ -475,8 +475,6 @@ func (w *WantTypeLoader) validateWithSpec(filePath string, yamlData []byte) erro
 		filepath.Join(SpecDir, "want-type-spec.yaml"),
 		filepath.Join("..", SpecDir, "want-type-spec.yaml"),
 		filepath.Join("../..", SpecDir, "want-type-spec.yaml"),
-		"yaml/spec/want-type-spec.yaml",
-		"../yaml/spec/want-type-spec.yaml",
 	}
 
 	var specPath string

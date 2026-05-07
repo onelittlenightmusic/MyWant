@@ -1,5 +1,0 @@
-capabilities:
-  - name: reminder_queue_management
-    gives:
-      -
-      - reminder_queue_management

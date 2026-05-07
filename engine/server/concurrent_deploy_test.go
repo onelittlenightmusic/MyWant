@@ -21,7 +21,7 @@ import (
 func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 	// Setup test server
 	config := Config{Port: 0, Host: "localhost", Debug: true, WantTypesDir: "../../engine/bundled/want_types"}
-	os.MkdirAll("yaml/recipes", 0755)
+	os.MkdirAll("engine/bundled/recipes", 0755)
 
 	server := New(config)
 	server.setupRoutes()
