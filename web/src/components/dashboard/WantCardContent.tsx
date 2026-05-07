@@ -102,6 +102,8 @@ interface WantCardContentProps {
   onResume?: (want: Want) => void;
   onShowReactionConfirmation?: (want: Want, action: 'approve' | 'deny') => void;
   onSliderActiveChange?: (active: boolean) => void;
+  isInnerFocused?: boolean;
+  onExitInnerFocus?: () => void;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -121,6 +123,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   onResume,
   onShowReactionConfirmation,
   onSliderActiveChange,
+  isInnerFocused = false,
+  onExitInnerFocus,
 }) => {
   const wantType = want.metadata?.type || 'unknown';
   const labels = want.metadata?.labels || {};
@@ -268,6 +272,8 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
                 onView={onView}
                 onViewResults={onViewResults}
                 onSliderActiveChange={onSliderActiveChange}
+                isInnerFocused={isInnerFocused}
+                onExitInnerFocus={onExitInnerFocus}
               />
             </div>
           )}

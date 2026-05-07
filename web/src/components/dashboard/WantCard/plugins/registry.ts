@@ -12,6 +12,10 @@ export interface WantCardPluginProps {
   onView: (want: Want) => void;
   onViewResults?: (want: Want) => void;
   onSliderActiveChange?: (active: boolean) => void;
+  /** True when keyboard/gamepad has drilled into this control's inner focus */
+  isInnerFocused?: boolean;
+  /** Called by the plugin to exit inner focus back to the card */
+  onExitInnerFocus?: () => void;
 }
 
 export interface WantCardPlugin {

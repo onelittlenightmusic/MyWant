@@ -5,6 +5,7 @@ import { WantCardContent } from '../WantCardContent';
 import { classNames, suppressDragImage } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
+import { useInputActions } from '@/hooks/useInputActions';
 import styles from '../WantCard.module.css';
 
 import { ProgressBars } from './parts/ProgressBars';
@@ -115,6 +116,19 @@ export const WantCard: React.FC<WantCardProps> = ({
 
   const cardRef = useRef<HTMLDivElement>(null);
   const [sliderActive, setSliderActive] = useState(false);
+  const [isInnerFocused, setIsInnerFocused] = useState(false);
+
+  // Exit inner focus when the card loses selection
+  useEffect(() => {
+    if (!selected) setIsInnerFocused(false);
+  }, [selected]);
+
+  // Enter inner focus when the card is selected + Enter/A pressed
+  useInputActions({
+    enabled: selected && isControl && !isInnerFocused,
+    ignoreWhenInputFocused: false,
+    onConfirm: () => setIsInnerFocused(true),
+  });
 
   useEffect(() => {
     const wId = want.metadata?.id || want.id;
@@ -373,6 +387,8 @@ export const WantCard: React.FC<WantCardProps> = ({
             onSuspend={onSuspend} onResume={onResume}
             onShowReactionConfirmation={onShowReactionConfirmation}
             onSliderActiveChange={setSliderActive}
+            isInnerFocused={isInnerFocused}
+            onExitInnerFocus={() => setIsInnerFocused(false)}
           />
         </div>
 
