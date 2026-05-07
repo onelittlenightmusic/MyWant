@@ -14,11 +14,13 @@ import (
 var (
 	cfgFile string
 	server  string
+	version = "dev"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "mywant",
-	Short: "MyWant CLI - Declarative Chain Programming System",
+	Use:     "mywant",
+	Version: version,
+	Short:   "MyWant CLI - Declarative Chain Programming System",
 	Long: `MyWant is a declarative chain programming system where you express
 "what you want" through YAML configuration. Autonomous agents collaborate
 to solve your wants based on their capabilities.`,

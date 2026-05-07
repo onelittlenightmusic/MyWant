@@ -1,0 +1,61 @@
+version: 2
+
+project_name: mywant
+
+before:
+  hooks:
+    - sh -c "cd web && npm ci && npm run build"
+
+builds:
+  - id: mywant
+    dir: client
+    main: ./cmd/mywant
+    binary: mywant
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: mywant
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - none*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+brews:
+  - name: mywant
+    repository:
+      owner: onelittlenightmusic
+      name: homebrew-mywant
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    homepage: https://github.com/onelittlenightmusic/MyWant
+    description: "Declarative chain programming system - express what you want via YAML, autonomous agents execute it"
+    license: "MIT"
+    install: |
+      bin.install "mywant"
+    test: |
+      system "#{bin}/mywant", "--version"
