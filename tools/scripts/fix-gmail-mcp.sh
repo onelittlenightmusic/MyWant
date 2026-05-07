@@ -148,7 +148,7 @@ echo ""
 
 # Restart MyWant server
 echo "5. Restarting MyWant server..."
-cd /Users/hiroyukiosaki/work/golang/MyWant
+cd "$(git rev-parse --show-toplevel)"
 make restart-all > /dev/null 2>&1 &
 sleep 3
 echo "   ✓ Server restarting"
