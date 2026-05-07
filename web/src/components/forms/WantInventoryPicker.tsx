@@ -127,7 +127,18 @@ export const WantInventoryPicker: React.FC<WantInventoryPickerProps> = ({
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => searchRef.current?.focus(), 80);
+    const t = setTimeout(() => {
+      const el = searchRef.current;
+      if (!el) return;
+      // Only focus if the element is actually on-screen.
+      // WantForm stays in the DOM even when closed (hidden via CSS translateX),
+      // so without this guard the focus call steals keyboard focus from the Dashboard.
+      const rect = el.getBoundingClientRect();
+      const inViewport = rect.width > 0 && rect.height > 0
+        && rect.right > 0 && rect.left < window.innerWidth
+        && rect.bottom > 0 && rect.top < window.innerHeight;
+      if (inViewport) el.focus();
+    }, 80);
     return () => clearTimeout(t);
   }, []);
 
