@@ -21,6 +21,11 @@ export interface UseInputActionsOptions {
    */
   onContextMenu?: () => void;
   /**
+   * Called on the `y` key or Gamepad Y button (index 3 / Triangle).
+   * Intended for entering header button selection mode.
+   */
+  onYButton?: () => void;
+  /**
    * Called on Tab key or Gamepad R bumper (index 5).
    * When no callback is provided the R bumper simulates a Tab keypress
    * (moves DOM focus to the next focusable element).
@@ -62,7 +67,8 @@ type GamepadActionType =
   | 'menu-toggle'
   | 'context-menu'
   | 'tab-forward'
-  | 'tab-backward';
+  | 'tab-backward'
+  | 'y-button';
 
 type GamepadActionListener = (action: GamepadActionType) => void;
 
@@ -76,6 +82,7 @@ const BUTTON_MAP: Readonly<Record<number, GamepadActionType>> = {
   0: 'confirm',       // A / Cross
   1: 'cancel',        // B / Circle
   2: 'toggle',        // X / Square
+  3: 'y-button',      // Y / Triangle
   4: 'tab-backward',  // L Bumper (LB / L1)
   5: 'tab-forward',   // R Bumper (RB / R1)
   8: 'menu-toggle',   // Select / Back / View / Share
@@ -325,6 +332,7 @@ export function useInputActions({
   onToggle,
   onMenuToggle,
   onContextMenu,
+  onYButton,
   onTabForward,
   onTabBackward,
   enabled = true,
@@ -340,6 +348,7 @@ export function useInputActions({
   const onToggleRef      = useRef(onToggle);
   const onMenuToggleRef  = useRef(onMenuToggle);
   const onContextMenuRef = useRef(onContextMenu);
+  const onYButtonRef     = useRef(onYButton);
   const onTabForwardRef  = useRef(onTabForward);
   const onTabBackwardRef = useRef(onTabBackward);
   const enabledRef       = useRef(enabled);
@@ -351,6 +360,7 @@ export function useInputActions({
   onToggleRef.current      = onToggle;
   onMenuToggleRef.current  = onMenuToggle;
   onContextMenuRef.current = onContextMenu;
+  onYButtonRef.current     = onYButton;
   onTabForwardRef.current  = onTabForward;
   onTabBackwardRef.current = onTabBackward;
   enabledRef.current       = enabled;
@@ -398,6 +408,12 @@ export function useInputActions({
             onTabForwardRef.current?.();
           }
           break;
+        case 'y':
+        case 'Y':
+          if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            if (onYButtonRef.current) { e.preventDefault(); onYButtonRef.current(); }
+          }
+          break;
         default:
           return;
       }
@@ -440,6 +456,12 @@ export function useInputActions({
           else            { onTabForwardRef.current?.();  }
           // Never stopImmediatePropagation for Tab — browser focus must still move
           return;
+        case 'y':
+        case 'Y':
+          if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+            if (onYButtonRef.current) { handled = true; onYButtonRef.current(); }
+          }
+          break;
         default:
           return;
       }
@@ -479,6 +501,7 @@ export function useInputActions({
         case 'toggle':       onToggleRef.current?.();      break;
         case 'menu-toggle':  onMenuToggleRef.current?.();  break;
         case 'context-menu': onContextMenuRef.current?.(); break;
+        case 'y-button':     onYButtonRef.current?.();     break;
         case 'tab-forward':
           if (onTabForwardRef.current) { _tabActionConsumed = true; onTabForwardRef.current(); }
           break;

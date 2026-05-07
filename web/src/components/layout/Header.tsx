@@ -86,6 +86,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [headerFocusIdx, setHeaderFocusIdx] = useState(-1);
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
   const selectRef = useRef<HTMLDivElement>(null);
@@ -182,13 +183,32 @@ export const Header: React.FC<HeaderProps> = ({
     closeMenu();
   }, [focusedIdx, navigate, closeMenu]);
 
+  // ── Header button list (dynamic — only buttons that are present) ─────────────
+  const headerButtons = useCallback(() => {
+    const btns: Array<{ id: string; label: string; action: () => void }> = [];
+    if (onGlobalStateToggle)  btns.push({ id: 'memo',   label: 'Memo',   action: onGlobalStateToggle });
+    if (onToggleSelectMode)   btns.push({ id: 'select', label: 'Select', action: onToggleSelectMode });
+    if (onCanvasModeToggle)   btns.push({ id: 'list',   label: showCanvasMode ? 'Canvas' : 'List', action: onCanvasModeToggle });
+    if (!hideCreateButton) {
+      btns.push({ id: 'want', label: 'Want', action: onCreateWant });
+      if (onCreateTargetWant) btns.push({ id: 'whim', label: 'Whim', action: onCreateTargetWant });
+    }
+    return btns;
+  }, [onGlobalStateToggle, onToggleSelectMode, onCanvasModeToggle, showCanvasMode, hideCreateButton, onCreateWant, onCreateTargetWant]);
+
+  const hBtns = headerButtons();
+  const isHeaderFocused = headerFocusIdx >= 0;
+
   // ── Unified keyboard + gamepad input ─────────────────────────────────────────
   useInputActions({
-    // Alt+Space / Select button always toggles the menu regardless of whether
-    // it is open or closed.
+    // Alt+Space / Select button always toggles the menu.
     onMenuToggle: toggleMenu,
 
-    // While the menu is open, navigate through items.
+    // y key / Y button → enter header button selection (only when menu closed and header not already focused)
+    onYButton: !menuOpen && !isHeaderFocused ? () => setHeaderFocusIdx(0) : undefined,
+
+    // While the menu is open, navigate through menu items.
+    // While header is focused, navigate through header buttons.
     onNavigate: menuOpen ? (dir) => {
       if (dir === 'up') {
         setFocusedIdx(i => (i <= 0 ? NAV_ENTRIES.length - 1 : i - 1));
@@ -199,17 +219,24 @@ export const Header: React.FC<HeaderProps> = ({
       } else if (dir === 'end') {
         setFocusedIdx(NAV_ENTRIES.length - 1);
       }
+    } : isHeaderFocused ? (dir) => {
+      if (dir === 'left')  setHeaderFocusIdx(i => Math.max(0, i - 1));
+      if (dir === 'right') setHeaderFocusIdx(i => Math.min(hBtns.length - 1, i + 1));
     } : undefined,
 
-    // Confirm/cancel are only meaningful while the menu is open.
-    onConfirm: menuOpen ? confirmFocusedItem : undefined,
-    onCancel:  menuOpen ? closeMenu          : undefined,
+    // Confirm/cancel for menu or header selection.
+    onConfirm: menuOpen ? confirmFocusedItem
+      : isHeaderFocused ? () => {
+          hBtns[headerFocusIdx]?.action();
+          setHeaderFocusIdx(-1);
+        } : undefined,
+    onCancel: menuOpen ? closeMenu
+      : isHeaderFocused ? () => setHeaderFocusIdx(-1)
+      : undefined,
 
-    // Capture all input while the menu is open so page navigation is suppressed.
-    captureInput: menuOpen,
+    // Capture all input while the menu or header selection is active.
+    captureInput: menuOpen || isHeaderFocused,
 
-    // Guards: the menu itself is not inside a data-sidebar element, and we want
-    // the handler to work regardless of focus position.
     ignoreWhenInputFocused: true,
     ignoreWhenInSidebar: false,
   });
@@ -443,11 +470,13 @@ export const Header: React.FC<HeaderProps> = ({
             <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g">
               <button
                 onClick={onGlobalStateToggle}
+                data-header-btn-id="memo"
                 className={classNames(
                   'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showGlobalState
                     ? 'bg-green-600/90 text-white hover:brightness-110'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'memo' && 'ring-2 ring-inset ring-yellow-400'
                 )}
               >
                 <StickyNote className="h-4 w-4" />
@@ -461,11 +490,13 @@ export const Header: React.FC<HeaderProps> = ({
             <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
               <button
                 onClick={onToggleSelectMode}
+                data-header-btn-id="select"
                 className={classNames(
                   'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none',
                   showSelectMode
                     ? 'bg-blue-600/90 text-white hover:brightness-110'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'select' && 'ring-2 ring-inset ring-yellow-400'
                 )}
               >
                 <ListChecks className="h-4 w-4" />
@@ -481,7 +512,11 @@ export const Header: React.FC<HeaderProps> = ({
               <Tooltip label={showCanvasMode ? 'Switch to List' : 'Switch to Canvas'}>
                 <button
                   onClick={onCanvasModeToggle}
-                  className="flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  data-header-btn-id="list"
+                  className={classNames(
+                    'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
+                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'list' && 'ring-2 ring-inset ring-yellow-400'
+                  )}
                 >
                   {/* Switch track */}
                   <div className={classNames(
@@ -514,11 +549,13 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
               <button
                 onClick={onCreateWant}
+                data-header-btn-id="want"
                 className={classNames(
                   "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
                   isAddWantActive
                     ? "bg-primary-600 text-white hover:brightness-110 active:opacity-80"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want' && 'ring-2 ring-inset ring-yellow-400'
                 )}
               >
                 <span className="relative inline-flex flex-shrink-0">
@@ -531,11 +568,13 @@ export const Header: React.FC<HeaderProps> = ({
               {onCreateTargetWant && (
                 <button
                   onClick={onCreateTargetWant}
+                  data-header-btn-id="whim"
                   className={classNames(
                     "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
                     isWhimActive
                       ? "bg-indigo-600 text-white hover:brightness-110 active:opacity-80"
-                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim' && 'ring-2 ring-inset ring-yellow-400'
                   )}
                 >
                   <span className="relative inline-flex flex-shrink-0">
