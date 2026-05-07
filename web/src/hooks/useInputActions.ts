@@ -44,6 +44,12 @@ export interface UseInputActionsOptions {
    * over page-level handlers.
    */
   captureInput?: boolean;
+  /**
+   * When true, only the gamepad listener is registered — keyboard events are
+   * ignored entirely.  Use when a component already has its own keydown handler
+   * for keyboard behaviour but still needs gamepad equivalents.
+   */
+  gamepadOnly?: boolean;
 }
 
 // ─── Gamepad singleton ────────────────────────────────────────────────────────
@@ -325,6 +331,7 @@ export function useInputActions({
   ignoreWhenInputFocused = true,
   ignoreWhenInSidebar = true,
   captureInput = false,
+  gamepadOnly = false,
 }: UseInputActionsOptions): void {
   // Refs let us update callbacks without re-subscribing to events.
   const onNavigateRef    = useRef(onNavigate);
@@ -350,7 +357,7 @@ export function useInputActions({
 
   // ── Normal (bubble-phase) keyboard handler — active when captureInput is false ──
   useEffect(() => {
-    if (!enabled || captureInput) return;
+    if (!enabled || captureInput || gamepadOnly) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
@@ -398,11 +405,11 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Capture-phase keyboard handler — active when captureInput is true ────────
   useEffect(() => {
-    if (!enabled || !captureInput) return;
+    if (!enabled || !captureInput || gamepadOnly) return;
 
     const handleKeyDownCapture = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
@@ -445,7 +452,7 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDownCapture, true);
     return () => window.removeEventListener('keydown', handleKeyDownCapture, true);
-  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Gamepad ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -488,5 +495,5 @@ export function useInputActions({
       _unregisterListener(handleGamepadAction);
       if (_captureListener === handleGamepadAction) _captureListener = null;
     };
-  }, [enabled, captureInput, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 }

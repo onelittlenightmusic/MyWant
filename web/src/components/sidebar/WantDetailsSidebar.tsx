@@ -34,6 +34,7 @@ import {
   InfoRow,
   TabConfig
 } from './DetailsSidebar';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface WantDetailsSidebarProps {
   want: Want | null;
@@ -473,6 +474,21 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
   // Get previous tab ID for simultaneous animation
   const prevTabId = tabs[prevTabIndex]?.id;
   const showPrevTab = prevTabId && prevTabId !== activeTab && prevTabIndex >= 0;
+
+  // Gamepad L/R bumpers switch sidebar tabs (keyboard Tab is handled by the raw
+  // keydown listener below; gamepadOnly prevents double-firing on keyboard).
+  useInputActions({
+    gamepadOnly: true,
+    ignoreWhenInputFocused: false,
+    onTabForward: () => {
+      const nextIndex = (currentTabIndex + 1) % tabs.length;
+      handleTabChange(tabs[nextIndex].id);
+    },
+    onTabBackward: () => {
+      const nextIndex = (currentTabIndex - 1 + tabs.length) % tabs.length;
+      handleTabChange(tabs[nextIndex].id);
+    },
+  });
 
   return (
     <>
