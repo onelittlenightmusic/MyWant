@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { BaseModal } from './BaseModal';
 import { useConfigStore } from '@/stores/configStore';
-import { Monitor, Sun, Moon, Layout as LayoutIcon, ArrowUp, ArrowDown, Power, RotateCcw, ShieldAlert } from 'lucide-react';
+import { useDebugStore } from '@/stores/debugStore';
+import { POLLING_PRESETS } from '@/constants/polling';
+import { Monitor, Sun, Moon, Layout as LayoutIcon, ArrowUp, ArrowDown, Power, RotateCcw, ShieldAlert, Bug } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { apiClient } from '@/api/client';
 
@@ -12,6 +14,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { config, updateConfig } = useConfigStore();
+  const { pollingIntervalMs, setPollingIntervalMs } = useDebugStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -114,6 +117,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 italic">
             "Bottom" position is recommended for one-handed operation on mobile devices.
           </p>
+        </section>
+
+        {/* Debug Options */}
+        <section className="pt-4 border-t border-gray-100 dark:border-gray-800">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+            <Bug className="w-4 h-4 mr-2" />
+            Debug Options
+          </h4>
+          <div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Polling interval (dashboard &amp; want detail ETag checks)</p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${POLLING_PRESETS.length}, 1fr)` }}>
+              {POLLING_PRESETS.map((preset) => (
+                <button
+                  key={preset.value}
+                  onClick={() => setPollingIntervalMs(preset.value)}
+                  className={classNames(
+                    "flex items-center justify-center p-3 rounded-xl border-2 transition-all text-xs font-medium",
+                    pollingIntervalMs === preset.value
+                      ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+                      : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         {/* System Control */}

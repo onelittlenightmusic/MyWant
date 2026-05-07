@@ -8,7 +8,7 @@ import { useRecipeStore } from '@/stores/recipeStore';
 import { useUIStore } from '@/stores/uiStore';
 import { usePolling } from '@/hooks/usePolling';
 import { smartPollWants, seedWantETags } from '@/stores/wantHashCache';
-import { POLLING_INTERVAL_MS } from '@/constants/polling';
+import { useDebugStore } from '@/stores/debugStore';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useInputActions } from '@/hooks/useInputActions';
@@ -47,6 +47,8 @@ export const Dashboard: React.FC = () => {
     suspendWant, resumeWant, stopWant, startWant, clearError, 
     draggingTemplate, setDraggingTemplate, touchPos, setTouchPos
   } = useWantStore();
+
+  const pollingIntervalMs = useDebugStore(state => state.pollingIntervalMs);
 
   const sidebar = useRightSidebarExclusivity<Want>();
   const [expandedChain, setExpandedChain] = useState<Want[]>([]);
@@ -236,7 +238,7 @@ export const Dashboard: React.FC = () => {
   // autoRefresh adds visual spinner; polling itself is unconditional
   usePolling(
     () => { if (wants.length > 0) smartPollWants(); fetchLabels(); },
-    { interval: POLLING_INTERVAL_MS, enabled: true, immediate: false }
+    { interval: pollingIntervalMs, enabled: true, immediate: false }
   );
 
   useEffect(() => {

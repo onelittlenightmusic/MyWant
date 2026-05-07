@@ -8,7 +8,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
-import { POLLING_INTERVAL_MS } from '@/constants/polling';
+import { useDebugStore } from '@/stores/debugStore';
 import { useConfigStore } from '@/stores/configStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml, validateYamlWithSpec, WantTypeDefinition } from '@/utils/yaml';
@@ -113,6 +113,8 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
     updateWant,
     loading
   } = useWantStore();
+
+  const pollingIntervalMs = useDebugStore(state => state.pollingIntervalMs);
 
   // Identify if this want is a Target (can have children)
   const wantType = want?.metadata?.type?.toLowerCase() || '';
@@ -316,11 +318,11 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
         // Only re-fetch results when the want actually changed (not a 304).
         // Results = GetAllState(), so they can't change without the want changing.
         if (updated) fetchWantResults(wantId);
-      }, POLLING_INTERVAL_MS);
+      }, pollingIntervalMs);
 
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, wantId, fetchWantDetails, fetchWantResults]);
+  }, [autoRefresh, wantId, fetchWantDetails, fetchWantResults, pollingIntervalMs]);
 
   // Register header action handlers with the sidebar
   useEffect(() => {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StickyNote, ChevronDown, ChevronRight, Copy, Check, Eraser, Settings, Plus, Trash2, Save, BarChart3, Radar } from 'lucide-react';
 import { apiClient } from '@/api/client';
-import { POLLING_INTERVAL_MS } from '@/constants/polling';
+import { useDebugStore } from '@/stores/debugStore';
 import { DetailsSidebar } from './DetailsSidebar';
 import { ConfirmationBubble } from '@/components/notifications/ConfirmationBubble';
 import { SummarySidebarContent, SummarySidebarContentProps } from '@/components/sidebar/SummarySidebarContent';
@@ -384,6 +384,8 @@ interface GlobalStateSidebarProps {
 }
 
 export const GlobalStateSidebar: React.FC<GlobalStateSidebarProps> = ({ summaryProps, radarMode, onRadarModeToggle }) => {
+  const pollingIntervalMs = useDebugStore(state => state.pollingIntervalMs);
+
   const [activeTab, setActiveTab] = useState('results');
   const [globalState, setGlobalState] = useState<Record<string, unknown>>({});
   const [globalParams, setGlobalParams] = useState<Record<string, unknown>>({});
@@ -419,9 +421,9 @@ export const GlobalStateSidebar: React.FC<GlobalStateSidebarProps> = ({ summaryP
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, POLLING_INTERVAL_MS);
+    const interval = setInterval(fetchData, pollingIntervalMs);
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, pollingIntervalMs]);
 
   const handleUpdateParameters = async (parameters: Record<string, unknown>) => {
     await apiClient.updateGlobalParameters(parameters);

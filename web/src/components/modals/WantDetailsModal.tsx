@@ -6,7 +6,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
 import { YamlEditor } from '@/components/forms/YamlEditor';
 import { useWantStore } from '@/stores/wantStore';
-import { POLLING_INTERVAL_MS } from '@/constants/polling';
+import { useDebugStore } from '@/stores/debugStore';
 import { formatDate, formatDuration, classNames, truncateText } from '@/utils/helpers';
 import { stringifyYaml, validateYaml } from '@/utils/yaml';
 import { BaseModal } from './BaseModal';
@@ -33,6 +33,8 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
     updateWant,
     loading
   } = useWantStore();
+
+  const pollingIntervalMs = useDebugStore(state => state.pollingIntervalMs);
 
   const [activeTab, setActiveTab] = useState<TabType>('results');
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -76,10 +78,10 @@ export const WantDetailsModal: React.FC<WantDetailsModalProps> = ({
           fetchWants();
         }
       }
-    }, POLLING_INTERVAL_MS);
+    }, pollingIntervalMs);
 
     return () => clearInterval(interval);
-  }, [isOpen, want, autoRefresh, selectedWantDetails?.status]);
+  }, [isOpen, want, autoRefresh, selectedWantDetails?.status, pollingIntervalMs]);
 
   const handleRefresh = () => {
     if (want) {
