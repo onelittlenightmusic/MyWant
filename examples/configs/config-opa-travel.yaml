@@ -22,7 +22,7 @@ wants:
           dinner_cost: 0
         use_llm: false
         # Path to OPA policy directory (relative to server working directory)
-        policy_dir: "yaml/policies"
+        policy_dir: "engine/bundled/policies"
         direction_map: >-
           {
             "reserve_hotel": {

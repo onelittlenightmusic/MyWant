@@ -27,7 +27,7 @@ func (g *GoalWant) Initialize() {
 		// Restore non-persistent config fields that Initialize normally sets.
 		g.SetCurrent("interactive", true)
 		g.SetCurrent("opa_llm_planner_command", g.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
-		g.SetCurrent("policy_dir", g.GetStringParam("policy_dir", "yaml/policies/goal"))
+		g.SetCurrent("policy_dir", g.GetStringParam("policy_dir", "engine/bundled/policies/goal"))
 		g.SetCurrent("use_llm", g.GetBoolParam("use_llm", true))
 		g.SetCurrent("llm_provider", g.GetStringParam("llm_provider", "anthropic"))
 		g.SetCurrent("auto_approve", g.GetBoolParam("auto_approve", false))
@@ -53,7 +53,7 @@ func (g *GoalWant) Initialize() {
 
 	// OPA LLM Planner config params
 	g.SetCurrent("opa_llm_planner_command", g.GetStringParam("opa_llm_planner_command", "opa-llm-planner"))
-	g.SetCurrent("policy_dir", g.GetStringParam("policy_dir", "yaml/policies/goal"))
+	g.SetCurrent("policy_dir", g.GetStringParam("policy_dir", "engine/bundled/policies/goal"))
 	g.SetCurrent("use_llm", g.GetBoolParam("use_llm", true))
 	g.SetCurrent("llm_provider", g.GetStringParam("llm_provider", "anthropic"))
 }

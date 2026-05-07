@@ -21,7 +21,7 @@ wants:
           hotel_cost: 0
           dinner_cost: 0
         use_llm: false
-        policy_dir: "yaml/policies"
+        policy_dir: "engine/bundled/policies"
         direction_map: >-
           {
             "reserve_hotel": {

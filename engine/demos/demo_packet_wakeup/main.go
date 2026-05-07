@@ -13,7 +13,7 @@ func main() {
 	fmt.Println("==============================")
 	fmt.Println("This demo tests automatic wake-up of completed wants when receiving packets.")
 	fmt.Println()
-	configFile := "yaml/config/config-packet-test.yaml"
+	configFile := "../examples/configs/config-packet-test.yaml"
 	if len(os.Args) > 1 {
 		configFile = os.Args[1]
 	}

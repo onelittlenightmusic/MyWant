@@ -199,4 +199,4 @@ wantType:
     - name: ensure_file_agent
       type: do
       runtime: ansible
-      scriptFile: yaml/scripts/ensure_file.yaml
+      scriptFile: tools/scripts/ensure_file.yaml

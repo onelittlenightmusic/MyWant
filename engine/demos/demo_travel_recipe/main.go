@@ -17,7 +17,7 @@ func main() {
 	fmt.Println("- Flight monitoring enables automatic rebooking on delay detection")
 	fmt.Println("- Demo runs for extended duration to observe complete cycle")
 	fmt.Println()
-	yamlFile := "yaml/config/config-travel-recipe.yaml"
+	yamlFile := "../examples/configs/config-travel-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

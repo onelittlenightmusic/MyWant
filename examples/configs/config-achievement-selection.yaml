@@ -20,7 +20,7 @@ wants:
           hotel_reserved: false
           hotel_cost: 0
         use_llm: false
-        policy_dir: "yaml/policies/achievement"
+        policy_dir: "engine/bundled/policies/achievement"
         direction_map: >-
           {
             "reserve_hotel_luxury": {

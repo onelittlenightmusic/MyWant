@@ -14,7 +14,7 @@ func main() {
 	fmt.Println("- Recipe defines: generator, queue, sink wants")
 	fmt.Println("- Uses unified generic recipe structure")
 	fmt.Println()
-	yamlFile := "yaml/config/config-queue-system-recipe.yaml"
+	yamlFile := "../examples/configs/config-queue-system-recipe.yaml"
 	if len(os.Args) > 1 {
 		yamlFile = os.Args[1]
 	}

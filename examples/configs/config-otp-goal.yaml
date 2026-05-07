@@ -8,7 +8,7 @@ wants:
       params:
         goal_text: "OpenTripPlannerをセットアップしてルート検索サーバを起動する"
         auto_approve: true
-        policy_dir: "yaml/policies/goal"
+        policy_dir: "engine/bundled/policies/goal"
         use_llm: false
 
         # 静的 breakdown: LLM を使わず固定の子Want ツリーを定義

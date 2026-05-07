@@ -75,17 +75,15 @@ func UserCustomTypesDir() string {
 const bundledRoot = "engine/bundled"
 
 const (
-	// YamlBaseDir is the legacy root; prefer bundledRoot for new code.
-	YamlBaseDir = "yaml"
-
 	RecipesDir      = bundledRoot + "/recipes"
 	AgentsDir       = bundledRoot + "/agents"
-	ConfigDir       = "yaml/config" // user config — never embedded
+	ConfigDir       = "examples/configs"
 	CapabilitiesDir = bundledRoot + "/capabilities"
 	WantTypesDir    = bundledRoot + "/want_types"
 	DataTypesDir    = bundledRoot + "/data"
 	SpecDir         = bundledRoot + "/spec"
 	AchievementsDir = bundledRoot + "/achievements"
+	PoliciesDir     = bundledRoot + "/policies"
 	SystemWantsFile = bundledRoot + "/system_wants.yaml"
 
 	// MemoryDir contains memory persistence files (not moved)

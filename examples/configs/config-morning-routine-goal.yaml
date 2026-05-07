@@ -37,7 +37,7 @@ wants:
 
         # 初期分解はstatic。チャットでの replan では use_llm: true が効く
         use_llm: false
-        policy_dir: "yaml/policies/goal"
+        policy_dir: "engine/bundled/policies/goal"
 
         initial_breakdown:
           # ── フェーズ1: 毎朝の情報収集 ───────────────────────────────────────
@@ -89,4 +89,4 @@ wants:
                 5〜20分でできる習慣を組み合わせてリマインダーとして設定する。
               auto_approve: false
               use_llm: true
-              policy_dir: "yaml/policies/goal"
+              policy_dir: "engine/bundled/policies/goal"
