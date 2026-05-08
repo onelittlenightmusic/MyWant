@@ -21,6 +21,11 @@ export interface UseInputActionsOptions {
    */
   onContextMenu?: () => void;
   /**
+   * Called on Shift+Arrow (keyboard) or A-button held + D-pad (gamepad).
+   * Intended for moving/reordering the focused item within a list or canvas grid.
+   */
+  onMove?: (direction: NavigationDirection) => void;
+  /**
    * Called on the `y` key or Gamepad Y button (index 3 / Triangle).
    * Intended for entering header button selection mode.
    */
@@ -61,6 +66,7 @@ export interface UseInputActionsOptions {
 
 type GamepadActionType =
   | NavigationDirection
+  | 'move-up' | 'move-down' | 'move-left' | 'move-right'
   | 'confirm'
   | 'cancel'
   | 'toggle'
@@ -114,25 +120,36 @@ const _trackStates = new Map<string, TrackState>();
 // consumer provides its own onTabForward / onTabBackward handler.
 let _tabActionConsumed = false;
 
+// True while the A/Cross (confirm) button is physically held.
+// When held, direction inputs are upgraded to "move-*" actions so consumers
+// can bind A+D-pad to a separate "move/reorder" operation.
+let _confirmHeld = false;
+
 function _emit(action: GamepadActionType): void {
+  // Upgrade direction → move-<dir> while A button is held
+  const effectiveAction: GamepadActionType =
+    _confirmHeld && NAV_ACTIONS.has(action as NavigationDirection)
+      ? (`move-${action}` as GamepadActionType)
+      : action;
+
   if (_captureListener) {
-    _captureListener(action);
+    _captureListener(effectiveAction);
     return;
   }
 
   // For tab-like actions, fire all listeners first (so custom callbacks can
   // set _tabActionConsumed), then — if no listener consumed it — do the
   // default DOM-focus simulation exactly once.
-  if (action === 'tab-forward' || action === 'tab-backward') {
+  if (effectiveAction === 'tab-forward' || effectiveAction === 'tab-backward') {
     _tabActionConsumed = false;
-    _listeners.forEach(fn => fn(action));
+    _listeners.forEach(fn => fn(effectiveAction));
     if (!_tabActionConsumed) {
-      _focusNext(action === 'tab-backward');
+      _focusNext(effectiveAction === 'tab-backward');
     }
     return;
   }
 
-  _listeners.forEach(fn => fn(action));
+  _listeners.forEach(fn => fn(effectiveAction));
 }
 
 function _getOrCreate(key: string): TrackState {
@@ -173,6 +190,9 @@ function _pollGamepads(): void {
     for (let gi = 0; gi < gamepads.length; gi++) {
       const gp = gamepads[gi];
       if (!gp) continue;
+
+      // Track A button held state for move-chord detection
+      if (gp.buttons[0]) _confirmHeld = gp.buttons[0].pressed;
 
       // Mapped buttons
       for (const [btnIdxStr, action] of Object.entries(BUTTON_MAP)) {
@@ -332,6 +352,7 @@ export function useInputActions({
   onToggle,
   onMenuToggle,
   onContextMenu,
+  onMove,
   onYButton,
   onTabForward,
   onTabBackward,
@@ -343,6 +364,7 @@ export function useInputActions({
 }: UseInputActionsOptions): void {
   // Refs let us update callbacks without re-subscribing to events.
   const onNavigateRef    = useRef(onNavigate);
+  const onMoveRef        = useRef(onMove);
   const onConfirmRef     = useRef(onConfirm);
   const onCancelRef      = useRef(onCancel);
   const onToggleRef      = useRef(onToggle);
@@ -355,6 +377,7 @@ export function useInputActions({
 
   // Keep refs current on every render.
   onNavigateRef.current    = onNavigate;
+  onMoveRef.current        = onMove;
   onConfirmRef.current     = onConfirm;
   onCancelRef.current      = onCancel;
   onToggleRef.current      = onToggle;
@@ -376,11 +399,23 @@ export function useInputActions({
       if (ignoreWhenInSidebar && target.closest('[data-sidebar="true"]')) return;
 
       switch (e.key) {
-        // Navigation — always preventDefault to suppress page-scroll
-        case 'ArrowUp':    e.preventDefault(); onNavigateRef.current?.('up');    break;
-        case 'ArrowDown':  e.preventDefault(); onNavigateRef.current?.('down');  break;
-        case 'ArrowLeft':  e.preventDefault(); onNavigateRef.current?.('left');  break;
-        case 'ArrowRight': e.preventDefault(); onNavigateRef.current?.('right'); break;
+        // Navigation — Shift+Arrow → onMove; plain Arrow → onNavigate
+        case 'ArrowUp':
+          e.preventDefault();
+          e.shiftKey ? onMoveRef.current?.('up') : onNavigateRef.current?.('up');
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          e.shiftKey ? onMoveRef.current?.('down') : onNavigateRef.current?.('down');
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          e.shiftKey ? onMoveRef.current?.('left') : onNavigateRef.current?.('left');
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          e.shiftKey ? onMoveRef.current?.('right') : onNavigateRef.current?.('right');
+          break;
         case 'Home':       e.preventDefault(); onNavigateRef.current?.('home');  break;
         case 'End':        e.preventDefault(); onNavigateRef.current?.('end');   break;
         // Enter / Escape — only preventDefault when we handle them
@@ -434,10 +469,22 @@ export function useInputActions({
 
       let handled = false;
       switch (e.key) {
-        case 'ArrowUp':    handled = true; onNavigateRef.current?.('up');    break;
-        case 'ArrowDown':  handled = true; onNavigateRef.current?.('down');  break;
-        case 'ArrowLeft':  handled = true; onNavigateRef.current?.('left');  break;
-        case 'ArrowRight': handled = true; onNavigateRef.current?.('right'); break;
+        case 'ArrowUp':
+          handled = true;
+          e.shiftKey ? onMoveRef.current?.('up') : onNavigateRef.current?.('up');
+          break;
+        case 'ArrowDown':
+          handled = true;
+          e.shiftKey ? onMoveRef.current?.('down') : onNavigateRef.current?.('down');
+          break;
+        case 'ArrowLeft':
+          handled = true;
+          e.shiftKey ? onMoveRef.current?.('left') : onNavigateRef.current?.('left');
+          break;
+        case 'ArrowRight':
+          handled = true;
+          e.shiftKey ? onMoveRef.current?.('right') : onNavigateRef.current?.('right');
+          break;
         case 'Home':       handled = true; onNavigateRef.current?.('home');  break;
         case 'End':        handled = true; onNavigateRef.current?.('end');   break;
         case 'Enter':  if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
@@ -496,6 +543,10 @@ export function useInputActions({
         case 'end':
           onNavigateRef.current?.(action);
           break;
+        case 'move-up':    onMoveRef.current?.('up');    break;
+        case 'move-down':  onMoveRef.current?.('down');  break;
+        case 'move-left':  onMoveRef.current?.('left');  break;
+        case 'move-right': onMoveRef.current?.('right'); break;
         case 'confirm':      onConfirmRef.current?.();     break;
         case 'cancel':       onCancelRef.current?.();      break;
         case 'toggle':       onToggleRef.current?.();      break;

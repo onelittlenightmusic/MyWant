@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { RefreshCw, ChevronDown, Heart, StickyNote, Zap } from 'lucide-react';
 import { WantExecutionStatus, Want } from '@/types/want';
 import { useWantStore } from '@/stores/wantStore';
@@ -11,7 +11,7 @@ import { smartPollWants, seedWantETags } from '@/stores/wantHashCache';
 import { useDebugStore } from '@/stores/debugStore';
 import { useHierarchicalKeyboardNavigation } from '@/hooks/useHierarchicalKeyboardNavigation';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
-import { useInputActions } from '@/hooks/useInputActions';
+import { useInputActions, NavigationDirection } from '@/hooks/useInputActions';
 import { useRightSidebarExclusivity } from '@/hooks/useRightSidebarExclusivity';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { classNames, truncateText } from '@/utils/helpers';
@@ -42,9 +42,9 @@ import { WantCanvas, CANVAS_LABEL_X, CANVAS_LABEL_Y } from '@/components/dashboa
 
 
 export const Dashboard: React.FC = () => {
-  const { 
-    wants, loading, error, fetchWants, deleteWant, deleteWants, 
-    suspendWant, resumeWant, stopWant, startWant, clearError, 
+  const {
+    wants, loading, error, fetchWants, deleteWant, deleteWants,
+    suspendWant, resumeWant, stopWant, startWant, clearError, reorderWant,
     draggingTemplate, setDraggingTemplate, touchPos, setTouchPos
   } = useWantStore();
 
@@ -1126,6 +1126,41 @@ export const Dashboard: React.FC = () => {
       const { quickActionsWantId, setQuickActionsWantId } = useWantStore.getState();
       setQuickActionsWantId(quickActionsWantId === id ? null : id);
     },
+  });
+
+  // Move want: Shift+Arrow (KB) or A-held+D-pad (GP)
+  // Canvas mode → shift canvas-x/y by ±1; Grid mode → swap with adjacent in sorted list
+  const handleMoveWant = useCallback(async (dir: NavigationDirection) => {
+    if (!selectedWant) return;
+    const id = selectedWant.metadata?.id || selectedWant.id || '';
+    if (!id) return;
+
+    if (canvasMode) {
+      const rawX = parseInt(selectedWant.metadata?.labels?.[CANVAS_LABEL_X] ?? '0', 10);
+      const rawY = parseInt(selectedWant.metadata?.labels?.[CANVAS_LABEL_Y] ?? '0', 10);
+      const newX = dir === 'right' ? rawX + 1 : dir === 'left' ? rawX - 1 : rawX;
+      const newY = dir === 'down'  ? rawY + 1 : dir === 'up'   ? rawY - 1 : rawY;
+      await handleCanvasMoveWant(id, newX, newY);
+    } else {
+      const idx = filteredWants.findIndex(w => (w.metadata?.id || w.id) === id);
+      if (idx < 0) return;
+      if (dir === 'right' || dir === 'down') {
+        if (idx >= filteredWants.length - 1) return;
+        const after  = filteredWants[idx + 1];
+        const after2 = filteredWants[idx + 2];
+        await reorderWant(id, after.metadata?.id || after.id, after2?.metadata?.id || after2?.id);
+      } else {
+        if (idx <= 0) return;
+        const before2 = filteredWants[idx - 2];
+        const before  = filteredWants[idx - 1];
+        await reorderWant(id, before2?.metadata?.id || before2?.id, before.metadata?.id || before.id);
+      }
+    }
+  }, [selectedWant, canvasMode, filteredWants, handleCanvasMoveWant, reorderWant]);
+
+  useInputActions({
+    enabled: !sidebar.showForm && !!selectedWant,
+    onMove: handleMoveWant,
   });
 
   // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
