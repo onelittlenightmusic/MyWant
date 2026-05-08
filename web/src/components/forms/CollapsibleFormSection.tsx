@@ -72,15 +72,8 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   /**
    * Get header color classes based on color scheme
    */
-  const getHeaderColorClasses = (scheme: ColorScheme): string => {
-    switch (scheme) {
-      case 'blue':
-        return 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30';
-      case 'amber':
-        return 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30';
-      case 'green':
-        return 'bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30';
-    }
+  const getHeaderColorClasses = (_scheme: ColorScheme): string => {
+    return 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700';
   };
 
   /**
@@ -229,7 +222,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`
-          focusable-section-header
+          sidebar-section-btn focusable-section-header
           w-full text-left px-3 py-2 rounded-lg
           transition-all duration-200 focus:outline-none
           relative

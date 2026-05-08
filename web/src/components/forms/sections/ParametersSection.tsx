@@ -265,10 +265,10 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`
-          sidebar-focus-ring focusable-section-header
+          sidebar-section-btn sidebar-focus-ring focusable-section-header
           w-full text-left px-3 py-2 rounded-lg
           transition-all duration-200
-          relative bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30
+          relative bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700
         `}
         aria-expanded={!isCollapsed}
         aria-label="Parameters section - Press Right to focus inputs, Up/Down to navigate sections"
