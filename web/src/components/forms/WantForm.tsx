@@ -99,12 +99,12 @@ export const WantForm: React.FC<WantFormProps> = ({
   const navigateFormTab = useCallback((forward: boolean) => {
     const els: HTMLElement[] = [];
     if (!isEditing && changeButtonRef.current) els.push(changeButtonRef.current);
-    // Collect visible .focusable-section-header elements in DOM order
+    // Collect visible .focusable-section-header elements in DOM order.
+    // nameInputRef also carries this class, so it's included automatically — no explicit push needed.
     document.querySelectorAll<HTMLElement>('.focusable-section-header').forEach(el => {
       const rect = el.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) els.push(el);
     });
-    if (nameInputRef.current) els.push(nameInputRef.current);
     if (addButtonRef.current) els.push(addButtonRef.current);
     if (els.length === 0) return;
     const active = document.activeElement as HTMLElement | null;
