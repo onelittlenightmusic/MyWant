@@ -95,7 +95,7 @@ export const CanvasChildOverlay: React.FC<CanvasChildOverlayProps> = ({
     <>
       {/* Float card — stopPropagation で外側の click/touch ハンドラーへのバブリングを防ぐ */}
       <div
-        style={{ position: 'fixed', left: cardLeft, top: cardTop, width: FLOAT_CARD_WIDTH, zIndex: 50 }}
+        style={{ position: 'fixed', left: cardLeft, top: cardTop, width: FLOAT_CARD_WIDTH, height: FLOAT_CARD_HEIGHT, zIndex: 50 }}
         onClick={e => e.stopPropagation()}
         onTouchStart={e => e.stopPropagation()}
         onTouchEnd={e => e.stopPropagation()}
