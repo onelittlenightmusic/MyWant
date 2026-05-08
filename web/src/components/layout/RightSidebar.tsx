@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LucideIcon, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
@@ -36,6 +36,34 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   const isBottom = config?.header_position === 'bottom';
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const [isMobileSheet, setIsMobileSheet] = useState(() => window.innerWidth < 640);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap: prevent Tab from leaving the sidebar
+  useEffect(() => {
+    if (!isOpen) return;
+    const FOCUSABLE = 'button:not([disabled]):not([tabindex="-1"]),input:not([disabled]):not([tabindex="-1"]),textarea:not([disabled]):not([tabindex="-1"]),select:not([disabled]):not([tabindex="-1"]),[tabindex]:not([tabindex="-1"])';
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      // If a component-level handler already called preventDefault and moved focus, don't interfere
+      if (e.defaultPrevented) return;
+      const container = containerRef.current;
+      if (!container) return;
+      const focusable = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE))
+        .filter(el => el.offsetParent !== null && window.getComputedStyle(el).visibility !== 'hidden');
+      if (focusable.length === 0) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!container.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+      if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && active === first) { e.preventDefault(); last.focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, [isOpen]);
 
   useEffect(() => {
     const handler = () => setIsMobileSheet(window.innerWidth < 640);
@@ -105,6 +133,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
 
       {/* Sidebar */}
       <div
+        ref={containerRef}
         data-sidebar="true"
         className={classNames(
           'fixed bg-white dark:bg-gray-900 z-40 flex flex-col overflow-hidden',
@@ -160,6 +189,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
             {headerActions && <div className="flex items-stretch gap-0">{headerActions}</div>}
             <button
               onClick={onClose}
+              tabIndex={-1}
               className="flex flex-col items-center justify-center gap-0.5 px-3 h-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-all duration-150 flex-shrink-0 focus:outline-none"
               title="Close sidebar"
             >

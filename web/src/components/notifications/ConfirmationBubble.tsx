@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, Check, X } from 'lucide-react';
 import { classNames, truncateText } from '@/utils/helpers';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useConfirmationDialogKeyboard } from '@/hooks/useConfirmationDialogKeyboard';
+import { useInputActions } from '@/hooks/useInputActions';
 import { ConfirmationProps } from './types';
 
 export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
@@ -23,6 +24,16 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isAnimatingRobot, setIsAnimatingRobot] = useState(false);
   const [isAnimatingBubble, setIsAnimatingBubble] = useState(false);
+  const [focusedBtn, setFocusedBtn] = useState<'cancel' | 'confirm'>('cancel');
+  const focusedBtnRef = useRef<'cancel' | 'confirm'>('cancel');
+
+  // Reset focused button when dialog appears
+  useEffect(() => {
+    if (isVisible) {
+      setFocusedBtn('cancel');
+      focusedBtnRef.current = 'cancel';
+    }
+  }, [isVisible]);
 
   useEffect(() => {
     if (isVisible) {
@@ -111,6 +122,40 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
     enabled: true
   });
 
+  // Left/Right arrow key: move focus between Cancel and Confirm
+  useEffect(() => {
+    if (!isVisible || isLoading || loading) return;
+    const handle = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (['INPUT', 'TEXTAREA'].includes(target.tagName) || target.isContentEditable) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setFocusedBtn('cancel'); focusedBtnRef.current = 'cancel';
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setFocusedBtn('confirm'); focusedBtnRef.current = 'confirm';
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusedBtnRef.current === 'confirm') handleConfirm(); else handleCancel();
+      }
+    };
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, [isVisible, isLoading, loading]);
+
+  // Gamepad: D-pad left/right to move focus, A=confirm focused, B=cancel
+  useInputActions({
+    enabled: !!isVisible && !isLoading && !loading,
+    captureInput: true,
+    ignoreWhenInputFocused: false,
+    onNavigate: (dir) => {
+      if (dir === 'left') { setFocusedBtn('cancel'); focusedBtnRef.current = 'cancel'; }
+      else if (dir === 'right') { setFocusedBtn('confirm'); focusedBtnRef.current = 'confirm'; }
+    },
+    onConfirm: () => { if (focusedBtnRef.current === 'confirm') handleConfirm(); else handleCancel(); },
+    onCancel: handleCancel,
+  });
+
   const isHeaderOverlay = layout === 'header-overlay';
 
   if (isHeaderOverlay) {
@@ -125,7 +170,10 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             <button
               onClick={handleCancel}
               disabled={isLoading || loading}
-              className="flex flex-col items-center justify-center gap-1 w-full h-full bg-gray-700/90 hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150"
+              className={classNames(
+                "flex flex-col items-center justify-center gap-1 w-full h-full bg-gray-700/90 hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150",
+                focusedBtn === 'cancel' && 'ring-2 ring-inset ring-sky-400'
+              )}
             >
               <X className="w-5 h-5 text-white" />
               <span className="text-white text-[10px] font-bold leading-none uppercase tracking-tighter">Cancel</span>
@@ -135,7 +183,10 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
             <button
               onClick={handleConfirm}
               disabled={isLoading || loading}
-              className={`flex flex-col items-center justify-center gap-1 w-full h-full hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150 ${danger ? 'bg-rose-700/90' : 'bg-green-600/90'}`}
+              className={classNames(
+                `flex flex-col items-center justify-center gap-1 w-full h-full hover:brightness-110 active:opacity-80 disabled:opacity-50 transition-all duration-150 ${danger ? 'bg-rose-700/90' : 'bg-green-600/90'}`,
+                focusedBtn === 'confirm' && 'ring-2 ring-inset ring-sky-400'
+              )}
             >
               {isLoading || loading
                 ? <LoadingSpinner size="sm" color="white" className="h-5 w-5" />
@@ -185,7 +236,10 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                 <button
                   onClick={handleCancel}
                   disabled={isLoading || loading}
-                  className="flex items-center justify-center h-6 w-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+                  className={classNames(
+                    "flex items-center justify-center h-6 w-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors",
+                    focusedBtn === 'cancel' && 'ring-2 ring-sky-400'
+                  )}
                   title="Cancel (N)"
                 >
                   <X className="h-3 w-3" />
@@ -193,7 +247,10 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                 <button
                   onClick={handleConfirm}
                   disabled={isLoading || loading}
-                  className="flex items-center justify-center h-6 w-6 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50 transition-colors"
+                  className={classNames(
+                    "flex items-center justify-center h-6 w-6 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50 transition-colors",
+                    focusedBtn === 'confirm' && 'ring-2 ring-sky-400'
+                  )}
                   title="Confirm (Y)"
                 >
                   {isLoading || loading ? (
@@ -249,7 +306,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                     'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700',
                     'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-600',
                     'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-300',
-                    'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
+                    'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200',
+                    focusedBtn === 'cancel' && 'ring-[3px] ring-sky-400'
                   )}
                   title="Cancel (N or Esc)"
                 >
@@ -262,7 +320,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
                     'flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 aspect-square flex-shrink-0 rounded-xl shadow-md',
                     'bg-blue-600 text-white hover:bg-blue-700',
                     'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500',
-                    'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
+                    'disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200',
+                    focusedBtn === 'confirm' && 'ring-[3px] ring-sky-400'
                   )}
                   title="Confirm (Y)"
                 >
@@ -304,7 +363,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
               className={classNames(
                 'flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
                 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-red-500',
-                'disabled:opacity-50 disabled:cursor-not-allowed transition-all'
+                'disabled:opacity-50 disabled:cursor-not-allowed transition-all',
+                focusedBtn === 'cancel' && 'ring-[3px] ring-sky-400'
               )}
               title="Cancel (N)"
             >
@@ -316,7 +376,8 @@ export const ConfirmationBubble: React.FC<ConfirmationProps> = ({
               className={classNames(
                 'flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 aspect-square flex-shrink-0 rounded-lg shadow-lg',
                 'bg-blue-600 text-white hover:bg-blue-700',
-                'disabled:opacity-50 disabled:cursor-not-allowed transition-all'
+                'disabled:opacity-50 disabled:cursor-not-allowed transition-all',
+                focusedBtn === 'confirm' && 'ring-[3px] ring-sky-400'
               )}
               title="Confirm (Y)"
             >

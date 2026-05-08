@@ -100,7 +100,7 @@ const SliderContentSection: React.FC<WantCardPluginProps> = ({
         value={localValue}
         onChange={(e) => handleMouseChange(Number(e.target.value))}
         onClick={(e) => e.stopPropagation()}
-        className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isInnerFocused ? `accent-yellow-500 ${isDirty ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-gray-200 dark:bg-gray-700'}` : 'accent-blue-500 bg-gray-200 dark:bg-gray-700'}`}
+        className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isInnerFocused ? `accent-sky-500 ${isDirty ? 'bg-sky-50 dark:bg-sky-900/20' : 'bg-gray-200 dark:bg-gray-700'}` : 'accent-sky-500 bg-gray-200 dark:bg-gray-700'}`}
       />
       <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
         <span>{sliderMin}</span>

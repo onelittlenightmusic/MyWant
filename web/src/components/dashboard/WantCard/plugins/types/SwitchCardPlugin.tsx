@@ -54,7 +54,7 @@ const SwitchContentSection: React.FC<WantCardPluginProps> = ({
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
     >
-      <div className={isInnerFocused ? 'ring-2 ring-yellow-400 ring-offset-1 rounded-full' : undefined}>
+      <div className={isInnerFocused ? 'ring-2 ring-sky-400 ring-offset-1 rounded-full' : undefined}>
         <button
           onClick={(e) => { e.stopPropagation(); handleToggle(); }}
           onMouseDown={(e) => e.stopPropagation()}

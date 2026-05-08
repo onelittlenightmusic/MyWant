@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react';
+import React, { useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect, forwardRef, useImperativeHandle } from 'react';
 import { Want } from '@/types/want';
 import { WantTypeListItem } from '@/types/wantType';
 import { getStatusHexColor } from './WantCard/parts/StatusColor';
@@ -42,6 +42,19 @@ function buildSpiralCoords(maxRings: number): ReadonlyArray<{ x: number; y: numb
 }
 const SPIRAL_COORDS = buildSpiralCoords(50);
 
+export interface WantCanvasRef {
+  /** Enter keyboard-driven drag mode for the given wantId */
+  startKeyboardDrag(wantId: string): void;
+  /** Move the drag cursor one cell in the given direction */
+  moveKeyboardDragCursor(dir: 'up' | 'down' | 'left' | 'right'): void;
+  /** Confirm the current drag position — executes the move + triggers field match check */
+  confirmKeyboardDrop(): void;
+  /** Cancel keyboard drag and restore original position */
+  cancelKeyboardDrag(): void;
+  /** Returns true while a keyboard drag is active */
+  isKeyboardDragging(): boolean;
+}
+
 interface WantCanvasProps {
   wants: Want[];
   selectedWant: Want | null;
@@ -66,7 +79,7 @@ interface WantCanvasProps {
   correlationHighlights?: Map<string, number>;
 }
 
-export const WantCanvas: React.FC<WantCanvasProps> = ({
+export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
   wants,
   selectedWant,
   onViewWant,
@@ -83,7 +96,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   onTemplateDrop,
   toolbarContent,
   correlationHighlights,
-}) => {
+}, ref) => {
   const colorMode = useColorMode();
   const canvasRef = useRef<HTMLDivElement>(null);
   const spacerRef  = useRef<HTMLDivElement>(null);
@@ -94,6 +107,7 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [dragWantId, setDragWantId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
+  const kbDragActiveRef = useRef(false);
   const scale = scaleProp;
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -696,6 +710,68 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
     return false;
   }, [positionMap]);
 
+  // Scroll canvas so a grid cell is visible in the viewport
+  const scrollToCell = useCallback((cx: number, cy: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const s = scaleRef.current;
+    const ox = Math.max(0, (el.clientWidth  - canvasWRef.current * s) / 2);
+    const oy = Math.max(0, (el.clientHeight - canvasHRef.current * s) / 2);
+    const px = (cx + originX) * STEP * s + ox;
+    const py = (cy + originY) * STEP * s + oy;
+    const padding = CELL_SIZE * s;
+    if (px - padding < el.scrollLeft) el.scrollLeft = px - padding;
+    if (px + CELL_SIZE * s + padding > el.scrollLeft + el.clientWidth)
+      el.scrollLeft = px + CELL_SIZE * s + padding - el.clientWidth;
+    if (py - padding < el.scrollTop) el.scrollTop = py - padding;
+    if (py + CELL_SIZE * s + padding > el.scrollTop + el.clientHeight)
+      el.scrollTop = py + CELL_SIZE * s + padding - el.clientHeight;
+  }, [originX, originY]);
+
+  // Keyboard drag imperative handle
+  useImperativeHandle(ref, () => ({
+    startKeyboardDrag(wantId: string) {
+      const pos = positionMap.get(wantId);
+      kbDragActiveRef.current = true;
+      setDragWantId(wantId);
+      setDragOverCell(pos ? { x: pos.x, y: pos.y } : { x: 0, y: 0 });
+      resetDismissed();
+    },
+    moveKeyboardDragCursor(dir: 'up' | 'down' | 'left' | 'right') {
+      setDragOverCell(prev => {
+        if (!prev) return prev;
+        const next = {
+          x: prev.x + (dir === 'right' ? 1 : dir === 'left' ? -1 : 0),
+          y: prev.y + (dir === 'down'  ? 1 : dir === 'up'   ? -1 : 0),
+        };
+        scrollToCell(next.x, next.y);
+        return next;
+      });
+    },
+    confirmKeyboardDrop() {
+      setDragOverCell(cell => {
+        setDragWantId(id => {
+          if (id && cell && !isCellOccupied(cell.x, cell.y, id)) {
+            setLocalOverrides(prev => new Map(prev).set(id, { x: cell.x, y: cell.y }));
+            onMoveWant(id, cell.x, cell.y);
+            checkOnDrop(id, { x: cell.x, y: cell.y });
+          }
+          return null;
+        });
+        return null;
+      });
+      kbDragActiveRef.current = false;
+    },
+    cancelKeyboardDrag() {
+      setDragWantId(null);
+      setDragOverCell(null);
+      kbDragActiveRef.current = false;
+    },
+    isKeyboardDragging() {
+      return kbDragActiveRef.current;
+    },
+  }), [positionMap, isCellOccupied, onMoveWant, checkOnDrop, resetDismissed, scrollToCell]);
+
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     const isWantMove = e.dataTransfer.types.includes('application/mywant-canvas-id');
     const isTemplateDrop = e.dataTransfer.types.includes('application/mywant-template');
@@ -1020,4 +1096,4 @@ export const WantCanvas: React.FC<WantCanvasProps> = ({
       )}
     </div>
   );
-};
+});

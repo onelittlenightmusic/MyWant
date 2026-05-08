@@ -213,11 +213,24 @@ function WantInventoryPicker({
   renderedItemsRef.current = renderedItems;
   slotButtonRefs.current.length = renderedItems.length;
 
+  // Visual (row, col) for each flat index, accounting for group boundaries.
+  // Each group starts on its own set of rows in its own GRID_COLS-wide grid.
+  const gridPositions = useMemo(() => {
+    const positions: Array<{ row: number; col: number }> = [];
+    let currentRow = 0;
+    for (const group of groups) {
+      for (let k = 0; k < group.items.length; k++) {
+        positions.push({ row: currentRow + Math.floor(k / GRID_COLS), col: k % GRID_COLS });
+      }
+      currentRow += Math.ceil(group.items.length / GRID_COLS);
+    }
+    return positions;
+  }, [groups]);
+
   useImperativeHandle(ref, () => ({
     focusSearch: () => { searchRef.current?.focus(); },
     navigate: (dir) => {
-      const items = renderedItemsRef.current;
-      const total = items.length;
+      const total = renderedItemsRef.current.length;
       if (total === 0) return;
       const currentIdx = slotButtonRefs.current.findIndex(el => el === document.activeElement);
       let next: number;
@@ -227,12 +240,26 @@ function WantInventoryPicker({
         next = (currentIdx + 1) % total;
       } else if (dir === 'left') {
         next = currentIdx === 0 ? total - 1 : currentIdx - 1;
-      } else if (dir === 'down') {
-        const c = currentIdx + GRID_COLS;
-        next = c < total ? c : currentIdx;
       } else {
-        const c = currentIdx - GRID_COLS;
-        next = c >= 0 ? c : currentIdx;
+        // up / down: use visual (row, col) to navigate across group boundaries correctly
+        const { row, col } = gridPositions[currentIdx];
+        const targetRow = dir === 'down' ? row + 1 : row - 1;
+        const candidates = gridPositions
+          .map((p, i) => ({ ...p, i }))
+          .filter(p => p.row === targetRow);
+        if (candidates.length === 0) {
+          next = currentIdx; // already at top/bottom edge
+        } else {
+          const exact = candidates.find(p => p.col === col);
+          if (exact) {
+            next = exact.i;
+          } else {
+            // nearest column in target row
+            next = candidates.reduce((best, c) =>
+              Math.abs(c.col - col) < Math.abs(best.col - col) ? c : best
+            ).i;
+          }
+        }
       }
       slotButtonRefs.current[next]?.focus();
     },
@@ -243,7 +270,7 @@ function WantInventoryPicker({
         if (item) onSelectRef.current(item.id, item.type);
       }
     },
-  }), []);
+  }), [gridPositions]);
 
   const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>, item: SlotItem) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -289,9 +316,8 @@ function WantInventoryPicker({
           'relative w-full aspect-square rounded-sm overflow-hidden cursor-grab active:cursor-grabbing',
           'border border-black/50 dark:border-black/70',
           'shadow-[inset_2px_2px_0px_rgba(255,255,255,0.22),inset_-2px_-2px_0px_rgba(0,0,0,0.35)]',
-          'hover:outline hover:outline-2 hover:outline-yellow-400 hover:outline-offset-0 hover:z-10',
-          'focus:outline focus:outline-2 focus:outline-yellow-400 focus:outline-offset-0 focus:z-10',
-          'focus:outline-none',
+          'hover:outline hover:outline-[3px] hover:outline-sky-400 hover:outline-offset-0 hover:z-10',
+          'focus:outline focus:outline-[3px] focus:outline-sky-400 focus:outline-offset-0 focus:z-10',
         ].join(' ')}
       >
         {(() => {
@@ -339,7 +365,7 @@ function WantInventoryPicker({
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => { if (e.key === 'Escape') setSearchQuery(''); }}
             placeholder="Search..."
-            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent"
           />
         </div>
         <div className="flex rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden text-xs flex-shrink-0">
@@ -348,7 +374,7 @@ function WantInventoryPicker({
             onClick={() => setSortMode('name')}
             className={`px-2.5 py-1.5 transition-colors ${
               sortMode === 'name'
-                ? 'bg-blue-500 text-white'
+                ? 'bg-sky-500 text-white'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
@@ -359,7 +385,7 @@ function WantInventoryPicker({
             onClick={() => setSortMode('category')}
             className={`px-2.5 py-1.5 transition-colors border-l border-gray-300 dark:border-gray-600 ${
               sortMode === 'category'
-                ? 'bg-blue-500 text-white'
+                ? 'bg-sky-500 text-white'
                 : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >

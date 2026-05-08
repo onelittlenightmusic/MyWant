@@ -120,7 +120,7 @@ const ChoiceContentSection: React.FC<WantCardPluginProps> = ({
             'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-xs',
             'focus:outline-none',
             isInnerFocused && !isDropdownOpen
-              ? 'ring-2 ring-yellow-400 border-yellow-400'
+              ? 'ring-2 ring-sky-400 border-sky-400'
               : 'border-gray-300 dark:border-gray-600',
             styles.compactSelect,
           )}
@@ -144,7 +144,7 @@ const ChoiceContentSection: React.FC<WantCardPluginProps> = ({
                 className={classNames(
                   'w-full text-left px-2 py-1.5 text-xs',
                   idx === highlightedIndex
-                    ? 'bg-yellow-400 text-gray-900'
+                    ? 'bg-sky-100 dark:bg-sky-900/30 text-sky-900 dark:text-sky-100'
                     : 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700',
                 )}
               >

@@ -179,11 +179,12 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
       e.preventDefault();
       onToggleCollapse();
     }
-    // Tab - custom navigation (e.g. to Add button)
-    else if (e.key === 'Tab' && navigationCallbacks.onTab) {
+    // Tab (forward only) - go to Name input
+    else if (e.key === 'Tab' && !e.shiftKey && navigationCallbacks.onTab) {
       e.preventDefault();
       navigationCallbacks.onTab();
     }
+    // Shift+Tab - go back to Change button (handled by focus trap / caller)
   }, [isCollapsed, onToggleCollapse, navigationCallbacks]);
 
   /**
@@ -264,15 +265,10 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`
-          focusable-section-header
+          sidebar-focus-ring focusable-section-header
           w-full text-left px-3 py-2 rounded-lg
-          transition-all duration-200 focus:outline-none
+          transition-all duration-200
           relative bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30
-
-          before:absolute before:left-0 before:top-0
-          before:bottom-0 before:w-1 before:rounded-l-md
-          before:opacity-0 before:transition-opacity
-          focus:before:opacity-100 before:bg-blue-500
         `}
         aria-expanded={!isCollapsed}
         aria-label="Parameters section - Press Right to focus inputs, Up/Down to navigate sections"

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { X, ArrowRight, Zap, Check, Plus } from 'lucide-react';
 import { ProximityState, FieldMatchRec } from './hooks/useFieldMatchProximity';
 import { classNames } from '@/utils/helpers';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface FieldMatchBubbleProps {
   proximity: ProximityState;
@@ -28,17 +29,18 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
 }) => {
   const [applying, setApplying] = useState<string | null>(null);
   const [applied, setApplied] = useState<Set<string>>(new Set());
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const applyingRef = useRef(applying);
+  applyingRef.current = applying;
+  const appliedRef = useRef(applied);
+  appliedRef.current = applied;
 
-  const containerRect = getContainerRect();
-  if (!containerRect) return null;
-
-  const vx = proximity.midX * scale + offsetX - scrollLeft + containerRect.left;
-  const vy = proximity.midY * scale + offsetY - scrollTop + containerRect.top;
-
+  const recs = proximity.recs.slice(0, 5);
   const recKey = (rec: FieldMatchRec) => `${rec.source.field_name}→${rec.target.param_name}`;
 
-  const handleApply = async (rec: FieldMatchRec) => {
+  const handleApply = useCallback(async (rec: FieldMatchRec) => {
     const key = recKey(rec);
+    if (applyingRef.current === key || appliedRef.current.has(key)) return;
     setApplying(key);
     try {
       await onApply(rec);
@@ -46,10 +48,34 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
     } finally {
       setApplying(null);
     }
-  };
+  }, [onApply]);
 
-  const sourceName = proximity.recs[0]?.source.want_name ?? '';
-  const targetName = proximity.recs[0]?.target.want_name ?? '';
+  const handleApplyFocused = useCallback(() => {
+    const rec = recs[focusedIndex];
+    if (rec) handleApply(rec);
+  }, [recs, focusedIndex, handleApply]);
+
+  useInputActions({
+    enabled: true,
+    captureInput: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onNavigate: (dir) => {
+      if (dir === 'up')   setFocusedIndex(i => Math.max(0, i - 1));
+      if (dir === 'down') setFocusedIndex(i => Math.min(recs.length - 1, i + 1));
+    },
+    onConfirm: handleApplyFocused,
+    onCancel: onDismiss,
+  });
+
+  const containerRect = getContainerRect();
+  if (!containerRect) return null;
+
+  const vx = proximity.midX * scale + offsetX - scrollLeft + containerRect.left;
+  const vy = proximity.midY * scale + offsetY - scrollTop + containerRect.top;
+
+  const sourceName = recs[0]?.source.want_name ?? '';
+  const targetName = recs[0]?.target.want_name ?? '';
 
   return (
     <div
@@ -87,17 +113,22 @@ export const FieldMatchBubble: React.FC<FieldMatchBubbleProps> = ({
 
         {/* List */}
         <div className="p-1 space-y-0.5">
-          {proximity.recs.slice(0, 5).map(rec => {
+          {recs.map((rec, idx) => {
             const key = recKey(rec);
             const isApplied = applied.has(key);
             const isApplying = applying === key;
+            const isFocused = idx === focusedIndex;
 
             return (
               <div
                 key={key}
                 className={classNames(
                   "flex items-center gap-2 rounded px-2 py-1 transition-colors",
-                  isApplied ? 'bg-green-50 dark:bg-green-900/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                  isApplied
+                    ? 'bg-green-50 dark:bg-green-900/10'
+                    : isFocused
+                    ? 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-400/50'
+                    : 'hover:bg-gray-50 dark:hover:bg-white/5'
                 )}
               >
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">

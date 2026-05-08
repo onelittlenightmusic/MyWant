@@ -35,6 +35,14 @@
     box-shadow: none !important;
   }
 
+  /* Override for elements that explicitly need a focus ring (sidebar form actions) */
+  .sidebar-focus-ring:focus,
+  .sidebar-focus-ring:focus-visible {
+    outline: 3px solid #38bdf8 !important; /* sky-400 */
+    outline-offset: -3px !important;
+    box-shadow: none !important;
+  }
+
   :root {
     --progress-bg-light: rgba(255, 255, 255, 0.5);
     --progress-bg-dark: rgba(0, 0, 0, 0.2);

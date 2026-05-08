@@ -38,7 +38,7 @@ import { HeaderOverlay } from '@/components/layout/HeaderOverlay';
 import { Toast } from '@/components/notifications';
 import { DragOverlay } from '@/components/dashboard/DragOverlay';
 import { SaveAsRecipeModal } from '@/components/modals/SaveAsRecipeModal';
-import { WantCanvas, CANVAS_LABEL_X, CANVAS_LABEL_Y } from '@/components/dashboard/WantCanvas';
+import { WantCanvas, CANVAS_LABEL_X, CANVAS_LABEL_Y, WantCanvasRef } from '@/components/dashboard/WantCanvas';
 
 
 export const Dashboard: React.FC = () => {
@@ -104,6 +104,40 @@ export const Dashboard: React.FC = () => {
   const [canvasCenterY, setCanvasCenterY] = useState<number | undefined>(undefined);
   const pendingCanvasPosRef = useRef<{ x: number; y: number } | null>(null);
   const prevWantIdsRef = useRef<Set<string>>(new Set());
+  const wantCanvasRef = useRef<WantCanvasRef>(null);
+  const [isCanvasDragging, setIsCanvasDragging] = useState(false);
+  const isCanvasDraggingRef = useRef(false);
+
+  // Shift keydown/keyup — enter/exit keyboard-driven drag mode on the canvas
+  useEffect(() => {
+    if (!canvasMode) return;
+    const onShiftDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Shift' || e.repeat) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return;
+      if (isCanvasDraggingRef.current) return;
+      const want = selectedWantRef.current;
+      if (!want) return;
+      const id = want.metadata?.id || want.id;
+      if (!id) return;
+      isCanvasDraggingRef.current = true;
+      setIsCanvasDragging(true);
+      wantCanvasRef.current?.startKeyboardDrag(id);
+    };
+    const onShiftUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Shift') return;
+      if (!isCanvasDraggingRef.current) return;
+      isCanvasDraggingRef.current = false;
+      setIsCanvasDragging(false);
+      wantCanvasRef.current?.confirmKeyboardDrop();
+    };
+    window.addEventListener('keydown', onShiftDown);
+    window.addEventListener('keyup', onShiftUp);
+    return () => {
+      window.removeEventListener('keydown', onShiftDown);
+      window.removeEventListener('keyup', onShiftUp);
+    };
+  }, [canvasMode]);
 
   // Global touch end handler for template drop
   useEffect(() => {
@@ -167,6 +201,10 @@ export const Dashboard: React.FC = () => {
     const wantId = sidebar.selectedItem.metadata?.id || sidebar.selectedItem.id;
     return wants.find(w => (w.metadata?.id === wantId) || (w.id === wantId)) || sidebar.selectedItem;
   }, [sidebar.selectedItem, wants]);
+
+  // Kept current each render so Shift keydown handler can read without stale closure
+  const selectedWantRef = useRef<Want | null>(null);
+  selectedWantRef.current = selectedWant ?? null;
 
   const [seriesWants, setSeriesWants] = useState<Want[]>([]);
   useEffect(() => {
@@ -1109,13 +1147,19 @@ export const Dashboard: React.FC = () => {
   useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm });
 
   const handleEscapeKey = () => {
+    if (isCanvasDraggingRef.current) {
+      isCanvasDraggingRef.current = false;
+      setIsCanvasDragging(false);
+      wantCanvasRef.current?.cancelKeyboardDrag();
+      return;
+    }
     if (showBatchConfirmation) setShowBatchConfirmation(false);
     else if (expandedChain.length > 0) setExpandedChain([]);
     else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
     else if (sidebar.showForm) sidebar.closeForm();
     else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
-  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || expandedChain.length > 0 });
+  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || expandedChain.length > 0 || isCanvasDragging });
 
   // Context menu (Shift+Space / Gamepad Start) — toggle QuickActions overlay for selected want
   useInputActions({
@@ -1129,13 +1173,20 @@ export const Dashboard: React.FC = () => {
   });
 
   // Move want: Shift+Arrow (KB) or A-held+D-pad (GP)
-  // Canvas mode → shift canvas-x/y by ±1; Grid mode → swap with adjacent in sorted list
+  // Canvas drag mode → move drag cursor; Canvas direct → shift x/y by ±1; Grid → reorder in list
   const handleMoveWant = useCallback(async (dir: NavigationDirection) => {
     if (!selectedWant) return;
     const id = selectedWant.metadata?.id || selectedWant.id || '';
     if (!id) return;
 
     if (canvasMode) {
+      if (isCanvasDraggingRef.current) {
+        if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') {
+          wantCanvasRef.current?.moveKeyboardDragCursor(dir);
+        }
+        return;
+      }
+      // No active drag — just move the want directly (non-drag path)
       const rawX = parseInt(selectedWant.metadata?.labels?.[CANVAS_LABEL_X] ?? '0', 10);
       const rawY = parseInt(selectedWant.metadata?.labels?.[CANVAS_LABEL_Y] ?? '0', 10);
       const newX = dir === 'right' ? rawX + 1 : dir === 'left' ? rawX - 1 : rawX;
@@ -1161,6 +1212,47 @@ export const Dashboard: React.FC = () => {
   useInputActions({
     enabled: !sidebar.showForm && !!selectedWant,
     onMove: handleMoveWant,
+  });
+
+  // Canvas drag: A long-press (gamepad) → enter drag mode
+  useInputActions({
+    enabled: canvasMode && !sidebar.showForm && !!selectedWant && !isCanvasDragging,
+    onConfirmLong: () => {
+      const want = selectedWantRef.current;
+      if (!want) return;
+      const id = want.metadata?.id || want.id;
+      if (!id) return;
+      isCanvasDraggingRef.current = true;
+      setIsCanvasDragging(true);
+      wantCanvasRef.current?.startKeyboardDrag(id);
+    },
+  });
+
+  // Canvas drag: capture all nav/confirm/cancel while drag is active (both KB and GP).
+  // onNavigate handles plain Arrow / D-pad (A not held).
+  // onMove handles Shift+Arrow (KB, Shift still held during drag) and A-held+D-pad (GP,
+  // A still physically held after the long-press fired confirm-long).
+  const moveDragCursor = useCallback((dir: NavigationDirection) => {
+    if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') {
+      wantCanvasRef.current?.moveKeyboardDragCursor(dir);
+    }
+  }, []);
+
+  useInputActions({
+    enabled: canvasMode && isCanvasDragging,
+    captureInput: true,
+    onNavigate: moveDragCursor,
+    onMove: moveDragCursor,
+    onConfirm: () => {
+      isCanvasDraggingRef.current = false;
+      setIsCanvasDragging(false);
+      wantCanvasRef.current?.confirmKeyboardDrop();
+    },
+    onCancel: () => {
+      isCanvasDraggingRef.current = false;
+      setIsCanvasDragging(false);
+      wantCanvasRef.current?.cancelKeyboardDrag();
+    },
   });
 
   // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
@@ -1383,6 +1475,7 @@ export const Dashboard: React.FC = () => {
             <div className="flex-1 overflow-hidden flex flex-col" style={{ minHeight: 0 }}>
               {error && <div className="mx-3 sm:mx-6 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300 flex items-center justify-between shrink-0"><span>{error}</span><button onClick={clearError} className="ml-2 text-red-400 hover:text-red-600">✕</button></div>}
               <WantCanvas
+                ref={wantCanvasRef}
                 wants={topLevelWants}
                 selectedWant={selectedWant}
                 onViewWant={handleViewWant}

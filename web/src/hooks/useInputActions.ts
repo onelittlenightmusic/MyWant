@@ -26,6 +26,11 @@ export interface UseInputActionsOptions {
    */
   onMove?: (direction: NavigationDirection) => void;
   /**
+   * Called after A/Cross is held for 500 ms (gamepad long-press).
+   * Intended for entering a keyboard-driven drag mode on the canvas.
+   */
+  onConfirmLong?: () => void;
+  /**
    * Called on the `y` key or Gamepad Y button (index 3 / Triangle).
    * Intended for entering header button selection mode.
    */
@@ -74,18 +79,23 @@ type GamepadActionType =
   | 'context-menu'
   | 'tab-forward'
   | 'tab-backward'
-  | 'y-button';
+  | 'y-button'
+  | 'confirm-long';
 
 type GamepadActionListener = (action: GamepadActionType) => void;
 
 // Repeat timing constants (ms) – mimics OS key-repeat behaviour
 const INITIAL_REPEAT_DELAY = 400;
 const REPEAT_INTERVAL = 120;
+const CONFIRM_LONG_MS = 500; // ms to hold A/Cross for confirm-long
 const AXIS_DEADZONE = 0.5;
 
-// Standard Gamepad API button indices
+// Standard Gamepad API button indices.
+// Button 0 (A/Cross) is intentionally excluded — it is handled with deferred-confirm
+// logic below so that short-press fires 'confirm' on RELEASE and long-press (≥500ms)
+// fires 'confirm-long' without ever emitting 'confirm'.  This prevents the immediate
+// confirm from side-effecting (e.g. deselecting a want) before D-pad move chords work.
 const BUTTON_MAP: Readonly<Record<number, GamepadActionType>> = {
-  0: 'confirm',       // A / Cross
   1: 'cancel',        // B / Circle
   2: 'toggle',        // X / Square
   3: 'y-button',      // Y / Triangle
@@ -124,6 +134,8 @@ let _tabActionConsumed = false;
 // When held, direction inputs are upgraded to "move-*" actions so consumers
 // can bind A+D-pad to a separate "move/reorder" operation.
 let _confirmHeld = false;
+// Timer for A long-press detection (→ confirm-long action).
+let _confirmLongTimer: ReturnType<typeof setTimeout> | null = null;
 
 function _emit(action: GamepadActionType): void {
   // Upgrade direction → move-<dir> while A button is held
@@ -191,8 +203,29 @@ function _pollGamepads(): void {
       const gp = gamepads[gi];
       if (!gp) continue;
 
-      // Track A button held state for move-chord detection
-      if (gp.buttons[0]) _confirmHeld = gp.buttons[0].pressed;
+      // Deferred-confirm for A/Cross (button 0):
+      //   Short press  (< 500ms): emits 'confirm' on RELEASE
+      //   Long press   (≥ 500ms): emits 'confirm-long' at 500ms, never emits 'confirm'
+      //   While held:  D-pad inputs are upgraded to 'move-*' (chord navigation)
+      if (gp.buttons[0]) {
+        const aPrev = _confirmHeld;
+        _confirmHeld = gp.buttons[0].pressed;
+        if (_confirmHeld && !aPrev) {
+          // A just pressed — start long-press timer; confirm is deferred to release
+          _confirmLongTimer = setTimeout(() => {
+            _confirmLongTimer = null;
+            _emit('confirm-long');
+          }, CONFIRM_LONG_MS);
+        } else if (!_confirmHeld && aPrev) {
+          if (_confirmLongTimer !== null) {
+            // Released before long-press threshold — fire deferred confirm
+            clearTimeout(_confirmLongTimer);
+            _confirmLongTimer = null;
+            _emit('confirm');
+          }
+          // If timer is null, long-press already fired — do not also fire confirm
+        }
+      }
 
       // Mapped buttons
       for (const [btnIdxStr, action] of Object.entries(BUTTON_MAP)) {
@@ -353,6 +386,7 @@ export function useInputActions({
   onMenuToggle,
   onContextMenu,
   onMove,
+  onConfirmLong,
   onYButton,
   onTabForward,
   onTabBackward,
@@ -366,6 +400,7 @@ export function useInputActions({
   const onNavigateRef    = useRef(onNavigate);
   const onMoveRef        = useRef(onMove);
   const onConfirmRef     = useRef(onConfirm);
+  const onConfirmLongRef = useRef(onConfirmLong);
   const onCancelRef      = useRef(onCancel);
   const onToggleRef      = useRef(onToggle);
   const onMenuToggleRef  = useRef(onMenuToggle);
@@ -379,6 +414,7 @@ export function useInputActions({
   onNavigateRef.current    = onNavigate;
   onMoveRef.current        = onMove;
   onConfirmRef.current     = onConfirm;
+  onConfirmLongRef.current = onConfirmLong;
   onCancelRef.current      = onCancel;
   onToggleRef.current      = onToggle;
   onMenuToggleRef.current  = onMenuToggle;
@@ -547,8 +583,9 @@ export function useInputActions({
         case 'move-down':  onMoveRef.current?.('down');  break;
         case 'move-left':  onMoveRef.current?.('left');  break;
         case 'move-right': onMoveRef.current?.('right'); break;
-        case 'confirm':      onConfirmRef.current?.();     break;
-        case 'cancel':       onCancelRef.current?.();      break;
+        case 'confirm':       onConfirmRef.current?.();      break;
+        case 'confirm-long':  onConfirmLongRef.current?.(); break;
+        case 'cancel':        onCancelRef.current?.();      break;
         case 'toggle':       onToggleRef.current?.();      break;
         case 'menu-toggle':  onMenuToggleRef.current?.();  break;
         case 'context-menu': onContextMenuRef.current?.(); break;

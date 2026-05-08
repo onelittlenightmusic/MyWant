@@ -61,6 +61,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   const inventoryPickerRef = useRef<WantInventoryPickerRef>(null);
 
   // Refs for form fields navigation
+  const changeButtonRef = useRef<HTMLButtonElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const paramsSectionRef = useRef<HTMLButtonElement>(null);
   const labelsSectionRef = useRef<HTMLButtonElement>(null);
@@ -92,22 +93,20 @@ export const WantForm: React.FC<WantFormProps> = ({
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
   const isRecommendationMode = mode === 'recommendation';
 
-  // Handle Tab key from editing fields (Name or Sections) to focus Add button
+  // Handle Tab from params section: go to name input
   const handleFieldTab = () => {
-    lastFocusedFieldRef.current = document.activeElement as HTMLElement;
-    addButtonRef.current?.focus();
+    nameInputRef.current?.focus();
   };
 
-  // Handle Tab key from Add button to return to last focused field
+  // Tab cycle: Add → Change (or Params if editing) | Shift+Tab: Add → Name
   const handleAddButtonKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
       e.preventDefault();
-      if (lastFocusedFieldRef.current) {
-        lastFocusedFieldRef.current.focus();
+      if (e.shiftKey) {
+        nameInputRef.current?.focus();
       } else {
-        // Fallback to name input or first section
-        if (nameInputRef.current) {
-          nameInputRef.current.focus();
+        if (!isEditing && changeButtonRef.current) {
+          changeButtonRef.current.focus();
         } else {
           paramsSectionRef.current?.focus();
         }
@@ -556,6 +555,7 @@ export const WantForm: React.FC<WantFormProps> = ({
       {!isEditing && !!selectedTypeId && (
         <button
           type="button"
+          tabIndex={-1}
           onClick={() => setShowFilter(v => !v)}
           className={classNames(
             "flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none",
@@ -582,14 +582,14 @@ export const WantForm: React.FC<WantFormProps> = ({
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
         className={classNames(
-          "flex flex-col items-center justify-center gap-0.5 px-4 h-full transition-all duration-150 flex-shrink-0 focus:outline-none",
+          "sidebar-focus-ring flex flex-col items-center justify-center gap-0.5 px-4 h-full transition-all duration-150 flex-shrink-0",
           isSubmitting || (!isEditing && !isTypeSelected)
             ? "bg-gray-400/30 cursor-not-allowed grayscale opacity-50"
             : isEditing
               ? "bg-indigo-600/90 text-white hover:brightness-110 active:opacity-80"
               : isRecommendationMode
                 ? "bg-purple-600/90 text-white hover:brightness-110 active:opacity-80"
-                : "bg-green-600/90 text-white hover:brightness-110 active:opacity-80"
+                : "bg-blue-950 text-white hover:brightness-110 active:opacity-80"
         )}
       >
         {isSubmitting ? (
@@ -720,6 +720,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                     </div>
                     {!isEditing && (
                       <button
+                        ref={changeButtonRef}
                         type="button"
                         onClick={() => {
                           setSelectedTypeId(null);
@@ -727,7 +728,14 @@ export const WantForm: React.FC<WantFormProps> = ({
                           setType('');
                           setName('');
                         }}
-                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Tab') {
+                            e.preventDefault();
+                            if (e.shiftKey) { addButtonRef.current?.focus(); }
+                            else { paramsSectionRef.current?.focus(); }
+                          }
+                        }}
+                        className="sidebar-focus-ring px-3 py-1.5 text-xs font-medium rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
                       >
                         Change
                       </button>
@@ -783,9 +791,9 @@ export const WantForm: React.FC<WantFormProps> = ({
                 >
                   <span className="flex items-center gap-1.5">
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                    Advanced (scheduling · labels · dependencies)
+                    Advanced
                   </span>
-                  {(Object.keys(labels).length > 0 || using.length > 0 || when.length > 0) && (
+                  {(Object.keys(labels).length > 0 || using.length > 0 || when.length > 0 || !!ownerWant) && (
                     <span className="text-blue-500 dark:text-blue-400 font-bold text-base leading-none">·</span>
                   )}
                 </button>
@@ -833,16 +841,57 @@ export const WantForm: React.FC<WantFormProps> = ({
                         onTab: handleFieldTab,
                       }}
                     />
-                  </>
-                )}
 
-                {/* Owner Section */}
-                {ownerWant && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20">
-                    <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
-                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
-                    <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>
-                  </div>
+                    {/* Owner */}
+                    {ownerWant && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20">
+                        <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
+                        <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>
+                      </div>
+                    )}
+
+                    {/* Load Example */}
+                    {editMode === 'form' && (() => {
+                      const recipeExamples = selectedItemType === 'recipe'
+                        ? (recipes.find(r => r.recipe?.metadata?.custom_type === type)?.recipe?.examples ?? [])
+                        : [];
+                      const wantTypeExamples = selectedItemType === 'want-type'
+                        ? (selectedWantType?.examples ?? [])
+                        : [];
+                      const allExamples = [...wantTypeExamples.map((ex, i) => ({ key: `wt-${i}`, name: ex.name, description: ex.description, onLoad: () => { setParams(ex.want?.spec?.params || {}); setExposes(ex.want?.spec?.exposes || []); } })), ...recipeExamples.map((ex, i) => ({ key: `re-${i}`, name: ex.name, description: ex.description, onLoad: () => setParams(prev => ({ ...prev, ...ex.params })) }))];
+                      if (allExamples.length === 0) return null;
+                      return (
+                        <div ref={exampleMenuRef} className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowExampleMenu(v => !v)}
+                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border transition-colors ${showExampleMenu ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                          >
+                            <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span>Load Example</span>
+                          </button>
+                          {showExampleMenu && (
+                            <div className="mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                              {allExamples.map(ex => (
+                                <button
+                                  key={ex.key}
+                                  type="button"
+                                  onClick={() => { ex.onLoad(); setShowExampleMenu(false); }}
+                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{ex.name}</p>
+                                  {ex.description && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{ex.description}</p>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
 
                 {/* Want Name with Auto-generation (at bottom) */}
@@ -859,12 +908,13 @@ export const WantForm: React.FC<WantFormProps> = ({
                       onKeyDown={(e) => {
                         if (e.key === 'Tab') {
                           e.preventDefault();
-                          handleFieldTab();
+                          if (e.shiftKey) { paramsSectionRef.current?.focus(); }
+                          else { addButtonRef.current?.focus(); }
                         } else {
                           handleArrowKeyNavigation(e);
                         }
                       }}
-                      className="focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-100"
+                      className="sidebar-focus-ring focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-100"
                       placeholder="Auto-generated or enter custom name"
                       required
                     />
@@ -908,73 +958,6 @@ export const WantForm: React.FC<WantFormProps> = ({
           <ErrorDisplay error={error} />
         )}
 
-        {/* Example loader button - bottom right, shown when want type or recipe with examples is selected */}
-        {(() => {
-          const recipeExamples = selectedItemType === 'recipe'
-            ? (recipes.find(r => r.recipe?.metadata?.custom_type === type)?.recipe?.examples ?? [])
-            : [];
-          const wantTypeExamples = selectedItemType === 'want-type'
-            ? (selectedWantType?.examples ?? [])
-            : [];
-          const hasAnyExamples = recipeExamples.length > 0 || wantTypeExamples.length > 0;
-
-          if (!selectedTypeId || editMode !== 'form' || !hasAnyExamples) return null;
-
-          return (
-            <div className="sticky bottom-2 flex justify-end pointer-events-none">
-              <div ref={exampleMenuRef} className="relative pointer-events-auto">
-                {showExampleMenu && (
-                  <div className="absolute bottom-full right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-[220px] max-h-64 overflow-y-auto">
-                    <p className="px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800">
-                      Load Example
-                    </p>
-                    {wantTypeExamples.map((example, i) => (
-                      <button
-                        key={`wt-${i}`}
-                        type="button"
-                        onClick={() => {
-                          setParams(example.want?.spec?.params || {});
-                          setExposes(example.want?.spec?.exposes || []);
-                          setShowExampleMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
-                        {example.description && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
-                        )}
-                      </button>
-                    ))}
-                    {recipeExamples.map((example, i) => (
-                      <button
-                        key={`re-${i}`}
-                        type="button"
-                        onClick={() => {
-                          setParams(prev => ({ ...prev, ...example.params }));
-                          setShowExampleMenu(false);
-                        }}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{example.name}</p>
-                        {example.description && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{example.description}</p>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowExampleMenu(v => !v)}
-                  className="p-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                  title="Load example"
-                >
-                  <FolderOpen className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </form>
     </RightSidebar>
   );

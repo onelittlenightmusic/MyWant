@@ -18,6 +18,7 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
     <div className="flex items-center justify-end space-x-0.5 bg-gray-100 dark:bg-gray-800 rounded-2xl p-0.5">
       <button
         type="button"
+        tabIndex={-1}
         onClick={() => onModeChange('form')}
         className={`flex items-center gap-1 px-1.5 py-0.5 rounded-xl text-[11px] font-medium transition-colors ${
           mode === 'form'
@@ -31,6 +32,7 @@ export const FormYamlToggle: React.FC<FormYamlToggleProps> = ({
       </button>
       <button
         type="button"
+        tabIndex={-1}
         onClick={() => onModeChange('yaml')}
         className={`flex items-center gap-1 px-1.5 py-0.5 rounded-xl text-[11px] font-medium transition-colors ${
           mode === 'yaml'

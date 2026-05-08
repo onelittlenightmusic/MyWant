@@ -128,10 +128,18 @@ export const Header: React.FC<HeaderProps> = ({
   }, [showProviderSelect, showBubbleOnMobile]);
 
   const menuJustClosedRef = useRef(false);
+  const menuCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Close hamburger menu when mouse leaves the menu area
-  const handleMenuMouseLeave = () => setMenuOpen(false);
+  // Close hamburger menu when mouse leaves — with a short delay so the cursor
+  // can travel from the button to the dropdown without the menu disappearing.
+  const handleMenuMouseLeave = () => {
+    menuCloseTimerRef.current = setTimeout(() => setMenuOpen(false), 120);
+  };
   const handleMenuMouseEnter = () => {
+    if (menuCloseTimerRef.current) {
+      clearTimeout(menuCloseTimerRef.current);
+      menuCloseTimerRef.current = null;
+    }
     if (!menuJustClosedRef.current) setMenuOpen(true);
   };
 
@@ -279,11 +287,14 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Dropdown menu */}
             {menuOpen && (
-              <div className={classNames(
-                "absolute left-0 w-48 z-50",
-                isBottom ? "bottom-full pb-2" : "top-full pt-2"
-              )}
-              role="menu"
+              <div
+                className={classNames(
+                  "absolute left-0 w-48 z-50",
+                  isBottom ? "bottom-full pb-2" : "top-full pt-2"
+                )}
+                role="menu"
+                onMouseEnter={handleMenuMouseEnter}
+                onMouseLeave={handleMenuMouseLeave}
               >
                 {/* Transparent bridge to prevent mouseleave when moving to menu */}
                 <div className="absolute inset-x-0 h-2 bg-transparent" style={isBottom ? { bottom: 0 } : { top: 0 }} />
@@ -310,7 +321,7 @@ export const Header: React.FC<HeaderProps> = ({
                             isActive
                               ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
                               : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
-                            isFocused && !isActive && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            isFocused && !isActive && 'ring-2 ring-inset ring-sky-400 dark:ring-sky-400 bg-sky-50 dark:bg-sky-900/20'
                           )}
                         >
                           <Icon className="h-4 w-4 mr-3" />
@@ -342,7 +353,7 @@ export const Header: React.FC<HeaderProps> = ({
                             isActive
                               ? 'bg-primary-100 text-primary-900 dark:bg-primary-900/30 dark:text-primary-300'
                               : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
-                            isFocused && !isActive && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            isFocused && !isActive && 'ring-2 ring-inset ring-sky-400 dark:ring-sky-400 bg-sky-50 dark:bg-sky-900/20'
                           )}
                         >
                           <Icon className="h-4 w-4 mr-3" />
@@ -365,7 +376,7 @@ export const Header: React.FC<HeaderProps> = ({
                           className={classNames(
                             'w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors',
                             'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200',
-                            isFocused && 'ring-2 ring-inset ring-primary-400 dark:ring-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            isFocused && 'ring-2 ring-inset ring-sky-400 dark:ring-sky-400 bg-sky-50 dark:bg-sky-900/20'
                           )}
                         >
                           <settingsEntry.icon className="h-4 w-4 mr-3" />
@@ -476,7 +487,7 @@ export const Header: React.FC<HeaderProps> = ({
                   showGlobalState
                     ? 'bg-green-600/90 text-white hover:brightness-110'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
-                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'memo' && 'ring-2 ring-inset ring-yellow-400'
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'memo' && 'ring-2 ring-inset ring-sky-400'
                 )}
               >
                 <StickyNote className="h-4 w-4" />
@@ -496,7 +507,7 @@ export const Header: React.FC<HeaderProps> = ({
                   showSelectMode
                     ? 'bg-blue-600/90 text-white hover:brightness-110'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
-                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'select' && 'ring-2 ring-inset ring-yellow-400'
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'select' && 'ring-2 ring-inset ring-sky-400'
                 )}
               >
                 <ListChecks className="h-4 w-4" />
@@ -515,7 +526,7 @@ export const Header: React.FC<HeaderProps> = ({
                   data-header-btn-id="list"
                   className={classNames(
                     'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
-                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'list' && 'ring-2 ring-inset ring-yellow-400'
+                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'list' && 'ring-2 ring-inset ring-sky-400'
                   )}
                 >
                   {/* Switch track */}
@@ -555,7 +566,7 @@ export const Header: React.FC<HeaderProps> = ({
                   isAddWantActive
                     ? "bg-primary-600 text-white hover:brightness-110 active:opacity-80"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
-                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want' && 'ring-2 ring-inset ring-yellow-400'
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want' && 'ring-2 ring-inset ring-sky-400'
                 )}
               >
                 <span className="relative inline-flex flex-shrink-0">
@@ -574,7 +585,7 @@ export const Header: React.FC<HeaderProps> = ({
                     isWhimActive
                       ? "bg-indigo-600 text-white hover:brightness-110 active:opacity-80"
                       : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
-                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim' && 'ring-2 ring-inset ring-yellow-400'
+                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim' && 'ring-2 ring-inset ring-sky-400'
                   )}
                 >
                   <span className="relative inline-flex flex-shrink-0">
