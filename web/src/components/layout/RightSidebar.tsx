@@ -71,15 +71,22 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // When sidebar closes, release focus so ignoreWhenInSidebar guards don't block
-  // keyboard/gamepad navigation on the cards behind it.  useLayoutEffect runs
-  // synchronously after commit (before the next RAF), so focus is released
-  // before the gamepad poll has a chance to check _isInSidebar().
+  // Synchronously mirror isOpen into a DOM attribute so that input guards
+  // (_isInSidebar, WantInventoryPicker focus) can read the *intended* open
+  // state rather than relying on CSS animation progress.
+  // useLayoutEffect runs before the next RAF, so the attribute is correct
+  // before any gamepad poll fires.
   useLayoutEffect(() => {
-    if (isOpen) return;
     const container = containerRef.current;
-    if (container?.contains(document.activeElement)) {
-      (document.activeElement as HTMLElement)?.blur();
+    if (!container) return;
+    if (isOpen) {
+      container.setAttribute('data-sidebar-open', 'true');
+    } else {
+      container.removeAttribute('data-sidebar-open');
+      // Also release focus so ignoreWhenInSidebar guards don't block card nav.
+      if (container.contains(document.activeElement)) {
+        (document.activeElement as HTMLElement)?.blur();
+      }
     }
   }, [isOpen]);
 
@@ -153,6 +160,15 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
           hiddenClass,
           className || ''
         )}
+        onKeyDown={isOpen ? (e) => {
+          // When the sidebar is open (state-based, not CSS-based), contain arrow
+          // keys so they never bubble out to Dashboard's card navigation handler.
+          // Inner form handlers (handleArrowKeyNavigation etc.) still fire first
+          // because they are deeper in the DOM (bubble order: inner → outer).
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.stopPropagation();
+          }
+        } : undefined}
         style={sidebarStyle}
       >
         {/* Background image */}

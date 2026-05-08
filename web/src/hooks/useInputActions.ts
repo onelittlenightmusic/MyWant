@@ -325,7 +325,10 @@ function _isInputFocused(): boolean {
 
 function _isInSidebar(target?: HTMLElement | null): boolean {
   const el = target ?? (document.activeElement as HTMLElement | null);
-  return !!el?.closest('[data-sidebar="true"]');
+  // data-sidebar-open is set/cleared by RightSidebar via useLayoutEffect
+  // based on the isOpen prop — not CSS animation state.  This makes the guard
+  // reliable regardless of transition timing.
+  return !!el?.closest('[data-sidebar="true"][data-sidebar-open="true"]');
 }
 
 // ─── Tab focus simulation ─────────────────────────────────────────────────────
@@ -450,7 +453,7 @@ export function useInputActions({
       if (!enabledRef.current) return;
       const target = e.target as HTMLElement;
       if (ignoreWhenInputFocused && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-      if (ignoreWhenInSidebar && target.closest('[data-sidebar="true"]')) return;
+      if (ignoreWhenInSidebar && _isInSidebar(target)) return;
 
       switch (e.key) {
         // Navigation — Shift+Arrow → onMove; plain Arrow → onNavigate
@@ -523,24 +526,31 @@ export function useInputActions({
 
       let handled = false;
       switch (e.key) {
-        case 'ArrowUp':
-          handled = true;
-          e.shiftKey ? onMoveRef.current?.('up') : onNavigateRef.current?.('up');
+        // Direction keys: only claim the event when a handler is actually registered.
+        // If no callback exists (e.g. WantForm form-fields phase has onNavigate=undefined),
+        // let the event continue bubbling so inner components can handle it.
+        case 'ArrowUp': {
+          const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
+          if (fn) { handled = true; fn('up'); }
           break;
-        case 'ArrowDown':
-          handled = true;
-          e.shiftKey ? onMoveRef.current?.('down') : onNavigateRef.current?.('down');
+        }
+        case 'ArrowDown': {
+          const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
+          if (fn) { handled = true; fn('down'); }
           break;
-        case 'ArrowLeft':
-          handled = true;
-          e.shiftKey ? onMoveRef.current?.('left') : onNavigateRef.current?.('left');
+        }
+        case 'ArrowLeft': {
+          const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
+          if (fn) { handled = true; fn('left'); }
           break;
-        case 'ArrowRight':
-          handled = true;
-          e.shiftKey ? onMoveRef.current?.('right') : onNavigateRef.current?.('right');
+        }
+        case 'ArrowRight': {
+          const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
+          if (fn) { handled = true; fn('right'); }
           break;
-        case 'Home':       handled = true; onNavigateRef.current?.('home');  break;
-        case 'End':        handled = true; onNavigateRef.current?.('end');   break;
+        }
+        case 'Home': if (onNavigateRef.current) { handled = true; onNavigateRef.current('home'); } break;
+        case 'End':  if (onNavigateRef.current) { handled = true; onNavigateRef.current('end');  } break;
         case 'Enter':  if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
         case 'Escape': if (onCancelRef.current)   { handled = true; onCancelRef.current();   } break;
         case ' ':

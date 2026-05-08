@@ -108,7 +108,26 @@ export const useHierarchicalKeyboardNavigation = <T extends HierarchicalItem>({
           break;
       }
 
-      if (!nextItem) return;
+      if (!nextItem) {
+        // At a boundary (e.g. leftmost card, rightmost card). If we arrived here
+        // from a lastSelectedItemId reference rather than an active currentItem,
+        // re-focus that reference card so the user re-enters focus from wherever
+        // they last were.
+        if (!currentItem && refItem) {
+          onNavigate(refItem);
+          const refId = refItem.id;
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              const el = document.querySelector(`[data-keyboard-nav-id="${refId}"]`);
+              if (el instanceof HTMLElement) {
+                el.focus();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 0);
+          });
+        }
+        return;
+      }
       onNavigate(nextItem);
 
       const targetId = nextItem.id;

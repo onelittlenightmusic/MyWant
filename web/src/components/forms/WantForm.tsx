@@ -546,7 +546,7 @@ export const WantForm: React.FC<WantFormProps> = ({
 
   useInputActions({
     enabled: isOpen && editMode === 'form',
-    captureGamepad: true,
+    captureInput: true,
     ignoreWhenInputFocused: false,
     ignoreWhenInSidebar: false,
     onNavigate: isTypeSelectionPhase ? (dir) => {
