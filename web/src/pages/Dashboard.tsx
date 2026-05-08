@@ -29,7 +29,7 @@ import { RightSidebar } from '@/components/layout/RightSidebar';
 import { WantGrid } from '@/components/dashboard/WantGrid';
 import { WantCard } from '@/components/dashboard/WantCard/WantCard';
 import { WantMinimap } from '@/components/dashboard/WantMinimap';
-import { WantForm } from '@/components/forms/WantForm';
+import { WantForm, WantFormHandle } from '@/components/forms/WantForm';
 import { WantDetailsSidebar } from '@/components/sidebar/WantDetailsSidebar';
 import { GlobalStateSidebar } from '@/components/sidebar/GlobalStateSidebar';
 import { SummarySidebarContent } from '@/components/sidebar/SummarySidebarContent';
@@ -340,8 +340,10 @@ export const Dashboard: React.FC = () => {
 
         // Apply form situation
         const savedFormSituation = cur['form_situation'] as string | undefined;
-        if (savedFormSituation === 'type-selection' || savedFormSituation === 'fields' || savedFormSituation === 'closed') {
-          setFormSituation(savedFormSituation);
+        if (savedFormSituation === 'type-selection' || savedFormSituation === 'fields' || savedFormSituation === 'closed' || savedFormSituation === 'select-mode' || savedFormSituation === 'batch-action') {
+          setFormSituation(savedFormSituation as 'type-selection' | 'fields' | 'closed' | 'select-mode' | 'batch-action');
+          if (savedFormSituation === 'select-mode' || savedFormSituation === 'batch-action') setIsSelectMode(true);
+          else setIsSelectMode(false);
         }
 
         // Apply sidebar state
@@ -442,9 +444,19 @@ export const Dashboard: React.FC = () => {
   }, [statusFilters, searchQuery, sidebar.selectedItem, sidebarInitialTab, canvasScale, canvasCenterX, canvasCenterY]);
 
 
-  const handleToggleSelectMode = () => { if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); } else { setIsSelectMode(true); } };
+  const handleToggleSelectMode = () => {
+    if (isSelectMode) {
+      setSelectedWantIds(new Set());
+      setIsSelectMode(false);
+      setFormSituation('closed');
+    } else {
+      setIsSelectMode(true);
+      setFormSituation('select-mode');
+    }
+  };
   const handleSelectWant = (id: string) => {
-    setLastSelectedWantId(id);
+    // Do NOT call setLastSelectedWantId here — the triangle cursor is driven by
+    // navigation (handleViewWant), not by checkbox toggling.
     setSelectedWantIds(prev => {
       const s = new Set(prev);
       if (s.has(id)) { s.delete(id); }
@@ -507,7 +519,12 @@ export const Dashboard: React.FC = () => {
   const [initialFormItemType, setInitialFormItemType] = useState<'want-type' | 'recipe'>('want-type');
   // Authoritative UI situation — written at Dashboard level immediately when the
   // form opens/closes so input routing is never delayed by WantForm's render cycle.
-  const [formSituation, setFormSituation] = useState<'closed' | 'type-selection' | 'fields'>('closed');
+  const [formSituation, setFormSituation] = useState<'closed' | 'type-selection' | 'fields' | 'select-mode' | 'batch-action'>('closed');
+  // Which BatchActionBar button is highlighted (0=Start, 1=Stop, 2=Delete) when formSituation === 'batch-action'
+  const [batchFocusIdx, setBatchFocusIdx] = useState(0);
+  // Ref to WantForm's imperative handle — used by Dashboard's capture handler
+  // to navigate the inventory picker without going through WantForm's props.
+  const wantFormRef = useRef<WantFormHandle>(null);
 
   const handleCreateWant = (parentWant?: Want) => {
     const isSameType = sidebar.showForm && !initialFormTypeId && initialFormItemType === 'want-type' && ownerWant === (parentWant || null);
@@ -1154,18 +1171,41 @@ export const Dashboard: React.FC = () => {
 
   // ============================================================
   // Input priority model:
-  //   captureInput (Header menu, card overlays, canvas drag)
-  //     > captureGamepad (WantForm sidebar — gamepad only)
+  //   captureInput — Dashboard type-selection, header menu, card overlays, canvas drag
   //     > default broadcast
   //         keyboard: blocked by ignoreWhenInSidebar when sidebar has focus
   //         gamepad:  all listeners fire; guards apply
   //
-  // Want-card navigation is the default handler and is always registered.
-  // Higher-priority contexts (form, overlays) capture via captureInput /
-  // captureGamepad so no enabled: !sidebar.showForm flags are needed here.
+  // When formSituation === 'type-selection' Dashboard owns ALL directional input
+  // (keyboard capture + gamepad exclusive) so the routing decision is made here,
+  // based on its own state, not WantForm's render cycle.
   // ============================================================
 
+  // Type-selection: capture arrow keys from any focus state (including INPUT)
+  // and route directly to the inventory picker via WantForm's imperative handle.
+  useInputActions({
+    enabled: formSituation === 'type-selection',
+    captureInput: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onNavigate: (dir) => { if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') wantFormRef.current?.navigateInventory(dir); },
+    onConfirm:  ()    => { wantFormRef.current?.confirmInventory(); },
+    onCancel:   ()    => { handleCloseModals(); },
+  });
+
   useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId });
+
+  // Select-mode: Enter/A button toggles checkbox on the focused want.
+  // Arrow navigation is already handled by useHierarchicalKeyboardNavigation above.
+  // Escape/B button is handled by useEscapeKey below.
+  useInputActions({
+    enabled: formSituation === 'select-mode',
+    onConfirm: () => {
+      if (!selectedWant) return;
+      const id = selectedWant.metadata?.id || selectedWant.id;
+      if (id) handleSelectWant(id);
+    },
+  });
 
   const handleEscapeKey = () => {
     if (isCanvasDraggingRef.current) {
@@ -1175,21 +1215,49 @@ export const Dashboard: React.FC = () => {
       return;
     }
     if (showBatchConfirmation) setShowBatchConfirmation(false);
+    else if (formSituation === 'batch-action') { setFormSituation('select-mode'); }
     else if (expandedChain.length > 0) setExpandedChain([]);
+    // Select mode: Escape always exits immediately (before clearing selectedWant)
+    else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); setFormSituation('closed'); }
     else if (selectedWant) { setLastSelectedWantId(selectedWant.metadata?.id || selectedWant.id || null); sidebar.clearSelection(); }
     else if (sidebar.showForm) sidebar.closeForm();
-    else if (isSelectMode) { setSelectedWantIds(new Set()); setIsSelectMode(false); }
   };
-  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || expandedChain.length > 0 || isCanvasDragging });
+  useEscapeKey({ onEscape: handleEscapeKey, enabled: !!selectedWant || sidebar.showForm || isSelectMode || formSituation === 'batch-action' || expandedChain.length > 0 || isCanvasDragging });
 
-  // Context menu (Shift+Space / Gamepad Start) — toggle QuickActions overlay for selected want
+  // Context menu (Shift+Space / Gamepad Start)
+  // In select-mode with selections → enter batch-action overlay; otherwise → QuickActions
   useInputActions({
     onContextMenu: () => {
+      if (isSelectMode && selectedWantIds.size > 0) {
+        setBatchFocusIdx(0);
+        setFormSituation('batch-action');
+        return;
+      }
       const id = selectedWant?.metadata?.id || selectedWant?.id;
       if (!id) return;
       const { quickActionsWantId, setQuickActionsWantId } = useWantStore.getState();
       setQuickActionsWantId(quickActionsWantId === id ? null : id);
     },
+  });
+
+  // Batch-action mode: Left/Right navigate Start/Stop/Delete; Enter confirms; Escape/Select returns
+  const BATCH_ACTIONS = ['start', 'stop', 'delete'] as const;
+  useInputActions({
+    enabled: formSituation === 'batch-action',
+    captureInput: true,
+    onNavigate: (dir) => {
+      if (dir === 'left')  setBatchFocusIdx(i => (i + 2) % 3);
+      if (dir === 'right') setBatchFocusIdx(i => (i + 1) % 3);
+    },
+    onConfirm: () => {
+      const action = BATCH_ACTIONS[batchFocusIdx];
+      if (!action || selectedWantIds.size === 0) return;
+      setBatchAction(action);
+      setShowBatchConfirmation(true);
+      setFormSituation('select-mode');
+    },
+    onCancel: () => { setFormSituation('select-mode'); },
+    onMenuToggle: () => { setFormSituation('select-mode'); },
   });
 
   // Move want: Shift+Arrow (KB) or A-held+D-pad (GP)
@@ -1475,6 +1543,7 @@ export const Dashboard: React.FC = () => {
             onBatchDelete={() => { setBatchAction('delete'); setShowBatchConfirmation(true); }}
             onExit={handleToggleSelectMode}
             loading={isBatchProcessing}
+            focusedIdx={formSituation === 'batch-action' ? batchFocusIdx : undefined}
           />
         )}
       </HeaderOverlay>
@@ -1660,7 +1729,7 @@ export const Dashboard: React.FC = () => {
         onDraftClick={handleMinimapDraftClick}
         isOpen={minimapOpen}
       />
-      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={(selectedWant && isDraftWant(selectedWant) ? ((selectedWant.state?.current?.proposed_recommendations as Recommendation[]) || (selectedWant.state?.current?.recommendations as Recommendation[]) || []) : [])} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} formSituation={formSituation} onSituationChange={setFormSituation} />
+      <WantForm ref={wantFormRef} isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={(selectedWant && isDraftWant(selectedWant) ? ((selectedWant.state?.current?.proposed_recommendations as Recommendation[]) || (selectedWant.state?.current?.recommendations as Recommendation[]) || []) : [])} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} formSituation={formSituation} onSituationChange={setFormSituation} />
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />

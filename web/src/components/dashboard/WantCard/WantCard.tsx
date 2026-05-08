@@ -290,9 +290,12 @@ export const WantCard: React.FC<WantCardProps> = ({
   const replayScreenshotUrl = want.state?.current?.replay_screenshot_url as string | undefined;
   const version = want.metadata?.version ?? 1;
 
+  // Navigation cursor: always tied to selectedWant (keyboard focus), independent of checkbox selection.
+  const isNavFocused = (selectedWant?.metadata?.id || selectedWant?.id) === (want.metadata?.id || want.id);
+
   return (
     <div className="relative h-full" style={{ isolation: 'isolate' }}>
-      <FocusTriangle visible={selected} />
+      <FocusTriangle visible={isNavFocused} />
       <StackLayers stackCount={stackCount} />
       <div
         ref={cardRef}

@@ -311,11 +311,10 @@ function WantInventoryPicker({
           useWantStore.getState().setDraggingTemplate(null);
         }}
         className={[
-          'relative w-full aspect-square rounded-sm overflow-hidden cursor-grab active:cursor-grabbing',
+          'relative w-full aspect-square rounded-sm cursor-grab active:cursor-grabbing',
           'border border-black/50 dark:border-black/70',
-          'shadow-[inset_2px_2px_0px_rgba(255,255,255,0.22),inset_-2px_-2px_0px_rgba(0,0,0,0.35)]',
           'hover:outline hover:outline-[3px] hover:outline-sky-400 hover:outline-offset-0 hover:z-10',
-          'focus:outline focus:outline-[3px] focus:outline-sky-400 focus:outline-offset-0 focus:z-10',
+          'inventory-slot-focus',
         ].join(' ')}
       >
         {(() => {
@@ -325,7 +324,7 @@ function WantInventoryPicker({
             ? <Package className="w-5 h-5 text-white/90 drop-shadow" />
             : (categoryIcon(item.category, 20) ?? <Zap className="w-5 h-5 text-white/90 drop-shadow" />);
           return (
-            <>
+            <div className="absolute inset-0 rounded-sm overflow-hidden shadow-[inset_2px_2px_0px_rgba(255,255,255,0.22),inset_-2px_-2px_0px_rgba(0,0,0,0.35)]">
               {bg.hasBackgroundImage ? (
                 <>
                   <div className="absolute inset-0" style={{ ...bg.style, backgroundSize: 'cover', backgroundPosition: 'center' }} />
@@ -337,7 +336,7 @@ function WantInventoryPicker({
               <div className="relative z-10 flex items-center justify-center w-full h-full">
                 {icon}
               </div>
-            </>
+            </div>
           );
         })()}
       </button>
@@ -398,7 +397,7 @@ function WantInventoryPicker({
             No results for &ldquo;{searchQuery}&rdquo;
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 p-[4px]">
             {(() => {
               let slotCounter = 0;
               return groups.map(({ label, items: groupItems }, gi) => (

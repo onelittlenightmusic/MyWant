@@ -43,6 +43,13 @@
     box-shadow: none !important;
   }
 
+  /* Inventory slot focus ring — box-shadow avoids the Chromium overflow:hidden+border-radius outline clip bug */
+  .inventory-slot-focus:focus,
+  .inventory-slot-focus:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 3px #38bdf8 !important; /* sky-400 ring outside border */
+  }
+
   /* Section header buttons: light blue background on keyboard focus */
   .sidebar-section-btn:focus,
   .sidebar-section-btn:focus-visible {

@@ -24,13 +24,15 @@
 
 ### 3. 現在地が一目でわかる視覚表現
 
-**薄い色** → 選択可能・遷移可能な候補（hover 状態に近い）
+**デフォルト（未フォーカス）** → モノトーン（グレー系）で控えめに表示
 
-**濃い色 / 枠線** → 現在選択中・フォーカス中
+**フォーカス中** → 背景色が薄い青色に変化 ＋ sky-400 の枠線（3px）が表示される
 
 - フォーカスリングの色は画面全体で **sky-400（薄水色）** に統一している
 - 枠線の太さは 3px。視認性のため `outline` を使用（`box-shadow` は `overflow: hidden` でクリップされるため不適）
 - 選択肢グリッドで現在フォーカスがある要素だけ `ring-2 ring-sky-400` が表示される
+- セクションヘッダーボタン・パラメータエリアは **デフォルトがグレー**、フォーカス時のみ **blue-100 系** に変化する
+- Add ボタン（追加確定）は **デフォルトがダークグレー**、フォーカス時のみ **blue-950（暗い紺）** に変化する
 
 ---
 
@@ -103,8 +105,8 @@ Change（Want type 再選択） → Parameters（セクションヘッダー） 
 
 #### Add ボタン
 
-- 色: 暗い紺（`bg-blue-950`）— 一般のアクション系ボタン（緑系）と意図的に区別
-- フォーカス時: 3px の sky-400 アウトライン
+- 色: デフォルトはダークグレー（`bg-gray-700`）— 未フォーカス時は目立たせない
+- フォーカス時: 暗い紺（`bg-blue-950`）に変化 ＋ 3px の sky-400 アウトライン
 - Want type 未選択時: グレーアウト（disabled）
 
 #### Advanced セクション（折りたたみ）
@@ -146,18 +148,20 @@ Change（Want type 再選択） → Parameters（セクションヘッダー） 
 
 ## カラーパレット（フォーカス・選択表現）
 
-| 用途 | クラス / 色 |
-| :--- | :--- |
-| フォーカスリング（全体統一） | `ring-sky-400` / `outline-sky-400` (#38bdf8) |
-| 枠線の太さ | 3px（`ring-[3px]` / `outline-[3px]`） |
-| 選択中の行ハイライト | `bg-blue-50 dark:bg-blue-900/20` |
-| プライマリアクションボタン（Add） | `bg-blue-950`（暗い紺） |
-| 危険操作ボタン（Delete） | `bg-rose-700/90` |
-| 停止ボタン | `bg-red-600/90` |
-| 開始ボタン | `bg-green-600/90` |
-| 編集ボタン | `bg-indigo-600/90` |
-| サスペンドボタン | `bg-amber-500/90` |
-| 非活性状態 | `bg-gray-400/30 grayscale opacity-50` |
+| 用途 | デフォルト | フォーカス時 |
+| :--- | :--- | :--- |
+| フォーカスリング（全体統一） | — | sky-400 (#38bdf8)、3px `outline` |
+| セクションヘッダーボタン | `bg-gray-100 dark:bg-gray-800` | `bg-blue-100 dark:bg-blue-900/25` |
+| Want Name 入力エリア | `bg-gray-100 dark:bg-gray-800` | テキスト入力は `bg-blue-100 dark:bg-blue-900/30`（グローバル CSS） |
+| Add ボタン（追加確定） | `bg-gray-700` | `bg-blue-950`（暗い紺） |
+| 編集確定ボタン（Update） | `bg-indigo-600/90` | — |
+| Deploy ボタン | `bg-purple-600/90` | — |
+| 選択中の行ハイライト | — | `bg-blue-50 ring-1 ring-blue-400/50` |
+| 危険操作ボタン（Delete） | `bg-rose-700/90` | — |
+| 停止ボタン | `bg-red-600/90` | — |
+| 開始ボタン | `bg-green-600/90` | — |
+| サスペンドボタン | `bg-amber-500/90` | — |
+| 非活性状態 | `bg-gray-400/30 grayscale opacity-50` | — |
 
 ---
 
@@ -174,6 +178,15 @@ captureInput の重ね順は後から開いたものが優先される。
 ---
 
 ## 実装上の注意点
+
+### フォーカス時の背景色変化（`.sidebar-section-btn` / `.sidebar-add-btn`）
+
+セクションヘッダーボタンと Add ボタンは、**デフォルトをモノトーン（グレー）にしてフォーカス時のみ青色に変化させる**ため、専用 CSS クラスを使用している。
+
+- `.sidebar-section-btn` — セクションヘッダーボタン（Parameters・Labels・Dependencies・Scheduling）に付与。`:focus` / `:focus-visible` で `background-color: blue-100` を `!important` で上書き。
+- `.sidebar-add-btn` — Add ボタン（create モード）に付与。フォーカス時 `background-color: blue-950` を適用。
+
+Tailwind の `focus:bg-*` 修飾子ではなく CSS クラスで管理する理由: `button:focus-visible { outline: none !important }` のグローバルリセット規則が先に適用されるため、`@layer base` 内で `!important` 付きのクラスを定義することでオーバーライドしている（specificity の問題を `!important` で解決）。
 
 ### `overflow: hidden` とフォーカスリング
 

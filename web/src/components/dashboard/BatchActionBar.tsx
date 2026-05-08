@@ -9,17 +9,19 @@ interface ActionCellProps {
   colorClass: string;
   disabled?: boolean;
   delay?: number;
+  focused?: boolean;
 }
 
-const ActionCell: React.FC<ActionCellProps> = ({ icon, label, onClick, colorClass, disabled = false, delay = 0 }) => (
+const ActionCell: React.FC<ActionCellProps> = ({ icon, label, onClick, colorClass, disabled = false, delay = 0, focused = false }) => (
   <button
     onClick={(e) => { e.stopPropagation(); if (!disabled) onClick(); }}
     disabled={disabled}
     className={classNames(
-      'flex flex-col items-center justify-center gap-0.5 h-full px-4 sm:px-6 transition-all duration-150',
+      'flex flex-col items-center justify-center gap-0.5 h-full px-4 sm:px-6 transition-all duration-150 relative',
       disabled
         ? 'bg-gray-400/30 cursor-not-allowed grayscale opacity-50'
-        : `hover:brightness-110 active:opacity-80 ${colorClass}`
+        : `hover:brightness-110 active:opacity-80 ${colorClass}`,
+      focused && !disabled && 'ring-4 ring-inset ring-white/60'
     )}
     style={{
       animation: 'quickActionBtnIn 150ms ease-out both',
@@ -38,6 +40,8 @@ interface BatchActionBarProps {
   onBatchDelete: () => void;
   onExit: () => void;
   loading?: boolean;
+  /** Index of keyboard-focused action button: 0=Start, 1=Stop, 2=Delete. undefined = no focus */
+  focusedIdx?: number;
 }
 
 export const BatchActionBar: React.FC<BatchActionBarProps> = ({
@@ -47,6 +51,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
   onBatchDelete,
   onExit,
   loading = false,
+  focusedIdx,
 }) => {
   const hasSelection = selectedCount > 0;
 
@@ -68,12 +73,21 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
 
   return (
     <div className="h-full flex items-stretch">
-      {/* Left: selection count */}
-      <div className="flex items-center px-3 sm:px-6 min-w-[72px] sm:min-w-[96px]">
+      {/* Left: selection count + hint */}
+      <div className="flex flex-col items-start justify-center px-3 sm:px-6 min-w-[72px] sm:min-w-[96px] gap-0.5">
         <span className="text-white dark:text-black text-sm font-semibold tabular-nums">
           {selectedCount}
           <span className="text-white/60 dark:text-black/60 text-xs ml-1 hidden sm:inline">selected</span>
         </span>
+        {focusedIdx === undefined ? (
+          <span className="text-white/50 dark:text-black/50 text-[9px] leading-none hidden sm:block">
+            ⊕ action select
+          </span>
+        ) : (
+          <span className="text-white/50 dark:text-black/50 text-[9px] leading-none hidden sm:block">
+            ⊖ want select
+          </span>
+        )}
       </div>
 
       {/* Center: action buttons */}
@@ -86,6 +100,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             colorClass="bg-green-600/90"
             disabled={!hasSelection || loading}
             delay={0}
+            focused={focusedIdx === 0}
           />
           <div className="w-px bg-white/15 dark:bg-black/15 self-stretch" />
           <ActionCell
@@ -95,6 +110,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             colorClass="bg-red-600/90"
             disabled={!hasSelection || loading}
             delay={30}
+            focused={focusedIdx === 1}
           />
           <div className="w-px bg-white/15 dark:bg-black/15 self-stretch" />
           <ActionCell
@@ -104,6 +120,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             colorClass="bg-rose-700/90"
             disabled={!hasSelection || loading}
             delay={60}
+            focused={focusedIdx === 2}
           />
         </div>
       </div>

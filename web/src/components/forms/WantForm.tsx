@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, Search } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest, WhenSpec } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -26,6 +26,11 @@ import { ApiError } from '@/types/api';
 import { Recommendation, ConfigModifications } from '@/types/interact';
 import { useInputActions } from '@/hooks/useInputActions';
 
+export interface WantFormHandle {
+  navigateInventory: (dir: 'up' | 'down' | 'left' | 'right') => void;
+  confirmInventory: () => void;
+}
+
 interface WantFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,13 +44,13 @@ interface WantFormProps {
   onRecommendationSelect?: (rec: Recommendation) => void;
   onRecommendationDeploy?: (recId: string, modifications?: ConfigModifications) => void;
   /** Authoritative form situation owned by Dashboard — drives input routing */
-  formSituation?: 'closed' | 'type-selection' | 'fields';
+  formSituation?: 'closed' | 'type-selection' | 'fields' | 'select-mode' | 'batch-action';
   /** Called when WantForm transitions between phases (type selected / back) */
   onSituationChange?: (sit: 'type-selection' | 'fields') => void;
 }
 
 
-export const WantForm: React.FC<WantFormProps> = ({
+export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantForm({
   isOpen,
   onClose,
   editingWant,
@@ -59,7 +64,7 @@ export const WantForm: React.FC<WantFormProps> = ({
   onRecommendationDeploy,
   formSituation,
   onSituationChange,
-}) => {
+}, ref) {
   const { wants, createWant, updateWant, fetchWants, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
   const { recipes, fetchRecipes } = useRecipeStore();
@@ -67,6 +72,13 @@ export const WantForm: React.FC<WantFormProps> = ({
   const inventoryPickerRef = useRef<WantInventoryPickerRef>(null);
 
   // Refs for form fields navigation
+  // Expose inventory navigation to Dashboard so it can route arrow keys directly
+  // from its own situation-based handler, independent of focus state.
+  useImperativeHandle(ref, () => ({
+    navigateInventory: (dir) => { inventoryPickerRef.current?.navigate(dir); },
+    confirmInventory:  ()    => { inventoryPickerRef.current?.confirmFocused(); },
+  }));
+
   const changeButtonRef = useRef<HTMLButtonElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const paramsSectionRef = useRef<HTMLButtonElement>(null);
@@ -561,16 +573,13 @@ export const WantForm: React.FC<WantFormProps> = ({
     }
   }, [onClose]);
 
+  // Dashboard owns arrow-key routing during type-selection phase via wantFormRef.
+  // WantForm only handles confirm/cancel and tab navigation for the fields phase.
   useInputActions({
     enabled: isOpen && editMode === 'form',
-    captureInput: true,
+    captureInput: !isTypeSelectionPhase, // Dashboard captures in type-selection; WantForm captures in fields
     ignoreWhenInputFocused: false,
     ignoreWhenInSidebar: false,
-    onNavigate: isTypeSelectionPhase ? (dir) => {
-      if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') {
-        inventoryPickerRef.current?.navigate(dir);
-      }
-    } : undefined,
     onConfirm: handleGamepadConfirm,
     onCancel: handleGamepadCancel,
     onTabForward:  !isTypeSelectionPhase ? () => navigateFormTab(true)  : undefined,
@@ -996,4 +1005,4 @@ export const WantForm: React.FC<WantFormProps> = ({
       </form>
     </RightSidebar>
   );
-};
+});
