@@ -71,6 +71,16 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
     return () => window.removeEventListener('resize', handler);
   }, []);
 
+  // When sidebar closes, release focus so ignoreWhenInSidebar guards don't block
+  // keyboard/gamepad navigation on the cards behind it.
+  useEffect(() => {
+    if (isOpen) return;
+    const container = containerRef.current;
+    if (container?.contains(document.activeElement)) {
+      (document.activeElement as HTMLElement)?.blur();
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const handleDragStart = () => setIsAnyDragging(true);
     const handleDragEnd = () => setIsAnyDragging(false);

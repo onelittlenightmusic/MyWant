@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { useInputActions } from '@/hooks/useInputActions';
@@ -9,16 +9,21 @@ interface DeleteConfirmOverlayProps {
 }
 
 export const DeleteConfirmOverlay: React.FC<DeleteConfirmOverlayProps> = ({ onConfirm, onCancel }) => {
-  // Enter/A → confirm, Escape/B → cancel (keyboard + gamepad unified)
+  // 'no' is the safe default focus so accidental Enter doesn't delete
+  const [focused, setFocused] = useState<'no' | 'yes'>('no');
+
   useInputActions({
     captureInput: true,
     ignoreWhenInputFocused: false,
-    onConfirm,
+    onNavigate: (dir) => {
+      if (dir === 'left')  setFocused('no');
+      if (dir === 'right') setFocused('yes');
+    },
+    onConfirm: () => { focused === 'yes' ? onConfirm() : onCancel(); },
     onCancel,
   });
 
-  // y/n letter shortcuts — captureInput only stops propagation for mapped keys,
-  // so these bubble-phase handlers still fire for unmapped y/n keys.
+  // y/n shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 'n') { e.preventDefault(); onCancel(); }
@@ -53,9 +58,11 @@ export const DeleteConfirmOverlay: React.FC<DeleteConfirmOverlayProps> = ({ onCo
         <div className="pointer-events-auto h-full w-full">
           <button
             onClick={(e) => { e.stopPropagation(); onCancel(); }}
+            onMouseEnter={() => setFocused('no')}
             className={classNames(
               'flex flex-col items-center justify-center gap-1 w-full h-full',
-              'bg-gray-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150'
+              'bg-gray-600/90 hover:brightness-110 active:opacity-80 transition-all duration-150',
+              focused === 'no' && 'ring-2 ring-inset ring-white/80'
             )}
             style={{ animation: 'quickActionBtnIn 150ms ease-out both', animationDelay: '0ms' }}
           >
@@ -68,9 +75,11 @@ export const DeleteConfirmOverlay: React.FC<DeleteConfirmOverlayProps> = ({ onCo
         <div className="pointer-events-auto h-full w-full">
           <button
             onClick={(e) => { e.stopPropagation(); onConfirm(); }}
+            onMouseEnter={() => setFocused('yes')}
             className={classNames(
               'flex flex-col items-center justify-center gap-1 w-full h-full',
-              'bg-rose-700/90 hover:brightness-110 active:opacity-80 transition-all duration-150'
+              'bg-rose-700/90 hover:brightness-110 active:opacity-80 transition-all duration-150',
+              focused === 'yes' && 'ring-2 ring-inset ring-white/80'
             )}
             style={{ animation: 'quickActionBtnIn 150ms ease-out both', animationDelay: '60ms' }}
           >

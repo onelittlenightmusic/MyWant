@@ -65,6 +65,23 @@ export interface UseInputActionsOptions {
    * for keyboard behaviour but still needs gamepad equivalents.
    */
   gamepadOnly?: boolean;
+  /**
+   * When true, gamepad events are dispatched exclusively to this handler
+   * (same as captureInput for gamepad) while keyboard events are left to the
+   * normal bubble phase.  Use for overlays / sidebars that own their own
+   * keyboard handling but must take gamepad priority so the page-level
+   * want-card navigation hook does not also fire.
+   *
+   * Priority hierarchy (highest to lowest):
+   *   captureInput   — keyboard capture + gamepad exclusive
+   *   captureGamepad — gamepad exclusive only (keyboard unchanged)
+   *   (default)      — all events broadcast to all listeners
+   *
+   * This is the preferred option for form sidebars: keyboard is handled by
+   * native focus / component keydown handlers; gamepad must be captured so
+   * D-pad presses do not simultaneously move want-card focus.
+   */
+  captureGamepad?: boolean;
 }
 
 // ─── Gamepad singleton ────────────────────────────────────────────────────────
@@ -395,6 +412,7 @@ export function useInputActions({
   ignoreWhenInSidebar = true,
   captureInput = false,
   gamepadOnly = false,
+  captureGamepad = false,
 }: UseInputActionsOptions): void {
   // Refs let us update callbacks without re-subscribing to events.
   const onNavigateRef    = useRef(onNavigate);
@@ -426,7 +444,7 @@ export function useInputActions({
 
   // ── Normal (bubble-phase) keyboard handler — active when captureInput is false ──
   useEffect(() => {
-    if (!enabled || captureInput || gamepadOnly) return;
+    if (!enabled || captureInput || gamepadOnly || captureGamepad) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
@@ -492,11 +510,11 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Capture-phase keyboard handler — active when captureInput is true ────────
   useEffect(() => {
-    if (!enabled || !captureInput || gamepadOnly) return;
+    if (!enabled || !captureInput || gamepadOnly || captureGamepad) return;
 
     const handleKeyDownCapture = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
@@ -557,7 +575,7 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDownCapture, true);
     return () => window.removeEventListener('keydown', handleKeyDownCapture, true);
-  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Gamepad ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -565,7 +583,7 @@ export function useInputActions({
 
     const handleGamepadAction = (action: GamepadActionType) => {
       if (!enabledRef.current) return;
-      if (!captureInput) {
+      if (!captureInput && !captureGamepad) {
         if (ignoreWhenInputFocused && _isInputFocused()) return;
         if (ignoreWhenInSidebar && _isInSidebar()) return;
       }
@@ -600,11 +618,11 @@ export function useInputActions({
     };
 
     _registerListener(handleGamepadAction);
-    if (captureInput) _captureListener = handleGamepadAction;
+    if (captureInput || captureGamepad) _captureListener = handleGamepadAction;
 
     return () => {
       _unregisterListener(handleGamepadAction);
       if (_captureListener === handleGamepadAction) _captureListener = null;
     };
-  }, [enabled, captureInput, gamepadOnly, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 }

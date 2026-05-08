@@ -1137,14 +1137,19 @@ export const Dashboard: React.FC = () => {
   };
 
   // ============================================================
-  // Dashboard Modes:
-  // - Normal Mode: Default mode with all shortcuts enabled
-  // - Select Mode: Shift+S to enter, batch operations enabled (isSelectMode=true)
-  // - Add Mode: New Want form open, all dashboard shortcuts disabled (sidebar.showForm=true)
-  // - Summary Mode: Summary panel open, all shortcuts enabled (sidebar.showSummary=true)
+  // Input priority model:
+  //   captureInput (Header menu, card overlays, canvas drag)
+  //     > captureGamepad (WantForm sidebar — gamepad only)
+  //     > default broadcast
+  //         keyboard: blocked by ignoreWhenInSidebar when sidebar has focus
+  //         gamepad:  all listeners fire; guards apply
+  //
+  // Want-card navigation is the default handler and is always registered.
+  // Higher-priority contexts (form, overlays) capture via captureInput /
+  // captureGamepad so no enabled: !sidebar.showForm flags are needed here.
   // ============================================================
 
-  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId, enabled: !sidebar.showForm });
+  useHierarchicalKeyboardNavigation({ items: hierarchicalWants, currentItem: currentHierarchicalWant, onNavigate: handleViewWant, onToggleExpand: handleToggleExpand, onSelect: isSelectMode ? handleSelectWant : undefined, expandedItems: expandedParents, lastSelectedItemId: lastSelectedWantId });
 
   const handleEscapeKey = () => {
     if (isCanvasDraggingRef.current) {
@@ -1163,7 +1168,6 @@ export const Dashboard: React.FC = () => {
 
   // Context menu (Shift+Space / Gamepad Start) — toggle QuickActions overlay for selected want
   useInputActions({
-    enabled: !sidebar.showForm,
     onContextMenu: () => {
       const id = selectedWant?.metadata?.id || selectedWant?.id;
       if (!id) return;
@@ -1210,13 +1214,13 @@ export const Dashboard: React.FC = () => {
   }, [selectedWant, canvasMode, filteredWants, handleCanvasMoveWant, reorderWant]);
 
   useInputActions({
-    enabled: !sidebar.showForm && !!selectedWant,
+    enabled: !!selectedWant,
     onMove: handleMoveWant,
   });
 
   // Canvas drag: A long-press (gamepad) → enter drag mode
   useInputActions({
-    enabled: canvasMode && !sidebar.showForm && !!selectedWant && !isCanvasDragging,
+    enabled: canvasMode && !!selectedWant && !isCanvasDragging,
     onConfirmLong: () => {
       const want = selectedWantRef.current;
       if (!want) return;
