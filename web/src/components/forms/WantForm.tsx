@@ -88,29 +88,41 @@ export const WantForm: React.FC<WantFormProps> = ({
     return new Set(['labels', 'dependencies', 'scheduling']);
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [addButtonFocused, setAddButtonFocused] = useState(false);
 
   // Recommendation mode state
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
   const isRecommendationMode = mode === 'recommendation';
 
-  // Handle Tab from params section: go to name input
-  const handleFieldTab = () => {
-    nameInputRef.current?.focus();
-  };
+  // Shared section-level Tab cycle used by both keyboard Tab and gamepad L/R buttons.
+  // Cycle order: Change button → visible section headers → Name input → Add button → (wrap)
+  const navigateFormTab = useCallback((forward: boolean) => {
+    const els: HTMLElement[] = [];
+    if (!isEditing && changeButtonRef.current) els.push(changeButtonRef.current);
+    // Collect visible .focusable-section-header elements in DOM order
+    document.querySelectorAll<HTMLElement>('.focusable-section-header').forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) els.push(el);
+    });
+    if (nameInputRef.current) els.push(nameInputRef.current);
+    if (addButtonRef.current) els.push(addButtonRef.current);
+    if (els.length === 0) return;
+    const active = document.activeElement as HTMLElement | null;
+    const idx = active ? els.indexOf(active) : -1;
+    const next = forward
+      ? (idx < 0 ? 0 : (idx + 1) % els.length)
+      : (idx <= 0 ? els.length - 1 : idx - 1);
+    els[next]?.focus();
+  }, [isEditing]);
 
-  // Tab cycle: Add → Change (or Params if editing) | Shift+Tab: Add → Name
+  // Delegates to navigateFormTab for keyboard Tab from any section header
+  const handleFieldTab = useCallback(() => navigateFormTab(true), [navigateFormTab]);
+
+  // Tab cycle on Add button delegates to the shared handler
   const handleAddButtonKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Tab') {
       e.preventDefault();
-      if (e.shiftKey) {
-        nameInputRef.current?.focus();
-      } else {
-        if (!isEditing && changeButtonRef.current) {
-          changeButtonRef.current.focus();
-        } else {
-          paramsSectionRef.current?.focus();
-        }
-      }
+      navigateFormTab(e.shiftKey ? false : true);
     }
   };
 
@@ -544,6 +556,8 @@ export const WantForm: React.FC<WantFormProps> = ({
     } : undefined,
     onConfirm: handleGamepadConfirm,
     onCancel: handleGamepadCancel,
+    onTabForward:  !isTypeSelectionPhase ? () => navigateFormTab(true)  : undefined,
+    onTabBackward: !isTypeSelectionPhase ? () => navigateFormTab(false) : undefined,
   });
 
   const isTypeSelected = !!type;
@@ -581,6 +595,8 @@ export const WantForm: React.FC<WantFormProps> = ({
         disabled={isSubmitting || (!isEditing && !isTypeSelected)}
         form="want-form"
         onKeyDown={handleAddButtonKeyDown}
+        onFocus={() => setAddButtonFocused(true)}
+        onBlur={() => setAddButtonFocused(false)}
         className={classNames(
           "sidebar-focus-ring flex flex-col items-center justify-center gap-0.5 px-4 h-full transition-all duration-150 flex-shrink-0",
           isSubmitting || (!isEditing && !isTypeSelected)
@@ -589,7 +605,9 @@ export const WantForm: React.FC<WantFormProps> = ({
               ? "bg-indigo-600/90 text-white hover:brightness-110 active:opacity-80"
               : isRecommendationMode
                 ? "bg-purple-600/90 text-white hover:brightness-110 active:opacity-80"
-                : "bg-blue-950 text-white hover:brightness-110 active:opacity-80"
+                : addButtonFocused
+                  ? "bg-blue-500 text-white active:opacity-80"
+                  : "bg-gray-700 text-white hover:bg-gray-600 active:opacity-80"
         )}
       >
         {isSubmitting ? (
@@ -895,7 +913,7 @@ export const WantForm: React.FC<WantFormProps> = ({
                 )}
 
                 {/* Want Name with Auto-generation (at bottom) */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
+                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 sm:p-4">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
                     Want Name *
                   </label>
