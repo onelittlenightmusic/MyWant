@@ -522,37 +522,54 @@ export function useInputActions({
     const handleKeyDownCapture = (e: KeyboardEvent) => {
       if (!enabledRef.current) return;
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      // isInputEl: focus is inside a text-editing element.
+      // For arrow keys we do NOT bail out unconditionally — if onNavigate is
+      // registered it means the owning component (e.g. WantForm in type-selection
+      // phase) has declared that directional input belongs to it regardless of
+      // which DOM element has focus.  That state is expressed through the callback
+      // existing, not through where the cursor happens to sit.
+      // For all other keys we keep the guard so typing, Enter, Escape etc. still
+      // work normally inside form inputs.
+      const isInputEl = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
       let handled = false;
       switch (e.key) {
-        // Direction keys: only claim the event when a handler is actually registered.
-        // If no callback exists (e.g. WantForm form-fields phase has onNavigate=undefined),
-        // let the event continue bubbling so inner components can handle it.
+        // Arrow keys: capture when a navigation handler is registered (= the owning
+        // component's state says "I own directional input now").  If no handler is
+        // registered AND focus is on an input element, yield so the input can move
+        // its cursor normally.
         case 'ArrowUp': {
           const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
           if (fn) { handled = true; fn('up'); }
+          else if (isInputEl) return;
           break;
         }
         case 'ArrowDown': {
           const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
           if (fn) { handled = true; fn('down'); }
+          else if (isInputEl) return;
           break;
         }
         case 'ArrowLeft': {
           const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
           if (fn) { handled = true; fn('left'); }
+          else if (isInputEl) return;
           break;
         }
         case 'ArrowRight': {
           const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
           if (fn) { handled = true; fn('right'); }
+          else if (isInputEl) return;
           break;
         }
-        case 'Home': if (onNavigateRef.current) { handled = true; onNavigateRef.current('home'); } break;
-        case 'End':  if (onNavigateRef.current) { handled = true; onNavigateRef.current('end');  } break;
-        case 'Enter':  if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
-        case 'Escape': if (onCancelRef.current)   { handled = true; onCancelRef.current();   } break;
+        // Non-arrow keys: preserve INPUT guard — typing, Enter, Escape etc. must
+        // still work normally inside text inputs.
+        case 'Home': if (isInputEl) return; if (onNavigateRef.current) { handled = true; onNavigateRef.current('home'); } break;
+        case 'End':  if (isInputEl) return; if (onNavigateRef.current) { handled = true; onNavigateRef.current('end');  } break;
+        case 'Enter':  if (isInputEl) return; if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
+        // Escape: no INPUT guard — regardless of DOM focus, the owning component
+        // (captureInput: true) declares it handles cancel in this context.
+        case 'Escape': if (onCancelRef.current) { handled = true; onCancelRef.current(); } break;
         case ' ':
           if (e.altKey) {
             if (onMenuToggleRef.current)  { handled = true; onMenuToggleRef.current(); }

@@ -361,20 +361,6 @@ function WantInventoryPicker({
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Escape') { setSearchQuery(''); return; }
-              // Route arrow keys to slot grid navigation so that pressing any
-              // directional key from the search box enters the inventory.
-              if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                e.preventDefault();
-                e.stopPropagation();
-                const total = slotButtonRefs.current.filter(Boolean).length;
-                if (total === 0) return;
-                const dir = e.key.replace('Arrow', '').toLowerCase();
-                const next = (dir === 'up' || dir === 'left') ? total - 1 : 0;
-                slotButtonRefs.current[next]?.focus();
-              }
-            }}
             placeholder="Search..."
             className="w-full pl-7 pr-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent"
           />
