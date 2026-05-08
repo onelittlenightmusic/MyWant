@@ -198,6 +198,9 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 				}
 			}
 			cb := GetGlobalChainBuilder()
+			if cb == nil {
+				return nil
+			}
 			keys := make([]string, 0, len(providerStateMap))
 			for _, stateKey := range providerStateMap {
 				keys = append(keys, stateKey)
@@ -278,6 +281,9 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 
 		const doneMarker = "DONE"
 		cb := GetGlobalChainBuilder()
+		if cb == nil {
+			return nil
+		}
 
 		// Build a lookup map for quick access
 		requestByDirection := make(map[string]DispatchRequest, len(desiredRequests))
