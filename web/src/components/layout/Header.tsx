@@ -478,7 +478,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Memo */}
           {onGlobalStateToggle && (
-            <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g">
+            <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g" below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'memo'}>
               <button
                 onClick={onGlobalStateToggle}
                 data-header-btn-id="memo"
@@ -498,7 +498,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Select */}
           {onToggleSelectMode && (
-            <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S">
+            <Tooltip label={showSelectMode ? 'Exit Select' : 'Select'} shortcut="⇧S" below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'select'}>
               <button
                 onClick={onToggleSelectMode}
                 data-header-btn-id="select"
@@ -520,7 +520,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onCanvasModeToggle && (
             <>
               <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
-              <Tooltip label={showCanvasMode ? 'Switch to List' : 'Switch to Canvas'}>
+              <Tooltip label={showCanvasMode ? 'Switch to List' : 'Switch to Canvas'} below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'list'}>
                 <button
                   onClick={onCanvasModeToggle}
                   data-header-btn-id="list"
@@ -558,42 +558,46 @@ export const Header: React.FC<HeaderProps> = ({
           {!hideCreateButton && (
             <>
               <div className="w-px bg-gray-200 dark:bg-gray-700 self-stretch" />
-              <button
-                onClick={onCreateWant}
-                data-header-btn-id="want"
-                className={classNames(
-                  "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
-                  isAddWantActive
-                    ? "bg-primary-600 text-white hover:brightness-110 active:opacity-80"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
-                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want' && 'ring-2 ring-inset ring-sky-400'
-                )}
-              >
-                <span className="relative inline-flex flex-shrink-0">
-                  <Heart className="h-4 w-4" />
-                  <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
-                </span>
-                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Want</span>
-              </button>
-
-              {onCreateTargetWant && (
+              <Tooltip label={isAddWantActive ? 'Close Add Want' : 'Add Want'} shortcut="a" below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want'}>
                 <button
-                  onClick={onCreateTargetWant}
-                  data-header-btn-id="whim"
+                  onClick={onCreateWant}
+                  data-header-btn-id="want"
                   className={classNames(
                     "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
-                    isWhimActive
-                      ? "bg-indigo-600 text-white hover:brightness-110 active:opacity-80"
+                    isAddWantActive
+                      ? "bg-primary-600 text-white hover:brightness-110 active:opacity-80"
                       : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
-                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim' && 'ring-2 ring-inset ring-sky-400'
+                    isHeaderFocused && hBtns[headerFocusIdx]?.id === 'want' && 'ring-2 ring-inset ring-sky-400'
                   )}
                 >
                   <span className="relative inline-flex flex-shrink-0">
-                    <span className="text-sm leading-none">🫙</span>
-                    <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
+                    <Heart className="h-4 w-4" />
+                    <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5" style={{ strokeWidth: 3 }} />
                   </span>
-                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Whim</span>
+                  <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Want</span>
                 </button>
+              </Tooltip>
+
+              {onCreateTargetWant && (
+                <Tooltip label={isWhimActive ? 'Close Add Whim' : 'Add Whim'} below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim'}>
+                  <button
+                    onClick={onCreateTargetWant}
+                    data-header-btn-id="whim"
+                    className={classNames(
+                      "flex flex-col items-center justify-center gap-0.5 px-3 sm:px-4 h-full transition-all duration-150 focus:outline-none",
+                      isWhimActive
+                        ? "bg-indigo-600 text-white hover:brightness-110 active:opacity-80"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800",
+                      isHeaderFocused && hBtns[headerFocusIdx]?.id === 'whim' && 'ring-2 ring-inset ring-sky-400'
+                    )}
+                  >
+                    <span className="relative inline-flex flex-shrink-0">
+                      <span className="text-sm leading-none">🫙</span>
+                      <Plus className="h-2.5 w-2.5 absolute -top-1.5 -right-1.5 text-white" style={{ strokeWidth: 3 }} />
+                    </span>
+                    <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Whim</span>
+                  </button>
+                </Tooltip>
               )}
             </>
           )}

@@ -43,16 +43,29 @@
     box-shadow: none !important;
   }
 
+  /* Section header buttons: light blue background on keyboard focus */
+  .sidebar-section-btn:focus,
+  .sidebar-section-btn:focus-visible {
+    background-color: rgb(219 234 254) !important; /* blue-100 */
+  }
+  .dark .sidebar-section-btn:focus,
+  .dark .sidebar-section-btn:focus-visible {
+    background-color: rgb(30 58 138 / 0.25) !important; /* blue-900/25 */
+  }
+
+
   :root {
+    --progress-base:     #f1f5f9;
     --progress-bg-light: rgba(255, 255, 255, 0.5);
-    --progress-bg-dark: rgba(0, 0, 0, 0.2);
+    --progress-bg-dark:  rgba(0, 0, 0, 0.2);
     --canvas-bg: #f1f5f9;
     --canvas-grid: rgba(100, 116, 139, 0.15);
   }
 
   .dark {
+    --progress-base:     #1e293b;
     --progress-bg-light: rgba(255, 255, 255, 0.15);
-    --progress-bg-dark: rgba(0, 0, 0, 0.4);
+    --progress-bg-dark:  rgba(0, 0, 0, 0.4);
     --canvas-bg: #0a0f1e;
     --canvas-grid: rgba(148, 163, 184, 0.07);
   }
