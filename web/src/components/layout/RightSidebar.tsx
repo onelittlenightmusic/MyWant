@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LucideIcon, X } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { useConfigStore } from '@/stores/configStore';
@@ -72,8 +72,10 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({
   }, []);
 
   // When sidebar closes, release focus so ignoreWhenInSidebar guards don't block
-  // keyboard/gamepad navigation on the cards behind it.
-  useEffect(() => {
+  // keyboard/gamepad navigation on the cards behind it.  useLayoutEffect runs
+  // synchronously after commit (before the next RAF), so focus is released
+  // before the gamepad poll has a chance to check _isInSidebar().
+  useLayoutEffect(() => {
     if (isOpen) return;
     const container = containerRef.current;
     if (container?.contains(document.activeElement)) {

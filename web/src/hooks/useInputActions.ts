@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -578,7 +578,12 @@ export function useInputActions({
   }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Gamepad ───────────────────────────────────────────────────────────────────
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) ensures _captureListener is cleared
+  // synchronously after React's commit, before the next requestAnimationFrame
+  // poll fires.  With useEffect the cleanup runs after paint, leaving a window
+  // where _captureListener still points to a disabled handler and swallows all
+  // gamepad input.
+  useLayoutEffect(() => {
     if (!enabled) return;
 
     const handleGamepadAction = (action: GamepadActionType) => {
