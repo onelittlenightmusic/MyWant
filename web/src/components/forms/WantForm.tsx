@@ -38,6 +38,10 @@ interface WantFormProps {
   selectedRecommendation?: Recommendation | null;
   onRecommendationSelect?: (rec: Recommendation) => void;
   onRecommendationDeploy?: (recId: string, modifications?: ConfigModifications) => void;
+  /** Authoritative form situation owned by Dashboard — drives input routing */
+  formSituation?: 'closed' | 'type-selection' | 'fields';
+  /** Called when WantForm transitions between phases (type selected / back) */
+  onSituationChange?: (sit: 'type-selection' | 'fields') => void;
 }
 
 
@@ -52,7 +56,9 @@ export const WantForm: React.FC<WantFormProps> = ({
   recommendations = [],
   selectedRecommendation = null,
   onRecommendationSelect,
-  onRecommendationDeploy
+  onRecommendationDeploy,
+  formSituation,
+  onSituationChange,
 }) => {
   const { wants, createWant, updateWant, fetchWants, loading, error } = useWantStore();
   const { wantTypes, selectedWantType, fetchWantTypes, getWantType } = useWantTypeStore();
@@ -517,7 +523,18 @@ export const WantForm: React.FC<WantFormProps> = ({
 
 
   // ── Gamepad input for Add Want sidebar ───────────────────────────────────────
-  const isTypeSelectionPhase = isOpen && !selectedTypeId && editMode === 'form';
+  // When Dashboard passes formSituation, use it as the authoritative source.
+  // It is set synchronously by Dashboard before WantForm re-renders, so it is
+  // never stale.  Fall back to internal computation when prop is absent.
+  const isTypeSelectionPhase = formSituation
+    ? formSituation === 'type-selection'
+    : (isOpen && !selectedTypeId && editMode === 'form');
+
+  // Notify Dashboard when the phase transitions (type selected / back / reset).
+  useEffect(() => {
+    if (!onSituationChange || !isOpen) return;
+    onSituationChange(selectedTypeId ? 'fields' : 'type-selection');
+  }, [selectedTypeId, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Confirm action: type phase → select focused item; params phase → Enter/click on active element
   const handleGamepadConfirm = useCallback(() => {

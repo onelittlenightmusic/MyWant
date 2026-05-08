@@ -516,7 +516,11 @@ export function useInputActions({
   }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Capture-phase keyboard handler — active when captureInput is true ────────
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the handler is registered synchronously
+  // after React commits — before the browser paints and before the user can
+  // interact.  This eliminates the window between a situation change (e.g.
+  // formSituation → 'type-selection') and the handler being ready to capture.
+  useLayoutEffect(() => {
     if (!enabled || !captureInput || gamepadOnly || captureGamepad) return;
 
     const handleKeyDownCapture = (e: KeyboardEvent) => {

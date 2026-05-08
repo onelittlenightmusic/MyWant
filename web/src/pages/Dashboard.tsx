@@ -338,6 +338,12 @@ export const Dashboard: React.FC = () => {
           setStatusFilters(statusFilter ? [statusFilter as WantExecutionStatus] : []);
         }
 
+        // Apply form situation
+        const savedFormSituation = cur['form_situation'] as string | undefined;
+        if (savedFormSituation === 'type-selection' || savedFormSituation === 'fields' || savedFormSituation === 'closed') {
+          setFormSituation(savedFormSituation);
+        }
+
         // Apply sidebar state
         const sidebarOpen = cur['sidebar_open'] as boolean | undefined;
         const sidebarWantId = cur['sidebar_want_id'] as string | undefined;
@@ -401,6 +407,7 @@ export const Dashboard: React.FC = () => {
       canvas_scale: canvasScale,
       canvas_center_x: canvasCenterX,
       canvas_center_y: canvasCenterY,
+      form_situation: formSituation,
     };
 
     // Skip if state is identical to what we last wrote or what we just received from sync
@@ -498,37 +505,45 @@ export const Dashboard: React.FC = () => {
   const [ownerWant, setOwnerWant] = useState<Want | null>(null);
   const [initialFormTypeId, setInitialFormTypeId] = useState<string | undefined>(undefined);
   const [initialFormItemType, setInitialFormItemType] = useState<'want-type' | 'recipe'>('want-type');
+  // Authoritative UI situation — written at Dashboard level immediately when the
+  // form opens/closes so input routing is never delayed by WantForm's render cycle.
+  const [formSituation, setFormSituation] = useState<'closed' | 'type-selection' | 'fields'>('closed');
 
   const handleCreateWant = (parentWant?: Want) => {
     const isSameType = sidebar.showForm && !initialFormTypeId && initialFormItemType === 'want-type' && ownerWant === (parentWant || null);
-    
+
     if (isSameType) {
       sidebar.closeForm();
+      setFormSituation('closed');
     } else {
       setInitialFormTypeId(undefined);
       setInitialFormItemType('want-type');
       setOwnerWant(parentWant || null);
       setEditingWant(null);
+      setFormSituation('type-selection');
       sidebar.openForm();
     }
   };
 
   const handleCreateTargetWant = () => {
     const isSameType = sidebar.showForm && initialFormTypeId === 'whim-target' && initialFormItemType === 'recipe';
-    
+
     if (isSameType) {
       sidebar.closeForm();
+      setFormSituation('closed');
     } else {
       setInitialFormTypeId('whim-target');
       setInitialFormItemType('recipe');
       setOwnerWant(null);
       setEditingWant(null);
+      setFormSituation('fields');
       sidebar.openForm();
     }
   };
 
   const handleEditWant = (w: Want) => {
     setEditingWant(w);
+    setFormSituation('fields');
     sidebar.openForm();
   };
 
@@ -766,7 +781,7 @@ export const Dashboard: React.FC = () => {
         showNotification(`Materializing idea...`);
         setShowRecommendationForm(false);
         setSelectedRecommendation(null);
-        sidebar.closeForm();
+        sidebar.closeForm(); setFormSituation('closed');
         sidebar.clearSelection();
         await fetchWants();
         return;
@@ -781,7 +796,7 @@ export const Dashboard: React.FC = () => {
       const r = await apiClient.deployRecommendation(sessionId, { recommendation_id: rid, modifications: mods });
       showNotification(`Deployed ${r.want_ids.length} want(s) successfully!`);
       try { await apiClient.deleteDraftWant(draftId); } catch (e) {}
-      await fetchWants(); setShowRecommendationForm(false); setSelectedRecommendation(null); sidebar.closeForm();
+      await fetchWants(); setShowRecommendationForm(false); setSelectedRecommendation(null); sidebar.closeForm(); setFormSituation('closed');
     } catch (e: any) { showNotification(`Deployment failed: ${e.message}`); }
   };
 
@@ -1017,6 +1032,7 @@ export const Dashboard: React.FC = () => {
     setSelectedRecommendation(rec);
     setShowRecommendationForm(true);
     setEditingWant(null);
+    setFormSituation('fields');
     sidebar.openForm();
   };
 
@@ -1093,7 +1109,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleToggleExpand = (wantId: string) => setExpandedParents(prev => { const next = new Set(prev); if (next.has(wantId)) next.delete(wantId); else next.add(wantId); return next; });
-  const handleCloseModals = () => { sidebar.closeForm(); setEditingWant(null); setOwnerWant(null); setDeleteWantState(null); setShowDeleteConfirmation(false); setReactionWantState(null); setShowReactionConfirmation(false); setReactionAction(null); };
+  const handleCloseModals = () => { sidebar.closeForm(); setFormSituation('closed'); setEditingWant(null); setOwnerWant(null); setDeleteWantState(null); setShowDeleteConfirmation(false); setReactionWantState(null); setShowReactionConfirmation(false); setReactionAction(null); };
   
   const handleExportWants = async () => {
     setIsExporting(true);
@@ -1644,7 +1660,7 @@ export const Dashboard: React.FC = () => {
         onDraftClick={handleMinimapDraftClick}
         isOpen={minimapOpen}
       />
-      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={(selectedWant && isDraftWant(selectedWant) ? ((selectedWant.state?.current?.proposed_recommendations as Recommendation[]) || (selectedWant.state?.current?.recommendations as Recommendation[]) || []) : [])} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} />
+      <WantForm isOpen={sidebar.showForm} onClose={handleCloseModals} editingWant={editingWant} ownerWant={ownerWant} initialTypeId={initialFormTypeId} initialItemType={initialFormItemType} mode={showRecommendationForm ? 'recommendation' : (editingWant ? 'edit' : 'create')} recommendations={(selectedWant && isDraftWant(selectedWant) ? ((selectedWant.state?.current?.proposed_recommendations as Recommendation[]) || (selectedWant.state?.current?.recommendations as Recommendation[]) || []) : [])} selectedRecommendation={selectedRecommendation} onRecommendationSelect={setSelectedRecommendation} onRecommendationDeploy={handleRecommendationDeploy} formSituation={formSituation} onSituationChange={setFormSituation} />
 
       <Toast message={notificationMessage} isVisible={isNotificationVisible} onDismiss={dismissNotification} />
       <DragOverlay />
