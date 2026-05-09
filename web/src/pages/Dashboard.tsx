@@ -1420,6 +1420,14 @@ export const Dashboard: React.FC = () => {
       } else if (e.key === 'g' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         sidebar.toggleMemo();
+      } else if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // The HelpModal is managed by the Header component, but we can't easily trigger its state from here
+        // However, the '?' key usually triggers help overlays.
+        // For consistency, let's find the help button and click it, or we could lift the state.
+        // In this project, finding the button is a common pattern for shortcuts.
+        e.preventDefault();
+        const helpBtn = document.querySelector('[data-header-btn-id="help"]') as HTMLButtonElement;
+        if (helpBtn) helpBtn.click();
       }
     };
 

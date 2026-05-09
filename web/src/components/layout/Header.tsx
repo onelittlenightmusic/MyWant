@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, Heart, ListChecks, Map, Bot, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2 } from 'lucide-react';
+import { Plus, Heart, ListChecks, Map, Bot, StickyNote, Menu, X, Zap, BookOpen, Activity, Settings, Trophy, LayoutGrid, Grid2X2, HelpCircle } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { classNames } from '@/utils/helpers';
 import { InteractBubble } from '@/components/interact/InteractBubble';
 import { useConfigStore } from '@/stores/configStore';
 import { SettingsModal } from '@/components/modals/SettingsModal';
+import { HelpModal } from '@/components/modals/HelpModal';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useInputActions } from '@/hooks/useInputActions';
 
@@ -49,6 +50,7 @@ const NAV_ENTRIES: NavEntry[] = [
   { id: 'recipes',      label: 'Recipes',       icon: BookOpen,   href: '/recipes' },
   { id: 'achievements', label: 'Achievements',  icon: Trophy,     href: '/achievements' },
   { id: 'logs',         label: 'Logs',          icon: Activity,   href: '/logs' },
+  { id: 'help',         label: 'Help',          icon: HelpCircle, href: null },
   { id: 'settings',     label: 'Settings',      icon: Settings,   href: null },
 ];
 
@@ -86,6 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [headerFocusIdx, setHeaderFocusIdx] = useState(-1);
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [showBubbleOnMobile, setShowBubbleOnMobile] = useState(false);
@@ -187,6 +190,8 @@ export const Header: React.FC<HeaderProps> = ({
       navigate(entry.href);
     } else if (entry.id === 'settings') {
       setIsSettingsOpen(true);
+    } else if (entry.id === 'help') {
+      setIsHelpOpen(true);
     }
     closeMenu();
   }, [focusedIdx, navigate, closeMenu]);
@@ -194,7 +199,10 @@ export const Header: React.FC<HeaderProps> = ({
   // ── Header button list (dynamic — only buttons that are present) ─────────────
   const headerButtons = useCallback(() => {
     const btns: Array<{ id: string; label: string; action: () => void }> = [];
-    if (onGlobalStateToggle)  btns.push({ id: 'memo',   label: 'Memo',   action: onGlobalStateToggle });
+    if (onGlobalStateToggle) {
+      btns.push({ id: 'help',   label: 'Help',   action: () => setIsHelpOpen(true) });
+      btns.push({ id: 'memo',   label: 'Memo',   action: onGlobalStateToggle });
+    }
     if (onToggleSelectMode)   btns.push({ id: 'select', label: 'Select', action: onToggleSelectMode });
     if (onCanvasModeToggle)   btns.push({ id: 'list',   label: showCanvasMode ? 'Canvas' : 'List', action: onCanvasModeToggle });
     if (!hideCreateButton) {
@@ -488,6 +496,23 @@ export const Header: React.FC<HeaderProps> = ({
             </Tooltip>
           )}
 
+          {/* Help */}
+          {onGlobalStateToggle && (
+            <Tooltip label="Shortcuts" shortcut="?" below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'help'}>
+              <button
+                onClick={() => setIsHelpOpen(true)}
+                data-header-btn-id="help"
+                className={classNames(
+                  'flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
+                  isHeaderFocused && hBtns[headerFocusIdx]?.id === 'help' && 'ring-2 ring-inset ring-sky-400'
+                )}
+              >
+                <HelpCircle className="h-4 w-4" />
+                <span className="text-[9px] font-bold leading-none uppercase tracking-tighter hidden sm:block">Help</span>
+              </button>
+            </Tooltip>
+          )}
+
           {/* Memo */}
           {onGlobalStateToggle && (
             <Tooltip label={showGlobalState ? 'Memo ON' : 'Memo'} shortcut="g" below={!isBottom} forceVisible={isHeaderFocused && hBtns[headerFocusIdx]?.id === 'memo'}>
@@ -618,6 +643,7 @@ export const Header: React.FC<HeaderProps> = ({
       {isBottom && <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />}
     </header>
     <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+    <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </>
   );
 };
