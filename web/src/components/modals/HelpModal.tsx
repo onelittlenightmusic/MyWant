@@ -2,6 +2,7 @@ import React from 'react';
 import { BaseModal } from './BaseModal';
 import { Keyboard, Gamepad, MousePointer2, Move, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, CornerDownLeft, X, Circle, Square, Triangle } from 'lucide-react';
 import { useInputActions } from '@/hooks/useInputActions';
+import { classNames } from '@/utils/helpers';
 
 interface HelpModalProps {
   isOpen: boolean;
