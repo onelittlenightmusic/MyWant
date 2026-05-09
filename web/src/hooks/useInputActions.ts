@@ -184,15 +184,25 @@ function _emit(action: GamepadActionType): void {
       ? (`move-${action}` as GamepadActionType)
       : action;
 
+  const isTabAction = effectiveAction === 'tab-forward' || effectiveAction === 'tab-backward';
+
   if (_captureListener) {
-    _captureListener(effectiveAction);
+    if (isTabAction) {
+      _tabActionConsumed = false;
+      _captureListener(effectiveAction);
+      if (!_tabActionConsumed) {
+        _focusNext(effectiveAction === 'tab-backward');
+      }
+    } else {
+      _captureListener(effectiveAction);
+    }
     return;
   }
 
   // For tab-like actions, fire all listeners first (so custom callbacks can
   // set _tabActionConsumed), then — if no listener consumed it — do the
   // default DOM-focus simulation exactly once.
-  if (effectiveAction === 'tab-forward' || effectiveAction === 'tab-backward') {
+  if (isTabAction) {
     _tabActionConsumed = false;
     _listeners.forEach(fn => fn(effectiveAction));
     if (!_tabActionConsumed) {
@@ -340,7 +350,7 @@ function _isInSidebar(target?: HTMLElement | null): boolean {
 // _emit, so multiple registered listeners never multiply this call).
 
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
 function _focusNext(reverse: boolean): void {
   // Use getBoundingClientRect for visibility check — more reliable than
@@ -349,6 +359,12 @@ function _focusNext(reverse: boolean): void {
     document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
   ).filter(el => {
     if (el.closest('[aria-hidden="true"]')) return false;
+    
+    // Visibility check
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (parseFloat(style.opacity) === 0) return false;
+
     const rect = el.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   });
@@ -376,8 +392,8 @@ function _focusNext(reverse: boolean): void {
  * Keyboard mapping:
  *   Arrow keys   → onNavigate (up / down / left / right)
  *   Home / End   → onNavigate (home / end)
- *   Enter        → onConfirm
- *   Escape       → onCancel
+ *   Enter        → onConfirm (KeyUp - aligned with Gamepad A release)
+ *   Escape       → onCancel (KeyUp - aligned with Gamepad B release)
  *   Space        → onToggle
  *   Alt+Space    → onMenuToggle
  *   Shift+Space  → onContextMenu
@@ -481,12 +497,11 @@ export function useInputActions({
           break;
         case 'Home':       e.preventDefault(); onNavigateRef.current?.('home');  break;
         case 'End':        e.preventDefault(); onNavigateRef.current?.('end');   break;
-        // Enter / Escape — only preventDefault when we handle them
+        // Enter / Escape — only handled on keydown if they would NOT be handled on keyup.
+        // But to unify timing, we move them to keyup.
         case 'Enter':
-          if (onConfirmRef.current) { e.preventDefault(); onConfirmRef.current(); }
-          break;
         case 'Escape':
-          if (onCancelRef.current) { e.preventDefault(); onCancelRef.current(); }
+          // Reserved for keyup handler below
           break;
         // Space variants — priority: Alt > Shift > plain
         case ' ':
@@ -522,8 +537,28 @@ export function useInputActions({
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (!enabledRef.current) return;
+      const target = e.target as HTMLElement;
+      if (ignoreWhenInputFocused && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (ignoreWhenInSidebar && _isInSidebar(target)) return;
+
+      switch (e.key) {
+        case 'Enter':
+          if (onConfirmRef.current) { e.preventDefault(); onConfirmRef.current(); }
+          break;
+        case 'Escape':
+          if (onCancelRef.current) { e.preventDefault(); onCancelRef.current(); }
+          break;
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup',   handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup',   handleKeyUp);
+    };
   }, [enabled, captureInput, gamepadOnly, captureGamepad, captureTab, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Capture-phase keyboard handler — active when captureInput is true ────────
@@ -538,21 +573,11 @@ export function useInputActions({
       if (!enabledRef.current) return;
       const target = e.target as HTMLElement;
       // isInputEl: focus is inside a text-editing element.
-      // For arrow keys we do NOT bail out unconditionally — if onNavigate is
-      // registered it means the owning component (e.g. WantForm in type-selection
-      // phase) has declared that directional input belongs to it regardless of
-      // which DOM element has focus.  That state is expressed through the callback
-      // existing, not through where the cursor happens to sit.
-      // For all other keys we keep the guard so typing, Enter, Escape etc. still
-      // work normally inside form inputs.
       const isInputEl = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
       let handled = false;
       switch (e.key) {
-        // Arrow keys: capture when a navigation handler is registered (= the owning
-        // component's state says "I own directional input now").  If no handler is
-        // registered AND focus is on an input element, yield so the input can move
-        // its cursor normally.
+        // Arrow keys: capture when a navigation handler is registered
         case 'ArrowUp': {
           const fn = e.shiftKey ? onMoveRef.current : onNavigateRef.current;
           if (fn) { handled = true; fn('up'); }
@@ -577,14 +602,15 @@ export function useInputActions({
           else if (isInputEl) return;
           break;
         }
-        // Non-arrow keys: preserve INPUT guard — typing, Enter, Escape etc. must
-        // still work normally inside text inputs.
         case 'Home': if (isInputEl) return; if (onNavigateRef.current) { handled = true; onNavigateRef.current('home'); } break;
         case 'End':  if (isInputEl) return; if (onNavigateRef.current) { handled = true; onNavigateRef.current('end');  } break;
-        case 'Enter':  if (isInputEl) return; if (onConfirmRef.current)  { handled = true; onConfirmRef.current();  } break;
-        // Escape: no INPUT guard — regardless of DOM focus, the owning component
-        // (captureInput: true) declares it handles cancel in this context.
-        case 'Escape': if (onCancelRef.current) { handled = true; onCancelRef.current(); } break;
+        
+        // Enter / Escape: alignment with KeyUp (see below)
+        case 'Enter':
+        case 'Escape':
+          // Reserved for keyup handler below
+          break;
+
         case ' ':
           if (e.altKey) {
             if (onMenuToggleRef.current)  { handled = true; onMenuToggleRef.current(); }
@@ -624,8 +650,41 @@ export function useInputActions({
       }
     };
 
+    const handleKeyUpCapture = (e: KeyboardEvent) => {
+      if (!enabledRef.current) return;
+      const target = e.target as HTMLElement;
+      const isInputEl = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      let handled = false;
+      switch (e.key) {
+        case 'Enter':
+          if (isInputEl) return;
+          if (onConfirmRef.current) { handled = true; onConfirmRef.current(); }
+          break;
+        case 'Escape':
+          // Centralized Escape/Blur behavior for interact-input
+          if (isInputEl && target.hasAttribute('data-interact-input')) {
+            target.blur();
+            handled = true;
+          } else if (onCancelRef.current) {
+            handled = true;
+            onCancelRef.current();
+          }
+          break;
+      }
+
+      if (handled) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDownCapture, true);
-    return () => window.removeEventListener('keydown', handleKeyDownCapture, true);
+    window.addEventListener('keyup',   handleKeyUpCapture,   true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDownCapture, true);
+      window.removeEventListener('keyup',   handleKeyUpCapture,   true);
+    };
   }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── captureTab: capture-phase listener that owns keyboard Tab exclusively ─────

@@ -1249,6 +1249,12 @@ export const Dashboard: React.FC = () => {
       if (dir === 'left')  setBatchFocusIdx(i => (i + 2) % 3);
       if (dir === 'right') setBatchFocusIdx(i => (i + 1) % 3);
     },
+    onTabForward: () => {
+      setBatchFocusIdx(i => (i + 1) % 3);
+    },
+    onTabBackward: () => {
+      setBatchFocusIdx(i => (i + 2) % 3);
+    },
     onConfirm: () => {
       const action = BATCH_ACTIONS[batchFocusIdx];
       if (!action || selectedWantIds.size === 0) return;
@@ -1342,28 +1348,6 @@ export const Dashboard: React.FC = () => {
       wantCanvasRef.current?.cancelKeyboardDrag();
     },
   });
-
-  // Separate Escape handler for interact input (since useEscapeKey ignores input elements)
-  // Use capture phase to catch the event before other handlers
-  useEffect(() => {
-    const handleInteractInputEscape = (e: KeyboardEvent) => {
-      console.log('[Dashboard] Escape handler triggered, key:', e.key, 'activeElement:', document.activeElement);
-      if (e.key === 'Escape') {
-        const interactInput = document.querySelector('[data-interact-input]') as HTMLInputElement;
-        console.log('[Dashboard] interactInput element:', interactInput, 'matches activeElement:', interactInput === document.activeElement);
-        if (interactInput && document.activeElement === interactInput) {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('[Dashboard] Escape pressed on interact input, blurring');
-          interactInput.blur();
-        }
-      }
-    };
-
-    // Use capture phase (true) to catch event before it reaches other handlers
-    window.addEventListener('keydown', handleInteractInputEscape, true);
-    return () => window.removeEventListener('keydown', handleInteractInputEscape, true);
-  }, []);
 
   // Keyboard shortcuts: a (add), s (summary), Shift+S (select), Ctrl+A (select all in select mode), q (focus suggestion input)
   // NOTE: All dashboard shortcuts are DISABLED when in Add Mode (sidebar.showForm=true)

@@ -232,6 +232,18 @@ export const Header: React.FC<HeaderProps> = ({
       if (dir === 'right') setHeaderFocusIdx(i => Math.min(hBtns.length - 1, i + 1));
     } : undefined,
 
+    onTabForward: menuOpen ? () => {
+      setFocusedIdx(i => (i < 0 ? 0 : (i + 1) % NAV_ENTRIES.length));
+    } : isHeaderFocused ? () => {
+      setHeaderFocusIdx(i => (i < 0 ? 0 : (i + 1) % hBtns.length));
+    } : undefined,
+
+    onTabBackward: menuOpen ? () => {
+      setFocusedIdx(i => (i <= 0 ? NAV_ENTRIES.length - 1 : i - 1));
+    } : isHeaderFocused ? () => {
+      setHeaderFocusIdx(i => (i <= 0 ? hBtns.length - 1 : i - 1));
+    } : undefined,
+
     // Confirm/cancel for menu or header selection.
     onConfirm: menuOpen ? confirmFocusedItem
       : isHeaderFocused ? () => {

@@ -88,6 +88,12 @@ const ChoiceContentSection: React.FC<WantCardPluginProps> = ({
       if (dir === 'up') setHighlightedIndex(i => Math.max(0, i - 1));
       else if (dir === 'down') setHighlightedIndex(i => Math.min(choices.length - 1, i + 1));
     },
+    onTabForward: () => {
+      setHighlightedIndex(i => (i < choices.length - 1 ? i + 1 : 0));
+    },
+    onTabBackward: () => {
+      setHighlightedIndex(i => (i > 0 ? i - 1 : choices.length - 1));
+    },
     onConfirm: () => {
       if (choices[highlightedIndex] !== undefined) handleSelect(choices[highlightedIndex]);
     },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BaseModal } from './BaseModal';
 import { useConfigStore } from '@/stores/configStore';
 import { useDebugStore } from '@/stores/debugStore';
@@ -6,39 +6,51 @@ import { POLLING_PRESETS } from '@/constants/polling';
 import { Monitor, Sun, Moon, Layout as LayoutIcon, ArrowUp, ArrowDown, Power, RotateCcw, ShieldAlert, Bug } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 import { apiClient } from '@/api/client';
+import { useInputActions } from '@/hooks/useInputActions';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const COLOR_MODES = [
+  { id: 'light'  as const, label: 'Light',  icon: Sun },
+  { id: 'dark'   as const, label: 'Dark',   icon: Moon },
+  { id: 'system' as const, label: 'System', icon: Monitor },
+];
+
+const HEADER_POSITIONS = [
+  { id: 'top'    as const, label: 'Top',    icon: ArrowUp },
+  { id: 'bottom' as const, label: 'Bottom', icon: ArrowDown },
+];
+
+// Number of buttons in each navigation group (must match JSX order).
+// Group 0: Appearance  (colorModes)
+// Group 1: Layout      (headerPositions)
+// Group 2: Debug       (pollingPresets)
+// Group 3: System      (restart, stop)
+const GROUP_SIZES = [COLOR_MODES.length, HEADER_POSITIONS.length, POLLING_PRESETS.length, 2];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { config, updateConfig } = useConfigStore();
   const { pollingIntervalMs, setPollingIntervalMs } = useDebugStore();
   const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [focus, setFocus] = useState({ group: -1, item: -1 });
 
-  if (!config) return null;
-
-  const colorModes = [
-    { id: 'light', label: 'Light', icon: Sun },
-    { id: 'dark', label: 'Dark', icon: Moon },
-    { id: 'system', label: 'System', icon: Monitor },
-  ] as const;
-
-  const headerPositions = [
-    { id: 'top', label: 'Top', icon: ArrowUp },
-    { id: 'bottom', label: 'Bottom', icon: ArrowDown },
-  ] as const;
+  // Initialize focus to first button when modal opens; reset on close.
+  useEffect(() => {
+    if (isOpen) setFocus({ group: 0, item: 0 });
+    else        setFocus({ group: -1, item: -1 });
+  }, [isOpen]);
 
   const handleStopServer = async () => {
     if (!confirm('Are you sure you want to STOP the server? You will lose connection to this dashboard.')) return;
-    
     setIsProcessing(true);
     try {
       const res = await apiClient.stopServer();
       setMessage(res.message);
-    } catch (err) {
+    } catch {
       setMessage('Failed to stop server');
     } finally {
       setIsProcessing(false);
@@ -47,33 +59,84 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   const handleRestartServer = async () => {
     if (!confirm('Are you sure you want to RESTART the server? The dashboard will briefly lose connection.')) return;
-
     setIsProcessing(true);
     try {
       const res = await apiClient.restartServer();
       setMessage(res.message);
-      // Optional: reload page after a delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
-    } catch (err) {
+      setTimeout(() => window.location.reload(), 5000);
+    } catch {
       setMessage('Failed to restart server');
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Action table indexed by [group][item] — must match GROUP_SIZES and JSX order.
+  const groupActions: Array<Array<() => void>> = [
+    COLOR_MODES.map(m => () => updateConfig({ color_mode: m.id })),
+    HEADER_POSITIONS.map(p => () => updateConfig({ header_position: p.id })),
+    POLLING_PRESETS.map(p => () => setPollingIntervalMs(p.value)),
+    [handleRestartServer, handleStopServer],
+  ];
+
+  useInputActions({
+    enabled: isOpen,
+    captureInput: isOpen,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+
+    onNavigate: (dir) => {
+      setFocus(prev => {
+        switch (dir) {
+          case 'up': {
+            if (prev.group <= 0) return prev;
+            const g = prev.group - 1;
+            return { group: g, item: Math.min(prev.item, GROUP_SIZES[g] - 1) };
+          }
+          case 'down': {
+            if (prev.group >= GROUP_SIZES.length - 1) return prev;
+            const g = prev.group + 1;
+            return { group: g, item: Math.min(prev.item, GROUP_SIZES[g] - 1) };
+          }
+          case 'left':
+            return { ...prev, item: Math.max(0, prev.item - 1) };
+          case 'right':
+            return { ...prev, item: Math.min(GROUP_SIZES[prev.group] - 1, prev.item + 1) };
+          case 'home':
+            return { group: 0, item: 0 };
+          case 'end': {
+            const lastG = GROUP_SIZES.length - 1;
+            return { group: lastG, item: GROUP_SIZES[lastG] - 1 };
+          }
+          default:
+            return prev;
+        }
+      });
+    },
+
+    onConfirm: () => {
+      const { group, item } = focus;
+      if (group >= 0 && item >= 0) groupActions[group]?.[item]?.();
+    },
+
+    onCancel: onClose,
+  });
+
+  if (!config) return null;
+
+  const isFocused = (g: number, i: number) => focus.group === g && focus.item === i;
+
   return (
     <BaseModal isOpen={isOpen} onClose={onClose} title="Settings" size="sm">
       <div className="space-y-8">
-        {/* Color Mode */}
+        {/* Color Mode — group 0 */}
         <section>
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
             <Sun className="w-4 h-4 mr-2" />
             Appearance
           </h4>
           <div className="grid grid-cols-3 gap-3">
-            {colorModes.map((mode) => (
+            {COLOR_MODES.map((mode, i) => (
               <button
                 key={mode.id}
                 onClick={() => updateConfig({ color_mode: mode.id })}
@@ -81,7 +144,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all",
                   config.color_mode === mode.id
                     ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
-                    : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                    : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400",
+                  isFocused(0, i) && "ring-2 ring-sky-400 dark:ring-sky-400"
                 )}
               >
                 <mode.icon className="w-6 h-6 mb-2" />
@@ -91,14 +155,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </section>
 
-        {/* Header Position */}
+        {/* Header Position — group 1 */}
         <section>
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
             <LayoutIcon className="w-4 h-4 mr-2" />
             Layout (Mobile Friendly)
           </h4>
           <div className="grid grid-cols-2 gap-3">
-            {headerPositions.map((pos) => (
+            {HEADER_POSITIONS.map((pos, i) => (
               <button
                 key={pos.id}
                 onClick={() => updateConfig({ header_position: pos.id })}
@@ -106,7 +170,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   "flex items-center justify-center p-4 rounded-xl border-2 transition-all",
                   config.header_position === pos.id
                     ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
-                    : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                    : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400",
+                  isFocused(1, i) && "ring-2 ring-sky-400 dark:ring-sky-400"
                 )}
               >
                 <pos.icon className="w-5 h-5 mr-3" />
@@ -119,7 +184,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </p>
         </section>
 
-        {/* Debug Options */}
+        {/* Debug Options — group 2 */}
         <section className="pt-4 border-t border-gray-100 dark:border-gray-800">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
             <Bug className="w-4 h-4 mr-2" />
@@ -128,7 +193,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           <div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Polling interval (dashboard &amp; want detail ETag checks)</p>
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${POLLING_PRESETS.length}, 1fr)` }}>
-              {POLLING_PRESETS.map((preset) => (
+              {POLLING_PRESETS.map((preset, i) => (
                 <button
                   key={preset.value}
                   onClick={() => setPollingIntervalMs(preset.value)}
@@ -136,7 +201,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                     "flex items-center justify-center p-3 rounded-xl border-2 transition-all text-xs font-medium",
                     pollingIntervalMs === preset.value
                       ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
-                      : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400"
+                      : "border-gray-100 bg-white text-gray-600 hover:border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400",
+                    isFocused(2, i) && "ring-2 ring-sky-400 dark:ring-sky-400"
                   )}
                 >
                   {preset.label}
@@ -146,7 +212,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         </section>
 
-        {/* System Control */}
+        {/* System Control — group 3 */}
         <section className="pt-4 border-t border-gray-100 dark:border-gray-800">
           <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center text-red-600 dark:text-red-400">
             <ShieldAlert className="w-4 h-4 mr-2" />
@@ -156,7 +222,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <button
               onClick={handleRestartServer}
               disabled={isProcessing}
-              className="flex items-center justify-center p-3 rounded-xl border-2 border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400 disabled:opacity-50"
+              className={classNames(
+                "flex items-center justify-center p-3 rounded-xl border-2 border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400 disabled:opacity-50",
+                isFocused(3, 0) && "ring-2 ring-sky-400 dark:ring-sky-400"
+              )}
             >
               <RotateCcw className="w-5 h-5 mr-2" />
               <span className="text-sm font-medium">Restart</span>
@@ -164,7 +233,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <button
               onClick={handleStopServer}
               disabled={isProcessing}
-              className="flex items-center justify-center p-3 rounded-xl border-2 border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-all dark:bg-red-900/20 dark:border-red-900/30 dark:text-red-400 disabled:opacity-50"
+              className={classNames(
+                "flex items-center justify-center p-3 rounded-xl border-2 border-red-100 bg-red-50 text-red-700 hover:bg-red-100 transition-all dark:bg-red-900/20 dark:border-red-900/30 dark:text-red-400 disabled:opacity-50",
+                isFocused(3, 1) && "ring-2 ring-sky-400 dark:ring-sky-400"
+              )}
             >
               <Power className="w-5 h-5 mr-2" />
               <span className="text-sm font-medium">Stop</span>

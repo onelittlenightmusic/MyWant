@@ -138,6 +138,12 @@ export const SelectInput = forwardRef<SelectInputHandle, SelectInputProps>(({
         setHighlightedIndex(i => (i < optionsRef.current.length - 1 ? i + 1 : 0));
       }
     },
+    onTabForward: () => {
+      setHighlightedIndex(i => (i < optionsRef.current.length - 1 ? i + 1 : 0));
+    },
+    onTabBackward: () => {
+      setHighlightedIndex(i => (i > 0 ? i - 1 : optionsRef.current.length - 1));
+    },
     onConfirm: () => confirm(highlightedIndexRef.current),
     onCancel: close,
   });
