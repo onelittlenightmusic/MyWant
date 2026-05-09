@@ -386,10 +386,8 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
     const cx = (el.scrollLeft - osx + fpx) / cur;
     const cy = (el.scrollTop  - osy + fpy) / cur;
 
-    const animated = !isGestureZoomRef.current;
-
-    if (!animated) {
-      // Gesture zoom: apply transform + scroll directly to DOM so there's no
+    if (isGestureZoomRef.current) {
+      // Gesture (pinch / wheel): apply transform + scroll directly to DOM so there's no
       // frame where scroll and transform are mismatched (which causes jitter).
       const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
       const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
@@ -407,24 +405,43 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
       return;
     }
 
+    // Button zoom: CSS transition animates the scale; RAF animates scroll in sync.
+    // Key fix: use the EXACT same cubic-bezier as the CSS transition so easing
+    // curves match perfectly and the focal point stays fixed throughout.
     onScaleChange?.(clamped);
 
-    // Button zoom: animate scroll position over the same duration as the CSS transition
     const DURATION = 180;
+    const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
+    const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
+    const targetSl = cx * clamped + nextOsx - fpx;
+    const targetSt = cy * clamped + nextOsy - fpy;
     const startSl = el.scrollLeft;
     const startSt = el.scrollTop;
     if (scrollAnimRafRef.current !== null) cancelAnimationFrame(scrollAnimRafRef.current);
-    let startTime: number | null = null;
 
+    // Evaluate CSS cubic-bezier(0.25, 0.46, 0.45, 0.94) exactly — matches
+    // the `transition: transform 180ms cubic-bezier(...)` applied by React's JSX.
+    const cssEase = (t: number): number => {
+      const p1x = 0.25, p1y = 0.46, p2x = 0.45, p2y = 0.94;
+      const cx3 = 3 * p1x, bx3 = 3 * (p2x - p1x) - cx3, ax3 = 1 - cx3 - bx3;
+      const cy3 = 3 * p1y, by3 = 3 * (p2y - p1y) - cy3, ay3 = 1 - cy3 - by3;
+      // Newton's method: find parameter s where bezierX(s) == t
+      let s = t;
+      for (let i = 0; i < 8; i++) {
+        const x = s * (cx3 + s * (bx3 + s * ax3)) - t;
+        if (Math.abs(x) < 1e-4) break;
+        const dx = cx3 + s * (2 * bx3 + 3 * ax3 * s);
+        if (Math.abs(dx) < 1e-6) break;
+        s -= x / dx;
+      }
+      return s * (cy3 + s * (by3 + s * ay3));
+    };
+
+    // Pre-record start time so t=0 aligns with when React commits the transform change.
+    const t0 = performance.now();
     const animScroll = (timestamp: number) => {
-      if (startTime === null) startTime = timestamp;
-      const t = Math.min((timestamp - startTime) / DURATION, 1);
-      // ease-out cubic
-      const ease = 1 - Math.pow(1 - t, 3);
-      const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
-      const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
-      const targetSl = cx * clamped + nextOsx - fpx;
-      const targetSt = cy * clamped + nextOsy - fpy;
+      const t = Math.min((timestamp - t0) / DURATION, 1);
+      const ease = cssEase(t);
       if (scrollRef.current) {
         scrollRef.current.scrollLeft = startSl + (targetSl - startSl) * ease;
         scrollRef.current.scrollTop  = startSt + (targetSt - startSt) * ease;
@@ -440,6 +457,59 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
 
   const applyScaleRef = useRef(applyScaleWithCenter);
   useEffect(() => { applyScaleRef.current = applyScaleWithCenter; }, [applyScaleWithCenter]);
+
+  // Gamepad analog: L-stick (axes 0/1) → canvas scroll, R-stick Y (axis 3) → zoom
+  useEffect(() => {
+    const SCROLL_SPEED = 12; // screen-px per frame at full deflection (~720 px/s at 60 fps)
+    const ZOOM_SPEED   = 0.004; // scale-units accumulated per frame at full deflection
+    const DEADZONE     = 0.15;
+
+    let scaleAccum = 0;
+    let rafHandle: number;
+
+    const poll = () => {
+      const gamepads = navigator.getGamepads?.();
+      if (gamepads) {
+        for (let gi = 0; gi < gamepads.length; gi++) {
+          const gp = gamepads[gi];
+          if (!gp) continue;
+
+          // L-stick scroll
+          const lx = Math.abs(gp.axes[0]) > DEADZONE ? gp.axes[0] : 0;
+          const ly = Math.abs(gp.axes[1]) > DEADZONE ? gp.axes[1] : 0;
+          const el = scrollRef.current;
+          if (el && (lx !== 0 || ly !== 0)) {
+            el.scrollLeft += lx * SCROLL_SPEED;
+            el.scrollTop  += ly * SCROLL_SPEED;
+          }
+
+          // R-stick Y zoom: up (axis < 0) → zoom in, down (axis > 0) → zoom out.
+          // Uses gesture path (immediate DOM update) because zoom fires every ~12 frames;
+          // overlapping 180ms animations would fight each other.
+          const ry = gp.axes.length > 3 && Math.abs(gp.axes[3]) > DEADZONE ? gp.axes[3] : 0;
+          if (ry !== 0) {
+            scaleAccum -= ry * ZOOM_SPEED; // invert: stick-up (negative axis) → zoom in
+            if (scaleAccum >= SCALE_STEP / 2 || scaleAccum <= -(SCALE_STEP / 2)) {
+              const newScale = Math.round(
+                (scaleRef.current + (scaleAccum > 0 ? SCALE_STEP : -SCALE_STEP)) * 10
+              ) / 10;
+              const prev = isGestureZoomRef.current;
+              isGestureZoomRef.current = true;
+              applyScaleRef.current(newScale);
+              isGestureZoomRef.current = prev;
+              scaleAccum = 0;
+            }
+          } else {
+            scaleAccum = 0;
+          }
+        }
+      }
+      rafHandle = requestAnimationFrame(poll);
+    };
+
+    rafHandle = requestAnimationFrame(poll);
+    return () => cancelAnimationFrame(rafHandle);
+  }, []);
 
   // Non-passive wheel + pinch listeners (React's synthetic handlers are passive)
   useEffect(() => {

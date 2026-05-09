@@ -262,30 +262,9 @@ function _pollGamepads(): void {
         }
       }
 
-      // Left analog stick — supplements / replaces D-pad on controllers without
-      // discrete D-pad buttons.
-      const axisBindings: [axisIdx: number, sign: -1 | 1, action: NavigationDirection][] = [
-        [0, -1, 'left'],
-        [0, +1, 'right'],
-        [1, -1, 'up'],
-        [1, +1, 'down'],
-      ];
-      for (const [axisIdx, sign, action] of axisBindings) {
-        if (axisIdx >= gp.axes.length) continue;
-        const key = `${gi}:a${axisIdx}:${sign > 0 ? 'pos' : 'neg'}`;
-        const state = _getOrCreate(key);
-        const value = gp.axes[axisIdx];
-        const active = sign < 0 ? value < -AXIS_DEADZONE : value > AXIS_DEADZONE;
-
-        if (active && !state.pressed) {
-          state.pressed = true;
-          _emit(action);
-          _beginRepeat(key, action);
-        } else if (!active && state.pressed) {
-          state.pressed = false;
-          _endRepeat(key);
-        }
-      }
+      // Left stick (axes 0/1) is reserved for canvas analog scroll in WantCanvas.
+      // Right stick (axes 2/3) is reserved for canvas zoom.
+      // D-pad buttons (12-15) are the canonical navigation input.
     }
   }
 
