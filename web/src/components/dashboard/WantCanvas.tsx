@@ -77,6 +77,12 @@ interface WantCanvasProps {
   toolbarContent?: React.ReactNode;
   /** wantId → correlation rate (0–N); populated when radar mode is active */
   correlationHighlights?: Map<string, number>;
+  /**
+   * Pixels on the right side of the scroll container that are visually covered by an overlay
+   * (e.g. minimap on sm-lg screens where lg:pr-[480px] doesn't apply yet).
+   * The center calculation subtracts this so the logical viewport center stays accurate.
+   */
+  viewportInsetRight?: number;
 }
 
 export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
@@ -96,6 +102,7 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
   onTemplateDrop,
   toolbarContent,
   correlationHighlights,
+  viewportInsetRight = 0,
 }, ref) => {
   const colorMode = useColorMode();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -112,23 +119,33 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
   const [tileCenter, setTileCenter] = useState<{ x: number; y: number } | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
-  // Tracks the last applied center to avoid feedback loops
-  const lastAppliedCenterRef = useRef<{ x: number; y: number } | null>(null);
+  // Tracks the last applied center (grid coords + origin snapshot) to avoid feedback loops.
+  // ox/oy capture the grid origin at apply time so we can detect origin changes and re-apply.
+  const lastAppliedCenterRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const isUserScrollingRef = useRef(false);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Internal function to calculate current viewport center in canvas-space
+  // Returns viewport center in grid coordinates (same coordinate system as want positions).
+  // Grid (0,0) is the logical canvas center; values are viewport- and scale-independent.
+  // viewportInsetRight shrinks the effective viewport width on screens where the minimap
+  // overlays the canvas without adjusting the container's clientWidth.
   const getCanvasCenter = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return null;
     const s = scaleRef.current;
-    const vw = el.clientWidth;
+    const vw = el.clientWidth - viewportInsetRightRef.current;
     const vh = el.clientHeight;
     const osx = Math.max(0, (vw - canvasWRef.current * s) / 2);
     const osy = Math.max(0, (vh - canvasHRef.current * s) / 2);
+    // Canvas-space pixel at the visual viewport center
+    const rawX = (el.scrollLeft - osx + vw / 2) / s;
+    const rawY = (el.scrollTop  - osy + vh / 2) / s;
+    // Convert canvas pixels → grid coordinates: pixel = (grid + origin) * STEP + GAP/2
+    const gridX = (rawX - GAP / 2) / STEP - originXRef.current;
+    const gridY = (rawY - GAP / 2) / STEP - originYRef.current;
     return {
-      x: (el.scrollLeft - osx + vw / 2) / s,
-      y: (el.scrollTop - osy + vh / 2) / s,
+      x: Math.round(gridX * 100) / 100,
+      y: Math.round(gridY * 100) / 100,
     };
   }, []);
 
@@ -143,7 +160,7 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
         isUserScrollingRef.current = false;
         const center = getCanvasCenter();
         if (center) {
-          lastAppliedCenterRef.current = center;
+          lastAppliedCenterRef.current = { ...center, ox: originXRef.current, oy: originYRef.current };
           onCenterChange?.(center.x, center.y);
         }
       }, 300);
@@ -151,29 +168,6 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
   }, [getCanvasCenter, onCenterChange]);
-
-  // Apply external center changes (sync from other tabs)
-  useEffect(() => {
-    if (centerX === undefined || centerY === undefined) return;
-    if (isUserScrollingRef.current || isPanningRef.current || isGestureZoomRef.current) return;
-
-    // Skip if it's the same center we just reported
-    if (lastAppliedCenterRef.current &&
-        Math.abs(lastAppliedCenterRef.current.x - centerX) < 1 &&
-        Math.abs(lastAppliedCenterRef.current.y - centerY) < 1) return;
-
-    const el = scrollRef.current;
-    if (!el) return;
-    const s = scaleRef.current;
-    const vw = el.clientWidth;
-    const vh = el.clientHeight;
-    const osx = Math.max(0, (vw - canvasWRef.current * s) / 2);
-    const osy = Math.max(0, (vh - canvasHRef.current * s) / 2);
-
-    el.scrollLeft = centerX * s + osx - vw / 2;
-    el.scrollTop  = centerY * s + osy - vh / 2;
-    lastAppliedCenterRef.current = { x: centerX, y: centerY };
-  }, [centerX, centerY]);
 
   // Optimistic local overrides
   const [localOverrides, setLocalOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
@@ -202,6 +196,12 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
   // Refs so touch/wheel handlers (registered once) can read latest layout values
   const canvasWRef = useRef(0);
   const canvasHRef = useRef(0);
+  // Grid origin refs — updated each render so callbacks always have the latest value
+  const originXRef = useRef(0);
+  const originYRef = useRef(0);
+  // Right-side viewport inset (pixels covered by an overlay not yet reflected in clientWidth)
+  const viewportInsetRightRef = useRef(viewportInsetRight);
+  useEffect(() => { viewportInsetRightRef.current = viewportInsetRight; }, [viewportInsetRight]);
 
   // Internal flag to skip transitions during manual DOM updates
   const isGestureZoomRef = useRef(false);
@@ -357,6 +357,44 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
 
   canvasWRef.current = canvasW;
   canvasHRef.current = canvasH;
+  originXRef.current = originX;
+  originYRef.current = originY;
+
+  // Apply external center changes (sync from other tabs).
+  // centerX/centerY are in grid coordinates; we convert to canvas pixels here.
+  // originX/originY are deps so this re-runs when the canvas layout changes
+  // (e.g. wants finish loading on a fresh browser), correcting the scroll automatically.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (centerX === undefined || centerY === undefined) return;
+    if (isUserScrollingRef.current || isPanningRef.current || isGestureZoomRef.current) return;
+
+    // Skip only when grid coords AND canvas origin are both unchanged from last apply.
+    // If originX/Y changed (canvas bounds shifted), we must re-apply even for the same grid coord.
+    const last = lastAppliedCenterRef.current;
+    if (last &&
+        Math.abs(last.x - centerX) < 0.01 &&
+        Math.abs(last.y - centerY) < 0.01 &&
+        last.ox === originX &&
+        last.oy === originY) return;
+
+    const el = scrollRef.current;
+    if (!el) return;
+    const s = scaleRef.current;
+    const vw = el.clientWidth - viewportInsetRightRef.current;
+    const vh = el.clientHeight;
+
+    // Convert grid coordinates → canvas pixels: pixel = (grid + origin) * STEP + GAP/2
+    const rawX = (centerX + originX) * STEP + GAP / 2;
+    const rawY = (centerY + originY) * STEP + GAP / 2;
+
+    const osx = Math.max(0, (vw - canvasWRef.current * s) / 2);
+    const osy = Math.max(0, (vh - canvasHRef.current * s) / 2);
+
+    el.scrollLeft = rawX * s + osx - vw / 2;
+    el.scrollTop  = rawY * s + osy - vh / 2;
+    lastAppliedCenterRef.current = { x: centerX, y: centerY, ox: originX, oy: originY };
+  }, [centerX, centerY, originX, originY]);
 
   // Offsets used to center the grid if it's smaller than the viewport.
   const offsetX = Math.max(0, (viewportSize.width - canvasW * scale) / 2);

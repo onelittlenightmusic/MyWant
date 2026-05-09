@@ -94,6 +94,17 @@ export const Dashboard: React.FC = () => {
   const [minimapOpen, setMinimapOpen] = useState(window.innerWidth >= 1024); // Desktop default: true, Mobile: false
   const [radarMode, setRadarMode] = useState(false);
 
+  // Track viewport width so we can compute canvas insets correctly.
+  // On lg+ (≥1024px) screens, lg:pr-[480px] already narrows the canvas container.
+  // On sm-lg (640-1023px) screens, the minimap is fixed-overlay (w-[480px]) without container adjustment.
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const minimapInsetRight = minimapOpen && viewportWidth >= 640 && viewportWidth < 1024 ? 480 : 0;
+
   const config = useConfigStore(state => state.config);
   const isBottom = config?.header_position === 'bottom';
 
@@ -1571,6 +1582,7 @@ export const Dashboard: React.FC = () => {
                   setCanvasCenterX(x);
                   setCanvasCenterY(y);
                 }}
+                viewportInsetRight={minimapInsetRight}
                 floatCard={selectedWant && (() => {
                   const selectedId = selectedWant.metadata?.id || selectedWant.id;
                   const handleFloatCardView = (w: Want) => {
