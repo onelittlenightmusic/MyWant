@@ -21,6 +21,8 @@ interface SchedulingSectionProps {
   onToggleCollapse: () => void;
   /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
+  /** When true, hides the collapsible header (for use inside tabs) */
+  hideHeader?: boolean;
 }
 
 type ScheduleMode = 'manual' | 'global_param';
@@ -104,6 +106,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
   isCollapsed,
   onToggleCollapse,
   navigationCallbacks,
+  hideHeader,
 }, ref) => {
   // Editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -443,6 +446,7 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
       colorScheme="amber"
       isCollapsed={isCollapsed}
       onToggleCollapse={onToggleCollapse}
+      hideHeader={hideHeader}
       navigationCallbacks={navigationCallbacks}
       items={chipItems}
       onAddItem={handleAddItem}

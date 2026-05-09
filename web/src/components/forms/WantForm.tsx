@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Save, Plus, Heart, X, Code, Edit3, ChevronDown, Clock, Bot, FolderOpen, Crown, Search } from 'lucide-react';
+import { Save, Plus, Heart, Bot, FolderOpen, Crown } from 'lucide-react';
 import { Want, CreateWantRequest, UpdateWantRequest, WhenSpec } from '@/types/want';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorDisplay } from '@/components/common/ErrorDisplay';
@@ -13,11 +13,9 @@ import { RecommendationSelector } from '@/components/interact/RecommendationSele
 import { LabelsSection } from './sections/LabelsSection';
 import { DependenciesSection } from './sections/DependenciesSection';
 import { SchedulingSection } from './sections/SchedulingSection';
-import { ParametersSection } from './sections/ParametersSection';
 import { validateYaml, stringifyYaml } from '@/utils/yaml';
-import { generateWantName, generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
-import { addLabelToRegistry } from '@/utils/labelUtils';
-import { truncateText, classNames } from '@/utils/helpers';
+import { generateUniqueWantName, isValidWantName } from '@/utils/nameGenerator';
+import { classNames } from '@/utils/helpers';
 import { getBackgroundStyle } from '@/utils/backgroundStyles';
 import { useWantStore } from '@/stores/wantStore';
 import { useWantTypeStore } from '@/stores/wantTypeStore';
@@ -25,6 +23,12 @@ import { useRecipeStore } from '@/stores/recipeStore';
 import { ApiError } from '@/types/api';
 import { Recommendation, ConfigModifications } from '@/types/interact';
 import { useInputActions } from '@/hooks/useInputActions';
+import { ParameterGridSection } from './sections/ParameterGridSection';
+import { useConfigStore } from '@/stores/configStore';
+import { FormTab, FormTabBar, FORM_TABS } from './FormTabBar';
+
+type WFTab = FormTab | 'add';
+const WF_TABS: WFTab[] = [...FORM_TABS, 'add'];
 
 export interface WantFormHandle {
   navigateInventory: (dir: 'up' | 'down' | 'left' | 'right') => void;
@@ -81,12 +85,10 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
 
   const changeButtonRef = useRef<HTMLButtonElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const paramsSectionRef = useRef<HTMLButtonElement>(null);
   const labelsSectionRef = useRef<HTMLButtonElement>(null);
   const dependenciesSectionRef = useRef<HTMLButtonElement>(null);
   const schedulingSectionRef = useRef<HTMLButtonElement>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
-  const lastFocusedFieldRef = useRef<HTMLElement | null>(null);
   const exampleMenuRef = useRef<HTMLDivElement>(null);
 
   const [showExampleMenu, setShowExampleMenu] = useState(false);
@@ -101,50 +103,23 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null); // Selected want type or recipe ID
   const [selectedItemType, setSelectedItemType] = useState<'want-type' | 'recipe'>('want-type'); // Type of selected item
   const [userNameSuffix, setUserNameSuffix] = useState(''); // User-provided name suffix for auto generation
-  const [collapsedSections, setCollapsedSections] = useState<Set<'parameters' | 'labels' | 'dependencies' | 'scheduling'>>(() => {
-    // Parameters open by default, others collapsed
-    return new Set(['labels', 'dependencies', 'scheduling']);
-  });
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [activeFormTab, setActiveFormTab] = useState<WFTab>('params');
   const [addButtonFocused, setAddButtonFocused] = useState(false);
-  const [advancedFocused, setAdvancedFocused] = useState(false);
-  const [nameFocused, setNameFocused] = useState(false);
 
   // Recommendation mode state
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
   const isRecommendationMode = mode === 'recommendation';
 
-  // Shared section-level Tab cycle used by both keyboard Tab and gamepad L/R buttons.
-  // Cycle order: Change button → visible section headers → Name input → Add button → (wrap)
-  const navigateFormTab = useCallback((forward: boolean) => {
-    const els: HTMLElement[] = [];
-    if (!isEditing && changeButtonRef.current) els.push(changeButtonRef.current);
-    // Collect visible .focusable-section-header elements in DOM order.
-    // nameInputRef also carries this class, so it's included automatically — no explicit push needed.
-    document.querySelectorAll<HTMLElement>('.focusable-section-header').forEach(el => {
-      const rect = el.getBoundingClientRect();
-      if (rect.width > 0 && rect.height > 0) els.push(el);
+  // Cycle through form tabs including the Add button as the final stop
+  const navigateTab = useCallback((forward: boolean) => {
+    setActiveFormTab(prev => {
+      const idx = WF_TABS.indexOf(prev);
+      const next = forward
+        ? (idx + 1) % WF_TABS.length
+        : (idx - 1 + WF_TABS.length) % WF_TABS.length;
+      return WF_TABS[next];
     });
-    if (addButtonRef.current) els.push(addButtonRef.current);
-    if (els.length === 0) return;
-    const active = document.activeElement as HTMLElement | null;
-    const idx = active ? els.indexOf(active) : -1;
-    const next = forward
-      ? (idx < 0 ? 0 : (idx + 1) % els.length)
-      : (idx <= 0 ? els.length - 1 : idx - 1);
-    els[next]?.focus();
-  }, [isEditing]);
-
-  // Delegates to navigateFormTab for keyboard Tab from any section header
-  const handleFieldTab = useCallback(() => navigateFormTab(true), [navigateFormTab]);
-
-  // Tab cycle on Add button delegates to the shared handler
-  const handleAddButtonKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      navigateFormTab(e.shiftKey ? false : true);
-    }
-  };
+  }, []);
 
   // Form state
   const [name, setName] = useState('');
@@ -311,30 +286,15 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
         setSelectedItemType(isRecipe ? 'recipe' : 'want-type');
       }
 
-      // Auto-show advanced if editing want has labels, deps, or scheduling
-      const hasAdvanced =
-        Object.keys(editingWant.metadata?.labels || {}).length > 0 ||
-        (editingWant.spec?.using || []).length > 0 ||
-        (editingWant.spec?.when || []).length > 0;
-      setShowAdvanced(hasAdvanced);
+      // Auto-switch to Labels tab if editing want has labels; otherwise stay on Params
+      const hasLabels = Object.keys(editingWant.metadata?.labels || {}).length > 0;
+      if (hasLabels) setActiveFormTab('labels');
       setYamlContent(stringifyYaml({
         metadata: editingWant.metadata,
         spec: editingWant.spec
       }));
     }
   }, [editingWant, recipes]);
-
-  const toggleSection = (section: 'parameters' | 'labels' | 'dependencies' | 'scheduling') => {
-    setCollapsedSections(prev => {
-      const updated = new Set(prev);
-      if (updated.has(section)) {
-        updated.delete(section);
-      } else {
-        updated.add(section);
-      }
-      return updated;
-    });
-  };
 
   const resetForm = () => {
     setIsEditing(false);
@@ -346,7 +306,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
     setUsing([]);
     setWhen([]);
     setExposes([]);
-    setSelectedTypeId(null); // Reset selector state
+    setSelectedTypeId(null);
     setSelectedItemType('want-type');
     setUserNameSuffix('');
     setYamlContent(stringifyYaml({
@@ -355,8 +315,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
     }));
     setValidationError(null);
     setApiError(null);
-    setCollapsedSections(new Set(['parameters', 'labels', 'dependencies', 'scheduling']));
-    setShowAdvanced(false);
+    setActiveFormTab('params');
   };
 
   // Close example menu on outside click
@@ -411,14 +370,8 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
       } else {
         setParams({});
       }
-      // B: Auto-expand parameters section if type has params
-      if (hasParams) {
-        setCollapsedSections(prev => {
-          const updated = new Set(prev);
-          updated.delete('parameters');
-          return updated;
-        });
-      }
+      // Switch to params tab if type has params
+      if (hasParams) setActiveFormTab('params');
     }
   }, [selectedWantType, isEditing, type, selectedItemType]);
 
@@ -428,14 +381,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
       const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === type);
       if (selectedRecipe && selectedRecipe.recipe?.parameters) {
         setParams(selectedRecipe.recipe.parameters);
-        // B: Auto-expand parameters if recipe has params
-        if (Object.keys(selectedRecipe.recipe.parameters).length > 0) {
-          setCollapsedSections(prev => {
-            const updated = new Set(prev);
-            updated.delete('parameters');
-            return updated;
-          });
-        }
+        if (Object.keys(selectedRecipe.recipe.parameters).length > 0) setActiveFormTab('params');
       } else {
         setParams({});
       }
@@ -550,6 +496,17 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
     onSituationChange(selectedTypeId ? 'fields' : 'type-selection');
   }, [selectedTypeId, isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-focus the primary element when the active tab changes
+  useEffect(() => {
+    if (!selectedTypeId) return;
+    if (activeFormTab === 'name') {
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    } else if (activeFormTab === 'add') {
+      setTimeout(() => addButtonRef.current?.focus(), 50);
+    }
+    // 'params': auto-highlighted by ParameterGridSection (isActive prop drives it)
+  }, [activeFormTab, selectedTypeId]);
+
   // Confirm action: type phase → select focused item; params phase → Enter/click on active element
   const handleGamepadConfirm = useCallback(() => {
     if (isTypeSelectionPhase) {
@@ -576,60 +533,93 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
   }, [onClose]);
 
   // Dashboard owns arrow-key routing during type-selection phase via wantFormRef.
-  // WantForm only handles confirm/cancel and tab navigation for the fields phase.
+  // Fields phase: L/R Bumper / Tab cycles form tabs; confirm/cancel as before.
   useInputActions({
     enabled: isOpen && editMode === 'form',
-    captureInput: !isTypeSelectionPhase, // Dashboard captures in type-selection; WantForm captures in fields
+    captureInput: !isTypeSelectionPhase,
     ignoreWhenInputFocused: false,
     ignoreWhenInSidebar: false,
     onConfirm: handleGamepadConfirm,
     onCancel: handleGamepadCancel,
-    onTabForward:  !isTypeSelectionPhase ? () => navigateFormTab(true)  : undefined,
-    onTabBackward: !isTypeSelectionPhase ? () => navigateFormTab(false) : undefined,
+    onTabForward:  !isTypeSelectionPhase ? () => navigateTab(true)  : undefined,
+    onTabBackward: !isTypeSelectionPhase ? () => navigateTab(false) : undefined,
   });
 
-  // Per-element captureTab hooks — keyboard Tab/Shift+Tab with preventDefault so
-  // browser does not also move focus; gamepad L/R handled by form-level hook above.
-  useInputActions({
-    enabled: advancedFocused,
-    captureTab: true,
-    ignoreWhenInputFocused: false,
-    ignoreWhenInSidebar: false,
-    onTabForward:  () => navigateFormTab(true),
-    onTabBackward: () => navigateFormTab(false),
-  });
-
-  useInputActions({
-    enabled: nameFocused,
-    captureTab: true,
-    ignoreWhenInputFocused: false,
-    ignoreWhenInSidebar: false,
-    onTabForward:  () => navigateFormTab(true),
-    onTabBackward: () => navigateFormTab(false),
-  });
+  // Tab badge counts — shown on each tab button
+  const tabBadges = useMemo((): Record<FormTab, string | number | null> => {
+    const unfilledRequired = selectedWantType?.parameters
+      ? selectedWantType.parameters.filter(p => p.required && params[p.name] === undefined).length
+      : 0;
+    return {
+      name: (!name.trim() && !!selectedTypeId) ? '!' : null,
+      params: unfilledRequired > 0 ? `★${unfilledRequired}` : null,
+      labels: Object.keys(labels).length > 0 ? Object.keys(labels).length : null,
+      schedule: when.length > 0 ? when.length : null,
+      deps: using.length > 0 ? using.length : null,
+    };
+  }, [selectedWantType, params, name, selectedTypeId, labels, when, using]);
 
   const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
-  const [showFilter, setShowFilter] = useState(false);
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
+  const allExamples = useMemo(() => {
+    const recipeExamples = selectedItemType === 'recipe'
+      ? (recipes.find(r => r.recipe?.metadata?.custom_type === type)?.recipe?.examples ?? [])
+      : [];
+    const wantTypeExamples = selectedItemType === 'want-type'
+      ? (selectedWantType?.examples ?? [])
+      : [];
+    return [
+      ...wantTypeExamples.map((ex, i) => ({
+        key: `wt-${i}`, name: ex.name, description: ex.description,
+        onLoad: () => { setParams(ex.want?.spec?.params || {}); setExposes(ex.want?.spec?.exposes || []); },
+      })),
+      ...recipeExamples.map((ex, i) => ({
+        key: `re-${i}`, name: ex.name, description: ex.description,
+        onLoad: () => setParams(prev => ({ ...prev, ...ex.params })),
+      })),
+    ];
+  }, [selectedItemType, type, recipes, selectedWantType]);
 
   const headerAction = (
     <div className="flex items-stretch gap-0">
-      {!isEditing && !!selectedTypeId && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={() => setShowFilter(v => !v)}
-          className={classNames(
-            "flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none",
-            showFilter
-              ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
-              : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+      {!isEditing && !!selectedTypeId && allExamples.length > 0 && (
+        <div ref={exampleMenuRef} className="relative flex items-stretch">
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={() => setShowExampleMenu(v => !v)}
+            className={classNames(
+              "flex flex-col items-center justify-center gap-0.5 px-3 h-full transition-all duration-150 focus:outline-none",
+              showExampleMenu
+                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800"
+            )}
+            title="Load example"
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span className="text-[9px] font-bold uppercase tracking-tighter hidden sm:block">Example</span>
+          </button>
+          {showExampleMenu && (
+            <div className="absolute bottom-full right-0 mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-48 max-h-48 overflow-y-auto">
+              {allExamples.map(ex => (
+                <button
+                  key={ex.key}
+                  type="button"
+                  onClick={() => { ex.onLoad(); setShowExampleMenu(false); }}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{ex.name}</p>
+                  {ex.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{ex.description}</p>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
-          title="Toggle search/filter"
-        >
-          <Search className="w-4 h-4" />
-          <span className="text-[9px] font-bold uppercase tracking-tighter hidden sm:block">Filter</span>
-        </button>
+        </div>
       )}
       <div className="flex items-center h-full px-2">
         <FormYamlToggle
@@ -642,7 +632,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
         type="submit"
         disabled={isSubmitting || (!isEditing && !isTypeSelected)}
         form="want-form"
-        onKeyDown={handleAddButtonKeyDown}
+
         onFocus={() => setAddButtonFocused(true)}
         onBlur={() => setAddButtonFocused(false)}
         className={classNames(
@@ -701,14 +691,12 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
 
         {editMode === 'form' ? (
           <>
-            {/* Type/Recipe Selector or Recommendation Selector */}
+            {/* ── Phase 1: Type/Recipe selector or Recommendation selector ── */}
             {isRecommendationMode ? (
-              /* Recommendation Mode - always show selector or collapsed view */
               <div className={classNames(
-                selectedRecId && selectedRecommendation ? "flex-shrink-0" : "flex-1 min-h-0 flex flex-col"
+                selectedRecId && selectedRecommendation ? 'flex-shrink-0' : 'flex-1 min-h-0 flex flex-col'
               )}>
                 {selectedRecId && selectedRecommendation ? (
-                  /* Collapsed view - show selected recommendation with Change button */
                   <button
                     type="button"
                     onClick={() => {
@@ -730,87 +718,31 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                         <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{selectedRecommendation.approach}</p>
                       </div>
                     </div>
-                    <span className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-100 text-blue-700 transition-colors">
-                      Change
-                    </span>
+                    <span className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-100 text-blue-700 transition-colors">Change</span>
                   </button>
                 ) : (
-                  /* Recommendation Selector */
                   <RecommendationSelector
                     recommendations={recommendations}
                     selectedId={selectedRecId}
                     onSelect={(rec) => {
                       setSelectedRecId(rec.id);
                       onRecommendationSelect?.(rec);
-
-                      // Auto-populate form from recommendation
-                      // The first want in the recommendation's config will be used as the primary want
-                      if (rec.config && rec.config.wants && rec.config.wants.length > 0) {
-                        const firstWant = rec.config.wants[0];
-                        // Populate form fields from the first want
-                        setName(firstWant.metadata?.name || '');
-                        setType(firstWant.metadata?.type || '');
-                        setLabels(firstWant.metadata?.labels || {});
-                        setParams(firstWant.spec?.params || {});
-                        setUsing(firstWant.spec?.using || []);
-                        setWhen(firstWant.spec?.when || []);
-                        setSelectedTypeId(firstWant.metadata?.type || null);
+                      if (rec.config?.wants?.length) {
+                        const fw = rec.config.wants[0];
+                        setName(fw.metadata?.name || '');
+                        setType(fw.metadata?.type || '');
+                        setLabels(fw.metadata?.labels || {});
+                        setParams(fw.spec?.params || {});
+                        setUsing(fw.spec?.using || []);
+                        setWhen(fw.spec?.when || []);
+                        setSelectedTypeId(fw.metadata?.type || null);
                       }
                     }}
                   />
                 )}
               </div>
-            ) : selectedTypeId ? (
-              /* Type selected — slot header with Change button */
-              (() => {
-                const selWt = userFacingWantTypes.find(wt => wt.name === selectedTypeId);
-                const selRec = recipes.find(r => r.recipe?.metadata?.custom_type === selectedTypeId);
-                const title = selWt?.title || selRec?.recipe?.metadata?.name || selectedTypeId;
-                const category = selWt?.category || selRec?.recipe?.metadata?.category;
-                return (
-                  <div className="flex-shrink-0 flex items-center gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <WantSlot
-                      id={selectedTypeId}
-                      itemType={selectedItemType}
-                      category={category}
-                      size={56}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{title}</p>
-                      {category && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 capitalize">{category}</p>
-                      )}
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                        {selectedItemType === 'recipe' ? '📦 Recipe' : '⚡ Want Type'}
-                      </p>
-                    </div>
-                    {!isEditing && (
-                      <button
-                        ref={changeButtonRef}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTypeId(null);
-                          setSelectedItemType('want-type');
-                          setType('');
-                          setName('');
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Tab') {
-                            e.preventDefault();
-                            if (e.shiftKey) { addButtonRef.current?.focus(); }
-                            else { paramsSectionRef.current?.focus(); }
-                          }
-                        }}
-                        className="sidebar-focus-ring px-3 py-1.5 text-xs font-medium rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
-                      >
-                        Change
-                      </button>
-                    )}
-                  </div>
-                );
-              })()
-            ) : (
-              /* No type selected — Minecraft-style inventory picker */
+            ) : !selectedTypeId ? (
+              /* Inventory picker (no type selected yet) */
               <div className="flex-1 min-h-0">
                 <WantInventoryPicker
                   ref={inventoryPickerRef}
@@ -822,177 +754,169 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                     setType(id);
                     const existingNames = new Set(wants?.map(w => w.metadata?.name) || []);
                     setName(generateUniqueWantName(id, itemType, existingNames, userNameSuffix));
-                    setTimeout(() => nameInputRef.current?.focus(), 0);
+                    setActiveFormTab('params');
                   }}
                 />
               </div>
-            )}
+            ) : (
+              /* ── Phase 2: Type selected — compact slot + tab layout ── */
+              (() => {
+                const selWt = userFacingWantTypes.find(wt => wt.name === selectedTypeId);
+                const selRec = recipes.find(r => r.recipe?.metadata?.custom_type === selectedTypeId);
+                const slotTitle = selWt?.title || selRec?.recipe?.metadata?.name || selectedTypeId;
+                const slotCategory = selWt?.category || selRec?.recipe?.metadata?.category;
+                const noopNav = { onNavigateUp: () => {}, onNavigateDown: () => {} };
+                const tabNav = {
+                  ...noopNav,
+                  onTab: () => navigateTab(true),
+                  onTabBack: () => navigateTab(false),
+                };
 
-            {/* Show fields only when a want type or recipe is selected */}
-            {selectedTypeId && (
-              <>
-                {/* Parameters Section */}
-                <ParametersSection
-                  ref={paramsSectionRef}
-                  parameters={params}
-                  parameterDefinitions={selectedWantType?.parameters}
-                  stateDefs={selectedWantType?.state}
-                  exposes={exposes}
-                  onExposesChange={setExposes}
-                  onChange={setParams}
-                  isCollapsed={collapsedSections.has('parameters')}
-                  onToggleCollapse={() => toggleSection('parameters')}
-                  navigationCallbacks={{
-                    onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                    onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                    onTab: handleFieldTab,
-                    onTabBack: () => navigateFormTab(false),
-                  }}
-                />
-
-                {/* C: Advanced Settings Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(v => !v)}
-                  onFocus={() => setAdvancedFocused(true)}
-                  onBlur={() => setAdvancedFocused(false)}
-                  className="focusable-section-header sidebar-focus-ring w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-                    Advanced
-                  </span>
-                  {(Object.keys(labels).length > 0 || using.length > 0 || when.length > 0 || !!ownerWant) && (
-                    <span className="text-blue-500 dark:text-blue-400 font-bold text-base leading-none">·</span>
-                  )}
-                </button>
-
-                {showAdvanced && (
+                return (
                   <>
-                    {/* Scheduling Section */}
-                    <SchedulingSection
-                      ref={schedulingSectionRef}
-                      schedules={when}
-                      onChange={setWhen}
-                      isCollapsed={collapsedSections.has('scheduling')}
-                      onToggleCollapse={() => toggleSection('scheduling')}
-                      navigationCallbacks={{
-                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                        onTab: handleFieldTab,
-                        onTabBack: () => navigateFormTab(false),
-                      }}
-                    />
-
-                    {/* Labels Section */}
-                    <LabelsSection
-                      ref={labelsSectionRef}
-                      labels={labels}
-                      onChange={setLabels}
-                      isCollapsed={collapsedSections.has('labels')}
-                      onToggleCollapse={() => toggleSection('labels')}
-                      navigationCallbacks={{
-                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                        onTab: handleFieldTab,
-                        onTabBack: () => navigateFormTab(false),
-                      }}
-                    />
-
-                    {/* Dependencies Section */}
-                    <DependenciesSection
-                      ref={dependenciesSectionRef}
-                      dependencies={using}
-                      onChange={setUsing}
-                      isCollapsed={collapsedSections.has('dependencies')}
-                      onToggleCollapse={() => toggleSection('dependencies')}
-                      navigationCallbacks={{
-                        onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                        onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-                        onTab: handleFieldTab,
-                        onTabBack: () => navigateFormTab(false),
-                      }}
-                    />
-
-                    {/* Owner */}
-                    {ownerWant && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20">
-                        <Crown className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 flex-shrink-0" />
-                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
-                        <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">{ownerWant.metadata?.name || ownerWant.id}</span>
+                    {/* Compact type slot header */}
+                    <div className="flex-shrink-0 flex items-center gap-2 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                      <WantSlot
+                        id={selectedTypeId}
+                        itemType={selectedItemType}
+                        category={slotCategory}
+                        size={40}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">{slotTitle}</p>
+                        {slotCategory && (
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500 capitalize">{slotCategory}</p>
+                        )}
                       </div>
-                    )}
-
-                    {/* Load Example */}
-                    {editMode === 'form' && (() => {
-                      const recipeExamples = selectedItemType === 'recipe'
-                        ? (recipes.find(r => r.recipe?.metadata?.custom_type === type)?.recipe?.examples ?? [])
-                        : [];
-                      const wantTypeExamples = selectedItemType === 'want-type'
-                        ? (selectedWantType?.examples ?? [])
-                        : [];
-                      const allExamples = [...wantTypeExamples.map((ex, i) => ({ key: `wt-${i}`, name: ex.name, description: ex.description, onLoad: () => { setParams(ex.want?.spec?.params || {}); setExposes(ex.want?.spec?.exposes || []); } })), ...recipeExamples.map((ex, i) => ({ key: `re-${i}`, name: ex.name, description: ex.description, onLoad: () => setParams(prev => ({ ...prev, ...ex.params })) }))];
-                      if (allExamples.length === 0) return null;
-                      return (
-                        <div ref={exampleMenuRef} className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowExampleMenu(v => !v)}
-                            className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs rounded-md border transition-colors ${showExampleMenu ? 'border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                          >
-                            <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                            <span>Load Example</span>
-                          </button>
-                          {showExampleMenu && (
-                            <div className="mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-                              {allExamples.map(ex => (
-                                <button
-                                  key={ex.key}
-                                  type="button"
-                                  onClick={() => { ex.onLoad(); setShowExampleMenu(false); }}
-                                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                >
-                                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{ex.name}</p>
-                                  {ex.description && (
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{ex.description}</p>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-
-                {/* Want Name with Auto-generation (at bottom) */}
-                <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 sm:p-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
-                    Want Name *
-                  </label>
-                  <div className="space-y-2">
-                    <input
-                      ref={nameInputRef}
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={handleArrowKeyNavigation}
-                      onFocus={() => setNameFocused(true)}
-                      onBlur={() => setNameFocused(false)}
-                      className="sidebar-focus-ring focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-100"
-                      placeholder="Auto-generated or enter custom name"
-                      required
-                    />
-                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                      <p className="mb-1">💡 Tip: Edit the name or use the selector's suffix option to customize auto-generation</p>
-                      {!isValidWantName(name) && name.trim() && (
-                        <p className="text-red-600">⚠️ Name contains invalid characters. Use only letters, numbers, hyphens, and underscores.</p>
+                      {!isEditing && (
+                        <button
+                          ref={changeButtonRef}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTypeId(null);
+                            setSelectedItemType('want-type');
+                            setType('');
+                            setName('');
+                          }}
+                          className="sidebar-focus-ring px-2 py-1 text-[10px] font-medium rounded-md bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors flex-shrink-0"
+                        >
+                          Change
+                        </button>
                       )}
                     </div>
-                  </div>
-                </div>
-              </>
+
+                    {/* ── Tab bar — order-2 when isBottom so content floats above ── */}
+                    <div className={isBottom ? 'order-2' : ''}>
+                      <FormTabBar
+                        activeTab={activeFormTab}
+                        onTabChange={(tab) => setActiveFormTab(tab)}
+                        badges={tabBadges}
+                        isBottom={isBottom}
+                      />
+                    </div>
+
+                    {/* ── Tab content (scrollable) — order-1 when isBottom ── */}
+                    <div className={classNames(
+                      'flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5',
+                      isBottom ? 'order-1' : ''
+                    )}>
+
+                      {/* NAME tab */}
+                      {activeFormTab === 'name' && (
+                        <div className="space-y-3 pt-1">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                              Want Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              ref={nameInputRef}
+                              type="text"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              className="sidebar-focus-ring w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+                              placeholder="Auto-generated or enter custom name"
+                              required
+                            />
+                            {!isValidWantName(name) && name.trim() && (
+                              <p className="mt-1 text-xs text-red-600">
+                                Invalid characters — use only letters, numbers, hyphens, underscores.
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Owner */}
+                          {ownerWant && (
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-900/20">
+                              <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Owner</span>
+                              <span className="text-xs text-amber-800 dark:text-amber-200 font-mono truncate">
+                                {ownerWant.metadata?.name || ownerWant.id}
+                              </span>
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
+                      {/* PARAMS tab — RPG-style grid cards */}
+                      {activeFormTab === 'params' && (
+                        <div className="pt-1">
+                          <ParameterGridSection
+                            parameters={params}
+                            parameterDefinitions={selectedWantType?.parameters}
+                            stateDefs={selectedWantType?.state}
+                            exposes={exposes}
+                            onExposesChange={setExposes}
+                            onChange={setParams}
+                            isActive={activeFormTab === 'params'}
+                            onTabForward={() => navigateTab(true)}
+                            onTabBackward={() => navigateTab(false)}
+                          />
+                        </div>
+                      )}
+
+                      {/* LABELS tab */}
+                      {activeFormTab === 'labels' && (
+                        <LabelsSection
+                          ref={labelsSectionRef}
+                          labels={labels}
+                          onChange={setLabels}
+                          isCollapsed={false}
+                          onToggleCollapse={() => {}}
+                          navigationCallbacks={tabNav}
+                          hideHeader={true}
+                        />
+                      )}
+
+                      {/* SCHEDULE tab */}
+                      {activeFormTab === 'schedule' && (
+                        <SchedulingSection
+                          ref={schedulingSectionRef}
+                          schedules={when}
+                          onChange={setWhen}
+                          isCollapsed={false}
+                          onToggleCollapse={() => {}}
+                          navigationCallbacks={tabNav}
+                          hideHeader={true}
+                        />
+                      )}
+
+                      {/* DEPS tab */}
+                      {activeFormTab === 'deps' && (
+                        <DependenciesSection
+                          ref={dependenciesSectionRef}
+                          dependencies={using}
+                          onChange={setUsing}
+                          isCollapsed={false}
+                          onToggleCollapse={() => {}}
+                          navigationCallbacks={tabNav}
+                          hideHeader={true}
+                        />
+                      )}
+                    </div>
+                  </>
+                );
+              })()
             )}
           </>
         ) : (

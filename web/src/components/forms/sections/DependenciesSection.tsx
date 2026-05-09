@@ -19,6 +19,8 @@ interface DependenciesSectionProps {
   onToggleCollapse: () => void;
   /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
+  /** When true, hides the collapsible header (for use inside tabs) */
+  hideHeader?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
   isCollapsed,
   onToggleCollapse,
   navigationCallbacks,
+  hideHeader,
 }, ref) => {
   // Editing state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -250,6 +253,7 @@ export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSec
       colorScheme="green"
       isCollapsed={isCollapsed}
       onToggleCollapse={onToggleCollapse}
+      hideHeader={hideHeader}
       navigationCallbacks={navigationCallbacks}
       items={chipItems}
       onAddItem={handleAddItem}

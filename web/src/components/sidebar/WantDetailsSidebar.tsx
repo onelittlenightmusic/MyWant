@@ -8,6 +8,7 @@ import { YamlEditor } from '@/components/forms/YamlEditor';
 import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
 import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
 import { useWantStore } from '@/stores/wantStore';
+import { useWantTypeStore } from '@/stores/wantTypeStore';
 import { useDebugStore } from '@/stores/debugStore';
 import { useConfigStore } from '@/stores/configStore';
 import { formatDate, formatDuration, formatRelativeTime, classNames, truncateText } from '@/utils/helpers';
@@ -18,6 +19,7 @@ import { WantCardContent } from '@/components/dashboard/WantCardContent';
 import { ArrayResultTable } from '@/components/common/ArrayResultTable';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ParametersSection } from '@/components/forms/sections/ParametersSection';
+import { ParameterGridSection } from '@/components/forms/sections/ParameterGridSection';
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
 import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
 import { SchedulingSection } from '@/components/forms/sections/SchedulingSection';
@@ -35,6 +37,7 @@ import {
   TabConfig
 } from './DetailsSidebar';
 import { useInputActions } from '@/hooks/useInputActions';
+import { FormTab, FormTabBar, FORM_TABS } from '@/components/forms/FormTabBar';
 
 interface WantDetailsSidebarProps {
   want: Want | null;
@@ -581,7 +584,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
       </div>
 
       {/* Tab content */}
-      <div className={classNames('flex-1 overflow-y-auto overflow-x-hidden relative', isBottom ? 'order-first' : '')}>
+      <div className={classNames('flex-1 min-h-0 overflow-hidden relative', isBottom ? 'order-first' : '')}>
         {loading && !selectedWantDetails ? (
           <div className="flex items-center justify-center py-12">
             <LoadingSpinner size="lg" />
@@ -646,7 +649,7 @@ export const WantDetailsSidebar: React.FC<WantDetailsSidebarProps> = ({
 
             {/* Current tab - animate in */}
             {activeTab === 'settings' && (
-              <div className={classNames('relative z-10', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
+              <div className={classNames('relative z-10 h-full', isMovingRight ? 'animate-slide-in-right' : 'animate-slide-in-left')}>
                 <SettingsTab
                   want={wantDetails}
                   isEditing={isEditing}
@@ -916,7 +919,12 @@ const SettingsTab: React.FC<{
     setTimeout(() => setSavedIndicator(false), 1500);
   }, []);
 
-  // Section collapsed states
+  // Settings sub-tab
+  const [activeSettingsTab, setActiveSettingsTab] = useState<FormTab>('name');
+  const config = useConfigStore(state => state.config);
+  const isBottom = config?.header_position === 'bottom';
+
+  // Section collapsed states (kept for compatibility, not used when hideHeader=true)
   const [isParametersCollapsed, setIsParametersCollapsed] = useState(true);
   const [isLabelsCollapsed, setIsLabelsCollapsed] = useState(true);
   const [isDependenciesCollapsed, setIsDependenciesCollapsed] = useState(true);
@@ -927,6 +935,14 @@ const SettingsTab: React.FC<{
   const [isEditingLabels, setIsEditingLabels] = useState(false);
   const [isEditingDependencies, setIsEditingDependencies] = useState(false);
   const [isEditingScheduling, setIsEditingScheduling] = useState(false);
+
+  // Want type full definition for ParameterGridSection
+  const [wantTypeDef, setWantTypeDef] = useState<import('@/types/wantType').WantTypeDetailResponse | null>(null);
+  useEffect(() => {
+    const typeName = want.metadata?.type;
+    if (!typeName) { setWantTypeDef(null); return; }
+    apiClient.getWantType(typeName).then(def => setWantTypeDef(def)).catch(() => setWantTypeDef(null));
+  }, [want.metadata?.type]);
 
   // Form data states
   const [params, setParams] = useState<Record<string, unknown>>(want.spec?.params || {});
@@ -1070,6 +1086,7 @@ const SettingsTab: React.FC<{
     setIsSchedulingCollapsed(true);
     setIsEditingName(false);
     setEditedName(want.metadata?.name || '');
+    setActiveSettingsTab('name');
   }, [want.metadata?.id]);
 
   return (
@@ -1086,10 +1103,29 @@ const SettingsTab: React.FC<{
         />
       </div>
 
+      {/* Sub-tab bar at TOP when !isBottom (form mode only) */}
+      {configMode === 'form' && !isBottom && (
+        <FormTabBar
+          activeTab={activeSettingsTab}
+          onTabChange={setActiveSettingsTab}
+          badges={{
+            name:     null,
+            params:   Object.keys(params).length || null,
+            labels:   Object.keys(labels).length || null,
+            schedule: when.length || null,
+            deps:     using.length || null,
+          }}
+          isBottom={false}
+        />
+      )}
+
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 pt-0 pb-3 sm:py-4 focusable-container">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 focusable-container">
         {configMode === 'form' ? (
-          <div className="space-y-2">
+          <>
+            {/* NAME tab: metadata + timeline */}
+            {activeSettingsTab === 'name' && (
+          <div className="space-y-3 pt-1">
             {/* Metadata Section */}
             <div className={SECTION_CONTAINER_CLASS}>
               <h4 className="text-sm sm:text-base font-medium text-gray-900 dark:text-white mb-2 sm:mb-4">Metadata</h4>
@@ -1146,19 +1182,6 @@ const SettingsTab: React.FC<{
               </div>
             </div>
 
-            {/* Parameters - Using Common Component */}
-            <ParametersSection
-              ref={paramsSectionRef}
-              parameters={params}
-              onChange={handleParametersChange}
-              isCollapsed={isParametersCollapsed}
-              onToggleCollapse={() => setIsParametersCollapsed(!isParametersCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-              }}
-            />
-
             {/* Timeline */}
             {want.stats && (
               <div className={SECTION_CONTAINER_CLASS}>
@@ -1192,45 +1215,6 @@ const SettingsTab: React.FC<{
               </div>
             )}
 
-            {/* Scheduling - Using Common Component */}
-            <SchedulingSection
-              ref={schedulingSectionRef}
-              schedules={when}
-              onChange={handleSchedulingChange}
-              isCollapsed={isSchedulingCollapsed}
-              onToggleCollapse={() => setIsSchedulingCollapsed(!isSchedulingCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-              }}
-            />
-
-            {/* Labels - Using Common Component */}
-            <LabelsSection
-              ref={labelsSectionRef}
-              labels={labels}
-              onChange={handleLabelsChange}
-              isCollapsed={isLabelsCollapsed}
-              onToggleCollapse={() => setIsLabelsCollapsed(!isLabelsCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-              }}
-            />
-
-            {/* Dependencies - Using Common Component */}
-            <DependenciesSection
-              ref={dependenciesSectionRef}
-              dependencies={using}
-              onChange={handleDependenciesChange}
-              isCollapsed={isDependenciesCollapsed}
-              onToggleCollapse={() => setIsDependenciesCollapsed(!isDependenciesCollapsed)}
-              navigationCallbacks={{
-                onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
-                onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
-              }}
-            />
-
             {/* Error Information */}
             {want.status === 'failed' && want.state?.current?.error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
@@ -1246,8 +1230,100 @@ const SettingsTab: React.FC<{
               </div>
             )}
           </div>
-        ) : (
-          /* Config Editor View */
+            )}
+
+            {/* PARAMS tab */}
+            {activeSettingsTab === 'params' && (
+              <div className="pt-1">
+                <ParameterGridSection
+                  parameters={params}
+                  parameterDefinitions={wantTypeDef?.parameters}
+                  stateDefs={wantTypeDef?.state}
+                  onChange={handleParametersChange}
+                  isActive={activeSettingsTab === 'params'}
+                  onTabForward={() => {
+                    const idx = FORM_TABS.indexOf(activeSettingsTab);
+                    setActiveSettingsTab(FORM_TABS[(idx + 1) % FORM_TABS.length]);
+                  }}
+                  onTabBackward={() => {
+                    const idx = FORM_TABS.indexOf(activeSettingsTab);
+                    setActiveSettingsTab(FORM_TABS[(idx - 1 + FORM_TABS.length) % FORM_TABS.length]);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* LABELS tab */}
+            {activeSettingsTab === 'labels' && (
+              <LabelsSection
+                ref={labelsSectionRef}
+                labels={labels}
+                onChange={handleLabelsChange}
+                isCollapsed={false}
+                onToggleCollapse={() => {}}
+                hideHeader={true}
+                navigationCallbacks={{
+                  onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                  onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                }}
+              />
+            )}
+
+            {/* SCHEDULE tab */}
+            {activeSettingsTab === 'schedule' && (
+              <SchedulingSection
+                ref={schedulingSectionRef}
+                schedules={when}
+                onChange={handleSchedulingChange}
+                isCollapsed={false}
+                onToggleCollapse={() => {}}
+                hideHeader={true}
+                navigationCallbacks={{
+                  onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                  onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                }}
+              />
+            )}
+
+            {/* DEPS tab */}
+            {activeSettingsTab === 'deps' && (
+              <DependenciesSection
+                ref={dependenciesSectionRef}
+                dependencies={using}
+                onChange={handleDependenciesChange}
+                isCollapsed={false}
+                onToggleCollapse={() => {}}
+                hideHeader={true}
+                navigationCallbacks={{
+                  onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
+                  onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
+                }}
+              />
+            )}
+          </>
+        ) : null}
+      </div>
+
+      {/* Sub-tab bar at BOTTOM when isBottom (form mode only) */}
+      {configMode === 'form' && isBottom && (
+        <FormTabBar
+          activeTab={activeSettingsTab}
+          onTabChange={setActiveSettingsTab}
+          badges={{
+            name:     null,
+            params:   Object.keys(params).length || null,
+            labels:   Object.keys(labels).length || null,
+            schedule: when.length || null,
+            deps:     using.length || null,
+          }}
+          isBottom={true}
+        />
+      )}
+
+      {/* YAML Editor (separate flow, no sub-tabs) */}
+      {configMode === 'yaml' && (
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4">
+          {/* Config Editor View */}
           <div className="flex flex-col h-full">
             {!isEditing ? (
               <div className="flex flex-col flex-1">
@@ -1317,8 +1393,8 @@ const SettingsTab: React.FC<{
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

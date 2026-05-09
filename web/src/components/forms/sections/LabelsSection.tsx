@@ -19,6 +19,8 @@ interface LabelsSectionProps {
   onToggleCollapse: () => void;
   /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
+  /** When true, hides the collapsible header (for use inside tabs) */
+  hideHeader?: boolean;
 }
 
 /**
@@ -41,6 +43,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
   isCollapsed,
   onToggleCollapse,
   navigationCallbacks,
+  hideHeader,
 }, ref) => {
   // Editing state
   const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
@@ -223,6 +226,7 @@ export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>((
       colorScheme="green"
       isCollapsed={isCollapsed}
       onToggleCollapse={onToggleCollapse}
+      hideHeader={hideHeader}
       navigationCallbacks={navigationCallbacks}
       items={chipItems}
       onAddItem={handleAddItem}

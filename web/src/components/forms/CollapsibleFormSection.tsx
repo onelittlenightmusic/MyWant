@@ -25,6 +25,7 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   colorScheme,
   isCollapsed,
   onToggleCollapse,
+  hideHeader = false,
   navigationCallbacks,
   items,
   onAddItem,
@@ -205,82 +206,84 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
 
   return (
     <div ref={sectionRef} className="space-y-2">
-      {/* Section Header */}
-      <button
-        ref={mergedRef}
-        type="button"
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onFocus={() => {
-          setHeaderFocused(true);
-          if (isCollapsed) { onToggleCollapse(); }
-        }}
-        onBlur={(e) => {
-          setHeaderFocused(false);
-          const relatedTarget = e.relatedTarget as Node;
-          if (relatedTarget && sectionRef.current?.contains(relatedTarget)) { return; }
-          if (!isCollapsed) { onToggleCollapse(); }
-        }}
-        onKeyDown={handleHeaderKeyDown}
-        className={`
-          sidebar-section-btn focusable-section-header
-          w-full text-left px-3 py-2 rounded-lg
-          transition-all duration-200 focus:outline-none
-          relative
-          ${getHeaderColorClasses(colorScheme)}
+      {/* Section Header — hidden when hideHeader=true (e.g. inside a dedicated tab) */}
+      {!hideHeader && (
+        <button
+          ref={mergedRef}
+          type="button"
+          onClick={handleClick}
+          onMouseDown={handleMouseDown}
+          onFocus={() => {
+            setHeaderFocused(true);
+            if (isCollapsed) { onToggleCollapse(); }
+          }}
+          onBlur={(e) => {
+            setHeaderFocused(false);
+            const relatedTarget = e.relatedTarget as Node;
+            if (relatedTarget && sectionRef.current?.contains(relatedTarget)) { return; }
+            if (!isCollapsed) { onToggleCollapse(); }
+          }}
+          onKeyDown={handleHeaderKeyDown}
+          className={`
+            sidebar-section-btn focusable-section-header
+            w-full text-left px-3 py-2 rounded-lg
+            transition-all duration-200 focus:outline-none
+            relative
+            ${getHeaderColorClasses(colorScheme)}
 
-          before:absolute before:left-0 before:top-0
-          before:bottom-0 before:w-1 before:rounded-l-md
-          before:opacity-0 before:transition-opacity
-          focus:before:opacity-100
-          ${getFocusIndicatorColor(colorScheme)}
-        `}
-        aria-expanded={!isCollapsed}
-        aria-label={`${title} section - Press Right to ${isCollapsed ? 'expand and ' : ''}focus items, 'a' to add new, Up/Down to navigate sections`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {/* Collapse/Expand Icon */}
-            {isCollapsed ? (
-              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
-            )}
+            before:absolute before:left-0 before:top-0
+            before:bottom-0 before:w-1 before:rounded-l-md
+            before:opacity-0 before:transition-opacity
+            focus:before:opacity-100
+            ${getFocusIndicatorColor(colorScheme)}
+          `}
+          aria-expanded={!isCollapsed}
+          aria-label={`${title} section - Press Right to ${isCollapsed ? 'expand and ' : ''}focus items, 'a' to add new, Up/Down to navigate sections`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Collapse/Expand Icon */}
+              {isCollapsed ? (
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
+              ) : (
+                <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 dark:text-gray-400" />
+              )}
 
-            {/* Section Icon */}
-            <span className="text-gray-700 dark:text-gray-300 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
-              {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
-            </span>
-
-            {/* Section Title */}
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              {title}
-            </h3>
-
-            {/* Item Count Badge */}
-            {items.length > 0 && (
-              <span className={`
-                px-2 py-0.5 text-xs font-medium rounded-full
-                ${colorScheme === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                  colorScheme === 'amber' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                  'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}
-              `}>
-                {items.length}
+              {/* Section Icon */}
+              <span className="text-gray-700 dark:text-gray-300 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+                {React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4 sm:w-5 sm:h-5' })}
               </span>
+
+              {/* Section Title */}
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                {title}
+              </h3>
+
+              {/* Item Count Badge */}
+              {items.length > 0 && (
+                <span className={`
+                  px-2 py-0.5 text-xs font-medium rounded-full
+                  ${colorScheme === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
+                    colorScheme === 'amber' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'}
+                `}>
+                  {items.length}
+                </span>
+              )}
+            </div>
+
+            {/* Collapsed Summary */}
+            {isCollapsed && items.length > 0 && (
+              <div className="text-sm text-gray-600 dark:text-gray-400 ml-4">
+                {renderCollapsedSummary()}
+              </div>
             )}
           </div>
+        </button>
+      )}
 
-          {/* Collapsed Summary */}
-          {isCollapsed && items.length > 0 && (
-            <div className="text-sm text-gray-600 dark:text-gray-400 ml-4">
-              {renderCollapsedSummary()}
-            </div>
-          )}
-        </div>
-      </button>
-
-      {/* Section Content (Expanded) */}
-      {!isCollapsed && (
+      {/* Section Content — always shown when hideHeader=true, otherwise only when expanded */}
+      {(hideHeader || !isCollapsed) && (
         <div className="pl-2 sm:pl-4 space-y-2 sm:space-y-3">
           {/* Chips Display */}
           {items.length > 0 && !isEditing && (

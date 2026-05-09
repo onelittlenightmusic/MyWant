@@ -23,6 +23,8 @@ interface ParametersSectionProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   navigationCallbacks: SectionNavigationCallbacks;
+  /** When true, hides the collapsible header (for use inside tabs) */
+  hideHeader?: boolean;
 }
 
 export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSectionProps>(({
@@ -35,6 +37,7 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
   isCollapsed,
   onToggleCollapse,
   navigationCallbacks,
+  hideHeader = false,
 }, ref) => {
   const [showOptionalParams, setShowOptionalParams] = useState(false);
   const [headerFocused, setHeaderFocused] = useState(false);
@@ -300,7 +303,8 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
 
   return (
     <div ref={sectionRef} className="space-y-2">
-      {/* Section Header */}
+      {/* Section Header — hidden when hideHeader=true */}
+      {!hideHeader && (
       <button
         ref={mergedRef}
         type="button"
@@ -347,9 +351,10 @@ export const ParametersSection = forwardRef<HTMLButtonElement, ParametersSection
           )}
         </div>
       </button>
+      )}
 
-      {/* Section Content */}
-      {!isCollapsed && (
+      {/* Section Content — always shown when hideHeader=true */}
+      {(hideHeader || !isCollapsed) && (
         <div className="pl-2 sm:pl-4 space-y-2 sm:space-y-3">
           {parameterDefinitions && parameterDefinitions.length > 0 ? (
             <>

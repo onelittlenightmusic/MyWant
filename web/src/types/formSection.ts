@@ -101,6 +101,12 @@ export interface CollapsibleFormSectionProps {
   isCollapsed: boolean;
   /** Callback to toggle collapsed/expanded state */
   onToggleCollapse: () => void;
+  /**
+   * When true, the collapsible header button (chevron + title) is hidden entirely.
+   * The section content is always shown. Intended for use inside dedicated tabs
+   * where the tab itself serves as the section header.
+   */
+  hideHeader?: boolean;
   /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
   /** Items to display as chips */
