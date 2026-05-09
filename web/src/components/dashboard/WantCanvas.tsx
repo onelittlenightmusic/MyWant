@@ -416,10 +416,9 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
   // Gamepad analog: L-stick (axes 0/1) → canvas scroll, R-stick Y (axis 3) → zoom
   useEffect(() => {
     const SCROLL_SPEED = 12; // screen-px per frame at full deflection (~720 px/s at 60 fps)
-    const ZOOM_SPEED   = 0.004; // scale-units accumulated per frame at full deflection
+    const ZOOM_RATE    = 0.02; // scale per frame at full deflection (~1.2/s at 60 fps)
     const DEADZONE     = 0.15;
 
-    let scaleAccum = 0;
     let rafHandle: number;
 
     const poll = () => {
@@ -439,20 +438,12 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
           }
 
           // R-stick Y zoom: up (axis < 0) → zoom in, down (axis > 0) → zoom out.
-          // Uses gesture path (immediate DOM update) because zoom fires every ~12 frames;
-          // overlapping 180ms animations would fight each other.
           const ry = gp.axes.length > 3 && Math.abs(gp.axes[3]) > DEADZONE ? gp.axes[3] : 0;
           if (ry !== 0) {
-            scaleAccum -= ry * ZOOM_SPEED; // invert: stick-up (negative axis) → zoom in
-            if (scaleAccum >= SCALE_STEP / 2 || scaleAccum <= -(SCALE_STEP / 2)) {
-              const newScale = Math.round(
-                (scaleRef.current + (scaleAccum > 0 ? SCALE_STEP : -SCALE_STEP)) * 10
-              ) / 10;
-              applyScaleRef.current(newScale);
-              scaleAccum = 0;
-            }
-          } else {
-            scaleAccum = 0;
+            const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE,
+              scaleRef.current + (-ry * ZOOM_RATE)
+            ));
+            if (newScale !== scaleRef.current) applyScaleRef.current(newScale);
           }
         }
       }

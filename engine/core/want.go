@@ -695,9 +695,7 @@ func (n *Want) prepareForRestart() {
 			if typeDef != nil {
 				resetState := make(map[string]any)
 				for _, sd := range typeDef.State {
-					if sd.InitialValue != nil {
-						resetState[sd.Name] = sd.InitialValue
-					}
+					resetState[sd.Name] = sd.InitialValue
 				}
 				if len(resetState) > 0 {
 					n.storeStateMulti(resetState)
@@ -1306,9 +1304,10 @@ func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
 func (n *Want) InitializeControlChannel() {
-	if n.controlChannel == nil {
-		n.controlChannel = make(chan *ControlCommand, 10) // Buffered for non-blocking receives
-	}
+	// Always create a fresh channel so that stale commands (e.g. ControlTriggerStop from a
+	// previous stop→start sequence) are not inherited by the new goroutine.
+	// Called only from startWant(), which guards against calling this while the goroutine is active.
+	n.controlChannel = make(chan *ControlCommand, 10)
 }
 func (n *Want) SendControlCommand(cmd *ControlCommand) error {
 	if n.controlChannel == nil {
