@@ -341,12 +341,18 @@ func composeEnv(want *mywant.Want) []string {
 // composeRunningSummary returns a JSON summary of running compose services.
 func composeRunningSummary(composeFile string) string {
 	out, err := exec.Command("docker", "compose", "-f", composeFile, "ps", "--format", "{{.Service}}:{{.State}}").Output()
-	var services []string
+	services := map[string]string{}
 	if err == nil {
 		for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 			line = strings.TrimSpace(line)
-			if line != "" {
-				services = append(services, line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				services[parts[0]] = parts[1]
+			} else {
+				services[line] = "unknown"
 			}
 		}
 	}
