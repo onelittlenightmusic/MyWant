@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useCallback, forwardRef } from 'react';
+import React, { useRef, useEffect, useCallback, useState, forwardRef } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { FocusableChip } from './FocusableChip';
 import { CollapsibleFormSectionProps, ColorScheme } from '@/types/formSection';
+import { useInputActions } from '@/hooks/useInputActions';
 
 /**
  * CollapsibleFormSection - Generic collapsible section with keyboard navigation
@@ -39,6 +40,18 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
   const editFormRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const wasCollapsedOnMouseDown = useRef<boolean>(false);
+
+  const [headerFocused, setHeaderFocused] = useState(false);
+
+  // Route Tab / Shift+Tab through useInputActions so gamepad L/R bumpers work
+  useInputActions({
+    enabled: headerFocused,
+    captureTab: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onTabForward:  navigationCallbacks.onTab,
+    onTabBackward: navigationCallbacks.onTabBack,
+  });
 
   // Merge forwarded ref with local ref
   const mergedRef = useCallback((node: HTMLButtonElement | null) => {
@@ -148,11 +161,6 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
       e.preventDefault();
       onToggleCollapse();
     }
-    // Tab - custom navigation (e.g. to Add button)
-    else if (e.key === 'Tab' && navigationCallbacks.onTab) {
-      e.preventDefault();
-      navigationCallbacks.onTab();
-    }
   }, [isCollapsed, isEditing, onToggleCollapse, onAddItem, navigationCallbacks]);
 
   /**
@@ -204,21 +212,14 @@ export const CollapsibleFormSection = forwardRef<HTMLButtonElement, CollapsibleF
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onFocus={() => {
-          // ヘッダーにフォーカスが当たった時、折りたたまれていれば自動的に展開
-          if (isCollapsed) {
-            onToggleCollapse();
-          }
+          setHeaderFocused(true);
+          if (isCollapsed) { onToggleCollapse(); }
         }}
         onBlur={(e) => {
-          // フォーカスがセクション内の要素に移った場合は閉じない
+          setHeaderFocused(false);
           const relatedTarget = e.relatedTarget as Node;
-          if (relatedTarget && sectionRef.current?.contains(relatedTarget)) {
-            return;
-          }
-          // ヘッダーからフォーカスが外れた時、展開されていれば自動的に折りたたむ
-          if (!isCollapsed) {
-            onToggleCollapse();
-          }
+          if (relatedTarget && sectionRef.current?.contains(relatedTarget)) { return; }
+          if (!isCollapsed) { onToggleCollapse(); }
         }}
         onKeyDown={handleHeaderKeyDown}
         className={`

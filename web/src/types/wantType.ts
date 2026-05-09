@@ -15,6 +15,7 @@ export interface ParameterDef {
   description: string;
   type: string;
   default?: unknown;
+  defaultGlobalParameter?: string;
   required: boolean;
   validation?: {
     min?: number;

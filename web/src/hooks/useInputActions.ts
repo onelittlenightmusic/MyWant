@@ -36,6 +36,13 @@ export interface UseInputActionsOptions {
    */
   onYButton?: () => void;
   /**
+   * Called on the Shift key (alone, no other modifiers) or Gamepad A long-press (≥500ms).
+   * Intended for triggering recommendation/autocomplete in value input fields.
+   * When onRecommend is provided, A long-press routes here instead of onConfirmLong.
+   * Keyboard: fires in capture phase when input is focused; fires in bubble phase when no input is focused.
+   */
+  onRecommend?: () => void;
+  /**
    * Called on Tab key or Gamepad R bumper (index 5).
    * When no callback is provided the R bumper simulates a Tab keypress
    * (moves DOM focus to the next focusable element).
@@ -82,6 +89,18 @@ export interface UseInputActionsOptions {
    * D-pad presses do not simultaneously move want-card focus.
    */
   captureGamepad?: boolean;
+  /**
+   * When true, this handler exclusively owns keyboard Tab / Shift+Tab.
+   * A capture-phase window listener fires with e.preventDefault() so the
+   * browser does not also move focus.  While this hook is enabled, the
+   * form-level captureInput handler will NOT call onTabForward/Backward for
+   * keyboard Tab — only gamepad L/R bumpers reach the form-level handler.
+   * Use on focused elements that need custom Tab order (section headers,
+   * Advanced button, Name input) instead of direct e.key==='Tab' detection,
+   * so that gamepad L/R bumpers route through the same onTabForward/Backward
+   * callbacks.
+   */
+  captureTab?: boolean;
 }
 
 // ─── Gamepad singleton ────────────────────────────────────────────────────────
@@ -97,7 +116,8 @@ type GamepadActionType =
   | 'tab-forward'
   | 'tab-backward'
   | 'y-button'
-  | 'confirm-long';
+  | 'confirm-long'
+  | 'recommend';
 
 type GamepadActionListener = (action: GamepadActionType) => void;
 
@@ -139,6 +159,9 @@ interface TrackState {
 const _listeners = new Set<GamepadActionListener>();
 // When set, only this listener receives gamepad events (all others are bypassed).
 let _captureListener: GamepadActionListener | null = null;
+// When true, a captureTab hook is active and owns keyboard Tab — the form-level
+// captureInput keyboard handler will skip Tab to avoid double-navigation.
+let _captureTabActive = false;
 let _rafHandle: number | null = null;
 const _trackStates = new Map<string, TrackState>();
 
@@ -389,12 +412,14 @@ export function useInputActions({
   onYButton,
   onTabForward,
   onTabBackward,
+  onRecommend,
   enabled = true,
   ignoreWhenInputFocused = true,
   ignoreWhenInSidebar = true,
   captureInput = false,
   gamepadOnly = false,
   captureGamepad = false,
+  captureTab = false,
 }: UseInputActionsOptions): void {
   // Refs let us update callbacks without re-subscribing to events.
   const onNavigateRef    = useRef(onNavigate);
@@ -408,6 +433,7 @@ export function useInputActions({
   const onYButtonRef     = useRef(onYButton);
   const onTabForwardRef  = useRef(onTabForward);
   const onTabBackwardRef = useRef(onTabBackward);
+  const onRecommendRef   = useRef(onRecommend);
   const enabledRef       = useRef(enabled);
 
   // Keep refs current on every render.
@@ -422,6 +448,7 @@ export function useInputActions({
   onYButtonRef.current     = onYButton;
   onTabForwardRef.current  = onTabForward;
   onTabBackwardRef.current = onTabBackward;
+  onRecommendRef.current   = onRecommend;
   enabledRef.current       = enabled;
 
   // ── Normal (bubble-phase) keyboard handler — active when captureInput is false ──
@@ -471,18 +498,23 @@ export function useInputActions({
             if (onToggleRef.current) { e.preventDefault(); onToggleRef.current(); }
           }
           break;
-        // Tab / Shift+Tab — no preventDefault so browser focus still moves
+        // Tab / Shift+Tab — no preventDefault so browser focus still moves.
+        // Skip when captureTab is true: the dedicated captureTab listener handles it.
         case 'Tab':
-          if (e.shiftKey) {
-            onTabBackwardRef.current?.();
-          } else {
-            onTabForwardRef.current?.();
+          if (!captureTab) {
+            if (e.shiftKey) { onTabBackwardRef.current?.(); }
+            else            { onTabForwardRef.current?.();  }
           }
           break;
         case 'y':
         case 'Y':
           if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
             if (onYButtonRef.current) { e.preventDefault(); onYButtonRef.current(); }
+          }
+          break;
+        case 'Shift':
+          if (!e.altKey && !e.ctrlKey && !e.metaKey) {
+            if (onRecommendRef.current) { e.preventDefault(); onRecommendRef.current(); }
           }
           break;
         default:
@@ -492,7 +524,7 @@ export function useInputActions({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+  }, [enabled, captureInput, gamepadOnly, captureGamepad, captureTab, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Capture-phase keyboard handler — active when captureInput is true ────────
   // useLayoutEffect (not useEffect) so the handler is registered synchronously
@@ -563,14 +595,23 @@ export function useInputActions({
           }
           break;
         case 'Tab':
-          if (e.shiftKey) { onTabBackwardRef.current?.(); }
-          else            { onTabForwardRef.current?.();  }
+          // Skip when a captureTab hook is active — it owns keyboard Tab exclusively.
+          if (!_captureTabActive) {
+            if (e.shiftKey) { onTabBackwardRef.current?.(); }
+            else            { onTabForwardRef.current?.();  }
+          }
           // Never stopImmediatePropagation for Tab — browser focus must still move
           return;
         case 'y':
         case 'Y':
           if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
             if (onYButtonRef.current) { handled = true; onYButtonRef.current(); }
+          }
+          break;
+        // Shift alone (no other modifier) — triggers recommend when input is focused
+        case 'Shift':
+          if (!e.altKey && !e.ctrlKey && !e.metaKey && isInputEl) {
+            if (onRecommendRef.current) { handled = true; onRecommendRef.current(); }
           }
           break;
         default:
@@ -586,6 +627,35 @@ export function useInputActions({
     window.addEventListener('keydown', handleKeyDownCapture, true);
     return () => window.removeEventListener('keydown', handleKeyDownCapture, true);
   }, [enabled, captureInput, gamepadOnly, captureGamepad, ignoreWhenInputFocused, ignoreWhenInSidebar]);
+
+  // ── captureTab: capture-phase listener that owns keyboard Tab exclusively ─────
+  // useLayoutEffect so _captureTabActive is set synchronously after React commits,
+  // before any keydown event can arrive.  While active, the form-level captureInput
+  // handler skips keyboard Tab (checked via _captureTabActive flag) so there is no
+  // double-call to navigateFormTab.
+  useLayoutEffect(() => {
+    if (!enabled || !captureTab) return;
+
+    _captureTabActive = true;
+
+    const handleTabCapture = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      if (!enabledRef.current) return;
+      const target = e.target as HTMLElement;
+      if (ignoreWhenInputFocused && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (ignoreWhenInSidebar && _isInSidebar(target)) return;
+      e.preventDefault();
+      if (e.shiftKey) { onTabBackwardRef.current?.(); }
+      else            { onTabForwardRef.current?.();  }
+    };
+
+    window.addEventListener('keydown', handleTabCapture, true);
+
+    return () => {
+      window.removeEventListener('keydown', handleTabCapture, true);
+      _captureTabActive = false;
+    };
+  }, [enabled, captureTab, ignoreWhenInputFocused, ignoreWhenInSidebar]);
 
   // ── Gamepad ───────────────────────────────────────────────────────────────────
   // useLayoutEffect (not useEffect) ensures _captureListener is cleared
@@ -616,8 +686,12 @@ export function useInputActions({
         case 'move-down':  onMoveRef.current?.('down');  break;
         case 'move-left':  onMoveRef.current?.('left');  break;
         case 'move-right': onMoveRef.current?.('right'); break;
-        case 'confirm':       onConfirmRef.current?.();      break;
-        case 'confirm-long':  onConfirmLongRef.current?.(); break;
+        case 'confirm':      onConfirmRef.current?.();     break;
+        case 'confirm-long':
+          // Route to onRecommend when provided; otherwise fall through to onConfirmLong.
+          onRecommendRef.current ? onRecommendRef.current() : onConfirmLongRef.current?.();
+          break;
+        case 'recommend':    onRecommendRef.current?.();   break;
         case 'cancel':        onCancelRef.current?.();      break;
         case 'toggle':       onToggleRef.current?.();      break;
         case 'menu-toggle':  onMenuToggleRef.current?.();  break;

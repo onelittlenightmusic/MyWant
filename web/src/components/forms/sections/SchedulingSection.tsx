@@ -3,6 +3,7 @@ import { Clock, Link } from 'lucide-react';
 import { CollapsibleFormSection } from '../CollapsibleFormSection';
 import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
 import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
+import { SelectInput } from '@/components/common/SelectInput';
 import { WhenSpec } from '@/types/want';
 import { apiClient } from '@/api/client';
 
@@ -322,21 +323,18 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
             Timer parameter (defined in parameters.yaml)
           </label>
           {Object.keys(timerParams).length > 0 ? (
-            <select
+            <SelectInput
               value={editingDraft.fromGlobalParam}
-              onChange={(e) => setEditingDraft(prev => ({ ...prev, fromGlobalParam: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm dark:bg-gray-800 dark:text-gray-100"
-            >
-              <option value="">— select a timer —</option>
-              {Object.entries(timerParams).map(([key, spec]) => {
-                const summary = spec.at
-                  ? `${spec.at}, every ${spec.every}`
-                  : `every ${spec.every}`;
-                return (
-                  <option key={key} value={key}>{key} — {summary}</option>
-                );
-              })}
-            </select>
+              onChange={(val) => setEditingDraft(prev => ({ ...prev, fromGlobalParam: val }))}
+              options={[
+                { value: '', label: '— select a timer —' },
+                ...Object.entries(timerParams).map(([key, spec]) => ({
+                  value: key,
+                  label: `${key} — ${spec.at ? `${spec.at}, every ${spec.every}` : `every ${spec.every}`}`,
+                })),
+              ]}
+              className="w-full"
+            />
           ) : (
             <p className="text-sm text-gray-500 dark:text-gray-400 italic">
               No timer parameters found in parameters.yaml
@@ -379,17 +377,18 @@ export const SchedulingSection = forwardRef<HTMLButtonElement, SchedulingSection
                 />
               </div>
               <div className="flex-1">
-                <select
+                <SelectInput
                   value={editingDraft.everyUnit}
-                  onChange={(e) => setEditingDraft(prev => ({ ...prev, everyUnit: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm dark:bg-gray-800 dark:text-gray-100"
-                >
-                  <option value="seconds">seconds</option>
-                  <option value="minutes">minutes</option>
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
-                  <option value="weeks">weeks</option>
-                </select>
+                  onChange={(val) => setEditingDraft(prev => ({ ...prev, everyUnit: val }))}
+                  options={[
+                    { value: 'seconds' },
+                    { value: 'minutes' },
+                    { value: 'hours' },
+                    { value: 'days' },
+                    { value: 'weeks' },
+                  ]}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>

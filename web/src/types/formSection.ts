@@ -37,8 +37,10 @@ export interface SectionNavigationCallbacks {
   onNavigateUp: (e?: React.KeyboardEvent) => void;
   /** Navigate to the next section */
   onNavigateDown: (e?: React.KeyboardEvent) => void;
-  /** Navigate via Tab key (e.g. to action button) */
+  /** Navigate forward via Tab key */
   onTab?: () => void;
+  /** Navigate backward via Shift+Tab */
+  onTabBack?: () => void;
 }
 
 /**

@@ -25,6 +25,7 @@ export const CommitInput = React.forwardRef<CommitInputHandle, CommitInputProps>
   className,
   onKeyDown,
   onBlur,
+  onFocus: onFocusProp,
   hint,
   multiline = false,
   ...props
@@ -111,8 +112,9 @@ export const CommitInput = React.forwardRef<CommitInputHandle, CommitInputProps>
     }
   };
 
-  const handleFocus = () => {
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setIsFocused(true);
+    onFocusProp?.(e as React.FocusEvent<HTMLInputElement>);
   };
 
   const sharedClassName = classNames(

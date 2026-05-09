@@ -47,6 +47,8 @@ wantType:
       type: string
       required: false
       default: "process"
+      validation:
+        enum: ["process", "docker_compose"]
 
     - name: command
       description: "(process only) Command to execute (e.g. \"/usr/local/bin/myserver\")"

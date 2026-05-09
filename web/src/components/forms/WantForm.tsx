@@ -107,6 +107,8 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [addButtonFocused, setAddButtonFocused] = useState(false);
+  const [advancedFocused, setAdvancedFocused] = useState(false);
+  const [nameFocused, setNameFocused] = useState(false);
 
   // Recommendation mode state
   const [selectedRecId, setSelectedRecId] = useState<string | null>(null);
@@ -586,6 +588,26 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
     onTabBackward: !isTypeSelectionPhase ? () => navigateFormTab(false) : undefined,
   });
 
+  // Per-element captureTab hooks — keyboard Tab/Shift+Tab with preventDefault so
+  // browser does not also move focus; gamepad L/R handled by form-level hook above.
+  useInputActions({
+    enabled: advancedFocused,
+    captureTab: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onTabForward:  () => navigateFormTab(true),
+    onTabBackward: () => navigateFormTab(false),
+  });
+
+  useInputActions({
+    enabled: nameFocused,
+    captureTab: true,
+    ignoreWhenInputFocused: false,
+    ignoreWhenInSidebar: false,
+    onTabForward:  () => navigateFormTab(true),
+    onTabBackward: () => navigateFormTab(false),
+  });
+
   const isTypeSelected = !!type;
   const shouldGlowButton = isTypeSelected && !isEditing && selectedTypeId;
   const [showFilter, setShowFilter] = useState(false);
@@ -824,6 +846,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                     onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
                     onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                     onTab: handleFieldTab,
+                    onTabBack: () => navigateFormTab(false),
                   }}
                 />
 
@@ -831,7 +854,9 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                 <button
                   type="button"
                   onClick={() => setShowAdvanced(v => !v)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  onFocus={() => setAdvancedFocused(true)}
+                  onBlur={() => setAdvancedFocused(false)}
+                  className="focusable-section-header sidebar-focus-ring w-full flex items-center justify-between px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
                   <span className="flex items-center gap-1.5">
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
@@ -855,6 +880,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                         onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
                         onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                         onTab: handleFieldTab,
+                        onTabBack: () => navigateFormTab(false),
                       }}
                     />
 
@@ -869,6 +895,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                         onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
                         onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                         onTab: handleFieldTab,
+                        onTabBack: () => navigateFormTab(false),
                       }}
                     />
 
@@ -883,6 +910,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                         onNavigateUp: (e) => e && handleArrowKeyNavigation(e),
                         onNavigateDown: (e) => e && handleArrowKeyNavigation(e),
                         onTab: handleFieldTab,
+                        onTabBack: () => navigateFormTab(false),
                       }}
                     />
 
@@ -949,15 +977,9 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Tab') {
-                          e.preventDefault();
-                          if (e.shiftKey) { paramsSectionRef.current?.focus(); }
-                          else { addButtonRef.current?.focus(); }
-                        } else {
-                          handleArrowKeyNavigation(e);
-                        }
-                      }}
+                      onKeyDown={handleArrowKeyNavigation}
+                      onFocus={() => setNameFocused(true)}
+                      onBlur={() => setNameFocused(false)}
                       className="sidebar-focus-ring focusable-section-header w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-800 dark:text-gray-100"
                       placeholder="Auto-generated or enter custom name"
                       required
