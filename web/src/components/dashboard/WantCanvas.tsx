@@ -386,70 +386,25 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
     const cx = (el.scrollLeft - osx + fpx) / cur;
     const cy = (el.scrollTop  - osy + fpy) / cur;
 
-    if (isGestureZoomRef.current) {
-      // Gesture (pinch / wheel): apply transform + scroll directly to DOM so there's no
-      // frame where scroll and transform are mismatched (which causes jitter).
-      const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
-      const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
-      if (canvasRef.current) {
-        canvasRef.current.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${clamped})`;
-      }
-      if (spacerRef.current) {
-        spacerRef.current.style.width  = `${canvasW * clamped}px`;
-        spacerRef.current.style.height = `${canvasH * clamped}px`;
-      }
-      el.scrollLeft = cx * clamped + nextOsx - fpx;
-      el.scrollTop  = cy * clamped + nextOsy - fpy;
-      // Sync React state — re-render will write same values, so no visual jump
-      onScaleChange?.(clamped);
-      return;
+    // All zoom paths use the same direct DOM update — no CSS transition, no RAF.
+    // Transform, spacer, and scroll are applied atomically in one frame so the
+    // focal point never drifts regardless of trigger (gesture / button / R-stick).
+    if (scrollAnimRafRef.current !== null) {
+      cancelAnimationFrame(scrollAnimRafRef.current);
+      scrollAnimRafRef.current = null;
     }
-
-    // Button zoom: CSS transition animates the scale; RAF animates scroll in sync.
-    // Key fix: use the EXACT same cubic-bezier as the CSS transition so easing
-    // curves match perfectly and the focal point stays fixed throughout.
-    onScaleChange?.(clamped);
-
-    const DURATION = 180;
     const nextOsx = Math.max(0, (vw - canvasW * clamped) / 2);
     const nextOsy = Math.max(0, (vh - canvasH * clamped) / 2);
-    const targetSl = cx * clamped + nextOsx - fpx;
-    const targetSt = cy * clamped + nextOsy - fpy;
-    const startSl = el.scrollLeft;
-    const startSt = el.scrollTop;
-    if (scrollAnimRafRef.current !== null) cancelAnimationFrame(scrollAnimRafRef.current);
-
-    // Evaluate CSS cubic-bezier(0.25, 0.46, 0.45, 0.94) exactly — matches
-    // the `transition: transform 180ms cubic-bezier(...)` applied by React's JSX.
-    const cssEase = (t: number): number => {
-      const p1x = 0.25, p1y = 0.46, p2x = 0.45, p2y = 0.94;
-      const cx3 = 3 * p1x, bx3 = 3 * (p2x - p1x) - cx3, ax3 = 1 - cx3 - bx3;
-      const cy3 = 3 * p1y, by3 = 3 * (p2y - p1y) - cy3, ay3 = 1 - cy3 - by3;
-      // Newton's method: find parameter s where bezierX(s) == t
-      let s = t;
-      for (let i = 0; i < 8; i++) {
-        const x = s * (cx3 + s * (bx3 + s * ax3)) - t;
-        if (Math.abs(x) < 1e-4) break;
-        const dx = cx3 + s * (2 * bx3 + 3 * ax3 * s);
-        if (Math.abs(dx) < 1e-6) break;
-        s -= x / dx;
-      }
-      return s * (cy3 + s * (by3 + s * ay3));
-    };
-
-    // Pre-record start time so t=0 aligns with when React commits the transform change.
-    const t0 = performance.now();
-    const animScroll = (timestamp: number) => {
-      const t = Math.min((timestamp - t0) / DURATION, 1);
-      const ease = cssEase(t);
-      if (scrollRef.current) {
-        scrollRef.current.scrollLeft = startSl + (targetSl - startSl) * ease;
-        scrollRef.current.scrollTop  = startSt + (targetSt - startSt) * ease;
-      }
-      if (t < 1) scrollAnimRafRef.current = requestAnimationFrame(animScroll);
-      else scrollAnimRafRef.current = null;
-    };
-    scrollAnimRafRef.current = requestAnimationFrame(animScroll);
+    if (canvasRef.current) {
+      canvasRef.current.style.transform = `translate3d(${nextOsx}px, ${nextOsy}px, 0) scale(${clamped})`;
+    }
+    if (spacerRef.current) {
+      spacerRef.current.style.width  = `${canvasW * clamped}px`;
+      spacerRef.current.style.height = `${canvasH * clamped}px`;
+    }
+    el.scrollLeft = cx * clamped + nextOsx - fpx;
+    el.scrollTop  = cy * clamped + nextOsy - fpy;
+    onScaleChange?.(clamped);
   }, [onScaleChange, canvasW, canvasH]);
 
   const zoomIn  = () => applyScaleWithCenter(Math.round((scaleRef.current + SCALE_STEP) * 10) / 10);
@@ -493,10 +448,7 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
               const newScale = Math.round(
                 (scaleRef.current + (scaleAccum > 0 ? SCALE_STEP : -SCALE_STEP)) * 10
               ) / 10;
-              const prev = isGestureZoomRef.current;
-              isGestureZoomRef.current = true;
               applyScaleRef.current(newScale);
-              isGestureZoomRef.current = prev;
               scaleAccum = 0;
             }
           } else {
@@ -976,8 +928,7 @@ export const WantCanvas = forwardRef<WantCanvasRef, WantCanvasProps>(({
               cursor: dragWantId || isPanning ? 'grabbing' : 'grab',
               transform: `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${scale})`,
               transformOrigin: '0 0',
-              transition: isGestureZoom ? undefined : 'transform 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-              willChange: isGestureZoom ? 'transform' : undefined,
+              willChange: 'transform',
               position: 'absolute',
               left: 0,
               top: 0,
