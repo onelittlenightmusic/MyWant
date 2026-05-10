@@ -3,6 +3,7 @@ import { AlertTriangle, Bot, Heart, Clock, ThumbsUp, ThumbsDown, Copy, Check, Me
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ArrayResultTable } from '@/components/common/ArrayResultTable';
+import { ObjectResultDisplay, isPlainObject } from '@/components/common/ObjectResultDisplay';
 import { truncateText, classNames } from '@/utils/helpers';
 import { useWantStore } from '@/stores/wantStore';
 import { useConfigStore } from '@/stores/configStore';
@@ -20,34 +21,60 @@ const FinalResultDisplay: React.FC<{
   onCopy: (e: React.MouseEvent) => void;
   onView: () => void;
 }> = ({ value, isChild, copied, onCopy, onView }) => {
-  const isArrayOfObjects =
-    Array.isArray(value) &&
-    value.length > 0 &&
-    typeof value[0] === 'object' &&
-    value[0] !== null;
+  let parsedValue = value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === 'object' && parsed !== null) {
+        parsedValue = parsed;
+      }
+    } catch (e) {
+      // Not a JSON string, keep as is
+    }
+  }
 
-  const fullText = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  const isArrayOfObjects =
+    Array.isArray(parsedValue) &&
+    parsedValue.length > 0 &&
+    typeof parsedValue[0] === 'object' &&
+    parsedValue[0] !== null;
+
+  const fullText = typeof parsedValue === 'string' ? parsedValue : JSON.stringify(parsedValue, null, 2);
   const truncateLimit = isChild ? 40 : 50;
+  const iconSize = isChild ? 'w-3 h-3' : 'w-3.5 h-3.5';
+  const labelClass = `${isChild ? 'text-[0.5rem]' : 'text-[0.55rem] sm:text-[0.6rem]'} font-mono text-green-400/70 hover:text-green-400 cursor-pointer`;
 
   if (isArrayOfObjects) {
-    const data = value as Record<string, unknown>[];
+    const data = parsedValue as Record<string, unknown>[];
     return (
       <div className="flex flex-col min-h-0 overflow-hidden">
         <div className="flex items-center justify-between mb-0.5">
-          <button
-            onClick={onView}
-            className={`${isChild ? 'text-[0.5rem]' : 'text-[0.55rem] sm:text-[0.6rem]'} font-mono text-green-400/70 hover:text-green-400 cursor-pointer`}
-          >
+          <button onClick={onView} className={labelClass}>
             [{data.length} items] — view all
           </button>
           <button onClick={onCopy} className="p-0.5 rounded text-green-400" title="Copy to clipboard">
-            {copied
-              ? <Check className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
-              : <Copy className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
-            }
+            {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
           </button>
         </div>
         <ArrayResultTable data={data} maxRows={isChild ? 3 : 5} size="compact" />
+      </div>
+    );
+  }
+
+  if (isPlainObject(parsedValue)) {
+    const data = parsedValue as Record<string, unknown>;
+    const fieldCount = Object.keys(data).length;
+    return (
+      <div className="flex flex-col min-h-0 overflow-hidden">
+        <div className="flex items-center justify-between mb-0.5">
+          <button onClick={onView} className={labelClass}>
+            {'{'}&#8203;{fieldCount} fields{'}'} — view all
+          </button>
+          <button onClick={onCopy} className="p-0.5 rounded text-green-400" title="Copy to clipboard">
+            {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
+          </button>
+        </div>
+        <ObjectResultDisplay data={data} maxRows={isChild ? 3 : 5} size="compact" />
       </div>
     );
   }
@@ -63,10 +90,7 @@ const FinalResultDisplay: React.FC<{
       <button onClick={onCopy}
         className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded text-green-400"
         title="Copy to clipboard">
-        {copied
-          ? <Check className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
-          : <Copy className={isChild ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
-        }
+        {copied ? <Check className={iconSize} /> : <Copy className={iconSize} />}
       </button>
     </div>
   );
