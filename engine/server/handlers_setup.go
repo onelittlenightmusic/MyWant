@@ -222,14 +222,8 @@ func (s *Server) setupRoutes() {
 	}
 }
 
-// loadRecipeFilesIntoRegistry loads recipe YAML files into the recipe registry for the API
-func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTargetTypeRegistry) error {
-	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
-		log.Printf("[SERVER] Recipe directory '%s' does not exist, skipping recipe loading\n", recipeDir)
-		return nil
-	}
-	loader := mywant.NewGenericRecipeLoader(recipeDir)
-
+// loadRecipeFilesIntoRegistryWithLoader loads recipe YAML files into the recipe registry using a pre-configured loader
+func loadRecipeFilesIntoRegistryWithLoader(loader *mywant.GenericRecipeLoader, recipeDir string, registry *mywant.CustomTargetTypeRegistry) error {
 	// List all recipe files
 	recipes, err := loader.ListRecipes()
 	if err != nil {
@@ -241,36 +235,49 @@ func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTarget
 	// Load each recipe file
 	loadedCount := 0
 	for _, relativePath := range recipes {
-		fullPath := fmt.Sprintf("%s/%s", recipeDir, relativePath)
-
-		// Read and parse the recipe file directly
-		data, err := os.ReadFile(fullPath)
+		// Use loader.LoadRecipe which now supports fallback to embedded FS
+		// For the loader, we need a consistent path. 
+		fullPath := filepath.Join(recipeDir, relativePath)
+		recipeConfig, err := loader.LoadRecipe(fullPath, nil)
 		if err != nil {
-			log.Printf("[SERVER] Warning: Failed to read recipe %s: %v\n", relativePath, err)
-			continue
-		}
-
-		var recipe mywant.GenericRecipe
-		if err := yaml.Unmarshal(data, &recipe); err != nil {
-			log.Printf("[SERVER] Warning: Failed to parse recipe %s: %v\n", relativePath, err)
+			log.Printf("[SERVER] Warning: Failed to load recipe %s: %v\n", relativePath, err)
 			continue
 		}
 
 		// Generate a dynamic GUID for the recipe ID (non-persistent)
 		recipeID := uuid.New().String()
-		recipe.Recipe.Metadata.ID = recipeID
+		recipeConfig.Metadata.ID = recipeID
+
+		// Convert back to GenericRecipe structure
+		recipe := mywant.GenericRecipe{
+			Recipe: mywant.RecipeContent{
+				Metadata:   recipeConfig.Metadata,
+				Parameters: recipeConfig.Parameters,
+				Wants:      nil, // Populated via config
+			},
+		}
 
 		if err := registry.CreateRecipe(recipeID, &recipe); err != nil {
 			log.Printf("[SERVER] Warning: Failed to register recipe %s: %v\n", recipeID, err)
 			continue
 		}
 
-		log.Printf("[SERVER] ✅ Loaded recipe: %s (ID: %s)\n", recipe.Recipe.Metadata.Name, recipeID)
+		log.Printf("[SERVER] ✅ Loaded recipe: %s (ID: %s)\n", recipeConfig.Metadata.Name, recipeID)
 		loadedCount++
 	}
 
 	log.Printf("[SERVER] Successfully loaded %d/%d recipe files\n", loadedCount, len(recipes))
 	return nil
+}
+
+// loadRecipeFilesIntoRegistry loads recipe YAML files into the recipe registry for the API
+func loadRecipeFilesIntoRegistry(recipeDir string, registry *mywant.CustomTargetTypeRegistry) error {
+	if _, err := os.Stat(recipeDir); os.IsNotExist(err) {
+		log.Printf("[SERVER] Recipe directory '%s' does not exist, skipping recipe loading\n", recipeDir)
+		return nil
+	}
+	loader := mywant.NewGenericRecipeLoader(recipeDir)
+	return loadRecipeFilesIntoRegistryWithLoader(loader, recipeDir, registry)
 }
 
 // loadRecipeFilesIntoRegistryFromFS loads recipe files from an embedded fs.FS into the registry.

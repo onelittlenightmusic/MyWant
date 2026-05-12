@@ -97,7 +97,8 @@ func New(config Config) *Server {
 		_ = loadRecipeFilesIntoRegistryFromFS(bundled.BuiltinFS, "recipes", recipeRegistry)
 	} else {
 		_ = mywant.ScanAndRegisterCustomTypes(mywant.RecipesDir, recipeRegistry)
-		_ = loadRecipeFilesIntoRegistry(mywant.RecipesDir, recipeRegistry)
+		loader := mywant.NewGenericRecipeLoader(mywant.RecipesDir).WithFallbackFS(bundled.BuiltinFS)
+		_ = loadRecipeFilesIntoRegistryWithLoader(loader, mywant.RecipesDir, recipeRegistry)
 	}
 
 	// Load user-saved recipes from ~/.mywant/recipes/

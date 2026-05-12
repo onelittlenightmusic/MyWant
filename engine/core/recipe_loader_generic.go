@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -129,8 +130,9 @@ type GenericRecipeConfig struct {
 
 // GenericRecipeLoader manages loading and processing any type of recipe
 type GenericRecipeLoader struct {
-	recipes   map[string]GenericRecipe
-	recipeDir string
+	recipes    map[string]GenericRecipe
+	recipeDir  string
+	fallbackFS fs.FS
 }
 
 // NewGenericRecipeLoader creates a new generic recipe loader
@@ -147,15 +149,40 @@ func NewGenericRecipeLoader(recipeDir string) *GenericRecipeLoader {
 	return loader
 }
 
+func (grl *GenericRecipeLoader) WithFallbackFS(fsys fs.FS) *GenericRecipeLoader {
+	grl.fallbackFS = fsys
+	return grl
+}
+
 // LoadRecipe loads and processes a recipe file with OpenAPI spec validation
 func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig, error) {
 	DebugLog("[RECIPE-LOADER] Loading recipe from path: %s\n", recipePath)
 
 	// Read recipe file
-	data, err := os.ReadFile(recipePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read recipe file: %v", err)
+	var data []byte
+	var err error
+
+	// Try reading from filesystem first
+	data, err = os.ReadFile(recipePath)
+	if err != nil && grl.fallbackFS != nil {
+		// Fallback to embedded FS
+		// Path might be absolute (from recipeDir), need to make it relative to fsRoot if possible, 
+		// but since we only have recipePath as a potentially full path, 
+		// let's try reading directly using the path if it's relative or stripped
+		relPath := filepath.Base(recipePath)
+		if strings.Contains(recipePath, "recipes/") {
+			relPath = "recipes/" + filepath.Base(recipePath)
+		}
+		data, err = fs.ReadFile(grl.fallbackFS, relPath)
+		if err == nil {
+			log.Printf("[RECIPE-LOADER] Fallback: Loaded recipe %s from embedded FS\n", relPath)
+		}
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to read recipe file %s: %w", recipePath, err)
+	}
+
 	DebugLog("[RECIPE-LOADER] Successfully read recipe file: %s\n", recipePath)
 
 	err = validateRecipeWithSpec(data)
