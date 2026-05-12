@@ -166,12 +166,10 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	data, err = os.ReadFile(recipePath)
 	if err != nil && grl.fallbackFS != nil {
 		// Fallback to embedded FS
-		// Path might be absolute (from recipeDir), need to make it relative to fsRoot if possible, 
-		// but since we only have recipePath as a potentially full path, 
-		// let's try reading directly using the path if it's relative or stripped
+		// Ensure we look for the file within the 'recipes/' directory of the embedded FS
 		relPath := filepath.Base(recipePath)
-		if strings.Contains(recipePath, "recipes/") {
-			relPath = "recipes/" + filepath.Base(recipePath)
+		if !strings.HasPrefix(relPath, "recipes/") {
+			relPath = "recipes/" + relPath
 		}
 		data, err = fs.ReadFile(grl.fallbackFS, relPath)
 		if err == nil {
