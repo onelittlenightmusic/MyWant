@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"mywant/engine/bundled"
 	"os"
 	"path/filepath"
 	"strings"
@@ -549,20 +550,32 @@ func validateRecipeWithSpec(yamlData []byte) error {
 	}
 
 	var specPath string
+	var specData []byte
+	var err error
+
+	// Try reading from filesystem first
 	for _, path := range specPaths {
 		if _, err := os.Stat(path); err == nil {
 			specPath = path
-			break
+			specData, err = os.ReadFile(specPath)
+			if err == nil {
+				break
+			}
 		}
 	}
 
-	if specPath == "" {
-		// Fallback to error from last attempt or default
-		specPath = filepath.Join(SpecDir, "recipe-spec.yaml")
+	// Fallback to embedded FS if filesystem reading fails
+	if specData == nil {
+		specPath = "spec/recipe-spec.yaml"
+		specData, err = fs.ReadFile(bundled.BuiltinFS, specPath)
+		if err != nil {
+			return fmt.Errorf("failed to load recipe OpenAPI spec from disk or embedded FS: %w", err)
+		}
+		DebugLog("[RECIPE-LOADER] Fallback: Loaded OpenAPI spec from embedded FS\n")
 	}
 
 	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile(specPath)
+	spec, err := loader.LoadFromData(specData)
 	if err != nil {
 		return fmt.Errorf("failed to load recipe OpenAPI spec: %w", err)
 	}
