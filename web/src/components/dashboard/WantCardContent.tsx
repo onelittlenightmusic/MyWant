@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer } from 'react';
+import React, { useState, useEffect, useReducer, useCallback } from 'react';
 import { AlertTriangle, Bot, Heart, Clock, ThumbsUp, ThumbsDown, Copy, Check, MessageSquare } from 'lucide-react';
 import { Want } from '@/types/want';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -160,23 +160,25 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const requireReaction = want.spec?.params?.require_reaction !== false;
   const isReminder = wantType === 'reminder';
   const isGoal = wantType === 'goal';
-  const reminderPhase = want.state?.current?.reminder_phase as string | undefined;
-  const goalPhase = want.state?.current?.phase as string | undefined;
-  const isAwaitingApproval = (isReminder && reminderPhase === 'reaching') || (isGoal && goalPhase === 'awaiting_approval');
+  const status = want.status;
+  const isAwaitingApproval = (isReminder && (status as any) === 'waiting_user_action') || (isGoal && (status as any) === 'awaiting_approval');
   const shouldShowReactionButtons = queueId && requireReaction && isAwaitingApproval;
+  console.log('DEBUG [WantCardContent]:', { queueId, requireReaction, isReminder, status, isAwaitingApproval, shouldShowReactionButtons, want });
 
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
-  const submitReaction = async (approved: boolean) => {
-    if (!queueId || isSubmittingReaction) return;
+  const submitReaction = useCallback(async (approved: boolean) => {
+    const currentQueueId = want.state?.current?.reaction_queue_id as string | undefined;
+    if (!currentQueueId || isSubmittingReaction) return;
+    
     setIsSubmittingReaction(true);
     try {
-      await fetch(`/api/v1/reactions/${queueId}`, {
+      await fetch(`/api/v1/reactions/${currentQueueId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approved, comment: 'Reaction submitted' }),
       });
     } catch (error) { console.error('Error submitting reaction:', error); } finally { setIsSubmittingReaction(false); }
-  };
+  }, [want.state?.current?.reaction_queue_id, isSubmittingReaction]);
 
   const [finalResultCopied, setFinalResultCopied] = useState(false);
   const handleCopyFinalResult = (e: React.MouseEvent) => {

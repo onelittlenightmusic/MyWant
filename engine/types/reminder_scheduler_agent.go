@@ -85,17 +85,14 @@ func (r *ReminderSchedulerAgent) run(w *Want) {
 func (r *ReminderSchedulerAgent) checkAndTriggerTransitions(w *Want) {
 	now := time.Now()
 
-	// Get current phase from state
-	phaseStr := GetCurrent(w, "reminder_phase", "")
-
-	// Check if we should transition to reaching phase
-	if phaseStr == ReminderPhaseWaiting && now.After(r.reachingTime) {
-		w.StoreLog("[REMINDER-SCHEDULER] Reaching time detected, transitioning to reaching phase\n")
-		w.SetCurrent("reminder_phase", ReminderPhaseReaching)
+	// Check if we should transition to reaching status
+	if w.GetStatus() == WantStatusIdle && now.After(r.reachingTime) {
+		w.StoreLog("[REMINDER-SCHEDULER] Reaching time detected, transitioning to reaching status\n")
+		w.SetStatus(WantStatusReaching)
 	}
 
-	// Check if event time has passed while in reaching phase
-	if phaseStr == ReminderPhaseReaching && !r.eventTime.IsZero() && now.After(r.eventTime) {
+	// Check if event time has passed while in reaching status
+	if (w.GetStatus() == WantStatusReaching || w.GetStatus() == WantStatusWaitingUserAction) && !r.eventTime.IsZero() && now.After(r.eventTime) {
 		w.StoreLog("[REMINDER-SCHEDULER] Event time passed\n")
 		// Don't auto-transition here; let Progress() handle it based on require_reaction
 	}

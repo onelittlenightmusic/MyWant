@@ -14,13 +14,13 @@ func init() {
 	})
 }
 
-// manageReactionQueue handles queue creation and deletion based on reminder phase
+// manageReactionQueue handles queue creation and deletion based on reminder status
 func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
-	// Get current reminder phase and queue ID using generic accessors
-	phase := mywant.GetCurrent(want, "reminder_phase", "")
+	// Get current reminder status and queue ID using generic accessors
+	status := want.GetStatus()
 	existingQueueID := mywant.GetCurrent(want, "reaction_queue_id", "")
 
-	if phase == "" {
+	if status == "" {
 		return nil
 	}
 
@@ -29,9 +29,9 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 		return fmt.Errorf("no http client")
 	}
 
-	switch phase {
-	case ReminderPhaseWaiting, ReminderPhaseReaching:
-		if existingQueueID != "" && phase == ReminderPhaseWaiting {
+	switch status {
+	case mywant.WantStatusIdle, mywant.WantStatusReaching, mywant.WantStatusWaitingUserAction:
+		if existingQueueID != "" && status == mywant.WantStatusIdle {
 			_ = deleteReactionQueue(httpClient, existingQueueID)
 			existingQueueID = ""
 		}
@@ -54,7 +54,7 @@ func manageReactionQueue(ctx context.Context, want *mywant.Want) error {
 			want.StoreLog("[INFO] Created reaction queue %s (type: %s)", queueID, reactionType)
 		}
 
-	case ReminderPhaseCompleted, ReminderPhaseFailed:
+	case mywant.WantStatusAchieved, mywant.WantStatusFailed:
 		if existingQueueID != "" {
 			err := deleteReactionQueue(httpClient, existingQueueID)
 			if err == nil {

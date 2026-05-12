@@ -16,9 +16,9 @@ func init() {
 }
 
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
-	phase := GetCurrent(want, "reminder_phase", "")
+	status := want.GetStatus()
 
-	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
+	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
 		return true, nil
 	}
 
@@ -43,11 +43,11 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 		return nil
 	}
 
-	phase := GetCurrent(want, "reminder_phase", "")
+	status := want.GetStatus()
 	requireReaction := GetGoal(want, "require_reaction", false)
 	queueID := GetCurrent(want, "reaction_queue_id", "")
 
-	if phase != ReminderPhaseWaiting && phase != ReminderPhaseReaching {
+	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
 		return nil
 	}
 	if !requireReaction || queueID == "" {
