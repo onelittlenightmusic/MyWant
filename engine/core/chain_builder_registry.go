@@ -1,6 +1,9 @@
 package mywant
 
-import "fmt"
+import (
+	"fmt"
+	"mywant/engine/bundled"
+)
 
 // RegisterWantType allows registering custom want types
 func (cb *ChainBuilder) RegisterWantType(wantType string, factory WantFactory) {
@@ -255,7 +258,7 @@ func (cb *ChainBuilder) createCustomTargetWant(want *Want) (any, error) {
 	mergedSpec := cb.mergeWithCustomDefaults(want.Spec, config)
 	target := config.CreateTargetFunc(want.Metadata, mergedSpec)
 	target.SetBuilder(cb)
-	recipeLoader := NewGenericRecipeLoader("recipes")
+	recipeLoader := NewGenericRecipeLoader("recipes").WithFallbackFS(bundled.BuiltinFS)
 	target.SetRecipeLoader(recipeLoader)
 
 	// Set the custom_target want type definition to enable state fields

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"mywant/engine/core/chain"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -52,7 +51,7 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 			PreservePendingState: true, // Target aggregates MergeParentState writes across iterations
 		},
 		MaxDisplay:   1000,
-		RecipePath:   filepath.Join(RecipesDir, "empty.yaml"), // Relative to project root
+		RecipePath:   "", // Path will be set dynamically via target type registration
 		RecipeParams: make(map[string]any), parameterSubscriptions: make(map[string][]string),
 		childWants:   make([]*Want, 0),
 		childrenDone: make(chan bool, 1), // Signal channel for subscription system
