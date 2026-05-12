@@ -18,8 +18,17 @@ func init() {
 func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 	status := want.GetStatus()
 
-	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
+	// Stop only on terminal states; keep running while Idle (waiting for reaching_time)
+	switch status {
+	case WantStatusAchieved, WantStatusAchievedWithWarning,
+		WantStatusFailed, WantStatusTerminated,
+		WantStatusModuleError, WantStatusConfigError, WantStatusCancelled:
 		return true, nil
+	}
+
+	// Only poll the reaction queue when in the active reaction phase
+	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
+		return false, nil
 	}
 
 	err := monitorUserReactions(ctx, want)

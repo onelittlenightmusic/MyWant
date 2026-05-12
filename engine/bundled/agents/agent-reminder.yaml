@@ -7,3 +7,12 @@ agents:
     capabilities:
       - reminder_queue_management
     role: action
+
+  - name: user_reaction_monitor
+    runtime: localGo
+    type: monitor
+    description: Polls the reaction queue API and writes the user's approve/reject response into want state.
+    version: '1.0'
+    capabilities:
+      - reminder_monitoring
+    role: monitor
