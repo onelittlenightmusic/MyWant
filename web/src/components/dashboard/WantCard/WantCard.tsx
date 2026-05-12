@@ -341,7 +341,7 @@ export const WantCard: React.FC<WantCardProps> = ({
         )}
         style={isControl && !selected
           ? { WebkitTouchCallout: 'none' } as React.CSSProperties
-          : { ...parentBackgroundStyle.style, WebkitTouchCallout: 'none' } as React.CSSProperties
+          : { WebkitTouchCallout: 'none' } as React.CSSProperties
         }
       >
         {(!isControl || selected) && <ProgressBars achievingPercentage={achievingPercentage} />}
@@ -381,7 +381,10 @@ export const WantCard: React.FC<WantCardProps> = ({
 
         <div
           className="relative z-10 transition-all duration-150 flex-1"
-          style={overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : undefined}
+          style={{
+            ...((!isControl || selected) ? parentBackgroundStyle.style : {}),
+            ...(overlay.showQuickActions ? { filter: 'blur(2px)', opacity: 0.5, pointerEvents: 'none' } : {})
+          }}
         >
           <WantCardContent
             want={want} isChild={false} hasChildren={!!hasChildren} isFocused={selected} isSelectMode={isSelectMode}
