@@ -1,0 +1,12 @@
+wants:
+  - metadata:
+      name: reminder-instance
+      type: reminder
+    spec:
+      when:
+        - fromGlobalParam: global_timer_1  # every: 30s, at: 08:30 (timer-instance で制御)
+      params:
+        message: "Quick check reminder"
+        ahead: "5 seconds"
+        require_reaction: true
+        reaction_type: internal

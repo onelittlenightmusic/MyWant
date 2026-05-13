@@ -73,7 +73,8 @@ func ParseTimeExpression(expr string) (int, int, error) {
 }
 
 // ParseFrequencyExpression parses natural language frequency expressions into time.Duration
-// Supports formats like "5 minutes", "2 hours", "day", "week", "30 seconds"
+// Supports formats like "5 minutes", "2 hours", "day", "week", "30 seconds",
+// and also shorthand Go-style duration strings like "30s", "1m", "10m", "1h", "1d".
 func ParseFrequencyExpression(expr string) (time.Duration, error) {
 	if expr == "" {
 		return 0, fmt.Errorf("empty frequency expression")
@@ -93,6 +94,19 @@ func ParseFrequencyExpression(expr string) (time.Duration, error) {
 		return time.Minute, nil
 	case "second":
 		return time.Second, nil
+	}
+
+	// Handle shorthand day format "Nd" (e.g. "1d", "7d") not supported by time.ParseDuration
+	if strings.HasSuffix(expr, "d") {
+		numStr := strings.TrimSuffix(expr, "d")
+		if n, err := strconv.Atoi(numStr); err == nil && n > 0 {
+			return time.Duration(n) * 24 * time.Hour, nil
+		}
+	}
+
+	// Handle Go-style shorthand duration strings: "30s", "5m", "1h", "6h", etc.
+	if d, err := time.ParseDuration(expr); err == nil {
+		return d, nil
 	}
 
 	// Handle expressions like "5 minutes", "2 hours", "30 seconds"

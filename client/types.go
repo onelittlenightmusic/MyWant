@@ -60,8 +60,9 @@ type WantSpec struct {
 
 // WhenSpec defines a scheduled execution time for a Want
 type WhenSpec struct {
-	At    string `json:"at,omitempty"`
-	Every string `json:"every,omitempty"`
+	At              string `json:"at,omitempty" yaml:"at,omitempty"`
+	Every           string `json:"every,omitempty" yaml:"every,omitempty"`
+	FromGlobalParam string `json:"fromGlobalParam,omitempty" yaml:"fromGlobalParam,omitempty"`
 }
 
 // CreateWantResponse represents the response from creating a want

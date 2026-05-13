@@ -117,7 +117,12 @@ func (r *ReminderWant) Initialize() {
 		}
 		eventTime = time.Now().Add(duration)
 		locals.DurationFromNow = durationFromNowStr
-	} else if !r.hasWhenSpec() {
+	} else if r.hasWhenSpec() {
+		// Scheduled via spec.when (e.g. fromGlobalParam or direct every/at).
+		// Fire immediately on each restart triggered by the scheduler.
+		eventTime = time.Now()
+		locals.DurationFromNow = "0 seconds"
+	} else {
 		r.SetConfigError("timing", "Either 'event_time', 'duration_from_now', or 'when' spec must be provided")
 		return
 	}
@@ -126,7 +131,7 @@ func (r *ReminderWant) Initialize() {
 		reachingTime := eventTime.Add(-aheadDuration)
 		locals.ReachingTime = reachingTime
 		locals.EventTime = eventTime
-		if eventTime.Before(time.Now()) {
+		if eventTime.Before(time.Now()) || reachingTime.Before(time.Now()) {
 			r.SetStatus(WantStatusReaching)
 		}
 	}
