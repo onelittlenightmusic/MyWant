@@ -163,7 +163,6 @@ export const WantCardContent: React.FC<WantCardContentProps> = ({
   const status = want.status;
   const isAwaitingApproval = (isReminder && (status as any) === 'waiting_user_action') || (isGoal && (status as any) === 'awaiting_approval');
   const shouldShowReactionButtons = queueId && requireReaction && isAwaitingApproval;
-  console.log('DEBUG [WantCardContent]:', { queueId, requireReaction, isReminder, status, isAwaitingApproval, shouldShowReactionButtons, want });
 
   const [isSubmittingReaction, setIsSubmittingReaction] = useState(false);
   const submitReaction = useCallback(async (approved: boolean) => {
