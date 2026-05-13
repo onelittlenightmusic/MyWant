@@ -17,130 +17,40 @@ import (
 )
 
 // WantTypeDefinition represents a complete want type definition
-type WantTypeDefinition struct {
-	Metadata            WantTypeMetadata       `json:"metadata" yaml:"metadata"`
-	Parameters          []ParameterDef         `json:"parameters" yaml:"parameters"`
-	State               []StateDef             `json:"state" yaml:"state"`
-	Connectivity        ConnectivityDef        `json:"connectivity" yaml:"connectivity"`
-	Connect             *RequireSpec           `json:"connect,omitempty" yaml:"connect,omitempty"`                         // New connectivity requirement field
-	Require             *RequireSpec           `json:"require,omitempty" yaml:"require,omitempty"`                         // Structured connectivity requirement (deprecated)
-	UsageLimit          *UsageLimitSpec        `json:"usageLimit,omitempty" yaml:"usageLimit,omitempty"`                   // Deprecated: use connect instead
-	Requires            []string               `json:"requires,omitempty" yaml:"requires,omitempty"`                       // Agent capability requirements (includes ThinkAgent capabilities)
-	MonitorCapabilities []MonitorCapabilityDef `json:"monitorCapabilities,omitempty" yaml:"monitorCapabilities,omitempty"` // MonitorAgent capabilities (auto-started or used for capability lookup)
-	FinalResultField    string                 `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`       // Default state key for final_result
-	GlobalOverrideFrom  string                 `json:"globalOverrideFrom,omitempty" yaml:"globalOverrideFrom,omitempty"`   // Global param key whose object fields override ALL params (highest priority)
-	Agents              []AgentDef             `json:"agents" yaml:"agents"`
-	InlineAgents        []InlineAgentDef       `json:"inlineAgents,omitempty" yaml:"inlineAgents,omitempty"` // executable inline agent definitions
-	FinalizeWhen        *FinalizeWhen          `json:"finalizeWhen,omitempty" yaml:"finalizeWhen,omitempty"` // declarative termination conditions (achieved + failed)
-	AchievedWhen        *AchievedWhenDef       `json:"achievedWhen,omitempty" yaml:"achievedWhen,omitempty"` // Deprecated: use finalizeWhen.achieved
-	OnInitialize        *LifecycleHookDef      `json:"onInitialize,omitempty" yaml:"onInitialize,omitempty"` // actions to run when want is initialized
-	OnDelete            *LifecycleHookDef      `json:"onDelete,omitempty" yaml:"onDelete,omitempty"`         // actions to run when want is deleted
-	OnAchieved          *LifecycleHookDef      `json:"onAchieved,omitempty" yaml:"onAchieved,omitempty"`     // actions to run each Progress() tick while achieved
-	Constraints         []ConstraintDef        `json:"constraints" yaml:"constraints"`
-	Examples            []ExampleDef           `json:"examples" yaml:"examples"`
-	RelatedTypes        []string               `json:"relatedTypes" yaml:"relatedTypes"`
-	SeeAlso             []string               `json:"seeAlso" yaml:"seeAlso"`
-	GoType              string                 `json:"goType,omitempty" yaml:"goType,omitempty"` // delegate to this registered Go implementation (e.g. "webhook_receiver")
-}
+type WantTypeDefinition = want_spec.WantTypeDefinition
 
 // WantTypeMetadata contains want type identity and classification
-type WantTypeMetadata struct {
-	Name        string            `json:"name" yaml:"name"`
-	Title       string            `json:"title" yaml:"title"`
-	Description string            `json:"description" yaml:"description"`
-	Version     string            `json:"version" yaml:"version"`
-	Category    string            `json:"category" yaml:"category"`
-	Pattern     string            `json:"pattern" yaml:"pattern"`                             // generator, processor, sink, independent
-	SystemType  bool              `json:"system_type,omitempty" yaml:"system_type,omitempty"` // If true, hide from user-facing want type selector
-	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`           // Labels automatically applied to all instances of this want type
-}
+type WantTypeMetadata = want_spec.WantTypeMetadata
 
 // ParameterDef defines a parameter for want type configuration
-type ParameterDef struct {
-	Name                       string          `json:"name" yaml:"name"`
-	Description                string          `json:"description" yaml:"description"`
-	Type                       string          `json:"type" yaml:"type"` // Go type: int, float64, string, bool, []string, map[string]any
-	Default                    any             `json:"default,omitempty" yaml:"default,omitempty"`
-	DefaultGlobalParameter     string          `json:"defaultGlobalParameter,omitempty" yaml:"defaultGlobalParameter,omitempty"`         // Global parameter key used as last-resort fallback
-	DefaultGlobalParameterFrom string          `json:"defaultGlobalParameterFrom,omitempty" yaml:"defaultGlobalParameterFrom,omitempty"` // Read this param's value as the global parameter key
-	Required                   bool            `json:"required" yaml:"required"`
-	Validation                 ValidationRules `json:"validation,omitempty" yaml:"validation,omitempty"`
-	Example                    any             `json:"example,omitempty" yaml:"example,omitempty"`
-}
+type ParameterDef = want_spec.ParameterDef
 
 // ValidationRules defines validation constraints for parameters
-type ValidationRules struct {
-	Min     *float64 `json:"min,omitempty" yaml:"min,omitempty"`
-	Max     *float64 `json:"max,omitempty" yaml:"max,omitempty"`
-	Pattern string   `json:"pattern,omitempty" yaml:"pattern,omitempty"`
-	Enum    []any    `json:"enum,omitempty" yaml:"enum,omitempty"`
-}
+type ValidationRules = want_spec.ValidationRules
 
 // StateDef defines a state key for a want type
-type StateDef struct {
-	Name         string `json:"name" yaml:"name"`
-	Description  string `json:"description" yaml:"description"`
-	Type         string `json:"type" yaml:"type"`
-	Label        string `json:"label,omitempty" yaml:"label,omitempty"` // goal, current, plan, internal
-	Persistent   bool   `json:"persistent" yaml:"persistent"`
-	InitialValue any    `json:"initialValue,omitempty" yaml:"initialValue,omitempty"`
-	Example      any    `json:"example,omitempty" yaml:"example,omitempty"`
-	OnFetchData  string `json:"onFetchData,omitempty" yaml:"onFetchData,omitempty"` // JSON path to extract from json_data (e.g. "routes[0].departure")
-	FetchFrom    string `json:"fetchFrom,omitempty" yaml:"fetchFrom,omitempty"`     // state field name to use as JSON source for onFetchData extraction (processed in EndProgressCycle)
-}
+type StateDef = want_spec.StateDef
 
 // MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.
-// This struct is NOT manually written in YAML; it is computed at runtime by
-// WantTypeLoader.EnrichMonitorCapabilities(), which cross-references each want type's
-// Requires list against the AgentRegistry to find MonitorAgents.
-type MonitorCapabilityDef struct {
-	Capability      string `json:"capability" yaml:"capability"`
-	IntervalSeconds int    `json:"intervalSeconds,omitempty" yaml:"intervalSeconds,omitempty"`
-}
+type MonitorCapabilityDef = want_spec.MonitorCapabilityDef
 
 // ConnectivityDef defines input/output patterns for a want type
-type ConnectivityDef struct {
-	Inputs  []ChannelDef `json:"inputs" yaml:"inputs"`
-	Outputs []ChannelDef `json:"outputs" yaml:"outputs"`
-}
+type ConnectivityDef = want_spec.ConnectivityDef
 
 // ChannelDef defines an input or output channel
-type ChannelDef struct {
-	Name        string `json:"name" yaml:"name"`
-	Type        string `json:"type" yaml:"type"` // want, agent, state, event
-	DataType    string `json:"data_type,omitempty" yaml:"data_type,omitempty"`
-	Description string `json:"description" yaml:"description"`
-	Required    bool   `json:"required,omitempty" yaml:"required,omitempty"`
-	Multiple    bool   `json:"multiple,omitempty" yaml:"multiple,omitempty"`
-}
+type ChannelDef = want_spec.ChannelDef
 
 // AgentDef defines agent integration for a want type
-type AgentDef struct {
-	Name        string `json:"name" yaml:"name"`
-	Role        string `json:"role" yaml:"role"` // monitor, action, validator, transformer
-	Description string `json:"description" yaml:"description"`
-	Example     string `json:"example,omitempty" yaml:"example,omitempty"`
-}
+type AgentDef = want_spec.AgentDef
 
 // ConstraintDef defines business logic constraints
-type ConstraintDef struct {
-	Description string `json:"description" yaml:"description"`
-	Validation  string `json:"validation" yaml:"validation"`
-}
+type ConstraintDef = want_spec.ConstraintDef
 
 // ExampleDef defines an example usage of a want type
-// The Want field contains the full want configuration that can be deployed via the want API
-type ExampleDef struct {
-	Name             string         `json:"name" yaml:"name"`
-	Description      string         `json:"description" yaml:"description"`
-	Want             map[string]any `json:"want" yaml:"want"` // Full want configuration (metadata + spec)
-	ExpectedBehavior string         `json:"expectedBehavior" yaml:"expectedBehavior"`
-}
+type ExampleDef = want_spec.ExampleDef
 
 // WantTypeWrapper is the top-level YAML structure for wantType-only files.
-type WantTypeWrapper struct {
-	WantType WantTypeDefinition `yaml:"wantType"`
-}
+type WantTypeWrapper = want_spec.WantTypeWrapper
 
 // WantTypeLoader loads and manages want type definitions
 type WantTypeLoader struct {

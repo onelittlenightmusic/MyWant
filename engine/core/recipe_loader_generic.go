@@ -15,65 +15,27 @@ import (
 )
 
 // RecipeWant represents a want in recipe format (aligned with Want structure)
-type RecipeWant struct {
-	Metadata Metadata `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Spec     WantSpec `yaml:"spec,omitempty" json:"spec,omitempty"`
-
-	// Legacy flattened fields for backward compatibility
-	Name        string              `yaml:"name,omitempty" json:"name,omitempty"`
-	Type        string              `yaml:"type,omitempty" json:"type,omitempty"`
-	Labels      map[string]string   `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Params      map[string]any      `yaml:"params,omitempty" json:"params,omitempty"`
-	Using       []map[string]string `yaml:"using,omitempty" json:"using,omitempty"`
-	Requires    []string            `yaml:"requires,omitempty" json:"requires,omitempty"`
-	RecipeAgent bool                `yaml:"recipeAgent,omitempty" json:"recipeAgent,omitempty"`
-}
+type RecipeWant = want_spec.RecipeWant
 
 // GenericRecipe represents the top-level recipe structure
-type GenericRecipe struct {
-	Recipe RecipeContent `yaml:"recipe" json:"recipe"`
-}
+type GenericRecipe = want_spec.GenericRecipe
 
 // RecipeResult defines how to compute results from recipe execution Supports both legacy format (primary/metrics) and new flat array format
-type RecipeResult []RecipeResultSpec
+type RecipeResult = want_spec.RecipeResult
 
 // RecipeResultSpec specifies which want and state field to use for result computation
-type RecipeResultSpec struct {
-	WantName    string `yaml:"want_name" json:"want_name"`
-	StateField  string `yaml:"state_field,omitempty" json:"state_field,omitempty"` // New: want type state field name (preferred)
-	StatName    string `yaml:"stat_name,omitempty" json:"stat_name,omitempty"`     // Deprecated: use state_field instead
-	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-}
+type RecipeResultSpec = want_spec.RecipeResultSpec
 
 // RecipeExample represents example deployment configuration for one-click deployment
-type RecipeExample struct {
-	Wants []RecipeWant `yaml:"wants,omitempty" json:"wants,omitempty"`
-}
+type RecipeExample = want_spec.RecipeExample
 
 // RecipeExampleDef defines a named example usage of a recipe with pre-filled parameters
-type RecipeExampleDef struct {
-	Name             string         `json:"name" yaml:"name"`
-	Description      string         `json:"description" yaml:"description"`
-	Params           map[string]any `json:"params" yaml:"params"`
-	ExpectedBehavior string         `json:"expectedBehavior,omitempty" yaml:"expectedBehavior,omitempty"`
-}
+type RecipeExampleDef = want_spec.RecipeExampleDef
 
 // RecipeContent contains the actual recipe data
-type RecipeContent struct {
-	Metadata              GenericRecipeMetadata `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Wants                 []RecipeWant          `yaml:"wants,omitempty" json:"wants,omitempty"`
-	Parameters            map[string]any        `yaml:"parameters,omitempty" json:"parameters,omitempty"`
-	ParameterDescriptions map[string]string     `yaml:"parameter_descriptions,omitempty" json:"parameter_descriptions,omitempty"`
-	Result                *RecipeResult         `yaml:"result,omitempty" json:"result,omitempty"`
-	Example               *RecipeExample        `yaml:"example,omitempty" json:"example,omitempty"`
-	Examples              []RecipeExampleDef    `yaml:"examples,omitempty" json:"examples,omitempty"`
-	// State defines coordinator-level state fields that will be added to Target's ProvidedStateFields
-	State []StateDef `yaml:"state,omitempty" json:"state,omitempty"`
-	// FinalResultField defines the default state key for the recipe's final_result
-	FinalResultField string `yaml:"finalResultField,omitempty" json:"finalResultField,omitempty"`
-}
+type RecipeContent = want_spec.RecipeContent
 
-func (rw RecipeWant) ConvertToWant() *Want {
+func ConvertRecipeWantToWant(rw RecipeWant) *Want {
 	want := &Want{}
 
 	// Use structured format if metadata type is provided
@@ -111,15 +73,7 @@ func (rw RecipeWant) ConvertToWant() *Want {
 }
 
 // GenericRecipeMetadata contains recipe information
-type GenericRecipeMetadata struct {
-	ID          string `yaml:"id,omitempty" json:"id,omitempty"`
-	Name        string `yaml:"name" json:"name"`
-	Description string `yaml:"description" json:"description"`
-	Version     string `yaml:"version" json:"version"`
-	Type        string `yaml:"type,omitempty" json:"type,omitempty"`               // travel, qnet, fibonacci, etc.
-	CustomType  string `yaml:"custom_type,omitempty" json:"custom_type,omitempty"` // "wait time in queue system", etc.
-	Category    string `yaml:"category,omitempty" json:"category,omitempty"`       // approval, travel, mathematics, queue, etc.
-}
+type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
@@ -233,7 +187,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		orderKeys := GenerateSequentialOrderKeys(len(recipeContent.Wants), "")
 
 		for i, recipeWant := range recipeContent.Wants {
-			want := recipeWant.ConvertToWant()
+			want := ConvertRecipeWantToWant(recipeWant)
 			DebugLog("[RECIPE-LOADER] Converted recipe want %d (type: %s) to Want struct\n", i+1, want.Metadata.Type)
 
 			// Generate or prefix name to ensure uniqueness across deployments

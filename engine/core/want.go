@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
@@ -70,42 +71,13 @@ type BackgroundAgent interface {
 }
 
 // OwnerReference represents a reference to an owner object
-type OwnerReference struct {
-	APIVersion         string `json:"apiVersion" yaml:"apiVersion"`
-	Kind               string `json:"kind" yaml:"kind"`
-	Name               string `json:"name" yaml:"name"`
-	ID                 string `json:"id" yaml:"id"`
-	Controller         bool   `json:"controller,omitempty" yaml:"controller,omitempty"`
-	BlockOwnerDeletion bool   `json:"blockOwnerDeletion,omitempty" yaml:"blockOwnerDeletion,omitempty"`
-}
+type OwnerReference = want_spec.OwnerReference
 
 // CorrelationEntry represents the correlation relationship between two Wants.
-// Labels uses a unified label space:
-//   - "key=value"               : shared metadata label
-//   - "using.select/key=value"  : one Want references the other via a using selector
-//   - "state.sibling/parent=id" : both Wants share the same parent Want (sibling relationship)
-//
-// Rate is the weighted sum of Labels (higher = stronger coupling).
-type CorrelationEntry struct {
-	WantID string   `json:"wantID" yaml:"wantID"`
-	Labels []string `json:"labels" yaml:"labels"`
-	Rate   int      `json:"rate"   yaml:"rate"`
-}
+type CorrelationEntry = want_spec.CorrelationEntry
 
 // Metadata contains want identification and classification info
-type Metadata struct {
-	ID              string             `json:"id,omitempty" yaml:"id,omitempty"`
-	Name            string             `json:"name" yaml:"name"`
-	Type            string             `json:"type" yaml:"type"`
-	Labels          map[string]string  `json:"labels" yaml:"labels"`
-	OwnerReferences []OwnerReference   `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
-	UpdatedAt       int64              `json:"updatedAt" yaml:"-"`                                   // Server-managed timestamp, ignored on load
-	IsSystemWant    bool               `json:"isSystemWant,omitempty" yaml:"isSystemWant,omitempty"` // true for system-managed wants
-	OrderKey        string             `json:"orderKey,omitempty" yaml:"orderKey,omitempty"`         // Fractional index for custom ordering (supports drag-and-drop reordering)
-	Correlation     []CorrelationEntry `json:"correlation,omitempty" yaml:"correlation,omitempty"`   // Inter-Want correlation (computed by correlationPhase, read-only at runtime)
-	Series          string             `json:"series,omitempty" yaml:"series,omitempty"`             // Stable lineage ID shared across cancel+rebook cycles; auto-assigned on creation
-	Version         int                `json:"version,omitempty" yaml:"version,omitempty"`           // 1-based counter; incremented each time a want replaces a cancelled predecessor in the same series
-}
+type Metadata = want_spec.Metadata
 
 // newSeriesID generates a new random UUID-format series identifier.
 // Used to stamp the Metadata.Series field on every freshly created want.
@@ -118,184 +90,7 @@ func newSeriesID() string {
 }
 
 // WantSpec contains the desired state configuration for a want
-type WantSpec struct {
-	Params              map[string]any       `json:"params" yaml:"params"`
-	Exposes             []ExposeEntry        `json:"exposes,omitempty" yaml:"exposes,omitempty"`
-	Using               []map[string]string  `json:"using,omitempty" yaml:"using,omitempty"`
-	Recipe              string               `json:"recipe,omitempty" yaml:"recipe,omitempty"`
-	StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty" yaml:"stateSubscriptions,omitempty"`
-	NotificationFilters []NotificationFilter `json:"notificationFilters,omitempty" yaml:"notificationFilters,omitempty"`
-	Requires            []string             `json:"requires,omitempty" yaml:"requires,omitempty"`
-	When                []WhenSpec           `json:"when,omitempty" yaml:"when,omitempty"`
-	FinalResultField    string               `json:"finalResultField,omitempty" yaml:"finalResultField,omitempty"`
-	// ResetOnRestart controls whether state is reset to initialValues on each scheduled restart.
-	// Defaults to true (nil treated as true). Set explicitly to false to preserve state across restarts.
-	ResetOnRestart *bool `json:"resetOnRestart,omitempty" yaml:"resetOnRestart,omitempty"`
-}
-
-// GetParam returns the value for the given key from Params map
-func (s *WantSpec) GetParam(key string) (any, bool) {
-	v, ok := s.Params[key]
-	return v, ok
-}
-
-// SetParam sets a param value, initializing the map if nil
-func (s *WantSpec) SetParam(key string, val any) {
-	if s.Params == nil {
-		s.Params = make(map[string]any)
-	}
-	s.Params[key] = val
-}
-
-// HasParam returns true if the key exists in Params
-func (s *WantSpec) HasParam(key string) bool {
-	_, ok := s.Params[key]
-	return ok
-}
-
-// ParamsAsMap returns the Params map directly
-func (s *WantSpec) ParamsAsMap() map[string]any {
-	return s.Params
-}
-
-// SetParamsFromMap replaces Params with the given map
-func (s *WantSpec) SetParamsFromMap(m map[string]any) {
-	s.Params = m
-}
-
-// UnmarshalJSON implements json.Unmarshaler to support both old map format and new array format.
-// Params can be a JSON object (legacy) or array of {key,value} entries.
-func (s *WantSpec) UnmarshalJSON(data []byte) error {
-	// Use a struct without Params to avoid duplicate key issue
-	type WantSpecNoParams struct {
-		Exposes             []ExposeEntry        `json:"exposes,omitempty"`
-		Using               []map[string]string  `json:"using,omitempty"`
-		Recipe              string               `json:"recipe,omitempty"`
-		StateSubscriptions  []StateSubscription  `json:"stateSubscriptions,omitempty"`
-		NotificationFilters []NotificationFilter `json:"notificationFilters,omitempty"`
-		Requires            []string             `json:"requires,omitempty"`
-		When                []WhenSpec           `json:"when,omitempty"`
-		FinalResultField    string               `json:"finalResultField,omitempty"`
-	}
-	var raw struct {
-		WantSpecNoParams
-		Params json.RawMessage `json:"params"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-	s.Exposes = raw.Exposes
-	s.Using = raw.Using
-	s.Recipe = raw.Recipe
-	s.StateSubscriptions = raw.StateSubscriptions
-	s.NotificationFilters = raw.NotificationFilters
-	s.Requires = raw.Requires
-	s.When = raw.When
-	s.FinalResultField = raw.FinalResultField
-
-	if raw.Params == nil {
-		return nil
-	}
-
-	// Detect array vs object
-	trimmed := bytes.TrimSpace(raw.Params)
-	if len(trimmed) > 0 && trimmed[0] == '[' {
-		// Array format: [{key: k, value: v}]
-		var entries []ParamEntry
-		if err := json.Unmarshal(raw.Params, &entries); err != nil {
-			return err
-		}
-		s.Params = make(map[string]any, len(entries))
-		for _, e := range entries {
-			s.Params[e.Key] = e.Value
-		}
-	} else {
-		// Map format
-		var m map[string]any
-		if err := json.Unmarshal(raw.Params, &m); err != nil {
-			return err
-		}
-		s.Params = m
-	}
-	return nil
-}
-
-// UnmarshalYAML implements yaml.Unmarshaler to support both old map format and new array format.
-// Params can be:
-//   - map format (legacy):  params: {key: val}
-//   - array format (new):   params: [{key: k, value: v}]
-//
-// Exposes is a separate section:
-//
-//	exposes:
-//	  - param: local_key
-//	    as: upper_scope_name
-//	  - currentState: local_state_key
-//	    as: upper_scope_name
-func (s *WantSpec) UnmarshalYAML(value *yaml.Node) error {
-	if value.Kind != yaml.MappingNode {
-		return fmt.Errorf("WantSpec must be a YAML mapping")
-	}
-
-	// Split content into params node vs everything else
-	type restSpec struct {
-		Exposes             []ExposeEntry        `yaml:"exposes,omitempty"`
-		Using               []map[string]string  `yaml:"using,omitempty"`
-		Recipe              string               `yaml:"recipe,omitempty"`
-		StateSubscriptions  []StateSubscription  `yaml:"stateSubscriptions,omitempty"`
-		NotificationFilters []NotificationFilter `yaml:"notificationFilters,omitempty"`
-		Requires            []string             `yaml:"requires,omitempty"`
-		When                []WhenSpec           `yaml:"when,omitempty"`
-		FinalResultField    string               `yaml:"finalResultField,omitempty"`
-	}
-
-	var paramsNode *yaml.Node
-	var otherContent []*yaml.Node
-	for i := 0; i+1 < len(value.Content); i += 2 {
-		if value.Content[i].Value == "params" {
-			paramsNode = value.Content[i+1]
-		} else {
-			otherContent = append(otherContent, value.Content[i], value.Content[i+1])
-		}
-	}
-
-	otherNode := &yaml.Node{Kind: yaml.MappingNode, Content: otherContent}
-	var rest restSpec
-	if err := otherNode.Decode(&rest); err != nil {
-		return err
-	}
-	s.Exposes = rest.Exposes
-	s.Using = rest.Using
-	s.Recipe = rest.Recipe
-	s.StateSubscriptions = rest.StateSubscriptions
-	s.NotificationFilters = rest.NotificationFilters
-	s.Requires = rest.Requires
-	s.When = rest.When
-	s.FinalResultField = rest.FinalResultField
-
-	if paramsNode == nil {
-		return nil
-	}
-	if paramsNode.Kind == yaml.SequenceNode {
-		// Array format: [{key: k, value: v}]
-		var entries []ParamEntry
-		if err := paramsNode.Decode(&entries); err != nil {
-			return err
-		}
-		s.Params = make(map[string]any, len(entries))
-		for _, e := range entries {
-			s.Params[e.Key] = e.Value
-		}
-	} else {
-		// Map format (legacy): {key: val}
-		var m map[string]any
-		if err := paramsNode.Decode(&m); err != nil {
-			return err
-		}
-		s.Params = m
-	}
-	return nil
-}
+type WantSpec = want_spec.WantSpec
 
 // WantHistory contains both parameter and state history
 type WantHistory struct {

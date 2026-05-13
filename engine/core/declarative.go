@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	want_spec "github.com/onelittlenightmusic/want-spec"
 )
 
 // Dict is a convenience alias for map[string]any
@@ -52,34 +54,16 @@ type OnDeletable interface {
 }
 
 // StateSubscription defines what state changes to monitor
-type StateSubscription struct {
-	WantName   string   `json:"wantName" yaml:"wantName"`                         // Which want to monitor
-	StateKeys  []string `json:"stateKeys,omitempty" yaml:"stateKeys,omitempty"`   // Specific keys (empty = all keys)
-	Conditions []string `json:"conditions,omitempty" yaml:"conditions,omitempty"` // Optional conditions like "value > 100"
-	BufferSize int      `json:"bufferSize,omitempty" yaml:"bufferSize,omitempty"` // For rate limiting
-}
+type StateSubscription = want_spec.StateSubscription
 
 // ParamEntry represents a single parameter entry in array format
-type ParamEntry struct {
-	Key   string `json:"key" yaml:"key"`
-	Value any    `json:"value" yaml:"value"`
-}
+type ParamEntry = want_spec.ParamEntry
 
 // ExposeEntry declares a parameter or state exposure between scope levels.
-// For top-down (param propagation): set Param to the local param key and As to the upper-scope name.
-// For bottom-up (state propagation): set CurrentState to the local state key and As to the upper-scope name.
-type ExposeEntry struct {
-	Param        string `json:"param,omitempty" yaml:"param,omitempty"`               // local param key to receive from upper scope
-	CurrentState string `json:"currentState,omitempty" yaml:"currentState,omitempty"` // local state key to expose to parent
-	As           string `json:"as" yaml:"as"`                                         // name in the upper scope
-}
+type ExposeEntry = want_spec.ExposeEntry
 
 // NotificationFilter allows filtering received notifications
-type NotificationFilter struct {
-	SourcePattern string   `json:"sourcePattern" yaml:"sourcePattern"`                   // Regex pattern for source names
-	StateKeys     []string `json:"stateKeys,omitempty" yaml:"stateKeys,omitempty"`       // Only these keys
-	ValuePattern  string   `json:"valuePattern,omitempty" yaml:"valuePattern,omitempty"` // Value conditions
-}
+type NotificationFilter = want_spec.NotificationFilter
 
 // StateHistoryEntry represents a state change entry in the generic history system
 type StateHistoryEntry struct {
@@ -221,128 +205,9 @@ func (p *Paths) GetActiveOutCount() int {
 }
 
 // ConnectivityMetadata defines want connectivity requirements and constraints
-type ConnectivityMetadata struct {
-	RequiredInputs  int    `json:"required_inputs"`
-	RequiredOutputs int    `json:"required_outputs"`
-	MaxInputs       int    `json:"max_inputs"`  // -1 for unlimited
-	MaxOutputs      int    `json:"max_outputs"` // -1 for unlimited
-	WantType        string `json:"want_type"`
-	Description     string `json:"description"`
-}
+type ConnectivityMetadata = want_spec.ConnectivityMetadata
 
 // RequirePolicy defines connectivity requirements as an enum
-// ConnectionSpec represents a single connection definition
-type ConnectionSpec struct {
-	Name        string `json:"name" yaml:"name"`
-	Type        string `json:"type" yaml:"type"`
-	DataType    string `json:"data_type,omitempty" yaml:"data_type,omitempty"`
-	Description string `json:"description" yaml:"description"`
-	Required    bool   `json:"required" yaml:"required"`
-	Multiple    bool   `json:"multiple" yaml:"multiple"`
-}
-
-// RequireSpec defines structured connectivity requirements
-type RequireSpec struct {
-	Type      string           `json:"type" yaml:"type"`                               // REQUIRED: connectivity policy (none, users, providers, providers_and_users)
-	Providers []ConnectionSpec `json:"providers,omitempty" yaml:"providers,omitempty"` // Input connection specifications
-	Users     []ConnectionSpec `json:"users,omitempty" yaml:"users,omitempty"`         // Output connection specifications
-}
-
-// ToConnectivityMetadata converts RequireSpec to ConnectivityMetadata
-func (r *RequireSpec) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
-	if r == nil {
-		// Default: no requirements
-		return ConnectivityMetadata{
-			RequiredInputs:  0,
-			MaxInputs:       -1,
-			RequiredOutputs: 0,
-			MaxOutputs:      -1,
-			WantType:        wantType,
-			Description:     "No connectivity requirements",
-		}
-	}
-
-	requiredInputs := 0
-	for _, p := range r.Providers {
-		if p.Required {
-			requiredInputs++
-		}
-	}
-
-	requiredOutputs := 0
-	for _, u := range r.Users {
-		if u.Required {
-			requiredOutputs++
-		}
-	}
-
-	// Handle legacy 'type' field for backward compatibility
-	// ONLY apply default "1" if no structured lists are provided at all
-	if len(r.Providers) == 0 && len(r.Users) == 0 {
-		switch r.Type {
-		case "providers":
-			requiredInputs = 1
-			requiredOutputs = 0
-		case "users":
-			requiredInputs = 0
-			requiredOutputs = 1
-		case "providers_and_users":
-			requiredInputs = 1
-			requiredOutputs = 1
-		}
-	}
-
-	description := "No connectivity requirements"
-	if requiredInputs > 0 && requiredOutputs > 0 {
-		description = "Requires both input and output connections"
-	} else if requiredInputs > 0 {
-		description = "Requires input connections"
-	} else if requiredOutputs > 0 {
-		description = "Requires output connections"
-	}
-
-	return ConnectivityMetadata{
-		RequiredInputs:  requiredInputs,
-		MaxInputs:       -1,
-		RequiredOutputs: requiredOutputs,
-		MaxOutputs:      -1,
-		WantType:        wantType,
-		Description:     description,
-	}
-}
-
-// UsageLimitSpec defines want usage limits in YAML format
-// Providers = input connections, Users = output connections
-// Deprecated: Use require field instead
-type UsageLimitSpec struct {
-	Providers struct {
-		Min int `json:"min" yaml:"min"`
-		Max int `json:"max" yaml:"max"`
-	} `json:"providers" yaml:"providers"`
-	Users struct {
-		Min int `json:"min" yaml:"min"`
-		Max int `json:"max" yaml:"max"`
-	} `json:"users" yaml:"users"`
-	Description string `json:"description" yaml:"description"`
-}
-
-// ToConnectivityMetadata converts UsageLimitSpec to ConnectivityMetadata
-func (u *UsageLimitSpec) ToConnectivityMetadata(wantType string) ConnectivityMetadata {
-	if u == nil {
-		return ConnectivityMetadata{
-			WantType:    wantType,
-			Description: "",
-		}
-	}
-	return ConnectivityMetadata{
-		RequiredInputs:  u.Providers.Min,
-		MaxInputs:       u.Providers.Max,
-		RequiredOutputs: u.Users.Min,
-		MaxOutputs:      u.Users.Max,
-		WantType:        wantType,
-		Description:     u.Description,
-	}
-}
 
 // SyncLocalsState synchronizes fields of a Locals struct with the want's state.
 // It uses naming conventions (CamelCase -> snake_case) and respects StateLabels
