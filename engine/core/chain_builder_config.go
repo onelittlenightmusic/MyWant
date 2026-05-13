@@ -4,9 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )
@@ -94,33 +95,22 @@ func loadConfigFromYAMLBytes(data []byte) (Config, error) {
 }
 
 func validateConfigWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec - try multiple paths to handle different working directories
-	loader := openapi3.NewLoader()
-
-	specPaths := []string{
-		filepath.Join(SpecDir, "want-spec.yaml"),
-		filepath.Join("..", SpecDir, "want-spec.yaml"),
-		filepath.Join("../..", SpecDir, "want-spec.yaml"),
-		"../spec/want-spec.yaml",    // Legacy engine directory
-		"spec/want-spec.yaml",       // Legacy project root
-		"../../spec/want-spec.yaml", // Legacy deeper subdirectories
-	}
-
-	var spec *openapi3.T
-	var err error
-
-	for _, path := range specPaths {
-		spec, err = loader.LoadFromFile(path)
-		if err == nil {
-			break
-		}
-	}
-
+	// Load the OpenAPI spec from the external want-spec module
+	specPath := "spec/want-spec.yaml"
+	specData, err := fs.ReadFile(want_spec.FS, specPath)
 	if err != nil {
-		return fmt.Errorf("failed to load OpenAPI spec from any of the tried paths %v: %w", specPaths, err)
+		return fmt.Errorf("failed to load OpenAPI spec from want-spec module: %w", err)
 	}
+
+	loader := openapi3.NewLoader()
+	spec, err := loader.LoadFromData(specData)
+	if err != nil {
+		return fmt.Errorf("failed to load OpenAPI spec: %w", err)
+	}
+
 	ctx := context.Background()
 	err = spec.Validate(ctx)
+
 	if err != nil {
 		return fmt.Errorf("OpenAPI spec is invalid: %w", err)
 	}

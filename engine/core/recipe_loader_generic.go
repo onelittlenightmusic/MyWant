@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"mywant/engine/bundled"
 	"os"
 	"path/filepath"
 	"strings"
 
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )
@@ -540,38 +540,11 @@ func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, p
 	return want
 }
 func validateRecipeWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec for recipes
-	specPaths := []string{
-		filepath.Join(SpecDir, "recipe-spec.yaml"),
-		filepath.Join("..", SpecDir, "recipe-spec.yaml"),
-		filepath.Join("../..", SpecDir, "recipe-spec.yaml"),
-		"spec/recipe-spec.yaml",    // Legacy
-		"../spec/recipe-spec.yaml", // Legacy
-	}
-
-	var specPath string
-	var specData []byte
-	var err error
-
-	// Try reading from filesystem first
-	for _, path := range specPaths {
-		if _, err := os.Stat(path); err == nil {
-			specPath = path
-			specData, err = os.ReadFile(specPath)
-			if err == nil {
-				break
-			}
-		}
-	}
-
-	// Fallback to embedded FS if filesystem reading fails
-	if specData == nil {
-		specPath = "spec/recipe-spec.yaml"
-		specData, err = fs.ReadFile(bundled.BuiltinFS, specPath)
-		if err != nil {
-			return fmt.Errorf("failed to load recipe OpenAPI spec from disk or embedded FS: %w", err)
-		}
-		DebugLog("[RECIPE-LOADER] Fallback: Loaded OpenAPI spec from embedded FS\n")
+	// Load the OpenAPI spec for recipes from the external want-spec module
+	specPath := "spec/recipe-spec.yaml"
+	specData, err := fs.ReadFile(want_spec.FS, specPath)
+	if err != nil {
+		return fmt.Errorf("failed to load recipe OpenAPI spec from want-spec module: %w", err)
 	}
 
 	loader := openapi3.NewLoader()

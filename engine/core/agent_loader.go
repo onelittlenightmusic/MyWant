@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -86,29 +87,21 @@ func (r *AgentRegistry) LoadCapabilities(path string) error {
 	return nil
 }
 
-// loadAgentSpec loads the agent OpenAPI spec, trying multiple possible paths
+// loadAgentSpec loads the agent OpenAPI spec from the want-spec module
 func loadAgentSpec() (*openapi3.T, error) {
+	specPath := "spec/agent-spec.yaml"
+	specData, err := fs.ReadFile(want_spec.FS, specPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load agent OpenAPI spec from want-spec module: %w", err)
+	}
+
 	loader := openapi3.NewLoader()
-	specPaths := []string{
-		filepath.Join(SpecDir, "agent-spec.yaml"),
-		filepath.Join("..", SpecDir, "agent-spec.yaml"),
-		filepath.Join("../..", SpecDir, "agent-spec.yaml"),
-		"spec/agent-spec.yaml",    // Legacy
-		"../spec/agent-spec.yaml", // Legacy
-		"../../openapi.yaml",      // Legacy
-		"openapi.yaml",            // Legacy
+	spec, err := loader.LoadFromData(specData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
 	}
 
-	var lastErr error
-	for _, specPath := range specPaths {
-		if spec, err := loader.LoadFromFile(specPath); err == nil {
-			return spec, nil
-		} else {
-			lastErr = err
-		}
-	}
-
-	return nil, fmt.Errorf("failed to load agent OpenAPI spec from paths %v: %w", specPaths, lastErr)
+	return spec, nil
 }
 func validateCapabilityWithSpec(yamlData []byte, filename string) error {
 	spec, err := loadAgentSpec()

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"github.com/getkin/kin-openapi/openapi3"
 	"gopkg.in/yaml.v3"
 )
@@ -471,35 +472,23 @@ func (w *WantTypeLoader) loadWantTypeFromFile(filePath string) (*WantTypeDefinit
 
 // validateWithSpec validates want type YAML against OpenAPI spec
 func (w *WantTypeLoader) validateWithSpec(filePath string, yamlData []byte) error {
-	// Load the OpenAPI spec for want types
-	specPaths := []string{
-		filepath.Join(SpecDir, "want-type-spec.yaml"),
-		filepath.Join("..", SpecDir, "want-type-spec.yaml"),
-		filepath.Join("../..", SpecDir, "want-type-spec.yaml"),
-	}
-
-	var specPath string
-	for _, path := range specPaths {
-		if _, err := os.Stat(path); err == nil {
-			specPath = path
-			break
-		}
-	}
-
-	if specPath == "" {
-		// Spec not found (e.g. Homebrew install without source tree) — skip validation.
+	// Load the OpenAPI spec for want types from the external want-spec module
+	specPath := "spec/want-type-spec.yaml"
+	specData, err := fs.ReadFile(want_spec.FS, specPath)
+	if err != nil {
+		// Spec not found in want-spec module — skip validation.
 		// Built-in types are pre-validated at build time.
 		return nil
 	}
 
 	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromFile(specPath)
+	spec, err := loader.LoadFromData(specData)
 	if err != nil {
 		return fmt.Errorf("failed to load want type OpenAPI spec: %w", err)
 	}
-
 	ctx := context.Background()
 	err = spec.Validate(ctx)
+
 	if err != nil {
 		return fmt.Errorf("want type OpenAPI spec is invalid: %w", err)
 	}
