@@ -1,16 +1,24 @@
 import React from 'react';
-import { Settings, Clock, Tag, Link2, Type } from 'lucide-react';
+import { SlidersHorizontal, Clock, Tag, Link2, BadgeInfo, ArrowUpFromLine } from 'lucide-react';
 import { classNames } from '@/utils/helpers';
 
-export type FormTab = 'name' | 'params' | 'labels' | 'schedule' | 'deps';
-export const FORM_TABS: FormTab[] = ['name', 'params', 'labels', 'schedule', 'deps'];
+export type FormTab = 'name' | 'params' | 'labels' | 'schedule' | 'deps' | 'expose';
+export const FORM_TABS: FormTab[] = ['name', 'params', 'labels', 'schedule', 'deps', 'expose'];
+
+const TagLinkIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <span className="relative inline-flex items-center justify-center" style={{ width: '1em', height: '1em' }}>
+    <Tag className={className} />
+    <Link2 className="absolute -bottom-1 -right-1 w-2 h-2" />
+  </span>
+);
 
 export const FORM_TAB_META: Record<FormTab, { label: string; icon: React.ElementType }> = {
-  name:     { label: 'Name',     icon: Type     },
-  params:   { label: 'Params',   icon: Settings },
+  name:     { label: 'Name',     icon: BadgeInfo },
+  params:   { label: 'Params',   icon: SlidersHorizontal },
   labels:   { label: 'Labels',   icon: Tag      },
   schedule: { label: 'Schedule', icon: Clock    },
-  deps:     { label: 'Deps',     icon: Link2    },
+  deps:     { label: 'Deps',     icon: TagLinkIcon },
+  expose:   { label: 'Expose',   icon: ArrowUpFromLine },
 };
 
 export function FormTabBar({

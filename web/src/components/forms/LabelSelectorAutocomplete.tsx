@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLabelHistoryStore } from '@/stores/labelHistoryStore';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { CommitInput, CommitInputHandle } from '@/components/common/CommitInput';
 
 interface LabelSelectorAutocompleteProps {
@@ -152,10 +152,9 @@ export const LabelSelectorAutocomplete = React.forwardRef<CommitInputHandle, Lab
   };
 
   return (
-    <div className="space-y-2 border border-gray-200 rounded-md p-3">
-      <div className="flex gap-2">
+    <div className="flex flex-col gap-1.5">
         {/* Key Input */}
-        <div ref={keyContainerRef} className="relative flex-1">
+        <div ref={keyContainerRef} className="relative w-full">
           <div className="relative">
             <CommitInput
               ref={keyInputRef}
@@ -230,7 +229,7 @@ export const LabelSelectorAutocomplete = React.forwardRef<CommitInputHandle, Lab
         </div>
 
         {/* Value Input */}
-        <div ref={valueContainerRef} className="relative flex-1">
+        <div ref={valueContainerRef} className="relative w-full">
           <div className="relative">
             <CommitInput
               ref={valueInputRef}
@@ -303,17 +302,6 @@ export const LabelSelectorAutocomplete = React.forwardRef<CommitInputHandle, Lab
             </div>
           )}
         </div>
-
-        {/* Remove Button */}
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-red-600 hover:text-red-800 p-2"
-          title="Remove this dependency"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
     </div>
   );
 });

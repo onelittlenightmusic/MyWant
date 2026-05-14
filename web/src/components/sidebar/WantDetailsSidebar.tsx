@@ -21,6 +21,7 @@ import { ObjectResultDisplay, isPlainObject } from '@/components/common/ObjectRe
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ParametersSection } from '@/components/forms/sections/ParametersSection';
 import { ParameterGridSection } from '@/components/forms/sections/ParameterGridSection';
+import { ExposeSection, ExposeEntry } from '@/components/forms/sections/ExposeSection';
 import { LabelsSection } from '@/components/forms/sections/LabelsSection';
 import { DependenciesSection } from '@/components/forms/sections/DependenciesSection';
 import { SchedulingSection } from '@/components/forms/sections/SchedulingSection';
@@ -950,6 +951,7 @@ const SettingsTab: React.FC<{
   const [labels, setLabels] = useState<Record<string, string>>(want.metadata?.labels || {});
   const [using, setUsing] = useState<Array<Record<string, string>>>(want.spec?.using || []);
   const [when, setWhen] = useState<WhenSpec[]>(want.spec?.when || []);
+  const [exposes, setExposes] = useState<ExposeEntry[]>(want.spec?.exposes || []);
 
   // Section refs for keyboard navigation
   const paramsSectionRef = useRef<HTMLButtonElement>(null);
@@ -976,6 +978,24 @@ const SettingsTab: React.FC<{
       setIsEditingParameters(false);
     }
   }, [want, params, updateWant, onWantUpdate]);
+
+  // Handler for expose changes - saves to API
+  const handleExposesChange = useCallback(async (newExposes: ExposeEntry[]) => {
+    if (!want.metadata?.id) return;
+    const oldExposes = exposes;
+    setExposes(newExposes);
+    try {
+      await updateWant(want.metadata.id, {
+        metadata: want.metadata,
+        spec: { ...want.spec, exposes: newExposes },
+      });
+      onWantUpdate?.();
+      showSaved();
+    } catch (error) {
+      setLocalUpdateError(error instanceof Error ? error.message : 'Failed to update exposes');
+      setExposes(oldExposes);
+    }
+  }, [want, exposes, updateWant, onWantUpdate]);
 
   // Handler for label changes - saves to API
   const handleLabelsChange = useCallback(async (newLabels: Record<string, string>) => {
@@ -1115,6 +1135,7 @@ const SettingsTab: React.FC<{
             labels:   Object.keys(labels).length || null,
             schedule: when.length || null,
             deps:     using.length || null,
+            expose:   exposes.length || null,
           }}
           isBottom={false}
         />
@@ -1301,6 +1322,15 @@ const SettingsTab: React.FC<{
                 }}
               />
             )}
+
+            {/* EXPOSE tab */}
+            {activeSettingsTab === 'expose' && (
+              <ExposeSection
+                exposes={exposes}
+                onExposesChange={handleExposesChange}
+                stateDefs={wantTypeDef?.state}
+              />
+            )}
           </>
         ) : null}
       </div>
@@ -1316,6 +1346,7 @@ const SettingsTab: React.FC<{
             labels:   Object.keys(labels).length || null,
             schedule: when.length || null,
             deps:     using.length || null,
+            expose:   exposes.length || null,
           }}
           isBottom={true}
         />

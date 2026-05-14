@@ -24,8 +24,10 @@ import { ApiError } from '@/types/api';
 import { Recommendation, ConfigModifications } from '@/types/interact';
 import { useInputActions } from '@/hooks/useInputActions';
 import { ParameterGridSection } from './sections/ParameterGridSection';
+import { ExposeSection, ExposeEntry } from './sections/ExposeSection';
 import { useConfigStore } from '@/stores/configStore';
 import { FormTab, FormTabBar, FORM_TABS } from './FormTabBar';
+import { ParameterDef } from '@/types/wantType';
 
 type WFTab = FormTab | 'add';
 const WF_TABS: WFTab[] = [...FORM_TABS, 'add'];
@@ -128,7 +130,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [using, setUsing] = useState<Array<Record<string, string>>>([]);
   const [when, setWhen] = useState<WhenSpec[]>([]);
-  const [exposes, setExposes] = useState<Array<{currentState?: string; param?: string; as?: string}>>([]);
+  const [exposes, setExposes] = useState<ExposeEntry[]>([]);
 
   // YAML state
   const [yamlContent, setYamlContent] = useState('');
@@ -556,6 +558,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
       labels: Object.keys(labels).length > 0 ? Object.keys(labels).length : null,
       schedule: when.length > 0 ? when.length : null,
       deps: using.length > 0 ? using.length : null,
+      expose: exposes.length > 0 ? exposes.length : null,
     };
   }, [selectedWantType, params, name, selectedTypeId, labels, when, using]);
 
@@ -582,6 +585,31 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
       })),
     ];
   }, [selectedItemType, type, recipes, selectedWantType]);
+
+  // Synthesize ParameterDef[] from recipe parameters so the grid card format is used.
+  const recipeParamDefs = useMemo((): ParameterDef[] | undefined => {
+    if (selectedItemType !== 'recipe') return undefined;
+    const selectedRecipe = recipes.find(r => r.recipe?.metadata?.custom_type === type);
+    if (!selectedRecipe?.recipe?.parameters) return undefined;
+    const descs = selectedRecipe.recipe.parameter_descriptions ?? {};
+    const types = selectedRecipe.recipe.parameter_types ?? {};
+    return Object.entries(selectedRecipe.recipe.parameters).map(([name, defaultValue]) => {
+      let paramType = types[name] ?? 'string';
+      if (!types[name]) {
+        if (Array.isArray(defaultValue)) paramType = 'array';
+        else if (typeof defaultValue === 'boolean') paramType = 'bool';
+        else if (typeof defaultValue === 'number') paramType = Number.isInteger(defaultValue) ? 'int' : 'float64';
+      }
+      return {
+        name,
+        type: paramType,
+        description: descs[name] ?? '',
+        required: false,
+        default: defaultValue,
+        example: defaultValue,
+      } satisfies ParameterDef;
+    });
+  }, [selectedItemType, type, recipes]);
 
   const headerAction = (
     <div className="flex items-stretch gap-0">
@@ -863,10 +891,8 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                         <div className="pt-1">
                           <ParameterGridSection
                             parameters={params}
-                            parameterDefinitions={selectedWantType?.parameters}
+                            parameterDefinitions={recipeParamDefs ?? selectedWantType?.parameters}
                             stateDefs={selectedWantType?.state}
-                            exposes={exposes}
-                            onExposesChange={setExposes}
                             onChange={setParams}
                             isActive={activeFormTab === 'params'}
                             onTabForward={() => navigateTab(true)}
@@ -911,6 +937,15 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
                           onToggleCollapse={() => {}}
                           navigationCallbacks={tabNav}
                           hideHeader={true}
+                        />
+                      )}
+
+                      {/* EXPOSE tab */}
+                      {activeFormTab === 'expose' && (
+                        <ExposeSection
+                          exposes={exposes}
+                          onExposesChange={setExposes}
+                          stateDefs={selectedWantType?.state}
                         />
                       )}
                     </div>

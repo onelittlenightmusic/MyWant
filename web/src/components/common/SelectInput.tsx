@@ -17,6 +17,8 @@ export interface SelectInputProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** Use semi-transparent background so card background icons show through */
+  transparent?: boolean;
   /** Pass-through: fires when trigger is focused (closed state). */
   onFocus?: (e: React.FocusEvent) => void;
   /** Pass-through: fires when focus leaves the entire widget. */
@@ -55,6 +57,7 @@ export const SelectInput = forwardRef<SelectInputHandle, SelectInputProps>(({
   placeholder = '— select —',
   className,
   disabled = false,
+  transparent = false,
   onFocus,
   onBlur,
   onKeyDown,
@@ -213,8 +216,8 @@ export const SelectInput = forwardRef<SelectInputHandle, SelectInputProps>(({
           'px-3 py-2 rounded-md border text-sm text-left',
           'transition-colors focus:outline-none focus:ring-2',
           isOpen
-            ? 'border-blue-400 ring-2 ring-blue-400 bg-white dark:bg-gray-800'
-            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800',
+            ? `border-blue-400 ring-2 ring-blue-400 ${transparent ? 'bg-white/80 dark:bg-gray-800/70' : 'bg-white dark:bg-gray-800'}`
+            : `${transparent ? 'border-gray-200/70 dark:border-gray-600/60 bg-white/70 dark:bg-gray-800/60' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800'}`,
           'text-gray-900 dark:text-gray-100',
           'hover:border-blue-400 dark:hover:border-blue-500',
           'focus:ring-blue-400 focus:border-blue-400',

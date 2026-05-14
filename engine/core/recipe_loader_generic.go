@@ -77,10 +77,12 @@ type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
-	Config     Config
-	Parameters map[string]any
-	Metadata   GenericRecipeMetadata
-	Result     *RecipeResult
+	Config                Config
+	Parameters            map[string]any
+	Metadata              GenericRecipeMetadata
+	Result                *RecipeResult
+	ParameterDescriptions map[string]string
+	ParameterTypes        map[string]string
 }
 
 // GenericRecipeLoader manages loading and processing any type of recipe
@@ -247,10 +249,12 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 
 	return &GenericRecipeConfig{
-		Config:     config,
-		Parameters: mergedParams,
-		Metadata:   recipeContent.Metadata,
-		Result:     recipeContent.Result,
+		Config:                config,
+		Parameters:            mergedParams,
+		Metadata:              recipeContent.Metadata,
+		Result:                recipeContent.Result,
+		ParameterDescriptions: recipeContent.ParameterDescriptions,
+		ParameterTypes:        recipeContent.ParameterTypes,
 	}, nil
 }
 

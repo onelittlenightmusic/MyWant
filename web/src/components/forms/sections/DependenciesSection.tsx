@@ -1,269 +1,120 @@
-import React, { useState, useCallback, useMemo, forwardRef, useRef } from 'react';
-import { GitBranch } from 'lucide-react';
-import { CollapsibleFormSection } from '../CollapsibleFormSection';
-import { LabelSelectorAutocomplete } from '../LabelSelectorAutocomplete';
-import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
+import React, { useState, useCallback, forwardRef, useRef } from 'react';
+import { GitBranch, ArrowRight, KeyRound, Type } from 'lucide-react';
+import { SectionNavigationCallbacks } from '@/types/formSection';
 import { CommitInputHandle } from '@/components/common/CommitInput';
+import { LabelSelectorAutocomplete } from '@/components/forms/LabelSelectorAutocomplete';
+import { CardGridShell, TEAL_SCHEME } from '@/components/forms/CardPrimitives';
+import { classNames } from '@/utils/helpers';
 
-/**
- * Props for DependenciesSection
- */
 interface DependenciesSectionProps {
-  /** Current dependencies as array of single-entry objects */
   dependencies: Array<Record<string, string>>;
-  /** Callback when dependencies change */
   onChange: (dependencies: Array<Record<string, string>>) => void;
-  /** Whether the section is collapsed */
   isCollapsed: boolean;
-  /** Callback to toggle collapsed state */
   onToggleCollapse: () => void;
-  /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
-  /** When true, hides the collapsible header (for use inside tabs) */
   hideHeader?: boolean;
 }
 
-/**
- * Editing state for a dependency
- */
-interface DependencyDraft {
+interface EditState {
+  /** null = not editing; deps.length = adding new */
+  index: number | null;
   key: string;
   value: string;
 }
 
-/**
- * DependenciesSection - Adapter for dependencies using CollapsibleFormSection
- *
- * Manages dependencies as Array<Record<string, string>> internally where each
- * record has exactly one key-value pair representing a label selector.
- */
 export const DependenciesSection = forwardRef<HTMLButtonElement, DependenciesSectionProps>(({
   dependencies,
   onChange,
-  isCollapsed,
-  onToggleCollapse,
-  navigationCallbacks,
-  hideHeader,
 }, ref) => {
-  // Editing state
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingDraft, setEditingDraft] = useState<DependencyDraft>({ key: '', value: '' });
-
-  // Refs for focus management and force commit
-  const headerRef = useRef<HTMLButtonElement>(null);
+  const [edit, setEdit] = useState<EditState>({ index: null, key: '', value: '' });
   const autocompleteRef = useRef<CommitInputHandle>(null);
 
-  // Merge forwarded ref with local headerRef
-  React.useEffect(() => {
-    if (typeof ref === 'function') {
-      ref(headerRef.current);
-    } else if (ref) {
-      (ref as React.MutableRefObject<HTMLButtonElement | null>).current = headerRef.current;
-    }
-  }, [ref]);
+  const startAdd = useCallback(() =>
+    setEdit({ index: dependencies.length, key: '', value: '' }), [dependencies.length]);
 
-  // Auto-focus first input when editing starts
-  React.useEffect(() => {
-    if (editingIndex !== null && autocompleteRef.current) {
-      setTimeout(() => {
-        autocompleteRef.current?.focus();
-      }, 100);
-    }
-  }, [editingIndex]);
-
-  /**
-   * Convert dependencies to chip items for display
-   */
-  const chipItems = useMemo((): ChipItem[] => {
-    return dependencies
-      .map((dep, index) => {
-        // Skip if this dependency is being edited
-        if (index === editingIndex) return null;
-
-        // Get the single key-value pair from the dependency object
-        const [key, value] = Object.entries(dep)[0];
-        return {
-          key: `${index}`,
-          display: `${key}: ${value}`,
-        };
-      })
-      .filter((item): item is ChipItem => item !== null);
-  }, [dependencies, editingIndex]);
-
-  /**
-   * Start editing an existing dependency
-   */
-  const handleEditChip = useCallback((chipIndex: number) => {
-    // Map chip index to dependency index (accounting for hidden editing chip)
-    let actualIndex = chipIndex;
-    if (editingIndex !== null && chipIndex >= editingIndex) {
-      actualIndex = chipIndex + 1;
-    }
-
-    const dependency = dependencies[actualIndex];
-    if (dependency) {
-      const [key, value] = Object.entries(dependency)[0];
-      setEditingIndex(actualIndex);
-      setEditingDraft({ key, value });
-    }
-  }, [dependencies, editingIndex]);
-
-  /**
-   * Remove a dependency
-   */
-  const handleRemoveChip = useCallback((chipIndex: number) => {
-    // Map chip index to dependency index
-    let actualIndex = chipIndex;
-    if (editingIndex !== null && chipIndex >= editingIndex) {
-      actualIndex = chipIndex + 1;
-    }
-
-    const newDependencies = dependencies.filter((_, index) => index !== actualIndex);
-    onChange(newDependencies);
-  }, [dependencies, editingIndex, onChange]);
-
-  /**
-   * Start adding a new dependency
-   */
-  const handleAddItem = useCallback(() => {
-    setEditingIndex(dependencies.length);
-    setEditingDraft({ key: '', value: '' });
-  }, [dependencies.length]);
-
-  /**
-   * Save the current dependency edit
-   */
-  const handleSave = useCallback(() => {
-    // Get latest uncommitted values directly from refs
-    const latestValues = (autocompleteRef.current as any)?.getValues?.() || editingDraft;
-
-    // Only update if draft has a key value
-    if (latestValues.key.trim()) {
-      const newDependencies = [...dependencies];
-
-      // Create new dependency object with single key-value pair
-      const newDependency = { [latestValues.key]: latestValues.value };
-
-      if (editingIndex !== null && editingIndex < dependencies.length) {
-        // Replace existing dependency
-        newDependencies[editingIndex] = newDependency;
-      } else {
-        // Add new dependency
-        newDependencies.push(newDependency);
-      }
-
-      onChange(newDependencies);
-    }
-
-    // Reset editing state
-    setEditingIndex(null);
-    setEditingDraft({ key: '', value: '' });
-  }, [editingIndex, editingDraft, dependencies, onChange]);
-
-  /**
-   * Cancel the current dependency edit
-   */
-  const handleCancel = useCallback(() => {
-    setEditingIndex(null);
-    setEditingDraft({ key: '', value: '' });
-  }, []);
-
-  /**
-   * Handle escape key - cancel and return focus to header
-   */
-  const handleEscape = useCallback(() => {
-    handleCancel();
-    setTimeout(() => {
-      headerRef.current?.focus();
-    }, 0);
-  }, [handleCancel]);
-
-  /**
-   * Handle remove from edit form
-   */
-  const handleRemoveFromEditForm = useCallback(() => {
-    if (editingIndex !== null && editingIndex < dependencies.length) {
-      const newDependencies = dependencies.filter((_, index) => index !== editingIndex);
-      onChange(newDependencies);
-    }
-
-    setEditingIndex(null);
-    setEditingDraft({ key: '', value: '' });
-  }, [editingIndex, dependencies, onChange]);
-
-  /**
-   * Render the edit form
-   */
-  const renderEditForm = useCallback(() => (
-    <div className="space-y-3">
-      <LabelSelectorAutocomplete
-        ref={autocompleteRef}
-        keyValue={editingDraft.key}
-        valuValue={editingDraft.value}
-        onKeyChange={(newKey) => setEditingDraft(prev => ({ ...prev, key: newKey }))}
-        onValueChange={(newValue) => setEditingDraft(prev => ({ ...prev, value: newValue }))}
-        onRemove={handleRemoveFromEditForm}
-        onLeftKey={handleEscape}
-      />
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleSave}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="px-3 py-1.5 text-gray-500 dark:text-gray-400 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  ), [editingDraft, handleSave, handleCancel, handleEscape, handleRemoveFromEditForm]);
-
-  /**
-   * Render collapsed summary
-   */
-  const renderCollapsedSummary = useCallback(() => {
-    if (dependencies.length === 0) return null;
-
-    return (
-      <div className="flex flex-wrap gap-2">
-        {dependencies.map((dep, index) => {
-          const [key, value] = Object.entries(dep)[0];
-          return (
-            <span key={index} className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded-full">
-              {key}: {value}
-            </span>
-          );
-        })}
-      </div>
-    );
+  const startEdit = useCallback((i: number) => {
+    const [k, v] = Object.entries(dependencies[i])[0] ?? ['', ''];
+    setEdit({ index: i, key: k, value: v });
   }, [dependencies]);
 
+  const handleSave = useCallback(() => {
+    const latest = (autocompleteRef.current as any)?.getValues?.() ?? { key: edit.key, value: edit.value };
+    const k = (latest.key ?? '').trim();
+    if (!k) { setEdit({ index: null, key: '', value: '' }); return; }
+    const next = [...dependencies];
+    const entry = { [k]: latest.value ?? '' };
+    if (edit.index !== null && edit.index < dependencies.length) {
+      next[edit.index] = entry;
+    } else {
+      next.push(entry);
+    }
+    onChange(next);
+    setEdit({ index: null, key: '', value: '' });
+  }, [edit, dependencies, onChange]);
+
+  const handleCancel = useCallback(() =>
+    setEdit({ index: null, key: '', value: '' }), []);
+
+  const handleDelete = useCallback((i: number) => {
+    onChange(dependencies.filter((_, idx) => idx !== i));
+    if (edit.index === i) setEdit({ index: null, key: '', value: '' });
+  }, [dependencies, onChange, edit.index]);
+
   return (
-    <CollapsibleFormSection
-      ref={headerRef}
-      sectionId="dependencies"
-      title="Using"
-      icon={<GitBranch className="w-5 h-5" />}
-      colorScheme="green"
-      isCollapsed={isCollapsed}
-      onToggleCollapse={onToggleCollapse}
-      hideHeader={hideHeader}
-      navigationCallbacks={navigationCallbacks}
-      items={chipItems}
-      onAddItem={handleAddItem}
-      renderEditForm={renderEditForm}
-      renderCollapsedSummary={renderCollapsedSummary}
-      isEditing={editingIndex !== null}
-      editingIndex={editingIndex ?? -1}
-      onEditChip={handleEditChip}
-      onRemoveChip={handleRemoveChip}
-    />
+    <div ref={ref as any}>
+      <CardGridShell
+        scheme={TEAL_SCHEME}
+        BgIcon={GitBranch}
+        count={dependencies.length}
+        editingIndex={edit.index}
+        addLabel="Add dep"
+        onAdd={startAdd}
+        onClickItem={startEdit}
+        onDeleteItem={handleDelete}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        renderItemHeaderLeft={(i) => {
+          const [k] = Object.entries(dependencies[i])[0] ?? [''];
+          return (
+            <>
+              <KeyRound className={classNames('w-2.5 h-2.5 flex-shrink-0', TEAL_SCHEME.iconColor)} />
+              <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 truncate leading-none font-mono">{k}</span>
+            </>
+          );
+        }}
+        renderItemBody={(i) => {
+          const [, v] = Object.entries(dependencies[i])[0] ?? ['', ''];
+          return (
+            <div className="flex items-center gap-1">
+              <Type className={classNames('w-2.5 h-2.5 flex-shrink-0 opacity-70', TEAL_SCHEME.iconColor)} />
+              <span className="font-mono text-xs text-teal-700 dark:text-teal-300 truncate">
+                {v || <span className="italic text-teal-400 dark:text-teal-600">any</span>}
+              </span>
+            </div>
+          );
+        }}
+        renderFormHeader={(isNew) => (
+          <>
+            <GitBranch className="w-2.5 h-2.5 text-teal-400" />
+            <span className="text-[10px] text-teal-500 dark:text-teal-400 font-medium">
+              {isNew ? 'New dep' : 'Edit dep'}
+            </span>
+          </>
+        )}
+        renderFormContent={() => (
+          <LabelSelectorAutocomplete
+            ref={autocompleteRef}
+            keyValue={edit.key}
+            valuValue={edit.value}
+            onKeyChange={k => setEdit(s => ({ ...s, key: k }))}
+            onValueChange={v => setEdit(s => ({ ...s, value: v }))}
+            onRemove={handleCancel}
+            onLeftKey={handleCancel}
+          />
+        )}
+        footerNote="Click a card to edit · hover to delete"
+      />
+    </div>
   );
 });
 

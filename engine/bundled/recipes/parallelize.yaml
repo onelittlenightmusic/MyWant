@@ -19,6 +19,9 @@ recipe:
     child_type: "Want type of each sibling to dispatch (required)"
     child_params: "List of param objects passed to each dispatched want. Example: [{target: hall-door-03}, {target: hall-door-04}]"
 
+  parameter_types:
+    child_type: want_type
+
   wants:
     - metadata:
         type: parallelize_dispatcher

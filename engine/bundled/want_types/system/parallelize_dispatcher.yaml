@@ -22,7 +22,7 @@ wantType:
       required: true
     - name: child_type
       description: Want type for each dispatched sibling
-      type: string
+      type: want_type
       required: true
 
   state:

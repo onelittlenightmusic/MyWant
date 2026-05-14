@@ -2706,22 +2706,41 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 		}
 	}
 
-	// Apply parameter defaults: spec.params (highest) > default > defaultGlobalParameter (lowest)
+	// Apply parameter defaults:
+	//   1. spec.params explicit literal value   (highest)
+	//   2. spec.params {fromGlobalParam: key}   (want-level global ref)
+	//   3. want-type YAML default value
+	//   4. want-type defaultGlobalParameter      (lowest)
 	if n.Spec.Params == nil {
 		n.Spec.Params = make(map[string]any)
 	}
+
+	// Priority 2: resolve any {fromGlobalParam: key} entries in spec.params in-place.
+	for k, v := range n.Spec.Params {
+		if ref, ok := v.(map[string]any); ok {
+			if key, ok := ref["fromGlobalParam"].(string); ok && key != "" {
+				if resolved, ok := GetGlobalParameter(key); ok {
+					n.Spec.Params[k] = resolved
+				} else {
+					// Key exists but no value yet — remove so lower priorities can fill
+					delete(n.Spec.Params, k)
+				}
+			}
+		}
+	}
+
 	for _, paramDef := range typeDef.Parameters {
 		if _, exists := n.Spec.Params[paramDef.Name]; exists {
-			// Explicitly provided in spec.params — highest priority, keep as-is
+			// Priority 1 or 2 already resolved — keep as-is
 			continue
 		}
 		if paramDef.Default != nil {
-			// YAML default — second priority
+			// Priority 3: YAML default
 			n.Spec.Params[paramDef.Name] = paramDef.Default
 			continue
 		}
 		if paramDef.DefaultGlobalParameter != "" {
-			// Global parameter fallback — lowest priority
+			// Priority 4: type-level global parameter fallback
 			if v, ok := GetGlobalParameter(paramDef.DefaultGlobalParameter); ok {
 				n.Spec.Params[paramDef.Name] = v
 			}

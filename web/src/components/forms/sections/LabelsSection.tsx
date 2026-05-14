@@ -1,242 +1,128 @@
-import React, { useState, useCallback, useMemo, forwardRef, useRef } from 'react';
-import { Tag } from 'lucide-react';
-import { CollapsibleFormSection } from '../CollapsibleFormSection';
-import { LabelAutocomplete } from '../LabelAutocomplete';
-import { ChipItem, SectionNavigationCallbacks } from '@/types/formSection';
+import React, { useState, useCallback, forwardRef, useRef } from 'react';
+import { Tag, KeyRound, Type } from 'lucide-react';
+import { SectionNavigationCallbacks } from '@/types/formSection';
 import { CommitInputHandle } from '@/components/common/CommitInput';
+import { LabelAutocomplete } from '@/components/forms/LabelAutocomplete';
+import { CardGridShell, GREEN_SCHEME } from '@/components/forms/CardPrimitives';
+import { classNames } from '@/utils/helpers';
 
-/**
- * Props for LabelsSection
- */
 interface LabelsSectionProps {
-  /** Current labels as key-value pairs */
   labels: Record<string, string>;
-  /** Callback when labels change */
   onChange: (labels: Record<string, string>) => void;
-  /** Whether the section is collapsed */
   isCollapsed: boolean;
-  /** Callback to toggle collapsed state */
   onToggleCollapse: () => void;
-  /** Navigation callbacks for moving between sections */
   navigationCallbacks: SectionNavigationCallbacks;
-  /** When true, hides the collapsible header (for use inside tabs) */
   hideHeader?: boolean;
 }
 
-/**
- * Editing state for a label
- */
-interface LabelDraft {
-  key: string;
-  value: string;
+interface EditState {
+  /** null = not editing; '__new__' = adding; key string = editing existing */
+  key: string | null;
+  draftKey: string;
+  draftValue: string;
 }
 
-/**
- * LabelsSection - Adapter for labels using CollapsibleFormSection
- *
- * Manages labels as Record<string, string> internally and provides
- * a consistent UI using the generic CollapsibleFormSection component.
- */
 export const LabelsSection = forwardRef<HTMLButtonElement, LabelsSectionProps>(({
   labels,
   onChange,
-  isCollapsed,
-  onToggleCollapse,
-  navigationCallbacks,
-  hideHeader,
 }, ref) => {
-  // Editing state
-  const [editingLabelKey, setEditingLabelKey] = useState<string | null>(null);
-  const [editingLabelDraft, setEditingLabelDraft] = useState<LabelDraft>({ key: '', value: '' });
-
-  // Refs for focus management and force commit
-  const headerRef = useRef<HTMLButtonElement>(null);
+  const [edit, setEdit] = useState<EditState>({ key: null, draftKey: '', draftValue: '' });
   const autocompleteRef = useRef<CommitInputHandle>(null);
 
-  // Merge forwarded ref with local headerRef
-  React.useEffect(() => {
-    if (typeof ref === 'function') {
-      ref(headerRef.current);
-    } else if (ref) {
-      (ref as React.MutableRefObject<HTMLButtonElement | null>).current = headerRef.current;
-    }
-  }, [ref]);
+  const entries = Object.entries(labels);
 
-  // Auto-focus first input when editing starts
-  React.useEffect(() => {
-    if (editingLabelKey !== null && autocompleteRef.current) {
-      setTimeout(() => {
-        autocompleteRef.current?.focus();
-      }, 100);
-    }
-  }, [editingLabelKey]);
+  const editingIndex: number | null = (() => {
+    if (edit.key === null) return null;
+    if (edit.key === '__new__') return entries.length;
+    const i = entries.findIndex(([k]) => k === edit.key);
+    return i >= 0 ? i : null;
+  })();
 
-  /**
-   * Convert labels to chip items for display
-   */
-  const chipItems = useMemo((): ChipItem[] => {
-    return Object.entries(labels)
-      .filter(([key]) => key !== editingLabelKey) // Hide chip being edited
-      .map(([key, value]) => ({
-        key,
-        display: `${key}: ${value}`,
-      }));
-  }, [labels, editingLabelKey]);
+  const startAdd = useCallback(() =>
+    setEdit({ key: '__new__', draftKey: '', draftValue: '' }), []);
 
-  /**
-   * Start editing an existing label
-   */
-  const handleEditChip = useCallback((index: number) => {
-    const entries = Object.entries(labels).filter(([key]) => key !== editingLabelKey);
-    const [key, value] = entries[index];
+  const startEdit = useCallback((i: number) => {
+    const [key, value] = entries[i];
+    setEdit({ key, draftKey: key, draftValue: value ?? '' });
+  }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    setEditingLabelKey(key);
-    setEditingLabelDraft({ key, value });
-  }, [labels, editingLabelKey]);
-
-  /**
-   * Remove a label
-   */
-  const handleRemoveChip = useCallback((index: number) => {
-    const entries = Object.entries(labels).filter(([key]) => key !== editingLabelKey);
-    const [keyToRemove] = entries[index];
-
-    const newLabels = { ...labels };
-    delete newLabels[keyToRemove];
-    onChange(newLabels);
-  }, [labels, editingLabelKey, onChange]);
-
-  /**
-   * Start adding a new label
-   */
-  const handleAddItem = useCallback(() => {
-    setEditingLabelKey('__new__');
-    setEditingLabelDraft({ key: '', value: '' });
-  }, []);
-
-  /**
-   * Save the current label edit
-   */
   const handleSave = useCallback(() => {
-    // Get latest uncommitted values directly from refs
-    const latestValues = (autocompleteRef.current as any)?.getValues?.() || editingLabelDraft;
-    
-    if (latestValues.key.trim()) {
-      const newLabels = { ...labels };
-      if (editingLabelKey !== '__new__' && editingLabelKey !== null) {
-        delete newLabels[editingLabelKey];
-      }
-      newLabels[latestValues.key] = latestValues.value;
-      onChange(newLabels);
-    }
+    const latest = (autocompleteRef.current as any)?.getValues?.() ?? { key: edit.draftKey, value: edit.draftValue };
+    const k = (latest.key ?? '').trim();
+    if (!k) return;
+    const next = { ...labels };
+    if (edit.key && edit.key !== '__new__' && edit.key !== k) delete next[edit.key];
+    next[k] = latest.value ?? '';
+    onChange(next);
+    setEdit({ key: null, draftKey: '', draftValue: '' });
+  }, [edit, labels, onChange]);
 
-    setEditingLabelKey(null);
-    setEditingLabelDraft({ key: '', value: '' });
-  }, [editingLabelKey, editingLabelDraft, labels, onChange]);
+  const handleCancel = useCallback(() =>
+    setEdit({ key: null, draftKey: '', draftValue: '' }), []);
 
-  /**
-   * Cancel the current label edit
-   */
-  const handleCancel = useCallback(() => {
-    setEditingLabelKey(null);
-    setEditingLabelDraft({ key: '', value: '' });
-  }, []);
-
-  /**
-   * Handle escape key - cancel and return focus to header
-   */
-  const handleEscape = useCallback(() => {
-    handleCancel();
-    setTimeout(() => {
-      headerRef.current?.focus();
-    }, 0);
-  }, [handleCancel]);
-
-  /**
-   * Handle remove from edit form
-   */
-  const handleRemoveFromEditForm = useCallback(() => {
-    if (editingLabelKey !== null && editingLabelKey !== '__new__') {
-      const newLabels = { ...labels };
-      delete newLabels[editingLabelKey];
-      onChange(newLabels);
-    }
-
-    setEditingLabelKey(null);
-    setEditingLabelDraft({ key: '', value: '' });
-  }, [editingLabelKey, labels, onChange]);
-
-  /**
-   * Render the edit form
-   */
-  const renderEditForm = useCallback(() => (
-    <div className="space-y-3">
-      <LabelAutocomplete
-        ref={autocompleteRef}
-        keyValue={editingLabelDraft.key}
-        valueValue={editingLabelDraft.value}
-        onKeyChange={(newKey) => setEditingLabelDraft(prev => ({ ...prev, key: newKey }))}
-        onValueChange={(newValue) => setEditingLabelDraft(prev => ({ ...prev, value: newValue }))}
-        onRemove={handleRemoveFromEditForm}
-        onLeftKey={handleEscape}
-      />
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={handleSave}
-          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="px-3 py-1.5 text-gray-500 dark:text-gray-400 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  ), [editingLabelDraft, handleSave, handleCancel, handleEscape, handleRemoveFromEditForm]);
-
-  /**
-   * Render collapsed summary
-   */
-  const renderCollapsedSummary = useCallback(() => {
-    const entries = Object.entries(labels);
-    if (entries.length === 0) return null;
-
-    return (
-      <div className="flex flex-wrap gap-2">
-        {entries.map(([key, value]) => (
-          <span key={key} className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded-full">
-            {key}: {value}
-          </span>
-        ))}
-      </div>
-    );
-  }, [labels]);
+  const handleDelete = useCallback((i: number) => {
+    const [key] = entries[i];
+    const next = { ...labels };
+    delete next[key];
+    onChange(next);
+    if (edit.key === key) setEdit({ key: null, draftKey: '', draftValue: '' });
+  }, [entries, labels, onChange, edit.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <CollapsibleFormSection
-      ref={headerRef}
-      sectionId="labels"
-      title="Labels"
-      icon={<Tag className="w-5 h-5" />}
-      colorScheme="green"
-      isCollapsed={isCollapsed}
-      onToggleCollapse={onToggleCollapse}
-      hideHeader={hideHeader}
-      navigationCallbacks={navigationCallbacks}
-      items={chipItems}
-      onAddItem={handleAddItem}
-      renderEditForm={renderEditForm}
-      renderCollapsedSummary={renderCollapsedSummary}
-      isEditing={editingLabelKey !== null}
-      editingIndex={editingLabelKey === null ? -1 : Object.keys(labels).indexOf(editingLabelKey)}
-      onEditChip={handleEditChip}
-      onRemoveChip={handleRemoveChip}
-    />
+    <div ref={ref as any}>
+      <CardGridShell
+        scheme={GREEN_SCHEME}
+        BgIcon={Tag}
+        count={entries.length}
+        editingIndex={editingIndex}
+        addLabel="Add label"
+        onAdd={startAdd}
+        onClickItem={startEdit}
+        onDeleteItem={handleDelete}
+        onSave={handleSave}
+        onCancel={handleCancel}
+        renderItemHeaderLeft={(i) => {
+          const [key] = entries[i];
+          return (
+            <>
+              <KeyRound className={classNames('w-2.5 h-2.5 flex-shrink-0', GREEN_SCHEME.iconColor)} />
+              <span className="text-[11px] font-semibold text-gray-600 dark:text-gray-300 truncate leading-none font-mono">{key}</span>
+            </>
+          );
+        }}
+        renderItemBody={(i) => {
+          const [, value] = entries[i];
+          return (
+            <div className="flex items-center gap-1">
+              <Type className={classNames('w-2.5 h-2.5 flex-shrink-0 opacity-70', GREEN_SCHEME.iconColor)} />
+              <span className="inline-block text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 truncate max-w-full">
+                {value || <span className="italic text-green-400 dark:text-green-600">empty</span>}
+              </span>
+            </div>
+          );
+        }}
+        renderFormHeader={(isNew) => (
+          <>
+            <Tag className="w-2.5 h-2.5 text-green-400" />
+            <span className="text-[10px] text-green-500 dark:text-green-400 font-medium">
+              {isNew ? 'New label' : 'Edit label'}
+            </span>
+          </>
+        )}
+        renderFormContent={() => (
+          <LabelAutocomplete
+            ref={autocompleteRef}
+            keyValue={edit.draftKey}
+            valueValue={edit.draftValue}
+            onKeyChange={k => setEdit(s => ({ ...s, draftKey: k }))}
+            onValueChange={v => setEdit(s => ({ ...s, draftValue: v }))}
+            onRemove={handleCancel}
+            onLeftKey={handleCancel}
+          />
+        )}
+        footerNote="Click a card to edit · hover to delete"
+      />
+    </div>
   );
 });
 
