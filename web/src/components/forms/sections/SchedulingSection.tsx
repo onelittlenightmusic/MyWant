@@ -25,7 +25,7 @@ const BG_ICON_COLOR = 'text-amber-400 dark:text-amber-600';
 const ICON_COLOR    = 'text-amber-500 dark:text-amber-400';
 const FORM_BORDER   = 'border-amber-300 dark:border-amber-600';
 const FORM_BG       = 'bg-amber-50/30 dark:bg-amber-900/10';
-const SAVE_COLOR    = 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30';
+const SAVE_COLOR    = 'bg-amber-500/80 text-white hover:bg-amber-600/90';
 const ADD_BORDER    = 'border-amber-200 dark:border-amber-800/50 hover:border-amber-400 dark:hover:border-amber-600';
 const ADD_ICON      = 'text-amber-300 dark:text-amber-700 group-hover:text-amber-500 dark:group-hover:text-amber-400';
 

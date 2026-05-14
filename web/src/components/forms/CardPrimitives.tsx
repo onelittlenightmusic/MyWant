@@ -27,7 +27,7 @@ export const BLUE_SCHEME: CardScheme = {
   iconColor:   'text-blue-500 dark:text-blue-400',
   formBorder:  'border-blue-300 dark:border-blue-600',
   formBg:      'bg-blue-50/30 dark:bg-blue-900/10',
-  saveColor:   'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30',
+  saveColor:   'bg-blue-600/80 text-white hover:bg-blue-700/90',
   addBorder:   'border-blue-200 dark:border-blue-800/50 hover:border-blue-400 dark:hover:border-blue-600',
   addIcon:     'text-blue-300 dark:text-blue-700 group-hover:text-blue-500 dark:group-hover:text-blue-400',
 };
@@ -39,7 +39,7 @@ export const GREEN_SCHEME: CardScheme = {
   iconColor:   'text-green-500 dark:text-green-400',
   formBorder:  'border-green-300 dark:border-green-600',
   formBg:      'bg-green-50/30 dark:bg-green-900/10',
-  saveColor:   'text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30',
+  saveColor:   'bg-green-600/80 text-white hover:bg-green-700/90',
   addBorder:   'border-green-200 dark:border-green-800/50 hover:border-green-400 dark:hover:border-green-600',
   addIcon:     'text-green-300 dark:text-green-700 group-hover:text-green-500 dark:group-hover:text-green-400',
 };
@@ -51,7 +51,7 @@ export const TEAL_SCHEME: CardScheme = {
   iconColor:   'text-teal-500 dark:text-teal-400',
   formBorder:  'border-teal-300 dark:border-teal-600',
   formBg:      'bg-teal-50/30 dark:bg-teal-900/10',
-  saveColor:   'text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/30',
+  saveColor:   'bg-teal-600/80 text-white hover:bg-teal-700/90',
   addBorder:   'border-teal-200 dark:border-teal-800/50 hover:border-teal-400 dark:hover:border-teal-600',
   addIcon:     'text-teal-300 dark:text-teal-700 group-hover:text-teal-500 dark:group-hover:text-teal-400',
 };
@@ -63,7 +63,7 @@ export const PURPLE_SCHEME: CardScheme = {
   iconColor:   'text-purple-500 dark:text-purple-400',
   formBorder:  'border-purple-300 dark:border-purple-600',
   formBg:      'bg-purple-50/30 dark:bg-purple-900/10',
-  saveColor:   'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30',
+  saveColor:   'bg-purple-600/80 text-white hover:bg-purple-700/90',
   addBorder:   'border-purple-200 dark:border-purple-800/50 hover:border-purple-400 dark:hover:border-purple-600',
   addIcon:     'text-purple-300 dark:text-purple-700 group-hover:text-purple-500 dark:group-hover:text-purple-400',
 };
@@ -75,7 +75,7 @@ export const AMBER_SCHEME: CardScheme = {
   iconColor:   'text-amber-500 dark:text-amber-400',
   formBorder:  'border-amber-300 dark:border-amber-600',
   formBg:      'bg-amber-50/30 dark:bg-amber-900/10',
-  saveColor:   'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/30',
+  saveColor:   'bg-amber-500/80 text-white hover:bg-amber-600/90',
   addBorder:   'border-amber-200 dark:border-amber-800/50 hover:border-amber-400 dark:hover:border-amber-600',
   addIcon:     'text-amber-300 dark:text-amber-700 group-hover:text-amber-500 dark:group-hover:text-amber-400',
 };
@@ -88,27 +88,29 @@ export const CardFormButtons: React.FC<{
   saveDisabled?: boolean;
   saveColorClass?: string;
 }> = ({ onSave, onCancel, saveDisabled, saveColorClass = BLUE_SCHEME.saveColor }) => (
-  <div className="flex gap-1 mt-1.5">
+  <div className="grid grid-cols-2 border-t border-gray-200/60 dark:border-gray-700/40">
+    <button
+      type="button"
+      onClick={onCancel}
+      title="Cancel"
+      className="flex items-center justify-center gap-1 py-1.5 bg-gray-600/70 dark:bg-gray-700/80 text-white hover:bg-gray-700/90 transition-colors"
+    >
+      <X className="w-3 h-3" />
+      <span className="text-[9px] font-bold uppercase tracking-tight">Cancel</span>
+    </button>
     <button
       type="button"
       onClick={onSave}
       disabled={saveDisabled}
       title="Save"
       className={classNames(
-        'w-6 h-6 flex items-center justify-center rounded transition-colors',
+        'flex items-center justify-center gap-1 py-1.5 transition-colors',
         'disabled:opacity-40 disabled:cursor-not-allowed',
         saveColorClass,
       )}
     >
-      <Check className="w-3.5 h-3.5" />
-    </button>
-    <button
-      type="button"
-      onClick={onCancel}
-      title="Cancel"
-      className="w-6 h-6 flex items-center justify-center rounded text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/50 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-    >
-      <X className="w-3.5 h-3.5" />
+      <Check className="w-3 h-3" />
+      <span className="text-[9px] font-bold uppercase tracking-tight">Save</span>
     </button>
   </div>
 );
@@ -197,9 +199,11 @@ export const FormCard: React.FC<{
   colSpan2?: boolean;
   children: React.ReactNode;
 }> = ({ borderClass, bgClass, header, onSave, onCancel, saveDisabled, saveColorClass, colSpan2, children }) => (
-  <div className={classNames('rounded-xl border-2 border-dashed p-2.5', borderClass, bgClass, colSpan2 ? 'col-span-2' : '')}>
-    <div className="flex items-center gap-1 mb-1.5">{header}</div>
-    {children}
+  <div className={classNames('rounded-xl border-2 border-dashed overflow-hidden', borderClass, bgClass, colSpan2 ? 'col-span-2' : '')}>
+    <div className="p-2.5">
+      <div className="flex items-center gap-1 mb-1.5">{header}</div>
+      {children}
+    </div>
     <CardFormButtons
       onSave={onSave}
       onCancel={onCancel}

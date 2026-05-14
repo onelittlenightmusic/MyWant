@@ -86,8 +86,8 @@ export function useCardGridNavigation({
       const total = countRef.current;
       const col = i % cols;
       const row = Math.floor(i / cols);
-      if (dir === 'left' && col > 0) setFocusedIndex(i - 1);
-      else if (dir === 'right' && col < cols - 1 && i + 1 < total) setFocusedIndex(i + 1);
+      if (dir === 'left' && i > 0) setFocusedIndex(i - 1);
+      else if (dir === 'right' && i + 1 < total) setFocusedIndex(i + 1);
       else if (dir === 'up' && row > 0) setFocusedIndex(i - cols);
       else if (dir === 'down' && i + cols < total) setFocusedIndex(i + cols);
     },
@@ -133,11 +133,11 @@ export function useCardGridNavigation({
     switch (e.key) {
       case 'ArrowLeft':
         e.preventDefault(); e.stopPropagation();
-        if (col > 0) setFocusedIndex(i - 1);
+        if (i > 0) setFocusedIndex(i - 1);
         break;
       case 'ArrowRight':
         e.preventDefault(); e.stopPropagation();
-        if (col < cols - 1 && i + 1 < total) setFocusedIndex(i + 1);
+        if (i + 1 < total) setFocusedIndex(i + 1);
         break;
       case 'ArrowUp':
         e.preventDefault(); e.stopPropagation();
