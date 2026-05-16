@@ -62,11 +62,18 @@ export interface ParameterDescription {
   description: string;
 }
 
+export interface RecipeParameterValidation {
+  min?: number;
+  max?: number;
+  enum?: unknown[];
+}
+
 export interface RecipeContent {
   metadata: RecipeMetadata;
   parameters?: Record<string, any>;
   parameter_descriptions?: Record<string, string>;
   parameter_types?: Record<string, string>;
+  parameter_validations?: Record<string, RecipeParameterValidation>;
   wants: RecipeWant[];
   result?: RecipeResultSpec[];
   example?: RecipeExample;

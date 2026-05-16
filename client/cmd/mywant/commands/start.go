@@ -9,7 +9,6 @@ import (
 
 	"mywant/engine/server"
 	"mywant/engine/worker"
-	"mywant/web"
 
 	"github.com/spf13/cobra"
 )
@@ -154,7 +153,7 @@ var StartCmd = &cobra.Command{
 			ColorMode:      config.ColorMode,
 			ConfigPath:     getConfigPath(),
 			MemoryPath:     filepath.Join(getMyWantDir(), "state.yaml"),
-			WebFS:          web.GetFileSystem(!debug),
+			WebFS:          nil,
 			OTELEndpoint:   config.OTELEndpoint,
 			GoalThinker:    server.GoalThinkerConfig{UseStub: config.GoalThinker.UseStub},
 		}

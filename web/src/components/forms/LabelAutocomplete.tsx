@@ -173,7 +173,7 @@ export const LabelAutocomplete = React.forwardRef<CommitInputHandle, LabelAutoco
         </div>
 
         {keyOpen && filteredKeys.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
             {filteredKeys.map((key, index) => (
               <button
                 key={index}
@@ -224,7 +224,7 @@ export const LabelAutocomplete = React.forwardRef<CommitInputHandle, LabelAutoco
         </div>
 
         {valueOpen && filteredValues.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
             {filteredValues.map((value, index) => (
               <button
                 key={index}

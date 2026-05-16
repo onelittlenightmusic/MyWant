@@ -7,6 +7,7 @@ import { useCardGridNavigation } from '@/hooks/useCardGridNavigation';
 import { apiClient } from '@/api/client';
 import { classNames } from '@/utils/helpers';
 import { DisplayCard, AddCard, FormCard, CardScheme, BLUE_SCHEME, GREEN_SCHEME, TEAL_SCHEME, PURPLE_SCHEME, AMBER_SCHEME } from '@/components/forms/CardPrimitives';
+import { NumberSliderInput } from '@/components/common/NumberSliderInput';
 
 const COLS = 2;
 
@@ -289,6 +290,10 @@ export const ParameterGridSection: React.FC<ParameterGridSectionProps> = ({
             const isCheckbox = param.type === 'bool';
             const isNumber = param.type === 'int' || param.type === 'float64';
             const isWantType = param.type === 'want_type';
+            const sliderMin = param.validation?.min ?? 0;
+            const sliderMax = param.validation?.max ?? 100;
+            const isSlider = isNumber && param.validation?.min !== undefined && param.validation?.max !== undefined;
+            const sliderStep = param.type === 'int' ? 1 : Math.max(0.001, (sliderMax - sliderMin) / 100);
             const hasGlobal = !!param.defaultGlobalParameter;
             const isOverride = globalOverrides[param.name] ?? false;
             const globalValue = hasGlobal ? globalParams[param.defaultGlobalParameter!] : undefined;
@@ -488,6 +493,15 @@ export const ParameterGridSection: React.FC<ParameterGridSectionProps> = ({
                 }
               >
                 {/* Input area */}
+                {isSlider && !isParamRef && (!hasGlobal || isOverride) ? (
+                  <NumberSliderInput
+                    value={typeof currentValue === 'number' ? currentValue : (typeof param.default === 'number' ? param.default : sliderMin)}
+                    min={sliderMin}
+                    max={sliderMax}
+                    step={sliderStep}
+                    onChange={v => handleUpdateParam(param.name, String(v), param.type)}
+                  />
+                ) : (
                 <div className="flex items-center gap-1">
                   <TypeIcon type={param.type} hasEnum={hasEnum} colorClass={classNames('opacity-70 flex-shrink-0', isFocused || isModified ? 'text-gray-400 dark:text-gray-500' : ts.iconColor)} />
                   <div className="flex-1 min-w-0">
@@ -552,6 +566,7 @@ export const ParameterGridSection: React.FC<ParameterGridSectionProps> = ({
                     <CopyButton value={String(currentValue)} />
                   )}
                 </div>
+                )}
 
                 {/* Type-level global param toggle button */}
                 {hasGlobal && (

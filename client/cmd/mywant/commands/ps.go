@@ -16,10 +16,23 @@ var PsCmd = &cobra.Command{
 	Aliases: []string{"p"},
 	Short:   "Show status of MyWant processes (Server, GUI, Agent Service, Mock)",
 	Run: func(cmd *cobra.Command, args []string) {
+		config, _ := LoadConfig()
+
 		serverPort, _ := cmd.Flags().GetInt("server-port")
 		guiPort, _ := cmd.Flags().GetInt("gui-port")
 		agentPort, _ := cmd.Flags().GetInt("agent-port")
 		mockPort, _ := cmd.Flags().GetInt("mock-port")
+
+		// Use config values when flags not explicitly set
+		if !cmd.Flags().Changed("server-port") && config != nil && config.ServerPort > 0 {
+			serverPort = config.ServerPort
+		}
+		if !cmd.Flags().Changed("gui-port") && config != nil && config.GUIPort > 0 {
+			guiPort = config.GUIPort
+		}
+		if !cmd.Flags().Changed("mock-port") && config != nil && config.MockFlightPort > 0 {
+			mockPort = config.MockFlightPort
+		}
 
 		// Try to read actual agent service port from file
 		agentPortFile := filepath.Join(getMyWantDir(), "agent-service.port")
@@ -92,7 +105,7 @@ func getProcessStatus(label string, pidFileName string, port int) (string, int, 
 
 func init() {
 	PsCmd.Flags().Int("server-port", 8080, "Backend server port")
-	PsCmd.Flags().Int("gui-port", 8080, "Frontend GUI port")
+	PsCmd.Flags().Int("gui-port", 8081, "Frontend GUI port")
 	PsCmd.Flags().Int("agent-port", 8080, "Agent service port")
 	PsCmd.Flags().Int("mock-port", 8090, "Mock flight server port")
 }

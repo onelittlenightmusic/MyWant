@@ -93,7 +93,7 @@ export const CardFormButtons: React.FC<{
       type="button"
       onClick={onCancel}
       title="Cancel"
-      className="flex items-center justify-center gap-1 py-1.5 bg-gray-600/70 dark:bg-gray-700/80 text-white hover:bg-gray-700/90 transition-colors"
+      className="flex items-center justify-center gap-1 py-1.5 rounded-bl-xl bg-gray-600/70 dark:bg-gray-700/80 text-white hover:bg-gray-700/90 transition-colors"
     >
       <X className="w-3 h-3" />
       <span className="text-[9px] font-bold uppercase tracking-tight">Cancel</span>
@@ -104,7 +104,7 @@ export const CardFormButtons: React.FC<{
       disabled={saveDisabled}
       title="Save"
       className={classNames(
-        'flex items-center justify-center gap-1 py-1.5 transition-colors',
+        'flex items-center justify-center gap-1 py-1.5 rounded-br-xl transition-colors',
         'disabled:opacity-40 disabled:cursor-not-allowed',
         saveColorClass,
       )}
@@ -199,7 +199,7 @@ export const FormCard: React.FC<{
   colSpan2?: boolean;
   children: React.ReactNode;
 }> = ({ borderClass, bgClass, header, onSave, onCancel, saveDisabled, saveColorClass, colSpan2, children }) => (
-  <div className={classNames('rounded-xl border-2 border-dashed overflow-hidden', borderClass, bgClass, colSpan2 ? 'col-span-2' : '')}>
+  <div className={classNames('relative rounded-xl border-2 border-dashed', borderClass, bgClass, colSpan2 ? 'col-span-2' : '')}>
     <div className="p-2.5">
       <div className="flex items-center gap-1 mb-1.5">{header}</div>
       {children}

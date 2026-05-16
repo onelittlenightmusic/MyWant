@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { WantCardPluginProps, registerWantCardPlugin } from '../registry';
 import { useInputActions } from '@/hooks/useInputActions';
+import { NumberSliderInput } from '@/components/common/NumberSliderInput';
 
 const SliderContentSection: React.FC<WantCardPluginProps> = ({
   want, isChild, isControl, isFocused, isInnerFocused, onExitInnerFocus, onSliderActiveChange,
@@ -71,41 +72,23 @@ const SliderContentSection: React.FC<WantCardPluginProps> = ({
 
   return (
     <div
-      className={`${(isChild || (isControl && !isFocused)) ? 'mt-2' : 'mt-4'} space-y-1`}
+      className={`${(isChild || (isControl && !isFocused)) ? 'mt-2' : 'mt-4'}`}
       onPointerEnter={() => onSliderActiveChange?.(true)}
       onPointerLeave={() => onSliderActiveChange?.(false)}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
     >
-      {/* Label + value row with OK? badge */}
-      <div className="relative flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span className="font-medium truncate mr-2" title={sliderTargetParam}>
-          {sliderTargetParam || 'value'}
-        </span>
-        <span className={`font-mono tabular-nums text-sm font-semibold ${isDirty ? 'text-yellow-700 dark:text-yellow-400' : 'text-gray-800 dark:text-gray-200'}`}>
-          {localValue}
-        </span>
-        {isDirty && (
-          <div className="absolute right-0 -top-5 text-[10px] font-medium text-yellow-700 bg-yellow-100 px-1.5 py-0.5 rounded shadow-sm border border-yellow-200 pointer-events-none">
-            OK?
-          </div>
-        )}
-      </div>
-      <input
-        type="range"
+      <NumberSliderInput
+        value={localValue}
         min={sliderMin}
         max={sliderMax}
         step={sliderStep}
-        value={localValue}
-        onChange={(e) => handleMouseChange(Number(e.target.value))}
-        onClick={(e) => e.stopPropagation()}
-        className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${isInnerFocused ? `accent-sky-500 ${isDirty ? 'bg-sky-50 dark:bg-sky-900/20' : 'bg-gray-200 dark:bg-gray-700'}` : 'accent-sky-500 bg-gray-200 dark:bg-gray-700'}`}
+        onChange={handleMouseChange}
+        isDirty={isDirty}
+        label={sliderTargetParam || 'value'}
+        stopPropagation
       />
-      <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500">
-        <span>{sliderMin}</span>
-        <span>{sliderMax}</span>
-      </div>
     </div>
   );
 };

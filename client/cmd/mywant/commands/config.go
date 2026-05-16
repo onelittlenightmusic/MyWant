@@ -22,6 +22,8 @@ type MyWantConfig struct {
 	AgentMode        string              `yaml:"agent_mode"`         // local, webhook, grpc
 	ServerHost       string              `yaml:"server_host"`        // Main server host
 	ServerPort       int                 `yaml:"server_port"`        // Main server port
+	GUIHost          string              `yaml:"gui_host"`           // mywant-gui host
+	GUIPort          int                 `yaml:"gui_port"`           // mywant-gui port
 	AgentServiceHost string              `yaml:"agent_service_host"` // Agent service host (for webhook mode)
 	AgentServicePort int                 `yaml:"agent_service_port"` // Agent service port (for webhook mode)
 	MockFlightPort   int                 `yaml:"mock_flight_port"`   // Mock flight server port
@@ -48,8 +50,10 @@ func DefaultConfig() *MyWantConfig {
 		AgentMode:        "local",
 		ServerHost:       "localhost",
 		ServerPort:       8080,
+		GUIHost:          "localhost",
+		GUIPort:          8081,
 		AgentServiceHost: "localhost",
-		AgentServicePort: 8081,
+		AgentServicePort: 8082,
 		MockFlightPort:   8090,
 		HeaderPosition:   "top",
 		ColorMode:        "system",

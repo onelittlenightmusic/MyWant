@@ -118,11 +118,18 @@ type GenericRecipe struct {
 	Recipe RecipeContent `json:"recipe"`
 }
 
+type RecipeParameterValidation struct {
+	Min  *float64 `json:"min,omitempty"`
+	Max  *float64 `json:"max,omitempty"`
+	Enum []any    `json:"enum,omitempty"`
+}
+
 type RecipeContent struct {
-	Metadata   RecipeMetadata `json:"metadata"`
-	Parameters map[string]any `json:"parameters,omitempty"`
-	Wants      []any          `json:"wants"` // Simplified for now
-	Example    *Config        `json:"example,omitempty"`
+	Metadata              RecipeMetadata                    `json:"metadata"`
+	Parameters            map[string]any                    `json:"parameters,omitempty"`
+	ParameterValidations  map[string]RecipeParameterValidation `json:"parameter_validations,omitempty"`
+	Wants                 []any                             `json:"wants"` // Simplified for now
+	Example               *Config                           `json:"example,omitempty"`
 }
 
 type RecipeMetadata struct {

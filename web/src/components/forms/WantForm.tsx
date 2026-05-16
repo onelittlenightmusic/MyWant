@@ -593,6 +593,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
     if (!selectedRecipe?.recipe?.parameters) return undefined;
     const descs = selectedRecipe.recipe.parameter_descriptions ?? {};
     const types = selectedRecipe.recipe.parameter_types ?? {};
+    const validations = selectedRecipe.recipe.parameter_validations ?? {};
     return Object.entries(selectedRecipe.recipe.parameters).map(([name, defaultValue]) => {
       let paramType = types[name] ?? 'string';
       if (!types[name]) {
@@ -607,6 +608,7 @@ export const WantForm = forwardRef<WantFormHandle, WantFormProps>(function WantF
         required: false,
         default: defaultValue,
         example: defaultValue,
+        validation: validations[name],
       } satisfies ParameterDef;
     });
   }, [selectedItemType, type, recipes]);

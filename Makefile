@@ -1,4 +1,4 @@
-.PHONY: clean build build-gui build-cli build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-gui build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
@@ -37,9 +37,16 @@ build-gui:
 	cd web && npm install && npm run build
 
 build-cli:
-	@echo "🔨 Building mywant with embedded GUI..."
+	@echo "🔨 Building mywant backend..."
 	@mkdir -p bin
 	go build -C client -o ../bin/mywant ./cmd/mywant
+
+build-mywant-gui:
+	@echo "📦 Building mywant-gui frontend assets..."
+	cd ../mywant-gui/web && npm install && npm run build
+	@echo "🔨 Building mywant-gui..."
+	@mkdir -p bin
+	go build -C ../mywant-gui -o ../mywant/bin/mywant-gui ./cmd/mywant-gui
 
 
 build-playwright-app:
@@ -217,24 +224,29 @@ restart-all:
 	@echo "🔄 Restarting MyWant server..."
 	@echo "🛑 Stopping existing processes..."
 	@./bin/mywant stop 2>/dev/null || echo "  Server not running"
+	@./bin/mywant-gui stop 2>/dev/null || true
 	@echo "🧹 Cleaning logs..."
-	@rm -f ~/.mywant/server.log
+	@rm -f ~/.mywant/server.log ~/.mywant/gui.log
 	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
 	@$(MAKE) build-gui
 	@$(MAKE) build-cli
+	@$(MAKE) build-mywant-gui
 	@$(MAKE) build-mock
 	@$(MAKE) build-mock-plugin
 	@mkdir -p ~/.mywant
-	@echo "🚀 Starting MyWant server via mywant..."
+	@echo "🚀 Starting MyWant backend..."
 	@nohup ./bin/mywant start -D --port 8080 --host 0.0.0.0 > /dev/null 2>&1 &
+	@echo "🌐 Starting mywant-gui frontend..."
+	@nohup ./bin/mywant-gui start -D --port 8081 --host 0.0.0.0 > /dev/null 2>&1 &
 	@sleep 2
 	@echo "✅ Server started"
-	@echo "🌐 URL: http://0.0.0.0:8080"
+	@echo "🌐 Backend: http://0.0.0.0:8080"
+	@echo "🖥️  Frontend: http://0.0.0.0:8081"
 	@echo ""
 	@echo "📋 Server management:"
-	@echo "  Stop:        ./bin/mywant stop"
+	@echo "  Stop:        ./bin/mywant stop && ./bin/mywant-gui stop"
 	@echo "  View status: ./bin/mywant ps"
 	@echo "  Mock flight: ./bin/mywant-mock flight start"
 
