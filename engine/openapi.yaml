@@ -1034,6 +1034,35 @@ paths:
         '200':
           description: List of want types
 
+  /api/v1/want-types/reload:
+    post:
+      summary: Reload user custom want types
+      operationId: reloadWantTypes
+      description: |
+        Re-scans `~/.mywant/custom-types/` and refreshes all user custom type definitions
+        without restarting the server. Existing Go-backed built-in types are preserved.
+        Returns the number of types loaded and any warnings encountered.
+      tags:
+        - WantTypes
+      responses:
+        '200':
+          description: Reload result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loaded:
+                    type: integer
+                    description: Number of user custom types loaded
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                    description: Any warnings encountered during reload
+                  message:
+                    type: string
+
   /api/v1/want-types/{name}:
     get:
       summary: Get want type definition

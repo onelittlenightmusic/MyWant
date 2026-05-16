@@ -64,6 +64,19 @@ func (c *Client) DeleteWantType(name string) (map[string]any, error) {
 	return result, nil
 }
 
+// ReloadWantTypes calls POST /api/v1/want-types/reload to re-scan ~/.mywant/custom-types/ without restart.
+func (c *Client) ReloadWantTypes() (map[string]any, error) {
+	raw, err := c.RawRequest("POST", "/api/v1/want-types/reload", nil, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return result, nil
+}
+
 // GetWantTypeExamples retrieves examples for a specific want type
 func (c *Client) GetWantTypeExamples(name string) (*map[string]any, error) {
 	var result map[string]any

@@ -350,6 +350,33 @@ Example:
 	},
 }
 
+var reloadTypesCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload user custom want types from ~/.mywant/custom-types/",
+	Long: `Re-scan ~/.mywant/custom-types/ and refresh user custom type definitions
+without restarting the server. Useful after adding, editing, or removing plugin YAML files.
+
+Example:
+  mywant types reload`,
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		result, err := c.ReloadWantTypes()
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		msg, _ := result["message"].(string)
+		loaded, _ := result["loaded"].(float64)
+		fmt.Printf("Reloaded %d user custom types: %s\n", int(loaded), msg)
+		if warnings, ok := result["warnings"].([]any); ok && len(warnings) > 0 {
+			fmt.Println("Warnings:")
+			for _, w := range warnings {
+				fmt.Printf("  - %v\n", w)
+			}
+		}
+	},
+}
+
 func init() {
 	AgentsCmd.AddCommand(listAgentsCmd)
 	AgentsCmd.AddCommand(getAgentCmd)
@@ -366,4 +393,5 @@ func init() {
 	TypesCmd.AddCommand(registerTypeCmd)
 	TypesCmd.AddCommand(updateTypeCmd)
 	TypesCmd.AddCommand(deleteTypeCmd)
+	TypesCmd.AddCommand(reloadTypesCmd)
 }

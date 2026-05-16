@@ -12,6 +12,18 @@ import (
 	mywant "mywant/engine/core"
 )
 
+// reloadWantTypes handles POST /api/v1/want-types/reload
+// Re-scans ~/.mywant/custom-types/ and refreshes user custom type definitions without restart.
+func (s *Server) reloadWantTypes(w http.ResponseWriter, _ *http.Request) {
+	loaded, warnings := s.wantTypeLoader.ReloadUserCustomTypes()
+	s.globalBuilder.LogAPIOperation("POST", "/want-types/reload", "", "reloaded", loaded, "", "")
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"loaded":   loaded,
+		"warnings": warnings,
+		"message":  fmt.Sprintf("reloaded %d user custom types", loaded),
+	})
+}
+
 // registerWantType handles POST /api/v1/want-types
 // Body: raw YAML of a wantType definition.
 // The type is registered immediately (hot-reload) and persisted to yaml/want_types/custom/.

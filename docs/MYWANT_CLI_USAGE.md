@@ -48,6 +48,7 @@ Most commands have short versions for convenience.
 | `types` | - | `t` | Manage want types |
 | | `list` | `l` | List types |
 | | `get` | `g` | Get type details |
+| | `reload` | - | Reload user custom types from `~/.mywant/custom-types/` |
 | `interact` | - | `i` | Interactive creation |
 | | `start` | `st` | Start session |
 | | `send` | `s` | Send message |
@@ -224,6 +225,10 @@ Explore available types and agents.
 ./bin/mywant types list
 # Short version:
 ./bin/mywant t l
+
+# Reload user custom types without restarting the server
+# (re-scans ~/.mywant/custom-types/ and hot-reloads all plugin YAML files)
+./bin/mywant types reload
 
 # List registered agents
 ./bin/mywant agents list

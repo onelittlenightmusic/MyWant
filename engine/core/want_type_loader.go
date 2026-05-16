@@ -486,6 +486,47 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 	return nil
 }
 
+// ReloadUserCustomTypes re-scans ~/.mywant/custom-types/ and refreshes definitions.
+// Existing user custom types are replaced; built-in types are preserved.
+// Returns the number of types loaded and any warnings collected.
+func (w *WantTypeLoader) ReloadUserCustomTypes() (loaded int, warnings []string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Remove previously loaded user custom types (those backed by inline agents or requires)
+	for name, def := range w.definitions {
+		if len(def.InlineAgents) > 0 || len(def.Requires) > 0 {
+			delete(w.definitions, name)
+			// Rebuild category/pattern indices after deletion
+			for cat, defs := range w.byCategory {
+				filtered := defs[:0]
+				for _, d := range defs {
+					if d.Metadata.Name != name {
+						filtered = append(filtered, d)
+					}
+				}
+				w.byCategory[cat] = filtered
+			}
+			for pat, defs := range w.byPattern {
+				filtered := defs[:0]
+				for _, d := range defs {
+					if d.Metadata.Name != name {
+						filtered = append(filtered, d)
+					}
+				}
+				w.byPattern[pat] = filtered
+			}
+		}
+	}
+
+	beforeCount := len(w.definitions)
+	w.loadWarnings = nil
+	w.loadUserCustomTypes()
+	afterCount := len(w.definitions)
+
+	return afterCount - beforeCount, w.loadWarnings
+}
+
 // RegisterDefinition adds or replaces a want type definition at runtime without loading from file.
 // Used by the hot-reload API to register new types dynamically.
 func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {

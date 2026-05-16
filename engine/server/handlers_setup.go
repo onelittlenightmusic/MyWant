@@ -93,6 +93,9 @@ func (s *Server) setupRoutes() {
 	wantTypes.HandleFunc("", s.listWantTypes).Methods("GET")
 	wantTypes.HandleFunc("", s.registerWantType).Methods("POST")
 	wantTypes.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	// /reload must be registered before /{name} to avoid being captured as a name value
+	wantTypes.HandleFunc("/reload", s.reloadWantTypes).Methods("POST")
+	wantTypes.HandleFunc("/reload", s.handleOptions).Methods("OPTIONS")
 	wantTypes.HandleFunc("/{name}", s.getWantType).Methods("GET")
 	wantTypes.HandleFunc("/{name}", s.updateWantType).Methods("PUT")
 	wantTypes.HandleFunc("/{name}", s.deleteWantType).Methods("DELETE")
