@@ -9,19 +9,40 @@ recipe:
     
   # Recipe parameters - these are the configurable values
   parameters:
-    prefix: "fibonacci"
-    display_name: "Fibonacci Sequence Generator"
-    count: 10
-    min_value: 0
-    max_value: 1000000
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    display_name: "Display name for the recipe instance"
-    count: "Number of fibonacci numbers to generate in the sequence"
-    min_value: "Minimum value for filtering the fibonacci sequence"
-    max_value: "Maximum value for filtering the fibonacci sequence"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "fibonacci"
+      required: false
+    - name: display_name
+      description: "Display name for the recipe instance"
+      type: string
+      default: "Fibonacci Sequence Generator"
+      required: false
+    - name: count
+      description: "Number of fibonacci numbers to generate in the sequence"
+      type: int
+      default: 10
+      required: false
+      validation:
+        min: 1
+        max: 50
+    - name: min_value
+      description: "Minimum value for filtering the fibonacci sequence"
+      type: int
+      default: 0
+      required: false
+      validation:
+        min: 0
+        max: 10000000
+    - name: max_value
+      description: "Maximum value for filtering the fibonacci sequence"
+      type: int
+      default: 1000000
+      required: false
+      validation:
+        min: 0
+        max: 10000000
 
   wants:
     # Fibonacci number generator - generates fibonacci sequence

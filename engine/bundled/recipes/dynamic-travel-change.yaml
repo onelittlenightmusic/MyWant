@@ -9,35 +9,77 @@ recipe:
 
   # Recipe parameters - these are the configurable values
   parameters:
-    prefix: "travel"
-    display_name: "Dynamic Travel Itinerary with Flight Monitoring"
-    server_url: "http://localhost:8090"
-    flight_number: "AA100"
-    flight_type: "business class"
-    from: "New York"
-    to: "Los Angeles"
-    departure_date: "2026-12-20"
-    restaurant_type: "fine dining"
-    hotel_type: "luxury"
-    buffet_type: "international"
-    dinner_duration: 2.0
-    flight_duration: 12.0
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    display_name: "Display name for the dynamic travel itinerary"
-    server_url: "URL of the flight API server for booking"
-    flight_number: "Flight number to book"
-    flight_type: "Class of service (e.g., business class, economy)"
-    from: "Departure city"
-    to: "Destination city"
-    departure_date: "Flight departure date in YYYY-MM-DD format"
-    restaurant_type: "Type of restaurant to book"
-    hotel_type: "Type of hotel accommodation"
-    buffet_type: "Type of buffet for breakfast"
-    dinner_duration: "Expected duration of dinner in hours"
-    flight_duration: "Expected duration of flight in hours"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "travel"
+      required: false
+    - name: display_name
+      description: "Display name for the dynamic travel itinerary"
+      type: string
+      default: "Dynamic Travel Itinerary with Flight Monitoring"
+      required: false
+    - name: server_url
+      description: "URL of the flight API server for booking"
+      type: string
+      default: "http://localhost:8090"
+      required: false
+    - name: flight_number
+      description: "Flight number to book"
+      type: string
+      default: "AA100"
+      required: false
+    - name: flight_type
+      description: "Class of service (e.g., business class, economy)"
+      type: string
+      default: "business class"
+      required: false
+    - name: from
+      description: "Departure city"
+      type: string
+      default: "New York"
+      required: false
+    - name: to
+      description: "Destination city"
+      type: string
+      default: "Los Angeles"
+      required: false
+    - name: departure_date
+      description: "Flight departure date in YYYY-MM-DD format"
+      type: string
+      default: "2026-12-20"
+      required: false
+    - name: restaurant_type
+      description: "Type of restaurant to book"
+      type: string
+      default: "fine dining"
+      required: false
+    - name: hotel_type
+      description: "Type of hotel accommodation"
+      type: string
+      default: "luxury"
+      required: false
+    - name: buffet_type
+      description: "Type of buffet for breakfast"
+      type: string
+      default: "international"
+      required: false
+    - name: dinner_duration
+      description: "Expected duration of dinner in hours"
+      type: float64
+      default: 2.0
+      required: false
+      validation:
+        min: 0.5
+        max: 6.0
+    - name: flight_duration
+      description: "Expected duration of flight in hours"
+      type: float64
+      default: 12.0
+      required: false
+      validation:
+        min: 1.0
+        max: 24.0
 
   wants:
     # Flight booking with API agent - monitors and auto-reboks on delay

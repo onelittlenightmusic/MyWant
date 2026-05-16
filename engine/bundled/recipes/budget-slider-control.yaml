@@ -7,28 +7,74 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    prefix: "budget-ctrl"
-    initial_budget: 5000.0
-    currency: USD
-    restaurant_type: "fine dining"
-    hotel_type: "luxury"
-    restaurant_cost: 300.0
-    hotel_cost: 800.0
-    budget_min: 1000.0
-    budget_max: 20000.0
-    budget_step: 500.0
-
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    initial_budget: "Initial budget amount (also controls slider default position)"
-    currency: "Currency code for budget tracking (USD, EUR, JPY)"
-    restaurant_type: "Type of restaurant to book"
-    hotel_type: "Type of hotel accommodation"
-    restaurant_cost: "Estimated restaurant cost"
-    hotel_cost: "Estimated hotel cost"
-    budget_min: "Minimum value for the budget slider"
-    budget_max: "Maximum value for the budget slider"
-    budget_step: "Step increment for the budget slider"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "budget-ctrl"
+      required: false
+    - name: initial_budget
+      description: "Initial budget amount (also controls slider default position)"
+      type: float64
+      default: 5000.0
+      required: false
+      validation:
+        min: 100
+        max: 50000
+    - name: currency
+      description: "Currency code for budget tracking (USD, EUR, JPY)"
+      type: string
+      default: USD
+      required: false
+    - name: restaurant_type
+      description: "Type of restaurant to book"
+      type: string
+      default: "fine dining"
+      required: false
+    - name: hotel_type
+      description: "Type of hotel accommodation"
+      type: string
+      default: "luxury"
+      required: false
+    - name: restaurant_cost
+      description: "Estimated restaurant cost"
+      type: float64
+      default: 300.0
+      required: false
+      validation:
+        min: 50
+        max: 5000
+    - name: hotel_cost
+      description: "Estimated hotel cost"
+      type: float64
+      default: 800.0
+      required: false
+      validation:
+        min: 100
+        max: 10000
+    - name: budget_min
+      description: "Minimum value for the budget slider"
+      type: float64
+      default: 1000.0
+      required: false
+      validation:
+        min: 100
+        max: 10000
+    - name: budget_max
+      description: "Maximum value for the budget slider"
+      type: float64
+      default: 20000.0
+      required: false
+      validation:
+        min: 1000
+        max: 100000
+    - name: budget_step
+      description: "Step increment for the budget slider"
+      type: float64
+      default: 500.0
+      required: false
+      validation:
+        min: 100
+        max: 5000
 
   wants:
     # Slider control — user drags this to change the budget limit in real-time.

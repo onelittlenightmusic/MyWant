@@ -159,7 +159,7 @@ func (s *Server) createRecipe(w http.ResponseWriter, r *http.Request) {
 			recipe.Recipe.Metadata.CustomType,
 			recipe.Recipe.Metadata.Description,
 			filename,
-			recipe.Recipe.Parameters,
+			mywant.ParameterDefsToMap(recipe.Recipe.Parameters),
 		)
 		log.Printf("[SERVER] 🎯 Registered custom target type '%s' from newly created recipe\n", recipe.Recipe.Metadata.CustomType)
 	}
@@ -219,7 +219,7 @@ func (s *Server) updateRecipe(w http.ResponseWriter, r *http.Request) {
 			recipe.Recipe.Metadata.CustomType,
 			recipe.Recipe.Metadata.Description,
 			filename,
-			recipe.Recipe.Parameters,
+			mywant.ParameterDefsToMap(recipe.Recipe.Parameters),
 		)
 		log.Printf("[SERVER] 🎯 Updated custom target type '%s' registration\n", recipe.Recipe.Metadata.CustomType)
 	}
@@ -448,7 +448,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 			recipe.Recipe.Metadata.CustomType,
 			recipe.Recipe.Metadata.Description,
 			filename,
-			recipe.Recipe.Parameters,
+			mywant.ParameterDefsToMap(recipe.Recipe.Parameters),
 		)
 		log.Printf("[SERVER] 🎯 Registered custom target type '%s' from newly saved recipe\n", recipe.Recipe.Metadata.CustomType)
 	}
@@ -471,7 +471,20 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 // Returns:
 //   - parameters: map of recipe-level param name → current value (used as defaults)
 //   - wants: copy of childWants with Spec.Params replaced by parameter references
-func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.WantTypeLoader) (map[string]any, []mywant.RecipeWant) {
+func inferParamType(v any) string {
+	switch v.(type) {
+	case int, int64:
+		return "int"
+	case float64:
+		return "float64"
+	case bool:
+		return "bool"
+	default:
+		return "string"
+	}
+}
+
+func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.WantTypeLoader) ([]mywant.ParameterDef, []mywant.RecipeWant) {
 	type entry struct {
 		wantIdx  int
 		wantType string
@@ -520,7 +533,7 @@ func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.Wan
 
 	// Step 3: disambiguate still-conflicting names (same type appears twice)
 	paramNameSeen := map[string]int{}
-	parameters := map[string]any{}
+	var parameters []mywant.ParameterDef
 	childRefs := make([]map[string]string, len(childWants))
 	for i := range childWants {
 		childRefs[i] = map[string]string{}
@@ -531,7 +544,11 @@ func buildParameterizedRecipe(childWants []mywant.RecipeWant, loader *mywant.Wan
 			paramNameSeen[ne.paramName]++
 			pName = fmt.Sprintf("%s_%d", ne.paramName, paramNameSeen[ne.paramName])
 		}
-		parameters[pName] = ne.value
+		parameters = append(parameters, mywant.ParameterDef{
+			Name:    pName,
+			Type:    inferParamType(ne.value),
+			Default: ne.value,
+		})
 		childRefs[ne.wantIdx][ne.key] = pName
 	}
 

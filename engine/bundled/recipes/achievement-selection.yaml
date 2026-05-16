@@ -28,34 +28,53 @@ recipe:
     version: "2.0.0"
 
   parameters:
-    prefix: "ach-selection"
-    destination: "Tokyo"
-    budget_target: 200
-    policy_dir: "yaml/policies/achievement"
-    use_llm: false
-    direction_map: >-
-      {
-        "reserve_hotel_discounted": {
-          "type": "hotel",
-          "params": {"hotel_type": "discounted"},
-          "sets": {"hotel_reserved": true},
-          "cost_field": "hotel_cost"
-        },
-        "reserve_hotel_standard": {
-          "type": "hotel",
-          "params": {"hotel_type": "standard"},
-          "sets": {"hotel_reserved": true},
-          "cost_field": "hotel_cost"
+    - name: prefix
+      description: "Name prefix for generated wants"
+      type: string
+      default: "ach-selection"
+      required: false
+    - name: destination
+      description: "Trip destination"
+      type: string
+      default: "Tokyo"
+      required: false
+    - name: budget_target
+      description: "Budget ceiling in USD (200 = between standard 250–400 and discounted 80–150)"
+      type: int
+      default: 200
+      required: false
+      validation:
+        min: 50
+        max: 10000
+    - name: policy_dir
+      description: "Path to the OPA policy directory"
+      type: string
+      default: "yaml/policies/achievement"
+      required: false
+    - name: use_llm
+      description: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+      type: bool
+      default: false
+      required: false
+    - name: direction_map
+      description: "JSON map of OPA action names to hotel want configurations"
+      type: string
+      default: >-
+        {
+          "reserve_hotel_discounted": {
+            "type": "hotel",
+            "params": {"hotel_type": "discounted"},
+            "sets": {"hotel_reserved": true},
+            "cost_field": "hotel_cost"
+          },
+          "reserve_hotel_standard": {
+            "type": "hotel",
+            "params": {"hotel_type": "standard"},
+            "sets": {"hotel_reserved": true},
+            "cost_field": "hotel_cost"
+          }
         }
-      }
-
-  parameter_descriptions:
-    prefix: "Name prefix for generated wants"
-    destination: "Trip destination"
-    budget_target: "Budget ceiling in USD (200 = between standard 250–400 and discounted 80–150)"
-    policy_dir: "Path to the OPA policy directory"
-    use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
-    direction_map: "JSON map of OPA action names to hotel want configurations"
+      required: false
 
   state:
     - name: available_capabilities

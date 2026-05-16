@@ -9,17 +9,32 @@ recipe:
 
   # Recipe parameters - these are the configurable values
   parameters:
-    prefix: "prime"
-    display_name: "Prime Number Sieve"
-    start_number: 2
-    end_number: 100
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    display_name: "Display name for the recipe instance"
-    start_number: "Starting number for the range to search for primes"
-    end_number: "Ending number for the range to search for primes"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "prime"
+      required: false
+    - name: display_name
+      description: "Display name for the recipe instance"
+      type: string
+      default: "Prime Number Sieve"
+      required: false
+    - name: start_number
+      description: "Starting number for the range to search for primes"
+      type: int
+      default: 2
+      required: false
+      validation:
+        min: 2
+        max: 1000
+    - name: end_number
+      description: "Ending number for the range to search for primes"
+      type: int
+      default: 100
+      required: false
+      validation:
+        min: 2
+        max: 10000
 
   wants:
     # Prime number generator - generates consecutive numbers

@@ -7,12 +7,16 @@ recipe:
     version: "3.0.0"
 
   parameters:
-    slack_webhook_url: ""
-    google_maps_api_key: ""
-
-  parameter_descriptions:
-    slack_webhook_url: "Slack Incoming Webhook URL"
-    google_maps_api_key: "Google Maps API キー (交通情報用)"
+    - name: slack_webhook_url
+      description: "Slack Incoming Webhook URL"
+      type: string
+      default: ""
+      required: false
+    - name: google_maps_api_key
+      description: "Google Maps API キー (交通情報用)"
+      type: string
+      default: ""
+      required: false
 
   wants:
     # コーディネーター: when で毎朝リセット、OPA + DispatchThinker が全フローを制御

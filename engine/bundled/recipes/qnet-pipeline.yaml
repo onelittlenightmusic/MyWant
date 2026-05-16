@@ -11,25 +11,67 @@ recipe:
   # This recipe defines the using field connections declaratively rather than hardcoded
 
   parameters:
-    prefix: "qnet"
-    primary_count: 10000
-    secondary_count: 7500
-    primary_rate: 3.0
-    secondary_rate: 4.0
-    primary_service_time: 0.1
-    secondary_service_time: 0.12
-    final_service_time: 0.05
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    primary_count: "Total number of packets for primary stream"
-    secondary_count: "Total number of packets for secondary stream"
-    primary_rate: "Generation rate for primary stream (packets per second)"
-    secondary_rate: "Generation rate for secondary stream (packets per second)"
-    primary_service_time: "Service time for primary stream queue processing"
-    secondary_service_time: "Service time for secondary stream queue processing"
-    final_service_time: "Service time for final combined queue processing"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "qnet"
+      required: false
+    - name: primary_count
+      description: "Total number of packets for primary stream"
+      type: int
+      default: 10000
+      required: false
+      validation:
+        min: 100
+        max: 100000
+    - name: secondary_count
+      description: "Total number of packets for secondary stream"
+      type: int
+      default: 7500
+      required: false
+      validation:
+        min: 100
+        max: 100000
+    - name: primary_rate
+      description: "Generation rate for primary stream (packets per second)"
+      type: float64
+      default: 3.0
+      required: false
+      validation:
+        min: 0.5
+        max: 20.0
+    - name: secondary_rate
+      description: "Generation rate for secondary stream (packets per second)"
+      type: float64
+      default: 4.0
+      required: false
+      validation:
+        min: 0.5
+        max: 20.0
+    - name: primary_service_time
+      description: "Service time for primary stream queue processing"
+      type: float64
+      default: 0.1
+      required: false
+      validation:
+        min: 0.01
+        max: 5.0
+    - name: secondary_service_time
+      description: "Service time for secondary stream queue processing"
+      type: float64
+      default: 0.12
+      required: false
+      validation:
+        min: 0.01
+        max: 5.0
+    - name: final_service_time
+      description: "Service time for final combined queue processing"
+      type: float64
+      default: 0.05
+      required: false
+      validation:
+        min: 0.01
+        max: 5.0
 
   wants:
     # Primary packet generator

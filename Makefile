@@ -1,10 +1,10 @@
-.PHONY: clean build build-gui build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
 
 # Code quality targets
 fmt:
 	@echo "🔧 Formatting Go code..."
-	@find . -name "*.go" -not -path "./archive/*" -not -path "./web/*" | xargs gofmt -w -s
-	@find . -name "*.go" -not -path "./archive/*" -not -path "./web/*" | xargs goimports -w 2>/dev/null || echo "goimports not available, using gofmt only"
+	@find . -name "*.go" -not -path "./archive/*" | xargs gofmt -w -s
+	@find . -name "*.go" -not -path "./archive/*" | xargs goimports -w 2>/dev/null || echo "goimports not available, using gofmt only"
 
 vet:
 	@echo "🔍 Running go vet..."
@@ -32,10 +32,6 @@ check: fmt vet test
 	@echo "✅ All code quality checks completed"
 
 # Build targets
-build-gui:
-	@echo "📦 Building frontend assets..."
-	cd web && npm install && npm run build
-
 build-cli:
 	@echo "🔨 Building mywant backend..."
 	@mkdir -p bin
@@ -59,7 +55,7 @@ install-playwright-browsers:
 	@cd mcp/playwright-app && npx playwright install chromium
 	@echo "✅ Playwright browsers installed"
 
-release: build-gui build-cli build-playwright-app
+release: build-cli build-mywant-gui build-playwright-app
 	@echo "🚀 Release build complete: bin/mywant + mcp/playwright-app/dist/server.js"
 
 # Build the mywant library
@@ -230,7 +226,6 @@ restart-all:
 	@echo ""
 	@echo "🧹 Cleaning Go build cache..."
 	@go clean -cache
-	@$(MAKE) build-gui
 	@$(MAKE) build-cli
 	@$(MAKE) build-mywant-gui
 	@$(MAKE) build-mock

@@ -36,18 +36,34 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    prefix: "ach-governance"
-    destination: "Osaka"
-    budget_target: 300
-    policy_dir: "yaml/policies"
-    use_llm: false
-
-  parameter_descriptions:
-    prefix: "Name prefix for generated wants"
-    destination: "Trip destination"
-    budget_target: "Budget ceiling in USD"
-    policy_dir: "Path to OPA policy directory"
-    use_llm: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+    - name: prefix
+      description: "Name prefix for generated wants"
+      type: string
+      default: "ach-governance"
+      required: false
+    - name: destination
+      description: "Trip destination"
+      type: string
+      default: "Osaka"
+      required: false
+    - name: budget_target
+      description: "Budget ceiling in USD"
+      type: int
+      default: 300
+      required: false
+      validation:
+        min: 50
+        max: 10000
+    - name: policy_dir
+      description: "Path to OPA policy directory"
+      type: string
+      default: "yaml/policies"
+      required: false
+    - name: use_llm
+      description: "Set true to enable LLM-assisted planning (requires ANTHROPIC_API_KEY)"
+      type: bool
+      default: false
+      required: false
 
   state:
     - name: hotel_reserved

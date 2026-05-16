@@ -12,15 +12,16 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    child_type: ""
-    child_params: []
-
-  parameter_descriptions:
-    child_type: "Want type of each sibling to dispatch (required)"
-    child_params: "List of param objects passed to each dispatched want. Example: [{target: hall-door-03}, {target: hall-door-04}]"
-
-  parameter_types:
-    child_type: want_type
+    - name: child_type
+      description: "Want type of each sibling to dispatch (required)"
+      type: want_type
+      default: ""
+      required: false
+    - name: child_params
+      description: "List of param objects passed to each dispatched want. Example: [{target: hall-door-03}, {target: hall-door-04}]"
+      type: array
+      default: []
+      required: false
 
   wants:
     - metadata:

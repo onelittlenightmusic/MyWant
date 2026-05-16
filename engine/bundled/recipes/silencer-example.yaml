@@ -10,10 +10,26 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    reminder_message: "This reminder will be automatically approved"
-    wait_duration: "15 seconds"
-    ahead_duration: "10 seconds"
-    silencer_policy: "all_true"
+    - name: reminder_message
+      description: ""
+      type: string
+      default: "This reminder will be automatically approved"
+      required: false
+    - name: wait_duration
+      description: ""
+      type: string
+      default: "15 seconds"
+      required: false
+    - name: ahead_duration
+      description: ""
+      type: string
+      default: "10 seconds"
+      required: false
+    - name: silencer_policy
+      description: ""
+      type: string
+      default: "all_true"
+      required: false
 
   wants:
     # The reminder that requires a reaction

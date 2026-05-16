@@ -9,23 +9,47 @@ recipe:
 
   # Recipe parameters - these are the configurable values
   parameters:
-    prefix: "travel"
-    display_name: "Full Agent-Enabled Travel System"
-    restaurant_type: "fine dining"
-    hotel_type: "luxury"
-    buffet_type: "international"
-    dinner_duration: 2.0
-    state_history_skip_count: 1
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    display_name: "Display name for the travel system"
-    restaurant_type: "Type of restaurant to book with agent support"
-    hotel_type: "Type of hotel accommodation with agent support"
-    buffet_type: "Type of buffet for breakfast with agent support"
-    dinner_duration: "Expected duration of dinner in hours"
-    state_history_skip_count: "Number of state history entries to skip for performance"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "travel"
+      required: false
+    - name: display_name
+      description: "Display name for the travel system"
+      type: string
+      default: "Full Agent-Enabled Travel System"
+      required: false
+    - name: restaurant_type
+      description: "Type of restaurant to book with agent support"
+      type: string
+      default: "fine dining"
+      required: false
+    - name: hotel_type
+      description: "Type of hotel accommodation with agent support"
+      type: string
+      default: "luxury"
+      required: false
+    - name: buffet_type
+      description: "Type of buffet for breakfast with agent support"
+      type: string
+      default: "international"
+      required: false
+    - name: dinner_duration
+      description: "Expected duration of dinner in hours"
+      type: float64
+      default: 2.0
+      required: false
+      validation:
+        min: 0.5
+        max: 6.0
+    - name: state_history_skip_count
+      description: "Number of state history entries to skip for performance"
+      type: int
+      default: 1
+      required: false
+      validation:
+        min: 0
+        max: 10
 
   wants:
     # Dinner restaurant reservation with agent support

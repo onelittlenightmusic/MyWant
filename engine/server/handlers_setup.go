@@ -254,11 +254,9 @@ func loadRecipeFilesIntoRegistryWithLoader(loader *mywant.GenericRecipeLoader, r
 		// Convert back to GenericRecipe structure
 		recipe := mywant.GenericRecipe{
 			Recipe: mywant.RecipeContent{
-				Metadata:              recipeConfig.Metadata,
-				Parameters:            recipeConfig.Parameters,
-				ParameterDescriptions: recipeConfig.ParameterDescriptions,
-				ParameterTypes:        recipeConfig.ParameterTypes,
-				Wants:                 nil, // Populated via config
+				Metadata:   recipeConfig.Metadata,
+				Parameters: recipeConfig.Parameters,
+				Wants:      nil, // Populated via config
 			},
 		}
 

@@ -9,19 +9,40 @@ recipe:
     
   # Recipe parameters - these are the configurable values
   parameters:
-    prefix: "queue-system"
-    count: 1000
-    rate: 10.0
-    service_time: 0.05
-    deterministic: false
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    prefix: "Prefix used for naming wants in the generated deployment"
-    count: "Total number of items to generate for the queue system"
-    rate: "Generation rate in items per second"
-    service_time: "Average time to service each item in the queue"
-    deterministic: "Use deterministic timing or variable timing for queue processing"
+    - name: prefix
+      description: "Prefix used for naming wants in the generated deployment"
+      type: string
+      default: "queue-system"
+      required: false
+    - name: count
+      description: "Total number of items to generate for the queue system"
+      type: int
+      default: 1000
+      required: false
+      validation:
+        min: 10
+        max: 100000
+    - name: rate
+      description: "Generation rate in items per second"
+      type: float64
+      default: 10.0
+      required: false
+      validation:
+        min: 0.1
+        max: 100.0
+    - name: service_time
+      description: "Average time to service each item in the queue"
+      type: float64
+      default: 0.05
+      required: false
+      validation:
+        min: 0.01
+        max: 10.0
+    - name: deterministic
+      description: "Use deterministic timing or variable timing for queue processing"
+      type: bool
+      default: false
+      required: false
 
   wants:
     # Generator want - explicitly define all labels in recipe

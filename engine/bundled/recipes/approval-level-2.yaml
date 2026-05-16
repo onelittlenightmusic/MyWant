@@ -9,15 +9,21 @@ recipe:
 
   # Recipe parameters - configurable values for Level 2 approval
   parameters:
-    approval_id: "approval-001"
-    coordinator_type: "level2"
-    level2_authority: "senior_manager"
-
-  # Parameter descriptions - explain what each parameter does
-  parameter_descriptions:
-    approval_id: "Unique identifier for this approval request"
-    coordinator_type: "Type of coordinator (level2 for second approval level)"
-    level2_authority: "Authority or role for level 2 approval decision"
+    - name: approval_id
+      description: "Unique identifier for this approval request"
+      type: string
+      default: "approval-001"
+      required: false
+    - name: coordinator_type
+      description: "Type of coordinator (level2 for second approval level)"
+      type: string
+      default: "level2"
+      required: false
+    - name: level2_authority
+      description: "Authority or role for level 2 approval decision"
+      type: string
+      default: "senior_manager"
+      required: false
 
   wants:
     # Evidence Provider for Level 2

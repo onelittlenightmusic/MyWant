@@ -130,19 +130,10 @@ var StartCmd = &cobra.Command{
 			os.Exit(0)
 		}
 
-		// Start frontend dev server if requested
+		// Start frontend dev server if requested (use mywant-gui)
 		if dev {
-			fmt.Println("Starting frontend development server (npm run dev)...")
-			npmCmd := exec.Command("npm", "run", "dev")
-			npmCmd.Dir = "web"
-			npmCmd.Stdout = os.Stdout
-			npmCmd.Stderr = os.Stderr
-
-			if err := npmCmd.Start(); err != nil {
-				fmt.Printf("Failed to start npm run dev: %v\n", err)
-			} else {
-				fmt.Printf("Frontend dev server started (PID: %d)\n", npmCmd.Process.Pid)
-			}
+			fmt.Println("Starting frontend development server (mywant-gui)...")
+			fmt.Println("Run: cd ../mywant-gui/web && npm run dev")
 		}
 
 		cfg := server.Config{

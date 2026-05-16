@@ -10,11 +10,34 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    simple_command: "echo 'Hello from ExecutionResult Want!'"
-    list_files_command: "ls -la /tmp | head -5"
-    date_command: "date"
-    fail_command: "exit 1"
-    timeout_value: 10
+    - name: simple_command
+      description: ""
+      type: string
+      default: "echo 'Hello from ExecutionResult Want!'"
+      required: false
+    - name: list_files_command
+      description: ""
+      type: string
+      default: "ls -la /tmp | head -5"
+      required: false
+    - name: date_command
+      description: ""
+      type: string
+      default: "date"
+      required: false
+    - name: fail_command
+      description: ""
+      type: string
+      default: "exit 1"
+      required: false
+    - name: timeout_value
+      description: "Command timeout in seconds"
+      type: int
+      default: 10
+      required: false
+      validation:
+        min: 1
+        max: 120
 
   wants:
     # Example 1: Simple echo command

@@ -6,10 +6,11 @@ recipe:
     version: "1.0.0"
 
   parameters:
-    want: ""
-
-  parameter_descriptions:
-    want: "やりたいことの自然言語メモ"
+    - name: want
+      description: "やりたいことの自然言語メモ"
+      type: string
+      default: ""
+      required: false
 
   examples:
     - name: 朝のルーティン自動化

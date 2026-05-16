@@ -77,12 +77,10 @@ type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
-	Config                Config
-	Parameters            map[string]any
-	Metadata              GenericRecipeMetadata
-	Result                *RecipeResult
-	ParameterDescriptions map[string]string
-	ParameterTypes        map[string]string
+	Config     Config
+	Parameters []ParameterDef
+	Metadata   GenericRecipeMetadata
+	Result     *RecipeResult
 }
 
 // GenericRecipeLoader manages loading and processing any type of recipe
@@ -156,10 +154,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	recipeContent := processedRecipe.Recipe
 
 	// Merge provided params with recipe defaults
-	mergedParams := make(map[string]any)
-	for k, v := range recipeContent.Parameters {
-		mergedParams[k] = v
-	}
+	mergedParams := ParameterDefsToMap(recipeContent.Parameters)
 	for k, v := range params {
 		mergedParams[k] = v
 	}
@@ -250,11 +245,9 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 
 	return &GenericRecipeConfig{
 		Config:                config,
-		Parameters:            mergedParams,
-		Metadata:              recipeContent.Metadata,
-		Result:                recipeContent.Result,
-		ParameterDescriptions: recipeContent.ParameterDescriptions,
-		ParameterTypes:        recipeContent.ParameterTypes,
+		Parameters: recipeContent.Parameters,
+		Metadata:   recipeContent.Metadata,
+		Result:     recipeContent.Result,
 	}, nil
 }
 
@@ -287,7 +280,7 @@ func (grl *GenericRecipeLoader) GetRecipeParameters(recipePath string) (map[stri
 		return nil, err
 	}
 
-	return genericRecipe.Recipe.Parameters, nil
+	return ParameterDefsToMap(genericRecipe.Recipe.Parameters), nil
 }
 
 // ListRecipes returns all recipe files in the recipe directory
@@ -360,7 +353,7 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 		return Config{}, nil, err
 	}
 
-	return recipeConfig.Config, recipeConfig.Parameters, nil
+	return recipeConfig.Config, ParameterDefsToMap(recipeConfig.Parameters), nil
 }
 
 // namespaceWantConnections adds owner namespace to labels and using selectors to isolate child wants
@@ -555,8 +548,10 @@ func validateRecipeContentStructure(recipeContent any) error {
 		}
 	}
 	if params, ok := recipeObj["parameters"]; ok {
-		if _, ok := AsMap(params); !ok {
-			return fmt.Errorf("parameters must be an object")
+		_, isMap := AsMap(params)
+		_, isArray := AsArray(params)
+		if !isMap && !isArray {
+			return fmt.Errorf("parameters must be an object or array")
 		}
 	}
 	if result, ok := recipeObj["result"]; ok {
@@ -762,11 +757,7 @@ func ScanAndRegisterCustomTypesFromFS(fsys fs.FS, fsRoot string, registry *Custo
 		if recipe.Recipe.Metadata.CustomType == "" {
 			return nil
 		}
-		defaultParams := recipe.Recipe.Parameters
-		if defaultParams == nil {
-			defaultParams = make(map[string]any)
-		}
-		RegisterCustomTargetType(registry, recipe.Recipe.Metadata.CustomType, recipe.Recipe.Metadata.Description, path, defaultParams)
+		RegisterCustomTargetType(registry, recipe.Recipe.Metadata.CustomType, recipe.Recipe.Metadata.Description, path, ParameterDefsToMap(recipe.Recipe.Parameters))
 		InfoLog("[RECIPE] 🎯 Registered embedded custom type '%s' from %s\n", recipe.Recipe.Metadata.CustomType, path)
 		customTypeCount++
 		return nil
@@ -831,4 +822,15 @@ func (grl *GenericRecipeLoader) ValidateRecipeResults(recipeResults *RecipeResul
 	}
 
 	return nil
+}
+
+// ParameterDefsToMap converts []ParameterDef to a name→default map for substitution into wants.
+func ParameterDefsToMap(params []ParameterDef) map[string]any {
+	m := make(map[string]any, len(params))
+	for _, p := range params {
+		if p.Default != nil {
+			m[p.Name] = p.Default
+		}
+	}
+	return m
 }

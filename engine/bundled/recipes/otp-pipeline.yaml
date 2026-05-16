@@ -22,44 +22,62 @@ recipe:
     version: "5.0.0"
 
   parameters:
-    prefix: "otp"
-    policy_dir: "yaml/policies/otp"
-    use_llm: false
-
-    direction_map: >-
-      {
-        "build_graph": {
-          "type": "file_exists",
-          "params": {
-            "filename": "graph.obj",
-            "method": "docker_build",
-            "docker_image": "docker.io/opentripplanner/opentripplanner:2.6.0",
-            "docker_container_name": "otp-builder",
-            "docker_command_args": "[\"--build\", \"--save\"]",
-            "docker_env": "{\"JAVA_OPTIONS\": \"-Xmx6G\"}"
+    - name: prefix
+      description: ""
+      type: string
+      default: "otp"
+      required: false
+    - name: policy_dir
+      description: ""
+      type: string
+      default: "yaml/policies/otp"
+      required: false
+    - name: use_llm
+      description: ""
+      type: bool
+      default: false
+      required: false
+    - name: direction_map
+      description: ""
+      type: string
+      default: >-
+        {
+          "build_graph": {
+            "type": "file_exists",
+            "params": {
+              "filename": "graph.obj",
+              "method": "docker_build",
+              "docker_image": "docker.io/opentripplanner/opentripplanner:2.6.0",
+              "docker_container_name": "otp-builder",
+              "docker_command_args": "[\"--build\", \"--save\"]",
+              "docker_env": "{\"JAVA_OPTIONS\": \"-Xmx6G\"}"
+            },
+            "using": [{"role": "otp_provider"}],
+            "sets": {"graph_done": true}
           },
-          "using": [{"role": "otp_provider"}],
-          "sets": {"graph_done": true}
-        },
-        "start_server": {
-          "type": "otp_server",
-          "params": {"server_memory": "-Xmx4G", "server_port": "8082"},
-          "using": [{"direction": "build_graph"}],
-          "sets": {"server_running": true}
+          "start_server": {
+            "type": "otp_server",
+            "params": {"server_memory": "-Xmx4G", "server_port": "8082"},
+            "using": [{"direction": "build_graph"}],
+            "sets": {"server_running": true}
+          }
         }
-      }
-
+      required: false
     # 静的wantの達成をRegoが参照できるstateフラグにマッピング
     # キー: 子wantのname (recipe内のmetadata.name)
     # 値: 親wantのcurrent stateに書き込むフラグ名
-    provider_state_map: >-
-      {
-        "ensure-osm":               "osm_done",
-        "ensure-gtfs-toei-bus":     "gtfs_toei_bus_done",
-        "ensure-gtfs-toei-train":   "gtfs_toei_train_done",
-        "ensure-gtfs-tokyo-metro":  "gtfs_tokyo_metro_done",
-        "build-config":             "build_config_done"
-      }
+    - name: provider_state_map
+      description: ""
+      type: string
+      default: >-
+        {
+          "ensure-osm":               "osm_done",
+          "ensure-gtfs-toei-bus":     "gtfs_toei_bus_done",
+          "ensure-gtfs-toei-train":   "gtfs_toei_train_done",
+          "ensure-gtfs-tokyo-metro":  "gtfs_tokyo_metro_done",
+          "build-config":             "build_config_done"
+        }
+      required: false
 
   state:
     # ── Goal ──────────────────────────────────────────────────────────────────
