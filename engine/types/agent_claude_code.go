@@ -50,6 +50,10 @@ func init() {
 // ---------------------------------------------------------------------------
 
 func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
+	if GetGoal(want, "provider", "claude_code") == "gemini" {
+		return geminiSessionMonitor(want)
+	}
+
 	sessionID := GetCurrent(want, "session_id", "")
 	if sessionID == "" {
 		// Also try goal (set by Initialize)
@@ -180,8 +184,10 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		}
 
 		// Check idempotency: is this trigger already handled?
+		// Skip when sessionID is empty — the shared idempotency dir would mix logs
+		// from different want instances that haven't established a session yet.
 		requestID := deriveClaudeRequestID(want)
-		if isClaudeRequestSent(sessionID, requestID) {
+		if sessionID != "" && isClaudeRequestSent(sessionID, requestID) {
 			want.DirectLog("[CC_THINK] Request %s already sent, skipping", requestID)
 			// Restore request_count from idempotency log
 			sentCount := countClaudeSentLogs(sessionID)
@@ -227,6 +233,10 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 // ---------------------------------------------------------------------------
 
 func claudeCodeRequester(ctx context.Context, want *Want) error {
+	if GetGoal(want, "provider", "claude_code") == "gemini" {
+		return geminiRequester(ctx, want)
+	}
+
 	sessionID := GetGoal(want, "session_id", "")
 	requestID := GetCurrent(want, "pending_request_id", "")
 
@@ -245,7 +255,8 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 	}
 
 	// Idempotency check: already sent?
-	if requestID != "" && isClaudeRequestSent(sessionID, requestID) {
+	// Skip when sessionID is empty — shared dir would match logs from other want instances.
+	if sessionID != "" && requestID != "" && isClaudeRequestSent(sessionID, requestID) {
 		want.StoreLog("[CC_DO] Request %s already sent (idempotency), skipping", requestID)
 		want.SetCurrent("last_request_at", time.Now().Unix())
 		return nil
@@ -256,17 +267,22 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		writeClaudeRequestLog(sessionID, requestID, "pending")
 	}
 
-	// Build and execute Claude CLI command
-	args := []string{"--print", "--output-format", "json"}
+	// Build and execute Claude CLI command (stream-json for real-time progress)
+	args := []string{"--print", "--output-format", "stream-json", "--verbose"}
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
+	}
+	if permMode := GetGoal(want, "permission_mode", ""); permMode != "" && permMode != "default" {
+		args = append(args, "--permission-mode", permMode)
+	}
+	if allowedTools := GetGoal(want, "allowed_tools", ""); allowedTools != "" {
+		args = append(args, "--allowedTools", allowedTools)
 	}
 	args = append(args, autoRequest)
 
 	want.StoreLog("[CC_DO] Executing: claude %s", strings.Join(args[:len(args)-1], " "))
 
-	// Set last_request_at before executing so MonitorAgent can detect responses
-	// that arrive during execution (timestamps will be >= this value).
+	// Set last_request_at before executing so MonitorAgent can detect responses.
 	want.SetCurrent("last_request_at", time.Now().Unix())
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
@@ -275,50 +291,114 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		cmd.Dir = workingDir
 	}
 
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return fmt.Errorf("claude stdout pipe: %v", err)
+	}
+	var stderrBuf strings.Builder
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("claude start: %v", err)
+	}
+
+	// Stream JSONL events and update state in real-time.
+	var (
+		finalResult    string
+		finalSessionID string
+		finalSubtype   string
+	)
+
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 4*1024*1024), 4*1024*1024) // 4MB for large tool outputs
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		var ev map[string]any
+		if err := json.Unmarshal([]byte(line), &ev); err != nil {
+			continue
+		}
+		switch ev["type"] {
+		case "system":
+			if ev["subtype"] == "init" {
+				if sid, ok := ev["session_id"].(string); ok && sid != "" {
+					finalSessionID = sid
+				}
+			}
+
+		case "assistant":
+			msg, _ := ev["message"].(map[string]any)
+			if msg == nil {
+				continue
+			}
+			contents, _ := msg["content"].([]any)
+			for _, c := range contents {
+				cm, ok := c.(map[string]any)
+				if !ok {
+					continue
+				}
+				switch cm["type"] {
+				case "text":
+					if text, ok := cm["text"].(string); ok && text != "" {
+						want.SetCurrent("cc_streaming_text", text)
+					}
+				case "tool_use":
+					name, _ := cm["name"].(string)
+					want.SetCurrent("cc_streaming_text", fmt.Sprintf("🔧 %s", name))
+				}
+			}
+
+		case "result":
+			finalSubtype, _ = ev["subtype"].(string)
+			finalResult, _ = ev["result"].(string)
+			if sid, ok := ev["session_id"].(string); ok && sid != "" {
+				finalSessionID = sid
+			}
+		}
+	}
+
+	if err := cmd.Wait(); err != nil {
+		want.SetCurrent("cc_streaming_text", "")
 		errMsg := fmt.Sprintf("claude CLI failed: %v", err)
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			errMsg = fmt.Sprintf("claude CLI exit %d: %s", exitErr.ExitCode(), string(exitErr.Stderr))
+		if stderrBuf.Len() > 0 {
+			errMsg = fmt.Sprintf("claude CLI: %s", stderrBuf.String())
 		}
 		want.StoreLog("[CC_DO] ERROR: %s", errMsg)
 		want.SetCurrent("last_error", errMsg)
 		return fmt.Errorf("%s", errMsg)
 	}
 
-	// Parse JSON response
-	var response map[string]any
-	if err := json.Unmarshal(out, &response); err != nil {
-		// Not JSON — store raw output
-		want.SetCurrent("last_response_raw", string(out))
-	} else {
-		want.SetCurrent("last_response_raw", response)
-		// Extract session_id from response if available for subsequent requests.
-		// SetGoal persists to state.yaml via MarshalYAML and survives restarts.
-		if sid, ok := response["session_id"].(string); ok && sid != "" {
-			want.SetGoal("session_id", sid)
-		}
-		// Append response to cc_responses ring buffer (FIFO, max 20) for chat display
-		if result, ok := response["result"].(string); ok && result != "" {
-			responses := GetCurrent(want, "cc_responses", []any{})
-			responses = append(responses, map[string]any{
-				"text":      result,
-				"timestamp": time.Now().Format(time.RFC3339),
-				"subtype":   response["subtype"],
-			})
-			if len(responses) > 20 {
-				responses = responses[len(responses)-20:]
-			}
-			want.SetCurrent("cc_responses", responses)
-		}
+	// Clear streaming indicator now that the response is complete.
+	want.SetCurrent("cc_streaming_text", "")
+
+	// Persist session_id for subsequent requests.
+	if finalSessionID != "" {
+		want.SetGoal("session_id", finalSessionID)
 	}
 
-	// Mark sent in idempotency log
+	// Append final response to cc_responses ring buffer (FIFO, max 20).
+	if finalResult != "" {
+		responses := GetCurrent(want, "cc_responses", []any{})
+		responses = append(responses, map[string]any{
+			"text":      finalResult,
+			"timestamp": time.Now().Format(time.RFC3339),
+			"subtype":   finalSubtype,
+		})
+		if len(responses) > 20 {
+			responses = responses[len(responses)-20:]
+		}
+		want.SetCurrent("cc_responses", responses)
+		want.SetCurrent("last_response_raw", finalResult)
+	}
+
+	// Mark sent in idempotency log.
 	if requestID != "" {
 		writeClaudeRequestLog(sessionID, requestID, "sent")
 	}
 
-	want.StoreLog("[CC_DO] Request sent successfully")
+	want.StoreLog("[CC_DO] Request completed (result len=%d)", len(finalResult))
 	return nil
 }
 

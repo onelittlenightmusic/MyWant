@@ -1,0 +1,383 @@
+wantType:
+  metadata:
+    name: coding
+    title: Coding Assistant
+    description: |
+      Interactive AI coding assistant supporting Claude Code and Gemini.
+
+      Sends user messages from the want card or webhook to the selected AI provider,
+      and stores conversation history in cc_messages / cc_responses for display.
+
+      Three cooperative agents:
+      - MonitorAgent: Watches session files for new responses (provider-aware)
+      - ThinkAgent:   Decides when to send requests based on webhook messages
+      - DoAgent:      Executes the appropriate CLI (claude / gemini)
+
+      Idempotency is ensured via external file-based logs so server restarts
+      are safe.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+
+  parameters:
+  - name: provider
+    description: |
+      AI provider to use.
+      - claude_code: Claude Code CLI (claude --print --output-format json)
+      - gemini:      Gemini CLI (gemini -p ... --output-format json)
+    type: string
+    required: false
+    default: "claude_code"
+    validation:
+      enum:
+      - claude_code
+      - gemini
+
+  - name: session_id
+    description: Session ID to resume (optional — omit to auto-create on first message)
+    type: string
+    required: false
+    default: ""
+
+  - name: auto_request
+    description: |
+      Prompt to send automatically on trigger (optional for webhook-driven mode).
+    type: string
+    required: false
+    default: ""
+
+  - name: webhook_secret
+    description: HMAC secret for webhook signature verification (optional)
+    type: string
+    required: false
+    default: ""
+
+  - name: max_requests
+    description: Maximum number of requests before completing (0 = unlimited)
+    type: int
+    required: false
+    default: 0
+
+  - name: timeout_seconds
+    description: Timeout in seconds waiting for AI response
+    type: int
+    required: false
+    default: 300
+
+  - name: working_dir
+    description: Working directory for AI sessions (defaults to server cwd if omitted)
+    type: string
+    required: false
+    default: ""
+
+  - name: permission_mode
+    description: |
+      Claude Code permission mode (claude_code provider only).
+      - default:            Normal permission prompts (interactive approval required — may block in --print mode)
+      - bypassPermissions:  Bypass all permission checks (allows MCP tools without prompting)
+      - acceptEdits:        Auto-accept file edits only
+      - dontAsk:            Don't ask for permissions (silently deny)
+    type: string
+    required: false
+    default: "default"
+    validation:
+      enum:
+      - default
+      - bypassPermissions
+      - acceptEdits
+      - dontAsk
+      - auto
+      - plan
+
+  - name: allowed_tools
+    description: |
+      Comma or space-separated list of tool names to allow (claude_code provider only).
+      Example: "mcp__rpg__* Bash Edit" — pre-approves specific tools without bypassing all permissions.
+      Leave empty to rely on permission_mode setting.
+    type: string
+    required: false
+    default: ""
+
+  state:
+  - name: phase
+    description: Current phase (monitoring, trigger_ready, requesting, awaiting_response, response_received, achieved, error)
+    type: string
+    persistent: true
+    initialValue: monitoring
+    label: current
+
+  - name: provider
+    description: Active AI provider (claude_code or gemini)
+    type: string
+    persistent: true
+    initialValue: "claude_code"
+    label: goal
+
+  - name: session_id
+    description: Session ID being used
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: auto_request
+    description: Prompt template to send on trigger
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: max_requests
+    description: Maximum requests (0 = unlimited)
+    type: int
+    persistent: true
+    initialValue: 0
+    label: goal
+
+  - name: working_dir
+    description: Working directory for AI sessions
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: permission_mode
+    description: Claude Code permission mode (bypassPermissions allows MCP tools without prompting)
+    type: string
+    persistent: true
+    initialValue: "default"
+    label: goal
+
+  - name: allowed_tools
+    description: Pre-approved tool names (comma/space separated)
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: current_session_state
+    description: Observed session state (idle, waiting_for_input, waiting_for_response, task_complete)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_output
+    description: Most recent output from the AI session
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_role
+    description: Role of most recent session entry (user, assistant)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: latest_timestamp
+    description: Timestamp of most recent session entry
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: has_new_response
+    description: Whether a new AI response was detected after last request
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  - name: latest_response_content
+    description: Content of the latest AI response
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: request_count
+    description: Number of requests sent so far
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: last_request_at
+    description: Unix timestamp of the last request sent
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: last_response_raw
+    description: Raw response from the last CLI execution
+    type: object
+    persistent: false
+    initialValue: {}
+    label: current
+
+  - name: last_error
+    description: Last error message
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: session_read_error
+    description: Error from MonitorAgent when reading session file
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: pending_request_id
+    description: Idempotency key for the pending request
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: last_poll_at
+    description: Unix timestamp of last MonitorAgent poll
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: session_entry_count
+    description: Total number of entries in the session file
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: timeout_seconds
+    description: Response timeout in seconds
+    type: int
+    persistent: true
+    initialValue: 300
+    label: current
+
+  - name: next_action
+    description: ThinkAgent's proposed next action
+    type: string
+    persistent: false
+    initialValue: ""
+    label: plan
+
+  - name: trigger_on
+    description: Trigger mode (webhook)
+    type: string
+    persistent: true
+    initialValue: "webhook"
+    label: goal
+
+  - name: watch_pattern
+    description: File watch pattern (unused for coding type)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: goal
+
+  # Webhook state
+  - name: webhook_url
+    description: Webhook endpoint URL (auto-set on init)
+    type: string
+    persistent: true
+    initialValue: ""
+    label: current
+
+  - name: cc_webhook_status
+    description: Webhook status (active, stopped, error)
+    type: string
+    persistent: true
+    initialValue: "active"
+    label: current
+
+  - name: cc_latest_message
+    description: Latest webhook message {sender, text, timestamp}
+    type: object
+    persistent: false
+    initialValue: {}
+    label: current
+
+  - name: cc_messages
+    description: FIFO buffer of last 20 user messages
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_message_count
+    description: Total webhook messages received
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: cc_responses
+    description: FIFO buffer of last 20 AI responses (paired with cc_messages)
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_streaming_text
+    description: Live partial text from the current Claude response (cleared when response completes)
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: webhook_auto_request
+    description: Dynamic prompt from webhook message
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: cc_webhook_processed
+    description: Number of webhook messages already processed by ThinkAgent
+    type: int
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: interactive
+    description: Whether this want supports interactive chat (enables Chat tab in UI)
+    type: bool
+    persistent: false
+    initialValue: false
+    label: current
+
+  examples:
+  - name: Claude Code Chat
+    description: Interactive Claude Code session driven by card/webhook messages
+    want:
+      metadata:
+        name: claude-assistant
+        type: coding
+      spec:
+        params:
+          provider: claude_code
+          max_requests: 0
+
+  - name: Gemini Chat
+    description: Interactive Gemini session driven by card/webhook messages
+    want:
+      metadata:
+        name: gemini-assistant
+        type: coding
+      spec:
+        params:
+          provider: gemini
+          max_requests: 0
+
+  requires:
+    - claude_code_session_monitoring
+    - claude_code_watching
+    - claude_code_requesting

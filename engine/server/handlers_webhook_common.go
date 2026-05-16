@@ -61,7 +61,7 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 // GET /api/v1/webhooks endpoint remains useful even before a want of each type exists.
 // Additional types are detected dynamically: any want that has a non-empty "webhook_url"
 // state is also included.
-var webhookTypes = []string{"webhook_receiver", "claude_code_thread", "goal"}
+var webhookTypes = []string{"webhook_receiver", "claude_code_thread", "coding", "goal"}
 
 // storeRawWebhookPayload stores a raw JSON payload into the FIFO buffer keyed by cfg.
 // Unlike storeWebhookMessage it does not try to extract sender/text fields —

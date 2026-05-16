@@ -483,6 +483,9 @@ func (n *Want) prepareForRestart() {
 	n.agentRunGuard = sync.Map{}
 
 	// Reset state fields to initialValues when resetOnRestart is enabled (nil = true).
+	// Goal-labeled fields are excluded: they represent configuration set by Initialize()
+	// from params, and must survive want restarts so that Initialize() can read them as
+	// fallbacks (e.g. session_id for coding want).
 	if n.Spec.ResetOnRestart == nil || *n.Spec.ResetOnRestart {
 		cb := GetGlobalChainBuilder()
 		if cb != nil {
@@ -490,6 +493,9 @@ func (n *Want) prepareForRestart() {
 			if typeDef != nil {
 				resetState := make(map[string]any)
 				for _, sd := range typeDef.State {
+					if label, exists := n.StateLabels[sd.Name]; exists && label == LabelGoal {
+						continue // goal state is re-set by Initialize(); don't wipe it here
+					}
 					resetState[sd.Name] = sd.InitialValue
 				}
 				if len(resetState) > 0 {

@@ -1,4 +1,6 @@
-.PHONY: clean build build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent restart-all test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp
+.PHONY: clean build build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
+
+INSTALL_DIR ?= $(HOME)/.local/bin
 
 # Code quality targets
 fmt:
@@ -38,11 +40,7 @@ build-cli:
 	go build -C client -o ../bin/mywant ./cmd/mywant
 
 build-mywant-gui:
-	@echo "📦 Building mywant-gui frontend assets..."
-	cd ../mywant-gui/web && npm install && npm run build
-	@echo "🔨 Building mywant-gui..."
-	@mkdir -p bin
-	go build -C ../mywant-gui -o ../mywant/bin/mywant-gui ./cmd/mywant-gui
+	@$(MAKE) -C ../mywant-gui build
 
 
 build-playwright-app:
@@ -109,7 +107,7 @@ run-flight:
 # Tests removed - no longer functional or environment-dependent
 
 # Test All Server-Based Tests
-test-all: restart-all
+test-all:
 	@echo ""
 	@echo "🧪 Running All Server-Based Tests..."
 	@echo "======================================================="
@@ -200,8 +198,8 @@ help:
 	@echo "  run-qnet-using-recipe - QNet with using field connections"
 	@echo ""
 	@echo "🔧 Server:"
-	@echo "  run-mock         - Start mock flight server directly (for development)"
-	@echo "  restart-all      - Rebuild and restart the MyWant server"
+	@echo "  run-mock           - Start mock flight server directly (for development)"
+	@echo "  reload-want-type   - Hot-reload custom want types from ~/.mywant/custom-types/ (no restart)"
 	@echo ""
 	@echo "  Mock flight management (via plugin):"
 	@echo "    mywant mock flight start   - Start mock flight server"
@@ -209,41 +207,16 @@ help:
 	@echo "    mywant mock flight status  - Show status"
 	@echo "    mywant mock list           - List all mock servers"
 	@echo ""
+	@echo "📦 Install:"
+	@echo "  install        - Build and install mywant + mywant-gui to INSTALL_DIR (default: ~/.local/bin)"
+	@echo "  uninstall      - Remove mywant + mywant-gui from INSTALL_DIR"
+	@echo "  (override:  make install INSTALL_DIR=/usr/local/bin)"
+	@echo ""
 	@echo "🧹 Utility:"
 	@echo "  clean - Clean build artifacts"
 	@echo "  help  - Show this help"
 
 all: build
-
-# Kill and restart the MyWant server (mock flight server is managed separately via mywant mock)
-restart-all:
-	@echo "🔄 Restarting MyWant server..."
-	@echo "🛑 Stopping existing processes..."
-	@./bin/mywant stop 2>/dev/null || echo "  Server not running"
-	@./bin/mywant-gui stop 2>/dev/null || true
-	@echo "🧹 Cleaning logs..."
-	@rm -f ~/.mywant/server.log ~/.mywant/gui.log
-	@echo ""
-	@echo "🧹 Cleaning Go build cache..."
-	@go clean -cache
-	@$(MAKE) build-cli
-	@$(MAKE) build-mywant-gui
-	@$(MAKE) build-mock
-	@$(MAKE) build-mock-plugin
-	@mkdir -p ~/.mywant
-	@echo "🚀 Starting MyWant backend..."
-	@nohup ./bin/mywant start -D --port 8080 --host 0.0.0.0 > /dev/null 2>&1 &
-	@echo "🌐 Starting mywant-gui frontend..."
-	@nohup ./bin/mywant-gui start -D --port 8081 --host 0.0.0.0 > /dev/null 2>&1 &
-	@sleep 2
-	@echo "✅ Server started"
-	@echo "🌐 Backend: http://0.0.0.0:8080"
-	@echo "🖥️  Frontend: http://0.0.0.0:8081"
-	@echo ""
-	@echo "📋 Server management:"
-	@echo "  Stop:        ./bin/mywant stop && ./bin/mywant-gui stop"
-	@echo "  View status: ./bin/mywant ps"
-	@echo "  Mock flight: ./bin/mywant-mock flight start"
 
 # Gmail MCP troubleshooting targets
 troubleshoot-mcp:
@@ -253,6 +226,20 @@ troubleshoot-mcp:
 fix-mcp:
 	@echo "🔧 Quick fix for Gmail MCP..."
 	@./tools/scripts/fix-gmail-mcp.sh
+
+reload-want-type:
+	@./bin/mywant types reload
+
+install: build-cli
+	@echo "📦 Installing mywant to $(INSTALL_DIR)..."
+	@mkdir -p $(INSTALL_DIR)
+	@cp bin/mywant $(INSTALL_DIR)/mywant
+	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
+
+uninstall:
+	@echo "🗑️  Uninstalling mywant from $(INSTALL_DIR)..."
+	@rm -f $(INSTALL_DIR)/mywant
+	@echo "✅ Uninstalled: mywant"
 
 # Default target
 .DEFAULT_GOAL := help

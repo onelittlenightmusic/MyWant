@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
+	"time"
 
 	"mywant/engine/server"
 	"mywant/engine/worker"
@@ -103,10 +105,21 @@ var StartCmd = &cobra.Command{
 			process := exec.Command(executable, newArgs...)
 			process.Stdout = logFile
 			process.Stderr = logFile
+			// Detach from the shell's process group so zsh/bash don't report
+			// the child as a killed job if it exits unexpectedly.
+			process.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 			err = process.Start()
 			if err != nil {
-				fmt.Printf("Failed to start background process: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error: Failed to start mywant: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Wait briefly to detect immediate startup failures (e.g. port conflict).
+			time.Sleep(300 * time.Millisecond)
+			if err := process.Process.Signal(syscall.Signal(0)); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: mywant exited immediately after start.\n")
+				fmt.Fprintf(os.Stderr, "       See logs for details: %s\n", logFilePath)
 				os.Exit(1)
 			}
 
@@ -114,11 +127,6 @@ var StartCmd = &cobra.Command{
 			err = os.WriteFile(pidFile, []byte(strconv.Itoa(process.Process.Pid)), 0644)
 			if err != nil {
 				fmt.Printf("Warning: Failed to write PID file: %v\n", err)
-			}
-
-			// Frontend is embedded in the server binary; write gui.pid with same PID
-			if !dev {
-				os.WriteFile(guiPidFile, []byte(strconv.Itoa(process.Process.Pid)), 0644)
 			}
 
 			fmt.Printf("MyWant Server started in background (PID: %d)\n", process.Process.Pid)

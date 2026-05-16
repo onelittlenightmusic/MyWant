@@ -32,8 +32,7 @@
 
 **Quick Start:**
 ```sh
-make restart-all                                    # ⚠️ ALWAYS use this to rebuild & restart (builds CLI + frontend + starts server)
-make release                                        # Build CLI only (no restart)
+make release                                        # Build CLI only
 ./bin/mywant start -D [--port 8080]                     # Start server (after manual build)
 ./bin/mywant start --worker -D                          # Agent service
 ./bin/mywant start --dev                                # Dev mode
@@ -61,14 +60,11 @@ make release                                        # Build CLI only (no restart
 
 **Make Commands:**
 ```sh
-make restart-all             # Start MyWant (8080) + Mock Flight (8090) [includes build]
 make test-concurrent-deploy  # Concurrent deployment test
 make run-travel-recipe       # Independent wants demo
 make run-queue-system-recipe # Pipeline demo
 make run-qnet-recipe         # Multi-stream demo
 ```
-
-**Note:** Always use `make restart-all` for rebuilding and restarting — it builds `./bin/mywant` (engine/server), the frontend, and starts both the main server and mock flight server. Never use `make release` + manual start as a substitute when doing a full rebuild.
 
 ## Key Patterns
 
@@ -143,7 +139,6 @@ mock_flight_port: 8090
 - ✅ Edit `engine/server/server.go` (server setup)
 
 **Build & Run:**
-- `make restart-all` - Builds `./bin/mywant` (includes `engine/server`) and starts it
 - `./bin/mywant start -D` - Starts server using `engine/server` implementation
 
 ## Pending Improvements
