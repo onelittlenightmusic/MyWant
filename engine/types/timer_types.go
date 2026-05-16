@@ -12,10 +12,10 @@ func init() {
 
 // TimerLocals holds type-specific local state to detect changes.
 type TimerLocals struct {
-	LastEvery         string `json:"last_every" yaml:"last_every"`
-	LastAt            string `json:"last_at" yaml:"last_at"`
-	LastTimerMode     string `json:"last_timer_mode" yaml:"last_timer_mode"`
-	LastAtRecurrence  string `json:"last_at_recurrence" yaml:"last_at_recurrence"`
+	LastEvery        string `json:"last_every" yaml:"last_every"`
+	LastAt           string `json:"last_at" yaml:"last_at"`
+	LastTimerMode    string `json:"last_timer_mode" yaml:"last_timer_mode"`
+	LastAtRecurrence string `json:"last_at_recurrence" yaml:"last_at_recurrence"`
 }
 
 // TimerWant controls a global parameter of WhenSpec type (every/at).

@@ -60,7 +60,6 @@ var StopCmd = &cobra.Command{
 				}
 			}
 			os.Remove(pidFile)
-			os.Remove(guiPidFile)
 		}
 
 		// 2. Fallback: Kill anything on the port

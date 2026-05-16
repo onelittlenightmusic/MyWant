@@ -24,18 +24,16 @@ func (m *EarlyAchievedWant) Progress() {
 }
 
 func TestEarlyAchievementFinalResult(t *testing.T) {
-	w := &Want{
-		Metadata: Metadata{
-			Name: "test-early-achieved",
-		},
-		Spec: WantSpec{
-			FinalResultField: "some_field",
-		},
-		Status: WantStatusReaching,
-	}
-
 	ew := &EarlyAchievedWant{
-		Want: *w,
+		Want: Want{
+			Metadata: Metadata{
+				Name: "test-early-achieved",
+			},
+			Spec: WantSpec{
+				FinalResultField: "some_field",
+			},
+			Status: WantStatusReaching,
+		},
 	}
 	ew.Want.progressable = ew
 

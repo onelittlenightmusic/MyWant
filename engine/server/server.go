@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	mywant "mywant/engine/core"
 	"mywant/engine/bundled"
+	mywant "mywant/engine/core"
 	types "mywant/engine/types"
 
 	"github.com/gorilla/mux"

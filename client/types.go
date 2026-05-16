@@ -125,11 +125,11 @@ type RecipeParameterValidation struct {
 }
 
 type RecipeContent struct {
-	Metadata              RecipeMetadata                    `json:"metadata"`
-	Parameters            map[string]any                    `json:"parameters,omitempty"`
-	ParameterValidations  map[string]RecipeParameterValidation `json:"parameter_validations,omitempty"`
-	Wants                 []any                             `json:"wants"` // Simplified for now
-	Example               *Config                           `json:"example,omitempty"`
+	Metadata             RecipeMetadata                       `json:"metadata"`
+	Parameters           map[string]any                       `json:"parameters,omitempty"`
+	ParameterValidations map[string]RecipeParameterValidation `json:"parameter_validations,omitempty"`
+	Wants                []any                                `json:"wants"` // Simplified for now
+	Example              *Config                              `json:"example,omitempty"`
 }
 
 type RecipeMetadata struct {

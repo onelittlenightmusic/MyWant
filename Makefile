@@ -53,8 +53,8 @@ install-playwright-browsers:
 	@cd mcp/playwright-app && npx playwright install chromium
 	@echo "✅ Playwright browsers installed"
 
-release: build-cli build-mywant-gui build-playwright-app
-	@echo "🚀 Release build complete: bin/mywant + mcp/playwright-app/dist/server.js"
+release: build-cli
+	@echo "🚀 Release build complete: bin/mywant"
 
 # Build the mywant library
 build: check
@@ -230,10 +230,11 @@ fix-mcp:
 reload-want-type:
 	@./bin/mywant types reload
 
-install: build-cli
+install: release
 	@echo "📦 Installing mywant to $(INSTALL_DIR)..."
 	@mkdir -p $(INSTALL_DIR)
 	@cp bin/mywant $(INSTALL_DIR)/mywant
+	@codesign --sign - --force $(INSTALL_DIR)/mywant 2>/dev/null || true
 	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
 
 uninstall:

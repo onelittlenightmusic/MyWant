@@ -393,7 +393,6 @@ func (r *ReminderWant) handleTimeout(locals *ReminderLocals) {
 	r.ExecuteAgents()
 }
 
-
 func parseDurationString(s string) (time.Duration, error) {
 	var unit time.Duration
 	if len(s) < 2 {

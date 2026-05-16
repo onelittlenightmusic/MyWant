@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	pidFile    = "flight-server.pid"
-	logFile    = "flight-server.log"
+	pidFile     = "flight-server.pid"
+	logFile     = "flight-server.log"
 	defaultPort = "8090"
 )
 

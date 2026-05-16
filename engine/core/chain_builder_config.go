@@ -7,8 +7,8 @@ import (
 	"io/fs"
 	"os"
 
-	want_spec "github.com/onelittlenightmusic/want-spec"
 	"github.com/getkin/kin-openapi/openapi3"
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
 

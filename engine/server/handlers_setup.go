@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
-	mywant "mywant/engine/core"
 	"gopkg.in/yaml.v3"
+	mywant "mywant/engine/core"
 )
 
 func (s *Server) setupRoutes() {
@@ -239,7 +239,7 @@ func loadRecipeFilesIntoRegistryWithLoader(loader *mywant.GenericRecipeLoader, r
 	loadedCount := 0
 	for _, relativePath := range recipes {
 		// Use loader.LoadRecipe which now supports fallback to embedded FS
-		// For the loader, we need a consistent path. 
+		// For the loader, we need a consistent path.
 		fullPath := filepath.Join(recipeDir, relativePath)
 		recipeConfig, err := loader.LoadRecipe(fullPath, nil)
 		if err != nil {

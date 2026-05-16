@@ -910,7 +910,11 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					runtimeWant.want.metadataMutex.Lock()
 					runtimeWant.want.Metadata = updatedConfigWant.Metadata
 					runtimeWant.want.metadataMutex.Unlock()
-					runtimeWant.want.State = updatedConfigWant.State
+					runtimeWant.want.State = sync.Map{}
+					updatedConfigWant.State.Range(func(k, v any) bool {
+						runtimeWant.want.State.Store(k, v)
+						return true
+					})
 
 					// Re-initialize progressable linkage
 					if progressable, ok := runtimeWant.function.(Progressable); ok {

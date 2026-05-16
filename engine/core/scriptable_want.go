@@ -260,7 +260,13 @@ func createScriptableFactory(def *WantTypeDefinition) WantFactory {
 	return func(metadata Metadata, spec WantSpec) Progressable {
 		locals := &ScriptableLocals{}
 		baseWant := NewWantWithLocals(metadata, spec, locals, def.Metadata.Name)
-		return &ScriptableWant{Want: *baseWant}
+		sw := &ScriptableWant{}
+		sw.Want.Metadata = baseWant.Metadata
+		sw.Want.Spec = baseWant.Spec
+		sw.Want.WantType = baseWant.WantType
+		sw.Want.Locals = baseWant.Locals
+		sw.Want.Init()
+		return sw
 	}
 }
 

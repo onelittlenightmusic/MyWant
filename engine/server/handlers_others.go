@@ -1089,10 +1089,15 @@ func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var defs []mywant.ParameterDef
+	if s.wantTypeLoader != nil {
+		defs = s.wantTypeLoader.GetGlobalParamDefs()
+	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{
-		"parameters": params,
-		"count":      len(params),
-		"types":      mywant.GetGlobalParamTypes(),
+		"parameters":  params,
+		"count":       len(params),
+		"types":       mywant.GetGlobalParamTypes(),
+		"definitions": defs,
 	})
 }
 
@@ -1112,10 +1117,15 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	params := mywant.GetAllGlobalParameters()
+	var defs []mywant.ParameterDef
+	if s.wantTypeLoader != nil {
+		defs = s.wantTypeLoader.GetGlobalParamDefs()
+	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{
-		"parameters": params,
-		"count":      len(params),
-		"types":      mywant.GetGlobalParamTypes(),
+		"parameters":  params,
+		"count":       len(params),
+		"types":       mywant.GetGlobalParamTypes(),
+		"definitions": defs,
 	})
 }
 

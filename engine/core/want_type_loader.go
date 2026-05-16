@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	want_spec "github.com/onelittlenightmusic/want-spec"
 	"github.com/getkin/kin-openapi/openapi3"
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -59,6 +59,7 @@ type WantTypeLoader struct {
 	definitions     map[string]*WantTypeDefinition
 	byCategory      map[string][]*WantTypeDefinition
 	byPattern       map[string][]*WantTypeDefinition
+	globalParamDefs map[string]ParameterDef // indexed by DefaultGlobalParameterFrom value
 	mu              sync.RWMutex
 	validPatterns   []string
 	validCategories map[string]bool
@@ -83,9 +84,47 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		definitions:     make(map[string]*WantTypeDefinition),
 		byCategory:      make(map[string][]*WantTypeDefinition),
 		byPattern:       make(map[string][]*WantTypeDefinition),
+		globalParamDefs: make(map[string]ParameterDef),
 		validPatterns:   []string{"generator", "processor", "sink", "independent", "coordinator"},
 		validCategories: make(map[string]bool),
 	}
+}
+
+// indexGlobalParams adds ParameterDefs with DefaultGlobalParameterFrom to the index.
+// First definition registered for a given global param name wins.
+// Must be called with mu held for writing.
+func (w *WantTypeLoader) indexGlobalParams(def *WantTypeDefinition) {
+	for _, p := range def.Parameters {
+		if p.DefaultGlobalParameterFrom == "" {
+			continue
+		}
+		if _, exists := w.globalParamDefs[p.DefaultGlobalParameterFrom]; exists {
+			continue
+		}
+		d := p
+		d.Name = p.DefaultGlobalParameterFrom
+		w.globalParamDefs[p.DefaultGlobalParameterFrom] = d
+	}
+}
+
+// rebuildGlobalParamIndex reconstructs the global param index from all current definitions.
+// Must be called with mu held for writing.
+func (w *WantTypeLoader) rebuildGlobalParamIndex() {
+	w.globalParamDefs = make(map[string]ParameterDef)
+	for _, def := range w.definitions {
+		w.indexGlobalParams(def)
+	}
+}
+
+// GetGlobalParamDefs returns a snapshot of ParameterDefs indexed from DefaultGlobalParameterFrom.
+func (w *WantTypeLoader) GetGlobalParamDefs() []ParameterDef {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	result := make([]ParameterDef, 0, len(w.globalParamDefs))
+	for _, d := range w.globalParamDefs {
+		result = append(result, d)
+	}
+	return result
 }
 
 // WithFallbackFS sets an embedded filesystem used when the on-disk directory is unavailable
@@ -189,6 +228,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 
 		// Register definition
 		w.definitions[def.Metadata.Name] = def
+		w.indexGlobalParams(def)
 
 		// Index by category
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
@@ -273,6 +313,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 		}
 		w.mergePredefinedState(def)
 		w.definitions[def.Metadata.Name] = def
+		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
 		w.validCategories[def.Metadata.Category] = true
@@ -344,6 +385,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		}
 		w.mergePredefinedState(def)
 		w.definitions[def.Metadata.Name] = def
+		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
 		w.validCategories[def.Metadata.Category] = true
@@ -533,6 +575,7 @@ func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.definitions[def.Metadata.Name] = def
+	w.indexGlobalParams(def)
 }
 
 // ParseDefinitionFromYAML parses and validates a WantTypeDefinition from raw YAML bytes.
@@ -566,6 +609,7 @@ func (w *WantTypeLoader) UnregisterDefinition(name string) error {
 		return fmt.Errorf("want type %q is backed by Go code and cannot be deleted via API", name)
 	}
 	delete(w.definitions, name)
+	w.rebuildGlobalParamIndex()
 	return nil
 }
 

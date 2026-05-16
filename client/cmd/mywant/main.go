@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"mywant/client/cmd/mywant/commands"
 
@@ -75,18 +76,14 @@ func main() {
 		if !strings.HasPrefix(firstArg, "-") && !isKnownCommand(rootCmd, firstArg) {
 			pluginName := "mywant-" + firstArg
 			if pluginPath, err := exec.LookPath(pluginName); err == nil {
-				pluginCmd := exec.Command(pluginPath, os.Args[2:]...)
-				pluginCmd.Stdin = os.Stdin
-				pluginCmd.Stdout = os.Stdout
-				pluginCmd.Stderr = os.Stderr
-				if err := pluginCmd.Run(); err != nil {
-					if exitErr, ok := err.(*exec.ExitError); ok {
-						os.Exit(exitErr.ExitCode())
-					}
-					fmt.Fprintln(os.Stderr, err)
+				// Replace the current process with the plugin (kubectl/git style).
+				// This keeps the same PID and process group, avoiding spurious
+				// shell job notifications when the plugin spawns child processes.
+				args := append([]string{pluginPath}, os.Args[2:]...)
+				if err := syscall.Exec(pluginPath, args, os.Environ()); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: failed to exec plugin %s: %v\n", pluginName, err)
 					os.Exit(1)
 				}
-				os.Exit(0)
 			}
 		}
 	}
