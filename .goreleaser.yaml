@@ -44,10 +44,8 @@ changelog:
       - Merge pull request
       - Merge branch
 
-homebrew_casks:
+brews:
   - name: mywant
-    binaries:
-      - mywant
     repository:
       owner: onelittlenightmusic
       name: homebrew-mywant
@@ -58,3 +56,7 @@ homebrew_casks:
     homepage: https://github.com/onelittlenightmusic/MyWant
     description: "Declarative chain programming system - express what you want via YAML, autonomous agents execute it"
     license: "MIT"
+    install: |
+      bin.install "mywant"
+    test: |
+      system "#{bin}/mywant", "--version"
