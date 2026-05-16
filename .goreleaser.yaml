@@ -2,10 +2,6 @@ version: 2
 
 project_name: mywant
 
-before:
-  hooks:
-    - sh -c "cd web && npm ci && npm run build"
-
 builds:
   - id: mywant
     dir: client
