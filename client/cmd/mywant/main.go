@@ -64,8 +64,6 @@ func main() {
 
 	rootCmd.AddCommand(commands.StateCmd)
 
-	rootCmd.AddCommand(commands.GuiCmd)
-
 	rootCmd.AddCommand(commands.PluginCmd)
 
 	rootCmd.AddCommand(commands.SkillsCmd)
