@@ -64,7 +64,7 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 			case <-p.ticker.C:
 				// Skip this tick if the previous execution for this agent is still running.
 				if !p.want.TryStartAgentRun(p.name) {
-					p.want.DirectLog("[%s] previous execution still running, skipping tick", p.name)
+					p.want.StoreLog("[%s] previous execution still running, skipping tick", p.name)
 					continue
 				}
 				p.BeginProgressCycle()

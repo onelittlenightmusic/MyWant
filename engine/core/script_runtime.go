@@ -100,7 +100,7 @@ func parseScriptOutput(stdout []byte) (*scriptOutput, error) {
 func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
 	if out.Directions != nil {
 		want.SetPlan("directions", out.Directions)
-		want.DirectLog("[%s] directions updated: %v", agentLabel, out.Directions)
+		want.StoreLog("[%s] directions updated: %v", agentLabel, out.Directions)
 	}
 	if out.Result != nil {
 		want.SetPlan("result", out.Result)
@@ -109,7 +109,7 @@ func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
 		if label, exists := want.StateLabels[k]; exists && label == LabelCurrent {
 			want.SetCurrent(k, v)
 		} else {
-			want.DirectLog("[%s] WARN: current_updates key %q is not current-labeled; skipped", agentLabel, k)
+			want.StoreLog("[%s] WARN: current_updates key %q is not current-labeled; skipped", agentLabel, k)
 		}
 	}
 	if out.JSONData != nil && want.WantTypeDefinition != nil {
@@ -120,7 +120,7 @@ func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
 			value := extractJSONPath(out.JSONData, sd.OnFetchData)
 			if value != nil {
 				want.SetCurrent(sd.Name, value)
-				want.DirectLog("[%s] onFetchData %q → %q = %v", agentLabel, sd.OnFetchData, sd.Name, value)
+				want.StoreLog("[%s] onFetchData %q → %q = %v", agentLabel, sd.OnFetchData, sd.Name, value)
 			}
 		}
 	}

@@ -118,7 +118,7 @@ func dockerAgentPoll(want *mywant.Want) error {
 		want.SetCurrent("docker_exit_code", exitCode)
 		want.SetCurrent("docker_phase", "exited")
 		want.SetCurrent("docker_error", fmt.Sprintf("container %s exited unexpectedly (code %d)", containerName, exitCode))
-		want.DirectLog("[DOCKER] Container %s exited (code %d). Last logs:\n%s", containerName, exitCode, logs)
+		want.StoreLog("[DOCKER] Container %s exited (code %d). Last logs:\n%s", containerName, exitCode, logs)
 	}
 	return nil
 }
@@ -129,7 +129,7 @@ func dockerAgentStop(ctx context.Context, want *mywant.Want) error {
 	if containerName == "" {
 		return nil
 	}
-	want.DirectLog("[DOCKER] Stopping container %s", containerName)
+	want.StoreLog("[DOCKER] Stopping container %s", containerName)
 	exec.CommandContext(ctx, "docker", "stop", containerName).Run() //nolint:errcheck
 	exec.CommandContext(ctx, "docker", "rm", containerName).Run()   //nolint:errcheck
 	want.SetCurrent("docker_phase", "stopped")
@@ -191,7 +191,7 @@ func dockerStart(ctx context.Context, want *mywant.Want) error {
 		}
 	}
 
-	want.DirectLog("[DOCKER] Running: docker %s", strings.Join(args, " "))
+	want.StoreLog("[DOCKER] Running: docker %s", strings.Join(args, " "))
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	out, err := cmd.Output()
@@ -201,12 +201,12 @@ func dockerStart(ctx context.Context, want *mywant.Want) error {
 
 	containerID := dockerShortID(string(out))
 	want.SetCurrent("docker_container_id", containerID)
-	want.DirectLog("[DOCKER] Container started: %s (ID: %s)", containerName, containerID)
+	want.StoreLog("[DOCKER] Container started: %s (ID: %s)", containerName, containerID)
 
 	// Task mode: wait for container to finish
 	waitForExit := mywant.GetCurrent(want, "docker_wait_for_exit", false)
 	if waitForExit {
-		want.DirectLog("[DOCKER] Waiting for container %s to finish...", containerName)
+		want.StoreLog("[DOCKER] Waiting for container %s to finish...", containerName)
 		waitCmd := exec.CommandContext(ctx, "docker", "wait", containerName)
 		exitOut, err := waitCmd.Output()
 		exitCode := 0
@@ -216,7 +216,7 @@ func dockerStart(ctx context.Context, want *mywant.Want) error {
 			exitCode, _ = strconv.Atoi(strings.TrimSpace(string(exitOut)))
 		}
 		want.SetCurrent("docker_exit_code", exitCode)
-		want.DirectLog("[DOCKER] Container %s exited with code %d", containerName, exitCode)
+		want.StoreLog("[DOCKER] Container %s exited with code %d", containerName, exitCode)
 	}
 
 	return nil

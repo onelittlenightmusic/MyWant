@@ -43,7 +43,7 @@ func goalThinkerThink(ctx context.Context, want *Want) error {
 				want.SetCurrent("phase", "decomposing")
 				want.SetCurrent("selected_recommendation_id", "") // Clear selection
 				want.SetStatus(WantStatusReaching)
-				want.DirectLog("[GOAL-THINKER] Recommendation selected: %s, transitioning to decomposing", title)
+				want.StoreLog("[GOAL-THINKER] Recommendation selected: %s, transitioning to decomposing", title)
 				return goalThinkerDecompose(ctx, want)
 			}
 		}
@@ -61,7 +61,7 @@ func goalThinkerThink(ctx context.Context, want *Want) error {
 	case "re_planning":
 		return goalThinkerReplan(ctx, want)
 	default:
-		want.DirectLog("[GOAL-THINKER] Unknown phase: %s", phase)
+		want.StoreLog("[GOAL-THINKER] Unknown phase: %s", phase)
 		return nil
 	}
 }
@@ -82,10 +82,10 @@ func goalThinkerIdeate(ctx context.Context, want *Want) error {
 	// If goal text looks concrete enough, skip ideating (optional logic)
 	// For now, let's always ideate if it's the first phase
 
-	want.DirectLog("[GOAL-THINKER] Ideating for goal: %s", goalText)
+	want.StoreLog("[GOAL-THINKER] Ideating for goal: %s", goalText)
 
 	useStub := GetGlobalGoalThinkerUseStub()
-	want.DirectLog("[DEBUG] GOAL-THINKER: use_stub=%v", useStub)
+	want.StoreLog("[DEBUG] GOAL-THINKER: use_stub=%v", useStub)
 
 	result, err := callGoalThinkerScript(ctx, map[string]any{
 		"phase":                  "ideate",
@@ -94,7 +94,7 @@ func goalThinkerIdeate(ctx context.Context, want *Want) error {
 		"use_stub":               useStub,
 	})
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Script error during ideate: %v", err)
+		want.StoreLog("[GOAL-THINKER] Script error during ideate: %v", err)
 		return nil
 	}
 
@@ -104,7 +104,7 @@ func goalThinkerIdeate(ctx context.Context, want *Want) error {
 	want.SetCurrent("proposed_recommendations", recs)
 	want.SetCurrent("proposed_response", responseText)
 	want.SetStatus(WantStatusWaitingUserAction)
-	want.DirectLog("[GOAL-THINKER] Proposed %d ideas, waiting for user selection", len(recs))
+	want.StoreLog("[GOAL-THINKER] Proposed %d ideas, waiting for user selection", len(recs))
 
 	return nil
 }
@@ -120,18 +120,18 @@ func goalThinkerDecompose(ctx context.Context, want *Want) error {
 	// Static breakdown: skip LLM if initial_breakdown param was provided
 	if raw, ok := want.GetCurrent("initial_breakdown"); ok {
 		if breakdown, ok := raw.([]any); ok && len(breakdown) > 0 {
-			want.DirectLog("[GOAL-THINKER] Using static initial_breakdown (%d items)", len(breakdown))
+			want.StoreLog("[GOAL-THINKER] Using static initial_breakdown (%d items)", len(breakdown))
 			return goalThinkerProposeBreakdown(ctx, want, breakdown, "")
 		}
 	}
 
 	goalText := GetGoal(want, "goal_text", "")
 	if goalText == "" {
-		want.DirectLog("[GOAL-THINKER] goal_text is empty, skipping decompose")
+		want.StoreLog("[GOAL-THINKER] goal_text is empty, skipping decompose")
 		return nil
 	}
 
-	want.DirectLog("[GOAL-THINKER] Decomposing goal: %s", goalText)
+	want.StoreLog("[GOAL-THINKER] Decomposing goal: %s", goalText)
 
 	useStub := GetGlobalGoalThinkerUseStub()
 
@@ -143,13 +143,13 @@ func goalThinkerDecompose(ctx context.Context, want *Want) error {
 	})
 
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Script error during decompose: %v", err)
+		want.StoreLog("[GOAL-THINKER] Script error during decompose: %v", err)
 		return nil
 	}
 
 	breakdown, _ := result["breakdown"].([]any)
 	responseText, _ := result["response_text"].(string)
-	want.DirectLog("[GOAL-THINKER] Decomposed into %d items: %s", len(breakdown), responseText)
+	want.StoreLog("[GOAL-THINKER] Decomposed into %d items: %s", len(breakdown), responseText)
 
 	return goalThinkerProposeBreakdown(ctx, want, breakdown, responseText)
 }
@@ -161,25 +161,25 @@ func goalThinkerProposeBreakdown(ctx context.Context, want *Want, breakdown []an
 	want.SetCurrent("proposed_response", responseText)
 
 	if autoApprove, _ := want.GetCurrent("auto_approve"); autoApprove == true {
-		want.DirectLog("[GOAL-THINKER] auto_approve=true, committing breakdown directly")
+		want.StoreLog("[GOAL-THINKER] auto_approve=true, committing breakdown directly")
 		return goalThinkerCommitApproval(want, breakdown)
 	}
 
 	httpClient := want.GetHTTPClient()
 	if httpClient == nil {
-		want.DirectLog("[GOAL-THINKER] No HTTP client available")
+		want.StoreLog("[GOAL-THINKER] No HTTP client available")
 		return nil
 	}
 	queueID, err := createGoalReactionQueue(httpClient)
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Failed to create reaction queue: %v", err)
+		want.StoreLog("[GOAL-THINKER] Failed to create reaction queue: %v", err)
 		return nil
 	}
 
 	want.SetCurrent("reaction_queue_id", queueID)
 	want.SetCurrent("phase", "awaiting_approval")
 	want.SetStatus(WantStatusWaitingUserAction)
-	want.DirectLog("[GOAL-THINKER] Reaction queue created: %s, transitioning to awaiting_approval", queueID)
+	want.StoreLog("[GOAL-THINKER] Reaction queue created: %s, transitioning to awaiting_approval", queueID)
 	return nil
 }
 
@@ -194,9 +194,9 @@ func goalThinkerCommitApproval(want *Want, breakdown []any) error {
 	spawnTarget := want.GetParentWant()
 	if spawnTarget == nil {
 		spawnTarget = want
-		want.DirectLog("[GOAL-THINKER] No parent want found, spawning under goal want")
+		want.StoreLog("[GOAL-THINKER] No parent want found, spawning under goal want")
 	} else {
-		want.DirectLog("[GOAL-THINKER] Spawning %d child wants under parent '%s'", len(breakdown), spawnTarget.Metadata.Name)
+		want.StoreLog("[GOAL-THINKER] Spawning %d child wants under parent '%s'", len(breakdown), spawnTarget.Metadata.Name)
 	}
 
 	for _, item := range breakdown {
@@ -205,14 +205,14 @@ func goalThinkerCommitApproval(want *Want, breakdown []any) error {
 			continue
 		}
 		if err := spawnChildWantFromBreakdownItem(spawnTarget, m); err != nil {
-			want.DirectLog("[GOAL-THINKER] Failed to spawn child want: %v", err)
+			want.StoreLog("[GOAL-THINKER] Failed to spawn child want: %v", err)
 		}
 	}
 
 	currentCount := toInt(GetCurrent(want, "cc_message_count", 0))
 	want.StoreState("_last_cc_message_count", currentCount)
 	want.SetCurrent("phase", "monitoring")
-	want.DirectLog("[GOAL-THINKER] Committed breakdown (%d items), transitioning to monitoring", len(breakdown))
+	want.StoreLog("[GOAL-THINKER] Committed breakdown (%d items), transitioning to monitoring", len(breakdown))
 	return nil
 }
 
@@ -220,7 +220,7 @@ func goalThinkerCommitApproval(want *Want, breakdown []any) error {
 func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 	queueID := GetCurrent(want, "reaction_queue_id", "")
 	if queueID == "" {
-		want.DirectLog("[GOAL-THINKER] No reaction_queue_id, returning to decomposing")
+		want.StoreLog("[GOAL-THINKER] No reaction_queue_id, returning to decomposing")
 		want.SetCurrent("phase", "decomposing")
 		want.SetCurrent("proposed_breakdown", []any{})
 		want.SetCurrent("proposed_response", "")
@@ -235,7 +235,7 @@ func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 	path := fmt.Sprintf("/api/v1/reactions/%s", queueID)
 	resp, err := httpClient.GET(path)
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Failed to poll reaction queue: %v", err)
+		want.StoreLog("[GOAL-THINKER] Failed to poll reaction queue: %v", err)
 		return nil
 	}
 	defer resp.Body.Close()
@@ -245,7 +245,7 @@ func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 		Reactions []ReactionData `json:"reactions"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		want.DirectLog("[GOAL-THINKER] Failed to decode reaction queue response: %v", err)
+		want.StoreLog("[GOAL-THINKER] Failed to decode reaction queue response: %v", err)
 		return nil
 	}
 
@@ -262,11 +262,11 @@ func goalThinkerAwaitApproval(ctx context.Context, want *Want) error {
 	want.SetStatus(WantStatusReaching)
 
 	if reaction.Approved {
-		want.DirectLog("[GOAL-THINKER] User approved breakdown")
+		want.StoreLog("[GOAL-THINKER] User approved breakdown")
 		breakdown := GetCurrent(want, "proposed_breakdown", []any{})
 		return goalThinkerCommitApproval(want, breakdown)
 	} else {
-		want.DirectLog("[GOAL-THINKER] User rejected breakdown — returning to decomposing")
+		want.StoreLog("[GOAL-THINKER] User rejected breakdown — returning to decomposing")
 		want.SetCurrent("phase", "decomposing")
 		want.SetCurrent("proposed_breakdown", []any{})
 		want.SetCurrent("proposed_response", "")
@@ -285,7 +285,7 @@ func goalThinkerMonitor(ctx context.Context, want *Want) error {
 
 	if currentCount > lastCount {
 		want.StoreState("_last_cc_message_count", currentCount)
-		want.DirectLog("[GOAL-THINKER] cc_message_count changed (%d → %d), triggering replan", lastCount, currentCount)
+		want.StoreLog("[GOAL-THINKER] cc_message_count changed (%d → %d), triggering replan", lastCount, currentCount)
 		return triggerReplan(want)
 	}
 
@@ -315,7 +315,7 @@ func goalThinkerReplan(ctx context.Context, want *Want) error {
 		}
 	}
 
-	want.DirectLog("[GOAL-THINKER] Replanning with modification_request: %s", modificationRequest)
+	want.StoreLog("[GOAL-THINKER] Replanning with modification_request: %s", modificationRequest)
 
 	result, err := callGoalThinkerScript(ctx, map[string]any{
 		"phase":                  "replan",
@@ -326,7 +326,7 @@ func goalThinkerReplan(ctx context.Context, want *Want) error {
 		"available_capabilities": computeAvailableCapabilities(),
 	})
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Script error during replan: %v", err)
+		want.StoreLog("[GOAL-THINKER] Script error during replan: %v", err)
 		return nil
 	}
 
@@ -344,24 +344,24 @@ func goalThinkerReplan(ctx context.Context, want *Want) error {
 	}
 	want.SetCurrent("cc_responses", existingResponses)
 
-	want.DirectLog("[GOAL-THINKER] Replanned into %d items: %s", len(breakdown), responseText)
+	want.StoreLog("[GOAL-THINKER] Replanned into %d items: %s", len(breakdown), responseText)
 
 	// Create reaction queue for approval
 	httpClient := want.GetHTTPClient()
 	if httpClient == nil {
-		want.DirectLog("[GOAL-THINKER] No HTTP client available")
+		want.StoreLog("[GOAL-THINKER] No HTTP client available")
 		return nil
 	}
 	queueID, err := createGoalReactionQueue(httpClient)
 	if err != nil {
-		want.DirectLog("[GOAL-THINKER] Failed to create reaction queue: %v", err)
+		want.StoreLog("[GOAL-THINKER] Failed to create reaction queue: %v", err)
 		return nil
 	}
 
 	want.SetCurrent("reaction_queue_id", queueID)
 	want.SetCurrent("phase", "awaiting_approval")
 	want.SetStatus(WantStatusWaitingUserAction)
-	want.DirectLog("[GOAL-THINKER] Reaction queue created: %s, transitioning to awaiting_approval", queueID)
+	want.StoreLog("[GOAL-THINKER] Reaction queue created: %s, transitioning to awaiting_approval", queueID)
 
 	return nil
 }

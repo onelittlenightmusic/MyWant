@@ -36,7 +36,7 @@ func startLiveServer(want *mywant.Want) (int, error) {
 		binPath = command
 	}
 
-	want.DirectLog("[INFO] Executing: %s %v", binPath, args)
+	want.StoreLog("[INFO] Executing: %s %v", binPath, args)
 	cmd := exec.Command(binPath, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
@@ -64,7 +64,7 @@ func startLiveServer(want *mywant.Want) (int, error) {
 	}
 
 	pid := cmd.Process.Pid
-	want.DirectLog("[INFO] Server started: %s %v (PID: %d)", binPath, args, pid)
+	want.StoreLog("[INFO] Server started: %s %v (PID: %d)", binPath, args, pid)
 
 	go func() {
 		cmd.Wait()
@@ -97,7 +97,7 @@ func waitForHealthCheck(ctx context.Context, want *mywant.Want, url string) (str
 
 		resp, err := client.Get(url)
 		if err != nil {
-			want.DirectLog("[DEBUG] Waiting for health check (attempt %d/%d)...", i+1, maxRetries)
+			want.StoreLog("[DEBUG] Waiting for health check (attempt %d/%d)...", i+1, maxRetries)
 			time.Sleep(interval)
 			continue
 		}
@@ -139,13 +139,13 @@ func getConfigInt(want *mywant.Want, stateKey, paramKey string, defaultVal int) 
 // getConfigArgs reads args from state (JSON string) first, then falls back to params.
 func getConfigArgs(want *mywant.Want) []string {
 	if v := mywant.GetCurrent(want, "process_args", ""); v != "" {
-		want.DirectLog("[DEBUG] Unmarshalling process_args: %q", v)
+		want.StoreLog("[DEBUG] Unmarshalling process_args: %q", v)
 		// Stored as JSON array string
 		var args []string
 		if err := json.Unmarshal([]byte(v), &args); err == nil {
 			return args
 		} else {
-			want.DirectLog("[DEBUG] Unmarshal failed: %v", err)
+			want.StoreLog("[DEBUG] Unmarshal failed: %v", err)
 		}
 	}
 	return getArgsParam(want)
@@ -212,7 +212,7 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 	// On Unix, sending signal to -pid sends it to the entire process group
 	err := syscall.Kill(-pid, syscall.SIGTERM)
 	if err == nil {
-		want.DirectLog("[INFO] Sent SIGTERM to process group %d", pid)
+		want.StoreLog("[INFO] Sent SIGTERM to process group %d", pid)
 		return nil
 	}
 
@@ -223,13 +223,13 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 	}
 
 	if err := process.Signal(syscall.SIGTERM); err != nil {
-		want.DirectLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
+		want.StoreLog("[WARN] SIGTERM failed for PID %d, trying SIGKILL: %v", pid, err)
 		if err := process.Kill(); err != nil {
 			return fmt.Errorf("failed to kill process %d: %w", pid, err)
 		}
 	}
 
-	want.DirectLog("[INFO] Sent termination signal to server PID %d", pid)
+	want.StoreLog("[INFO] Sent termination signal to server PID %d", pid)
 	return nil
 }
 
@@ -237,7 +237,7 @@ func stopLiveServer(pid int, want *mywant.Want) error {
 func waitForPattern(ctx context.Context, want *mywant.Want, logFile, pattern string, maxRetries int) string {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		want.DirectLog("[ERROR] Invalid url_regex: %v", err)
+		want.StoreLog("[ERROR] Invalid url_regex: %v", err)
 		return ""
 	}
 	interval := 500 * time.Millisecond
@@ -250,7 +250,7 @@ func waitForPattern(ctx context.Context, want *mywant.Want, logFile, pattern str
 		if url := scanPattern(logFile, re); url != "" {
 			return url
 		}
-		want.DirectLog("[DEBUG] Waiting for URL pattern (attempt %d/%d)...", i+1, maxRetries)
+		want.StoreLog("[DEBUG] Waiting for URL pattern (attempt %d/%d)...", i+1, maxRetries)
 		time.Sleep(interval)
 	}
 	return ""

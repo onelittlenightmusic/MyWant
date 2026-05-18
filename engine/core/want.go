@@ -1542,20 +1542,11 @@ func (n *Want) storeStateMulti(updates map[string]any) {
 // 	n.pendingLogs = append(n.pendingLogs, message)
 // }
 
-// DirectLog writes a log entry immediately to both the server log and the log
-// history ring, bypassing pendingLogs. Safe to call from background goroutines
-// (ThinkAgent, MonitorAgent, PollAgent) that run outside the want's Progress cycle.
-func (n *Want) DirectLog(message string, args ...any) {
+func (n *Want) StoreLog(message string, args ...any) {
 	formatted := fmt.Sprintf(message, args...)
 	InfoLog("[%s] %s", n.Metadata.Name, formatted)
 	n.getHistoryManager().AddLogEntry(formatted)
 	n.otelEmitWantLog(otellog.SeverityInfo, formatted)
-}
-
-func (n *Want) StoreLog(message string, args ...any) {
-	formatted := fmt.Sprintf(message, args...)
-	n.getHistoryManager().AddLogEntry(formatted)
-	n.otelEmitWantLog(otellog.SeverityDebug, formatted)
 }
 
 // otelEmitWantLog emits a log record with want identity attributes.
@@ -2775,14 +2766,14 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 				obj = v
 			case string:
 				if err := json.Unmarshal([]byte(v), &obj); err != nil {
-					n.DirectLog("[PARAM] globalOverrideFrom: failed to parse %q as JSON: %v", typeDef.GlobalOverrideFrom, err)
+					n.StoreLog("[PARAM] globalOverrideFrom: failed to parse %q as JSON: %v", typeDef.GlobalOverrideFrom, err)
 				}
 			}
 			if obj != nil {
 				for k, val := range obj {
 					n.Spec.Params[k] = val
 				}
-				n.DirectLog("[PARAM] globalOverrideFrom: applied %d fields from global param %q", len(obj), typeDef.GlobalOverrideFrom)
+				n.StoreLog("[PARAM] globalOverrideFrom: applied %d fields from global param %q", len(obj), typeDef.GlobalOverrideFrom)
 			}
 		}
 	}

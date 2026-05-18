@@ -119,7 +119,7 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 		return err
 	}
 	want.SetCurrent("process_pid", pid)
-	want.DirectLog("[LAUNCH] Started process PID %d", pid)
+	want.StoreLog("[LAUNCH] Started process PID %d", pid)
 
 	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
 	if healthURL != "" {
@@ -148,21 +148,21 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	if urlRegex != "" {
 		maxRetries := mywant.GetCurrent(want, "max_retries", 30)
 		resultField := mywant.GetCurrent(want, "result_field", "server_url")
-		want.DirectLog("[LAUNCH] Waiting for URL pattern in log (max %d retries)...", maxRetries)
+		want.StoreLog("[LAUNCH] Waiting for URL pattern in log (max %d retries)...", maxRetries)
 		if url := waitForPattern(ctx, want, logFile, urlRegex, maxRetries); url != "" {
-			want.DirectLog("[LAUNCH] Captured URL: %s → %s", url, resultField)
+			want.StoreLog("[LAUNCH] Captured URL: %s → %s", url, resultField)
 			want.SetCurrent(resultField, url)
 		} else {
-			want.DirectLog("[LAUNCH] Warning: url_regex did not match within %d retries", maxRetries)
+			want.StoreLog("[LAUNCH] Warning: url_regex did not match within %d retries", maxRetries)
 			// Fallback: query a local JSON API for the URL (e.g. ngrok at localhost:4040).
 			// Configured via fallback_url_api param — a URL whose JSON response contains the
 			// target URL anywhere in its structure.
 			if apiURL := mywant.GetCurrent(want, "fallback_url_api", ""); apiURL != "" {
 				if url := queryFallbackURLAPI(want, apiURL); url != "" {
-					want.DirectLog("[LAUNCH] Captured URL from fallback API: %s → %s", url, resultField)
+					want.StoreLog("[LAUNCH] Captured URL from fallback API: %s → %s", url, resultField)
 					want.SetCurrent(resultField, url)
 				} else {
-					want.DirectLog("[LAUNCH] Fallback API also returned no URL")
+					want.StoreLog("[LAUNCH] Fallback API also returned no URL")
 				}
 			}
 		}
@@ -178,7 +178,7 @@ func launchProcessStop(want *mywant.Want) error {
 		return nil
 	}
 	if err := stopLiveServer(pid, want); err != nil {
-		want.DirectLog("[LAUNCH] Failed to stop process PID %d: %v", pid, err)
+		want.StoreLog("[LAUNCH] Failed to stop process PID %d: %v", pid, err)
 	}
 	want.SetCurrent("process_pid", 0)
 	want.SetCurrent("status", "stopped")
@@ -193,7 +193,7 @@ func launchProcessPoll(want *mywant.Want) error {
 	if !isProcessAlive(pid) {
 		want.SetCurrent("status", "exited")
 		want.SetCurrent("launch_error", fmt.Sprintf("process PID %d exited unexpectedly", pid))
-		want.DirectLog("[LAUNCH] Process PID %d exited unexpectedly", pid)
+		want.StoreLog("[LAUNCH] Process PID %d exited unexpectedly", pid)
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 		return err
 	}
 
-	want.DirectLog("[LAUNCH] Running: docker compose -f %s up -d", composeFile)
+	want.StoreLog("[LAUNCH] Running: docker compose -f %s up -d", composeFile)
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", composeFile, "up", "-d", "--remove-orphans")
 	cmd.Env = composeEnv(want)
 	out, err := cmd.CombinedOutput()
@@ -219,7 +219,7 @@ func launchDockerComposeStart(ctx context.Context, want *mywant.Want) error {
 		want.SetCurrent("launch_error", msg)
 		return fmt.Errorf("%s", msg)
 	}
-	want.DirectLog("[LAUNCH] docker compose up: %s", strings.TrimSpace(string(out)))
+	want.StoreLog("[LAUNCH] docker compose up: %s", strings.TrimSpace(string(out)))
 
 	// Optional health check
 	healthURL := getConfigString(want, "server_health_check_url", "health_check_url", "")
@@ -244,14 +244,14 @@ func launchDockerComposeStop(ctx context.Context, want *mywant.Want) error {
 		return nil
 	}
 
-	want.DirectLog("[LAUNCH] Running: docker compose -f %s down", composeFile)
+	want.StoreLog("[LAUNCH] Running: docker compose -f %s down", composeFile)
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", composeFile, "down")
 	cmd.Env = composeEnv(want)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		want.DirectLog("[LAUNCH] docker compose down warning: %v\n%s", err, string(out))
+		want.StoreLog("[LAUNCH] docker compose down warning: %v\n%s", err, string(out))
 	} else {
-		want.DirectLog("[LAUNCH] docker compose down: %s", strings.TrimSpace(string(out)))
+		want.StoreLog("[LAUNCH] docker compose down: %s", strings.TrimSpace(string(out)))
 	}
 	want.SetCurrent("status", "stopped")
 	return nil
@@ -275,7 +275,7 @@ func launchDockerComposePoll(want *mywant.Want) error {
 		logs := composeRecentLogs(composeFile, 30)
 		want.SetCurrent("status", "exited")
 		want.SetCurrent("launch_error", "all compose services stopped unexpectedly")
-		want.DirectLog("[LAUNCH] All compose services stopped unexpectedly. Last logs:\n%s", logs)
+		want.StoreLog("[LAUNCH] All compose services stopped unexpectedly. Last logs:\n%s", logs)
 	}
 	return nil
 }
@@ -327,7 +327,7 @@ func composeEnv(want *mywant.Want) []string {
 	if raw := mywant.GetCurrent(want, "launch_env", ""); raw != "" {
 		var vars map[string]string
 		if err := json.Unmarshal([]byte(raw), &vars); err != nil {
-			want.DirectLog("[LAUNCH] Warning: could not parse launch_env JSON: %v", err)
+			want.StoreLog("[LAUNCH] Warning: could not parse launch_env JSON: %v", err)
 		} else {
 			for k, v := range vars {
 				env = append(env, fmt.Sprintf("%s=%s", k, v))
@@ -380,7 +380,7 @@ func queryFallbackURLAPI(want *mywant.Want, apiURL string) string {
 	client := &http.Client{Timeout: 3 * time.Second}
 	resp, err := client.Get(apiURL)
 	if err != nil {
-		want.DirectLog("[LAUNCH] Fallback API request failed: %v", err)
+		want.StoreLog("[LAUNCH] Fallback API request failed: %v", err)
 		return ""
 	}
 	defer resp.Body.Close()

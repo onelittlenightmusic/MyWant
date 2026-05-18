@@ -143,7 +143,7 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		msgCount := GetCurrent(want, "cc_message_count", 0)
 		if msgCount > lastProcessedCount {
 			if text, ok := latestMsg["text"].(string); ok && text != "" {
-				want.DirectLog("[CC_THINK] Webhook message received, overriding auto_request")
+				want.StoreLog("[CC_THINK] Webhook message received, overriding auto_request")
 				want.SetCurrent("webhook_auto_request", text)
 				want.SetCurrent("cc_webhook_processed", msgCount)
 			}
@@ -188,7 +188,7 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		// from different want instances that haven't established a session yet.
 		requestID := deriveClaudeRequestID(want)
 		if sessionID != "" && isClaudeRequestSent(sessionID, requestID) {
-			want.DirectLog("[CC_THINK] Request %s already sent, skipping", requestID)
+			want.StoreLog("[CC_THINK] Request %s already sent, skipping", requestID)
 			// Restore request_count from idempotency log
 			sentCount := countClaudeSentLogs(sessionID)
 			currentCount := GetCurrent(want, "request_count", 0)
@@ -198,7 +198,7 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 			return nil
 		}
 
-		want.DirectLog("[CC_THINK] Trigger detected (%s), proposing send_request", triggerLabel)
+		want.StoreLog("[CC_THINK] Trigger detected (%s), proposing send_request", triggerLabel)
 		want.SetCurrent("pending_request_id", requestID)
 		want.SetPlan("next_action", "send_request")
 
@@ -206,7 +206,7 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		// Check if MonitorAgent found a new response
 		hasNew := GetCurrent(want, "has_new_response", false)
 		if hasNew {
-			want.DirectLog("[CC_THINK] Response received from Claude Code")
+			want.StoreLog("[CC_THINK] Response received from Claude Code")
 			want.SetPlan("next_action", "process_response")
 			return nil
 		}
@@ -215,13 +215,13 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		lastRequestAt := GetCurrent(want, "last_request_at", int64(0))
 		timeoutSec := GetCurrent(want, "timeout_seconds", 300)
 		if lastRequestAt > 0 && time.Now().Unix()-lastRequestAt > int64(timeoutSec) {
-			want.DirectLog("[CC_THINK] Response timeout after %ds", timeoutSec)
+			want.StoreLog("[CC_THINK] Response timeout after %ds", timeoutSec)
 			want.SetPlan("next_action", "handle_timeout")
 		}
 
 	case CCPhaseError:
 		// Simple retry: wait a tick then resume
-		want.DirectLog("[CC_THINK] Proposing retry from error state")
+		want.StoreLog("[CC_THINK] Proposing retry from error state")
 		want.SetPlan("next_action", "retry")
 	}
 
@@ -653,7 +653,7 @@ func backfillChatHistory(want *Want, entries []sessionEntry, maxPairs int) {
 	}
 	want.SetCurrent("cc_messages", msgs)
 	want.SetCurrent("cc_responses", resps)
-	want.DirectLog("[CC_MONITOR] Backfilled %d exchange pair(s) from session history", len(pairs))
+	want.StoreLog("[CC_MONITOR] Backfilled %d exchange pair(s) from session history", len(pairs))
 }
 
 // getLatestAssistantContent returns the content of the most recent assistant message.

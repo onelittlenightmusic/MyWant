@@ -40,7 +40,7 @@ func EnsureProcessStopped(want *mywant.Want, pidStateKey string) {
 	if pid == 0 {
 		return
 	}
-	want.DirectLog("[IDEMPOTENT] Killing stale process PID %d (key: %s)", pid, pidStateKey)
+	want.StoreLog("[IDEMPOTENT] Killing stale process PID %d (key: %s)", pid, pidStateKey)
 	stopLiveServer(pid, want)
 	want.SetCurrent(pidStateKey, 0)
 	time.Sleep(300 * time.Millisecond) // wait for process group to exit
@@ -55,6 +55,6 @@ func EnsureLogFileTruncated(want *mywant.Want, logFileStateKey string) {
 		return
 	}
 	if err := os.Truncate(path, 0); err != nil && !os.IsNotExist(err) {
-		want.DirectLog("[IDEMPOTENT] Warning: could not truncate log file %s: %v", path, err)
+		want.StoreLog("[IDEMPOTENT] Warning: could not truncate log file %s: %v", path, err)
 	}
 }

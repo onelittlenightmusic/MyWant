@@ -144,7 +144,7 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 
 	// Step 5: Build and execute the command (read from state set by Initialize).
 	pythonCmd := GetCurrent(want, "python_command", "python3")
-	want.DirectLog("[PYTHON-THINKER] Running: %s %s", pythonCmd, scriptPath)
+	want.StoreLog("[PYTHON-THINKER] Running: %s %s", pythonCmd, scriptPath)
 
 	cmd := exec.CommandContext(ctx, pythonCmd, scriptPath)
 	cmd.Env = append(os.Environ(),
@@ -190,7 +190,7 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 			}
 		}
 		want.SetPlan("directions", directionTypes)
-		want.DirectLog("[PYTHON-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
+		want.StoreLog("[PYTHON-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 	}
 
 	// Apply current_updates — only for keys already labeled LabelCurrent to prevent
@@ -200,7 +200,7 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 			if label, exists := want.StateLabels[k]; exists && label == LabelCurrent {
 				want.SetCurrent(k, v)
 			} else {
-				want.DirectLog("[PYTHON-THINKER] WARN: current_updates key %q is not a current-labeled field; skipped", k)
+				want.StoreLog("[PYTHON-THINKER] WARN: current_updates key %q is not a current-labeled field; skipped", k)
 			}
 		}
 	}
@@ -215,7 +215,7 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 // and returns the error so the think loop can record it.
 func pythonThinkerError(want *Want, msg string) error {
 	err := fmt.Errorf("[PYTHON-THINKER] %s", msg)
-	want.DirectLog("%v", err)
+	want.StoreLog("%v", err)
 	want.SetStatus(WantStatusModuleError)
 	return err
 }

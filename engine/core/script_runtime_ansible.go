@@ -97,13 +97,13 @@ func (a *ansibleRuntime) run(want *Want, playbook, label string, apply func(*scr
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	want.DirectLog("[%s] running ansible-playbook", label)
+	want.StoreLog("[%s] running ansible-playbook", label)
 	if err := cmd.Run(); err != nil {
 		return scriptErr(want, label, fmt.Sprintf("ansible-playbook failed: %v\nstdout:\n%s\nstderr:\n%s",
 			err, stdout.String(), stderr.String()))
 	}
 	if out := strings.TrimSpace(stdout.String()); out != "" {
-		want.DirectLog("[%s] %s", label, out)
+		want.StoreLog("[%s] %s", label, out)
 	}
 
 	// Apply state updates written by the playbook to MYWANT_OUTPUT_FILE.

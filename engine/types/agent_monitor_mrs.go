@@ -46,7 +46,7 @@ func init() {
 func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
-		want.DirectLog("[MRS-MONITOR] %v", err)
+		want.StoreLog("[MRS-MONITOR] %v", err)
 		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
 		return false, nil
 	}
@@ -55,16 +55,16 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	skillCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	want.DirectLog("[MRS-MONITOR] executing skill: %s (timeout: %ds)", scriptPath, timeoutSec)
+	want.StoreLog("[MRS-MONITOR] executing skill: %s (timeout: %ds)", scriptPath, timeoutSec)
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, nil, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
 		if msg != "" {
 			want.SetCurrent("summary", msg)
 		}
-		want.DirectLog("[MRS-MONITOR] progress %d%%: %s", pct, msg)
+		want.StoreLog("[MRS-MONITOR] progress %d%%: %s", pct, msg)
 	})
 	if err != nil {
-		want.DirectLog("[MRS-MONITOR] skill failed: %v", err)
+		want.StoreLog("[MRS-MONITOR] skill failed: %v", err)
 		want.RecordAgentResult("", mrsMonitorAgentName, string(MonitorAgentType), "error", err.Error())
 		want.SetCurrent("error", err.Error())
 		return false, nil
@@ -91,7 +91,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 func doMRSAgentFn(ctx context.Context, want *Want) error {
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
-		want.DirectLog("[MRS-DO] %v", err)
+		want.StoreLog("[MRS-DO] %v", err)
 		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
 		return nil
 	}
@@ -102,16 +102,16 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	skillCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
 	defer cancel()
 
-	want.DirectLog("[MRS-DO] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
+	want.StoreLog("[MRS-DO] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
 		if msg != "" {
 			want.SetCurrent("summary", msg)
 		}
-		want.DirectLog("[MRS-DO] progress %d%%: %s", pct, msg)
+		want.StoreLog("[MRS-DO] progress %d%%: %s", pct, msg)
 	})
 	if err != nil {
-		want.DirectLog("[MRS-DO] skill failed: %v", err)
+		want.StoreLog("[MRS-DO] skill failed: %v", err)
 		want.RecordAgentResult("", mrsDoAgentName, string(DoAgentType), "error", err.Error())
 		want.SetCurrent("error", err.Error())
 		return nil

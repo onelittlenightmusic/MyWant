@@ -60,7 +60,7 @@ func (p *pythonRuntime) run(want *Want, script, label string, apply func(*script
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	want.DirectLog("[%s] executing python script", label)
+	want.StoreLog("[%s] executing python script", label)
 	if err := cmd.Run(); err != nil {
 		return scriptErr(want, label, fmt.Sprintf("script failed: %v\nstderr:\n%s", err, stderr.String()))
 	}

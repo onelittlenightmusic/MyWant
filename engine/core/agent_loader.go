@@ -388,10 +388,10 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				args := mrsPluginBuildArgs(want)
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
-				want.DirectLog("[MRS-DO:%s] executing %s args=%v", finalName, finalPath, args)
+				want.StoreLog("[MRS-DO:%s] executing %s args=%v", finalName, finalPath, args)
 				raw, err := mrsRunScript(skillCtx, finalPath, args)
 				if err != nil {
-					want.DirectLog("[MRS-DO:%s] failed: %v", finalName, err)
+					want.StoreLog("[MRS-DO:%s] failed: %v", finalName, err)
 					return nil
 				}
 				mrsApplyStateUpdates(want, raw, stateUpdates)
@@ -406,10 +406,10 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 			Monitor: func(ctx context.Context, want *Want) (bool, error) {
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
-				want.DirectLog("[MRS-MONITOR:%s] executing %s", finalName, finalPath)
+				want.StoreLog("[MRS-MONITOR:%s] executing %s", finalName, finalPath)
 				raw, err := mrsRunScript(skillCtx, finalPath, nil)
 				if err != nil {
-					want.DirectLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
+					want.StoreLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
 					return false, nil
 				}
 				mrsApplyStateUpdates(want, raw, stateUpdates)

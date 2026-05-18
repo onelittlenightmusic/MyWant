@@ -32,8 +32,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp_grpc/tempo]
+      exporters: [otlp_grpc/tempo, debug]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp_http/loki]
+      exporters: [otlp_http/loki, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

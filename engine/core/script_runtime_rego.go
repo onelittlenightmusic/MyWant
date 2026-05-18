@@ -57,7 +57,7 @@ func (r *regoRuntime) ExecuteThink(want *Want, script string) error {
 	}
 
 	// Evaluate `directions` rule.
-	want.DirectLog("[REGO-THINK] evaluating policy")
+	want.StoreLog("[REGO-THINK] evaluating policy")
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "opa", "eval",
 		"--format", "raw",
@@ -88,11 +88,11 @@ func (r *regoRuntime) ExecuteThink(want *Want, script string) error {
 	var directions []any
 	if err := json.Unmarshal(raw, &directions); err != nil {
 		// Could be a single value or empty — try wrapping.
-		want.DirectLog("[REGO-THINK] WARN: could not parse directions as array: %v (raw: %s)", err, raw)
+		want.StoreLog("[REGO-THINK] WARN: could not parse directions as array: %v (raw: %s)", err, raw)
 		want.SetPlan("directions", []any{})
 	} else {
 		want.SetPlan("directions", directions)
-		want.DirectLog("[REGO-THINK] directions updated: %v", directions)
+		want.StoreLog("[REGO-THINK] directions updated: %v", directions)
 	}
 
 	// Also evaluate optional `result` rule.

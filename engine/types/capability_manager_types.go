@@ -167,7 +167,7 @@ func capabilityManagerThink(ctx context.Context, want *Want) error {
 				continue
 			}
 			if _, ok := UnlockAchievement(a.ID); ok {
-				want.DirectLog("[CapabilityManager] Unlocked '%s' for agent '%s' (rule: %s)",
+				want.StoreLog("[CapabilityManager] Unlocked '%s' for agent '%s' (rule: %s)",
 					rule.Award.Title, agentName, rule.ID)
 			}
 		}

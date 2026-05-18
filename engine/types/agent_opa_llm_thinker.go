@@ -132,7 +132,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 
 	tmpDir, err := os.MkdirTemp("", "opa-llm-thinker-*")
 	if err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)
+		want.StoreLog("[OPA-LLM-THINKER] ERROR creating temp dir: %v", err)
 		return nil
 	}
 	defer os.RemoveAll(tmpDir)
@@ -141,11 +141,11 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	currentPath := filepath.Join(tmpDir, "current.json")
 
 	if err := os.WriteFile(goalPath, goalBytes, 0600); err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR writing goal.json: %v", err)
+		want.StoreLog("[OPA-LLM-THINKER] ERROR writing goal.json: %v", err)
 		return nil
 	}
 	if err := os.WriteFile(currentPath, currentBytes, 0600); err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR writing current.json: %v", err)
+		want.StoreLog("[OPA-LLM-THINKER] ERROR writing current.json: %v", err)
 		return nil
 	}
 
@@ -164,7 +164,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 		args = append(args, "--llm", "--llm-provider", provider)
 	}
 
-	want.DirectLog("[OPA-LLM-THINKER] Running: %s %v", command, args)
+	want.StoreLog("[OPA-LLM-THINKER] Running: %s %v", command, args)
 
 	// Step 5: Execute the planner command, inheriting the current process environment
 	// so that env vars like ANTHROPIC_API_KEY are available to the planner.
@@ -172,7 +172,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	cmd.Env = os.Environ()
 	stdout, err := cmd.Output()
 	if err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR running planner: %v", err)
+		want.StoreLog("[OPA-LLM-THINKER] ERROR running planner: %v", err)
 		return nil
 	}
 
@@ -180,7 +180,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 	// OPA output format: {"actions": [{"type": "reserve_hotel", "status": "pending"}, ...]}
 	var planResult map[string]any
 	if err := json.Unmarshal(stdout, &planResult); err != nil {
-		want.DirectLog("[OPA-LLM-THINKER] ERROR parsing planner output: %v", err)
+		want.StoreLog("[OPA-LLM-THINKER] ERROR parsing planner output: %v", err)
 		return nil
 	}
 
@@ -198,7 +198,7 @@ func opaLLMThinkerThink(ctx context.Context, want *Want) error {
 
 	want.SetPlan("directions", directionTypes)
 	want.SetCurrent("opa_input_hash", inputHash)
-	want.DirectLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
+	want.StoreLog("[OPA-LLM-THINKER] Plan updated with %d directions: %v", len(directionTypes), directionTypes)
 
 	return nil
 }

@@ -102,7 +102,7 @@ func (s *ScriptableWant) execLifecycleHook(hook *LifecycleHookDef) {
 	}
 	if hook.ExecuteAgents {
 		if err := s.ExecuteAgents(); err != nil {
-			s.DirectLog("[ScriptableWant] ExecuteAgents error in lifecycle hook: %v", err)
+			s.StoreLog("[ScriptableWant] ExecuteAgents error in lifecycle hook: %v", err)
 		}
 	}
 }
@@ -196,7 +196,7 @@ func (s *ScriptableWant) Progress() {
 		return
 	}
 	if err := s.ExecuteAgents(); err != nil {
-		s.DirectLog("[ScriptableWant] ExecuteAgents error: %v", err)
+		s.StoreLog("[ScriptableWant] ExecuteAgents error: %v", err)
 	}
 }
 

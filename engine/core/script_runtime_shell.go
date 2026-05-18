@@ -52,7 +52,7 @@ func (s *shellRuntime) run(want *Want, script, label string, apply func(*scriptO
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	want.DirectLog("[%s] executing shell script", label)
+	want.StoreLog("[%s] executing shell script", label)
 	if err := cmd.Run(); err != nil {
 		return scriptErr(want, label, fmt.Sprintf("script failed: %v\nstderr:\n%s", err, stderr.String()))
 	}
@@ -68,7 +68,7 @@ func (s *shellRuntime) run(want *Want, script, label string, apply func(*scriptO
 
 func scriptErr(want *Want, label, msg string) error {
 	err := fmt.Errorf("[%s] %s", label, msg)
-	want.DirectLog("%v", err)
+	want.StoreLog("%v", err)
 	want.SetStatus(WantStatusModuleError)
 	return err
 }
