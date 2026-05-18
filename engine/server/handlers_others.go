@@ -38,6 +38,7 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	// Update in-memory config
 	s.config.HeaderPosition = newConfig.HeaderPosition
 	s.config.ColorMode = newConfig.ColorMode
+	s.config.CardHeight = newConfig.CardHeight
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()
@@ -1164,14 +1165,22 @@ type guiStateResponse struct {
 }
 
 // getGUIState handles GET /api/v1/gui/state
+// Supports conditional GET via If-None-Match: returns 304 when seq unchanged.
 func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil {
 		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
 		return
 	}
+	seq := currentGUIStateSeq()
+	etagValue := fmt.Sprintf(`"%d"`, seq)
+	w.Header().Set("ETag", etagValue)
+	if r.Header.Get("If-None-Match") == etagValue {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	s.JSONResponse(w, http.StatusOK, guiStateResponse{
-		Seq:   currentGUIStateSeq(),
+		Seq:   seq,
 		State: guiFields(want),
 	})
 }

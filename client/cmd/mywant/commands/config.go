@@ -29,6 +29,7 @@ type MyWantConfig struct {
 	MockFlightPort   int                 `yaml:"mock_flight_port"`   // Mock flight server port
 	HeaderPosition   string              `yaml:"header_position"`    // top or bottom
 	ColorMode        string              `yaml:"color_mode"`         // light, dark, system
+	CardHeight       string              `yaml:"card_height"`        // sm, md, lg
 	Environments     map[string]string   `yaml:"environments"`       // arbitrary env vars applied at startup
 	OTELEndpoint     string              `yaml:"otel_endpoint"`      // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
 	GoalThinker      GoalThinkerSettings `yaml:"goal_thinker"`       // Goal thinker settings
@@ -57,6 +58,7 @@ func DefaultConfig() *MyWantConfig {
 		MockFlightPort:   8090,
 		HeaderPosition:   "top",
 		ColorMode:        "system",
+		CardHeight:       "sm",
 	}
 }
 

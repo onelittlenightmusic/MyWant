@@ -376,6 +376,7 @@ func (s *Server) saveFrontendConfig() {
 	// 2. Update only the frontend sections
 	fullConfig["header_position"] = s.config.HeaderPosition
 	fullConfig["color_mode"] = s.config.ColorMode
+	fullConfig["card_height"] = s.config.CardHeight
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

@@ -13,6 +13,7 @@ type Config struct {
 	Debug          bool              `json:"debug" yaml:"debug"`
 	HeaderPosition string            `json:"header_position" yaml:"header_position"`
 	ColorMode      string            `json:"color_mode" yaml:"color_mode"`
+	CardHeight     string            `json:"card_height" yaml:"card_height"`
 	ConfigPath     string            `json:"config_path" yaml:"config_path"`
 	MemoryPath     string            `json:"memory_path" yaml:"memory_path"`
 	WantTypesDir   string            `json:"want_types_dir" yaml:"want_types_dir"`
