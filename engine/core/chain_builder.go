@@ -237,6 +237,11 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		if err := LoadGlobalParameters(paramsPath); err != nil {
 			log.Printf("[ChainBuilder] Warning: failed to load global parameters from %s: %v", paramsPath, err)
 		}
+		// Load global parameter definitions from <configDir>/parameter_defs.yaml
+		defsPath := filepath.Join(dir, "parameter_defs.yaml")
+		if err := LoadGlobalParamDefs(defsPath); err != nil {
+			log.Printf("[ChainBuilder] Warning: failed to load global parameter defs from %s: %v", defsPath, err)
+		}
 	}
 
 	// Register all types that have Go implementations

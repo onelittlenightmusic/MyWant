@@ -15,6 +15,10 @@ var (
 	globalParameters map[string]any
 	globalParamTypes map[string][]string // cached classification, updated on every write
 	globalParamsPath string
+
+	globalParamDefsMu   sync.RWMutex
+	globalParamDefs     []ParameterDef
+	globalParamDefsPath string
 )
 
 // recomputeTypes classifies the given parameter snapshot by type schema.
@@ -197,5 +201,51 @@ func GetAllGlobalParameters() map[string]any {
 	for k, v := range globalParameters {
 		result[k] = v
 	}
+	return result
+}
+
+// LoadGlobalParamDefs reads <configDir>/parameter_defs.yaml into memory.
+// Absent file is silently ignored.
+func LoadGlobalParamDefs(path string) error {
+	globalParamDefsPath = path
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var defs []ParameterDef
+	if err := yaml.Unmarshal(data, &defs); err != nil {
+		return err
+	}
+	globalParamDefsMu.Lock()
+	globalParamDefs = defs
+	globalParamDefsMu.Unlock()
+	return nil
+}
+
+// SetGlobalParamDefs replaces all parameter definitions in memory and persists to disk.
+func SetGlobalParamDefs(defs []ParameterDef) error {
+	globalParamDefsMu.Lock()
+	globalParamDefs = defs
+	path := globalParamDefsPath
+	globalParamDefsMu.Unlock()
+	if path == "" {
+		return nil
+	}
+	data, err := yaml.Marshal(defs)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// GetAllGlobalParamDefs returns a snapshot copy of all parameter definitions.
+func GetAllGlobalParamDefs() []ParameterDef {
+	globalParamDefsMu.RLock()
+	defer globalParamDefsMu.RUnlock()
+	result := make([]ParameterDef, len(globalParamDefs))
+	copy(result, globalParamDefs)
 	return result
 }

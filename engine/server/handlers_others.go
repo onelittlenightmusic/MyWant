@@ -1090,9 +1090,18 @@ func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var defs []mywant.ParameterDef
+	defs := mywant.GetAllGlobalParamDefs()
+	// Merge in any definitions from want types (want type defs supplement but don't override user-defined ones)
 	if s.wantTypeLoader != nil {
-		defs = s.wantTypeLoader.GetGlobalParamDefs()
+		defByName := make(map[string]bool, len(defs))
+		for _, d := range defs {
+			defByName[d.Name] = true
+		}
+		for _, d := range s.wantTypeLoader.GetGlobalParamDefs() {
+			if !defByName[d.Name] {
+				defs = append(defs, d)
+			}
+		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters":  params,
@@ -1104,7 +1113,8 @@ func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Parameters map[string]any `json:"parameters"`
+		Parameters  map[string]any        `json:"parameters"`
+		Definitions []mywant.ParameterDef `json:"definitions"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
@@ -1117,11 +1127,14 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 		s.JSONError(w, r, http.StatusInternalServerError, "Failed to save parameters", err.Error())
 		return
 	}
-	params := mywant.GetAllGlobalParameters()
-	var defs []mywant.ParameterDef
-	if s.wantTypeLoader != nil {
-		defs = s.wantTypeLoader.GetGlobalParamDefs()
+	if body.Definitions != nil {
+		if err := mywant.SetGlobalParamDefs(body.Definitions); err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "Failed to save parameter definitions", err.Error())
+			return
+		}
 	}
+	params := mywant.GetAllGlobalParameters()
+	defs := mywant.GetAllGlobalParamDefs()
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"parameters":  params,
 		"count":       len(params),
