@@ -693,6 +693,7 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 			"pattern":     d.Metadata.Pattern,
 			"version":     d.Metadata.Version,
 			"system_type": d.Metadata.SystemType,
+			"labels":      d.Metadata.Labels,
 		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"wantTypes": res, "count": len(res)})
