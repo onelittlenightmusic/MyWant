@@ -149,6 +149,11 @@ type ChainBuilder struct {
 	fieldConsumerIndex map[string]map[string]struct{} // providerID → set<consumerID>
 	fieldProviderIndex map[string]map[string]struct{} // consumerID → set<providerID>
 
+	// fieldAccessDetails records which specific fields are shared between each provider/consumer pair.
+	// fieldAccessDetails[providerID][consumerID] = set of field names the consumer reads from the provider.
+	// Rebuilt during buildStateAccessIndex alongside fieldConsumerIndex/fieldProviderIndex.
+	fieldAccessDetails map[string]map[string]map[string]struct{} // providerID → consumerID → set<fieldName>
+
 	// Global state (shared across all wants, persisted to disk)
 	globalState         sync.Map // key(string) -> value(any), key-level concurrency
 	globalStatePath     string   // ~/.mywant/global_state.yaml
@@ -224,6 +229,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		stateAccessIndex:       make(map[string][]string),
 		fieldConsumerIndex:     make(map[string]map[string]struct{}),
 		fieldProviderIndex:     make(map[string]map[string]struct{}),
+		fieldAccessDetails:     make(map[string]map[string]map[string]struct{}),
 	}
 
 	// Derive globalStatePath from memoryPath directory

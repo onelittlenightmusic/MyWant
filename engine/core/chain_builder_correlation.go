@@ -16,6 +16,7 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 	cb.stateAccessIndex = make(map[string][]string)
 	cb.fieldConsumerIndex = make(map[string]map[string]struct{})
 	cb.fieldProviderIndex = make(map[string]map[string]struct{})
+	cb.fieldAccessDetails = make(map[string]map[string]map[string]struct{})
 
 	// Helper to register an accessor to a specific field and maintain bidirectional peer indices.
 	register := func(providerID, fieldName, accessorID string) {
@@ -34,6 +35,14 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 			cb.fieldProviderIndex[accessorID] = make(map[string]struct{})
 		}
 		cb.fieldProviderIndex[accessorID][providerID] = struct{}{}
+		// fieldAccessDetails: providerID → consumerID → set of fieldNames
+		if cb.fieldAccessDetails[providerID] == nil {
+			cb.fieldAccessDetails[providerID] = make(map[string]map[string]struct{})
+		}
+		if cb.fieldAccessDetails[providerID][accessorID] == nil {
+			cb.fieldAccessDetails[providerID][accessorID] = make(map[string]struct{})
+		}
+		cb.fieldAccessDetails[providerID][accessorID][fieldName] = struct{}{}
 	}
 
 	for _, rw := range cb.wants {
@@ -225,13 +234,18 @@ func (cb *ChainBuilder) correlationPhase() {
 
 		// ── 3. State Access Dependencies (bidirectional peer index) ──────────────
 		// Direct consumers: wants that read at least one field dirty provides.
+		// Emit one label per field so the frontend can display exactly which fields flow.
 		for consumerID := range cb.fieldConsumerIndex[dirtyID] {
-			add(consumerID, "stateAccess/consumer")
+			for fieldName := range cb.fieldAccessDetails[dirtyID][consumerID] {
+				add(consumerID, "stateAccess/consumer:"+fieldName)
+			}
 		}
 		// Direct providers: wants whose fields dirty reads.
 		// Also add co-consumers (siblings): other wants reading the same provider's fields.
 		for providerID := range cb.fieldProviderIndex[dirtyID] {
-			add(providerID, "stateAccess/provider")
+			for fieldName := range cb.fieldAccessDetails[providerID][dirtyID] {
+				add(providerID, "stateAccess/provider:"+fieldName)
+			}
 			for siblingID := range cb.fieldConsumerIndex[providerID] {
 				if siblingID != dirtyID {
 					add(siblingID, "stateAccess/sibling")
@@ -263,15 +277,22 @@ func (cb *ChainBuilder) correlationPhase() {
 
 // correlationRate returns the weighted coupling strength for a set of
 // correlation labels.
+// stateAccess labels contribute a fixed +2 regardless of how many field-specific
+// labels exist (stateAccess/consumer:fieldA, stateAccess/consumer:fieldB …) to
+// prevent rate inflation when many fields are shared.
 func correlationRate(labels []string) int {
 	rate := 0
+	hasStateAccess := false
 	for _, l := range labels {
 		switch {
 		case strings.HasPrefix(l, "stateAccess/"):
-			rate += 2
+			hasStateAccess = true
 		default:
 			rate += 1
 		}
+	}
+	if hasStateAccess {
+		rate += 2
 	}
 	return rate
 }
