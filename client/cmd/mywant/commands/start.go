@@ -151,6 +151,7 @@ var StartCmd = &cobra.Command{
 			HeaderPosition: config.HeaderPosition,
 			ColorMode:      config.ColorMode,
 			CardHeight:     config.CardHeight,
+			SoundEnabled:   config.SoundEnabled,
 			ConfigPath:     getConfigPath(),
 			MemoryPath:     filepath.Join(getMyWantDir(), "state.yaml"),
 			WebFS:          nil,

@@ -39,6 +39,7 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.HeaderPosition = newConfig.HeaderPosition
 	s.config.ColorMode = newConfig.ColorMode
 	s.config.CardHeight = newConfig.CardHeight
+	s.config.SoundEnabled = newConfig.SoundEnabled
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()

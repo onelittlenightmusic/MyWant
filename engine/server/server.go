@@ -377,6 +377,9 @@ func (s *Server) saveFrontendConfig() {
 	fullConfig["header_position"] = s.config.HeaderPosition
 	fullConfig["color_mode"] = s.config.ColorMode
 	fullConfig["card_height"] = s.config.CardHeight
+	if s.config.SoundEnabled != nil {
+		fullConfig["sound_enabled"] = *s.config.SoundEnabled
+	}
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

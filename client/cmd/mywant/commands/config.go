@@ -30,6 +30,7 @@ type MyWantConfig struct {
 	HeaderPosition   string              `yaml:"header_position"`    // top or bottom
 	ColorMode        string              `yaml:"color_mode"`         // light, dark, system
 	CardHeight       string              `yaml:"card_height"`        // sm, md, lg
+	SoundEnabled     *bool               `yaml:"sound_enabled"`      // true (default) or false
 	Environments     map[string]string   `yaml:"environments"`       // arbitrary env vars applied at startup
 	OTELEndpoint     string              `yaml:"otel_endpoint"`      // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
 	GoalThinker      GoalThinkerSettings `yaml:"goal_thinker"`       // Goal thinker settings
