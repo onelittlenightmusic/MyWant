@@ -345,13 +345,17 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 		finalField = typeDef.FinalResultField
 	}
 
+	// Build a set of framework-reserved field names to exclude from recommendations.
+	reservedFields := make(map[string]bool)
+	for _, f := range mywant.SystemReservedStateFields() {
+		reservedFields[f] = true
+	}
+
 	state := want.GetExplicitState()
 	var fields []FieldRef
 	for k, v := range state {
-		if strings.HasPrefix(k, "_") || k == "final_result" {
-			continue // skip internal/system fields; final_result is a system alias stored under
-			// globalState["wants"][name] (not globalState["final_result"]), so it cannot be
-			// read by independent wants via GetParentState — reference the finalResultField instead.
+		if strings.HasPrefix(k, "_") || reservedFields[k] {
+			continue // skip internal fields (underscore-prefixed) and framework-reserved fields
 		}
 		label, hasLabel := want.StateLabels[k]
 		// Treat unlabeled fields as "current" so legacy types still expose outputs.

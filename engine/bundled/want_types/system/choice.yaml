@@ -8,6 +8,7 @@ wantType:
     pattern: independent
     labels:
       user-control: "true"
+      type-icon: "ListFilter"
   parameters:
   - name: target_param
     description: Name of the parent parameter to control

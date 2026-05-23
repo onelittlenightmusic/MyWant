@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -12,10 +13,7 @@ import (
 	"strings"
 	"time"
 
-	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
-
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // MRSAgentDef describes a Machine-Readable Skill agent declared in a plugin agent.yaml.
@@ -87,32 +85,13 @@ func (r *AgentRegistry) LoadCapabilities(path string) error {
 	return nil
 }
 
-// loadAgentSpec loads the agent OpenAPI spec from the want-spec module
-func loadAgentSpec() (*openapi3.T, error) {
-	specPath := "spec/agent-spec.yaml"
-	specData, err := fs.ReadFile(want_spec.FS, specPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load agent OpenAPI spec from want-spec module: %w", err)
-	}
-
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromData(specData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load agent OpenAPI spec: %w", err)
-	}
-
-	return spec, nil
-}
 func validateCapabilityWithSpec(yamlData []byte, filename string) error {
-	spec, err := loadAgentSpec()
+	spec, err := loadOpenAPISpec("spec/agent-spec.yaml")
 	if err != nil {
-		// Spec not found (e.g. Homebrew install) — skip validation; built-ins are pre-validated.
-		return nil
-	}
-	ctx := context.Background()
-	err = spec.Validate(ctx)
-	if err != nil {
-		return fmt.Errorf("agent OpenAPI spec is invalid: %w", err)
+		if errors.Is(err, errSpecNotFound) {
+			return nil // Spec not found — skip; built-ins are pre-validated
+		}
+		return err
 	}
 	capabilitySchemaRef := spec.Components.Schemas["CapabilityYAML"]
 	if capabilitySchemaRef == nil {
@@ -178,14 +157,12 @@ func (r *AgentRegistry) LoadAgents(path string) error {
 	return nil
 }
 func validateAgentWithSpec(yamlData []byte, filename string) error {
-	spec, err := loadAgentSpec()
+	spec, err := loadOpenAPISpec("spec/agent-spec.yaml")
 	if err != nil {
-		return nil // Spec not found — skip validation; built-ins are pre-validated.
-	}
-	ctx := context.Background()
-	err = spec.Validate(ctx)
-	if err != nil {
-		return fmt.Errorf("agent OpenAPI spec is invalid: %w", err)
+		if errors.Is(err, errSpecNotFound) {
+			return nil // Spec not found — skip; built-ins are pre-validated
+		}
+		return err
 	}
 	agentSchemaRef := spec.Components.Schemas["AgentYAML"]
 	if agentSchemaRef == nil {

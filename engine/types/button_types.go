@@ -22,7 +22,6 @@ func (b *ButtonWant) GetLocals() *ButtonLocals {
 
 func (b *ButtonWant) Initialize() {
 	b.StoreState("label", b.GetStringParam("label", "Push"))
-	b.StoreState("target_param", b.GetStringParam("target_param", ""))
 	if _, ok := b.GetCurrent("pressed_count"); !ok {
 		b.SetCurrent("pressed_count", 0)
 	}
@@ -31,6 +30,12 @@ func (b *ButtonWant) Initialize() {
 
 func (b *ButtonWant) IsAchieved() bool { return false }
 
+// Progress increments pressed_count on each press event (delivered via webhook).
+// The count is propagated to the parent via expose entries, e.g.:
+//
+//	exposes:
+//	  - currentState: "pressed_count"
+//	    asGoal: "trigger_count"
 func (b *ButtonWant) Progress() {
 	payload, hasPayload := b.GetCurrent("webhook_payload")
 	receivedAt, _ := b.GetStateString("webhook_received_at", "")
@@ -44,17 +49,7 @@ func (b *ButtonWant) Progress() {
 				b.SetCurrent("pressed_count", count)
 				b.StoreState("last_press_at", receivedAt)
 				b.SetCurrent("webhook_payload", nil)
-
-				targetParam, _ := b.GetStateString("target_param", "")
-				if targetParam == "" {
-					targetParam = b.GetStringParam("target_param", "")
-					if targetParam != "" {
-						b.StoreState("target_param", targetParam)
-					}
-				}
-				if targetParam != "" {
-					b.PropagateParameter(targetParam, count)
-				}
+				// Expose handlers fire automatically via SetCurrent("pressed_count", count) above.
 			}
 		}
 	}

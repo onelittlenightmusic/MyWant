@@ -1,13 +1,17 @@
+//go:build !ios
+
 package mywant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otellog "go.opentelemetry.io/otel/log"
@@ -123,6 +127,99 @@ func otelTracer() trace.Tracer {
 	globalOTELMu.RLock()
 	defer globalOTELMu.RUnlock()
 	return globalTracer
+}
+
+// otelOnStatusChange manages the OTEL lifecycle span for a want.
+//   - First active status (idle → anything) → start a new span
+//   - Every status change → add a span event
+//   - Terminal status → end the span
+func (n *Want) otelOnStatusChange(oldStatus, newStatus WantStatus) {
+	if !IsOTELEnabled() {
+		return
+	}
+
+	terminalStatuses := map[WantStatus]bool{
+		WantStatusAchieved:            true,
+		WantStatusAchievedWithWarning: true,
+		WantStatusFailed:              true,
+		WantStatusCancelled:           true,
+		WantStatusTerminated:          true,
+	}
+
+	if n.otelSpan == nil && oldStatus == WantStatusIdle {
+		tracer := otelTracer()
+		if tracer != nil {
+			ctx, span := tracer.Start(context.Background(), "want/"+n.Metadata.Name,
+				trace.WithAttributes(
+					attribute.String("want.name", n.Metadata.Name),
+					attribute.String("want.type", n.Metadata.Type),
+					attribute.String("want.id", n.Metadata.ID),
+				),
+			)
+			n.otelSpan = span
+			n.otelSpanCtx = ctx
+		}
+	}
+
+	if n.otelSpan == nil {
+		return
+	}
+
+	n.otelSpan.AddEvent("status_change", trace.WithAttributes(
+		attribute.String("want.status.old", string(oldStatus)),
+		attribute.String("want.status.new", string(newStatus)),
+	))
+
+	if terminalStatuses[newStatus] {
+		n.otelSpan.End()
+		n.otelSpan = nil
+		n.otelSpanCtx = nil
+	}
+}
+
+// otelEmitWantInfo emits an Info-level log record with the want's identity attributes.
+// Use this from non-otel files to avoid importing otellog severity constants.
+func (n *Want) otelEmitWantInfo(body string) {
+	n.otelEmitWantLog(otellog.SeverityInfo, body)
+}
+
+// otelEmitWantLog emits a log record with the want's identity attributes attached.
+func (n *Want) otelEmitWantLog(severity otellog.Severity, body string) {
+	ctx := n.otelSpanCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	otelEmitLog(ctx, severity, body,
+		otellog.String("want.name", n.Metadata.Name),
+		otellog.String("want.type", n.Metadata.Type),
+		otellog.String("want.status", string(n.Status)),
+	)
+}
+
+// otelEmitStateChange records a single state key/value pair as a span event (traces)
+// and as a JSON log line (Loki), so Grafana can filter and unwrap any field by name.
+func (n *Want) otelEmitStateChange(key string, value any) {
+	if !IsOTELEnabled() {
+		return
+	}
+	if n.otelSpan != nil {
+		valStr := fmt.Sprintf("%v", value)
+		if len(valStr) > 256 {
+			valStr = valStr[:256] + "…"
+		}
+		n.otelSpan.AddEvent("state_change", trace.WithAttributes(
+			attribute.String("state.key", key),
+			attribute.String("state.value", valStr),
+		))
+	}
+	valJSON, err := json.Marshal(value)
+	var body string
+	if err != nil || len(valJSON) > 512 {
+		body = fmt.Sprintf(`{"event":"state","key":%q,"value":%q}`, key, fmt.Sprintf("%v", value))
+	} else {
+		body = fmt.Sprintf(`{"event":"state","key":%q,"value":%s}`, key, string(valJSON))
+	}
+	n.otelEmitWantLog(otellog.SeverityDebug, body)
 }
 
 // otelEmitLog emits a single log record via the OTEL LoggerProvider.

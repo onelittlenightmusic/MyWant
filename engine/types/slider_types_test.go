@@ -9,15 +9,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// makeStateChangeSyncForTest temporarily sets the StateChange event processing mode
+// to synchronous so expose handlers fire inline during test assertions.
+// Returns a cleanup function that restores the original (async) mode.
+func makeStateChangeSyncForTest(t *testing.T) func() {
+	t.Helper()
+	uss := GetGlobalSubscriptionSystem()
+	uss.SetProcessingMode(EventTypeStateChange, ProcessSync)
+	return func() {
+		uss.SetProcessingMode(EventTypeStateChange, ProcessAsync)
+	}
+}
+
 func TestSliderWant_Initialize(t *testing.T) {
 	slider := &SliderWant{Want: Want{
 		Metadata: Metadata{ID: "slider-id", Name: "budget-slider", Type: "slider"},
 		Spec: WantSpec{Params: map[string]any{
-			"target_param": "max_budget",
-			"default":      5000.0,
-			"min":          0.0,
-			"max":          10000.0,
-			"step":         100.0,
+			"default": 5000.0,
+			"min":     0.0,
+			"max":     10000.0,
+			"step":    100.0,
 		}},
 	}}
 
@@ -37,20 +48,29 @@ func TestSliderWant_Initialize(t *testing.T) {
 	step, _ := slider.GetStateFloat64("step", -1.0)
 	assert.Equal(t, 100.0, step)
 
+	// target_param is no longer stored in state — propagation is via expose entries.
 	tp, _ := slider.GetStateString("target_param", "")
-	assert.Equal(t, "max_budget", tp)
+	assert.Equal(t, "", tp, "target_param should not be stored in state")
 }
 
-func TestSliderWant_PropagatesValueToParent(t *testing.T) {
+func TestSliderWant_PropagatesValueToParentGoal(t *testing.T) {
+	cleanup := makeStateChangeSyncForTest(t)
+	defer cleanup()
+
+	// Parent want with "max_budget" declared as a goal-labeled state key.
 	parent := &Want{
-		Metadata: Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
-		Spec:     WantSpec{Params: map[string]any{"max_budget": 1000.0}},
+		Metadata:    Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
+		Spec:        WantSpec{Params: map[string]any{}},
+		StateLabels: map[string]StateLabel{"max_budget": LabelGoal},
 	}
 
-	// Set up ChainBuilder so GetParentWant can find the parent via FindWantByID
 	cb := NewChainBuilder([]*Want{parent})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
+
+	// Register parent so findWantByName works inside the expose handler.
+	RegisterWant(parent)
+	defer UnregisterWant(parent.Metadata.Name)
 
 	slider := &SliderWant{Want: Want{
 		Metadata: Metadata{
@@ -61,38 +81,59 @@ func TestSliderWant_PropagatesValueToParent(t *testing.T) {
 				Kind: "Want", ID: "parent-id", Name: "parent", Controller: true,
 			}},
 		},
-		Spec: WantSpec{Params: map[string]any{
-			"target_param": "max_budget",
-			"default":      5000.0,
-			"min":          0.0,
-			"max":          10000.0,
-		}},
+		Spec: WantSpec{
+			Params: map[string]any{
+				"default": 5000.0,
+				"min":     0.0,
+				"max":     10000.0,
+			},
+			Exposes: []ExposeEntry{
+				{CurrentState: "value", AsGoal: "max_budget"},
+			},
+		},
 	}}
+
+	// RegisterWant sets up the asGoal expose handler subscription.
+	RegisterWant(&slider.Want)
+	defer UnregisterWant(slider.Metadata.Name)
 
 	slider.BeginProgressCycle()
 	slider.Initialize()
 	slider.EndProgressCycle()
 
+	// Progress() calls SetCurrent("value", 5000.0) → StateChangeEvent (sync) → expose handler
+	// → parent.SetGoal("max_budget", 5000.0)
 	slider.BeginProgressCycle()
 	slider.Progress()
 	slider.EndProgressCycle()
 
-	// FindWantByID returns the config want (parent) since reconcile loop isn't running
-	rtParent, _, found := cb.FindWantByID("parent-id")
-	require.True(t, found)
-	paramVal, ok := rtParent.Spec.GetParam("max_budget")
-	assert.True(t, ok)
-	assert.Equal(t, 5000.0, paramVal)
+	goalVal, ok := parent.GetGoal("max_budget")
+	require.True(t, ok, "parent goal 'max_budget' should be set")
+	assert.Equal(t, 5000.0, goalVal)
 }
 
-func TestSliderWant_NoParent_SetsGlobalParameter(t *testing.T) {
+func TestSliderWant_NoParent_GlobalStateExpose(t *testing.T) {
+	cleanup := makeStateChangeSyncForTest(t)
+	defer cleanup()
+
+	// GlobalChainBuilder is required for StoreGlobalState / GetGlobalState to work.
+	cb := NewChainBuilder([]*Want{})
+	SetGlobalChainBuilder(cb)
+	defer SetGlobalChainBuilder(nil)
+
 	slider := &SliderWant{Want: Want{
 		Metadata: Metadata{ID: "slider-id", Name: "orphan-slider", Type: "slider"},
-		Spec: WantSpec{Params: map[string]any{
-			"target_param": "some_param",
-			"default":      42.0,
-		}},
+		Spec: WantSpec{
+			Params: map[string]any{"default": 42.0},
+			// Top-level want: use "as" to write to global state.
+			Exposes: []ExposeEntry{
+				{CurrentState: "value", As: "some_param"},
+			},
+		},
 	}}
+
+	RegisterWant(&slider.Want)
+	defer UnregisterWant(slider.Metadata.Name)
 
 	slider.BeginProgressCycle()
 	slider.Initialize()
@@ -102,13 +143,13 @@ func TestSliderWant_NoParent_SetsGlobalParameter(t *testing.T) {
 	slider.Progress()
 	slider.EndProgressCycle()
 
-	// Should propagate to global parameter
-	val, found := GetGlobalParameter("some_param")
-	assert.True(t, found)
+	// Top-level expose writes to global STATE (not global parameter).
+	val, found := GetGlobalState("some_param")
+	assert.True(t, found, "global state 'some_param' should be set via expose")
 	assert.Equal(t, 42.0, val)
 }
 
-func TestSliderWant_EmptyTargetParam(t *testing.T) {
+func TestSliderWant_NoExpose_NoPanic(t *testing.T) {
 	slider := &SliderWant{Want: Want{
 		Metadata: Metadata{ID: "slider-id", Name: "empty-slider", Type: "slider"},
 		Spec:     WantSpec{Params: map[string]any{"default": 10.0}},
@@ -118,7 +159,7 @@ func TestSliderWant_EmptyTargetParam(t *testing.T) {
 	slider.Initialize()
 	slider.EndProgressCycle()
 
-	// Should not panic when target_param is empty
+	// Should not panic when no expose entries are configured.
 	slider.BeginProgressCycle()
 	slider.Progress()
 	slider.EndProgressCycle()

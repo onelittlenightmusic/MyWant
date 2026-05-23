@@ -18,10 +18,14 @@ type TimerLocals struct {
 	LastAtRecurrence string `json:"last_at_recurrence" yaml:"last_at_recurrence"`
 }
 
-// TimerWant controls a global parameter of WhenSpec type (every/at).
-// The user sets the scheduling interval via the dashboard and the value
-// is propagated to the named global parameter so other wants can use it
-// via fromGlobalParam references.
+// TimerWant computes a WhenSpec (every/at schedule) and exposes it as "timer_spec" current state.
+// The value is propagated to the parent via expose entries, e.g.:
+//
+//	exposes:
+//	  - currentState: "timer_spec"
+//	    asGoal: "schedule"
+//
+// For top-level wants writing to global state, use "as" instead of "asGoal".
 type TimerWant struct{ Want }
 
 func (t *TimerWant) GetLocals() *TimerLocals {
@@ -29,27 +33,10 @@ func (t *TimerWant) GetLocals() *TimerLocals {
 }
 
 func (t *TimerWant) Initialize() {
-	targetParam := t.GetStringParam("target_param", "")
-	t.StoreState("target_param", targetParam)
-
-	// Seed from global param if already set, otherwise fall back to defaults.
 	every := t.GetStringParam("default_every", "5m")
 	at := ""
 	timerMode := "every"
 	atRecurrence := ""
-
-	if targetParam != "" {
-		if raw, ok := GetGlobalParameter(targetParam); ok {
-			if m, ok := raw.(map[string]any); ok {
-				if v, ok := m["every"].(string); ok && v != "" {
-					every = v
-				}
-				if v, ok := m["at"].(string); ok {
-					at = v
-				}
-			}
-		}
-	}
 
 	t.StoreState("every", every)
 	t.StoreState("at", at)
@@ -62,7 +49,7 @@ func (t *TimerWant) Initialize() {
 	locals.LastTimerMode = timerMode
 	locals.LastAtRecurrence = atRecurrence
 
-	// Force propagation on startup so global param always reflects current mode.
+	// Store initial timer_spec so expose handlers can propagate it on first tick.
 	t.propagateTimer(every, at, timerMode, atRecurrence)
 }
 
@@ -89,14 +76,6 @@ func (t *TimerWant) Progress() {
 }
 
 func (t *TimerWant) propagateTimer(every, at, timerMode, atRecurrence string) {
-	targetParam, _ := t.GetStateString("target_param", "")
-	if targetParam == "" {
-		targetParam = t.GetStringParam("target_param", "")
-	}
-	if targetParam == "" {
-		return
-	}
-
 	var spec map[string]any
 
 	if timerMode == "at" {
@@ -120,5 +99,7 @@ func (t *TimerWant) propagateTimer(every, at, timerMode, atRecurrence string) {
 		spec = map[string]any{"every": every}
 	}
 
-	t.PropagateParameter(targetParam, spec)
+	// Store as "timer_spec" current state; expose handlers propagate it to the parent.
+	// e.g. exposes: [{currentState: "timer_spec", asGoal: "schedule"}]
+	t.SetCurrent("timer_spec", spec)
 }

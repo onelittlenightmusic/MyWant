@@ -16,6 +16,8 @@ type Config struct {
 	ColorMode      string            `json:"color_mode" yaml:"color_mode"`
 	CardHeight     string            `json:"card_height" yaml:"card_height"`
 	SoundEnabled   *bool             `json:"sound_enabled" yaml:"sound_enabled"`
+	IconFont       string            `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	CanvasBgURL    string            `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
 	ConfigPath     string            `json:"config_path" yaml:"config_path"`
 	MemoryPath     string            `json:"memory_path" yaml:"memory_path"`
 	WantTypesDir   string            `json:"want_types_dir" yaml:"want_types_dir"`

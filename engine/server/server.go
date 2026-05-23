@@ -381,6 +381,12 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.SoundEnabled != nil {
 		fullConfig["sound_enabled"] = *s.config.SoundEnabled
 	}
+	if s.config.IconFont != "" {
+		fullConfig["icon_font"] = s.config.IconFont
+	}
+	if s.config.CanvasBgURL != "" {
+		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL
+	}
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

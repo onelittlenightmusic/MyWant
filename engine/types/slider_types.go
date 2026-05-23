@@ -11,8 +11,12 @@ func init() {
 // SliderLocals holds type-specific local state.
 type SliderLocals struct{}
 
-// SliderWant dynamically controls a parent want's parameter based on its current value.
-// The target parent parameter is specified via the "target_param" param.
+// SliderWant dynamically controls a parent want's goal or state based on its current value.
+// The output is propagated via expose entries, e.g.:
+//
+//	exposes:
+//	  - currentState: "value"
+//	    asGoal: "budget_limit"
 type SliderWant struct{ Want }
 
 func (s *SliderWant) GetLocals() *SliderLocals {
@@ -24,26 +28,14 @@ func (s *SliderWant) Initialize() {
 	s.StoreState("min", s.GetFloatParam("min", 0))
 	s.StoreState("max", s.GetFloatParam("max", 100))
 	s.StoreState("step", s.GetFloatParam("step", 1))
-	s.StoreState("target_param", s.GetStringParam("target_param", ""))
 }
 
 // IsAchieved always returns false — slider is a persistent control.
 func (s *SliderWant) IsAchieved() bool { return false }
 
-// Progress reads the current value and propagates it to the parent's target parameter,
-// or to global parameters if there is no parent.
+// Progress re-emits the current value so expose handlers fire on the first tick
+// (initial propagation) as well as on every user-driven value change.
 func (s *SliderWant) Progress() {
-	// Re-sync target_param from params if state is empty (handles late param assignment)
-	targetParam, _ := s.GetStateString("target_param", "")
-	if targetParam == "" {
-		targetParam = s.GetStringParam("target_param", "")
-		if targetParam != "" {
-			s.StoreState("target_param", targetParam)
-		} else {
-			return
-		}
-	}
-
 	value, _ := s.GetStateFloat64("value", 0.0)
-	s.PropagateParameter(targetParam, value)
+	s.SetCurrent("value", value)
 }

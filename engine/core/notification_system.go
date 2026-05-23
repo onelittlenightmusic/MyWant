@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 )
 
@@ -95,6 +96,40 @@ func (h *currentStateExposeHandler) OnEvent(ctx context.Context, event WantEvent
 	return EventResponse{Handled: true}
 }
 
+// goalStateExposeHandler handles StateChangeEvent emitted by this want and
+// propagates the value to the parent want's Goal-labeled state via SetGoal.
+// Used for exposes entries with CurrentState + AsGoal fields (bottom-up to parent Goal).
+type goalStateExposeHandler struct {
+	want       *Want
+	localKey   string // state key in this want (ExposeEntry.CurrentState)
+	parentName string // parent want name
+	parentKey  string // goal key in parent (ExposeEntry.AsGoal)
+}
+
+func (h *goalStateExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:goal-expose:%s→%s.%s", h.want.Metadata.Name, h.localKey, h.parentName, h.parentKey)
+}
+
+func (h *goalStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	sce, ok := event.(*StateChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if sce.GetSourceName() != h.want.Metadata.Name || sce.StateKey != h.localKey {
+		return EventResponse{}
+	}
+	parent := findWantByName(h.parentName)
+	if parent == nil {
+		return EventResponse{}
+	}
+	// Dedup: skip if parent goal already holds the same value (avoids cascade on every-tick re-emit).
+	if existing, ok := parent.GetGoal(h.parentKey); ok && reflect.DeepEqual(existing, sce.StateValue) {
+		return EventResponse{Handled: true}
+	}
+	parent.SetGoal(h.parentKey, sce.StateValue)
+	return EventResponse{Handled: true}
+}
+
 // Global want registry for notification lookup
 var (
 	wantRegistry      = make(map[string]*Want)
@@ -164,25 +199,41 @@ func RegisterWant(want *Want) {
 			}
 			want.GetSubscriptionSystem().Subscribe(EventTypeParameterChange, handler)
 		} else if entry.CurrentState != "" {
-			// Bottom-up: push state to parent when local state changes.
-			// "final_result" is handled specially via MergeParentState, so it works for top-level wants too.
-			if parentName == "" && entry.As != "final_result" {
-				// Top-level want: expose directly to global state as a flat key.
-				handler := &globalStateExposeHandler{
-					want:      want,
-					localKey:  entry.CurrentState,
-					globalKey: entry.As,
+			if entry.AsGoal != "" {
+				// Bottom-up: push local current state to parent's Goal-labeled state via SetGoal.
+				// Top-level wants have no parent and are not supported for asGoal.
+				if parentName == "" {
+					WarnLog("[EXPOSE] asGoal on top-level want %q (key=%q) is not supported — no parent", want.Metadata.Name, entry.AsGoal)
+					continue
+				}
+				handler := &goalStateExposeHandler{
+					want:       want,
+					localKey:   entry.CurrentState,
+					parentName: parentName,
+					parentKey:  entry.AsGoal,
 				}
 				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
-				continue
+			} else {
+				// Bottom-up: push state to parent when local state changes.
+				// "final_result" is handled specially via MergeParentState, so it works for top-level wants too.
+				if parentName == "" && entry.As != "final_result" {
+					// Top-level want: expose directly to global state as a flat key.
+					handler := &globalStateExposeHandler{
+						want:      want,
+						localKey:  entry.CurrentState,
+						globalKey: entry.As,
+					}
+					want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+					continue
+				}
+				handler := &currentStateExposeHandler{
+					want:       want,
+					localKey:   entry.CurrentState,
+					parentName: parentName,
+					parentKey:  entry.As,
+				}
+				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 			}
-			handler := &currentStateExposeHandler{
-				want:       want,
-				localKey:   entry.CurrentState,
-				parentName: parentName,
-				parentKey:  entry.As,
-			}
-			want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 		}
 	}
 }
@@ -208,13 +259,16 @@ func UnregisterWant(wantName string) {
 			subscriberName := fmt.Sprintf("%s:param-expose:%s→%s", wantName, entry.As, entry.Param)
 			want.GetSubscriptionSystem().Unsubscribe(EventTypeParameterChange, subscriberName)
 		} else if entry.CurrentState != "" {
-			if parentName == "" && entry.As != "final_result" {
+			if entry.AsGoal != "" {
+				subscriberName := fmt.Sprintf("%s:goal-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.AsGoal)
+				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
+			} else if parentName == "" && entry.As != "final_result" {
 				subscriberName := fmt.Sprintf("%s:global-state-expose:%s→%s", wantName, entry.CurrentState, entry.As)
 				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
-				continue
+			} else {
+				subscriberName := fmt.Sprintf("%s:state-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.As)
+				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
 			}
-			subscriberName := fmt.Sprintf("%s:state-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.As)
-			want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
 		}
 	}
 }

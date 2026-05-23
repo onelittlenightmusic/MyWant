@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -40,11 +41,121 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.ColorMode = newConfig.ColorMode
 	s.config.CardHeight = newConfig.CardHeight
 	s.config.SoundEnabled = newConfig.SoundEnabled
+	if newConfig.IconFont != "" {
+		s.config.IconFont = newConfig.IconFont
+	}
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()
 
 	s.JSONResponse(w, http.StatusOK, s.config)
+}
+
+// Canvas Background Image
+
+const canvasBgFilename = "canvas_bg"
+
+// uploadCanvasBg handles multipart file upload for the canvas background image.
+// Accepts image/jpeg, image/png, image/webp, image/gif.
+// Saves to ~/.mywant/canvas_bg.<ext> and returns the public URL via config.
+func (s *Server) uploadCanvasBg(w http.ResponseWriter, r *http.Request) {
+	const maxSize = 10 << 20 // 10 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+	if err := r.ParseMultipartForm(maxSize); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "File too large or bad multipart", err.Error())
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Missing 'image' field", err.Error())
+		return
+	}
+	defer file.Close()
+
+	// Validate MIME type
+	contentType := header.Header.Get("Content-Type")
+	extMap := map[string]string{
+		"image/jpeg": ".jpg",
+		"image/png":  ".png",
+		"image/webp": ".webp",
+		"image/gif":  ".gif",
+	}
+	ext, ok := extMap[contentType]
+	if !ok {
+		s.JSONError(w, r, http.StatusBadRequest, "Unsupported image type", contentType)
+		return
+	}
+
+	// Determine save directory (~/.mywant/)
+	dir := filepath.Dir(s.config.ConfigPath)
+	if dir == "" || dir == "." {
+		s.JSONError(w, r, http.StatusInternalServerError, "ConfigPath not set", "")
+		return
+	}
+
+	// Remove old canvas_bg.* files before saving the new one
+	glob := filepath.Join(dir, canvasBgFilename+".*")
+	if existing, err := filepath.Glob(glob); err == nil {
+		for _, f := range existing {
+			os.Remove(f)
+		}
+	}
+
+	// Save the new file
+	destPath := filepath.Join(dir, canvasBgFilename+ext)
+	out, err := os.Create(destPath)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to create file", err.Error())
+		return
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, file); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to save file", err.Error())
+		return
+	}
+
+	// Update config and persist
+	s.config.CanvasBgURL = "/api/v1/config/canvas-bg"
+	s.saveFrontendConfig()
+
+	s.JSONResponse(w, http.StatusOK, s.config)
+}
+
+// deleteCanvasBg removes the canvas background image.
+func (s *Server) deleteCanvasBg(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Dir(s.config.ConfigPath)
+	glob := filepath.Join(dir, canvasBgFilename+".*")
+	if existing, err := filepath.Glob(glob); err == nil {
+		for _, f := range existing {
+			os.Remove(f)
+		}
+	}
+	s.config.CanvasBgURL = ""
+	s.saveFrontendConfig()
+	s.JSONResponse(w, http.StatusOK, s.config)
+}
+
+// serveCanvasBg serves the saved canvas background image file.
+func (s *Server) serveCanvasBg(w http.ResponseWriter, r *http.Request) {
+	dir := filepath.Dir(s.config.ConfigPath)
+	extMap := []string{".jpg", ".png", ".webp", ".gif"}
+	mimeMap := map[string]string{
+		".jpg":  "image/jpeg",
+		".png":  "image/png",
+		".webp": "image/webp",
+		".gif":  "image/gif",
+	}
+	for _, ext := range extMap {
+		p := filepath.Join(dir, canvasBgFilename+ext)
+		if _, err := os.Stat(p); err == nil {
+			w.Header().Set("Content-Type", mimeMap[ext])
+			w.Header().Set("Cache-Control", "no-cache")
+			http.ServeFile(w, r, p)
+			return
+		}
+	}
+	http.NotFound(w, r)
 }
 
 // System Controls

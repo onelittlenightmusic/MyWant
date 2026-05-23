@@ -39,14 +39,17 @@ const (
 	StateFieldActionByAgent    = "action_by_agent"      // Agent type that performed last action (MonitorAgent, DoAgent)
 	StateFieldAchievingPercent = "achieving_percentage" // Progress percentage of want execution (0-100)
 	StateFieldCompleted        = "completed"            // Whether the want has reached achieved status
+	StateFieldAchieved         = "achieved"             // Boolean flag set true when want reaches achieved status
 )
 
-// SystemReservedStateFields returns the list of state fields automatically managed by the framework
+// SystemReservedStateFields returns the list of state fields automatically managed by the framework.
+// These must NOT be recommended as data-flow sources in field-match recommendations.
 func SystemReservedStateFields() []string {
 	return []string{
 		StateFieldActionByAgent,
 		StateFieldAchievingPercent,
 		StateFieldCompleted,
+		StateFieldAchieved,
 		"final_result",
 	}
 }

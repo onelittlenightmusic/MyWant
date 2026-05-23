@@ -59,6 +59,11 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/using/{key}", s.removeUsingDependency).Methods("DELETE")
 	wants.HandleFunc("/{id}/using", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/relations", s.addRelation).Methods("POST")
+	wants.HandleFunc("/{id}/relations", s.removeRelation).Methods("DELETE")
+	wants.HandleFunc("/{id}/relations", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/cluster", s.getWantCluster).Methods("GET")
+	wants.HandleFunc("/{id}/cluster", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/labels/{key}", s.handleOptions).Methods("OPTIONS")
 
 	// Agents CRUD
@@ -148,6 +153,10 @@ func (s *Server) setupRoutes() {
 	// Config endpoint
 	api.HandleFunc("/config", s.getConfig).Methods("GET", "OPTIONS")
 	api.HandleFunc("/config", s.updateConfig).Methods("PUT", "OPTIONS")
+	// Canvas background image upload/serve/delete
+	api.HandleFunc("/config/canvas-bg", s.serveCanvasBg).Methods("GET")
+	api.HandleFunc("/config/canvas-bg", s.uploadCanvasBg).Methods("POST", "OPTIONS")
+	api.HandleFunc("/config/canvas-bg", s.deleteCanvasBg).Methods("DELETE", "OPTIONS")
 
 	// Global State endpoint
 	api.HandleFunc("/global-state", s.getGlobalState).Methods("GET", "OPTIONS")

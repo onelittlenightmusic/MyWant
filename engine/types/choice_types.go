@@ -24,7 +24,6 @@ func (c *ChoiceWant) GetLocals() *ChoiceLocals {
 }
 
 func (c *ChoiceWant) Initialize() {
-	c.StoreState("target_param", c.GetStringParam("target_param", ""))
 	// Initial selection can be provided via 'default' param
 	if def := c.GetStringParam("default", ""); def != "" {
 		c.StoreState("selected", def)
@@ -33,12 +32,17 @@ func (c *ChoiceWant) Initialize() {
 
 // IsAchieved always returns false — choice is a persistent control.
 func (c *ChoiceWant) IsAchieved() bool { return false }
+
 func (c *ChoiceWant) Progress() {
 	// choices is populated via spec.imports (global state → local key).
 	// getState("choices") transparently reads from global state — no explicit fetch needed.
-	targetParam := c.GetStringParam("target_param", "")
-	selected, _ := c.GetCurrent("selected")
-	if selected != nil && targetParam != "" {
-		c.PropagateParameter(targetParam, selected)
+	//
+	// The selected value is propagated to the parent via expose entries, e.g.:
+	//   exposes:
+	//     - currentState: "selected"
+	//       asGoal: "target_key"
+	// Re-emit on each tick to ensure initial propagation fires after RegisterWant.
+	if selected, ok := c.GetCurrent("selected"); ok && selected != nil {
+		c.SetCurrent("selected", selected)
 	}
 }
