@@ -29,18 +29,19 @@ func (s *Server) validateWant(w http.ResponseWriter, r *http.Request) {
 		ValidatedAt: time.Now().Format(time.RFC3339),
 	}
 
-	var config mywant.Config
+	var wants []*mywant.Want
 	var parseErr error
 
-	if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
-		parseErr = yaml.Unmarshal(data, &config)
+	isYAML := r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml"
+	if isYAML {
+		parseErr = yaml.Unmarshal(data, &wants)
 	} else {
-		parseErr = json.Unmarshal(data, &config)
+		parseErr = json.Unmarshal(data, &wants)
 	}
 
-	if parseErr != nil || len(config.Wants) == 0 {
+	if parseErr != nil || len(wants) == 0 {
 		var newWant *mywant.Want
-		if r.Header.Get("Content-Type") == "application/yaml" || r.Header.Get("Content-Type") == "text/yaml" {
+		if isYAML {
 			parseErr = yaml.Unmarshal(data, &newWant)
 		} else {
 			parseErr = json.Unmarshal(data, &newWant)
@@ -57,14 +58,14 @@ func (s *Server) validateWant(w http.ResponseWriter, r *http.Request) {
 			json.NewEncoder(w).Encode(result)
 			return
 		}
-		config = mywant.Config{Wants: []*mywant.Want{newWant}}
+		wants = []*mywant.Want{newWant}
 	}
 
-	result.WantCount = len(config.Wants)
-	s.collectFatalErrors(&config, &result)
+	result.WantCount = len(wants)
+	s.collectFatalErrors(wants, &result)
 
 	if result.Valid {
-		s.collectWarnings(&config, &result)
+		s.collectWarnings(wants, &result)
 	}
 
 	statusCode := http.StatusOK
@@ -76,8 +77,8 @@ func (s *Server) validateWant(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
-func (s *Server) validateWantTypes(config mywant.Config) error {
-	for _, want := range config.Wants {
+func (s *Server) validateWantTypes(wants []*mywant.Want) error {
+	for _, want := range wants {
 		wantType := want.Metadata.Type
 		hasRecipe := want.Spec.Recipe != ""
 
@@ -103,8 +104,8 @@ func (s *Server) validateWantTypes(config mywant.Config) error {
 	return nil
 }
 
-func (s *Server) validateWantSpec(config mywant.Config) error {
-	for _, want := range config.Wants {
+func (s *Server) validateWantSpec(wants []*mywant.Want) error {
+	for _, want := range wants {
 		for i, selector := range want.Spec.Using {
 			for key := range selector {
 				if key == "" {
@@ -159,8 +160,8 @@ func (s *Server) validateOwnerReferences(want *mywant.Want) error {
 	return nil
 }
 
-func (s *Server) collectFatalErrors(config *mywant.Config, result *ValidationResult) {
-	for _, want := range config.Wants {
+func (s *Server) collectFatalErrors(wants []*mywant.Want, result *ValidationResult) {
+	for _, want := range wants {
 		wantName := want.Metadata.Name
 		if wantName == "" {
 			wantName = want.Metadata.Type
@@ -289,8 +290,8 @@ func (s *Server) validateRequiredParameters(want *mywant.Want) []ValidationError
 	return errors
 }
 
-func (s *Server) collectWarnings(config *mywant.Config, result *ValidationResult) {
-	for _, want := range config.Wants {
+func (s *Server) collectWarnings(wants []*mywant.Want, result *ValidationResult) {
+	for _, want := range wants {
 		if warnings := s.checkDependencySatisfaction(want); len(warnings) > 0 {
 			result.Warnings = append(result.Warnings, warnings...)
 		}

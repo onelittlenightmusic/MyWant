@@ -211,18 +211,6 @@ func (s *Server) findWantByIDOrName(idOrName string) *mywant.Want {
 			return want
 		}
 	}
-	for _, execution := range s.wants {
-		if execution.Builder != nil {
-			// Try by ID first
-			if want, _, found := execution.Builder.FindWantByID(idOrName); found {
-				return want
-			}
-			// Try by Name
-			if want, found := execution.Builder.FindWantByName(idOrName); found {
-				return want
-			}
-		}
-	}
 	return nil
 }
 

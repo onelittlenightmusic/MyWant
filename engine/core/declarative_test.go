@@ -94,57 +94,51 @@ func TestWantExecCycle(t *testing.T) {
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  Config
+		wants   []*Want
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: Config{
-				Wants: []*Want{
-					{
-						Metadata: Metadata{Name: "test", Type: "test"},
-						Spec:     WantSpec{},
-					},
+			wants: []*Want{
+				{
+					Metadata: Metadata{Name: "test", Type: "test"},
+					Spec:     WantSpec{},
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "empty config",
-			config: Config{
-				Wants: []*Want{},
-			},
+			name:    "empty config",
+			wants:   []*Want{},
 			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Basic validation test - ensure config can be created
-			if len(tt.config.Wants) < 0 {
-				t.Error("Invalid config structure")
+			// Basic validation test - ensure wants can be created
+			if len(tt.wants) < 0 {
+				t.Error("Invalid wants structure")
 			}
 		})
 	}
 }
 
 func TestChainBuilderCreation(t *testing.T) {
-	config := Config{
-		Wants: []*Want{
-			{
-				Metadata: Metadata{Name: "test", Type: "test"},
-				Spec:     WantSpec{},
-			},
+	wants := []*Want{
+		{
+			Metadata: Metadata{Name: "test", Type: "test"},
+			Spec:     WantSpec{},
 		},
 	}
 
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(wants)
 	if builder == nil {
 		t.Error("Expected ChainBuilder to be created")
 	}
 
-	if len(builder.config.Wants) != 1 {
-		t.Errorf("Expected 1 want, got %d", len(builder.config.Wants))
+	if len(builder.config) != 1 {
+		t.Errorf("Expected 1 want, got %d", len(builder.config))
 	}
 }
 

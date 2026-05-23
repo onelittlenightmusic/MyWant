@@ -14,21 +14,19 @@ func main() {
 	fmt.Println("This demo tests the parameterHistory functionality by")
 	fmt.Println("creating a simple want and then updating its parameters")
 	fmt.Println("multiple times to verify parameter history tracking.")
-	config := mywant.Config{
-		Wants: []*mywant.Want{
-			{
-				Metadata: mywant.Metadata{
-					Name: "test-want",
-					Type: "numbers",
-					Labels: map[string]string{
-						"role": "test",
-					},
+	config := []*mywant.Want{
+		{
+			Metadata: mywant.Metadata{
+				Name: "test-want",
+				Type: "numbers",
+				Labels: map[string]string{
+					"role": "test",
 				},
-				Spec: mywant.WantSpec{
-					Params: map[string]any{
-						"count": 100,
-						"rate":  1.0,
-					},
+			},
+			Spec: mywant.WantSpec{
+				Params: map[string]any{
+					"count": 100,
+					"rate":  1.0,
 				},
 			},
 		},
@@ -36,7 +34,7 @@ func main() {
 	builder := mywant.NewChainBuilder(config)
 
 	fmt.Println("🔧 Creating test want...")
-	testWant := config.Wants[0]
+	testWant := config[0]
 	testWant.State.Store("initial_state", "initialized")
 
 	fmt.Println("📝 Testing parameter updates...")

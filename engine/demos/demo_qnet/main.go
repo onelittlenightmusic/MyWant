@@ -23,8 +23,8 @@ func main() {
 		return
 	}
 
-	fmt.Printf("Loaded %d nodes from configuration\n", len(config.Wants))
-	builder := mywant.NewChainBuilder(config)
+	fmt.Printf("Loaded %d nodes from configuration\n", len(config))
+	builder := mywant.NewChainBuilder(mywant.WantDTOSliceToRuntime(config))
 
 	// Register qnet node types
 

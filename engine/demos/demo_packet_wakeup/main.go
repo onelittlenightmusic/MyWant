@@ -24,8 +24,8 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config.Wants))
-	builder := mywant.NewChainBuilder(config)
+	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config))
+	builder := mywant.NewChainBuilder(mywant.WantDTOSliceToRuntime(config))
 
 	// Register want types
 

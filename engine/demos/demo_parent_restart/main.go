@@ -11,26 +11,24 @@ func main() {
 	fmt.Println("🧪 Testing Parent-Child Lifecycle with Parameter Updates")
 	fmt.Println("=========================================================")
 	fmt.Println()
-	config := mywant.Config{
-		Wants: []*mywant.Want{
-			{
-				Metadata: mywant.Metadata{
-					Name: "test-target",
-					Type: "target",
-					Labels: map[string]string{
-						"role": "parent",
-					},
+	config := []*mywant.Want{
+		{
+			Metadata: mywant.Metadata{
+				Name: "test-target",
+				Type: "target",
+				Labels: map[string]string{
+					"role": "parent",
 				},
-				Spec: mywant.WantSpec{
-					Params: map[string]any{
-						"max_display":  100,
-						"count":        50,
-						"rate":         10.0,
-						"service_time": 0.1,
-					},
-				},
-				Status: mywant.WantStatusIdle,
 			},
+			Spec: mywant.WantSpec{
+				Params: map[string]any{
+					"max_display":  100,
+					"count":        50,
+					"rate":         10.0,
+					"service_time": 0.1,
+				},
+			},
+			Status: mywant.WantStatusIdle,
 		},
 	}
 	builder := mywant.NewChainBuilder(config)

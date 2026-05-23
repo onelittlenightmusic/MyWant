@@ -60,7 +60,7 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 				return
 			}
 
-			wants := recipeConfig.Config.Wants
+			wants := recipeConfig.Wants
 			if len(wants) == 0 {
 				deploymentErrors <- fmt.Errorf("instance %d: recipe produced no wants", idx)
 				return
@@ -75,9 +75,8 @@ func TestConcurrentPrimeSieveDeployment(t *testing.T) {
 				ids = append(ids, want.Metadata.ID)
 			}
 
-			// Create payload
-			configPayload := mywant.Config{Wants: wants}
-			body, err := json.Marshal(configPayload)
+			// Create payload — API accepts a bare []*mywant.Want array
+			body, err := json.Marshal(wants)
 			if err != nil {
 				deploymentErrors <- fmt.Errorf("instance %d: failed to marshal: %v", idx, err)
 				return

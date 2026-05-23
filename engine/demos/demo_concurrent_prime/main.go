@@ -15,7 +15,7 @@ func main() {
 	log.Println("Deploying 10 prime sieve instances in parallel...")
 
 	// Create ChainBuilder
-	cb := NewChainBuilder(Config{})
+	cb := NewChainBuilder([]*Want{})
 
 	// Register prime types
 
@@ -48,7 +48,7 @@ func main() {
 				errors <- fmt.Errorf("instance %d: failed to instantiate: %v", idx, err)
 				return
 			}
-			wants := recipeConfig.Config.Wants
+			wants := recipeConfig.Wants
 
 			// Add wants
 			err = cb.AddWantsAsync(wants)

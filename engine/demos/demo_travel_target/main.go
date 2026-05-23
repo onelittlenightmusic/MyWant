@@ -25,17 +25,17 @@ func main() {
 		return
 	}
 
-	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config.Wants))
+	fmt.Printf("📝 Loaded %d wants from configuration\n", len(config))
 
 	// Show target want details
-	for _, want := range config.Wants {
+	for _, want := range config {
 		if want.Metadata.Type == "target" {
 			fmt.Printf("🎯 Target Want: %s\n", want.Metadata.Name)
 			fmt.Printf("  Type: %s\n", want.Metadata.Type)
 			fmt.Printf("  Parameters: %v\n", want.Spec.Params)
 		}
 	}
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(WantDTOSliceToRuntime(config))
 
 	// Register travel want types first
 

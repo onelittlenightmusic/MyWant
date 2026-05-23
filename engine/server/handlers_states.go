@@ -7,43 +7,16 @@ import (
 	mywant "mywant/engine/core"
 )
 
-// getAllWants returns all runtime Want instances from all executions and the globalBuilder.
+// getAllWants returns all runtime Want instances from the globalBuilder.
 func (s *Server) getAllWants() []*mywant.Want {
-	s.wantsMu.RLock()
-	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
-	s.wantsMu.RUnlock()
-
-	var result []*mywant.Want
-	for _, exec := range executions {
-		if exec.Builder != nil {
-			result = append(result, exec.Builder.GetWants()...)
-		}
-	}
 	if s.globalBuilder != nil {
-		result = append(result, s.globalBuilder.GetWants()...)
+		return s.globalBuilder.GetWants()
 	}
-	return result
+	return nil
 }
 
-// findWantByIDInAll finds a Want by ID across all executions and the globalBuilder.
+// findWantByIDInAll finds a Want by ID in the globalBuilder.
 func (s *Server) findWantByIDInAll(wantID string) *mywant.Want {
-	s.wantsMu.RLock()
-	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
-	s.wantsMu.RUnlock()
-
-	for _, exec := range executions {
-		if exec.Builder != nil {
-			if want, _, found := exec.Builder.FindWantByID(wantID); found {
-				return want
-			}
-		}
-	}
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			return want

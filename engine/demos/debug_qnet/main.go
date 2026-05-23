@@ -7,34 +7,32 @@ import (
 )
 
 func main() {
-	config := mywant.Config{
-		Wants: []*mywant.Want{
-			{
-				Metadata: mywant.Metadata{
-					Name:   "gen",
-					Type:   "qnet numbers",
-					Labels: map[string]string{"role": "source"},
-				},
-				Spec: mywant.WantSpec{
-					Params: map[string]any{
-						"count":         5,
-						"rate":          1.0,
-						"deterministic": true,
-					},
+	config := []*mywant.Want{
+		{
+			Metadata: mywant.Metadata{
+				Name:   "gen",
+				Type:   "qnet numbers",
+				Labels: map[string]string{"role": "source"},
+			},
+			Spec: mywant.WantSpec{
+				Params: map[string]any{
+					"count":         5,
+					"rate":          1.0,
+					"deterministic": true,
 				},
 			},
-			{
-				Metadata: mywant.Metadata{
-					Name:   "queue",
-					Type:   "qnet queue",
-					Labels: map[string]string{"role": "processor"},
+		},
+		{
+			Metadata: mywant.Metadata{
+				Name:   "queue",
+				Type:   "qnet queue",
+				Labels: map[string]string{"role": "processor"},
+			},
+			Spec: mywant.WantSpec{
+				Params: map[string]any{
+					"service_time": 0.1,
 				},
-				Spec: mywant.WantSpec{
-					Params: map[string]any{
-						"service_time": 0.1,
-					},
-					Using: []map[string]string{{"role": "source"}},
-				},
+				Using: []map[string]string{{"role": "source"}},
 			},
 		},
 	}

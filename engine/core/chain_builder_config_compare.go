@@ -56,11 +56,11 @@ func mapsEqual(a, b map[string]string) bool {
 	return true
 }
 
-// deepCopyConfig creates a deep copy of a Config to prevent reference aliasing This is critical for change detection to work correctly
-func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
-	// Copy the wants slice with new Want objects
-	copiedWants := make([]*Want, 0, len(src.Wants))
-	for _, want := range src.Wants {
+// deepCopyWants creates a deep copy of a []*Want slice to prevent reference aliasing.
+// This is critical for change detection to work correctly.
+func (cb *ChainBuilder) deepCopyWants(src []*Want) []*Want {
+	copiedWants := make([]*Want, 0, len(src))
+	for _, want := range src {
 		// Deep copy the want
 		copiedWant := &Want{
 			Metadata: Metadata{
@@ -85,7 +85,7 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 		copiedWants = append(copiedWants, copiedWant)
 	}
 
-	return Config{Wants: copiedWants}
+	return copiedWants
 }
 
 // Helper functions for deep copying

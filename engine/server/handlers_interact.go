@@ -202,11 +202,11 @@ func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Apply modifications if provided
-	config := recommendation.Config
+	wants := recommendation.Wants
 	if req.Modifications != nil {
 		// Apply parameter overrides
 		if req.Modifications.ParameterOverrides != nil {
-			for _, want := range config.Wants {
+			for _, want := range wants {
 				for key, value := range req.Modifications.ParameterOverrides {
 					want.Spec.SetParam(key, value)
 				}
@@ -221,17 +221,17 @@ func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
 			}
 
 			var filteredWants []*mywant.Want
-			for _, want := range config.Wants {
+			for _, want := range wants {
 				if !disabledSet[want.Metadata.Name] {
 					filteredWants = append(filteredWants, want)
 				}
 			}
-			config.Wants = filteredWants
+			wants = filteredWants
 		}
 	}
 
 	// Assign IDs to wants
-	for _, want := range config.Wants {
+	for _, want := range wants {
 		if want.Metadata.ID == "" {
 			want.Metadata.ID = generateWantID()
 		}
@@ -241,13 +241,12 @@ func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
 	executionID := generateWantID()
 	execution := &WantExecution{
 		ID:      executionID,
-		Config:  config,
+		Wants:   mywant.RuntimeWantsToDTOSlice(wants),
 		Status:  "created",
-		Builder: s.globalBuilder,
 	}
 	s.wants[executionID] = execution
 
-	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(wants)
 	if err != nil {
 		delete(s.wants, executionID)
 		errorMsg := fmt.Sprintf("Failed to deploy wants: %v", err)

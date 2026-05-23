@@ -25,7 +25,7 @@ func main() {
 		},
 	}
 
-	config := &mywant.Config{Wants: wants}
+	config := &wants
 
 	fmt.Println("Creating ChainBuilder...")
 	builder := mywant.NewChainBuilder(*config)

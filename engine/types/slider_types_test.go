@@ -48,7 +48,7 @@ func TestSliderWant_PropagatesValueToParent(t *testing.T) {
 	}
 
 	// Set up ChainBuilder so GetParentWant can find the parent via FindWantByID
-	cb := NewChainBuilder(Config{Wants: []*Want{parent}})
+	cb := NewChainBuilder([]*Want{parent})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 

@@ -23,14 +23,14 @@ func main() {
 		return
 	}
 
-	fmt.Printf("📋 Loaded configuration with %d wants\n", len(config.Wants))
-	for _, want := range config.Wants {
+	fmt.Printf("📋 Loaded configuration with %d wants\n", len(config))
+	for _, want := range config {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 		if len(want.Spec.Requires) > 0 {
 			fmt.Printf("    Requires: %v\n", want.Spec.Requires)
 		}
 	}
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(WantDTOSliceToRuntime(config))
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities and agents

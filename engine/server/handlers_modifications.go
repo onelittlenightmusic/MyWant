@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,22 +25,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 
 	wantsByID := make(map[string]*mywant.Want)
 
-	for _, execution := range s.wants {
-		currentStates := execution.Builder.GetAllWantStates()
-		for _, want := range currentStates {
-			wantCopy := &mywant.Want{
-				Metadata:    want.Metadata,
-				Spec:        want.Spec,
-				Status:      want.GetStatus(),
-				History:     want.BuildHistory(),
-				HiddenState: want.GetHiddenState(),
-			}
-			mywant.StoreStateMulti(wantCopy, want.GetExplicitState())
-			wantsByID[want.Metadata.ID] = wantCopy
-		}
-	}
-
-	if len(wantsByID) == 0 && s.globalBuilder != nil {
+	if s.globalBuilder != nil {
 		currentStates := s.globalBuilder.GetAllWantStates()
 		for _, want := range currentStates {
 			wantCopy := &mywant.Want{
@@ -78,8 +64,7 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
 	})
 
-	config := mywant.Config{Wants: allWants}
-	yamlData, err := yaml.Marshal(&config)
+	yamlData, err := yaml.Marshal(allWants)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -96,29 +81,29 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 	io.Copy(&buf, r.Body)
 	data := buf.Bytes()
 
-	var config mywant.Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	var importedWants []*mywant.Want
+	if err := yaml.Unmarshal(data, &importedWants); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	for _, want := range config.Wants {
+	for _, want := range importedWants {
 		if want.Metadata.ID == "" {
 			http.Error(w, "Imported wants must have IDs", http.StatusBadRequest)
 			return
 		}
 	}
 
+	dtoWants := mywant.RuntimeWantsToDTOSlice(importedWants)
 	executionID := generateWantID()
 	execution := &WantExecution{
 		ID:      executionID,
-		Config:  config,
+		Wants:   dtoWants,
 		Status:  "created",
-		Builder: s.globalBuilder,
 	}
 	s.wants[executionID] = execution
 
-	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(importedWants)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -131,9 +116,9 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
-		for _, want := range config.Wants {
-			if importedWant, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
-				mywant.StoreStateMulti(importedWant, want.GetAllState())
+		for _, want := range importedWants {
+			if rw, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
+				mywant.StoreStateMulti(rw, want.GetAllState())
 			}
 		}
 	}()
@@ -208,4 +193,144 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{"message": "removed"})
+}
+
+// addRelation adds an expose entry to a want's Spec.Exposes.
+//
+// POST /api/v1/wants/{id}/relations
+// Body: { "as": "temperature", "currentState": "temperature" }
+//
+//	or: { "as": "temperature", "param": "temperature" }
+func (s *Server) addRelation(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	var req struct {
+		As           string `json:"as"`
+		Param        string `json:"param,omitempty"`
+		CurrentState string `json:"currentState,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.As == "" {
+		http.Error(w, `{"error":"as is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found {
+		http.Error(w, `{"error":"want not found"}`, http.StatusNotFound)
+		return
+	}
+
+	entry := mywant.ExposeEntry{
+		As:           req.As,
+		Param:        req.Param,
+		CurrentState: req.CurrentState,
+	}
+	want.Spec.Exposes = append(want.Spec.Exposes, entry)
+	s.globalBuilder.UpdateWant(want)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{"message": "added"})
+}
+
+// removeRelation removes an expose entry from a want's Spec.Exposes.
+//
+// DELETE /api/v1/wants/{id}/relations
+// Body: { "label": "expose/temperature" }
+//
+// The label must start with "expose/". The "expose/" prefix is stripped to obtain
+// the ExposeEntry.As key. Returns 404 if no matching entry is found.
+func (s *Server) removeRelation(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	var req struct {
+		Label string `json:"label"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Label == "" {
+		http.Error(w, `{"error":"label is required"}`, http.StatusBadRequest)
+		return
+	}
+	asKey := strings.TrimPrefix(req.Label, "expose/")
+	if asKey == req.Label {
+		http.Error(w, `{"error":"label must start with expose/"}`, http.StatusBadRequest)
+		return
+	}
+
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found {
+		http.Error(w, `{"error":"want not found"}`, http.StatusNotFound)
+		return
+	}
+
+	newExposes := make([]mywant.ExposeEntry, 0, len(want.Spec.Exposes))
+	removed := false
+	for _, e := range want.Spec.Exposes {
+		if e.As == asKey {
+			removed = true
+		} else {
+			newExposes = append(newExposes, e)
+		}
+	}
+	if !removed {
+		http.Error(w, `{"error":"expose entry not found"}`, http.StatusNotFound)
+		return
+	}
+
+	want.Spec.Exposes = newExposes
+	s.globalBuilder.UpdateWant(want)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]any{"message": "removed"})
+}
+
+// getWantCluster returns all wants in the same expose-based cluster as the given want.
+//
+// GET /api/v1/wants/{id}/cluster
+//
+// A cluster is the connected component reachable via expose-based stateAccess
+// correlations (labels prefixed "stateAccess/consumer:expose/" or
+// "stateAccess/provider:expose/").  The response includes the root want itself.
+func (s *Server) getWantCluster(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+
+	// BFS through expose-linked correlations to find all cluster members.
+	visited := map[string]bool{wantID: true}
+	queue := []string{wantID}
+	var members []ClusterMember
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		want, _, found := s.globalBuilder.FindWantByID(current)
+		if !found {
+			continue
+		}
+
+		x, _ := strconv.Atoi(want.Metadata.Labels["mywant.io/canvas-x"])
+		y, _ := strconv.Atoi(want.Metadata.Labels["mywant.io/canvas-y"])
+		members = append(members, ClusterMember{
+			ID:   current,
+			Name: want.Metadata.Name,
+			X:    x,
+			Y:    y,
+		})
+
+		for _, corr := range want.Metadata.Correlation {
+			if visited[corr.WantID] {
+				continue
+			}
+			for _, l := range corr.Labels {
+				if strings.HasPrefix(l, "stateAccess/consumer:expose/") ||
+					strings.HasPrefix(l, "stateAccess/provider:expose/") {
+					visited[corr.WantID] = true
+					queue = append(queue, corr.WantID)
+					break
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(ClusterResponse{
+		RootID:  wantID,
+		Members: members,
+	})
 }

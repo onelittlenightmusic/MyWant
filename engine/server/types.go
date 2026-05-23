@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	mywant "mywant/engine/core"
+	want_spec "github.com/onelittlenightmusic/want-spec"
 )
 
 // Config holds server configuration
@@ -45,11 +46,10 @@ type ErrorHistoryEntry struct {
 
 // WantExecution represents a running want execution
 type WantExecution struct {
-	ID      string               `json:"id"`
-	Config  mywant.Config        `json:"config"`
-	Status  string               `json:"status"`
-	Results map[string]any       `json:"results,omitempty"`
-	Builder *mywant.ChainBuilder `json:"-"` // Don't serialize builder
+	ID      string            `json:"id"`
+	Wants   []*want_spec.Want `json:"wants"` // DTO snapshot of wants in this execution
+	Status  string            `json:"status"`
+	Results map[string]any    `json:"results,omitempty"`
 }
 
 // LLMRequest represents a request to the LLM inference API
@@ -167,4 +167,19 @@ type StateSearchResponse struct {
 	Field   string              `json:"field"`
 	Results []StateSearchResult `json:"results"`
 	Total   int                 `json:"total"`
+}
+
+// ClusterMember represents a single want in a cluster, with its canvas position.
+type ClusterMember struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	X    int    `json:"x"`
+	Y    int    `json:"y"`
+}
+
+// ClusterResponse is the response for GET /api/v1/wants/{id}/cluster.
+// Members includes the root want itself.
+type ClusterResponse struct {
+	RootID  string          `json:"rootId"`
+	Members []ClusterMember `json:"members"`
 }

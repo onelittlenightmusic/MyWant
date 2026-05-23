@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	mywant "mywant/engine/core"
+	want_spec "github.com/onelittlenightmusic/want-spec"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
@@ -40,20 +42,6 @@ func (s *Server) listWantHashes(w http.ResponseWriter, r *http.Request) {
 
 	wantsByID := make(map[string]*mywant.Want)
 
-	s.wantsMu.RLock()
-	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
-	s.wantsMu.RUnlock()
-
-	for _, execution := range executions {
-		if execution.Builder != nil && execution.Builder != s.globalBuilder {
-			for _, want := range execution.Builder.GetAllWantStates() {
-				wantsByID[want.Metadata.ID] = want
-			}
-		}
-	}
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
 			wantsByID[want.Metadata.ID] = want
@@ -102,52 +90,55 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// First try to parse as a Config
-	var config mywant.Config
-	var configErr error
-
 	contentType := r.Header.Get("Content-Type")
+
+	// Try to parse as []*want_spec.Want (bare array)
+	var dtoWants []*want_spec.Want
+	var parseErr error
 	if strings.Contains(contentType, "yaml") {
-		configErr = yaml.Unmarshal(data, &config)
+		parseErr = yaml.Unmarshal(data, &dtoWants)
 	} else {
-		configErr = json.Unmarshal(data, &config)
+		parseErr = json.Unmarshal(data, &dtoWants)
 	}
 
-	// If config parsing failed or has no wants, try parsing as single Want
-	if configErr != nil || len(config.Wants) == 0 {
-		var newWant *mywant.Want
+	// Fallback: try parsing as a single want_spec.Want
+	if parseErr != nil || len(dtoWants) == 0 {
+		var singleDTO *want_spec.Want
 		if strings.Contains(contentType, "yaml") {
-			configErr = yaml.Unmarshal(data, &newWant)
+			parseErr = yaml.Unmarshal(data, &singleDTO)
 		} else {
-			configErr = json.Unmarshal(data, &newWant)
+			parseErr = json.Unmarshal(data, &singleDTO)
 		}
-
-		if configErr != nil || newWant == nil {
-			s.JSONError(w, r, http.StatusBadRequest, "Invalid request: must be either a Want object or Config with wants array", configErr.Error())
+		if parseErr != nil || singleDTO == nil {
+			s.JSONError(w, r, http.StatusBadRequest, "Invalid request: must be a Want object or array of Wants", parseErr.Error())
 			return
 		}
-		config = mywant.Config{Wants: []*mywant.Want{newWant}}
+		dtoWants = []*want_spec.Want{singleDTO}
 	}
 
+	// Convert DTOs to runtime wants
+	runtimeWants := mywant.WantDTOSliceToRuntime(dtoWants)
+
 	// Resolve fromGlobalParam references in spec.when using parameters.yaml values
-	if err := mywant.ResolveFromGlobalParams(config.Wants); err != nil {
+	if err := mywant.ResolveFromGlobalParams(runtimeWants); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Failed to resolve fromGlobalParam", err.Error())
 		return
 	}
 
-	if err := s.validateWantTypes(config); err != nil {
+	if err := s.validateWantTypes(runtimeWants); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid want type", err.Error())
 		return
 	}
-	if err := s.validateWantSpec(config); err != nil {
+	if err := s.validateWantSpec(runtimeWants); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid want spec", err.Error())
 		return
 	}
 
 	// Assign IDs and apply want type defaults
-	for _, want := range config.Wants {
+	for i, want := range runtimeWants {
 		if want.Metadata.ID == "" {
 			want.Metadata.ID = generateWantID()
+			dtoWants[i].Metadata.ID = want.Metadata.ID
 		}
 
 		// Apply want type definition defaults
@@ -155,6 +146,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		if typeDef != nil {
 			if len(want.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
 				want.Spec.Requires = typeDef.Requires
+				dtoWants[i].Spec.Requires = typeDef.Requires
 			}
 		}
 	}
@@ -168,25 +160,25 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, want := range config.Wants {
+	for i, want := range runtimeWants {
 		if want.Metadata.OrderKey == "" {
 			lastOrderKey = mywant.GenerateOrderKeyAfter(lastOrderKey)
 			want.Metadata.OrderKey = lastOrderKey
+			dtoWants[i].Metadata.OrderKey = lastOrderKey
 		}
 	}
 
 	executionID := generateWantID()
 	execution := &WantExecution{
 		ID:      executionID,
-		Config:  config,
+		Wants:   dtoWants,
 		Status:  "created",
-		Builder: s.globalBuilder,
 	}
 	s.wantsMu.Lock()
 	s.wants[executionID] = execution
 	s.wantsMu.Unlock()
 
-	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(config.Wants)
+	wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(runtimeWants)
 	if err != nil {
 		s.wantsMu.Lock()
 		delete(s.wants, executionID)
@@ -196,15 +188,15 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wantNames := []string{}
-	for _, want := range config.Wants {
+	for _, want := range runtimeWants {
 		wantNames = append(wantNames, want.Metadata.Name)
 	}
-	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(config.Wants)))
+	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(runtimeWants)))
 
 	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"id":       executionID,
 		"status":   execution.Status,
-		"wants":    len(config.Wants),
+		"wants":    len(runtimeWants),
 		"want_ids": wantIDs,
 		"message":  "Wants created and added to execution queue",
 	})
@@ -235,21 +227,6 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wantsByID := make(map[string]*mywant.Want)
-
-	s.wantsMu.RLock()
-	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
-	s.wantsMu.RUnlock()
-
-	for _, execution := range executions {
-		if execution.Builder != nil && execution.Builder != s.globalBuilder {
-			for _, want := range execution.Builder.GetAllWantStates() {
-				wantsByID[want.Metadata.ID] = want
-			}
-		}
-	}
 
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
@@ -387,13 +364,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 
-	s.wantsMu.RLock()
-	executions := make([]*WantExecution, 0, len(s.wants))
-	for _, exec := range s.wants {
-		executions = append(executions, exec)
-	}
-	s.wantsMu.RUnlock()
-
 	serveWantResponse := func(want *mywant.Want) {
 		resp := buildWantAPIResponse(want, includeConnectivity)
 		w.Header().Set("ETag", `"`+resp.Hash+`"`)
@@ -403,21 +373,6 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.JSONResponse(w, http.StatusOK, resp)
-	}
-
-	for _, execution := range executions {
-		if execution.Builder != nil {
-			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				serveWantResponse(want)
-				return
-			}
-		}
-		for _, want := range execution.Config.Wants {
-			if want.Metadata.ID == wantID {
-				s.JSONResponse(w, http.StatusOK, want)
-				return
-			}
-		}
 	}
 
 	if s.globalBuilder != nil {
@@ -432,37 +387,9 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
-	var targetExecution *WantExecution
-	var targetWantIndex int = -1
 	var foundWant *mywant.Want
 
-	s.wantsMu.RLock()
-	for _, execution := range s.wants {
-		if execution.Builder != nil {
-			if want, _, found := execution.Builder.FindWantByID(wantID); found {
-				targetExecution, foundWant = execution, want
-				for j, cw := range execution.Config.Wants {
-					if cw.Metadata.ID == wantID {
-						targetWantIndex = j
-						break
-					}
-				}
-				break
-			}
-		}
-		for j, cw := range execution.Config.Wants {
-			if cw.Metadata.ID == wantID {
-				targetExecution, foundWant, targetWantIndex = execution, cw, j
-				break
-			}
-		}
-		if foundWant != nil {
-			break
-		}
-	}
-	s.wantsMu.RUnlock()
-
-	if foundWant == nil && s.globalBuilder != nil {
+	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			foundWant = want
 		}
@@ -479,21 +406,18 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Detect unknown WantSpec fields — signals the client was built against a
+	// newer want-spec than this engine.  Log a warning so operators can upgrade.
+	if unknown := updatedWant.Spec.UnknownFields; len(unknown) > 0 {
+		log.Printf("[WARN][want-spec drift] PUT /api/v1/wants/%s: unknown spec fields received: %v — client may be using a newer want-spec version than this engine", wantID, unknown)
+	}
+
 	updatedWant.Metadata.ID = foundWant.Metadata.ID
 	if updatedWant.Metadata.OwnerReferences == nil {
 		updatedWant.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
 	}
 
-	if targetExecution != nil {
-		if targetWantIndex >= 0 {
-			targetExecution.Config.Wants[targetWantIndex] = updatedWant
-		} else {
-			targetExecution.Config.Wants = append(targetExecution.Config.Wants, updatedWant)
-		}
-		if targetExecution.Builder != nil {
-			targetExecution.Builder.UpdateWant(updatedWant)
-		}
-	} else if s.globalBuilder != nil {
+	if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
 	}
 
@@ -503,35 +427,6 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
-	var targetBuilder *mywant.ChainBuilder
-	var targetExecutionID string
-
-	s.wantsMu.RLock()
-	for eid, exec := range s.wants {
-		if exec.Builder != nil {
-			for _, want := range exec.Builder.GetAllWantStates() {
-				if want.Metadata.ID == wantID {
-					targetBuilder, targetExecutionID = exec.Builder, eid
-					break
-				}
-			}
-		}
-		if targetBuilder != nil {
-			break
-		}
-	}
-	s.wantsMu.RUnlock()
-
-	if targetBuilder != nil {
-		targetBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
-		s.wantsMu.Lock()
-		if exec, ok := s.wants[targetExecutionID]; ok && len(exec.Config.Wants) == 0 {
-			delete(s.wants, targetExecutionID)
-		}
-		s.wantsMu.Unlock()
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
 
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {

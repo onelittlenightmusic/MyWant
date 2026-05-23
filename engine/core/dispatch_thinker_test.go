@@ -33,7 +33,7 @@ func getRuntimeWant(t *testing.T, cb *ChainBuilder, id string) *Want {
 // TestInterpretDirections verifies that InterpretDirections converts directions + direction_map
 // into DispatchRequests and writes them to the parent state via ProposeDispatch.
 func TestInterpretDirections(t *testing.T) {
-	cb := NewChainBuilder(Config{Wants: []*Want{}})
+	cb := NewChainBuilder([]*Want{})
 	SetGlobalChainBuilder(cb)
 	go cb.reconcileLoop()
 	defer cb.Stop()
@@ -151,7 +151,7 @@ func TestInterpretDirections(t *testing.T) {
 // TestDispatchThinkerRealizesDesiredDispatch verifies that DispatchThinker reads
 // desired_dispatch from its own state and creates child wants via AddChildWant.
 func TestDispatchThinkerRealizesDesiredDispatch(t *testing.T) {
-	cb := NewChainBuilder(Config{Wants: []*Want{}})
+	cb := NewChainBuilder([]*Want{})
 	SetGlobalChainBuilder(cb)
 	go cb.reconcileLoop()
 	defer cb.Stop()
@@ -222,7 +222,7 @@ func TestDispatchThinkerRealizesDesiredDispatch(t *testing.T) {
 // TestProposeDispatchOverwrites verifies that ProposeDispatch overwrites (not appends)
 // so that OPA replanning with fewer directions is handled correctly.
 func TestProposeDispatchOverwrites(t *testing.T) {
-	cb := NewChainBuilder(Config{Wants: []*Want{}})
+	cb := NewChainBuilder([]*Want{})
 	SetGlobalChainBuilder(cb)
 	go cb.reconcileLoop()
 	defer cb.Stop()

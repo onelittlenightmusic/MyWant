@@ -191,21 +191,9 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 			s.JSONError(w, r, http.StatusBadRequest, "param_change.want_id must match target_id", "")
 			return
 		}
-		s.wantsMu.RLock()
 		var foundWant *mywant.Want
-		for _, exec := range s.wants {
-			if exec.Builder != nil {
-				if fw, _, ok := exec.Builder.FindWantByID(pc.WantID); ok {
-					foundWant = fw
-					break
-				}
-			}
-		}
-		s.wantsMu.RUnlock()
-		if foundWant == nil {
-			if fw, _, ok := s.globalBuilder.FindWantByID(pc.WantID); ok {
-				foundWant = fw
-			}
+		if fw, _, ok := s.globalBuilder.FindWantByID(pc.WantID); ok {
+			foundWant = fw
 		}
 		if foundWant == nil {
 			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("want %s not found", pc.WantID), "")

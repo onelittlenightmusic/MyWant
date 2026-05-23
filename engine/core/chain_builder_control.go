@@ -162,7 +162,7 @@ func (cb *ChainBuilder) distributeControlCommand(cmd *ControlCommand) {
 func (cb *ChainBuilder) Stop() error {
 	// Clear the config wants which will trigger reconciliation to clean up
 	cb.reconcileMutex.Lock()
-	cb.config.Wants = []*Want{}
+	cb.config = []*Want{}
 	cb.reconcileMutex.Unlock()
 
 	// Trigger reconciliation to process the empty config
@@ -212,7 +212,7 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	if !found {
 		// Also check config if not in runtime
 		cb.reconcileMutex.RLock()
-		for _, cfgWant := range cb.config.Wants {
+		for _, cfgWant := range cb.config {
 			if cfgWant.Metadata.ID == wantID {
 				found = true
 				break
@@ -252,13 +252,13 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 
 	// Also remove from config so detectConfigChanges sees the deletion
 	// Remove ALL occurrences of the want ID (handles duplicates in config)
-	newWants := make([]*Want, 0, len(cb.config.Wants))
-	for _, cfgWant := range cb.config.Wants {
+	newWants := make([]*Want, 0, len(cb.config))
+	for _, cfgWant := range cb.config {
 		if cfgWant.Metadata.ID != wantID {
 			newWants = append(newWants, cfgWant)
 		}
 	}
-	cb.config.Wants = newWants
+	cb.config = newWants
 
 	// Persist configuration change to memory file
 	if err := cb.copyConfigToMemory(); err != nil {

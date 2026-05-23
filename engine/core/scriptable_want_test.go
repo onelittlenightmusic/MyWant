@@ -46,7 +46,7 @@ func TestScriptableWantFactory(t *testing.T) {
 		t.Fatal("echo_monitor type not found")
 	}
 
-	cb := NewChainBuilder(Config{})
+	cb := NewChainBuilder([]*Want{})
 	cb.StoreWantTypeDefinition(def)
 
 	want := &Want{}

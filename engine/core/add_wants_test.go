@@ -10,9 +10,7 @@ import (
 // TestAddWantsAsyncDuplicateNameGuard tests that duplicate want names are rejected
 func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 	// Create a minimal ChainBuilder for testing
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{},
-	})
+	cb := NewChainBuilder([]*Want{})
 
 	// Start the reconcile loop in the background
 	go cb.reconcileLoop()
@@ -125,9 +123,7 @@ func TestAddWantsAsyncDuplicateNameGuard(t *testing.T) {
 
 // TestAddWantsAsyncChannelFull tests behavior when the add channel is full
 func TestAddWantsAsyncChannelFull(t *testing.T) {
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{},
-	})
+	cb := NewChainBuilder([]*Want{})
 
 	// Start reconcile loop, but immediately fill the channel before it can process
 	go cb.reconcileLoop()

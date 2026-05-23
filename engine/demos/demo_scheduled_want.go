@@ -36,27 +36,25 @@ func NewLoggerWant(m mywant.Metadata, s mywant.WantSpec) mywant.Progressable {
 	return &LoggerWant{Want: *mywant.NewWantWithLocals(m, s, nil, "logger")}
 }
 
-func main() {
+func demoScheduledWant() {
 	fmt.Println("=== Want Scheduling Demo ===")
 	fmt.Println("Demonstrates scheduled execution of wants")
 	fmt.Println()
 
 	// Create a config with a scheduled logger want
-	config := mywant.Config{
-		Wants: []*mywant.Want{
-			{
-				Metadata: mywant.Metadata{
-					Name: "scheduled-logger",
-					Type: "logger",
-					Labels: map[string]string{
-						"demo": "scheduled",
-					},
+	config := []*mywant.Want{
+		{
+			Metadata: mywant.Metadata{
+				Name: "scheduled-logger",
+				Type: "logger",
+				Labels: map[string]string{
+					"demo": "scheduled",
 				},
-				Spec: mywant.WantSpec{
-					// Schedule: Execute every 3 seconds (for demo purposes)
-					When: []mywant.WhenSpec{
-						{Every: "3 seconds"},
-					},
+			},
+			Spec: mywant.WantSpec{
+				// Schedule: Execute every 3 seconds (for demo purposes)
+				When: []mywant.WhenSpec{
+					{Every: "3 seconds"},
 				},
 			},
 		},

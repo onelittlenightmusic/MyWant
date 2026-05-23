@@ -238,20 +238,20 @@ func (t *Target) CreateChildWants() []*Want {
 
 	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
-	for _, childWant := range config.Wants {
+	for _, childWant := range config {
 		if childWant.Metadata.Type == parentType {
 			t.StoreLog("[TARGET] ❌ ERROR: Target %s (type=%s) cannot have child wants of the same type from recipe %s",
 				t.Metadata.Name, parentType, t.RecipePath)
 			return []*Want{}
 		}
 	}
-	for i := range config.Wants {
+	for i := range config {
 		// Ensure ID is generated if not present
-		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = GenerateUUID()
+		if config[i].Metadata.ID == "" {
+			config[i].Metadata.ID = GenerateUUID()
 		}
 
-		config.Wants[i].Metadata.OwnerReferences = []OwnerReference{
+		config[i].Metadata.OwnerReferences = []OwnerReference{
 			{
 				APIVersion:         "mywant/v1",
 				Kind:               "Want",
@@ -261,31 +261,31 @@ func (t *Target) CreateChildWants() []*Want {
 				BlockOwnerDeletion: true,
 			},
 		}
-		config.Wants[i].metadataMutex.Lock()
-		if config.Wants[i].Metadata.Labels == nil {
-			config.Wants[i].Metadata.Labels = make(map[string]string)
+		config[i].metadataMutex.Lock()
+		if config[i].Metadata.Labels == nil {
+			config[i].Metadata.Labels = make(map[string]string)
 		}
-		config.Wants[i].Metadata.Labels["owner"] = "child"
+		config[i].Metadata.Labels["owner"] = "child"
 		// Inject affinity label to namespace children of this target
 		// Use both name and ID to ensure uniqueness across redeployments
 		instanceID := t.Metadata.Name
 		if t.Metadata.ID != "" {
 			instanceID = fmt.Sprintf("%s-%s", t.Metadata.Name, t.Metadata.ID)
 		}
-		config.Wants[i].Metadata.Labels["owner-name"] = instanceID
-		config.Wants[i].metadataMutex.Unlock()
+		config[i].Metadata.Labels["owner-name"] = instanceID
+		config[i].metadataMutex.Unlock()
 
 		// Inject the same affinity label into all 'using' selectors of the child
 		// This ensures sibling wants within the same target connect to each other
-		for j := range config.Wants[i].Spec.Using {
-			if config.Wants[i].Spec.Using[j] == nil {
-				config.Wants[i].Spec.Using[j] = make(map[string]string)
+		for j := range config[i].Spec.Using {
+			if config[i].Spec.Using[j] == nil {
+				config[i].Spec.Using[j] = make(map[string]string)
 			}
-			config.Wants[i].Spec.Using[j]["owner-name"] = instanceID
+			config[i].Spec.Using[j]["owner-name"] = instanceID
 		}
 	}
 
-	t.childWants = config.Wants
+	t.childWants = config
 	t.StoreLog("📦 Target %s initialized: %d child wants created from recipe", t.Metadata.Name, len(t.childWants))
 	return t.childWants
 }

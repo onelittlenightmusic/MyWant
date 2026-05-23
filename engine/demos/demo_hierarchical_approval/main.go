@@ -24,7 +24,7 @@ func main() {
 		fmt.Printf("Error loading %s: %v\n", configPath, err)
 		os.Exit(1)
 	}
-	builder := mywant.NewChainBuilder(config)
+	builder := mywant.NewChainBuilder(mywant.WantDTOSliceToRuntime(config))
 
 	// Scan and register custom target types from recipes directory
 	customRegistry := mywant.NewCustomTargetTypeRegistry()
@@ -52,10 +52,10 @@ func main() {
 
 	// Register approval want types
 
-	fmt.Printf("📋 Configuration loaded with %d wants\n", len(config.Wants))
+	fmt.Printf("📋 Configuration loaded with %d wants\n", len(config))
 
 	// Display wants for debugging
-	for i, want := range config.Wants {
+	for i, want := range config {
 		fmt.Printf("  %d. %s (%s)\n", i+1, want.Metadata.Name, want.Metadata.Type)
 		if want.Metadata.Labels != nil {
 			for k, v := range want.Metadata.Labels {

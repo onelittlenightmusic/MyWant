@@ -1,7 +1,6 @@
 package mywant
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"log"
@@ -9,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
@@ -77,7 +75,7 @@ type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
-	Config     Config
+	Wants      []*Want
 	Parameters []ParameterDef
 	Metadata   GenericRecipeMetadata
 	Result     *RecipeResult
@@ -168,9 +166,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 	DebugLog("[RECIPE-LOADER] Parameters substituted in wants for %s\n", recipePath)
 
-	config := Config{
-		Wants: make([]*Want, 0),
-	}
+	wants := make([]*Want, 0)
 	if len(recipeContent.Wants) > 0 {
 		prefix := "want"
 		if prefixVal, ok := mergedParams["prefix"]; ok {
@@ -215,7 +211,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 				DebugLog("[RECIPE-LOADER] Applied auto-connect for RecipeAgent want %s\n", want.Metadata.Name)
 			}
 
-			config.Wants = append(config.Wants, want)
+			wants = append(wants, want)
 			DebugLog("[RECIPE-LOADER] Added want %s to recipe config\n", want.Metadata.Name)
 		}
 	} else {
@@ -244,7 +240,7 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 	}
 
 	return &GenericRecipeConfig{
-		Config:     config,
+		Wants:      wants,
 		Parameters: recipeContent.Parameters,
 		Metadata:   recipeContent.Metadata,
 		Result:     recipeContent.Result,
@@ -252,13 +248,13 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 }
 
 // LoadConfigFromRecipe loads configuration from any recipe type
-func (grl *GenericRecipeLoader) LoadConfigFromRecipe(recipePath string, params map[string]any) (Config, error) {
+func (grl *GenericRecipeLoader) LoadConfigFromRecipe(recipePath string, params map[string]any) ([]*Want, error) {
 	recipeConfig, err := grl.LoadRecipe(recipePath, params)
 	if err != nil {
-		return Config{}, err
+		return nil, err
 	}
 
-	return recipeConfig.Config, nil
+	return recipeConfig.Wants, nil
 }
 func (grl *GenericRecipeLoader) ValidateRecipe(recipePath string) error {
 	if _, err := os.Stat(recipePath); os.IsNotExist(err) {
@@ -329,11 +325,11 @@ func (grl *GenericRecipeLoader) GetRecipeMetadata(recipePath string) (GenericRec
 }
 
 // LoadRecipeWithConfig loads a recipe using a config file that references the recipe
-func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
+func LoadRecipeWithConfig(configPath string) ([]*Want, map[string]any, error) {
 	// Read config file
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
-		return Config{}, nil, fmt.Errorf("failed to read config file: %v", err)
+		return nil, nil, fmt.Errorf("failed to read config file: %v", err)
 	}
 	var configFile struct {
 		Recipe struct {
@@ -343,17 +339,17 @@ func LoadRecipeWithConfig(configPath string) (Config, map[string]any, error) {
 	}
 
 	if err := yaml.Unmarshal(configData, &configFile); err != nil {
-		return Config{}, nil, fmt.Errorf("failed to parse config file: %v", err)
+		return nil, nil, fmt.Errorf("failed to parse config file: %v", err)
 	}
 
 	// Load recipe using generic loader
 	loader := NewGenericRecipeLoader("")
 	recipeConfig, err := loader.LoadRecipe(configFile.Recipe.Path, configFile.Recipe.Parameters)
 	if err != nil {
-		return Config{}, nil, err
+		return nil, nil, err
 	}
 
-	return recipeConfig.Config, ParameterDefsToMap(recipeConfig.Parameters), nil
+	return recipeConfig.Wants, ParameterDefsToMap(recipeConfig.Parameters), nil
 }
 
 // namespaceWantConnections adds owner namespace to labels and using selectors to isolate child wants
@@ -400,7 +396,7 @@ func LoadRecipe(recipePath string, params map[string]any) (*GenericRecipeConfig,
 	return loader.LoadRecipe(recipePath, params)
 }
 
-func LoadConfigFromRecipe(recipePath string, params map[string]any) (Config, error) {
+func LoadConfigFromRecipe(recipePath string, params map[string]any) ([]*Want, error) {
 	loader := NewGenericRecipeLoader("")
 	return loader.LoadConfigFromRecipe(recipePath, params)
 }
@@ -491,22 +487,9 @@ func (grl *GenericRecipeLoader) autoConnect(want *Want, allWants []RecipeWant, p
 	return want
 }
 func validateRecipeWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec for recipes from the external want-spec module
-	specPath := "spec/recipe-spec.yaml"
-	specData, err := fs.ReadFile(want_spec.FS, specPath)
-	if err != nil {
-		return fmt.Errorf("failed to load recipe OpenAPI spec from want-spec module: %w", err)
-	}
-
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromData(specData)
+	spec, err := loadOpenAPISpec("spec/recipe-spec.yaml")
 	if err != nil {
 		return fmt.Errorf("failed to load recipe OpenAPI spec: %w", err)
-	}
-	ctx := context.Background()
-	err = spec.Validate(ctx)
-	if err != nil {
-		return fmt.Errorf("recipe OpenAPI spec is invalid: %w", err)
 	}
 	var yamlObj any
 	err = yaml.Unmarshal(yamlData, &yamlObj)

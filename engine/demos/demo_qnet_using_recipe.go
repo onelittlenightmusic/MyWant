@@ -29,17 +29,17 @@ func RunDemoQnetUsingRecipe() {
 		return
 	}
 
-	fmt.Printf("Loaded %d wants from YAML configuration\n", len(config.Wants))
+	fmt.Printf("Loaded %d wants from YAML configuration\n", len(config))
 
 	// Show the using field connections defined in YAML
 	fmt.Println("\n🔗 Using Field Connections (from YAML, not Go code):")
-	for _, want := range config.Wants {
+	for _, want := range config {
 		if len(want.Spec.Using) > 0 {
 			fmt.Printf("  %s -> using: %v\n", want.Metadata.Name, want.Spec.Using)
 		}
 	}
 	fmt.Println()
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(WantDTOSliceToRuntime(config))
 
 	// Register qnet want types
 

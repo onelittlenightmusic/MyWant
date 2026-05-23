@@ -160,11 +160,6 @@ func (cb *ChainBuilder) migrateAllWantsAgentHistory() {
 	}
 }
 
-// Config holds the complete declarative configuration
-type Config struct {
-	Wants []*Want `json:"wants" yaml:"wants"`
-}
-
 // PathInfo represents connection information for a single path
 type PathInfo struct {
 	Channel        chain.Chan

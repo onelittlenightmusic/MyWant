@@ -75,15 +75,13 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 
-	updatedConfig := Config{
-		Wants: make([]*Want, 0),
-	}
+	updatedWants := make([]*Want, 0)
 
 	// First, add all wants from config and update with current stats
 	// Deduplicate by ID to prevent state.yaml bloat from accumulated duplicates
 	seenIDs := make(map[string]bool)
 	configWantMap := make(map[string]bool)
-	for _, want := range cb.config.Wants {
+	for _, want := range cb.config {
 		if seenIDs[want.Metadata.ID] {
 			continue // Skip duplicate entries
 		}
@@ -101,7 +99,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.storeStateMulti(stateCopy)
 			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
 		}
-		updatedConfig.Wants = append(updatedConfig.Wants, want)
+		updatedWants = append(updatedWants, want)
 	}
 
 	// Then, add any runtime wants that might not be in config (e.g., dynamically created and completed)
@@ -121,12 +119,12 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 				History: runtimeWant.want.BuildHistory(), // Include history in stats writes
 			}
 			wantConfig.storeStateMulti(stateCopy)
-			updatedConfig.Wants = append(updatedConfig.Wants, wantConfig)
+			updatedWants = append(updatedWants, wantConfig)
 		}
 	}
 
 	// Write updated config to memory file
-	data, err := yaml.Marshal(updatedConfig)
+	data, err := yaml.Marshal(updatedWants)
 	if err != nil {
 		return
 	}

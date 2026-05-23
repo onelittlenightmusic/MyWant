@@ -273,16 +273,7 @@ func (s *Server) analyzeWantForRecipe(w http.ResponseWriter, r *http.Request) {
 	var parentWant *mywant.Want
 	var builder *mywant.ChainBuilder
 
-	for _, execution := range s.wants {
-		if execution.Builder != nil {
-			if wnt, _, found := execution.Builder.FindWantByID(wantID); found {
-				parentWant = wnt
-				builder = execution.Builder
-				break
-			}
-		}
-	}
-	if parentWant == nil && s.globalBuilder != nil {
+	if s.globalBuilder != nil {
 		if wnt, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			parentWant = wnt
 			builder = s.globalBuilder
@@ -358,16 +349,7 @@ func (s *Server) saveRecipeFromWant(w http.ResponseWriter, r *http.Request) {
 	var parentWant *mywant.Want
 	var builder *mywant.ChainBuilder
 
-	for _, execution := range s.wants {
-		if execution.Builder != nil {
-			if wnt, _, found := execution.Builder.FindWantByID(req.WantID); found {
-				parentWant = wnt
-				builder = execution.Builder
-				break
-			}
-		}
-	}
-	if parentWant == nil && s.globalBuilder != nil {
+	if s.globalBuilder != nil {
 		if wnt, _, found := s.globalBuilder.FindWantByID(req.WantID); found {
 			parentWant = wnt
 			builder = s.globalBuilder
@@ -778,19 +760,8 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			// Track processed builders to avoid redundant scanning
-			processedBuilders := make(map[*mywant.ChainBuilder]bool)
-
 			if s.globalBuilder != nil {
 				findOwnersUsers(s.globalBuilder)
-				processedBuilders[s.globalBuilder] = true
-			}
-
-			for _, exec := range s.wants {
-				if exec.Builder != nil && !processedBuilders[exec.Builder] {
-					findOwnersUsers(exec.Builder)
-					processedBuilders[exec.Builder] = true
-				}
 			}
 
 			// Convert deduplicated maps to sorted slices

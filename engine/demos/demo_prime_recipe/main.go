@@ -26,12 +26,12 @@ func main() {
 		return
 	}
 
-	fmt.Printf("✅ Loaded %d wants from configuration\n", len(config.Wants))
-	for _, want := range config.Wants {
+	fmt.Printf("✅ Loaded %d wants from configuration\n", len(config))
+	for _, want := range config {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(WantDTOSliceToRuntime(config))
 
 	// Register prime want types
 

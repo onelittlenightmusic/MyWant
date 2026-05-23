@@ -29,8 +29,8 @@ func (m *mockGooseExecutor) ExecuteViaGoose(ctx context.Context, operation strin
 	recs := make([]map[string]interface{}, len(m.recommendations))
 	for i, rec := range m.recommendations {
 		// Serialize wants from the recommendation
-		wants := make([]interface{}, len(rec.Config.Wants))
-		for j, want := range rec.Config.Wants {
+		wants := make([]interface{}, len(rec.Wants))
+		for j, want := range rec.Wants {
 			wants[j] = map[string]interface{}{
 				"metadata": map[string]interface{}{
 					"name": want.Metadata.Name,
@@ -52,7 +52,7 @@ func (m *mockGooseExecutor) ExecuteViaGoose(ctx context.Context, operation strin
 				"wants": wants,
 			},
 			"metadata": map[string]interface{}{
-				"want_count":      len(rec.Config.Wants),
+				"want_count":      len(rec.Wants),
 				"want_types_used": []string{},
 				"complexity":      "low",
 				"pros_cons": map[string]interface{}{
@@ -105,7 +105,7 @@ func TestInteractMessage_Success(t *testing.T) {
 				Title:       "Test Hotel Booking",
 				Approach:    "custom",
 				Description: "Test description",
-				Config:      mywant.Config{Wants: []*mywant.Want{}},
+				Wants: []*mywant.Want{},
 			},
 		},
 	}
@@ -223,17 +223,15 @@ func TestInteractDeploy_Success(t *testing.T) {
 				Title:       "Test",
 				Approach:    "custom",
 				Description: "Test",
-				Config: mywant.Config{
-					Wants: []*mywant.Want{
-						{
-							Metadata: mywant.Metadata{
-								Name: "test-queue",
-								Type: "qnet queue",
-							},
-							Spec: mywant.WantSpec{
-								Params: map[string]any{
-									"service_time": 0.1,
-								},
+				Wants: []*mywant.Want{
+					{
+						Metadata: mywant.Metadata{
+							Name: "test-queue",
+							Type: "qnet queue",
+						},
+						Spec: mywant.WantSpec{
+							Params: map[string]any{
+								"service_time": 0.1,
 							},
 						},
 					},
@@ -283,16 +281,14 @@ func TestInteractDeploy_WithModifications(t *testing.T) {
 				ID:       "rec-1",
 				Title:    "Test",
 				Approach: "custom",
-				Config: mywant.Config{
-					Wants: []*mywant.Want{
-						{
-							Metadata: mywant.Metadata{Name: "queue1", Type: "qnet queue"},
-							Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.1}},
-						},
-						{
-							Metadata: mywant.Metadata{Name: "queue2", Type: "qnet queue"},
-							Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.2}},
-						},
+				Wants: []*mywant.Want{
+					{
+						Metadata: mywant.Metadata{Name: "queue1", Type: "qnet queue"},
+						Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.1}},
+					},
+					{
+						Metadata: mywant.Metadata{Name: "queue2", Type: "qnet queue"},
+						Spec:     mywant.WantSpec{Params: map[string]any{"service_time": 0.2}},
 					},
 				},
 			},
@@ -382,7 +378,7 @@ func TestInteractConversationalFlow(t *testing.T) {
 	// Setup mock
 	mockGoose := &mockGooseExecutor{
 		recommendations: []mywant.Recommendation{
-			{ID: "rec-1", Title: "Test", Approach: "custom", Config: mywant.Config{Wants: []*mywant.Want{}}},
+			{ID: "rec-1", Title: "Test", Approach: "custom", Wants: []*mywant.Want{}},
 		},
 	}
 	s.interactionManager = mywant.NewInteractionManager(s.wantTypeLoader, s.recipeRegistry, mockGoose)

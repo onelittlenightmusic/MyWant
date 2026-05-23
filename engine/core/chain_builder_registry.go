@@ -168,8 +168,9 @@ func (cb *ChainBuilder) GetCustomTargetRegistry() *CustomTargetTypeRegistry {
 	return cb.customRegistry
 }
 
-func (cb *ChainBuilder) SetConfigInternal(config Config) {
-	cb.config = config
+// SetConfigInternal sets the initial wants slice directly (used on server startup).
+func (cb *ChainBuilder) SetConfigInternal(wants []*Want) {
+	cb.config = wants
 }
 
 func (cb *ChainBuilder) SetServerMode(isServer bool) {

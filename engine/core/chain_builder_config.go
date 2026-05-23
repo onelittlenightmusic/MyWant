@@ -1,63 +1,69 @@
 package mywant
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
-	"io/fs"
+	"log"
 	"os"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
 
-// LoadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation (exported version)
-func LoadConfigFromYAML(filename string) (Config, error) {
+// LoadConfigFromYAML loads a bare-array YAML file and returns []*want_spec.Want.
+// The YAML format is a top-level array:
+//
+//	- metadata:
+//	    name: foo
+//	    type: bar
+//	  spec:
+//	    params: {}
+func LoadConfigFromYAML(filename string) ([]*want_spec.Want, error) {
 	return loadConfigFromYAML(filename)
 }
 
-// LoadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation (exported version)
-func LoadConfigFromYAMLBytes(data []byte) (Config, error) {
+// LoadConfigFromYAMLBytes loads wants from YAML bytes (bare array format).
+func LoadConfigFromYAMLBytes(data []byte) ([]*want_spec.Want, error) {
 	return loadConfigFromYAMLBytes(data)
 }
 
-// loadConfigFromYAML loads configuration from a YAML file with OpenAPI spec validation
-func loadConfigFromYAML(filename string) (Config, error) {
-	var config Config
-
+// loadConfigFromYAML loads configuration from a YAML file.
+func loadConfigFromYAML(filename string) ([]*want_spec.Want, error) {
 	InfoLog("[CONFIG-YAML] 📖 Loading config from: %s\n", filename)
 
-	// Read the YAML config file
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return config, fmt.Errorf("failed to read YAML file: %w", err)
-	}
-	err = validateConfigWithSpec(data)
-	if err != nil {
-		return config, fmt.Errorf("config validation failed: %w", err)
-	}
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return config, fmt.Errorf("failed to parse YAML config: %w", err)
+		return nil, fmt.Errorf("failed to read YAML file: %w", err)
 	}
 
-	InfoLog("[CONFIG-YAML] ✅ Loaded %d wants from config\n", len(config.Wants))
-	for i, want := range config.Wants {
+	return loadConfigFromYAMLBytes(data)
+}
+
+// loadConfigFromYAMLBytes loads wants from YAML bytes.
+func loadConfigFromYAMLBytes(data []byte) ([]*want_spec.Want, error) {
+	var wants []*want_spec.Want
+	if err := yaml.Unmarshal(data, &wants); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
+	}
+
+	assignWantIDs(wants)
+
+	InfoLog("[CONFIG-YAML] ✅ Loaded %d wants from config\n", len(wants))
+	for i, want := range wants {
 		recipe := ""
 		if want.Spec.Recipe != "" {
 			recipe = fmt.Sprintf(", recipe=%s", want.Spec.Recipe)
 		}
 		InfoLog("[CONFIG-YAML]   [%d] %s (type=%s%s)\n", i, want.Metadata.Name, want.Metadata.Type, recipe)
+		if unknown := want.Spec.UnknownFields; len(unknown) > 0 {
+			log.Printf("[WARN][want-spec drift] want %q has unknown spec fields in YAML config: %v — config file may reference a newer want-spec version than this engine", want.Metadata.Name, unknown)
+		}
 	}
 
-	// Assign individual IDs to each want if not already set
-	assignWantIDs(&config)
-
-	return config, nil
+	return wants, nil
 }
 
-// GenerateUUID generates a UUID v4 for want IDs
+// GenerateUUID generates a UUID v4 for want IDs.
 func GenerateUUID() string {
 	uuid := make([]byte, 16)
 	rand.Read(uuid)
@@ -67,155 +73,11 @@ func GenerateUUID() string {
 		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
 }
 
-// assignWantIDs assigns unique IDs to wants that don't have them
-func assignWantIDs(config *Config) {
-	for i := range config.Wants {
-		if config.Wants[i].Metadata.ID == "" {
-			config.Wants[i].Metadata.ID = GenerateUUID()
+// assignWantIDs assigns unique IDs to wants that don't have them.
+func assignWantIDs(wants []*want_spec.Want) {
+	for i := range wants {
+		if wants[i].Metadata.ID == "" {
+			wants[i].Metadata.ID = GenerateUUID()
 		}
 	}
-}
-
-// loadConfigFromYAMLBytes loads configuration from YAML bytes with OpenAPI spec validation
-func loadConfigFromYAMLBytes(data []byte) (Config, error) {
-	var config Config
-	err := validateConfigWithSpec(data)
-	if err != nil {
-		return config, fmt.Errorf("config validation failed: %w", err)
-	}
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		return config, fmt.Errorf("failed to parse YAML config: %w", err)
-	}
-
-	// Assign individual IDs to each want if not already set
-	assignWantIDs(&config)
-
-	return config, nil
-}
-
-func validateConfigWithSpec(yamlData []byte) error {
-	// Load the OpenAPI spec from the external want-spec module
-	specPath := "spec/want-spec.yaml"
-	specData, err := fs.ReadFile(want_spec.FS, specPath)
-	if err != nil {
-		return fmt.Errorf("failed to load OpenAPI spec from want-spec module: %w", err)
-	}
-
-	loader := openapi3.NewLoader()
-	spec, err := loader.LoadFromData(specData)
-	if err != nil {
-		return fmt.Errorf("failed to load OpenAPI spec: %w", err)
-	}
-
-	ctx := context.Background()
-	err = spec.Validate(ctx)
-
-	if err != nil {
-		return fmt.Errorf("OpenAPI spec is invalid: %w", err)
-	}
-	var yamlObj any
-	err = yaml.Unmarshal(yamlData, &yamlObj)
-	if err != nil {
-		return fmt.Errorf("failed to parse YAML for validation: %w", err)
-	}
-
-	// jsonData conversion removed - not needed for basic validation
-	configSchemaRef := spec.Components.Schemas["Config"]
-	if configSchemaRef == nil {
-		return fmt.Errorf("Config schema not found in OpenAPI spec")
-	}
-
-	// For now, do basic validation by checking that we can load and parse both spec and data A full OpenAPI->JSON Schema conversion would be more complex and is beyond current scope
-
-	// Basic structural validation - ensure the YAML contains expected top-level keys
-	var configObj map[string]any
-	err = yaml.Unmarshal(yamlData, &configObj)
-	if err != nil {
-		return fmt.Errorf("invalid YAML structure: %w", err)
-	}
-	hasWants := false
-	hasRecipe := false
-
-	if wants, ok := configObj["wants"]; ok {
-		if wantsArray, ok := wants.([]any); ok && len(wantsArray) > 0 {
-			hasWants = true
-		}
-	}
-
-	if recipe, ok := configObj["recipe"]; ok {
-		if recipeObj, ok := recipe.(map[string]any); ok {
-			if path, ok := recipeObj["path"]; ok {
-				if pathStr, ok := path.(string); ok && pathStr != "" {
-					hasRecipe = true
-				}
-			}
-		}
-	}
-
-	if !hasWants && !hasRecipe {
-		return fmt.Errorf("config validation failed: must have either 'wants' array or 'recipe' reference")
-	}
-
-	if hasWants && hasRecipe {
-		return fmt.Errorf("config validation failed: cannot have both 'wants' array and 'recipe' reference")
-	}
-
-	// If has wants, validate basic want structure
-	if hasWants {
-		err = validateWantsStructure(configObj["wants"])
-		if err != nil {
-			return fmt.Errorf("wants validation failed: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func validateWantsStructure(wants any) error {
-	wantsArray, ok := wants.([]any)
-	if !ok {
-		return fmt.Errorf("wants must be an array")
-	}
-
-	for i, want := range wantsArray {
-		wantObj, ok := want.(map[string]any)
-		if !ok {
-			return fmt.Errorf("want at index %d must be an object", i)
-		}
-		metadata, ok := wantObj["metadata"]
-		if !ok {
-			return fmt.Errorf("want at index %d missing required 'metadata' field", i)
-		}
-
-		metadataObj, ok := metadata.(map[string]any)
-		if !ok {
-			return fmt.Errorf("want at index %d 'metadata' must be an object", i)
-		}
-		if name, ok := metadataObj["name"]; !ok || name == "" {
-			return fmt.Errorf("want at index %d missing required 'metadata.name' field", i)
-		}
-
-		if wantType, ok := metadataObj["type"]; !ok || wantType == "" {
-			return fmt.Errorf("want at index %d missing required 'metadata.type' field", i)
-		}
-		spec, ok := wantObj["spec"]
-		if !ok {
-			return fmt.Errorf("want at index %d missing required 'spec' field", i)
-		}
-
-		specObj, ok := spec.(map[string]any)
-		if !ok {
-			return fmt.Errorf("want at index %d 'spec' must be an object", i)
-		}
-		if params, ok := specObj["params"]; !ok {
-			return fmt.Errorf("want at index %d missing required 'spec.params' field", i)
-		} else {
-			if _, ok := params.(map[string]any); !ok {
-				return fmt.Errorf("want at index %d 'spec.params' must be an object", i)
-			}
-		}
-	}
-
-	return nil
 }

@@ -161,7 +161,7 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 		if len(op.Wants) > 0 {
 			cb.reconcileMutex.Lock()
 			for _, want := range op.Wants {
-				cb.config.Wants = append(cb.config.Wants, want)
+				cb.config = append(cb.config, want)
 			}
 			cb.reconcileMutex.Unlock()
 			// Trigger reconciliation to connect and start new wants

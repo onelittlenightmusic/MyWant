@@ -78,7 +78,7 @@ type ChainBuilder struct {
 	customRegistry       *CustomTargetTypeRegistry       // Custom target type registry
 	agentRegistry        *AgentRegistry                  // Agent registry for agent-enabled wants
 	waitGroup            *sync.WaitGroup                 // Execution synchronization
-	config               Config                          // Current configuration
+	config               []*Want                         // Current configuration (wants slice)
 	ServerConfig         any                             // Global server config passed from server layer
 	goalThinkerUseStub   bool                            // Whether goal_thinker should use stub (no LLM)
 
@@ -90,7 +90,7 @@ type ChainBuilder struct {
 	wantsMu            sync.RWMutex         // Protect cb.wants map reads/writes (narrower than reconcileMutex)
 	inReconciliation   bool                 // Flag to prevent recursive reconciliation
 	running            bool                 // Execution state
-	lastConfig         Config               // Last known config state
+	lastConfig         []*Want              // Last known config state
 	lastConfigHash     string               // Hash of last config for change detection
 	lastConfigFileHash string               // Hash of config file for change detection (batch mode)
 	lastStatsHash      string               // Hash of last written stats for change detection
@@ -179,15 +179,15 @@ func (rw *runtimeWant) GetMetadata() Metadata {
 	return rw.want.GetMetadata()
 }
 
-// NewChainBuilder creates a new builder from configuration
-func NewChainBuilder(config Config) *ChainBuilder {
+// NewChainBuilder creates a new builder from a slice of wants.
+func NewChainBuilder(wants []*Want) *ChainBuilder {
 	builder := NewChainBuilderWithPaths("", "")
-	builder.config = config
+	builder.config = wants
 	return builder
 }
 
-// GetConfig returns the current builder Config (read-only copy)
-func (cb *ChainBuilder) GetConfig() Config {
+// GetConfigWants returns the current wants slice (read-only copy).
+func (cb *ChainBuilder) GetConfigWants() []*Want {
 	return cb.config
 }
 
@@ -494,8 +494,8 @@ func (cb *ChainBuilder) reconcileLoop() {
 			// In batch mode, watch config file for changes In server mode, skip file watching (API is the source of truth)
 			if !cb.isServerMode && cb.hasConfigFileChanged() {
 				// Load config from original config file (not from memory file) Memory file is only for persistence, not for reloading configuration
-				if newConfig, err := loadConfigFromYAML(cb.configPath); err == nil {
-					cb.config = newConfig
+				if dtowants, err := loadConfigFromYAML(cb.configPath); err == nil {
+					cb.config = WantDTOSliceToRuntime(dtowants)
 					// Update the hash after loading
 					cb.lastConfigFileHash, _ = cb.calculateFileHash(cb.configPath)
 					cb.reconcileWants()
@@ -546,7 +546,7 @@ func (cb *ChainBuilder) compilePhase() error {
 
 	if isInitialLoad {
 		// For initial load, treat all wants as new additions
-		for _, wantConfig := range newConfig.Wants {
+		for _, wantConfig := range newConfig {
 			cb.addDynamicWantUnsafe(wantConfig)
 		}
 
@@ -554,7 +554,7 @@ func (cb *ChainBuilder) compilePhase() error {
 		cb.migrateAllWantsAgentHistory()
 
 		// Dump memory after initial load (silent - routine operation)
-		if len(newConfig.Wants) > 0 {
+		if len(newConfig) > 0 {
 			cb.dumpWantMemoryToYAML()
 		}
 
@@ -585,10 +585,10 @@ func (cb *ChainBuilder) compilePhase() error {
 			}
 		}
 
-		// CRITICAL FIX: Ensure all wants in newConfig.Wants exist in cb.wants
-		// This handles wants added via addWantsChan which are already in cb.config.Wants
+		// CRITICAL FIX: Ensure all wants in newConfig exist in cb.wants
+		// This handles wants added via addWantsChan which are already in cb.config
 		// but might have been missed by detectConfigChanges due to timing/aliasing
-		for _, wantConfig := range newConfig.Wants {
+		for _, wantConfig := range newConfig {
 			if _, exists := cb.wants[wantConfig.Metadata.ID]; !exists {
 				cb.addWant(wantConfig)
 				cb.dirtyWantIDs[wantConfig.Metadata.ID] = struct{}{}
@@ -597,7 +597,7 @@ func (cb *ChainBuilder) compilePhase() error {
 	}
 
 	// Update last config and hash IMPORTANT: Make a deep copy to avoid reference aliasing issues When both lastConfig and config point to the same Want objects, updates to one appear to update both, breaking change detection
-	cb.lastConfig = cb.deepCopyConfig(newConfig)
+	cb.lastConfig = cb.deepCopyWants(newConfig)
 	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 	// Also track config file hash for batch mode watching
 	cb.lastConfigFileHash, _ = cb.calculateFileHash(cb.configPath)
@@ -842,16 +842,16 @@ func (cb *ChainBuilder) startPhase() {
 	}
 }
 
-// detectConfigChanges compares configs and returns change events
-func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig Config) []ChangeEvent {
+// detectConfigChanges compares two want slices and returns change events
+func (cb *ChainBuilder) detectConfigChanges(oldConfig, newConfig []*Want) []ChangeEvent {
 	var changes []ChangeEvent
 	oldWants := make(map[string]*Want)
-	for _, want := range oldConfig.Wants {
+	for _, want := range oldConfig {
 		oldWants[want.Metadata.ID] = want
 	}
 
 	newWants := make(map[string]*Want)
-	for _, want := range newConfig.Wants {
+	for _, want := range newConfig {
 		newWants[want.Metadata.ID] = want
 	}
 	for id, newWant := range newWants {
@@ -893,7 +893,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 	for _, change := range sortedChanges {
 		switch change.Type {
 		case ChangeEventAdd:
-			// Just add to runtime mapping, it's already in cb.config.Wants
+			// Just add to runtime mapping, it's already in cb.config
 			cb.addRuntimeWantOnly(change.Want)
 			cb.notifyParentOfAdoption(change.Want)
 			hasWantChanges = true
@@ -1023,7 +1023,7 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[strin
 
 	// Then find in config if not in runtime
 	if wantConfig == nil {
-		for _, configWant := range cb.config.Wants {
+		for _, configWant := range cb.config {
 			if configWant.Metadata.ID == wantID {
 				wantConfig = configWant
 				break
@@ -1041,7 +1041,7 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[strin
 
 	maxDependencyLevel := 0
 	for _, usingSelector := range wantConfig.Spec.Using {
-		for _, configWant := range cb.config.Wants {
+		for _, configWant := range cb.config {
 			if cb.matchesSelector(configWant.GetLabels(), usingSelector) {
 				depLevel := cb.calculateDependencyLevel(configWant.Metadata.ID, levels, visited, inProgress)
 				if depLevel >= maxDependencyLevel {
@@ -1063,16 +1063,16 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if existingID, nameExists := cb.wantNameToID[wantConfig.Metadata.Name]; nameExists {
 		if existingWant, idExists := cb.wants[existingID]; idExists {
 			// Duplicate name detected - reject the new want to protect existing one.
-			// Also remove from cb.config.Wants to prevent ghost accumulation in state.yaml.
+			// Also remove from cb.config to prevent ghost accumulation in state.yaml.
 			InfoLog("[WARN] Rejecting want '%s' (ID: %s): name already exists (existing ID: %s)\n",
 				wantConfig.Metadata.Name, wantConfig.Metadata.ID, existingWant.want.Metadata.ID)
-			newWants := make([]*Want, 0, len(cb.config.Wants))
-			for _, cw := range cb.config.Wants {
+			newWants := make([]*Want, 0, len(cb.config))
+			for _, cw := range cb.config {
 				if cw.Metadata.ID != wantConfig.Metadata.ID {
 					newWants = append(newWants, cw)
 				}
 			}
-			cb.config.Wants = newWants
+			cb.config = newWants
 			return
 		}
 		// Index is stale (ID was removed but name index wasn't cleaned) - clean it up
@@ -1281,7 +1281,7 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	}
 
 	// If not found in runtime, search in config wants This handles newly created wants that haven't been promoted to runtime yet
-	for _, configWant := range cb.config.Wants {
+	for _, configWant := range cb.config {
 		if configWant.Metadata.ID == wantID {
 			return configWant, configWant.Metadata.Name, true
 		}
@@ -1306,7 +1306,7 @@ func (cb *ChainBuilder) FindWantByName(wantName string) (*Want, bool) {
 	}
 
 	// If not found in runtime, search in config wants
-	for _, configWant := range cb.config.Wants {
+	for _, configWant := range cb.config {
 		if configWant.Metadata.Name == wantName {
 			return configWant, true
 		}
@@ -1326,9 +1326,9 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 
 	// Search in config wants and update
 	foundInConfig := false
-	for i, cfgWant := range cb.config.Wants {
+	for i, cfgWant := range cb.config {
 		if cfgWant.Metadata.ID == wantConfig.Metadata.ID {
-			cb.config.Wants[i] = wantConfig
+			cb.config[i] = wantConfig
 			foundInConfig = true
 			break
 		}
@@ -1609,7 +1609,7 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 			cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
 		}
 	}
-	cb.lastConfig = Config{Wants: []*Want{}}
+	cb.lastConfig = []*Want{}
 	cb.reconcileMutex.Lock()
 	cb.running = true
 	cb.reconcileMutex.Unlock()
@@ -1719,8 +1719,8 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 			return nil
 		}
 	}
-	// Also check cb.config.Wants to prevent duplicates accumulating across restarts
-	for _, cw := range cb.config.Wants {
+	// Also check cb.config to prevent duplicates accumulating across restarts
+	for _, cw := range cb.config {
 		if cw.Metadata.ID == want.Metadata.ID {
 			cb.addWant(want)
 			return nil
@@ -1729,14 +1729,14 @@ func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
 	// Reuse the existing ID if a same-name entry already exists in config (e.g. restored from
 	// state.yaml). This prevents duplicate same-name entries accumulating across restarts when
 	// parent wants recreate children with fresh IDs on each startup.
-	for _, cw := range cb.config.Wants {
+	for _, cw := range cb.config {
 		if cw.Metadata.Name == want.Metadata.Name {
 			want.Metadata.ID = cw.Metadata.ID
 			cb.addWant(want)
 			return nil
 		}
 	}
-	cb.config.Wants = append(cb.config.Wants, want)
+	cb.config = append(cb.config, want)
 	cb.addWant(want)
 
 	// Trigger reconciliation to process the new want

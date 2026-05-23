@@ -25,7 +25,7 @@ func main() {
 
 	// If config has wants with recipes, expand them
 	expandedWants := make([]*Want, 0)
-	for _, want := range config.Wants {
+	for _, want := range config {
 		if want.Spec.Recipe != "" {
 			// Load and expand recipe
 			// Find the recipe base directory by looking for recipes folder
@@ -40,15 +40,14 @@ func main() {
 				continue
 			}
 			// Add expanded wants from recipe
-			expandedWants = append(expandedWants, recipeConfig.Config.Wants...)
+			expandedWants = append(expandedWants, recipeConfig.Wants...)
 		} else {
-			expandedWants = append(expandedWants, want)
+			expandedWants = append(expandedWants, WantDTOToRuntime(want))
 		}
 	}
-	config.Wants = expandedWants
 
-	fmt.Printf("Loaded %d wants from configuration\n", len(config.Wants))
-	builder := NewChainBuilder(config)
+	fmt.Printf("Loaded %d wants from configuration\n", len(expandedWants))
+	builder := NewChainBuilder(expandedWants)
 
 	fmt.Println("\nExecuting fibonacci sequence with reconcile loop...")
 	builder.Execute()

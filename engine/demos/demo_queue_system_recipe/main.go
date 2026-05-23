@@ -27,8 +27,8 @@ func main() {
 	}
 
 	fmt.Printf("📋 Recipe parameters: %+v\n", params)
-	fmt.Printf("✅ Generated %d wants from recipe\n", len(config.Wants))
-	for _, want := range config.Wants {
+	fmt.Printf("✅ Generated %d wants from recipe\n", len(config))
+	for _, want := range config {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()

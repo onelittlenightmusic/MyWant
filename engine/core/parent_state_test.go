@@ -57,9 +57,7 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 	parentWant.storeState("costs", map[string]any{})
 
 	// Create ChainBuilder with parent want registered
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{parentWant},
-	})
+	cb := NewChainBuilder([]*Want{parentWant})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 
@@ -150,9 +148,7 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 	}
 	parentWant.storeState("costs", map[string]any{})
 
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{parentWant},
-	})
+	cb := NewChainBuilder([]*Want{parentWant})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 
@@ -222,9 +218,7 @@ func TestParentStateAccess_Cache(t *testing.T) {
 	}
 	parentWant.storeState("value", "original")
 
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{parentWant},
-	})
+	cb := NewChainBuilder([]*Want{parentWant})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 
@@ -278,9 +272,7 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 	coordinator.storeState("budget", 5000.0)
 	coordinator.storeState("costs", map[string]any{})
 
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{coordinator},
-	})
+	cb := NewChainBuilder([]*Want{coordinator})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 
@@ -469,9 +461,7 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 	}
 	coordinator.storeState("costs", map[string]any{})
 
-	cb := NewChainBuilder(Config{
-		Wants: []*Want{coordinator},
-	})
+	cb := NewChainBuilder([]*Want{coordinator})
 	SetGlobalChainBuilder(cb)
 	defer SetGlobalChainBuilder(nil)
 

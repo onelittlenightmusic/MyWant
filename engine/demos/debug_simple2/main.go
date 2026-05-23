@@ -25,7 +25,7 @@ func main() {
 		},
 	}
 
-	config := &mywant.Config{Wants: wants}
+	config := &wants
 	builder := mywant.NewChainBuilder(*config)
 
 	// Execute in background goroutine

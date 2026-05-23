@@ -144,12 +144,13 @@ func New(config Config) *Server {
 	mywant.SetGlobalServerConfig(config)
 
 	// Load initial configuration from memory file if it exists (persistence)
-	initialConfig := mywant.Config{Wants: []*mywant.Want{}}
+	// Format: bare YAML array of wants (no wrapper key)
+	initialWants := []*mywant.Want{}
 	if config.MemoryPath != "" {
 		if _, err := os.Stat(config.MemoryPath); err == nil {
-			if loadedConfig, err := mywant.LoadConfigFromYAML(config.MemoryPath); err == nil {
-				initialConfig = loadedConfig
-				log.Printf("[SERVER] Restored %d wants from %s\n", len(initialConfig.Wants), config.MemoryPath)
+			if dtoWants, err := mywant.LoadConfigFromYAML(config.MemoryPath); err == nil {
+				initialWants = mywant.WantDTOSliceToRuntime(dtoWants)
+				log.Printf("[SERVER] Restored %d wants from %s\n", len(initialWants), config.MemoryPath)
 			}
 		}
 	}
@@ -166,15 +167,15 @@ func New(config Config) *Server {
 		log.Printf("[WARN] Failed to load system wants: %v", err)
 	}
 	systemTypes := mywant.SystemWantTypes(systemWants)
-	filtered := initialConfig.Wants[:0]
-	for _, w := range initialConfig.Wants {
+	filtered := initialWants[:0]
+	for _, w := range initialWants {
 		if !systemTypes[w.Metadata.Type] {
 			filtered = append(filtered, w)
 		}
 	}
-	initialConfig.Wants = append(filtered, systemWants...)
+	initialWants = append(filtered, systemWants...)
 
-	globalBuilder.SetConfigInternal(initialConfig)
+	globalBuilder.SetConfigInternal(initialWants)
 	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
 	globalBuilder.SetCustomTargetRegistry(recipeRegistry) // Set custom types from recipes

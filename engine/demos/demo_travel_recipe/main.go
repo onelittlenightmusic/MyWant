@@ -39,12 +39,12 @@ func main() {
 		return
 	}
 
-	fmt.Printf("✅ Generated %d wants from recipe\n", len(config.Wants))
-	for _, want := range config.Wants {
+	fmt.Printf("✅ Generated %d wants from recipe\n", len(config))
+	for _, want := range config {
 		fmt.Printf("  - %s (%s)\n", want.Metadata.Name, want.Metadata.Type)
 	}
 	fmt.Println()
-	builder := NewChainBuilder(config)
+	builder := NewChainBuilder(WantDTOSliceToRuntime(config))
 	agentRegistry := NewAgentRegistry()
 
 	// Load capabilities from YAML files (from project root, accounting for engine subdirectory) Try both relative paths since go run -C engine changes the working directory
