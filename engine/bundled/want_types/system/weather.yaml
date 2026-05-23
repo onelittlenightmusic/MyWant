@@ -53,6 +53,7 @@ wantType:
       type: string
       persistent: true
       label: current
+      exposable: true
       initialValue: ''
 
     - name: weather_date

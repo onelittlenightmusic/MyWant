@@ -24,6 +24,7 @@ wantType:
     type: integer
     label: current
     persistent: true
+    exposable: true
   - name: label
     description: Button display label
     type: string

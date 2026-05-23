@@ -26,6 +26,7 @@ wantType:
     type: any
     label: current
     persistent: true
+    exposable: true
   examples:
   - title: SmartGolf slot selection
     description: Selects an available SmartGolf slot fetched by smartgolf_list_available, propagating the selection to parent's goal state.

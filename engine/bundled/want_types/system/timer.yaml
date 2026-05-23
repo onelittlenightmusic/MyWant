@@ -1,13 +1,14 @@
 wantType:
   metadata:
     name: timer
-    title: Timer Control
+    title: Timer
     description: Controls a global scheduling parameter (WhenSpec). The user sets the interval (every) and optional time-of-day (at), which are propagated to the named global parameter so other wants can reference it via fromGlobalParam.
-    version: '1.0'
+    version: '1.1'
     category: system
     pattern: independent
     labels:
       user-control: "true"
+      type-icon: "Timer"
   parameters:
   - name: target_param
     description: Name of the global parameter to control (e.g., global_timer_1)
@@ -21,19 +22,35 @@ wantType:
     default: "5m"
   state:
   - name: every
-    description: Scheduling interval (e.g., 5m, 1h, 1 day)
+    description: Scheduling interval input (e.g., 5m, 1h, 1 day). UI control — feeds into schedule.
     type: string
-    label: current
+    label: internal
     persistent: true
   - name: at
-    description: Optional time-of-day expression (e.g., 09:00, 7am). Leave empty for interval-only scheduling.
+    description: Optional time-of-day input (e.g., 09:00, 7am). UI control — feeds into schedule.
     type: string
+    label: internal
+    persistent: true
+  - name: timer_mode
+    description: Scheduling mode (every or at)
+    type: string
+    label: internal
+    persistent: true
+  - name: at_recurrence
+    description: Recurrence for at-mode (day or week)
+    type: string
+    label: internal
+    persistent: true
+  - name: schedule
+    description: Computed WhenSpec combining every and at. Expose this to propagate the schedule to other wants.
+    type: WhenSpec
     label: current
     persistent: true
+    exposable: true
   - name: target_param
     description: Target global parameter name
     type: string
-    label: current
+    label: internal
     persistent: true
   examples:
   - title: Global timer for periodic jobs

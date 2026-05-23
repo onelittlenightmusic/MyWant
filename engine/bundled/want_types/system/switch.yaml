@@ -24,6 +24,7 @@ wantType:
     type: boolean
     label: current
     persistent: true
+    exposable: true
     initialValue: false
   - name: label
     description: Switch display label

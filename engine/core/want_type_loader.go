@@ -30,6 +30,16 @@ type ValidationRules = want_spec.ValidationRules
 // StateDef defines a state key for a want type
 type StateDef = want_spec.StateDef
 
+// WantTypeStateLabel is the set of valid label values for a StateDef.
+type WantTypeStateLabel = want_spec.StateLabel
+
+const (
+	WantTypeStateLabelGoal     = want_spec.StateLabelGoal
+	WantTypeStateLabelCurrent  = want_spec.StateLabelCurrent
+	WantTypeStateLabelPlan     = want_spec.StateLabelPlan
+	WantTypeStateLabelInternal = want_spec.StateLabelInternal
+)
+
 // MonitorCapabilityDef describes a MonitorAgent capability derived from requires analysis.
 type MonitorCapabilityDef = want_spec.MonitorCapabilityDef
 
@@ -502,7 +512,7 @@ func (w *WantTypeLoader) validateDefinition(def *WantTypeDefinition) error {
 			return fmt.Errorf("state key '%s' missing mandatory label (must be one of: goal, current, plan, internal)", state.Name)
 		}
 		validLabels := map[string]bool{"goal": true, "current": true, "plan": true, "internal": true}
-		if !validLabels[state.Label] {
+		if !validLabels[string(state.Label)] {
 			return fmt.Errorf("state key '%s' has invalid label '%s' (must be one of: goal, current, plan, internal)", state.Name, state.Label)
 		}
 	}

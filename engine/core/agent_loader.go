@@ -411,7 +411,7 @@ func mrsStateUpdatesToDefs(updates []MRSStateUpdate) []StateDef {
 		defs = append(defs, StateDef{
 			Name:       u.Name,
 			Type:       u.Type,
-			Label:      label,
+			Label:      WantTypeStateLabel(label),
 			Persistent: u.Persistent,
 		})
 	}

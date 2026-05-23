@@ -38,7 +38,7 @@ func (s *ScriptableWant) Initialize() {
 	// Copy spec params into state using declared labels.
 	labels := make(map[string]string, len(s.WantTypeDefinition.State))
 	for _, sd := range s.WantTypeDefinition.State {
-		labels[sd.Name] = sd.Label
+		labels[sd.Name] = string(sd.Label)
 	}
 	for k, v := range s.Spec.Params {
 		switch labels[k] {

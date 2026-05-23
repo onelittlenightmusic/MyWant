@@ -1,13 +1,14 @@
 wantType:
   metadata:
     name: slider
-    title: Parameter Slider
+    title: Slider
     description: Dynamically controls a parent want's parameter. When the slider's value changes, the specified parent parameter is updated in real-time.
-    version: '1.0'
+    version: '1.1'
     category: system
     pattern: independent
     labels:
       user-control: "true"
+      type-icon: "SlidersHorizontal"
   parameters:
   - name: target_param
     description: Name of the parent parameter to control
@@ -40,6 +41,7 @@ wantType:
     type: float64
     persistent: true
     label: current
+    exposable: true
     initialValue: 0
   - name: min
     description: Minimum value

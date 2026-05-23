@@ -45,12 +45,13 @@ type ImportAction struct {
 
 // FieldRef describes the source field.
 type FieldRef struct {
-	WantID    string `json:"want_id"`
-	WantName  string `json:"want_name"`
-	FieldName string `json:"field_name"`
-	FieldType string `json:"field_type"` // "array", "string", "number", "bool", "object"
-	Label     string `json:"label"`      // "current", "plan", "goal", or "" (unlabeled)
-	IsFinal   bool   `json:"is_final"`   // true if this is the want type's finalResultField
+	WantID      string `json:"want_id"`
+	WantName    string `json:"want_name"`
+	FieldName   string `json:"field_name"`
+	FieldType   string `json:"field_type"`   // "array", "string", "number", "bool", "object"
+	Label       string `json:"label"`        // "current", "plan", "goal", or "" (unlabeled)
+	IsFinal     bool   `json:"is_final"`     // true if this is the want type's finalResultField
+	IsExposable bool   `json:"is_exposable"` // true if the want type declares exposable: true for this field
 }
 
 // ParamRef describes the target parameter to be written.
@@ -95,9 +96,7 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	recs := computeFieldMatchRecommendations(s, sourceWant, targetWant, exposedLabels)
-	eiRecs := computeExposeImportRecommendations(s, sourceWant, targetWant, exposedLabels)
-	recs = append(recs, eiRecs...)
+	recs := computeExposeImportRecommendations(s, sourceWant, targetWant, exposedLabels)
 	sort.Slice(recs, func(i, j int) bool { return recs[i].Score > recs[j].Score })
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
@@ -274,64 +273,6 @@ func hasExposeAs(w *mywant.Want, asKey string) bool {
 	return false
 }
 
-// computeFieldMatchRecommendations scores all combinations of source state fields
-// (filtered by allowedLabels) against target *_import_field / *_source_* parameters.
-func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldMatchRecommendation {
-	// Collect source state fields whose label is in allowedLabels
-	sourceFields := collectSourceFields(s, source, allowedLabels)
-	// Collect target import-style parameters
-	targetParams := collectTargetImportParams(s, target)
-
-	if len(sourceFields) == 0 || len(targetParams) == 0 {
-		return []FieldMatchRecommendation{}
-	}
-
-	// Pre-compute which fields are already exposed by source (by As key).
-	alreadyExposedKeys := make(map[string]bool, len(source.Spec.Exposes))
-	for _, e := range source.Spec.Exposes {
-		if e.As != "" {
-			alreadyExposedKeys[e.As] = true
-		}
-	}
-
-	var recs []FieldMatchRecommendation
-	for _, sf := range sourceFields {
-		// Build the ExposeAction for this field (nil if already exposed).
-		var exposeAction *ExposeAction
-		if !alreadyExposedKeys[sf.FieldName] {
-			exposeAction = &ExposeAction{
-				WantID:    source.Metadata.ID,
-				WantName:  source.Metadata.Name,
-				FieldName: sf.FieldName,
-			}
-		}
-		for _, tp := range targetParams {
-			score := scoreMatch(sf, tp)
-			if score <= 0 {
-				continue
-			}
-			recs = append(recs, FieldMatchRecommendation{
-				Score:        score,
-				Description:  fmt.Sprintf("%s.%s → %s.%s", source.Metadata.Name, sf.FieldName, target.Metadata.Name, tp),
-				Source:       sf,
-				Target: ParamRef{
-					WantID:    target.Metadata.ID,
-					WantName:  target.Metadata.Name,
-					ParamName: tp,
-				},
-				ParamChange: ParamChange{
-					WantID:    target.Metadata.ID,
-					ParamName: tp,
-					Value:     sf.FieldName,
-				},
-				ExposeAction: exposeAction,
-			})
-		}
-	}
-
-	sort.Slice(recs, func(i, j int) bool { return recs[i].Score > recs[j].Score })
-	return recs
-}
 
 // collectSourceFields enumerates state fields whose label is in allowedLabels,
 // annotating each with its runtime type, label, and whether it is the finalResultField.
@@ -341,8 +282,14 @@ func computeFieldMatchRecommendations(s *Server, source, target *mywant.Want, al
 func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldRef {
 	typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
 	finalField := ""
+	exposableFields := make(map[string]bool)
 	if typeDef != nil {
 		finalField = typeDef.FinalResultField
+		for _, sd := range typeDef.State {
+			if sd.Exposable {
+				exposableFields[sd.Name] = true
+			}
+		}
 	}
 
 	// Build a set of framework-reserved field names to exclude from recommendations.
@@ -367,12 +314,13 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 			continue
 		}
 		fields = append(fields, FieldRef{
-			WantID:    want.Metadata.ID,
-			WantName:  want.Metadata.Name,
-			FieldName: k,
-			FieldType: runtimeTypeName(v),
-			Label:     stateLabelString(effective),
-			IsFinal:   k == finalField,
+			WantID:      want.Metadata.ID,
+			WantName:    want.Metadata.Name,
+			FieldName:   k,
+			FieldType:   runtimeTypeName(v),
+			Label:       stateLabelString(effective),
+			IsFinal:     k == finalField,
+			IsExposable: exposableFields[k],
 		})
 	}
 	return fields
@@ -391,68 +339,6 @@ func stateLabelString(label mywant.StateLabel) string {
 	}
 }
 
-// collectTargetImportParams returns parameter names from the target want type definition
-// that look like "import field" selectors (e.g. choice_import_field, source_field, *_import_*).
-func collectTargetImportParams(s *Server, want *mywant.Want) []string {
-	typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
-	if typeDef == nil {
-		return nil
-	}
-
-	var params []string
-	for _, p := range typeDef.Parameters {
-		if isImportParam(p.Name) {
-			params = append(params, p.Name)
-		}
-	}
-	return params
-}
-
-// isImportParam returns true if the parameter name looks like a field-import selector.
-func isImportParam(name string) bool {
-	lower := strings.ToLower(name)
-	return strings.Contains(lower, "_import_field") ||
-		strings.Contains(lower, "_source_field") ||
-		strings.HasSuffix(lower, "_field") ||
-		strings.Contains(lower, "_from_field")
-}
-
-// scoreMatch returns a score [0,1] for how well a source field matches a target param name.
-// 0 means not a match at all.
-func scoreMatch(sf FieldRef, targetParam string) float64 {
-	score := 0.0
-
-	// finalResultField is the canonical output → highest boost
-	if sf.IsFinal {
-		score += 0.5
-	}
-
-	// Array/slice fields match "choices"-style params especially well
-	targetLower := strings.ToLower(targetParam)
-	if sf.FieldType == "array" && (strings.Contains(targetLower, "choice") || strings.Contains(targetLower, "list") || strings.Contains(targetLower, "import")) {
-		score += 0.4
-	}
-
-	// Label-to-param keyword match: a "plan"-labelled field matched against a param
-	// containing "plan" is a stronger semantic hit than a generic word match.
-	if sf.Label != "" && strings.Contains(targetLower, sf.Label) {
-		score += 0.3
-	}
-
-	// Name similarity: words in common between field name and param name
-	fieldWords := splitWords(sf.FieldName)
-	paramWords := splitWords(targetParam)
-	common := wordIntersection(fieldWords, paramWords)
-	if len(common) > 0 {
-		score += 0.1 * float64(len(common))
-	}
-
-	// Any non-zero score qualifies (minimum baseline so every candidate appears)
-	if score == 0 {
-		score = 0.1
-	}
-	return score
-}
 
 func runtimeTypeName(v any) string {
 	if v == nil {
@@ -554,10 +440,12 @@ func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, 
 			continue
 		}
 
-		// Score: finalResultField >> current >> plan/goal
+		// Score: finalResultField >> exposable >> current >> plan/goal
 		score := 0.3
 		if sf.IsFinal {
 			score = 0.85
+		} else if sf.IsExposable {
+			score = 0.75
 		} else if sf.Label == "current" {
 			score = 0.55
 		}
