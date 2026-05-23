@@ -48,9 +48,7 @@ func (m *mockGooseExecutor) ExecuteViaGoose(ctx context.Context, operation strin
 			"title":       rec.Title,
 			"approach":    rec.Approach,
 			"description": rec.Description,
-			"config": map[string]interface{}{
-				"wants": wants,
-			},
+			"wants":       wants,
 			"metadata": map[string]interface{}{
 				"want_count":      len(rec.Wants),
 				"want_types_used": []string{},

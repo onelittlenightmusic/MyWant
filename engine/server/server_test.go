@@ -45,18 +45,16 @@ func TestHealthCheck(t *testing.T) {
 func TestCreateWantAPI(t *testing.T) {
 	s := setupTestServer()
 
-	// Valid payload
-	payload := map[string]any{
-		"wants": []map[string]any{
-			{
-				"metadata": map[string]string{
-					"name": "test-want",
-					"type": "qnet queue",
-				},
-				"spec": map[string]any{
-					"params": map[string]any{
-						"service_time": 0.1,
-					},
+	// Valid payload — bare array (Config wrapper was removed in v0.0.46)
+	payload := []map[string]any{
+		{
+			"metadata": map[string]string{
+				"name": "test-want",
+				"type": "qnet queue",
+			},
+			"spec": map[string]any{
+				"params": map[string]any{
+					"service_time": 0.1,
 				},
 			},
 		},
