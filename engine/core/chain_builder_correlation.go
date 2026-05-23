@@ -110,20 +110,20 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 	}
 
 	// D. Import-param references: if want B has an import-style param (e.g. choice_import_field)
-	// whose string value matches a state field declared by want A's type definition, treat B as
-	// a consumer of A's state. Also handle exposes.As global key references.
-	fieldToProviders := make(map[string][]string)  // stateFieldName → []providerWantID
+	// whose string value matches an expose.As key declared by want A, treat B as a consumer of A's
+	// exposed state.
+	//
+	// NOTE: we intentionally do NOT match against raw type-definition state field names here.
+	// A type definition declaring a field does not mean the field is accessible — it must be
+	// explicitly exposed via Spec.Exposes.  Matching unexposed fields caused phantom correlations
+	// (stateAccess dots) for wants that referenced a field name that happened to exist in another
+	// want's type definition, even though no actual data flow existed.
 	exposeKeyToProvider := make(map[string]string) // exposeAs key → providerWantID
 	for _, rw := range cb.wants {
 		w := rw.want
 		wID := w.Metadata.ID
 		if wID == "" {
 			continue
-		}
-		if def, ok := cb.wantTypeDefinitions[w.Metadata.Type]; ok {
-			for _, s := range def.State {
-				fieldToProviders[s.Name] = append(fieldToProviders[s.Name], wID)
-			}
 		}
 		for _, exp := range w.Spec.Exposes {
 			if exp.As != "" {
@@ -145,15 +145,26 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 			if !isCorrelationImportParam(paramName) {
 				continue
 			}
-			// Match against type-definition state field names
-			for _, providerID := range fieldToProviders[strVal] {
-				if providerID != wID {
-					register(providerID, strVal, wID)
-				}
-			}
-			// Match against expose global keys
+			// Match against expose global keys only
 			if providerID, found := exposeKeyToProvider[strVal]; found && providerID != wID {
 				register(providerID, "expose/"+strVal, wID)
+			}
+		}
+	}
+
+	// Section E: Imports-based correlations.
+	// When a want declares `imports: { globalKey: localKey }`, find the want that exposes
+	// `as: globalKey` and register a direct stateAccess correlation between them.
+	// This replaces ad-hoc param-name inference (e.g. choice_import_field) with an explicit link.
+	for _, rw := range cb.wants {
+		w := rw.want
+		wID := w.Metadata.ID
+		if wID == "" || len(w.Spec.Imports) == 0 {
+			continue
+		}
+		for globalKey := range w.Spec.Imports {
+			if providerID, found := exposeKeyToProvider[globalKey]; found && providerID != wID {
+				register(providerID, "expose/"+globalKey, wID)
 			}
 		}
 	}

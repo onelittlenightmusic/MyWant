@@ -34,14 +34,8 @@ func (c *ChoiceWant) Initialize() {
 // IsAchieved always returns false — choice is a persistent control.
 func (c *ChoiceWant) IsAchieved() bool { return false }
 func (c *ChoiceWant) Progress() {
-	// 1. パラメータから import パスを取得
-	importPath := c.GetStringParam("choice_import_field", "")
-	if importPath != "" {
-		if val, ok := c.GetParentState(importPath); ok {
-			c.StoreState("choices", val)
-		}
-	}
-
+	// choices is populated via spec.imports (global state → local key).
+	// getState("choices") transparently reads from global state — no explicit fetch needed.
 	targetParam := c.GetStringParam("target_param", "")
 	selected, _ := c.GetCurrent("selected")
 	if selected != nil && targetParam != "" {

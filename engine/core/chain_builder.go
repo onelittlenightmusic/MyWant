@@ -932,6 +932,13 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 						runtimeWant.want.SetProgressable(progressable)
 					}
 
+					// Re-register expose/notification handlers so changes to Spec.Exposes
+					// (e.g. new expose entries added via API) take effect immediately.
+					// UnregisterWant removes old subscriptions; RegisterWant sets up new ones
+					// based on the updated Spec.
+					UnregisterWant(runtimeWant.want.Metadata.Name)
+					RegisterWant(runtimeWant.want)
+
 					// Notify parents of changes (adoption or disowning)
 					cb.notifyParentOfChanges(updatedConfigWant, oldOwnerRefs, newOwnerRefs)
 
@@ -1338,13 +1345,15 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	// Update label registry
 	cb.registerLabelsFromWant(wantConfig)
 
-	// Directly update the live want's metadata so the hash changes immediately.
-	// Reconciliation only calls addWant for wants not yet in cb.wants, so without
-	// this direct update, metadata changes (e.g. canvas labels) would never be reflected.
+	// Directly update the live want's metadata AND spec so the changes are reflected
+	// immediately in writeStatsToMemory (which reads runtimeWant.want.GetSpec()).
+	// Without updating Spec here, writeStatsToMemory would overwrite the newly saved
+	// config want's Spec with the stale runtime spec, losing fields like Imports.
 	cb.wantsMu.RLock()
 	if rw, exists := cb.wants[wantConfig.Metadata.ID]; exists {
 		rw.want.metadataMutex.Lock()
 		rw.want.Metadata = wantConfig.Metadata
+		rw.want.Spec = wantConfig.Spec
 		rw.want.metadataMutex.Unlock()
 	}
 	cb.wantsMu.RUnlock()

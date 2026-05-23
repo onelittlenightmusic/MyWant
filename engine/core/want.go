@@ -1,7 +1,6 @@
 package mywant
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -10,7 +9,6 @@ import (
 	"fmt"
 	"log"
 	"mywant/engine/core/pubsub"
-	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -19,8 +17,6 @@ import (
 	"time"
 
 	want_spec "github.com/onelittlenightmusic/want-spec"
-	"go.opentelemetry.io/otel/attribute"
-	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/yaml.v3"
 )
@@ -322,6 +318,11 @@ func (n *Want) MarshalYAML() (interface{}, error) {
 	type Alias Want
 	stateMap := make(map[string]any)
 	n.State.Range(func(key, value any) bool {
+		// Imported fields are not owned by this want — global state is the source of truth.
+		// Exclude them from persistence to prevent stale copies.
+		if _, isImported := n.importedLocalKey(key.(string)); isImported {
+			return true
+		}
 		stateMap[key.(string)] = value
 		return true
 	})
@@ -411,57 +412,6 @@ func (n *Want) SetStatus(status WantStatus) {
 
 		// OpenTelemetry: manage want lifecycle span
 		n.otelOnStatusChange(oldStatus, status)
-	}
-}
-
-// otelOnStatusChange manages the OTEL lifecycle span for this want.
-//   - First active status → start a new span
-//   - Every status change → add a span event
-//   - Terminal status → end the span
-func (n *Want) otelOnStatusChange(oldStatus, newStatus WantStatus) {
-	if !IsOTELEnabled() {
-		return
-	}
-
-	terminalStatuses := map[WantStatus]bool{
-		WantStatusAchieved:            true,
-		WantStatusAchievedWithWarning: true,
-		WantStatusFailed:              true,
-		WantStatusCancelled:           true,
-		WantStatusTerminated:          true,
-	}
-
-	// Start span when want first becomes active
-	if n.otelSpan == nil && oldStatus == WantStatusIdle {
-		tracer := otelTracer()
-		if tracer != nil {
-			ctx, span := tracer.Start(context.Background(), "want/"+n.Metadata.Name,
-				trace.WithAttributes(
-					attribute.String("want.name", n.Metadata.Name),
-					attribute.String("want.type", n.Metadata.Type),
-					attribute.String("want.id", n.Metadata.ID),
-				),
-			)
-			n.otelSpan = span
-			n.otelSpanCtx = ctx
-		}
-	}
-
-	if n.otelSpan == nil {
-		return
-	}
-
-	// Record status transition as a span event
-	n.otelSpan.AddEvent("status_change", trace.WithAttributes(
-		attribute.String("want.status.old", string(oldStatus)),
-		attribute.String("want.status.new", string(newStatus)),
-	))
-
-	// End span at terminal status
-	if terminalStatuses[newStatus] {
-		n.otelSpan.End()
-		n.otelSpan = nil
-		n.otelSpanCtx = nil
 	}
 }
 
@@ -1150,6 +1100,13 @@ func (n *Want) SetSuspended(suspended bool) {
 //   - NEVER call want_A.storeState(...) from code that runs on behalf of want_B.
 //     Cross-want state writes bypass locking assumptions and can corrupt state history.
 func (n *Want) StoreState(key string, value any) {
+	// Imported fields are read-only: global state is the source of truth.
+	for _, localKey := range n.Spec.Imports {
+		if localKey == key {
+			return
+		}
+	}
+
 	previousValue, _ := n.State.Load(key)
 	if n.valuesEqual(previousValue, value) {
 		return
@@ -1546,24 +1503,26 @@ func (n *Want) StoreLog(message string, args ...any) {
 	formatted := fmt.Sprintf(message, args...)
 	InfoLog("[%s] %s", n.Metadata.Name, formatted)
 	n.getHistoryManager().AddLogEntry(formatted)
-	n.otelEmitWantLog(otellog.SeverityInfo, formatted)
-}
-
-// otelEmitWantLog emits a log record with want identity attributes.
-func (n *Want) otelEmitWantLog(severity otellog.Severity, body string) {
-	ctx := n.otelSpanCtx
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	otelEmitLog(ctx, severity, body,
-		otellog.String("want.name", n.Metadata.Name),
-		otellog.String("want.type", n.Metadata.Type),
-		otellog.String("want.status", string(n.Status)),
-	)
+	n.otelEmitWantInfo(formatted)
 }
 
 func (n *Want) getState(key string) (any, bool) {
+	// Imported fields are resolved live from global state.
+	if globalKey, ok := n.importedLocalKey(key); ok {
+		return GetGlobalState(globalKey)
+	}
 	return n.State.Load(key)
+}
+
+// importedLocalKey returns the global state key for a given local state key if it is imported,
+// or ("", false) if the key is not an import.
+func (n *Want) importedLocalKey(localKey string) (string, bool) {
+	for globalKey, lk := range n.Spec.Imports {
+		if lk == localKey {
+			return globalKey, true
+		}
+	}
+	return "", false
 }
 
 func (n *Want) storeState(key string, value any) {
@@ -1580,54 +1539,6 @@ func StoreStateMulti(wp WantPointer, updates map[string]any) {
 // GetPendingStateChanges is obsolete; state changes are committed immediately via StoreState.
 func (n *Want) GetPendingStateChanges() map[string]any {
 	return make(map[string]any)
-}
-
-// SetRemoteCallback configures Want for remote execution mode with callback support
-func (n *Want) SetRemoteCallback(callbackURL, agentName string) {
-	n.callbackURL = callbackURL
-	n.agentName = agentName
-	n.remoteMode = true
-}
-
-// SendCallback sends pending state changes to the callback URL (for remote agent execution)
-func (n *Want) SendCallback() error {
-	if n.callbackURL == "" {
-		return fmt.Errorf("callback URL not set")
-	}
-
-	changes := n.GetPendingStateChanges()
-	if len(changes) == 0 {
-		return nil // No changes to send
-	}
-
-	callback := WebhookCallback{
-		AgentName:    n.agentName,
-		WantID:       n.Metadata.Name,
-		Status:       "state_changed",
-		StateUpdates: changes,
-	}
-
-	// Send callback asynchronously
-	go func() {
-		body, err := json.Marshal(callback)
-		if err != nil {
-			log.Printf("[CALLBACK] Failed to marshal callback: %v", err)
-			return
-		}
-
-		resp, err := http.Post(n.callbackURL, "application/json", bytes.NewReader(body))
-		if err != nil {
-			log.Printf("[CALLBACK] Failed to send callback to %s: %v", n.callbackURL, err)
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-			log.Printf("[CALLBACK] Callback returned status %d", resp.StatusCode)
-		}
-	}()
-
-	return nil
 }
 
 // ============================================================================
@@ -2098,6 +2009,13 @@ func (n *Want) GetAllState() map[string]any {
 		state[key.(string)] = value
 		return true
 	})
+	// Overlay imported fields with live global state values so the API response
+	// always reflects the current value without requiring a want restart.
+	for globalKey, localKey := range n.Spec.Imports {
+		if val, ok := GetGlobalState(globalKey); ok {
+			state[localKey] = val
+		}
+	}
 	return state
 }
 func (n *Want) GetStopChannel() chan struct{} {
@@ -2389,20 +2307,7 @@ func (n *Want) FinishAgentRun(agentName string, permanent bool) {
 func (n *Want) getHistoryManager() *HistoryManager {
 	if n.history == nil {
 		hm := NewHistoryManager()
-		// Inject OTEL span-event hook for state changes
-		hm.OnStateEntry = func(key string, value any) {
-			if n.otelSpan == nil || !IsOTELEnabled() {
-				return
-			}
-			valStr := fmt.Sprintf("%v", value)
-			if len(valStr) > 256 {
-				valStr = valStr[:256] + "…"
-			}
-			n.otelSpan.AddEvent("state_change", trace.WithAttributes(
-				attribute.String("state.key", key),
-				attribute.String("state.value", valStr),
-			))
-		}
+		hm.OnStateEntry = func(key string, value any) { n.otelEmitStateChange(key, value) }
 		n.history = hm
 	}
 	return n.history

@@ -30,6 +30,14 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		return false
 	}
 
+	if !reflect.DeepEqual(a.Spec.Exposes, b.Spec.Exposes) {
+		return false
+	}
+
+	if !reflect.DeepEqual(a.Spec.Imports, b.Spec.Imports) {
+		return false
+	}
+
 	return true
 }
 
@@ -70,6 +78,8 @@ func (cb *ChainBuilder) deepCopyConfig(src Config) Config {
 				NotificationFilters: copyNotificationFilters(want.Spec.NotificationFilters),
 				Requires:            copyStringSlice(want.Spec.Requires),
 				When:                copyWhen(want.Spec.When),
+				Exposes:             copyExposes(want.Spec.Exposes),
+				Imports:             copyStringMap(want.Spec.Imports),
 			},
 		}
 		copiedWants = append(copiedWants, copiedWant)
@@ -170,5 +180,14 @@ func copyNotificationFilters(src []NotificationFilter) []NotificationFilter {
 		}
 		dst = append(dst, copiedFilter)
 	}
+	return dst
+}
+
+func copyExposes(src []ExposeEntry) []ExposeEntry {
+	if src == nil {
+		return nil
+	}
+	dst := make([]ExposeEntry, len(src))
+	copy(dst, src)
 	return dst
 }
