@@ -7,7 +7,7 @@ wantType:
       Uses wttr.in (no API key) or OpenWeatherMap if an API key is provided.
       Achieved once weather has been fetched for today's date.
     version: '2.0'
-    category: system
+    category: weather
     pattern: independent
     labels:
       user-control: 'true'
