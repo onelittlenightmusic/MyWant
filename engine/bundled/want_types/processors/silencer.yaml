@@ -8,8 +8,10 @@ wantType:
       when certain conditions are met, allowing for agentic automation of
       human-in-the-loop tasks.
     version: '1.0'
-    category: processor
+    category: system
     pattern: processor
+    labels:
+      type-icon: BellOff
   parameters:
   - name: policy
     description: Processing policy (e.g., 'all_true')

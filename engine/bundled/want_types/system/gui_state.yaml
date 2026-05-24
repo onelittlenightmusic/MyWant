@@ -64,3 +64,111 @@ wantType:
       label: current
       persistent: false
       initialValue: 1.0
+
+    # ── Robot cursor fields ────────────────────────────────────────────────────
+    # Used by mywant-gui robot overlay (driven by CLI commands like `mywant gui wants open`)
+
+    - name: robot_visible
+      description: Whether the robot cursor overlay is visible
+      type: bool
+      label: current
+      persistent: false
+      initialValue: false
+
+    - name: robot_message
+      description: Message shown in the robot speech bubble
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: robot_target_type
+      description: >
+        DOM target type for the robot cursor:
+        "want_card" | "nav_wants" | "nav_agents" | "nav_types" | "nav_recipes" |
+        "sidebar_tab" | "sidebar_close" | "param_field" | "none" | ""
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: robot_target_id
+      description: Target identifier (want ID, param key, nav ID, etc.)
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: robot_action
+      description: Action to perform — "click" | "hover" | "type" | "navigate" | ""
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: robot_action_payload
+      description: Payload for the "type" action (value to display being typed)
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: robot_nonce
+      description: >
+        Monotonically increasing counter (unix ms); each CLI command increments
+        this so the frontend can detect a new command even when the target is the same.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: nav_route
+      description: Client-side navigation route to push (e.g. "/agents", "/recipes")
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: sidebar_settings_subtab
+      description: Active sub-tab within the settings panel (name|params|labels|schedule|deps|expose|import)
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: expanded_want_id
+      description: ID of the want card currently maximized/expanded to full-screen view. Empty string means no card is maximized.
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    # ── Add Want form control (driven by CLI) ─────────────────────────────────
+
+    - name: add_form_open
+      description: When true, the CLI has requested the Add Want form to open.
+      type: bool
+      label: current
+      persistent: false
+      initialValue: false
+
+    - name: add_form_type
+      description: Want type ID to pre-select in the Add Want form (e.g. "choice"). Empty = show type picker.
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: add_form_nonce
+      description: Monotonically increasing counter. Each new value triggers the action encoded in add_form_open/add_form_type.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: add_form_deploy_nonce
+      description: Monotonically increasing counter. Each new value triggers form submission/deploy.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0

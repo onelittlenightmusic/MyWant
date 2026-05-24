@@ -12,6 +12,9 @@ wantType:
     labels:
       user-control: 'true'
       full-screen-display: 'true'
+      category-icon: CloudSun
+      category-bg-light: "linear-gradient(160deg, #fde68a 0%, #bfdbfe 100%)"
+      category-bg-dark: "linear-gradient(160deg, #b45309 0%, #1d4ed8 100%)"
 
   finalResultField: weather_text
 
