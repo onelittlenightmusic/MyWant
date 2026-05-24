@@ -51,7 +51,6 @@ func SystemReservedStateFields() []string {
 		StateFieldCompleted,
 		StateFieldAchieved,
 		"agent_result",
-		"want",
 		"desired_dispatch",
 	}
 }

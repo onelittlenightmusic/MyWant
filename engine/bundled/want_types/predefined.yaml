@@ -40,12 +40,6 @@ predefined:
       label: current
       persistent: true
       initialValue: null
-    - name: want
-      description: やりたいことの自然言語メモ
-      type: string
-      label: goal
-      persistent: true
-      initialValue: ""
     - name: desired_dispatch
       description: Dispatch requests proposed by a thinker child
       type: object
