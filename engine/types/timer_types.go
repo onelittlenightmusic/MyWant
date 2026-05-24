@@ -21,14 +21,12 @@ type TimerLocals struct {
 // scheduleStateKey is the canonical current-state key for the computed WhenSpec output.
 const scheduleStateKey = "schedule"
 
-// TimerWant computes a WhenSpec (every/at schedule) and exposes it as "timer_spec" current state.
-// The value is propagated to the parent via expose entries, e.g.:
+// TimerWant computes a WhenSpec (every/at schedule) and stores it as the "schedule" current state.
+// Use asGlobalParam in the want's exposes spec to write it to a named global parameter, e.g.:
 //
 //	exposes:
-//	  - currentState: "timer_spec"
-//	    asGoal: "schedule"
-//
-// For top-level wants writing to global state, use "as" instead of "asGoal".
+//	  - currentState: schedule
+//	    asGlobalParam: global_timer_1
 type TimerWant struct{ Want }
 
 func (t *TimerWant) GetLocals() *TimerLocals {

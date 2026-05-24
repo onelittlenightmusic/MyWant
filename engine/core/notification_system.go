@@ -130,6 +130,31 @@ func (h *goalStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) E
 	return EventResponse{Handled: true}
 }
 
+// globalParamExposeHandler handles StateChangeEvent and writes the value directly
+// to a named global parameter via SetGlobalParameter.
+// Used for exposes entries with CurrentState + AsGlobalParam fields.
+type globalParamExposeHandler struct {
+	want      *Want
+	localKey  string // state key in this want (ExposeEntry.CurrentState)
+	paramKey  string // global parameter name (ExposeEntry.AsGlobalParam)
+}
+
+func (h *globalParamExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:global-param-expose:%s→%s", h.want.Metadata.Name, h.localKey, h.paramKey)
+}
+
+func (h *globalParamExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	sce, ok := event.(*StateChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if sce.GetSourceName() != h.want.Metadata.Name || sce.StateKey != h.localKey {
+		return EventResponse{}
+	}
+	SetGlobalParameter(h.paramKey, sce.StateValue) //nolint:errcheck
+	return EventResponse{Handled: true}
+}
+
 // Global want registry for notification lookup
 var (
 	wantRegistry      = make(map[string]*Want)
@@ -199,7 +224,15 @@ func RegisterWant(want *Want) {
 			}
 			want.GetSubscriptionSystem().Subscribe(EventTypeParameterChange, handler)
 		} else if entry.CurrentState != "" {
-			if entry.AsGoal != "" {
+			if entry.AsGlobalParam != "" {
+				// Write local current state directly to a named global parameter.
+				handler := &globalParamExposeHandler{
+					want:     want,
+					localKey: entry.CurrentState,
+					paramKey: entry.AsGlobalParam,
+				}
+				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+			} else if entry.AsGoal != "" {
 				// Bottom-up: push local current state to parent's Goal-labeled state via SetGoal.
 				// Top-level wants have no parent and are not supported for asGoal.
 				if parentName == "" {
