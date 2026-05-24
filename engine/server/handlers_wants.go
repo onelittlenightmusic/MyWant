@@ -299,6 +299,7 @@ type hierarchicalState struct {
 	Current     map[string]any `json:"current,omitempty"`
 	Goal        map[string]any `json:"goal,omitempty"`
 	Plan        map[string]any `json:"plan,omitempty"`
+	Internal    map[string]any `json:"internal,omitempty"`
 }
 
 // wantAPIResponse is the API-level representation of a Want with hierarchical state.
@@ -322,6 +323,7 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 	current := make(map[string]any)
 	goal := make(map[string]any)
 	plan := make(map[string]any)
+	internal := make(map[string]any)
 	var finalResult any
 
 	for k, v := range explicitState {
@@ -338,6 +340,8 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 			goal[k] = v
 		case mywant.LabelPlan:
 			plan[k] = v
+		case mywant.LabelInternal:
+			internal[k] = v
 		default:
 			// LabelCurrent, LabelNone (including system-reserved fields) → current
 			current[k] = v
@@ -348,7 +352,7 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 		Metadata:        want.Metadata,
 		Spec:            want.Spec,
 		Status:          want.GetStatus(),
-		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan},
+		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
 		StateTimestamps: want.GetStateTimestamps(),
 		HiddenState:     want.GetHiddenState(),
 		History:         want.BuildHistory(),

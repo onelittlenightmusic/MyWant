@@ -70,6 +70,7 @@ func buildWantStateSnapshot(want *mywant.Want, labelFilter string) WantStateSnap
 	current := make(map[string]any)
 	goal := make(map[string]any)
 	plan := make(map[string]any)
+	internal := make(map[string]any)
 	var finalResult any
 
 	for k, v := range explicitState {
@@ -90,6 +91,10 @@ func buildWantStateSnapshot(want *mywant.Want, labelFilter string) WantStateSnap
 			if labelFilter == "" || labelFilter == "plan" {
 				plan[k] = v
 			}
+		case mywant.LabelInternal:
+			if labelFilter == "" || labelFilter == "internal" {
+				internal[k] = v
+			}
 		default:
 			if labelFilter == "" || labelFilter == "current" {
 				current[k] = v
@@ -104,7 +109,7 @@ func buildWantStateSnapshot(want *mywant.Want, labelFilter string) WantStateSnap
 	return WantStateSnapshot{
 		WantID:   want.Metadata.ID,
 		WantName: want.Metadata.Name,
-		State:    hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan},
+		State:    hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
 	}
 }
 
