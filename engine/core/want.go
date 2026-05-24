@@ -50,7 +50,6 @@ func SystemReservedStateFields() []string {
 		StateFieldAchievingPercent,
 		StateFieldCompleted,
 		StateFieldAchieved,
-		"final_result",
 		"agent_result",
 		"want",
 		"desired_dispatch",
