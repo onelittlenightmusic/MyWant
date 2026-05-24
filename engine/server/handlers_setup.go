@@ -126,6 +126,13 @@ func (s *Server) setupRoutes() {
 	logs.HandleFunc("", s.clearLogs).Methods("DELETE")
 	logs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
+	robotLogs := api.PathPrefix("/robot/logs").Subrouter()
+	robotLogs.HandleFunc("", s.getRobotLogs).Methods("GET")
+	robotLogs.HandleFunc("", s.clearRobotLogs).Methods("DELETE")
+	robotLogs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	robotLogs.HandleFunc("/{id}/replay", s.replayRobotLog).Methods("POST")
+	robotLogs.HandleFunc("/{id}/replay", s.handleOptions).Methods("OPTIONS")
+
 	llm := api.PathPrefix("/llm").Subrouter()
 	llm.HandleFunc("/query", s.queryLLM).Methods("POST")
 	llm.HandleFunc("/query", s.handleOptions).Methods("OPTIONS")

@@ -1284,6 +1284,7 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 
 // updateGUIState handles PUT /api/v1/gui/state
 // Merges the request body into the gui_state want's state and increments seq.
+// If the payload carries robot fields with a new nonce, appends a RobotLogEntry.
 func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil {
@@ -1300,6 +1301,167 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	for key, val := range updates {
 		want.StoreState(key, val)
 	}
+
+	// Append robot log entry when a new robot command arrives (visible=true, nonce present)
+	if vis, ok := updates["robot_visible"]; ok {
+		isVisible := false
+		switch v := vis.(type) {
+		case bool:
+			isVisible = v
+		case float64:
+			isVisible = v != 0
+		}
+		nonce, _ := updates["robot_nonce"].(float64)
+		if isVisible && nonce != 0 {
+			entry := RobotLogEntry{
+				ID:            fmt.Sprintf("rlog-%d", time.Now().UnixNano()),
+				Timestamp:     time.Now().UTC().Format(time.RFC3339Nano),
+				Message:       stringField(updates, "robot_message"),
+				TargetType:    stringField(updates, "robot_target_type"),
+				TargetID:      stringField(updates, "robot_target_id"),
+				Action:        stringField(updates, "robot_action"),
+				ActionPayload: stringField(updates, "robot_action_payload"),
+				NavRoute:      stringField(updates, "nav_route"),
+				Nonce:         int64(nonce),
+				SidebarOpen:   boolField(updates, "sidebar_open"),
+				SidebarWantID: stringField(updates, "sidebar_want_id"),
+				SidebarTab:    stringField(updates, "sidebar_active_tab"),
+				SettingsSubtab: stringField(updates, "sidebar_settings_subtab"),
+			}
+			s.robotLogMu.Lock()
+			s.robotLog = append(s.robotLog, entry)
+			if len(s.robotLog) > 500 {
+				s.robotLog = s.robotLog[len(s.robotLog)-500:]
+			}
+			s.robotLogMu.Unlock()
+		}
+	}
+
+	s.JSONResponse(w, http.StatusOK, guiStateResponse{
+		Seq:   nextGUIStateSeq(),
+		State: guiFields(want),
+	})
+}
+
+// ── Robot Log ─────────────────────────────────────────────────────────────────
+
+// RobotLogEntry records a single robot cursor command sent from the CLI.
+type RobotLogEntry struct {
+	ID             string `json:"id"`
+	Timestamp      string `json:"timestamp"`
+	Message        string `json:"message"`
+	TargetType     string `json:"target_type"`
+	TargetID       string `json:"target_id"`
+	Action         string `json:"action"`
+	ActionPayload  string `json:"action_payload"`
+	NavRoute       string `json:"nav_route"`
+	Nonce          int64  `json:"nonce"`
+	SidebarOpen    bool   `json:"sidebar_open"`
+	SidebarWantID  string `json:"sidebar_want_id"`
+	SidebarTab     string `json:"sidebar_tab"`
+	SettingsSubtab string `json:"settings_subtab"`
+}
+
+func stringField(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func boolField(m map[string]any, key string) bool {
+	if v, ok := m[key]; ok {
+		switch t := v.(type) {
+		case bool:
+			return t
+		case float64:
+			return t != 0
+		}
+	}
+	return false
+}
+
+// getRobotLogs handles GET /api/v1/robot/logs
+func (s *Server) getRobotLogs(w http.ResponseWriter, r *http.Request) {
+	s.robotLogMu.Lock()
+	logs := make([]RobotLogEntry, len(s.robotLog))
+	copy(logs, s.robotLog)
+	s.robotLogMu.Unlock()
+
+	// Return newest first
+	for i, j := 0, len(logs)-1; i < j; i, j = i+1, j-1 {
+		logs[i], logs[j] = logs[j], logs[i]
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"logs": logs, "count": len(logs)})
+}
+
+// clearRobotLogs handles DELETE /api/v1/robot/logs
+func (s *Server) clearRobotLogs(w http.ResponseWriter, r *http.Request) {
+	s.robotLogMu.Lock()
+	s.robotLog = make([]RobotLogEntry, 0)
+	s.robotLogMu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// replayRobotLog handles POST /api/v1/robot/logs/{id}/replay
+// Re-applies the stored robot command with a fresh nonce so the browser re-animates it.
+func (s *Server) replayRobotLog(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	s.robotLogMu.Lock()
+	var entry *RobotLogEntry
+	for i := range s.robotLog {
+		if s.robotLog[i].ID == id {
+			cp := s.robotLog[i]
+			entry = &cp
+			break
+		}
+	}
+	s.robotLogMu.Unlock()
+
+	if entry == nil {
+		s.JSONError(w, r, http.StatusNotFound, "robot log entry not found", id)
+		return
+	}
+
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
+		return
+	}
+
+	// Re-apply the command with a new nonce
+	newNonce := time.Now().UnixMilli()
+	updates := map[string]any{
+		"robot_visible":          true,
+		"robot_message":          entry.Message,
+		"robot_target_type":      entry.TargetType,
+		"robot_target_id":        entry.TargetID,
+		"robot_action":           entry.Action,
+		"robot_action_payload":   entry.ActionPayload,
+		"robot_nonce":            newNonce,
+		"nav_route":              entry.NavRoute,
+		"sidebar_open":           entry.SidebarOpen,
+		"sidebar_want_id":        entry.SidebarWantID,
+		"sidebar_active_tab":     entry.SidebarTab,
+		"sidebar_settings_subtab": entry.SettingsSubtab,
+	}
+	for key, val := range updates {
+		want.StoreState(key, val)
+	}
+
+	// Append the replayed command to the log too
+	replayed := *entry
+	replayed.ID = fmt.Sprintf("rlog-%d", time.Now().UnixNano())
+	replayed.Timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+	replayed.Nonce = newNonce
+	s.robotLogMu.Lock()
+	s.robotLog = append(s.robotLog, replayed)
+	s.robotLogMu.Unlock()
+
 	s.JSONResponse(w, http.StatusOK, guiStateResponse{
 		Seq:   nextGUIStateSeq(),
 		State: guiFields(want),

@@ -32,6 +32,8 @@ type Server struct {
 	wantTypeLoader       *mywant.WantTypeLoader           // Want type definitions loader
 	errorHistory         []ErrorHistoryEntry              // Store error history
 	errorMu              sync.Mutex                       // Protects errorHistory slice
+	robotLog             []RobotLogEntry                  // Store robot command log
+	robotLogMu           sync.Mutex                       // Protects robotLog slice
 	router               *mux.Router
 	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
@@ -241,6 +243,7 @@ func New(config Config) *Server {
 		recipeRegistry:       recipeRegistry,
 		wantTypeLoader:       wantTypeLoader,
 		errorHistory:         make([]ErrorHistoryEntry, 0),
+		robotLog:             make([]RobotLogEntry, 0),
 		router:               mux.NewRouter(),
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
