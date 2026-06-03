@@ -75,5 +75,3 @@ require (
 )
 
 replace mywant/engine => ../engine
-
-replace github.com/onelittlenightmusic/want-spec => /Users/hiroyukiosaki/work/want-spec

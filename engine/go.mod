@@ -2,8 +2,6 @@ module mywant/engine
 
 go 1.26.2
 
-replace github.com/onelittlenightmusic/want-spec => /Users/hiroyukiosaki/work/want-spec
-
 require (
 	github.com/ThreeDotsLabs/watermill v1.5.1
 	github.com/evanw/esbuild v0.28.0
