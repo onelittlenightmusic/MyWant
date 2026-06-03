@@ -2,6 +2,8 @@ package mywant
 
 import (
 	"testing"
+
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 func TestRecipeParameterSubstitution(t *testing.T) {
@@ -107,8 +109,8 @@ func TestRecipeWantCreation(t *testing.T) {
 			Labels: map[string]string{"category": "processor"},
 		},
 		Spec: struct {
-			Params map[string]any      `yaml:"params"`
-			Using  []map[string]string `yaml:"using,omitempty"`
+			Params map[string]any `yaml:"params"`
+			Using  []ws.UsingEntry `yaml:"using,omitempty"`
 		}{
 			Params: map[string]any{
 				"service_time": "service_time",
