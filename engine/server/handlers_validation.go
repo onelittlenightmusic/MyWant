@@ -107,7 +107,7 @@ func (s *Server) validateWantTypes(wants []*mywant.Want) error {
 func (s *Server) validateWantSpec(wants []*mywant.Want) error {
 	for _, want := range wants {
 		for i, selector := range want.Spec.Using {
-			for key := range selector {
+			for key := range selector.Labels {
 				if key == "" {
 					return fmt.Errorf("want '%s': using[%d] has empty selector key", want.Metadata.Name, i)
 				}
@@ -251,7 +251,7 @@ func (s *Server) validateRecipeExists(recipePath string) error {
 
 func (s *Server) validateSelectors(want *mywant.Want) error {
 	for i, selector := range want.Spec.Using {
-		for key := range selector {
+		for key := range selector.Labels {
 			if key == "" {
 				return fmt.Errorf("using[%d] has empty selector key", i)
 			}
@@ -315,7 +315,7 @@ func (s *Server) checkDependencySatisfaction(want *mywant.Want) []ValidationWarn
 	for i, selector := range want.Spec.Using {
 		matched := false
 		for _, deployed := range deployedWants {
-			if s.matchesSelector(deployed.Metadata.Labels, selector) {
+			if s.matchesSelector(deployed.Metadata.Labels, selector.ToLabelMap()) {
 				matched = true
 				break
 			}
@@ -357,7 +357,7 @@ func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWa
 	inputCount := 0
 	for _, selector := range want.Spec.Using {
 		for _, deployed := range deployedWants {
-			if s.matchesSelector(deployed.Metadata.Labels, selector) {
+			if s.matchesSelector(deployed.Metadata.Labels, selector.ToLabelMap()) {
 				inputCount++
 				break
 			}
@@ -367,7 +367,7 @@ func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWa
 	outputCount := 0
 	for _, deployed := range deployedWants {
 		for _, deployedSelector := range deployed.Spec.Using {
-			if s.matchesSelector(want.Metadata.Labels, deployedSelector) {
+			if s.matchesSelector(want.Metadata.Labels, deployedSelector.ToLabelMap()) {
 				outputCount++
 				break
 			}

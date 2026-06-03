@@ -5,6 +5,8 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 // RecipeParameter defines a configurable parameter for recipes
@@ -24,7 +26,7 @@ type WantRecipe struct {
 	} `yaml:"metadata"`
 	Spec struct {
 		Params map[string]any      `yaml:"params"`
-		Using  []map[string]string `yaml:"using,omitempty"`
+		Using  []ws.UsingEntry `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
@@ -35,7 +37,7 @@ type DRYWantSpec struct {
 	Type      string              `yaml:"type"`
 	Labels    map[string]string   `yaml:"labels,omitempty"`
 	Params    map[string]any      `yaml:"params,omitempty"`
-	Using     []map[string]string `yaml:"using,omitempty"`
+	Using     []ws.UsingEntry `yaml:"using,omitempty"`
 	TypeHints map[string]string   `yaml:"-"` // param_name -> type_tag
 }
 

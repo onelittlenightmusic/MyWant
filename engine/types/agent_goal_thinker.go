@@ -9,6 +9,7 @@ import (
 	"os/exec"
 
 	. "mywant/engine/core"
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 const goalThinkerAgentName = "goal_thinker"
@@ -403,7 +404,7 @@ func spawnChildWantFromBreakdownItem(parent *Want, item map[string]any) error {
 						entry[k] = s
 					}
 				}
-				child.Spec.Using = append(child.Spec.Using, entry)
+				child.Spec.Using = append(child.Spec.Using, ws.UsingEntry{Labels: entry})
 			}
 		}
 	}

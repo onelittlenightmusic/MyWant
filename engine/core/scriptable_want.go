@@ -209,8 +209,30 @@ func resolveSpecialValue(v any) any {
 	return v
 }
 
+// resolveConditionField returns the field name to look up, defaulting to "final_result"
+// when field is empty. This allows isSatisfied conditions to omit the field entirely.
+func resolveConditionField(field string) string {
+	if field == "" {
+		return "final_result"
+	}
+	return field
+}
+
 // evaluateCondition compares actual (from state) against expected using the operator.
+// When operator is empty the condition is treated as "field == true",
+// allowing boolean fields to be used without explicit operator/value.
 func evaluateCondition(actual any, operator string, expected any) bool {
+	if operator == "" {
+		// Default: treat as boolean truthy check (field == true)
+		switch v := actual.(type) {
+		case bool:
+			return v
+		case nil:
+			return false
+		default:
+			return fmt.Sprintf("%v", actual) == "true"
+		}
+	}
 	expected = resolveSpecialValue(expected)
 	// Convert to float64 for numeric comparisons.
 	af, aOK := toFloat64(actual)
@@ -232,11 +254,20 @@ func evaluateCondition(actual any, operator string, expected any) bool {
 		}
 	}
 	// Fall back to string/equality comparison.
+	// Treat nil as empty string so that an unset state field (nil) compares equal
+	// to "" rather than "<nil>". This prevents false-positive IsFailed() when a
+	// "failed" condition checks `error != ""` and the error field was never written.
+	anyToStr := func(v any) string {
+		if v == nil {
+			return ""
+		}
+		return fmt.Sprintf("%v", v)
+	}
 	switch operator {
 	case "==":
-		return fmt.Sprintf("%v", actual) == fmt.Sprintf("%v", expected)
+		return anyToStr(actual) == anyToStr(expected)
 	case "!=":
-		return fmt.Sprintf("%v", actual) != fmt.Sprintf("%v", expected)
+		return anyToStr(actual) != anyToStr(expected)
 	}
 	return false
 }

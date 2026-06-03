@@ -14,6 +14,7 @@ import (
 	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
+	ws "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
 
@@ -97,9 +98,9 @@ func (s *Server) importWants(w http.ResponseWriter, r *http.Request) {
 	dtoWants := mywant.RuntimeWantsToDTOSlice(importedWants)
 	executionID := generateWantID()
 	execution := &WantExecution{
-		ID:      executionID,
-		Wants:   dtoWants,
-		Status:  "created",
+		ID:     executionID,
+		Wants:  dtoWants,
+		Status: "created",
 	}
 	s.wants[executionID] = execution
 
@@ -164,9 +165,9 @@ func (s *Server) addUsingDependency(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if want.Spec.Using == nil {
-		want.Spec.Using = make([]map[string]string, 0)
+		want.Spec.Using = make([]ws.UsingEntry, 0)
 	}
-	want.Spec.Using = append(want.Spec.Using, map[string]string{req.Key: req.Value})
+	want.Spec.Using = append(want.Spec.Using, ws.UsingEntry{Labels: map[string]string{req.Key: req.Value}})
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{"message": "added"})
@@ -183,9 +184,9 @@ func (s *Server) removeUsingDependency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUsing := make([]map[string]string, 0)
+	newUsing := make([]ws.UsingEntry, 0)
 	for _, dep := range want.Spec.Using {
-		if _, has := dep[key]; !has {
+		if _, has := dep.Labels[key]; !has {
 			newUsing = append(newUsing, dep)
 		}
 	}

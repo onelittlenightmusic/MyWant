@@ -38,7 +38,7 @@ func (cb *ChainBuilder) buildLabelToUsersMapping() {
 
 		// For each "using" selector, record this want ID as a user
 		for _, selector := range spec.Using {
-			selectorKey := cb.selectorToKey(selector)
+			selectorKey := cb.selectorToKey(selector.ToLabelMap())
 			if selectorKey != "" {
 				cb.labelToUsers[selectorKey] = append(cb.labelToUsers[selectorKey], wantID)
 			}

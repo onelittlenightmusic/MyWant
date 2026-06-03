@@ -5,11 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"mywant/engine/core/chain"
+	"mywant/engine/planner"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	ws "github.com/onelittlenightmusic/want-spec"
 )
+
+// plannerRoleToChildRole converts a Planner step role to a child-role label value
+// used by the GUI balloon to display the correct category.
+//
+//	monitor     → "monitor"   (Satisfied? / Monitor カード)
+//	intermediate → "thinker"  (Thinker カード)
+//	terminal     → "doer"     (Doer カード)
+func plannerRoleToChildRole(role string) string {
+	switch role {
+	case "monitor":
+		return "monitor"
+	case "intermediate":
+		return "thinker"
+	case "terminal":
+		return "doer"
+	default:
+		return role
+	}
+}
 
 // extractIntParam extracts an integer parameter with type conversion and default fallback
 func extractIntParam(params map[string]any, key string, defaultValue int) int {
@@ -39,6 +61,17 @@ type Target struct {
 	childrenCreated        bool                 // Track if child wants have been created
 	childCount             int                  // Count of child wants
 	stateNotify            chan struct{}        // Notified when MergeParentState writes pending state
+
+	// Declarative planning fields — populated from recipe at Initialize time.
+	// When RecipeAchieve is non-empty, the Planner derives child wants automatically.
+	RecipeAchieve     []PlanTarget       // achieve section from recipe
+	RecipeIsSatisfied *RecipeIsSatisfied // isSatisfied section — short-circuits achieve chain if condition true
+	RecipeHints       []PlanHint         // hints section for Planner guidance
+
+	// isSatisfied gate — evaluated in Progress() once check want completes.
+	// Achieve chain wants use the Target itself as provider via _isSatisfied_gate label.
+	isSatisfiedCheckWant *Want // reference to the pre-check want for condition evaluation
+	isSatisfiedGateFired bool  // true once Target has evaluated and provided/achieved
 }
 
 // NewTarget creates a new target want
@@ -236,6 +269,98 @@ func (t *Target) CreateChildWants() []*Want {
 		return []*Want{}
 	}
 
+	// ── Planner-derived children (recipe.achieve) ─────────────────────────────
+	// Run the planner here inside Progress() Phase 1 so that:
+	// (a) the blueprint is committed to state via EndProgressCycle(), and
+	// (b) failures are observable and retriable within the Progress loop.
+	if len(t.RecipeAchieve) > 0 && t.builder != nil {
+		defs := t.builder.AllWantTypeDefinitions()
+		wsDefs := make(map[string]*ws.WantTypeDefinition, len(defs))
+		for k, v := range defs {
+			wsDefs[k] = v
+		}
+		idx := planner.BuildExposableIndexFromDefs(wsDefs)
+		p := planner.New(idx, wsDefs)
+		plan := &ws.WantTypePlan{
+			Achieve: t.RecipeAchieve,
+			Hints:   t.RecipeHints,
+		}
+		if t.RecipeIsSatisfied != nil {
+			mon := ws.PlanTarget{
+				Type:        t.RecipeIsSatisfied.Type,
+				Name:        t.RecipeIsSatisfied.Name,
+				Description: "isSatisfied pre-check",
+			}
+			// Always set When — field defaults to "final_result" when omitted.
+			cond := t.RecipeIsSatisfied.When
+			mon.When = &cond
+			plan.Monitor = []ws.PlanTarget{mon}
+		}
+		result := p.PlanFromWantType(t.Metadata.Type, "", plan, t.RecipeParams)
+
+		// Store the blueprint in plan state so the GUI can display the reasoning
+		// trace immediately after the first Progress cycle commits it.
+		if t.StateLabels == nil {
+			t.StateLabels = make(map[string]StateLabel)
+		}
+		t.StateLabels["planner_result"] = LabelPlan
+		t.StoreState("planner_result", map[string]any{
+			"confidence": result.Confidence,
+			"steps":      result.Steps,
+			"warnings":   result.Warnings,
+		})
+
+		if len(result.Warnings) > 0 {
+			for _, w := range result.Warnings {
+				t.StoreLog("[TARGET] Planner warning: %s", w)
+			}
+		}
+
+		// Convert planner-derived RecipeWants to *Want and prepend to config.
+		prefix := t.Metadata.Name
+		planWants := make([]*Want, 0, len(result.Recipe.Wants))
+		for i, rw := range result.Recipe.Wants {
+			w := ConvertRecipeWantToWant(rw)
+			// Apply the same prefix convention as LoadConfigFromRecipe uses.
+			if w.Metadata.Name == "" {
+				w.Metadata.Name = fmt.Sprintf("%s-%s-%d", prefix, w.Metadata.Type, i+1)
+			} else {
+				w.Metadata.Name = fmt.Sprintf("%s-%s", prefix, w.Metadata.Name)
+			}
+			if w.Metadata.ID == "" {
+				w.Metadata.ID = GenerateUUID()
+			}
+			// Apply child-role label from planner step role so the GUI balloon
+			// shows the correct category (Thinker / Doer / Monitor etc.).
+			if i < len(result.Steps) {
+				if w.Metadata.Labels == nil {
+					w.Metadata.Labels = make(map[string]string)
+				}
+				w.Metadata.Labels["child-role"] = plannerRoleToChildRole(result.Steps[i].Role)
+			}
+			planWants = append(planWants, w)
+		}
+
+		// Inject label-level when: conditions from planner result into using: entries.
+		if len(result.Recipe.LabelConditions) > 0 {
+			for _, w := range planWants {
+				injectLabelConditions(w, result.Recipe.LabelConditions)
+			}
+		}
+
+		// Track the isSatisfied check want reference (first monitor want in planWants).
+		for _, w := range planWants {
+			if w.Metadata.Labels["child-role"] == "monitor" && t.isSatisfiedCheckWant == nil {
+				t.isSatisfiedCheckWant = w
+			}
+		}
+
+		// Prepend planner wants; manually-listed recipe wants follow.
+		config = append(planWants, config...)
+		t.StoreLog("[TARGET] Planner derived %d child want(s) from recipe.achieve (confidence: %s)",
+			len(planWants), result.Confidence)
+	}
+
 	// VALIDATION: Prevent want type name conflicts between parent and children This prevents infinite loops where a want type references a recipe that contains a want of the same type, which would cause recursive instantiation
 	parentType := t.Metadata.Type
 	for _, childWant := range config {
@@ -278,10 +403,10 @@ func (t *Target) CreateChildWants() []*Want {
 		// Inject the same affinity label into all 'using' selectors of the child
 		// This ensures sibling wants within the same target connect to each other
 		for j := range config[i].Spec.Using {
-			if config[i].Spec.Using[j] == nil {
-				config[i].Spec.Using[j] = make(map[string]string)
+			if config[i].Spec.Using[j].Labels == nil {
+				config[i].Spec.Using[j].Labels = make(map[string]string)
 			}
-			config[i].Spec.Using[j]["owner-name"] = instanceID
+			config[i].Spec.Using[j].Labels["owner-name"] = instanceID
 		}
 	}
 
@@ -292,6 +417,22 @@ func (t *Target) CreateChildWants() []*Want {
 
 // Initialize resets state before execution begins
 func (t *Target) Initialize() {
+	// Copy declarative planning fields from the recipe (achieve/isSatisfied/hints).
+	// These are used by CreateChildWants and Progress to drive Planner-based expansion.
+	if t.recipeLoader != nil && t.RecipePath != "" {
+		if cfg, err := t.recipeLoader.LoadRecipe(t.RecipePath, map[string]any{}); err == nil {
+			if len(cfg.Achieve) > 0 && len(t.RecipeAchieve) == 0 {
+				t.RecipeAchieve = cfg.Achieve
+			}
+			if cfg.IsSatisfied != nil && t.RecipeIsSatisfied == nil {
+				t.RecipeIsSatisfied = cfg.IsSatisfied
+			}
+			if len(cfg.Hints) > 0 && len(t.RecipeHints) == 0 {
+				t.RecipeHints = cfg.Hints
+			}
+		}
+	}
+
 	// Apply recipe-defined state labels early so SetGoal/SetCurrent/etc. work during Initialize.
 	// This mirrors what Progress() does on first run, but must happen here so child wants and
 	// the coordinator itself can call SetGoal/SetCurrent immediately.
@@ -479,6 +620,35 @@ func (t *Target) Progress() {
 
 	if !t.childrenCreated {
 		return
+	}
+
+	// ── isSatisfied gate evaluation ────────────────────────────────────────────
+	// Once the pre-check want completes, evaluate the When condition.
+	// Target-level responsibility: no achieve-chain want logic needs to know about this.
+	if t.RecipeIsSatisfied != nil && !t.isSatisfiedGateFired && t.isSatisfiedCheckWant != nil {
+		checkStatus := t.isSatisfiedCheckWant.GetStatus()
+		if !IsAchievedStatus(checkStatus) && checkStatus != WantStatusFailed {
+			return // still waiting for check want to complete
+		}
+		field := resolveConditionField(t.RecipeIsSatisfied.When.Field)
+		actual, _ := t.isSatisfiedCheckWant.getState(field)
+		if evaluateCondition(actual, t.RecipeIsSatisfied.When.Operator, t.RecipeIsSatisfied.When.Value) {
+			// Condition met — goal already achieved, skip achieve chain
+			t.StoreLog("[TARGET] isSatisfied condition met (%s %s %v) — marking achieved without running achieve chain",
+				field, t.RecipeIsSatisfied.When.Operator, t.RecipeIsSatisfied.When.Value)
+			t.SetStatus(WantStatusAchieved)
+			t.isSatisfiedGateFired = true
+			return
+		}
+		// Condition not met — provide a go-ahead signal so achieve-chain wants start
+		t.StoreLog("[TARGET] isSatisfied condition not met — providing gate signal to achieve chain")
+		gateSignal := NewDataObjectFrom("isSatisfied_gate_open", map[string]any{
+			"gate":       "open",
+			"check_want": t.isSatisfiedCheckWant.Metadata.Name,
+			field:        actual,
+		})
+		t.Provide(gateSignal)
+		t.isSatisfiedGateFired = true
 	}
 
 	// Phase 2: Wait for MergeParentState data or child-completion signal

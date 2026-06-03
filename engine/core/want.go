@@ -304,6 +304,10 @@ type Want struct {
 	cachedPacket *CachedPacket `json:"-" yaml:"-"`
 	cacheMutex   sync.Mutex    `json:"-" yaml:"-"`
 
+	// Track whether Provide() was called in the current progress cycle.
+	// Used to suppress auto-provide for wants that explicitly send output.
+	providedThisCycle bool `json:"-" yaml:"-"`
+
 	// Metadata protection
 	metadataMutex sync.RWMutex `json:"-" yaml:"-"`
 
@@ -538,6 +542,7 @@ func (n *Want) PropagateParameter(paramName string, paramValue any) {
 func (n *Want) BeginProgressCycle() {
 	n.inExecCycle = true
 	n.execCycleCount++
+	n.providedThisCycle = false
 }
 
 // EndProgressCycle completes the execution cycle and commits all batched state and parameter changes
@@ -558,6 +563,14 @@ func (n *Want) EndProgressCycle() {
 	// CRITICAL: If achieved (with or without warning), ALWAYS enforce achieving_percentage = 100
 	if IsAchievedStatus(n.Status) {
 		n.storeState("achieving_percentage", 100.0)
+
+		// Auto-provide: if this want has downstream consumers and Progress() did not
+		// call Provide() explicitly, send the want's current state automatically.
+		// This lets isSatisfied-style check wants notify downstream consumers without
+		// requiring explicit Provide() calls in every want type implementation.
+		if !n.providedThisCycle && len(n.paths.Out) > 0 {
+			n.provideRaw(n.GetExplicitState())
+		}
 	}
 
 	// fetchFrom expansion must run BEFORE FinalResultField so that derived fields are
@@ -682,6 +695,33 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 	return true
 }
 
+// checkUsingWhenConditions evaluates the when: conditions declared on using entries
+// against the packet cached by UnusedExists(). Returns false if any entry declares
+// a when: condition that the received data does NOT satisfy.
+func (n *Want) checkUsingWhenConditions() bool {
+	n.cacheMutex.Lock()
+	cached := n.cachedPacket
+	n.cacheMutex.Unlock()
+	if cached == nil {
+		return true // no data cached — no condition to check
+	}
+	data, _ := cached.Packet.(map[string]any)
+
+	for _, entry := range n.Spec.Using {
+		if entry.When == nil {
+			continue
+		}
+		var actual any
+		if data != nil {
+			actual = data[resolveConditionField(entry.When.Field)]
+		}
+		if !evaluateCondition(actual, entry.When.Operator, entry.When.Value) {
+			return false
+		}
+	}
+	return true
+}
+
 // StartProgressionLoop starts the want execution loop in a goroutine
 //
 // Parameters (minimal interface):
@@ -720,8 +760,17 @@ func (n *Want) StartProgressionLoop(
 			}
 		}()
 
+		// Stop any background agents left over from a previous execution cycle (e.g., a
+		// PollingAgent still running after a param-driven restart via startWant()).
+		// Must happen BEFORE prepareForRestart() clears agentRunGuard — otherwise the old
+		// PollingAgent's guard is gone and a simultaneous ticker tick can launch a second
+		// concurrent script execution, causing the SIGKILL race condition.
+		if err := n.StopAllBackgroundAgents(); err != nil {
+			n.StoreLog("ERROR: Failed to stop lingering background agents before restart: %v", err)
+		}
+
 		// Reset per-run state then initialize.
-		// Order: reset state/agentRunGuard → Initialize() → onInitialize.
+		// Order: stop agents → reset state/agentRunGuard → Initialize() → onInitialize.
 		n.prepareForRestart()
 		if n.progressable != nil {
 			n.progressable.Initialize()
@@ -855,6 +904,29 @@ func (n *Want) StartProgressionLoop(
 				n.SetStatus(WantStatusSuspended)
 				time.Sleep(GlobalExecutionInterval)
 				continue // Go back to step 1: Check stop channel
+			}
+
+			// 3.9. If using: selectors are declared and providers are connected, wait until
+			// at least one provider has actually sent data before running Progress().
+			// If a using entry declares a when: condition, also evaluate it against the
+			// received data — discarding packets that don't satisfy the condition.
+			// This makes wants self-gating without requiring explicit use() calls.
+			if len(n.Spec.Using) > 0 && len(currentPaths.In) > 0 {
+				if !n.UnusedExists(0) {
+					n.SetStatus(WantStatusIdle)
+					time.Sleep(GlobalExecutionInterval)
+					continue
+				}
+				// Evaluate when: conditions against the cached packet (from UnusedExists).
+				if !n.checkUsingWhenConditions() {
+					// Packet arrived but condition not met — discard and keep waiting.
+					n.cacheMutex.Lock()
+					n.cachedPacket = nil
+					n.cacheMutex.Unlock()
+					n.SetStatus(WantStatusIdle)
+					time.Sleep(GlobalExecutionInterval)
+					continue
+				}
 			}
 
 			// 4. Synchronize paths before execution (preconditions: providers + users)
@@ -1511,8 +1583,13 @@ func (n *Want) StoreLog(message string, args ...any) {
 }
 
 func (n *Want) getState(key string) (any, bool) {
-	// Imported fields are resolved live from global state.
+	// Imported fields are resolved live:
+	//   - child wants  → parent's current state (siblings share state through the parent)
+	//   - top-level    → global state store
 	if globalKey, ok := n.importedLocalKey(key); ok {
+		if parent := n.getParentWant(); parent != nil {
+			return parent.getState(globalKey)
+		}
 		return GetGlobalState(globalKey)
 	}
 	return n.State.Load(key)
@@ -2007,17 +2084,33 @@ func (n *Want) GetSubscriptionSystem() *UnifiedSubscriptionSystem {
 	return GetGlobalSubscriptionSystem()
 }
 
-func (n *Want) GetAllState() map[string]any {
+// getRawState returns the raw persisted state without imports overlay.
+// Safe to call from within reconciliation (does NOT acquire reconcileMutex).
+func (n *Want) getRawState() map[string]any {
 	state := make(map[string]any)
 	n.State.Range(func(key, value any) bool {
 		state[key.(string)] = value
 		return true
 	})
-	// Overlay imported fields with live global state values so the API response
-	// always reflects the current value without requiring a want restart.
+	return state
+}
+
+func (n *Want) GetAllState() map[string]any {
+	state := n.getRawState()
+	// Overlay imported fields with live values so the API response always reflects
+	// the current value without requiring a want restart.
+	//   - child wants  → read from parent's current state
+	//   - top-level    → read from global state store
+	parent := n.getParentWant()
 	for globalKey, localKey := range n.Spec.Imports {
-		if val, ok := GetGlobalState(globalKey); ok {
-			state[localKey] = val
+		if parent != nil {
+			if val, ok := parent.getState(globalKey); ok {
+				state[localKey] = val
+			}
+		} else {
+			if val, ok := GetGlobalState(globalKey); ok {
+				state[localKey] = val
+			}
 		}
 	}
 	return state
@@ -3000,6 +3093,7 @@ func (n *Want) UseForeverTyped(typeName string) (int, *DataObject, bool, bool) {
 // Provide validates the DataObject against its schema and sends it downstream.
 // Validation errors are logged as warnings but do not block sending.
 func (n *Want) Provide(obj *DataObject) {
+	n.providedThisCycle = true
 	if obj == nil {
 		n.provideRaw(nil)
 		return
@@ -3313,7 +3407,7 @@ func (w *Want) MatchesFilters(filters WantFilters) bool {
 			// Check if any using entry contains the key=value pair
 			found := false
 			for _, usingEntry := range w.Spec.Using {
-				if usingValue, exists := usingEntry[key]; exists && usingValue == value {
+				if usingValue, exists := usingEntry.Labels[key]; exists && usingValue == value {
 					found = true
 					break
 				}

@@ -1,6 +1,10 @@
 package mywant
 
-import "reflect"
+import (
+	"reflect"
+
+	ws "github.com/onelittlenightmusic/want-spec"
+)
 
 // wantsEqual compares two wants for equality.
 // Only spec fields (params, using, when) and type trigger a restart.
@@ -120,14 +124,18 @@ func copyInterfaceMap(src map[string]any) map[string]any {
 	return dst
 }
 
-func copyUsing(src []map[string]string) []map[string]string {
+func copyUsing(src []ws.UsingEntry) []ws.UsingEntry {
 	if src == nil {
 		return nil
 	}
-	dst := make([]map[string]string, 0, len(src))
-	for _, selector := range src {
-		copiedSelector := copyStringMap(selector)
-		dst = append(dst, copiedSelector)
+	dst := make([]ws.UsingEntry, 0, len(src))
+	for _, entry := range src {
+		copied := ws.UsingEntry{Labels: copyStringMap(entry.Labels)}
+		if entry.When != nil {
+			c := *entry.When
+			copied.When = &c
+		}
+		dst = append(dst, copied)
 	}
 	return dst
 }

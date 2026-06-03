@@ -314,7 +314,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 		wantDisplayName := want.want.Metadata.Name
 
 		for selectorIdx, selector := range want.GetSpec().Using {
-			if len(selector) == 0 {
+			if len(selector.Labels) == 0 {
 				continue // Skip empty selectors
 			}
 
@@ -326,7 +326,7 @@ func (cb *ChainBuilder) addPubSubPaths(pathMap map[string]*Paths) {
 				}
 
 				// Check if provider's labels match this selector
-				if cb.matchesSelector(providerWant.want.Metadata.Labels, selector) {
+				if cb.matchesSelector(providerWant.want.Metadata.Labels, selector.ToLabelMap()) {
 					matchCount++
 
 					// Subscribe to PubSub topic for this provider's labels
@@ -1042,7 +1042,7 @@ func (cb *ChainBuilder) calculateDependencyLevel(wantID string, levels map[strin
 	maxDependencyLevel := 0
 	for _, usingSelector := range wantConfig.Spec.Using {
 		for _, configWant := range cb.config {
-			if cb.matchesSelector(configWant.GetLabels(), usingSelector) {
+			if cb.matchesSelector(configWant.GetLabels(), usingSelector.ToLabelMap()) {
 				depLevel := cb.calculateDependencyLevel(configWant.Metadata.ID, levels, visited, inProgress)
 				if depLevel >= maxDependencyLevel {
 					maxDependencyLevel = depLevel + 1
@@ -1197,8 +1197,11 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		wantPtr.SetStateLabels(typeDef)
 	}
 
-	// Merge state data if provided
-	stateUpdates := wantConfig.GetAllState()
+	// Merge state data if provided.
+	// Use getRawState() (not GetAllState()) to avoid acquiring reconcileMutex inside
+	// a context that already holds it — GetAllState overlays imports via getParentWant()
+	// which calls FindWantByID() → reconcileMutex.RLock(), causing a deadlock.
+	stateUpdates := wantConfig.getRawState()
 	if len(stateUpdates) > 0 {
 		wantPtr.storeStateMulti(stateUpdates)
 	}

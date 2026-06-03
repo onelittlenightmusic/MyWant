@@ -4,6 +4,7 @@ import (
 	"fmt"
 	mywant "mywant/engine/core"
 	_ "mywant/engine/types"
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 				Params: map[string]any{
 					"service_time": 0.1,
 				},
-				Using: []map[string]string{{"role": "source"}},
+				Using: []ws.UsingEntry{{Labels: map[string]string{"role": "source"}}},
 			},
 		},
 	}

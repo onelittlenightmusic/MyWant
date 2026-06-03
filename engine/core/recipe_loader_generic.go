@@ -33,6 +33,21 @@ type RecipeExampleDef = want_spec.RecipeExampleDef
 // RecipeContent contains the actual recipe data
 type RecipeContent = want_spec.RecipeContent
 
+// PlanTarget declares a child want type in recipe achieve/monitor sections.
+type PlanTarget = want_spec.PlanTarget
+
+// PlanHint provides Planner guidance for intermediate want type selection.
+type PlanHint = want_spec.PlanHint
+
+// PlanConstraint expresses an optional constraint on the plan.
+type PlanConstraint = want_spec.PlanConstraint
+
+// WantTypePlan embeds planning instructions (used by the Planner).
+type WantTypePlan = want_spec.WantTypePlan
+
+// RecipeIsSatisfied defines the pre-check want and condition for recipe short-circuiting.
+type RecipeIsSatisfied = want_spec.RecipeIsSatisfied
+
 func ConvertRecipeWantToWant(rw RecipeWant) *Want {
 	want := &Want{}
 
@@ -75,10 +90,15 @@ type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
-	Wants      []*Want
-	Parameters []ParameterDef
-	Metadata   GenericRecipeMetadata
-	Result     *RecipeResult
+	Wants       []*Want
+	Parameters  []ParameterDef
+	Metadata    GenericRecipeMetadata
+	Result      *RecipeResult
+	// Declarative planning fields — copied from RecipeContent if present
+	Achieve         []PlanTarget
+	IsSatisfied     *RecipeIsSatisfied
+	Hints           []PlanHint
+	LabelConditions []want_spec.LabelCondition
 }
 
 // GenericRecipeLoader manages loading and processing any type of recipe
@@ -239,12 +259,52 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		DebugLog("[RECIPE-LOADER] Recipe %s has no result definitions (empty or null).\n", recipePath)
 	}
 
+	// Inject label-level when: conditions into using: entries of all wants.
+	// This allows a single labelConditions definition to apply to all subscribers.
+	if len(recipeContent.LabelConditions) > 0 {
+		for _, w := range wants {
+			injectLabelConditions(w, recipeContent.LabelConditions)
+		}
+	}
+
 	return &GenericRecipeConfig{
-		Wants:      wants,
-		Parameters: recipeContent.Parameters,
-		Metadata:   recipeContent.Metadata,
-		Result:     recipeContent.Result,
+		Wants:           wants,
+		Parameters:      recipeContent.Parameters,
+		Metadata:        recipeContent.Metadata,
+		Result:          recipeContent.Result,
+		Achieve:         recipeContent.Achieve,
+		IsSatisfied:     recipeContent.IsSatisfied,
+		Hints:           recipeContent.Hints,
+		LabelConditions: recipeContent.LabelConditions,
 	}, nil
+}
+
+// injectLabelConditions checks each using: entry in the want against all LabelConditions.
+// When a using: entry's labels contain all keys in a LabelCondition.Match,
+// the LabelCondition.When is injected into that entry (if not already set).
+func injectLabelConditions(w *Want, conditions []want_spec.LabelCondition) {
+	for i, entry := range w.Spec.Using {
+		if entry.When != nil {
+			continue // subscriber already declared an explicit when:, respect it
+		}
+		for _, lc := range conditions {
+			if labelsContainMatch(entry.Labels, lc.Match) {
+				cond := lc.When
+				w.Spec.Using[i].When = &cond
+				break
+			}
+		}
+	}
+}
+
+// labelsContainMatch returns true when all key-value pairs in match are present in labels.
+func labelsContainMatch(labels, match map[string]string) bool {
+	for k, v := range match {
+		if labels[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // LoadConfigFromRecipe loads configuration from any recipe type
@@ -372,16 +432,16 @@ func (grl *GenericRecipeLoader) namespaceWantConnections(want *Want, ownerPrefix
 	// to match the namespaced label in want A
 	if want.Spec.Using != nil {
 		for i := range want.Spec.Using {
-			namespacedSelector := make(map[string]string)
-			for key, value := range want.Spec.Using[i] {
+			namespacedLabels := make(map[string]string)
+			for key, value := range want.Spec.Using[i].Labels {
 				// Skip namespacing for reserved/system labels
 				if key == "child-role" || key == "category" {
-					namespacedSelector[key] = value
+					namespacedLabels[key] = value
 					continue
 				}
-				namespacedSelector[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
+				namespacedLabels[key] = fmt.Sprintf("%s:%s", ownerPrefix, value)
 			}
-			want.Spec.Using[i] = namespacedSelector
+			want.Spec.Using[i].Labels = namespacedLabels
 		}
 	}
 }

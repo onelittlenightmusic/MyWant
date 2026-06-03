@@ -3,6 +3,8 @@ package mywant
 import (
 	"fmt"
 	"strings"
+
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 func (cb *ChainBuilder) processAutoConnections() {
@@ -49,7 +51,7 @@ func (cb *ChainBuilder) autoConnectWant(want *Want, allWants []*runtimeWant) {
 	}
 
 	if want.Spec.Using == nil {
-		want.Spec.Using = make([]map[string]string, 0)
+		want.Spec.Using = make([]ws.UsingEntry, 0)
 	}
 
 	for _, otherRuntimeWant := range allWants {
@@ -125,7 +127,7 @@ func (cb *ChainBuilder) addAutoConnection(want *Want, otherWant *Want) {
 		return
 	}
 
-	want.Spec.Using = append(want.Spec.Using, selector)
+	want.Spec.Using = append(want.Spec.Using, ws.UsingEntry{Labels: selector})
 }
 
 // buildConnectionSelector builds a connection selector map
@@ -148,7 +150,7 @@ func (cb *ChainBuilder) buildConnectionSelector(want *Want, otherWant *Want, con
 // hasDuplicateSelector checks if a selector already exists in want's using list
 func (cb *ChainBuilder) hasDuplicateSelector(want *Want, selector map[string]string) bool {
 	for _, existingSelector := range want.Spec.Using {
-		if cb.selectorsMatch(existingSelector, selector) {
+		if cb.selectorsMatch(existingSelector.ToLabelMap(), selector) {
 			return true
 		}
 	}

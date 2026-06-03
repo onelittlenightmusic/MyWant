@@ -125,11 +125,13 @@ type RecipeParameterValidation struct {
 }
 
 type RecipeContent struct {
-	Metadata             RecipeMetadata                       `json:"metadata"`
-	Parameters           map[string]any                       `json:"parameters,omitempty"`
-	ParameterValidations map[string]RecipeParameterValidation `json:"parameter_validations,omitempty"`
-	Wants                []any                                `json:"wants"` // Simplified for now
-	Example              *Config                              `json:"example,omitempty"`
+	Metadata RecipeMetadata `json:"metadata" yaml:"metadata"`
+	// Parameters accepts both list format ([]ParameterDef) and legacy map format (map[string]any).
+	// Use []any so YAML lists unmarshal correctly; the server handles both formats.
+	Parameters           []any                                `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	ParameterValidations map[string]RecipeParameterValidation `json:"parameter_validations,omitempty" yaml:"parameter_validations,omitempty"`
+	Wants                []any                                `json:"wants" yaml:"wants"` // Simplified for now
+	Example              *Config                              `json:"example,omitempty" yaml:"example,omitempty"`
 }
 
 type RecipeMetadata struct {

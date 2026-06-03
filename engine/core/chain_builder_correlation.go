@@ -234,8 +234,8 @@ func (cb *ChainBuilder) correlationPhase() {
 					if peerRW.want.Metadata.ID == dirtyID {
 						continue
 					}
-					if cb.matchesSelector(peerRW.want.Metadata.Labels, sel) {
-						for k, v := range sel {
+					if cb.matchesSelector(peerRW.want.Metadata.Labels, sel.ToLabelMap()) {
+						for k, v := range sel.Labels {
 							add(peerRW.want.Metadata.ID, "using.select/"+k+"="+v)
 						}
 					}

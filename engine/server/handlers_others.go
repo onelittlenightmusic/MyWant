@@ -864,7 +864,7 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 					}
 					// Check if want USES this label (via 'using' in spec)
 					for _, u := range want.Spec.Using {
-						if uv, ok := u[k]; ok && uv == v {
+						if uv, ok := u.Labels[k]; ok && uv == v {
 							userMap[want.Metadata.ID] = true
 						}
 					}
@@ -1314,18 +1314,18 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 		nonce, _ := updates["robot_nonce"].(float64)
 		if isVisible && nonce != 0 {
 			entry := RobotLogEntry{
-				ID:            fmt.Sprintf("rlog-%d", time.Now().UnixNano()),
-				Timestamp:     time.Now().UTC().Format(time.RFC3339Nano),
-				Message:       stringField(updates, "robot_message"),
-				TargetType:    stringField(updates, "robot_target_type"),
-				TargetID:      stringField(updates, "robot_target_id"),
-				Action:        stringField(updates, "robot_action"),
-				ActionPayload: stringField(updates, "robot_action_payload"),
-				NavRoute:      stringField(updates, "nav_route"),
-				Nonce:         int64(nonce),
-				SidebarOpen:   boolField(updates, "sidebar_open"),
-				SidebarWantID: stringField(updates, "sidebar_want_id"),
-				SidebarTab:    stringField(updates, "sidebar_active_tab"),
+				ID:             fmt.Sprintf("rlog-%d", time.Now().UnixNano()),
+				Timestamp:      time.Now().UTC().Format(time.RFC3339Nano),
+				Message:        stringField(updates, "robot_message"),
+				TargetType:     stringField(updates, "robot_target_type"),
+				TargetID:       stringField(updates, "robot_target_id"),
+				Action:         stringField(updates, "robot_action"),
+				ActionPayload:  stringField(updates, "robot_action_payload"),
+				NavRoute:       stringField(updates, "nav_route"),
+				Nonce:          int64(nonce),
+				SidebarOpen:    boolField(updates, "sidebar_open"),
+				SidebarWantID:  stringField(updates, "sidebar_want_id"),
+				SidebarTab:     stringField(updates, "sidebar_active_tab"),
 				SettingsSubtab: stringField(updates, "sidebar_settings_subtab"),
 			}
 			s.robotLogMu.Lock()
@@ -1436,17 +1436,17 @@ func (s *Server) replayRobotLog(w http.ResponseWriter, r *http.Request) {
 	// Re-apply the command with a new nonce
 	newNonce := time.Now().UnixMilli()
 	updates := map[string]any{
-		"robot_visible":          true,
-		"robot_message":          entry.Message,
-		"robot_target_type":      entry.TargetType,
-		"robot_target_id":        entry.TargetID,
-		"robot_action":           entry.Action,
-		"robot_action_payload":   entry.ActionPayload,
-		"robot_nonce":            newNonce,
-		"nav_route":              entry.NavRoute,
-		"sidebar_open":           entry.SidebarOpen,
-		"sidebar_want_id":        entry.SidebarWantID,
-		"sidebar_active_tab":     entry.SidebarTab,
+		"robot_visible":           true,
+		"robot_message":           entry.Message,
+		"robot_target_type":       entry.TargetType,
+		"robot_target_id":         entry.TargetID,
+		"robot_action":            entry.Action,
+		"robot_action_payload":    entry.ActionPayload,
+		"robot_nonce":             newNonce,
+		"nav_route":               entry.NavRoute,
+		"sidebar_open":            entry.SidebarOpen,
+		"sidebar_want_id":         entry.SidebarWantID,
+		"sidebar_active_tab":      entry.SidebarTab,
 		"sidebar_settings_subtab": entry.SettingsSubtab,
 	}
 	for key, val := range updates {
