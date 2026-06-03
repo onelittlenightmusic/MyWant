@@ -13,11 +13,11 @@ import (
 // LoadConfigFromYAML loads a bare-array YAML file and returns []*want_spec.Want.
 // The YAML format is a top-level array:
 //
-//	- metadata:
-//	    name: foo
-//	    type: bar
-//	  spec:
-//	    params: {}
+//   - metadata:
+//     name: foo
+//     type: bar
+//     spec:
+//     params: {}
 func LoadConfigFromYAML(filename string) ([]*want_spec.Want, error) {
 	return loadConfigFromYAML(filename)
 }

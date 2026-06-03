@@ -152,6 +152,19 @@ func (cb *ChainBuilder) GetWantTypeDefinition(wantType string) *WantTypeDefiniti
 	return cb.wantTypeDefinitions[wantType]
 }
 
+// AllWantTypeDefinitions returns a snapshot of all registered want type definitions.
+// The returned map is a shallow copy; do not mutate the values.
+func (cb *ChainBuilder) AllWantTypeDefinitions() map[string]*WantTypeDefinition {
+	if cb.wantTypeDefinitions == nil {
+		return map[string]*WantTypeDefinition{}
+	}
+	snap := make(map[string]*WantTypeDefinition, len(cb.wantTypeDefinitions))
+	for k, v := range cb.wantTypeDefinitions {
+		snap[k] = v
+	}
+	return snap
+}
+
 func (cb *ChainBuilder) SetAgentRegistry(registry *AgentRegistry) {
 	cb.agentRegistry = registry
 }
