@@ -695,6 +695,17 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 	return true
 }
 
+// hasUsingWhenConditions returns true if at least one using: entry has a When condition.
+// Only such wants are subject to the step-3.9 data gate; plain using: entries are unaffected.
+func (n *Want) hasUsingWhenConditions() bool {
+	for _, entry := range n.Spec.Using {
+		if entry.When != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // checkUsingWhenConditions evaluates the when: conditions declared on using entries
 // against the packet cached by UnusedExists(). Returns false if any entry declares
 // a when: condition that the received data does NOT satisfy.
@@ -906,12 +917,10 @@ func (n *Want) StartProgressionLoop(
 				continue // Go back to step 1: Check stop channel
 			}
 
-			// 3.9. If using: selectors are declared and providers are connected, wait until
-			// at least one provider has actually sent data before running Progress().
-			// If a using entry declares a when: condition, also evaluate it against the
-			// received data — discarding packets that don't satisfy the condition.
-			// This makes wants self-gating without requiring explicit use() calls.
-			if len(n.Spec.Using) > 0 && len(currentPaths.In) > 0 {
+			// 3.9. If any using: entry carries a when: condition, gate Progress() on
+			// receiving data that satisfies the condition.  Wants without when: are
+			// unaffected — they continue to call Use()/UseForever() themselves.
+			if n.hasUsingWhenConditions() && len(currentPaths.In) > 0 {
 				if !n.UnusedExists(0) {
 					n.SetStatus(WantStatusIdle)
 					time.Sleep(GlobalExecutionInterval)
