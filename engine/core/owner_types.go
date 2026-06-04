@@ -458,6 +458,10 @@ func (t *Target) Initialize() {
 					}
 					t.StateLabels[def.Name] = label
 				}
+				// Register in ProvidedStateFields so fields appear in explicit state (not hidden_state)
+				if !Contains(t.ProvidedStateFields, def.Name) {
+					t.ProvidedStateFields = append(t.ProvidedStateFields, def.Name)
+				}
 				// Initialize state with initial value if not already set
 				if def.InitialValue != nil {
 					if _, exists := t.getState(def.Name); !exists {
@@ -564,6 +568,65 @@ func (t *Target) Progress() {
 	if IsAchievedStatus(t.Status) {
 		t.storeState("achieving_percentage", 100.0)
 		return
+	}
+
+	// ── Phase 0: Compute planner blueprint and wait for user approval ──────────
+	// Only applies to wants with an achieve: section (RecipeAchieve).
+	// The blueprint is written once to state.plan and state.current.plan_status.
+	// CreateChildWants (Phase 1) is blocked until plan_approved becomes true.
+	if len(t.RecipeAchieve) > 0 {
+		planStatus, _ := t.GetStateString("plan_status", "")
+		if planStatus == "" {
+			// First cycle: run planner, store blueprint in state.plan, mark pending approval.
+			if t.StateLabels == nil {
+				t.StateLabels = make(map[string]StateLabel)
+			}
+			t.StateLabels["plan_status"] = LabelCurrent
+			t.StateLabels["plan_approved"] = LabelCurrent
+			t.StateLabels["planner_result"] = LabelPlan
+
+			// Run planner now so the blueprint is visible in the balloon before approval.
+			if t.builder != nil {
+				defs := t.builder.AllWantTypeDefinitions()
+				wsDefs := make(map[string]*ws.WantTypeDefinition, len(defs))
+				for k, v := range defs {
+					wsDefs[k] = v
+				}
+				idx := planner.BuildExposableIndexFromDefs(wsDefs)
+				p := planner.New(idx, wsDefs)
+				plan := &ws.WantTypePlan{
+					Achieve: t.RecipeAchieve,
+					Hints:   t.RecipeHints,
+				}
+				if t.RecipeIsSatisfied != nil {
+					cond := t.RecipeIsSatisfied.When
+					plan.Monitor = []ws.PlanTarget{{
+						Type: t.RecipeIsSatisfied.Type,
+						Name: t.RecipeIsSatisfied.Name,
+						When: &cond,
+					}}
+				}
+				result := p.PlanFromWantType(t.Metadata.Type, "", plan, t.RecipeParams)
+				t.StoreState("planner_result", map[string]any{
+					"confidence": result.Confidence,
+					"steps":      result.Steps,
+					"warnings":   result.Warnings,
+				})
+			}
+
+			t.StoreState("plan_status", "pending_approval")
+			t.StoreState("plan_approved", false)
+			t.StoreLog("[TARGET] Planner blueprint ready — waiting for user approval")
+			return
+		}
+		if planStatus == "pending_approval" {
+			approved, _ := t.GetStateBool("plan_approved", false)
+			if !approved {
+				return // still waiting
+			}
+			t.StoreState("plan_status", "approved")
+			t.StoreLog("[TARGET] Plan approved — deploying child wants")
+		}
 	}
 
 	// Phase 1: Create child wants (only once)

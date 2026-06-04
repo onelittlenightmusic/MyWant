@@ -371,7 +371,7 @@ func TestInteractionManager_GetRecommendation(t *testing.T) {
 		ID:       "rec-test",
 		Title:    "Test Rec",
 		Approach: "custom",
-		Wants: []*Want{},
+		Wants:    []*Want{},
 	}
 	manager.sessionCache.UpdateSession(session.SessionID, []ConversationMessage{}, []Recommendation{rec})
 
