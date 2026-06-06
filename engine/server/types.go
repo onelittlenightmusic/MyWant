@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	mywant "mywant/engine/core"
 	want_spec "github.com/onelittlenightmusic/want-spec"
+	mywant "mywant/engine/core"
 )
 
 // Config holds server configuration

@@ -1,0 +1,94 @@
+wantType:
+  metadata:
+    name: date_and_time
+    title: Date & Time
+    description: A date/time picker control. The user selects a date from a calendar and hour/minute/second from dropdowns. The composed datetime is stored as an exposable current-state key.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "Calendar"
+  parameters:
+  - name: default_date
+    description: Initial date in YYYY-MM-DD format (empty = no date selected)
+    type: string
+    required: false
+    default: ""
+  - name: default_hour
+    description: Initial hour (0–23)
+    type: integer
+    required: false
+    default: 0
+  - name: default_minute
+    description: Initial minute (0–59)
+    type: integer
+    required: false
+    default: 0
+  - name: default_second
+    description: Initial second (0–59)
+    type: integer
+    required: false
+    default: 0
+  - name: clock_type
+    description: Clock display style on the card — "analog" shows an SVG analog clock face, "digital" shows HH:MM:SS digits. Defaults to global parameter "default_clock_type"; falls back to "analog" if unset.
+    type: string
+    required: false
+    defaultGlobalParameter: default_clock_type
+    validation:
+      enum:
+        - analog
+        - digital
+  - name: now
+    description: When true, the datetime is continuously updated to the current system time on every progress tick (live clock mode). The date/hour/minute/second parts are overwritten automatically; default_date and default_h/m/s are ignored.
+    type: bool
+    required: false
+    default: false
+  - name: time_zone
+    description: IANA timezone name (e.g. "Asia/Tokyo", "UTC", "America/New_York"). Displayed as a label on the card; the stored datetime uses this timezone context. Also used as the source timezone when now=true.
+    type: string
+    required: false
+    default: ""
+  state:
+  - name: datetime
+    description: Composed datetime string in ISO-8601 format (YYYY-MM-DDTHH:MM:SS)
+    type: string
+    label: current
+    persistent: true
+    exposable: true
+    initialValue: ""
+  - name: date
+    description: Selected date (YYYY-MM-DD)
+    type: string
+    label: current
+    persistent: true
+    initialValue: ""
+  - name: hour
+    description: Selected hour (0–23)
+    type: integer
+    label: current
+    persistent: true
+    initialValue: 0
+  - name: minute
+    description: Selected minute (0–59)
+    type: integer
+    label: current
+    persistent: true
+    initialValue: 0
+  - name: second
+    description: Selected second (0–59)
+    type: integer
+    label: current
+    persistent: true
+    initialValue: 0
+  examples:
+  - title: Scheduled datetime picker
+    description: Pick a date and time to expose as scheduled_at
+    want:
+      metadata:
+        name: schedule-picker
+        type: date_and_time
+      spec:
+        exposes:
+          - currentState: datetime
+            asGoal: scheduled_at

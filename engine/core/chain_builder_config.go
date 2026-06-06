@@ -27,6 +27,24 @@ func LoadConfigFromYAMLBytes(data []byte) ([]*want_spec.Want, error) {
 	return loadConfigFromYAMLBytes(data)
 }
 
+// LoadWantsFromMemoryFile loads a state/memory YAML file directly into []*Want,
+// preserving persisted state (State, StateTimestamps, Status, History).
+// Used for server restart persistence; the core *Want UnmarshalYAML handles
+// the extra top-level keys (state, state_timestamps) that want_spec.Want ignores.
+func LoadWantsFromMemoryFile(filename string) ([]*Want, error) {
+	InfoLog("[CONFIG-YAML] 📖 Loading state from: %s\n", filename)
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read memory file: %w", err)
+	}
+	var wants []*Want
+	if err := yaml.Unmarshal(data, &wants); err != nil {
+		return nil, fmt.Errorf("failed to parse memory file: %w", err)
+	}
+	InfoLog("[CONFIG-YAML] ✅ Loaded %d wants (with state) from %s\n", len(wants), filename)
+	return wants, nil
+}
+
 // loadConfigFromYAML loads configuration from a YAML file.
 func loadConfigFromYAML(filename string) ([]*want_spec.Want, error) {
 	InfoLog("[CONFIG-YAML] 📖 Loading config from: %s\n", filename)

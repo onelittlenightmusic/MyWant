@@ -103,7 +103,7 @@ func TestInteractMessage_Success(t *testing.T) {
 				Title:       "Test Hotel Booking",
 				Approach:    "custom",
 				Description: "Test description",
-				Wants: []*mywant.Want{},
+				Wants:       []*mywant.Want{},
 			},
 		},
 	}

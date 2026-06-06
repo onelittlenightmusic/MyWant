@@ -20,6 +20,7 @@ wantType:
     pattern: independent
     labels:
       user-control: "true"
+      type-icon: "Bot"
 
   parameters:
   - name: provider

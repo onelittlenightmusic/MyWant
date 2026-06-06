@@ -1,6 +1,10 @@
 package client
 
-import "time"
+import (
+	"time"
+
+	ws "github.com/onelittlenightmusic/want-spec"
+)
 
 // WantExecution represents a want execution returned by the API
 type WantExecution struct {
@@ -53,7 +57,7 @@ type ExposeEntry struct {
 // WantSpec represents want specification
 type WantSpec struct {
 	Params  map[string]any      `json:"params"`
-	Using   []map[string]string `json:"using,omitempty"`
+	Using   []ws.UsingEntry     `json:"using,omitempty"`
 	When    []WhenSpec          `json:"when,omitempty"`
 	Exposes []ExposeEntry       `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 }

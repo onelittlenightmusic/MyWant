@@ -29,7 +29,7 @@ wantType:
     exposable: true
   examples:
   - title: SmartGolf slot selection
-    description: Selects an available SmartGolf slot fetched by smartgolf_list_available, propagating the selection to parent's goal state.
+    description: Selects an available SmartGolf slot fetched by smartgolf_list_available, propagating the selection to parent's plan state.
     want:
       metadata:
         name: smartgolf-slot-choice
@@ -39,4 +39,4 @@ wantType:
           smartgolf_all_available_times: choices
         exposes:
           - currentState: selected
-            asGoal: selected_slot
+            asPlan: selected_slot

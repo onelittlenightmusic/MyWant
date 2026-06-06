@@ -39,6 +39,8 @@ type Server struct {
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
 	httpServer           *http.Server                // HTTP server instance
 	otelShutdown         func(context.Context) error // OpenTelemetry shutdown hook
+	wantCreationHooks    []WantCreationHook          // Hooks called on POST /api/v1/wants
+	memoStore            *MemoStore                  // Persists user-entered values to ~/.mywant/memo.yaml
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -145,14 +147,17 @@ func New(config Config) *Server {
 	globalBuilder := mywant.NewChainBuilderWithPaths(config.ConfigPath, config.MemoryPath)
 	mywant.SetGlobalServerConfig(config)
 
-	// Load initial configuration from memory file if it exists (persistence)
-	// Format: bare YAML array of wants (no wrapper key)
+	// Load initial configuration from memory file if it exists (persistence).
+	// Use LoadWantsFromMemoryFile (core *Want) instead of LoadConfigFromYAML
+	// (want_spec.Want) so that persisted state (plan_status, etc.) is restored.
 	initialWants := []*mywant.Want{}
 	if config.MemoryPath != "" {
 		if _, err := os.Stat(config.MemoryPath); err == nil {
-			if dtoWants, err := mywant.LoadConfigFromYAML(config.MemoryPath); err == nil {
-				initialWants = mywant.WantDTOSliceToRuntime(dtoWants)
-				log.Printf("[SERVER] Restored %d wants from %s\n", len(initialWants), config.MemoryPath)
+			if loaded, err := mywant.LoadWantsFromMemoryFile(config.MemoryPath); err == nil {
+				initialWants = loaded
+				log.Printf("[SERVER] Restored %d wants (with state) from %s\n", len(initialWants), config.MemoryPath)
+			} else {
+				log.Printf("[WARN] Failed to load memory file %s: %v", config.MemoryPath, err)
 			}
 		}
 	}
@@ -248,11 +253,22 @@ func New(config Config) *Server {
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
+		memoStore: newMemoStore(),
+		wantCreationHooks: []WantCreationHook{
+			&OrderKeyHook{},
+			&WantTypeDefaultsHook{builder: globalBuilder},
+			&CanvasCoordinateHook{},
+		},
 	}
 }
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Register MemoHook here (after New) so it can reference s.memoStore and s.globalBuilder.
+	s.wantCreationHooks = append(s.wantCreationHooks, &MemoHook{
+		memo:    s.memoStore,
+		builder: s.globalBuilder,
+	})
 	s.setupRoutes()
 
 	// Start pprof profiling server only in debug mode

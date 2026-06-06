@@ -348,10 +348,13 @@ func (t *Target) CreateChildWants() []*Want {
 			}
 		}
 
-		// Track the isSatisfied check want reference (first monitor want in planWants).
+		// Track the isSatisfied check want reference (first monitor want in planWants)
+		// and enable AutoExpose so its exposable state fields are automatically
+		// propagated to this coordinator want when they change.
 		for _, w := range planWants {
 			if w.Metadata.Labels["child-role"] == "monitor" && t.isSatisfiedCheckWant == nil {
 				t.isSatisfiedCheckWant = w
+				w.Spec.AutoExpose = true
 			}
 		}
 
@@ -576,6 +579,21 @@ func (t *Target) Progress() {
 	// CreateChildWants (Phase 1) is blocked until plan_approved becomes true.
 	if len(t.RecipeAchieve) > 0 {
 		planStatus, _ := t.GetStateString("plan_status", "")
+
+		// After a server restart, plan_status may be "" or "pending_approval" even
+		// though children were already created and persisted. Detect this by checking
+		// whether child wants with our OwnerReference already exist in the builder.
+		// If they do, skip the planning phase and mark children as already created.
+		if (planStatus == "" || planStatus == "pending_approval") && t.builder != nil {
+			existingChildren := t.builder.FindChildWantsByOwnerID(t.Metadata.ID)
+			if len(existingChildren) > 0 {
+				t.childrenCreated = true
+				t.StoreState("plan_status", "approved")
+				t.StoreState("plan_approved", true)
+				planStatus = "approved"
+			}
+		}
+
 		if planStatus == "" {
 			// First cycle: run planner, store blueprint in state.plan, mark pending approval.
 			if t.StateLabels == nil {

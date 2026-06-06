@@ -27,12 +27,15 @@ wantType:
     - name: weather_city
       description: City name to fetch weather for (e.g. Tokyo)
       type: string
+      subType: city
       required: false
       default: "Tokyo"
 
     - name: openweathermap_api_key
       description: OpenWeatherMap API key. Falls back to OPENWEATHERMAP_API_KEY env var. If absent, uses wttr.in.
       type: string
+      subType: secret
+      recordMemo: false
       required: false
       default: ""
 
@@ -40,6 +43,7 @@ wantType:
     - name: weather_city
       description: City name (copied from param)
       type: string
+      subType: city
       persistent: false
       label: current
       initialValue: 'Tokyo'
@@ -47,6 +51,8 @@ wantType:
     - name: openweathermap_api_key
       description: OpenWeatherMap API key (copied from param)
       type: string
+      subType: secret
+      recordMemo: false
       persistent: false
       label: current
       initialValue: ''

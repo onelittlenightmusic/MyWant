@@ -147,10 +147,11 @@ func exposedLabelsToStrings(set map[mywant.StateLabel]bool) []string {
 
 // POST /api/v1/wants/field-match-recommendations/apply
 // Supports two modes:
-//   1. Param-change (legacy): set a param on target, auto-expose source field.
-//      Body: { "source_id": "...", "target_id": "...", "param_change": { ... } }
-//   2. Expose+Import (new): explicitly add expose entry to source and import entry to target.
-//      Body: { "source_id": "...", "target_id": "...", "expose_action": { ... }, "import_action": { ... } }
+//  1. Param-change (legacy): set a param on target, auto-expose source field.
+//     Body: { "source_id": "...", "target_id": "...", "param_change": { ... } }
+//  2. Expose+Import (new): explicitly add expose entry to source and import entry to target.
+//     Body: { "source_id": "...", "target_id": "...", "expose_action": { ... }, "import_action": { ... } }
+//
 // Both modes can be combined in one request.
 func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -273,7 +274,6 @@ func hasExposeAs(w *mywant.Want, asKey string) bool {
 	return false
 }
 
-
 // collectSourceFields enumerates state fields whose label is in allowedLabels,
 // annotating each with its runtime type, label, and whether it is the finalResultField.
 //
@@ -338,7 +338,6 @@ func stateLabelString(label mywant.StateLabel) string {
 		return ""
 	}
 }
-
 
 func runtimeTypeName(v any) string {
 	if v == nil {

@@ -219,6 +219,7 @@ func (p *Planner) backwardChain(target ws.PlanTarget, hints []ws.PlanHint, globa
 	var intermediates []ws.RecipeWant
 	var intermediateSteps []ws.PlannerStep
 	usingEntries := []ws.UsingEntry{}
+	var terminalImports map[string]string
 
 	if len(missingParams) > 0 || hintWantType != "" {
 		if hintWantType != "" {
@@ -227,6 +228,7 @@ func (p *Planner) backwardChain(target ws.PlanTarget, hints []ws.PlanHint, globa
 			intermediates = append(intermediates, providerChain.wants...)
 			intermediateSteps = append(intermediateSteps, providerChain.steps...)
 			usingEntries = providerChain.usingEntries
+			terminalImports = providerChain.terminalImports
 			if lowerConf(providerChain.confidence, result.confidence) {
 				result.confidence = providerChain.confidence
 			}
@@ -271,8 +273,9 @@ func (p *Planner) backwardChain(target ws.PlanTarget, hints []ws.PlanHint, globa
 			Type: target.Type,
 		},
 		Spec: ws.WantSpec{
-			Params: target.Params,
-			Using:  usingEntries,
+			Params:  target.Params,
+			Using:   usingEntries,
+			Imports: terminalImports,
 		},
 	}
 	result.wants = append(result.wants, terminalWant)
@@ -288,11 +291,12 @@ func (p *Planner) backwardChain(target ws.PlanTarget, hints []ws.PlanHint, globa
 
 // hintedProviderChain is an intermediate result for hint-guided planning.
 type hintedProviderChain struct {
-	wants        []ws.RecipeWant
-	steps        []ws.PlannerStep
-	usingEntries []ws.UsingEntry
-	confidence   string
-	warnings     []string
+	wants           []ws.RecipeWant
+	steps           []ws.PlannerStep
+	usingEntries    []ws.UsingEntry
+	terminalImports map[string]string // imports to inject into the terminal want
+	confidence      string
+	warnings        []string
 }
 
 // buildHintedProvider constructs intermediate wants using a hint-specified provider type.
@@ -338,14 +342,16 @@ func (p *Planner) buildHintedProvider(providerType, targetType, targetName strin
 	}
 
 	if choiceImportKey != "" && p.defs["choice"] != nil {
-		// Add a choice want that imports the array and exposes selected.
+		// Add a choice want that imports the array and exposes selected as a global param.
+		// The terminal want then imports that global param — no channel/using wiring needed.
 		choiceName := slugify(targetType) + "-choice"
+		globalParamName := slugify(targetType) + "-selected-slot"
 		choiceWant := ws.RecipeWant{
 			Metadata: ws.Metadata{Name: choiceName, Type: "choice"},
 			Spec: ws.WantSpec{
 				Imports: map[string]string{choiceImportKey: "choices"},
 				Exposes: []ws.ExposeEntry{
-					{CurrentState: "selected", AsPlan: "selected_slot"},
+					{CurrentState: "selected", AsGlobalParam: globalParamName},
 				},
 			},
 		}
@@ -356,12 +362,12 @@ func (p *Planner) buildHintedProvider(providerType, targetType, targetName strin
 			ProvidedBy: providerType,
 			Confidence: "inferred",
 			Reasoning: fmt.Sprintf(
-				"choice imports %s.%s (array) → user picks one → exposes selected as selected_slot",
-				providerType, choiceImportKey),
+				"choice imports %s.%s (array) → user picks one → writes selected to global param %q",
+				providerType, choiceImportKey, globalParamName),
 		})
-		chain.usingEntries = []ws.UsingEntry{
-			{Labels: map[string]string{"name": choiceName, "select": "selected_slot"}},
-		}
+		// Terminal want imports the global param (not using: channel wiring)
+		chain.terminalImports = map[string]string{globalParamName: "selected_slot"}
+		chain.usingEntries = nil
 	}
 
 	return chain

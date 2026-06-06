@@ -150,6 +150,15 @@ func (s *Server) setupRoutes() {
 	interact.HandleFunc("/{id}/deploy", s.interactDeploy).Methods("POST")
 	interact.HandleFunc("/{id}/deploy", s.handleOptions).Methods("OPTIONS")
 
+	// Planner — recipe achieve/isSatisfied → derived wants
+	plannerR := api.PathPrefix("/planner").Subrouter()
+	// POST /planner/recipe/{name} — preview derived wants for a registered recipe's achieve section
+	plannerR.HandleFunc("/recipe/{name}", s.planFromRecipe).Methods("POST", "OPTIONS")
+	// POST /planner/plan — derive from inline WantTypePlan body (ad-hoc testing)
+	plannerR.HandleFunc("/plan", s.planFromBody).Methods("POST", "OPTIONS")
+	// GET /planner/index — list all exposable fields
+	plannerR.HandleFunc("/index", s.getPlannerIndex).Methods("GET", "OPTIONS")
+
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 
@@ -184,6 +193,12 @@ func (s *Server) setupRoutes() {
 	states.HandleFunc("/{id}/{key}", s.setWantStateKey).Methods("PUT")
 	states.HandleFunc("/{id}/{key}", s.deleteWantStateKey).Methods("DELETE")
 	states.HandleFunc("/{id}/{key}", s.handleOptions).Methods("OPTIONS")
+
+	// Memo API (user input history per subtype)
+	memo := api.PathPrefix("/memo").Subrouter()
+	memo.HandleFunc("", s.getMemo).Methods("GET", "OPTIONS")
+	memo.HandleFunc("", s.putMemo).Methods("PUT", "OPTIONS")
+	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")

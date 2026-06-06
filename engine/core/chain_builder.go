@@ -1274,6 +1274,24 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Automatically register labels in the global registry
 	cb.registerLabelsFromWant(wantConfig)
 }
+// FindChildWantsByOwnerID returns all runtime wants whose OwnerReferences
+// contain a controlling reference with the given owner ID.
+// Used by Target.Progress to detect children that survived a server restart.
+func (cb *ChainBuilder) FindChildWantsByOwnerID(ownerID string) []*Want {
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
+	var children []*Want
+	for _, rw := range cb.wants {
+		for _, ref := range rw.want.Metadata.OwnerReferences {
+			if ref.Kind == "Want" && ref.Controller && ref.ID == ownerID {
+				children = append(children, rw.want)
+				break
+			}
+		}
+	}
+	return children
+}
+
 func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	cb.reconcileMutex.RLock()
 	defer cb.reconcileMutex.RUnlock()

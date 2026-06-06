@@ -14,6 +14,8 @@ wantType:
     version: '2.0'
     category: system
     pattern: independent
+    labels:
+      type-icon: File
 
   finalResultField: ensure_file_phase
 

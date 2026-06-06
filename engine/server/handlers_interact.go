@@ -240,9 +240,9 @@ func (s *Server) interactDeploy(w http.ResponseWriter, r *http.Request) {
 	// Deploy wants using existing logic
 	executionID := generateWantID()
 	execution := &WantExecution{
-		ID:      executionID,
-		Wants:   mywant.RuntimeWantsToDTOSlice(wants),
-		Status:  "created",
+		ID:     executionID,
+		Wants:  mywant.RuntimeWantsToDTOSlice(wants),
+		Status: "created",
 	}
 	s.wants[executionID] = execution
 

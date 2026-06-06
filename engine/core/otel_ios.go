@@ -21,9 +21,9 @@ func IsOTELEnabled() bool { return false }
 
 func otelTracer() trace.Tracer { return nil }
 
-func (n *Want) otelOnStatusChange(_, _ WantStatus)          {}
-func (n *Want) otelEmitWantInfo(_ string)                   {}
+func (n *Want) otelOnStatusChange(_, _ WantStatus)           {}
+func (n *Want) otelEmitWantInfo(_ string)                    {}
 func (n *Want) otelEmitWantLog(_ otellog.Severity, _ string) {}
-func (n *Want) otelEmitStateChange(_ string, _ any)         {}
+func (n *Want) otelEmitStateChange(_ string, _ any)          {}
 
 func otelEmitLog(_ context.Context, _ otellog.Severity, _ string, _ ...otellog.KeyValue) {}

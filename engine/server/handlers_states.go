@@ -269,6 +269,15 @@ func (s *Server) setWantStateKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	want.StoreState(key, value)
+
+	// When plan_approved is set to true, atomically advance plan_status to 'approved'
+	// so the next GET already reflects the approval without waiting for Progress().
+	if key == "plan_approved" {
+		if approved, ok := value.(bool); ok && approved {
+			want.StoreState("plan_status", "approved")
+		}
+	}
+
 	s.JSONResponse(w, http.StatusOK, map[string]any{"key": key, "value": value})
 }
 

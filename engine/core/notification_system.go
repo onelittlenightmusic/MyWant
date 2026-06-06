@@ -130,13 +130,50 @@ func (h *goalStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) E
 	return EventResponse{Handled: true}
 }
 
+// planStateExposeHandler handles StateChangeEvent emitted by this want and
+// propagates the value to the parent want's Plan-labeled state via SetPlan.
+// Used for exposes entries with CurrentState + AsPlan fields (bottom-up to parent Plan).
+type planStateExposeHandler struct {
+	want       *Want
+	localKey   string // state key in this want (ExposeEntry.CurrentState)
+	parentName string // parent want name
+	parentKey  string // plan key in parent (ExposeEntry.AsPlan)
+}
+
+func (h *planStateExposeHandler) GetSubscriberName() string {
+	return fmt.Sprintf("%s:plan-expose:%s→%s.%s", h.want.Metadata.Name, h.localKey, h.parentName, h.parentKey)
+}
+
+func (h *planStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) EventResponse {
+	sce, ok := event.(*StateChangeEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if sce.GetSourceName() != h.want.Metadata.Name || sce.StateKey != h.localKey {
+		return EventResponse{}
+	}
+	parent := findWantByName(h.parentName)
+	if parent == nil {
+		return EventResponse{}
+	}
+	// Dedup: skip if parent already holds the same value.
+	if existing, ok := parent.GetPlan(h.parentKey); ok && reflect.DeepEqual(existing, sce.StateValue) {
+		return EventResponse{Handled: true}
+	}
+	// Use StoreState (not SetPlan) to avoid governance violations on parent want types
+	// that don't declare this key as plan — the asPlan semantics are captured at the
+	// expose-declaration level; storage is a plain state write.
+	parent.StoreState(h.parentKey, sce.StateValue)
+	return EventResponse{Handled: true}
+}
+
 // globalParamExposeHandler handles StateChangeEvent and writes the value directly
 // to a named global parameter via SetGlobalParameter.
 // Used for exposes entries with CurrentState + AsGlobalParam fields.
 type globalParamExposeHandler struct {
-	want      *Want
-	localKey  string // state key in this want (ExposeEntry.CurrentState)
-	paramKey  string // global parameter name (ExposeEntry.AsGlobalParam)
+	want     *Want
+	localKey string // state key in this want (ExposeEntry.CurrentState)
+	paramKey string // global parameter name (ExposeEntry.AsGlobalParam)
 }
 
 func (h *globalParamExposeHandler) GetSubscriberName() string {
@@ -206,6 +243,31 @@ func RegisterWant(want *Want) {
 		want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 	}
 
+	// AutoExpose: register expose handlers for every exposable field in the type definition.
+	// Equivalent to listing each field in spec.exposes with {currentState: X, as: X}.
+	// Requires a parent (controller OwnerReference) — silently skipped for top-level wants.
+	if want.Spec.AutoExpose && parentName != "" {
+		cb := GetGlobalChainBuilder()
+		if cb != nil {
+			typeDef := cb.GetWantTypeDefinition(want.Metadata.Type)
+			if typeDef != nil {
+				for _, sd := range typeDef.State {
+					if !sd.Exposable {
+						continue
+					}
+					fieldName := sd.Name
+					handler := &currentStateExposeHandler{
+						want:       want,
+						localKey:   fieldName,
+						parentName: parentName,
+						parentKey:  fieldName,
+					}
+					want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+				}
+			}
+		}
+	}
+
 	// Subscribe handlers for each expose entry
 	for _, entry := range want.Spec.Exposes {
 		if entry.Param != "" {
@@ -244,6 +306,20 @@ func RegisterWant(want *Want) {
 					localKey:   entry.CurrentState,
 					parentName: parentName,
 					parentKey:  entry.AsGoal,
+				}
+				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+			} else if entry.AsPlan != "" {
+				// Bottom-up: push local current state to parent's Plan-labeled state via SetPlan.
+				// Top-level wants have no parent and are not supported for asPlan.
+				if parentName == "" {
+					WarnLog("[EXPOSE] asPlan on top-level want %q (key=%q) is not supported — no parent", want.Metadata.Name, entry.AsPlan)
+					continue
+				}
+				handler := &planStateExposeHandler{
+					want:       want,
+					localKey:   entry.CurrentState,
+					parentName: parentName,
+					parentKey:  entry.AsPlan,
 				}
 				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 			} else {
@@ -295,6 +371,9 @@ func UnregisterWant(wantName string) {
 			if entry.AsGoal != "" {
 				subscriberName := fmt.Sprintf("%s:goal-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.AsGoal)
 				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
+			} else if entry.AsPlan != "" {
+				subscriberName := fmt.Sprintf("%s:plan-expose:%s→%s.%s", wantName, entry.CurrentState, parentName, entry.AsPlan)
+				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
 			} else if parentName == "" && entry.As != "final_result" {
 				subscriberName := fmt.Sprintf("%s:global-state-expose:%s→%s", wantName, entry.CurrentState, entry.As)
 				want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, subscriberName)
@@ -314,6 +393,15 @@ func sendStateNotifications(notification StateNotification) {
 	// Emit state change through unified subscription system
 	emitStateChangeEvent(notification)
 	sendOwnerChildNotifications(notification)
+	// Restart children that import the changed state key from this parent.
+	// Uses the same restartDependentChildren infrastructure as sendParameterNotifications.
+	for _, child := range gatherChildWants(notification.SourceWantName) {
+		if _, ok := child.Spec.Imports[notification.StateKey]; ok {
+			DebugLog("[IMPORT-CHANGE] %s: key %q changed on parent %s, restarting\n",
+				child.Metadata.Name, notification.StateKey, notification.SourceWantName)
+			restartWantWithFallback(child)
+		}
+	}
 	storeNotificationHistory(notification)
 }
 
@@ -342,64 +430,68 @@ func emitStateChangeEvent(notification StateNotification) {
 func sendParameterNotifications(notification StateNotification) {
 	// Emit through unified subscription system
 	emitParameterChangeEvent(notification)
-	wantRegistryMutex.RLock()
-	childWants := make([]*Want, 0)
-	for _, childWant := range wantRegistry {
-		for _, ownerRef := range childWant.Metadata.OwnerReferences {
-			if ownerRef.Name == notification.SourceWantName && ownerRef.Controller && ownerRef.Kind == "Want" {
-				childWants = append(childWants, childWant)
-				break
-			}
-		}
-	}
-	wantRegistryMutex.RUnlock()
-	for _, childWant := range childWants {
-		// Skip wants whose target_param matches the changed key — they are the
-		// *source* of the change (e.g. a slider propagating its value to the parent).
-		// Restarting the source would reset its value and trigger an infinite loop.
-		if targetParam, ok := childWant.GetParameter("target_param"); ok {
-			if targetParam == notification.StateKey {
-				DebugLog("[PARAMETER CHANGE] %s: skipping restart (source of change via target_param=%s)\n",
-					childWant.Metadata.Name, notification.StateKey)
-				continue
-			}
-		}
-		// Skip wants that receive this param via exposes — the paramExposeHandler
-		// subscription already calls UpdateParameter on them, and their background
-		// ThinkAgent picks up the new value on its next tick. Restarting would
-		// stop the ThinkAgent goroutine unnecessarily.
-		hasExposeForKey := false
-		for _, entry := range childWant.Spec.Exposes {
-			if entry.Param != "" && entry.As == notification.StateKey {
-				hasExposeForKey = true
-				break
-			}
-		}
-		if hasExposeForKey {
-			DebugLog("[PARAMETER CHANGE] %s: skipping restart (receives %s via exposes)\n",
-				childWant.Metadata.Name, notification.StateKey)
+	for _, child := range gatherChildWants(notification.SourceWantName) {
+		if !shouldRestartOnParamChange(child, notification.StateKey) {
 			continue
 		}
-		// Skip wants that don't have the changed key bound in their own Spec.Params.
-		// Only restart wants that actually use this parameter — e.g. if "budget"
-		// changes, only restart wants whose params include "budget", not all children.
-		if _, hasBoundParam := childWant.GetParameter(notification.StateKey); !hasBoundParam {
-			DebugLog("[PARAMETER CHANGE] %s: skipping restart (param %s not bound)\n",
-				childWant.Metadata.Name, notification.StateKey)
-			continue
-		}
-		DebugLog("[PARAMETER CHANGE] %s: Parameter %s changed to %v, restarting execution\n",
-			childWant.Metadata.Name, notification.StateKey, notification.StateValue)
-		cb := GetGlobalChainBuilder()
-		if cb != nil {
-			if err := cb.RestartWant(childWant.Metadata.ID); err != nil {
-				childWant.RestartWant() // fallback: set idle without reconcile trigger
-			}
-		} else {
-			childWant.RestartWant()
-		}
+		DebugLog("[PARAMETER CHANGE] %s: param %q changed to %v, restarting\n",
+			child.Metadata.Name, notification.StateKey, notification.StateValue)
+		restartWantWithFallback(child)
 	}
 	storeNotificationHistory(notification)
+}
+
+// shouldRestartOnParamChange reports whether child should be restarted when
+// changedKey changes on its parent. Guards:
+//   - target_param == key: child is the *source* of the change (slider etc.) — skip.
+//   - exposes[Param=key]: paramExposeHandler handles the propagation — skip.
+//   - key not in Spec.Params: child doesn't use this param — skip.
+func shouldRestartOnParamChange(child *Want, key string) bool {
+	if _, bound := child.GetParameter(key); !bound {
+		DebugLog("[PARAMETER CHANGE] %s: skipping (param %q not bound)\n", child.Metadata.Name, key)
+		return false
+	}
+	if tp, ok := child.GetParameter("target_param"); ok && tp == key {
+		DebugLog("[PARAMETER CHANGE] %s: skipping (source of change via target_param=%q)\n", child.Metadata.Name, key)
+		return false
+	}
+	for _, e := range child.Spec.Exposes {
+		if e.Param != "" && e.As == key {
+			DebugLog("[PARAMETER CHANGE] %s: skipping (receives %q via exposes)\n", child.Metadata.Name, key)
+			return false
+		}
+	}
+	return true
+}
+
+// gatherChildWants returns all wants that have a controlling ownerReference pointing
+// to sourceName. The registry mutex must NOT be held by the caller.
+func gatherChildWants(sourceName string) []*Want {
+	wantRegistryMutex.RLock()
+	defer wantRegistryMutex.RUnlock()
+	var children []*Want
+	for _, w := range wantRegistry {
+		for _, ref := range w.Metadata.OwnerReferences {
+			if ref.Name == sourceName && ref.Controller && ref.Kind == "Want" {
+				children = append(children, w)
+				break
+			}
+		}
+	}
+	return children
+}
+
+// restartWantWithFallback restarts a want via the global ChainBuilder, falling back
+// to the want's own RestartWant if the builder is unavailable or returns an error.
+func restartWantWithFallback(want *Want) {
+	cb := GetGlobalChainBuilder()
+	if cb != nil {
+		if err := cb.RestartWant(want.Metadata.ID); err != nil {
+			want.RestartWant()
+		}
+	} else {
+		want.RestartWant()
+	}
 }
 
 // emitParameterChangeEvent emits a parameter change through the unified subscription system

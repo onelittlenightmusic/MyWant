@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	mywant "mywant/engine/core"
 	want_spec "github.com/onelittlenightmusic/want-spec"
+	mywant "mywant/engine/core"
 
 	"github.com/gorilla/mux"
 	"gopkg.in/yaml.v3"
@@ -134,45 +134,36 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assign IDs and apply want type defaults
+	// Assign IDs
 	for i, want := range runtimeWants {
 		if want.Metadata.ID == "" {
 			want.Metadata.ID = generateWantID()
 			dtoWants[i].Metadata.ID = want.Metadata.ID
 		}
-
-		// Apply want type definition defaults
-		typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
-		if typeDef != nil {
-			if len(want.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
-				want.Spec.Requires = typeDef.Requires
-				dtoWants[i].Spec.Requires = typeDef.Requires
-			}
-		}
 	}
 
-	// Assign OrderKeys
+	// Run all creation hooks (OrderKey, WantTypeDefaults, CanvasCoordinate, …).
+	// Hooks mutate runtimeWants in place; sync changes back to dtoWants afterward.
 	allWantStates := s.globalBuilder.GetAllWantStates()
-	var lastOrderKey string
-	for _, existingWant := range allWantStates {
-		if existingWant.Metadata.OrderKey != "" && existingWant.Metadata.OrderKey > lastOrderKey {
-			lastOrderKey = existingWant.Metadata.OrderKey
-		}
+	allWantSlice := make([]*mywant.Want, 0, len(allWantStates))
+	for _, w := range allWantStates {
+		allWantSlice = append(allWantSlice, w)
 	}
-
+	if err := s.runWantCreationHooks(runtimeWants, allWantSlice); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Want creation hook failed", err.Error())
+		return
+	}
 	for i, want := range runtimeWants {
-		if want.Metadata.OrderKey == "" {
-			lastOrderKey = mywant.GenerateOrderKeyAfter(lastOrderKey)
-			want.Metadata.OrderKey = lastOrderKey
-			dtoWants[i].Metadata.OrderKey = lastOrderKey
-		}
+		dtoWants[i].Metadata.Labels   = want.Metadata.Labels
+		dtoWants[i].Metadata.OrderKey = want.Metadata.OrderKey
+		dtoWants[i].Spec.Requires     = want.Spec.Requires
 	}
 
 	executionID := generateWantID()
 	execution := &WantExecution{
-		ID:      executionID,
-		Wants:   dtoWants,
-		Status:  "created",
+		ID:     executionID,
+		Wants:  dtoWants,
+		Status: "created",
 	}
 	s.wantsMu.Lock()
 	s.wants[executionID] = execution
@@ -417,8 +408,39 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updatedWant.Metadata.ID = foundWant.Metadata.ID
+	// Preserve metadata fields not supplied in the PUT body so partial updates don't
+	// accidentally strip e.g. the name, type, labels, or ownerReferences.
+	if updatedWant.Metadata.Name == "" {
+		updatedWant.Metadata.Name = foundWant.Metadata.Name
+	}
+	if updatedWant.Metadata.Type == "" {
+		updatedWant.Metadata.Type = foundWant.Metadata.Type
+	}
+	if updatedWant.Metadata.Labels == nil {
+		updatedWant.Metadata.Labels = foundWant.Metadata.Labels
+	}
 	if updatedWant.Metadata.OwnerReferences == nil {
 		updatedWant.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
+	}
+	// Preserve spec fields not supplied in the PUT body so partial param updates don't
+	// strip structural fields like Requires, Exposes, Imports, Using, FinalResultField, etc.
+	// For slice/map fields we cannot distinguish "client sent []" from "client omitted the field"
+	// (both deserialize to nil/len==0 due to omitempty).
+	// Preserve only when the client sent a completely absent params map; for Exposes/Using/etc.
+	// trust the client — an empty slice means "clear this field" (e.g. global param removal).
+	if len(updatedWant.Spec.Requires) == 0 && foundWant.Spec.Requires != nil {
+		updatedWant.Spec.Requires = foundWant.Spec.Requires
+	}
+	// Exposes: always trust the client value. An empty [] means intentional removal.
+	// (Preserving would break global param drag-out which sends filtered/empty exposes.)
+	if updatedWant.Spec.Imports == nil {
+		updatedWant.Spec.Imports = foundWant.Spec.Imports
+	}
+	if len(updatedWant.Spec.Using) == 0 && foundWant.Spec.Using != nil {
+		updatedWant.Spec.Using = foundWant.Spec.Using
+	}
+	if updatedWant.Spec.FinalResultField == "" {
+		updatedWant.Spec.FinalResultField = foundWant.Spec.FinalResultField
 	}
 
 	if s.globalBuilder != nil {

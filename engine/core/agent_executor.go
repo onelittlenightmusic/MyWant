@@ -208,4 +208,3 @@ func NewExecutor(config ExecutionConfig) (AgentExecutor, error) {
 		return nil, fmt.Errorf("unknown execution mode: %s", config.Mode)
 	}
 }
-
