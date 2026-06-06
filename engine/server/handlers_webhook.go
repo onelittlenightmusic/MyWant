@@ -63,6 +63,18 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// User-control wants (button, switch, etc.) declare webhook_payload as a current-labeled
+	// state field and consume it in Progress(). Store the raw payload there directly.
+	if label, ok := want.StateLabels["webhook_payload"]; ok && label == mywant.LabelCurrent {
+		mywant.StoreStateMulti(want, map[string]any{
+			"webhook_payload":     payload,
+			"webhook_received_at": time.Now().Format(time.RFC3339),
+		})
+		log.Printf("[WEBHOOK] Stored webhook_payload for want %s (type=%s)\n", wantID, want.Metadata.Type)
+		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
+		return
+	}
+
 	// Generic webhook receiver: handle challenge, verify, and store raw payload.
 	// verify_type / challenge_field / secret_param are want params so that platform-specific
 	// YAML types (teams_notify, slack_notify, …) supply their own defaults without Go changes.

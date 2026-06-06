@@ -12,11 +12,7 @@ func init() {
 type SliderLocals struct{}
 
 // SliderWant dynamically controls a parent want's goal or state based on its current value.
-// The output is propagated via expose entries, e.g.:
-//
-//	exposes:
-//	  - currentState: "value"
-//	    asGoal: "budget_limit"
+// A value change is delivered via POST /api/v1/webhooks/{id} with {"action":"set","value":...}.
 type SliderWant struct{ Want }
 
 func (s *SliderWant) GetLocals() *SliderLocals {
@@ -24,18 +20,30 @@ func (s *SliderWant) GetLocals() *SliderLocals {
 }
 
 func (s *SliderWant) Initialize() {
-	s.StoreState("value", s.GetFloatParam("default", 0))
-	s.StoreState("min", s.GetFloatParam("min", 0))
-	s.StoreState("max", s.GetFloatParam("max", 100))
-	s.StoreState("step", s.GetFloatParam("step", 1))
+	s.SetCurrent("value", s.GetFloatParam("default", 0))
+	s.SetCurrent("min", s.GetFloatParam("min", 0))
+	s.SetCurrent("max", s.GetFloatParam("max", 100))
+	s.SetCurrent("step", s.GetFloatParam("step", 1))
+	if tp := s.GetStringParam("target_param", ""); tp != "" {
+		s.SetCurrent("target_param", tp)
+	}
+	s.StoreState("last_action_at", "")
 }
 
 // IsAchieved always returns false — slider is a persistent control.
 func (s *SliderWant) IsAchieved() bool { return false }
 
-// Progress re-emits the current value so expose handlers fire on the first tick
-// (initial propagation) as well as on every user-driven value change.
+// Progress processes a value change delivered via webhook.
 func (s *SliderWant) Progress() {
-	value, _ := s.GetStateFloat64("value", 0.0)
-	s.SetCurrent("value", value)
+	ConsumeWebhookAction(&s.Want, "last_action_at", func(action string, pm map[string]any) bool {
+		if action != "set" {
+			return false
+		}
+		v, ok := pm["value"].(float64)
+		if !ok {
+			return false
+		}
+		s.SetCurrent("value", v)
+		return true
+	})
 }

@@ -141,6 +141,11 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	if mrsCheckRequiredParams(want) {
 		return false, nil // keep polling; retry on next tick
 	}
+	// Gate: check using.when conditions against live provider state.
+	// This blocks execution when the gate condition is not met regardless of packet cache.
+	if want.HasUsingWhenConditions() && !want.CheckUsingWhenConditions() {
+		return false, nil
+	}
 	// Rebuild skill_json_arg from template so param updates are picked up each tick.
 	mrsRebuildSkillArg(want)
 

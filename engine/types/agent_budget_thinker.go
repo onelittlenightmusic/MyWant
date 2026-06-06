@@ -2,7 +2,6 @@ package types
 
 import (
 	"context"
-	"fmt"
 	. "mywant/engine/core"
 )
 
@@ -89,8 +88,13 @@ func budgetThinkerThink(ctx context.Context, want *Want) error {
 	want.SetCurrent("remaining_budget", remaining)
 	want.SetCurrent("budget_exceeded", exceeded)
 
-	summary := fmt.Sprintf("Budget: %.2f, Spent: %.2f, Remaining: %.2f (%d costs reported)",
-		budgetVal, totalCost, remaining, len(costs))
+	summary := map[string]any{
+		"budget":    budgetVal,
+		"spent":     totalCost,
+		"remaining": remaining,
+		"exceeded":  exceeded,
+		"costs":     costs,
+	}
 	want.SetCurrent("budget_summary", summary)
 	want.SetCurrent("costs", costs)
 

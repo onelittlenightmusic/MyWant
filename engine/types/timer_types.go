@@ -10,19 +10,18 @@ func init() {
 	})
 }
 
-// TimerLocals holds type-specific local state to detect changes.
-type TimerLocals struct {
-	LastEvery        string `json:"last_every" yaml:"last_every"`
-	LastAt           string `json:"last_at" yaml:"last_at"`
-	LastTimerMode    string `json:"last_timer_mode" yaml:"last_timer_mode"`
-	LastAtRecurrence string `json:"last_at_recurrence" yaml:"last_at_recurrence"`
-}
+// TimerLocals holds type-specific local state.
+type TimerLocals struct{}
 
 // scheduleStateKey is the canonical current-state key for the computed WhenSpec output.
 const scheduleStateKey = "schedule"
 
 // TimerWant computes a WhenSpec (every/at schedule) and stores it as the "schedule" current state.
-// Use asGlobalParam in the want's exposes spec to write it to a named global parameter, e.g.:
+// A schedule change is delivered via POST /api/v1/webhooks/{id} with:
+//
+//	{"action":"set","timer_mode":"every|at","every":"5m","at":"09:00","at_recurrence":"day|week","at_weekday":"mon"}
+//
+// Use asGlobalParam in the want's exposes spec to write the schedule to a named global parameter:
 //
 //	exposes:
 //	  - currentState: schedule
@@ -35,45 +34,40 @@ func (t *TimerWant) GetLocals() *TimerLocals {
 
 func (t *TimerWant) Initialize() {
 	every := t.GetStringParam("default_every", "5m")
-	at := ""
-	timerMode := "every"
-	atRecurrence := ""
-
 	t.SetInternal("every", every)
-	t.SetInternal("at", at)
-	t.SetInternal("timer_mode", timerMode)
-	t.SetInternal("at_recurrence", atRecurrence)
-
-	locals := t.GetLocals()
-	locals.LastEvery = every
-	locals.LastAt = at
-	locals.LastTimerMode = timerMode
-	locals.LastAtRecurrence = atRecurrence
-
-	// Compute and store initial schedule so expose handlers can propagate it on first tick.
-	t.propagateTimer(every, at, timerMode, atRecurrence)
+	t.SetInternal("at", "")
+	t.SetInternal("timer_mode", "every")
+	t.SetInternal("at_recurrence", "")
+	t.SetInternal("at_weekday", "")
+	t.StoreState("last_action_at", "")
+	t.propagateTimer(every, "", "every", "")
 }
 
 // IsAchieved always returns false — the timer is a persistent control want.
 func (t *TimerWant) IsAchieved() bool { return false }
 
+// Progress processes a schedule update delivered via webhook.
 func (t *TimerWant) Progress() {
-	locals := t.GetLocals()
-
-	every := GetInternal[string](&t.Want, "every", "")
-	at := GetInternal[string](&t.Want, "at", "")
-	timerMode := GetInternal[string](&t.Want, "timer_mode", "every")
-	atRecurrence := GetInternal[string](&t.Want, "at_recurrence", "")
-
-	// Propagate only when relevant values have changed.
-	if every != locals.LastEvery || at != locals.LastAt ||
-		timerMode != locals.LastTimerMode || atRecurrence != locals.LastAtRecurrence {
-		locals.LastEvery = every
-		locals.LastAt = at
-		locals.LastTimerMode = timerMode
-		locals.LastAtRecurrence = atRecurrence
+	ConsumeWebhookAction(&t.Want, "last_action_at", func(action string, pm map[string]any) bool {
+		if action != "set" {
+			return false
+		}
+		every, _ := pm["every"].(string)
+		at, _ := pm["at"].(string)
+		timerMode, _ := pm["timer_mode"].(string)
+		if timerMode == "" {
+			timerMode = "every"
+		}
+		atRecurrence, _ := pm["at_recurrence"].(string)
+		atWeekday, _ := pm["at_weekday"].(string)
+		t.SetInternal("every", every)
+		t.SetInternal("at", at)
+		t.SetInternal("timer_mode", timerMode)
+		t.SetInternal("at_recurrence", atRecurrence)
+		t.SetInternal("at_weekday", atWeekday)
 		t.propagateTimer(every, at, timerMode, atRecurrence)
-	}
+		return true
+	})
 }
 
 func (t *TimerWant) propagateTimer(every, at, timerMode, atRecurrence string) {

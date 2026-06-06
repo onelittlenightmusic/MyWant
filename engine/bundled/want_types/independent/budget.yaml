@@ -80,10 +80,10 @@ wantType:
     initialValue: false
     label: current
   - name: budget_summary
-    description: Human-readable budget summary
-    type: string
+    description: Budget summary as JSON object {budget, spent, remaining, exceeded, costs}
+    type: object
     persistent: true
-    initialValue: ''
+    initialValue: null
     label: current
   - name: achieving_percentage
     description: Progress percentage toward completion

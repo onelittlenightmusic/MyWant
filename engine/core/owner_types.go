@@ -647,7 +647,13 @@ func (t *Target) Progress() {
 		}
 	}
 
-	// Phase 1: Create child wants (only once)
+	// Phase 1: Create child wants (only once).
+	// On restart, childrenCreated is false but children may already exist — check first.
+	if !t.childrenCreated && t.builder != nil {
+		if existing := t.builder.FindChildWantsByOwnerID(t.Metadata.ID); len(existing) > 0 {
+			t.childrenCreated = true
+		}
+	}
 	if !t.childrenCreated && t.builder != nil {
 		childWants := t.CreateChildWants()
 		if err := t.builder.AddWantsAsync(childWants); err != nil {
@@ -704,6 +710,23 @@ func (t *Target) Progress() {
 	}
 
 	// ── isSatisfied gate evaluation ────────────────────────────────────────────
+	// Restore isSatisfiedGateFired from persisted state after restart.
+	if !t.isSatisfiedGateFired {
+		if fired, _ := t.GetStateBool("_isSatisfied_gate_fired", false); fired {
+			t.isSatisfiedGateFired = true
+		}
+	}
+
+	// Also try to wire up isSatisfiedCheckWant after restart if not yet set.
+	if t.RecipeIsSatisfied != nil && t.isSatisfiedCheckWant == nil && t.builder != nil {
+		for _, child := range t.builder.FindChildWantsByOwnerID(t.Metadata.ID) {
+			if child.Metadata.Labels["child-role"] == "monitor" {
+				t.isSatisfiedCheckWant = child
+				break
+			}
+		}
+	}
+
 	// Once the pre-check want completes, evaluate the When condition.
 	// Target-level responsibility: no achieve-chain want logic needs to know about this.
 	if t.RecipeIsSatisfied != nil && !t.isSatisfiedGateFired && t.isSatisfiedCheckWant != nil {
@@ -719,6 +742,7 @@ func (t *Target) Progress() {
 				field, t.RecipeIsSatisfied.When.Operator, t.RecipeIsSatisfied.When.Value)
 			t.SetStatus(WantStatusAchieved)
 			t.isSatisfiedGateFired = true
+			t.StoreState("_isSatisfied_gate_fired", true)
 			return
 		}
 		// Condition not met — provide a go-ahead signal so achieve-chain wants start
@@ -730,6 +754,7 @@ func (t *Target) Progress() {
 		})
 		t.Provide(gateSignal)
 		t.isSatisfiedGateFired = true
+		t.StoreState("_isSatisfied_gate_fired", true)
 	}
 
 	// Phase 2: Wait for MergeParentState data or child-completion signal

@@ -105,6 +105,14 @@ func (m *MemoStore) Replace(data memoData) error {
 	return m.save(data)
 }
 
+// All returns the full memo data as-is from disk.
+func (m *MemoStore) All() memoData {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data, _ := m.load()
+	return data
+}
+
 // AllSubtypes returns all known subtype keys sorted alphabetically.
 func (m *MemoStore) AllSubtypes() []string {
 	m.mu.Lock()

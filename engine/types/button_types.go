@@ -37,20 +37,12 @@ func (b *ButtonWant) IsAchieved() bool { return false }
 //	  - currentState: "pressed_count"
 //	    asGoal: "trigger_count"
 func (b *ButtonWant) Progress() {
-	payload, hasPayload := b.GetCurrent("webhook_payload")
-	receivedAt, _ := b.GetStateString("webhook_received_at", "")
-	lastAt, _ := b.GetStateString("last_press_at", "")
-
-	if hasPayload && payload != nil && receivedAt != "" && receivedAt != lastAt {
-		if pm, ok := payload.(map[string]any); ok {
-			if action, _ := pm["action"].(string); action == "press" {
-				count := GetCurrent[float64](b, "pressed_count", 0)
-				count++
-				b.SetCurrent("pressed_count", count)
-				b.StoreState("last_press_at", receivedAt)
-				b.SetCurrent("webhook_payload", nil)
-				// Expose handlers fire automatically via SetCurrent("pressed_count", count) above.
-			}
+	ConsumeWebhookAction(&b.Want, "last_press_at", func(action string, _ map[string]any) bool {
+		if action != "press" {
+			return false
 		}
-	}
+		count := GetCurrent[float64](b, "pressed_count", 0)
+		b.SetCurrent("pressed_count", count+1)
+		return true
+	})
 }

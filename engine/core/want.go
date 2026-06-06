@@ -3,14 +3,11 @@ package mywant
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
-	"mywant/engine/core/pubsub"
+	"maps"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -322,7 +319,7 @@ type Want struct {
 
 // MarshalYAML handles custom YAML marshalling for the Want struct.
 // Includes State so it is persisted to state.yaml and survives server restarts.
-func (n *Want) MarshalYAML() (interface{}, error) {
+func (n *Want) MarshalYAML() (any, error) {
 	type Alias Want
 	stateMap := make(map[string]any)
 	n.State.Range(func(key, value any) bool {
@@ -661,77 +658,27 @@ func (n *Want) ShouldRetrigger() bool {
 	return false
 }
 
+// checkCountBounds returns false when actual is below the required minimum (if > 0)
+// or above the allowed maximum (if > 0).
+func checkCountBounds(actual, required, max int) bool {
+	if required > 0 && actual < required {
+		return false
+	}
+	if max > 0 && actual > max {
+		return false
+	}
+	return true
+}
+
 // checkPreconditions verifies that path preconditions are satisfied
 // Returns true if all required providers/users are connected, false otherwise
 func (n *Want) checkPreconditions(paths Paths) bool {
-	// Check minimum required inputs (providers)
-	if n.ConnectivityMetadata.RequiredInputs > 0 {
-		if len(paths.In) < n.ConnectivityMetadata.RequiredInputs {
-			return false
-		}
-	}
-
-	// Check minimum required outputs (users)
-	if n.ConnectivityMetadata.RequiredOutputs > 0 {
-		if len(paths.Out) < n.ConnectivityMetadata.RequiredOutputs {
-			return false
-		}
-	}
-
-	// Check maximum inputs if limited
-	if n.ConnectivityMetadata.MaxInputs > 0 {
-		if len(paths.In) > n.ConnectivityMetadata.MaxInputs {
-			return false
-		}
-	}
-
-	// Check maximum outputs if limited
-	if n.ConnectivityMetadata.MaxOutputs > 0 {
-		if len(paths.Out) > n.ConnectivityMetadata.MaxOutputs {
-			return false
-		}
-	}
-
-	return true
+	cm := n.ConnectivityMetadata
+	return checkCountBounds(len(paths.In), cm.RequiredInputs, cm.MaxInputs) &&
+		checkCountBounds(len(paths.Out), cm.RequiredOutputs, cm.MaxOutputs)
 }
 
-// hasUsingWhenConditions returns true if at least one using: entry has a When condition.
-// Only such wants are subject to the step-3.9 data gate; plain using: entries are unaffected.
-func (n *Want) hasUsingWhenConditions() bool {
-	for _, entry := range n.Spec.Using {
-		if entry.When != nil {
-			return true
-		}
-	}
-	return false
-}
 
-// checkUsingWhenConditions evaluates the when: conditions declared on using entries
-// against the packet cached by UnusedExists(). Returns false if any entry declares
-// a when: condition that the received data does NOT satisfy.
-func (n *Want) checkUsingWhenConditions() bool {
-	n.cacheMutex.Lock()
-	cached := n.cachedPacket
-	n.cacheMutex.Unlock()
-	if cached == nil {
-		return true // no data cached — no condition to check
-	}
-	data, _ := cached.Packet.(map[string]any)
-
-	for _, entry := range n.Spec.Using {
-		if entry.When == nil {
-			continue
-		}
-		var actual any
-		if data != nil {
-			actual = data[resolveConditionField(entry.When.Field)]
-		}
-		if !evaluateCondition(actual, entry.When.Operator, entry.When.Value) {
-			return false
-		}
-	}
-	return true
-}
 
 // StartProgressionLoop starts the want execution loop in a goroutine
 //
@@ -771,37 +718,19 @@ func (n *Want) StartProgressionLoop(
 			}
 		}()
 
-		// Stop any background agents left over from a previous execution cycle (e.g., a
-		// PollingAgent still running after a param-driven restart via startWant()).
-		// Must happen BEFORE prepareForRestart() clears agentRunGuard — otherwise the old
-		// PollingAgent's guard is gone and a simultaneous ticker tick can launch a second
-		// concurrent script execution, causing the SIGKILL race condition.
-		if err := n.StopAllBackgroundAgents(); err != nil {
-			n.StoreLog("ERROR: Failed to stop lingering background agents before restart: %v", err)
-		}
+		// Stop lingering agents from a previous cycle BEFORE prepareForRestart() clears
+		// agentRunGuard — otherwise a simultaneous ticker tick can race with the new cycle.
+		n.stopAgents("before restart")
 
-		// Reset per-run state then initialize.
-		// Order: stop agents → reset state/agentRunGuard → Initialize() → onInitialize.
-		n.prepareForRestart()
-		if n.progressable != nil {
-			n.progressable.Initialize()
-			n.syncLocalsAfterInitialize()
-		}
-
-		// Phase 0: Start persistent background agents (Monitor/Poll/Think) before the loop.
-		// DoAgents are excluded here — they run from Progress() via ExecuteAgents().
-		if err := n.StartBackgroundAgents(); err != nil {
-			n.StoreLog("ERROR: Failed to start background agents during loop startup: %v", err)
-		}
+		// Reset per-run state, call Initialize(), sync locals, start background agents.
+		n.initializeForRun()
 
 		for {
 			// 1. Check stop channel
 			select {
 			case <-n.stopChannel:
 				n.SetStatus(WantStatusTerminated)
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents on stop: %v", err)
-				}
+				n.stopAgents("on stop")
 				return
 			default:
 				// Continue execution
@@ -809,31 +738,11 @@ func (n *Want) StartProgressionLoop(
 
 			// 2. Check control signals
 			if cmd, received := n.CheckControlSignal(); received {
-				switch cmd.Trigger {
-				case ControlTriggerSuspend:
-					n.SetSuspended(true)
-					n.SetStatus(WantStatusSuspended)
-				case ControlTriggerResume:
-					n.SetSuspended(false)
-					n.SetStatus(WantStatusReaching)
-				case ControlTriggerStop:
-					n.SetStatus(WantStatusTerminated)
+				switch n.handleControlSignal(cmd) {
+				case loopSignalReturn:
 					return
-				case ControlTriggerRestart:
-					n.SetSuspended(false)
-					// Stop background agents before re-initializing
-					if err := n.StopAllBackgroundAgents(); err != nil {
-						n.StoreLog("ERROR: Failed to stop background agents on restart: %v", err)
-					}
-					n.prepareForRestart()
-					if n.progressable != nil {
-						n.progressable.Initialize()
-						n.syncLocalsAfterInitialize()
-					}
-					// Re-start background agents that were stopped for restart
-					if err := n.StartBackgroundAgents(); err != nil {
-						n.StoreLog("ERROR: Failed to re-start background agents on restart: %v", err)
-					}
+				case loopSignalContinue:
+					continue
 				}
 			}
 
@@ -847,9 +756,7 @@ func (n *Want) StartProgressionLoop(
 			if failable, ok := n.progressable.(Failable); ok {
 				if failable.IsFailed() {
 					n.SetStatus(WantStatusFailed)
-					if err := n.StopAllBackgroundAgents(); err != nil {
-						n.StoreLog("ERROR: Failed to stop background agents on failed: %v", err)
-					}
+					n.stopAgents("on failed (pre-progress)")
 					return
 				}
 			}
@@ -857,36 +764,26 @@ func (n *Want) StartProgressionLoop(
 			// 3.1. Check if want is achieved (before precondition check)
 			if n.progressable != nil && n.progressable.IsAchieved() {
 				n.SetStatus(WantStatusAchieved)
-				// CRITICAL: Even if already achieved, we must run one cycle to ensure
-				// FinalResultField is processed, state is aggregated, and child-to-parent
-				// propagation (MergeParentState) in Progress() is executed.
+				// CRITICAL: run one final cycle to flush FinalResultField and propagate state.
 				n.BeginProgressCycle()
 				n.progressable.Progress()
 				n.EndProgressCycle()
 
-				// Dynamic dispatch coordinators (direction_map) keep monitoring after
-				// achievement so they can detect deleted child wants and re-dispatch.
+				// Dynamic dispatch coordinators keep monitoring after achievement.
 				if _, hasDirMap := n.GetParameter("direction_map"); hasDirMap {
 					time.Sleep(GlobalExecutionInterval)
 					continue
 				}
 
-				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)
 				n.FlushThinkingAgents(context.Background())
-				// Stop all background agents when want is achieved
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
-				}
+				n.stopAgents("on achieved (pre-progress)")
 				return
 			}
 
-			// 3.2. Check if want is in error or terminal state
+			// 3.2. Check for terminal/error status
 			status := n.GetStatus()
 			if status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError || status == WantStatusCancelled {
-				// Terminal error states - stop background agents and exit goroutine
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents on terminal state: %v", err)
-				}
+				n.stopAgents("on terminal state")
 				return
 			}
 			if status == WantStatusConfigError {
@@ -949,9 +846,7 @@ func (n *Want) StartProgressionLoop(
 			case <-n.stopChannel:
 				n.EndProgressCycle()
 				n.SetStatus(WantStatusTerminated)
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents on stop: %v", err)
-				}
+				n.stopAgents("on stop (pre-exec)")
 				return
 			default:
 				// Continue with execution
@@ -964,48 +859,9 @@ func (n *Want) StartProgressionLoop(
 				return
 			}
 
-			// Execute Progress() with panic/recover to handle immediate termination
-			// SetModuleErrorAndExit() and SetConfigErrorAndExit() use panic to exit
-			// from deep call stacks without requiring error propagation
-			exitLoop := false
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						switch r.(type) {
-						case ModuleErrorPanic:
-							// Status already set by SetModuleErrorAndExit()
-							// Stop background agents and exit goroutine
-							if err := n.StopAllBackgroundAgents(); err != nil {
-								n.StoreLog("ERROR: Failed to stop background agents: %v", err)
-							}
-							exitLoop = true
-						case ConfigErrorPanic:
-							// Status already set by SetConfigErrorAndExit()
-							// Will be handled in next loop iteration (wait for config update)
-						default:
-							// Re-panic for unexpected panics (actual bugs, runtime errors)
-							panic(r)
-						}
-					}
-				}()
-				// Declarative mapping: State -> Locals
-				var locals any
-				if progressableVal := reflect.ValueOf(n.progressable); progressableVal.Kind() == reflect.Ptr {
-					method := progressableVal.MethodByName("GetLocals")
-					if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
-						results := method.Call(nil)
-						locals = results[0].Interface()
-						SyncLocalsState(n, locals, true)
-					}
-				}
-
-				n.progressable.Progress()
-
-				// Declarative mapping: Locals -> State
-				if locals != nil {
-					SyncLocalsState(n, locals, false)
-				}
-			}()
+			// Execute Progress() with panic/recover to handle immediate termination.
+			// SetModuleErrorAndExit() / SetConfigErrorAndExit() use panic to exit deep stacks.
+			exitLoop := n.runProgressWithRecovery()
 
 			// 8. End execution cycle (commit batched changes)
 			n.EndProgressCycle()
@@ -1014,47 +870,12 @@ func (n *Want) StartProgressionLoop(
 				return
 			}
 
-			// 8.5. Check if want entered error state during Progress()
-			currentStatus := n.GetStatus()
-			if currentStatus == WantStatusModuleError {
-				// Module error - unrecoverable, exit goroutine
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
-				}
+			// 8.5-8.6. Check status after Progress() (error, cancel, achieved, failed).
+			switch n.checkPostProgressStatus() {
+			case loopSignalReturn:
 				return
-			}
-			if currentStatus == WantStatusCancelled {
-				// Self-cancelled by Progress() — stop agents and exit goroutine
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents on cancel: %v", err)
-				}
-				return
-			}
-			if currentStatus == WantStatusConfigError {
-				// Config error - wait for config update (will be handled in next iteration)
+			case loopSignalContinue:
 				continue
-			}
-
-			// 8.6a. Check if want has failed AFTER execution cycle
-			if failable, ok := n.progressable.(Failable); ok && failable.IsFailed() {
-				n.SetStatus(WantStatusFailed)
-				n.FlushThinkingAgents(context.Background())
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents on failed: %v", err)
-				}
-				return
-			}
-
-			// 8.6. Check if want is achieved AFTER execution cycle (catch state changes from Progress)
-			if n.progressable != nil && n.progressable.IsAchieved() {
-				n.SetStatus(WantStatusAchieved)
-				// Flush ThinkingAgents before stopping (ensures cost propagation etc.)
-				n.FlushThinkingAgents(context.Background())
-				// Stop all background agents when want is achieved
-				if err := n.StopAllBackgroundAgents(); err != nil {
-					n.StoreLog("ERROR: Failed to stop background agents: %v", err)
-				}
-				return
 			}
 
 			// 9. Check for pending agent state changes and dump them
@@ -1139,42 +960,6 @@ func (n *Want) isOnlyStatusChange(oldState, newState map[string]any) bool {
 func (n *Want) GetStatus() WantStatus {
 	return n.Status
 }
-func (n *Want) InitializeControlChannel() {
-	// Always create a fresh channel so that stale commands (e.g. ControlTriggerStop from a
-	// previous stop→start sequence) are not inherited by the new goroutine.
-	// Called only from startWant(), which guards against calling this while the goroutine is active.
-	n.controlChannel = make(chan *ControlCommand, 10)
-}
-func (n *Want) SendControlCommand(cmd *ControlCommand) error {
-	if n.controlChannel == nil {
-		return fmt.Errorf("control channel not initialized for want %s", n.Metadata.Name)
-	}
-	select {
-	case n.controlChannel <- cmd:
-		return nil
-	default:
-		return fmt.Errorf("control channel full for want %s", n.Metadata.Name)
-	}
-}
-func (n *Want) CheckControlSignal() (*ControlCommand, bool) {
-	if n.controlChannel == nil {
-		return nil, false
-	}
-	select {
-	case cmd := <-n.controlChannel:
-		return cmd, true
-	default:
-		return nil, false
-	}
-}
-
-// IsSuspended returns whether the want is currently suspended
-func (n *Want) IsSuspended() bool {
-	return n.suspended.Load()
-}
-func (n *Want) SetSuspended(suspended bool) {
-	n.suspended.Store(suspended)
-}
 
 // StoreState writes a key-value pair directly into this want's State and stages it
 // for history recording in the next EndProgressCycle() call.
@@ -1251,13 +1036,8 @@ func (n *Want) DeleteState(key string) {
 //	EndProgressCycle() → dumps all pending together → both recorded
 func (n *Want) MergeState(updates map[string]any) {
 	extractMap := func(v any) (map[string]any, bool) {
-		if m, ok := v.(map[string]any); ok {
-			return m, true
-		}
-		if m, ok := v.(map[string]interface{}); ok {
-			return m, true
-		}
-		return nil, false
+		m, ok := v.(map[string]any)
+		return m, ok
 	}
 
 	for key, value := range updates {
@@ -1277,12 +1057,8 @@ func (n *Want) MergeState(updates map[string]any) {
 		if oldVal, ok := n.State.Load(key); ok {
 			if oldMap, isOldMap := extractMap(oldVal); isOldMap {
 				merged = make(map[string]any, len(oldMap)+len(valueMap))
-				for k, v := range oldMap {
-					merged[k] = v
-				}
-				for k, v := range valueMap {
-					merged[k] = v
-				}
+				maps.Copy(merged, oldMap)
+				maps.Copy(merged, valueMap)
 			} else {
 				merged = valueMap
 			}
@@ -1297,246 +1073,6 @@ func (n *Want) MergeState(updates map[string]any) {
 
 	if n.onMergeState != nil {
 		n.onMergeState()
-	}
-}
-
-func (n *Want) getParentWant() *Want {
-	if len(n.Metadata.OwnerReferences) == 0 {
-		return nil
-	}
-	var parentID string
-	for _, ref := range n.Metadata.OwnerReferences {
-		if ref.Controller && ref.Kind == "Want" {
-			parentID = ref.ID
-			break
-		}
-	}
-	if parentID == "" {
-		return nil
-	}
-
-	// DO NOT CACHE Parent Want pointer.
-	// Caching can lead to using stale Want objects if the parent is recreated
-	// during reconciliation or if it was initially found in Config but later promoted to Runtime.
-	// Always look up the latest runtime instance from the global builder.
-
-	cb := GetGlobalChainBuilder()
-	if cb == nil {
-		return nil
-	}
-	parent, _, found := cb.FindWantByID(parentID)
-	if !found {
-		return nil
-	}
-	return parent
-}
-
-func (n *Want) GetParentWant() *Want { return n.getParentWant() }
-
-// isOwnerOf returns true if this want is a controller owner of the target want.
-func (n *Want) isOwnerOf(target *Want) bool {
-	for _, ref := range target.Metadata.OwnerReferences {
-		if ref.Controller && ref.ID == n.Metadata.ID {
-			return true
-		}
-	}
-	return false
-}
-
-// AddChildWant adds a new child want to the system, automatically setting
-// this want as the owner (parent).
-//
-// HIERARCHY RULE: Sub-wants are forbidden from calling cb.AddWant directly.
-// They must instead use AddChildWant on their parent, or request the parent
-// to dispatch via a ThinkAgent (DispatchThinkerAgent).
-func (n *Want) AddChildWant(child *Want) error {
-	cb := GetGlobalChainBuilder()
-	if cb == nil {
-		return fmt.Errorf("ChainBuilder unavailable")
-	}
-
-	// Ensure child has a valid ID
-	if child.Metadata.ID == "" {
-		child.Metadata.ID = GenerateUUID()
-	}
-
-	// Set owner reference to this want
-	ownerRef := OwnerReference{
-		APIVersion: "mywant/v1",
-		Kind:       "Want",
-		Name:       n.Metadata.Name,
-		ID:         n.Metadata.ID,
-		Controller: true,
-	}
-	child.Metadata.OwnerReferences = append(child.Metadata.OwnerReferences, ownerRef)
-
-	// Add to system asynchronously
-	return cb.AddWantsAsync([]*Want{child})
-}
-
-// HasParent returns true if this want has a parent coordinator.
-func (n *Want) HasParent() bool {
-
-	return n.getParentWant() != nil
-}
-
-func (n *Want) GetParentState(path string) (any, bool) {
-	parent := n.getParentWant()
-	if parent == nil {
-		return resolveGlobalPath(path)
-	}
-	// もし path にドットが含まれていたら階層探索、そうでなければ親のステート取得
-	if strings.Contains(path, ".") {
-		return resolveGlobalPath(path)
-	}
-	return parent.getState(path)
-}
-
-func resolveGlobalPath(path string) (any, bool) {
-	parts := strings.Split(path, ".")
-	if len(parts) == 0 {
-		return nil, false
-	}
-
-	// ルート（wants など）を取得
-	val, ok := GetGlobalState(parts[0])
-	if !ok {
-		return nil, false
-	}
-
-	// 階層を辿る
-	current := val
-	for i := 1; i < len(parts); i++ {
-		if m, ok := current.(map[string]any); ok {
-			current, ok = m[parts[i]]
-			if !ok {
-				return nil, false
-			}
-		} else if m, ok := current.(map[any]any); ok {
-			// YAML unmarshalでmap[any]anyになる場合への対応
-			current, ok = m[parts[i]]
-			if !ok {
-				return nil, false
-			}
-		} else {
-			return nil, false
-		}
-	}
-	return current, true
-}
-
-func (n *Want) StoreParentState(key string, value any) {
-	parent := n.getParentWant()
-	if parent == nil {
-		StoreGlobalState(key, value) // fallback to globalState for top-level wants
-		return
-	}
-
-	role := n.GetRole()
-	label := parent.StateLabels[key]
-	engine := &GovernanceEngine{}
-
-	if !engine.CanWriteParentState(role, label) {
-		n.StoreLog("[GOVERNANCE] Write Warning: child %q (role:%s) attempted to write parent %q's key %q (label:%v) — policy not satisfied, proceeding anyway\n",
-			n.Metadata.Name, role, parent.Metadata.Name, key, label)
-		n.governanceViolationCount++
-	}
-
-	parent.storeState(key, value)
-}
-
-func (n *Want) MergeParentState(updates map[string]any) {
-	parent := n.getParentWant()
-	if parent == nil {
-		MergeGlobalState(updates) // fallback to globalState for top-level wants
-		return
-	}
-
-	role := n.GetRole()
-	engine := &GovernanceEngine{}
-
-	for k := range updates {
-		label := parent.StateLabels[k]
-		if !engine.CanWriteParentState(role, label) {
-			n.StoreLog("[GOVERNANCE] Merge Warning: child %q (role:%s) attempted to write %q's key %q (label:%v) — policy not satisfied, proceeding anyway\n",
-				n.Metadata.Name, role, parent.Metadata.Name, k, label)
-			n.governanceViolationCount++
-		}
-	}
-
-	if len(updates) > 0 {
-		parent.MergeState(updates)
-	}
-}
-
-// GetRole returns the ChildRole assigned to this want via its labels.
-func (n *Want) GetRole() ChildRole {
-	if n.Metadata.Labels != nil {
-		if role, ok := n.Metadata.Labels["child-role"]; ok {
-			return ChildRole(role)
-		}
-	}
-	return RoleUnknown
-}
-
-// ProposeDispatch writes a fully-resolved list of DispatchRequests to the parent
-// Target's "desired_dispatch" state. The parent's DispatchExecutor reconciles this
-// list against existing children and calls AddChildWant idempotently.
-// Overwrites (not appends) so that OPA replanning that removes directions is respected.
-func (n *Want) ProposeDispatch(requests []DispatchRequest) {
-	if requests == nil {
-		requests = []DispatchRequest{}
-	}
-	n.StoreParentState("desired_dispatch", requests)
-}
-
-// SuggestParent suggests a set of directions to the parent want (or global state).
-// This is typically used by planning wants (like Itinerary) to request the
-// parent's DispatchThinker to realize new child wants.
-// It appends to existing directions instead of overwriting to support incremental planning.
-func (n *Want) SuggestParent(directions []string) {
-	parent := n.getParentWant()
-
-	var existing []string
-	var raw any
-	var exists bool
-
-	if parent != nil {
-		raw, exists = parent.getState("directions")
-	} else {
-		raw, exists = GetGlobalState("directions")
-	}
-
-	if exists {
-		if slice, ok := raw.([]string); ok {
-			existing = slice
-		} else if slice, ok := raw.([]any); ok {
-			for _, item := range slice {
-				if s, ok := item.(string); ok {
-					existing = append(existing, s)
-				}
-			}
-		}
-	}
-
-	changed := false
-	for _, d := range directions {
-		if !Contains(existing, d) {
-			existing = append(existing, d)
-			changed = true
-		}
-	}
-
-	if changed || (!exists && len(directions) > 0) {
-		if parent != nil {
-			DebugLog("[SUGGEST] Adding %d directions to parent %s (total: %d)",
-				len(directions), parent.Metadata.Name, len(existing))
-			n.MergeParentState(map[string]any{"directions": existing})
-		} else {
-			DebugLog("[SUGGEST] Adding %d directions to global state (total: %d)",
-				len(directions), len(existing))
-			MergeGlobalState(map[string]any{"directions": existing})
-		}
 	}
 }
 
@@ -1764,7 +1300,7 @@ func (n *Want) GetStateMulti(data Dict) {
 		rv := reflect.ValueOf(templateValue)
 
 		// 1. If it's a pointer, we populate the value it points to
-		if rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 			elem := rv.Elem()
 			switch elem.Interface().(type) {
 			case string:
@@ -1811,279 +1347,6 @@ func (n *Want) GetStateMulti(data Dict) {
 	}
 }
 
-// CalculateAchievingPercentage computes the progress percentage toward completion. This is a virtual method that want type implementations should override to provide type-specific completion percentage calculation. Default implementation returns 0 unless the want has reached completion status,
-// in which case it returns 100. Want types should override this to provide meaningful progress indicators: - ApprovalWant: Calculate based on evidence/description fields (0%, 50%, 100%) - QueueWant: Calculate based on processedCount / total capacity
-// - Numbers generator: Calculate based on currentCount / target count - Coordinator: Calculate based on channels heard / total required channels - Travel wants (Restaurant, Hotel, Buffet): Return 100 if attempted, else 0
-func (n *Want) CalculateAchievingPercentage() int {
-	// Default implementation: check if completed Want types should override this method for specific logic
-	switch n.Status {
-	case "completed", "achieved":
-		return 100
-	case "idle", "reaching", "suspended":
-		return 0
-	default:
-		return 0
-	}
-}
-
-// SetStateLabels populates the static StateLabels map from a WantTypeDefinition.
-
-// SetStateLabels populates the static StateLabels map from a WantTypeDefinition.
-func (n *Want) SetStateLabels(def *WantTypeDefinition) {
-	if def == nil {
-		return
-	}
-	n.StateLabels = make(map[string]StateLabel)
-	for _, s := range def.State {
-		var label StateLabel
-		switch s.Label {
-		case "goal":
-			label = LabelGoal
-		case "current":
-			label = LabelCurrent
-		case "plan":
-			label = LabelPlan
-		case "internal":
-			label = LabelInternal
-		default:
-			label = LabelNone
-		}
-		n.StateLabels[s.Name] = label
-	}
-}
-
-// ============================================================================
-// Agent State Labeling Helpers
-// ============================================================================
-
-func (n *Want) SetGoal(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelGoal {
-		WarnLog("[WARN] SetGoal(%q) on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.governanceViolationCount++
-	}
-	n.storeState(key, value)
-}
-
-func (n *Want) GetGoal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
-		return n.getState(key)
-	}
-	return nil, false
-}
-
-func (n *Want) SetCurrent(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelCurrent {
-		WarnLog("[WARN] SetCurrent(%q) on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.governanceViolationCount++
-	}
-	n.storeState(key, value)
-}
-
-func (n *Want) GetCurrent(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
-		return n.getState(key)
-	}
-	return nil, false
-}
-
-// GetAllCurrent returns all state entries whose label is LabelCurrent.
-func (n *Want) GetAllCurrent() map[string]any {
-	return n.getAllByLabel(LabelCurrent)
-}
-
-// GetAllGoal returns all state entries whose label is LabelGoal.
-func (n *Want) GetAllGoal() map[string]any {
-	return n.getAllByLabel(LabelGoal)
-}
-
-// GetAllPlan returns all state entries whose label is LabelPlan.
-func (n *Want) GetAllPlan() map[string]any {
-	return n.getAllByLabel(LabelPlan)
-}
-
-// GetParentAllCurrent returns all current-labeled state entries from the parent want,
-// or nil if there is no parent.
-func (n *Want) GetParentAllCurrent() map[string]any {
-	parent := n.getParentWant()
-	if parent == nil {
-		return nil
-	}
-	return parent.GetAllCurrent()
-}
-
-// GetParentAllGoal returns all goal-labeled state entries from the parent want,
-// or nil if there is no parent.
-func (n *Want) GetParentAllGoal() map[string]any {
-	parent := n.getParentWant()
-	if parent == nil {
-		return nil
-	}
-	return parent.GetAllGoal()
-}
-
-// getAllByLabel collects all state key-value pairs registered under the given label.
-func (n *Want) getAllByLabel(label StateLabel) map[string]any {
-	result := make(map[string]any)
-	for key, l := range n.StateLabels {
-		if l != label {
-			continue
-		}
-		if val, ok := n.getState(key); ok {
-			result[key] = val
-		}
-	}
-	return result
-}
-
-func (n *Want) SetPlan(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelPlan {
-		WarnLog("[WARN] SetPlan(%q) on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.governanceViolationCount++
-	}
-	n.storeState(key, value)
-}
-
-func (n *Want) GetPlan(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		return n.getState(key)
-	}
-	return nil, false
-}
-
-func (n *Want) ClearPlan(key string) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
-		n.storeState(key, nil)
-	}
-}
-
-func (n *Want) SetInternal(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelInternal {
-		WarnLog("[WARN] SetInternal(%q) on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
-		n.governanceViolationCount++
-	}
-	n.storeState(key, value)
-}
-
-func (n *Want) GetInternal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
-		return n.getState(key)
-	}
-	return nil, false
-}
-
-// WantPointer is an interface for types that can provide a pointer to their underlying Want.
-// This allows our generic helpers to work with custom types that embed Want.
-type WantPointer interface {
-	GetWant() *Want
-}
-
-// GetWant implements the WantPointer interface for the base Want type.
-func (n *Want) GetWant() *Want {
-	return n
-}
-
-// --- Package-level Generic State Access Helpers ---
-
-// GetState retrieves a value from the want's state with automatic type conversion.
-func GetState[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.getState(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetGoal retrieves a goal-labeled value with automatic type conversion.
-func GetGoal[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetGoal(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetCurrent retrieves a current-labeled value with automatic type conversion.
-func GetCurrent[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetCurrent(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetPlan retrieves a plan-labeled value with automatic type conversion.
-func GetPlan[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetPlan(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetInternal retrieves an internal-labeled value with automatic type conversion.
-func GetInternal[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetInternal(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// GetParentState retrieves a value from the parent want's state with automatic type conversion.
-func GetParentState[T any](wp WantPointer, key string, defaultVal T) T {
-	n := wp.GetWant()
-	raw, ok := n.GetParentState(key)
-	if !ok || raw == nil {
-		return defaultVal
-	}
-	return convertToType(raw, defaultVal)
-}
-
-// convertToType is an internal helper that bridges generics to our conversion utilities.
-func convertToType[T any](val any, defaultVal T) T {
-	// Attempt direct type assertion first for performance and complex types
-	if tVal, ok := val.(T); ok {
-		return tVal
-	}
-
-	// Fallback to our flexible conversion utilities for common primitive types
-	var result any
-	switch d := any(defaultVal).(type) {
-	case string:
-		result = ToString(val, d)
-	case int:
-		result = ToInt(val, d)
-	case bool:
-		result = ToBool(val, d)
-	case float64:
-		result = ToFloat64(val, d)
-	case []string:
-		result = ToStringSlice(val, d)
-	case []int:
-		result = ToIntSlice(val, d)
-	case []float64:
-		result = ToFloat64Slice(val, d)
-	default:
-		// If we don't have a conversion helper, we've already tried direct assertion
-		return defaultVal
-	}
-	return result.(T)
-}
-
-func (n *Want) GetParameter(paramName string) (any, bool) {
-	n.metadataMutex.RLock()
-	defer n.metadataMutex.RUnlock()
-	if n.Spec.Params == nil {
-		return nil, false
-	}
-	value, exists := n.Spec.Params[paramName]
-	return value, exists
-}
 func (n *Want) InitializeSubscriptionSystem() {
 	if n.subscriptionSystem == nil {
 		n.subscriptionSystem = NewUnifiedSubscriptionSystem()
@@ -2198,180 +1461,6 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
-// serializeLabels converts label map to deterministic topic name for PubSub routing.
-// Ensures consistent topic names across publisher and subscribers.
-// Example: {role: "processor", stage: "final"} → "role=processor,stage=final"
-func serializeLabels(labels map[string]string) string {
-	if labels == nil || len(labels) == 0 {
-		return ""
-	}
-
-	// Sort keys for deterministic output
-	keys := make([]string, 0, len(labels))
-	for k := range labels {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Build comma-separated key=value pairs
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = fmt.Sprintf("%s=%s", k, labels[k])
-	}
-	return strings.Join(parts, ",")
-}
-
-// provideRaw sends a raw data packet to PubSub topic for subscribers.
-// Internal use only — callers should use Provide(*DataObject) instead.
-func (n *Want) provideRaw(payload any) {
-	cb := GetGlobalChainBuilder()
-
-	n.metadataMutex.RLock()
-	topic := n.Metadata.Name // Fallback to name if no labels
-	hasLabels := len(n.Metadata.Labels) > 0
-	wantName := n.Metadata.Name
-
-	if hasLabels {
-		topic = serializeLabels(n.Metadata.Labels)
-	}
-	n.metadataMutex.RUnlock()
-
-	if cb != nil && cb.pubsub != nil && hasLabels {
-		msg := &pubsub.Message{
-			Payload:   payload,
-			Timestamp: time.Now(),
-			Done:      false,
-		}
-		if err := cb.pubsub.Publish(topic, msg); err != nil {
-			ErrorLog("[PubSub] Failed to publish packet from '%s' to topic '%s': %v",
-				wantName, topic, err)
-		}
-
-		// Also log PubSub routing
-		InfoLog("[PROVIDE] Want '%s' published packet to PubSub topic '%s'",
-			wantName, topic)
-	}
-}
-
-// ProvideDone sends a termination signal to PubSub topic
-func (n *Want) ProvideDone() {
-	cb := GetGlobalChainBuilder()
-
-	n.metadataMutex.RLock()
-	topic := n.Metadata.Name
-	hasLabels := len(n.Metadata.Labels) > 0
-	wantName := n.Metadata.Name
-
-	if hasLabels {
-		topic = serializeLabels(n.Metadata.Labels)
-	}
-	n.metadataMutex.RUnlock()
-
-	if cb != nil && cb.pubsub != nil && hasLabels {
-		msg := &pubsub.Message{
-			Payload:   nil,
-			Timestamp: time.Now(),
-			Done:      true,
-		}
-		if err := cb.pubsub.Publish(topic, msg); err != nil {
-			ErrorLog("[PubSub] Failed to publish Done signal from '%s' to topic '%s': %v",
-				wantName, topic, err)
-		}
-		InfoLog("[PROVIDE_DONE] Want '%s' published Done signal to PubSub topic '%s'",
-			wantName, topic)
-	}
-}
-func (n *Want) GetType() string {
-	return n.WantType
-}
-func (n *Want) GetConnectivityMetadata() ConnectivityMetadata {
-	return n.ConnectivityMetadata
-}
-func (n *Want) GetInCount() int {
-	return n.paths.GetInCount()
-}
-func (n *Want) GetOutCount() int {
-	return n.paths.GetOutCount()
-}
-func (n *Want) GetPaths() *Paths {
-	return &n.paths
-}
-
-// UnusedExists checks if there are unused packets in the cache or any input channel.
-// It uses a single, blocking `reflect.Select` call to wait for a packet, which is
-// then cached internally with its original channel index. This avoids polling loops.
-// timeoutMs: wait time in milliseconds. If 0, performs a non-blocking check.
-// Returns true if a packet is in the cache or received from a channel.
-func (n *Want) UnusedExists(timeoutMs int) bool {
-	n.cacheMutex.Lock()
-	// 1. Check if a packet is already cached.
-	if n.cachedPacket != nil {
-		n.cacheMutex.Unlock()
-		return true
-	}
-	n.cacheMutex.Unlock()
-
-	paths := n.GetPaths()
-	if paths == nil || len(paths.In) == 0 {
-		return false
-	}
-
-	// 2. Create select cases and map to original channel indices.
-	cases := make([]reflect.SelectCase, 0, len(paths.In)+1)
-	channelIndexMap := make([]int, 0, len(paths.In)+1)
-
-	for i, pathInfo := range paths.In {
-		if pathInfo.Channel != nil {
-			cases = append(cases, reflect.SelectCase{
-				Dir:  reflect.SelectRecv,
-				Chan: reflect.ValueOf(pathInfo.Channel),
-			})
-			channelIndexMap = append(channelIndexMap, i) // Map case index to original path index
-		}
-	}
-
-	// If no valid channels, we can't select.
-	if len(cases) == 0 {
-		return false
-	}
-
-	// 3. Add a timeout or default case.
-	if timeoutMs > 0 {
-		timeoutChan := time.After(time.Duration(timeoutMs) * time.Millisecond)
-		timeoutCase := reflect.SelectCase{
-			Dir:  reflect.SelectRecv,
-			Chan: reflect.ValueOf(timeoutChan),
-		}
-		cases = append(cases, timeoutCase)
-	} else {
-		defaultCase := reflect.SelectCase{Dir: reflect.SelectDefault}
-		cases = append(cases, defaultCase)
-	}
-
-	// 4. Perform the select.
-	chosen, _, ok := reflect.Select(cases)
-
-	// 5. Process the result.
-	isTimeout := (timeoutMs > 0 && chosen == len(cases)-1)
-	isDefault := (timeoutMs <= 0 && chosen == len(cases)-1)
-
-	if isTimeout || isDefault {
-		if isTimeout {
-			n.StoreLog("[UnusedExists] TIMEOUT after %dms (no packets found).\n", timeoutMs)
-		}
-		return false
-	}
-
-	if !ok {
-		n.StoreLog("[UnusedExists] A channel was closed (index: %d).\n", chosen)
-		return false
-	}
-
-	// 6. A packet was received. Get its original index and cache it.
-	// UnusedExists should not cache; it only checks if there is something to read.
-	// The actual consumption is done by Use().
-	return true
-}
 
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
@@ -2430,220 +1519,6 @@ func (n *Want) BuildHistory() WantHistory {
 func (w *Want) AddMonitoringAgent(name string, interval time.Duration, poll PollFunc) error {
 	agent := NewPollingAgent(name, interval, name, string(MonitorAgentType), poll)
 	return w.AddBackgroundAgent(agent)
-}
-
-// ============================================================================
-// Config and Module Error Handling
-// ============================================================================
-
-// ModuleErrorPanic is a sentinel type used to immediately terminate Progress() execution
-// When SetModuleErrorAndExit() is called, it panics with this type
-// StartProgressionLoop() recovers from this panic and handles cleanup gracefully
-type ModuleErrorPanic struct {
-	Component string
-	Message   string
-}
-
-func (e ModuleErrorPanic) Error() string {
-	return fmt.Sprintf("module error [%s]: %s", e.Component, e.Message)
-}
-
-// ConfigErrorPanic is a sentinel type used to immediately terminate Progress() execution
-// When SetConfigErrorAndExit() is called, it panics with this type
-type ConfigErrorPanic struct {
-	Field   string
-	Message string
-}
-
-func (e ConfigErrorPanic) Error() string {
-	return fmt.Sprintf("config error [%s]: %s", e.Field, e.Message)
-}
-
-// SetConfigError marks the want as having a configuration error
-// ConfigError means the input values or spec are invalid and processing cannot continue
-// The want can be recovered by updating the configuration (params/spec)
-// Usage in Initialize():
-//
-//	if locals.Topic == "" {
-//	    return w.SetConfigError("topic", "Missing required parameter 'topic'")
-//	}
-func (w *Want) SetConfigError(field string, message string) error {
-	w.storeStateMulti(map[string]any{
-		"config_error_field":   field,
-		"config_error_message": message,
-		"error":                message,
-	})
-	w.StoreLog("CONFIG_ERROR: %s - %s", field, message)
-	w.SetStatus(WantStatusConfigError)
-	return fmt.Errorf("config error [%s]: %s", field, message)
-}
-
-// setGovernanceWarning records a governance or label access violation as a warning.
-// The want continues running — governance rules are best-effort, not enforced hard stops.
-// Status transitions: reaching → reaching_with_warning, achieved → achieved_with_warning.
-func (w *Want) setGovernanceWarning(component string, message string) {
-	w.storeStateMulti(map[string]any{
-		"governance_warning_component": component,
-		"governance_warning_message":   message,
-	})
-	w.StoreLog("[GOVERNANCE_WARNING] %s - %s", component, message)
-	switch w.Status {
-	case WantStatusReaching, WantStatusReachingWithWarning:
-		w.SetStatus(WantStatusReachingWithWarning)
-	case WantStatusAchieved, WantStatusAchievedWithWarning:
-		w.SetStatus(WantStatusAchievedWithWarning)
-	}
-}
-
-// SetModuleError marks the want as having a module/implementation error
-// ModuleError means there's an issue with the want type implementation itself
-// (e.g., GetState failure, type cast failure, nil pointer dereference in framework code)
-// This typically requires code changes to fix, not configuration changes
-// Usage in Progress():
-//
-//	if locals == nil {
-//	    return w.SetModuleError("GetLocals", "Failed to access type-specific locals")
-//	}
-func (w *Want) SetModuleError(component string, message string) error {
-	w.storeStateMulti(map[string]any{
-		"module_error_component": component,
-		"module_error_message":   message,
-		"error":                  message,
-	})
-	w.StoreLog("MODULE_ERROR: %s - %s", component, message)
-	w.SetStatus(WantStatusModuleError)
-	return fmt.Errorf("module error [%s]: %s", component, message)
-}
-
-// SetModuleErrorAndExit sets module error and immediately terminates Progress() execution
-// This uses panic/recover to exit the goroutine cleanly from deep call stacks
-// StartProgressionLoop() will recover from this panic and handle cleanup
-// Use this when you want to immediately stop execution without returning through the call stack
-//
-// Usage in Progress():
-//
-//	locals := w.GetLocals()
-//	if locals == nil {
-//	    w.SetModuleErrorAndExit("Locals", "Failed to access type-specific locals")
-//	    // Code after this line will NOT execute
-//	}
-func (w *Want) SetModuleErrorAndExit(component string, message string) {
-	w.storeStateMulti(map[string]any{
-		"module_error_component": component,
-		"module_error_message":   message,
-		"error":                  message,
-	})
-	w.StoreLog("MODULE_ERROR: %s - %s (exiting immediately)", component, message)
-	w.SetStatus(WantStatusModuleError)
-	panic(ModuleErrorPanic{Component: component, Message: message})
-}
-
-// SetConfigErrorAndExit sets config error and immediately terminates Progress() execution
-// Similar to SetModuleErrorAndExit but for configuration errors
-// StartProgressionLoop() will recover and keep the want in ConfigError state waiting for config update
-func (w *Want) SetConfigErrorAndExit(field string, message string) {
-	w.storeStateMulti(map[string]any{
-		"config_error_field":   field,
-		"config_error_message": message,
-		"error":                message,
-	})
-	w.StoreLog("CONFIG_ERROR: %s - %s (exiting immediately)", field, message)
-	w.SetStatus(WantStatusConfigError)
-	panic(ConfigErrorPanic{Field: field, Message: message})
-}
-
-// ClearConfigError clears config error state and transitions to Idle
-// Called when user updates the configuration that caused the error
-func (w *Want) ClearConfigError() {
-	if w.Status != WantStatusConfigError {
-		return
-	}
-
-	// Clear error-related state
-	w.storeStateMulti(map[string]any{
-		"config_error_field":   nil,
-		"config_error_message": nil,
-		"error":                nil,
-	})
-
-	// Transition back to idle for re-execution
-	w.SetStatus(WantStatusIdle)
-	w.StoreLog("Config error cleared, transitioning to idle")
-}
-
-// IsRecoverableError returns true if the current status is a recoverable error state
-// ConfigError is recoverable (by updating config), ModuleError is not
-func (w *Want) IsRecoverableError() bool {
-	return w.Status == WantStatusConfigError
-}
-
-// IsErrorState returns true if the want is in any error state
-func (w *Want) IsErrorState() bool {
-	return w.Status == WantStatusConfigError ||
-		w.Status == WantStatusModuleError ||
-		w.Status == WantStatusFailed
-}
-
-// ValidateRequiredParams validates that required parameters are present and returns error if any are missing
-// Returns nil if all required params are present, otherwise calls SetConfigError and returns error
-// Usage in Initialize():
-//
-//	if err := w.ValidateRequiredParams("topic", "output_path"); err != nil {
-//	    return // Want status already set to ConfigError
-//	}
-func (w *Want) ValidateRequiredParams(paramNames ...string) error {
-	for _, paramName := range paramNames {
-		value, exists := w.Spec.Params[paramName]
-		if !exists {
-			return w.SetConfigError(paramName, fmt.Sprintf("Missing required parameter '%s'", paramName))
-		}
-		// Check for empty string values
-		if strVal, ok := value.(string); ok && strVal == "" {
-			return w.SetConfigError(paramName, fmt.Sprintf("Required parameter '%s' cannot be empty", paramName))
-		}
-	}
-	return nil
-}
-
-// ValidateParamFormat validates a parameter against a validation function
-// Usage in Initialize():
-//
-//	if err := w.ValidateParamFormat("event_time", func(v any) error {
-//	    if str, ok := v.(string); ok {
-//	        _, err := time.Parse(time.RFC3339, str)
-//	        return err
-//	    }
-//	    return fmt.Errorf("must be a string")
-//	}); err != nil {
-//	    return
-//	}
-func (w *Want) ValidateParamFormat(paramName string, validator func(any) error) error {
-	value, exists := w.Spec.Params[paramName]
-	if !exists {
-		return nil // Skip validation for non-existent params (use ValidateRequiredParams for required check)
-	}
-	if err := validator(value); err != nil {
-		return w.SetConfigError(paramName, fmt.Sprintf("Invalid format for parameter '%s': %v", paramName, err))
-	}
-	return nil
-}
-
-// CheckLocalsInitialized checks if Locals is properly initialized and immediately
-// terminates the goroutine via panic if not. The panic is recovered by
-// StartProgressionLoop() which handles cleanup gracefully.
-// Usage in Progress():
-//
-//	locals := CheckLocalsInitialized[MyLocals](w)
-//	// No nil check needed - if Locals is invalid, execution stops immediately
-func CheckLocalsInitialized[T any](w *Want) *T {
-	if w.Locals == nil {
-		w.SetModuleErrorAndExit("Locals", "Locals not initialized - Initialize() may not have been called")
-	}
-	locals, ok := w.Locals.(*T)
-	if !ok {
-		w.SetModuleErrorAndExit("Locals", fmt.Sprintf("Failed to cast Locals to expected type %T", (*T)(nil)))
-	}
-	return locals
 }
 
 // SetWantTypeDefinition sets the want type definition and initializes provided state fields
@@ -2781,74 +1656,12 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 				}
 			}
 			if obj != nil {
-				for k, val := range obj {
-					n.Spec.Params[k] = val
-				}
+				maps.Copy(n.Spec.Params, obj)
 				n.StoreLog("[PARAM] globalOverrideFrom: applied %d fields from global param %q", len(obj), typeDef.GlobalOverrideFrom)
 			}
 		}
 	}
 
-}
-
-func (n *Want) GetIntParam(key string, defaultValue int) int {
-	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
-	n.metadataMutex.RUnlock()
-	if ok {
-		if intVal, ok := value.(int); ok {
-			return intVal
-		} else if floatVal, ok := value.(float64); ok {
-			return int(floatVal)
-		}
-	}
-	return defaultValue
-}
-func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
-	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
-	n.metadataMutex.RUnlock()
-	if ok {
-		if floatVal, ok := value.(float64); ok {
-			return floatVal
-		} else if intVal, ok := value.(int); ok {
-			return float64(intVal)
-		}
-	}
-	return defaultValue
-}
-func (n *Want) GetStringParam(key string, defaultValue string) string {
-	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
-	n.metadataMutex.RUnlock()
-	if ok {
-		if strVal, ok := value.(string); ok {
-			return strVal
-		}
-	}
-	return defaultValue
-}
-func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
-	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
-	n.metadataMutex.RUnlock()
-	if ok {
-		if boolVal, ok := value.(bool); ok {
-			return boolVal
-		} else if strVal, ok := value.(string); ok {
-			return strVal == "true" || strVal == "True" || strVal == "TRUE" || strVal == "1"
-		}
-	}
-	return defaultValue
-}
-
-// GetGlobalParameter returns the value from parameters.yaml for the given key,
-// or defaultValue if the key is absent.
-func (n *Want) GetGlobalParameter(key string, defaultValue any) any {
-	if v, ok := GetGlobalParameter(key); ok {
-		return v
-	}
-	return defaultValue
 }
 
 // count := want.IncrementIntState("total_processed")  // Returns new count
@@ -2886,9 +1699,7 @@ func (w *Want) GetMetadata() Metadata {
 	meta := w.Metadata
 	if w.Metadata.Labels != nil {
 		meta.Labels = make(map[string]string, len(w.Metadata.Labels))
-		for k, v := range w.Metadata.Labels {
-			meta.Labels[k] = v
-		}
+		maps.Copy(meta.Labels, w.Metadata.Labels)
 	}
 	if w.Metadata.OwnerReferences != nil {
 		meta.OwnerReferences = make([]OwnerReference, len(w.Metadata.OwnerReferences))
@@ -2907,11 +1718,9 @@ func (n *Want) GetLabels() map[string]string {
 	}
 
 	// Return a deep copy to prevent external modification
-	copy := make(map[string]string, len(n.Metadata.Labels))
-	for k, v := range n.Metadata.Labels {
-		copy[k] = v
-	}
-	return copy
+	result := make(map[string]string, len(n.Metadata.Labels))
+	maps.Copy(result, n.Metadata.Labels)
+	return result
 }
 
 // matchesSelector checks if want labels match the selector criteria
@@ -2948,172 +1757,6 @@ func (n *Want) emitOwnerCompletionEventIfOwned() {
 			break
 		}
 	}
-}
-
-// Use attempts to receive data from any available input channel.
-// It first checks an internal cache (filled by UnusedExists) before attempting
-// to receive from the channels directly.
-//
-// Timeout behavior:
-//   - timeoutMilliseconds < 0: infinite wait (blocks until data arrives or channels close)
-//   - timeoutMilliseconds == 0: non-blocking (returns immediately if no data available)
-//   - timeoutMilliseconds > 0: wait up to specified milliseconds
-//
-// Returns: (channelIndex, data, done, ok)
-//   - channelIndex: Index of the channel that provided data (-1 if no data available)
-//   - data: The data received (nil if ok is false)
-//   - done: True if the sender signalled completion
-//   - ok: True if data was successfully received, false if timeout or no channels
-//
-// Usage:
-//
-//	index, data, done, ok := w.Use(1000)
-//	if ok {
-//	    if done { ... }
-//	    fmt.Printf("Received data: %v\n", data)
-//	}
-func (n *Want) Use(timeoutMilliseconds int) (int, any, bool, bool) {
-	var rawPacket any
-	var originalIndex int
-	var received bool
-
-	// 1. Check internal cache first (filled by UnusedExists)
-	n.cacheMutex.Lock()
-	if n.cachedPacket != nil {
-		cached := n.cachedPacket
-		n.cachedPacket = nil // Consume from cache
-		rawPacket = cached.Packet
-		originalIndex = cached.OriginalIndex
-		received = true
-	}
-	n.cacheMutex.Unlock()
-
-	if !received {
-		// Proceed with existing channel receive logic if cache is empty
-		if len(n.paths.In) == 0 {
-			return -1, nil, false, false
-		}
-
-		inCount := len(n.paths.In)
-		cases := make([]reflect.SelectCase, 0, inCount+1)
-		channelIndexMap := make([]int, 0, inCount+1) // Maps case index -> original channel index
-
-		for i := 0; i < inCount; i++ {
-			pathInfo := n.paths.In[i]
-			if pathInfo.Channel != nil {
-				cases = append(cases, reflect.SelectCase{
-					Dir:  reflect.SelectRecv,
-					Chan: reflect.ValueOf(pathInfo.Channel),
-				})
-				channelIndexMap = append(channelIndexMap, i) // Track which channel index this case corresponds to
-			}
-		}
-
-		// If no valid channels found, return immediately
-		if len(cases) == 0 {
-			return -1, nil, false, false
-		}
-
-		// Handle timeout:
-		if timeoutMilliseconds >= 0 {
-			timeoutChan := time.After(time.Duration(timeoutMilliseconds) * time.Millisecond)
-			cases = append(cases, reflect.SelectCase{
-				Dir: reflect.SelectRecv, Chan: reflect.ValueOf(timeoutChan),
-			})
-			channelIndexMap = append(channelIndexMap, -1) // -1 for timeout case
-		}
-
-		chosen, recv, recvOK := reflect.Select(cases)
-
-		// If timeout case was chosen (last index in cases), no data available
-		if chosen == len(cases)-1 && timeoutMilliseconds >= 0 {
-			return -1, nil, false, false
-		}
-
-		// If we got here, data was received or a channel was closed.
-		if recvOK {
-			originalIndex = channelIndexMap[chosen]
-			rawPacket = recv.Interface()
-			received = true
-
-			// Store packet receive info for debugging
-			n.storeState(fmt.Sprintf("packet_received_from_channel_%d", originalIndex), time.Now().Unix())
-			n.storeState("last_packet_received_timestamp", getCurrentTimestamp())
-		} else {
-			// Channel was closed
-			return -1, nil, false, false
-		}
-	}
-
-	// Unwrap TransportPacket if present
-	if tp, ok := rawPacket.(TransportPacket); ok {
-		return originalIndex, tp.Payload, tp.Done, true
-	}
-
-	// Legacy behavior or unwrapped packet (shouldn't happen with new Provide)
-	return originalIndex, rawPacket, false, true
-}
-
-// UseForever attempts to receive data from any available input channel,
-// blocking indefinitely until data arrives or all channels are closed.
-// This is a convenience wrapper around Use(-1) for infinite wait.
-func (n *Want) UseForever() (int, any, bool, bool) {
-	return n.Use(-1)
-}
-
-// UseTyped calls Use() and auto-parses the result into a *DataObject.
-// typeName specifies the expected data type (must be loaded in DataTypeLoader).
-// If typeName is empty or DataTypeLoader is unavailable, wraps raw data in a generic DataObject.
-func (n *Want) UseTyped(typeName string, timeoutMilliseconds int) (int, *DataObject, bool, bool) {
-	idx, raw, done, ok := n.Use(timeoutMilliseconds)
-	if !ok || done {
-		return idx, nil, done, ok
-	}
-	loader := GetGlobalDataTypeLoader()
-	if loader == nil || typeName == "" {
-		return idx, wrapRaw(raw), done, ok
-	}
-	obj, err := loader.Parse(typeName, raw)
-	if err != nil {
-		WarnLog("[UseTyped] Failed to parse data as type %q: %v", typeName, err)
-		return idx, wrapRaw(raw), done, ok
-	}
-	return idx, obj, done, ok
-}
-
-// UseForeverTyped calls UseForever() and auto-parses the result into a *DataObject.
-func (n *Want) UseForeverTyped(typeName string) (int, *DataObject, bool, bool) {
-	idx, raw, done, ok := n.UseForever()
-	if !ok || done {
-		return idx, nil, done, ok
-	}
-	loader := GetGlobalDataTypeLoader()
-	if loader == nil || typeName == "" {
-		return idx, wrapRaw(raw), done, ok
-	}
-	obj, err := loader.Parse(typeName, raw)
-	if err != nil {
-		WarnLog("[UseForeverTyped] Failed to parse data as type %q: %v", typeName, err)
-		return idx, wrapRaw(raw), done, ok
-	}
-	return idx, obj, done, ok
-}
-
-// Provide validates the DataObject against its schema and sends it downstream.
-// Validation errors are logged as warnings but do not block sending.
-func (n *Want) Provide(obj *DataObject) {
-	n.providedThisCycle = true
-	if obj == nil {
-		n.provideRaw(nil)
-		return
-	}
-	loader := GetGlobalDataTypeLoader()
-	if loader != nil && obj.TypeName() != "" {
-		if err := loader.Validate(obj.TypeName(), obj.ToMap()); err != nil {
-			WarnLog("[Provide] Validation warning for type %q: %v", obj.TypeName(), err)
-		}
-	}
-	n.provideRaw(obj.ToMap())
 }
 
 // IncrementIntStateValue safely increments an integer state value
@@ -3212,34 +1855,25 @@ func (w *Want) GetLocals() WantLocals {
 	return w.Locals
 }
 
+// isStateFieldVisible returns false for internal (underscore-prefixed) fields.
+func isStateFieldVisible(k string) bool {
+	return !strings.HasPrefix(k, "_")
+}
+
 // GetExplicitState returns the explicitly defined state fields
 // This includes system-reserved fields and fields defined in ProvidedStateFields
 func (w *Want) GetExplicitState() map[string]any {
 	explicitState := make(map[string]any)
-	currentState := w.GetAllState()
 	reservedFields := SystemReservedStateFields()
 
-	for k, v := range currentState {
-		// Skip internal framework fields
-		if strings.HasPrefix(k, "_") {
+	for k, v := range w.GetAllState() {
+		if !isStateFieldVisible(k) {
 			continue
 		}
-
-		// Always include system-reserved fields
-		isReservedField := false
-		for _, reserved := range reservedFields {
-			if k == reserved {
-				isReservedField = true
-				break
-			}
-		}
-
-		if isReservedField {
+		if Contains(reservedFields, k) {
 			explicitState[k] = v
 			continue
 		}
-
-		// Include fields defined in ProvidedStateFields
 		if len(w.ProvidedStateFields) > 0 && Contains(w.ProvidedStateFields, k) {
 			explicitState[k] = v
 		}
@@ -3252,29 +1886,15 @@ func (w *Want) GetExplicitState() map[string]any {
 // These are fields that weren't explicitly defined in the want type spec
 func (w *Want) GetHiddenState() map[string]any {
 	hiddenState := make(map[string]any)
-	currentState := w.GetAllState()
 	reservedFields := SystemReservedStateFields()
 
-	for k, v := range currentState {
-		// Skip internal framework fields
-		if strings.HasPrefix(k, "_") {
+	for k, v := range w.GetAllState() {
+		if !isStateFieldVisible(k) {
 			continue
 		}
-
-		// Skip system-reserved fields (they're always explicit)
-		isReservedField := false
-		for _, reserved := range reservedFields {
-			if k == reserved {
-				isReservedField = true
-				break
-			}
-		}
-
-		if isReservedField {
+		if Contains(reservedFields, k) {
 			continue
 		}
-
-		// Include fields NOT in ProvidedStateFields
 		if len(w.ProvidedStateFields) > 0 && !Contains(w.ProvidedStateFields, k) {
 			hiddenState[k] = v
 		}
@@ -3293,172 +1913,3 @@ func (w *Want) GetHTTPClient() *HTTPClient {
 	return cb.GetHTTPClient()
 }
 
-// Contains checks if a string slice contains a specific string value
-// resolveNestedStateField resolves a dot-notation field path from Want state.
-// For example, "slack_latest_message.text" first fetches the "slack_latest_message"
-// state key (expected to be a map) and then navigates to the "text" sub-field.
-// A plain key with no dots falls back to a normal GetState call.
-func resolveNestedStateField(n *Want, field string) (any, bool) {
-	parts := splitFirst(field, '.')
-	top, ok := n.getState(parts[0])
-	if !ok || top == nil {
-		return nil, false
-	}
-	if len(parts) == 1 {
-		return top, true
-	}
-	// Navigate nested map(s)
-	cur := top
-	for _, part := range parts[1:] {
-		switch m := cur.(type) {
-		case map[string]any:
-			v, exists := m[part]
-			if !exists {
-				return nil, false
-			}
-			cur = v
-		case map[any]any:
-			v, exists := m[part]
-			if !exists {
-				return nil, false
-			}
-			cur = v
-		default:
-			return nil, false
-		}
-	}
-	return cur, true
-}
-
-// splitFirst splits s on the first occurrence of sep and returns all parts.
-func splitFirst(s string, sep byte) []string {
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep {
-			rest := s[i+1:]
-			// recursively split remainder to support multi-level nesting
-			return append([]string{s[:i]}, splitFirst(rest, sep)...)
-		}
-	}
-	return []string{s}
-}
-
-func Contains(slice []string, item string) bool {
-	for _, v := range slice {
-		if v == item {
-			return true
-		}
-	}
-	return false
-}
-
-// CalculateWantHash computes a hash of want's metadata, spec, all state fields, and status
-// This hash is used for change detection to avoid unnecessary frontend re-renders
-func CalculateWantHash(w *Want) string {
-	// Build hash data structure with all relevant fields
-	hashData := struct {
-		Metadata Metadata       `json:"metadata"`
-		Spec     WantSpec       `json:"spec"`
-		Status   WantStatus     `json:"status"`
-		State    map[string]any `json:"state"` // All state fields
-	}{
-		Metadata: w.Metadata,
-		Spec:     w.Spec,
-		Status:   w.Status,
-		State:    w.GetAllState(), // Include all state fields
-	}
-
-	// Serialize to JSON
-	jsonData, err := json.Marshal(hashData)
-	if err != nil {
-		// If marshaling fails, return empty string
-		return ""
-	}
-
-	// Compute SHA256 hash
-	hash := sha256.Sum256(jsonData)
-	return hex.EncodeToString(hash[:])
-}
-
-// WantFilters contains filter criteria for want list queries
-type WantFilters struct {
-	Type         string            // Filter by want type
-	Labels       map[string]string // Filter by labels (key=value pairs, AND logic)
-	UsingFilters map[string]string // Filter by using selectors (key=value pairs, AND logic)
-}
-
-// MatchesFilters checks if a want matches all specified filters
-// Returns true if the want passes all filters (AND logic)
-func (w *Want) MatchesFilters(filters WantFilters) bool {
-	// Filter by type if specified
-	if filters.Type != "" && w.Metadata.Type != filters.Type {
-		return false
-	}
-
-	// Filter by labels if specified
-	if len(filters.Labels) > 0 {
-		for key, value := range filters.Labels {
-			if w.Metadata.Labels == nil {
-				return false
-			}
-			labelValue, exists := w.Metadata.Labels[key]
-			if !exists || labelValue != value {
-				return false
-			}
-		}
-	}
-
-	// Filter by using selectors if specified
-	if len(filters.UsingFilters) > 0 {
-		for key, value := range filters.UsingFilters {
-			if w.Spec.Using == nil || len(w.Spec.Using) == 0 {
-				return false
-			}
-			// Check if any using entry contains the key=value pair
-			found := false
-			for _, usingEntry := range w.Spec.Using {
-				if usingValue, exists := usingEntry.Labels[key]; exists && usingValue == value {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-// syncLocalsAfterInitialize persists the locals to internal state immediately after
-// Initialize() is called. Without this, the next SyncLocalsState(toStruct=true) would
-// read stale internal state (e.g., old _phase = "completed") and overwrite the
-// freshly initialized locals.Phase back to the old value, causing the want to
-// skip re-execution on restart.
-func (n *Want) syncLocalsAfterInitialize() {
-	if n.progressable == nil {
-		return
-	}
-	progressableVal := reflect.ValueOf(n.progressable)
-	if progressableVal.Kind() != reflect.Ptr {
-		return
-	}
-	method := progressableVal.MethodByName("GetLocals")
-	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
-		return
-	}
-	results := method.Call(nil)
-	locals := results[0].Interface()
-	SyncLocalsState(n, locals, false)
-}
-
-// FilterWants filters a list of wants based on the provided filters
-func FilterWants(wants []*Want, filters WantFilters) []*Want {
-	filtered := make([]*Want, 0, len(wants))
-	for _, want := range wants {
-		if want.MatchesFilters(filters) {
-			filtered = append(filtered, want)
-		}
-	}
-	return filtered
-}

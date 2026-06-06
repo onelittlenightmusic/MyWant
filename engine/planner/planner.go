@@ -134,9 +134,17 @@ func negateCondition(c ws.ConditionDef) ws.ConditionDef {
 	}
 	switch c.Operator {
 	case "", "==":
-		neg.Operator = "!="
-		if c.Operator == "" {
-			neg.Value = true // explicitly set value for the negated form
+		// Negate "== X" as "== (not X)" rather than "!= X".
+		// Using "!= X" would match null/unset values (null != true == true),
+		// causing the gate to open before the check want has run.
+		// "== false" correctly requires the field to be explicitly false.
+		neg.Operator = "=="
+		if c.Value == true || c.Operator == "" {
+			neg.Value = false
+		} else if c.Value == false {
+			neg.Value = true
+		} else {
+			neg.Operator = "!="
 		}
 	case "!=":
 		neg.Operator = "=="

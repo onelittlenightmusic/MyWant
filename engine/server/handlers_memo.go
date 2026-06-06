@@ -31,10 +31,14 @@ func (s *Server) getMemoSuggestions(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/memo
 // Returns all subtypes and their recorded values.
 func (s *Server) getMemo(w http.ResponseWriter, r *http.Request) {
-	subtypes := s.memoStore.AllSubtypes()
-	result := make(map[string][]string, len(subtypes))
-	for _, st := range subtypes {
-		result[st] = s.memoStore.Suggestions(st, 0)
+	data := s.memoStore.All()
+	result := make(map[string][]string, len(data))
+	for k, v := range data {
+		if v == nil {
+			result[k] = []string{}
+		} else {
+			result[k] = v
+		}
 	}
 	s.JSONResponse(w, http.StatusOK, result)
 }
