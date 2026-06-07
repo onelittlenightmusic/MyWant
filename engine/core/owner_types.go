@@ -70,8 +70,9 @@ type Target struct {
 
 	// isSatisfied gate — evaluated in Progress() once check want completes.
 	// Achieve chain wants use the Target itself as provider via _isSatisfied_gate label.
-	isSatisfiedCheckWant *Want // reference to the pre-check want for condition evaluation
-	isSatisfiedGateFired bool  // true once Target has evaluated and provided/achieved
+	isSatisfiedCheckWant        *Want // reference to the pre-check want for condition evaluation
+	isSatisfiedGateFired        bool  // true once Target has evaluated and provided/achieved
+	isSatisfiedRecheckAfterAchieve bool  // re-run check after achieve chain completes
 }
 
 // NewTarget creates a new target want
@@ -429,6 +430,9 @@ func (t *Target) Initialize() {
 			}
 			if cfg.IsSatisfied != nil && t.RecipeIsSatisfied == nil {
 				t.RecipeIsSatisfied = cfg.IsSatisfied
+				if cfg.IsSatisfiedRecheckAfterAchieve {
+					t.isSatisfiedRecheckAfterAchieve = true
+				}
 			}
 			if len(cfg.Hints) > 0 && len(t.RecipeHints) == 0 {
 				t.RecipeHints = cfg.Hints
@@ -740,19 +744,19 @@ func (t *Target) Progress() {
 			// Condition met — goal already achieved, skip achieve chain
 			t.StoreLog("[TARGET] isSatisfied condition met (%s %s %v) — marking achieved without running achieve chain",
 				field, t.RecipeIsSatisfied.When.Operator, t.RecipeIsSatisfied.When.Value)
+			// Close the achieve-chain gate so achieve-chain wants (which import
+			// _achieve_gate_open) stay blocked even if they restart.
+			t.StoreState("_achieve_gate_open", nil)
 			t.SetStatus(WantStatusAchieved)
 			t.isSatisfiedGateFired = true
 			t.StoreState("_isSatisfied_gate_fired", true)
 			return
 		}
-		// Condition not met — provide a go-ahead signal so achieve-chain wants start
-		t.StoreLog("[TARGET] isSatisfied condition not met — providing gate signal to achieve chain")
-		gateSignal := NewDataObjectFrom("isSatisfied_gate_open", map[string]any{
-			"gate":       "open",
-			"check_want": t.isSatisfiedCheckWant.Metadata.Name,
-			field:        actual,
-		})
-		t.Provide(gateSignal)
+		// Condition not met — open the gate so achieve-chain wants can proceed.
+		// _achieve_gate_open is imported by all achieve-chain wants; setting it
+		// to true (non-nil) unblocks hasUnresolvedImports() on each of them.
+		t.StoreLog("[TARGET] isSatisfied condition not met — opening achieve-chain gate")
+		t.StoreState("_achieve_gate_open", true)
 		t.isSatisfiedGateFired = true
 		t.StoreState("_isSatisfied_gate_fired", true)
 	}
@@ -850,6 +854,32 @@ drained:
 	}
 
 	if allComplete {
+		// recheckAfterAchieve: re-run the isSatisfied check want once the achieve chain
+		// completes. This verifies the goal was actually reached (e.g. confirm a booking
+		// was made) before marking the coordinator as achieved.
+		if t.isSatisfiedRecheckAfterAchieve && t.RecipeIsSatisfied != nil && t.isSatisfiedCheckWant != nil {
+			postRechecked, _ := t.GetStateBool("_post_achieve_rechecked", false)
+			if !postRechecked {
+				t.StoreLog("[TARGET] Achieve chain complete — re-running isSatisfied check (recheckAfterAchieve)")
+				t.StoreState("_post_achieve_rechecked", true)
+				t.isSatisfiedGateFired = false
+				t.StoreState("_isSatisfied_gate_fired", false)
+				// Reset the check want: clear the field that caused finalization so it runs again.
+				cb := GetGlobalChainBuilder()
+				if cb != nil {
+					typeDef := cb.GetWantTypeDefinition(t.isSatisfiedCheckWant.Metadata.Type)
+					if typeDef != nil && typeDef.FinalizeWhen != nil && typeDef.FinalizeWhen.Achieved != nil {
+						t.isSatisfiedCheckWant.StoreState(typeDef.FinalizeWhen.Achieved.Field, nil)
+					}
+				}
+				t.isSatisfiedCheckWant.StoreState("error", "")
+				t.isSatisfiedCheckWant.SetStatus(WantStatusReaching)
+				// Remove from completedChildren so allComplete recalculates correctly.
+				t.completedChildren.Delete(t.isSatisfiedCheckWant.Metadata.Name)
+				return
+			}
+		}
+
 		// Propagate warning status: if any child achieved with warnings, so does this target.
 		finalStatus := t.resolveAchievedStatus()
 		t.SetStatus(finalStatus)

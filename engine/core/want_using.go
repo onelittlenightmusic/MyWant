@@ -1,11 +1,25 @@
 package mywant
 
-// want_using.go — using.when gate evaluation
+// want_using.go — import-based gate evaluation
 //
-// Implements idempotent condition checking for spec.using entries that carry
-// a when: clause. When no cached packet is available (e.g. after restart),
-// the provider want's live state is queried directly so the result is always
-// consistent regardless of packet cache state.
+// Step 3.9 of the main progress loop: before running Progress(), check that all
+// imported fields have resolved to a non-nil value. A nil import means the
+// upstream want has not yet produced its result, so the want stays idle and
+// polls on the next cycle. This replaces the old using:when: packet-based
+// mechanism which was not idempotent across restarts.
+
+// hasUnresolvedImports returns true if any imported field currently resolves to
+// nil. A nil value means the upstream provider has not yet produced it; Progress()
+// must not run until all imports are non-nil.
+func (n *Want) hasUnresolvedImports() bool {
+	for _, localKey := range n.Spec.Imports {
+		val, ok := n.getState(localKey)
+		if !ok || val == nil {
+			return true
+		}
+	}
+	return false
+}
 
 // HasUsingWhenConditions returns true if at least one using: entry has a When condition.
 func (n *Want) HasUsingWhenConditions() bool {

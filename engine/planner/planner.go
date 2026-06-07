@@ -86,22 +86,19 @@ func (p *Planner) PlanFromWantType(typeName, category string, plan *ws.WantTypeP
 	}
 
 	// ── Gate wiring ──────────────────────────────────────────────────────────
-	// For each isSatisfied-style gate: add using: entry to every achieve-chain
-	// want so they wait for the monitor's go-ahead before starting.
-	var labelConditions []ws.LabelCondition
-	for _, gate := range gates {
+	// For each isSatisfied gate, inject an import for the coordinator-managed
+	// _achieve_gate_open key into every achieve-chain want. The coordinator sets
+	// this key to true when the isSatisfied condition is NOT met (achieve chain
+	// should run), and clears it to nil when the condition IS met (already
+	// satisfied). hasUnresolvedImports() blocks Progress() while the key is nil.
+	if len(gates) > 0 {
 		for i := achieveStart; i < len(recipeWants); i++ {
-			if recipeWants[i].Spec.Using == nil {
-				recipeWants[i].Spec.Using = []ws.UsingEntry{}
+			w := recipeWants[i]
+			if w.Spec.Imports == nil {
+				w.Spec.Imports = map[string]string{}
 			}
-			recipeWants[i].Spec.Using = append(recipeWants[i].Spec.Using, ws.UsingEntry{
-				Labels: map[string]string{gate.labelKey: gate.labelValue},
-			})
+			w.Spec.Imports["_achieve_gate_open"] = "_achieve_gate_open"
 		}
-		labelConditions = append(labelConditions, ws.LabelCondition{
-			Match: map[string]string{gate.labelKey: gate.labelValue},
-			When:  gate.negated,
-		})
 	}
 
 	recipeName := typeName + "-auto"
@@ -112,8 +109,7 @@ func (p *Planner) PlanFromWantType(typeName, category string, plan *ws.WantTypeP
 			Version:     "1.0",
 			Category:    category,
 		},
-		Wants:           recipeWants,
-		LabelConditions: labelConditions,
+		Wants: recipeWants,
 	}
 
 	return ws.PlannerResult{
@@ -350,16 +346,17 @@ func (p *Planner) buildHintedProvider(providerType, targetType, targetName strin
 	}
 
 	if choiceImportKey != "" && p.defs["choice"] != nil {
-		// Add a choice want that imports the array and exposes selected as a global param.
-		// The terminal want then imports that global param — no channel/using wiring needed.
+		// Add a choice want that imports the array and exposes selected to the
+		// coordinator's current state as "selected_slot". The terminal want then
+		// imports "selected_slot" from the coordinator — both go through coordinator
+		// state so imports polling in hasUnresolvedImports() can see the value.
 		choiceName := slugify(targetType) + "-choice"
-		globalParamName := slugify(targetType) + "-selected-slot"
 		choiceWant := ws.RecipeWant{
 			Metadata: ws.Metadata{Name: choiceName, Type: "choice"},
 			Spec: ws.WantSpec{
 				Imports: map[string]string{choiceImportKey: "choices"},
 				Exposes: []ws.ExposeEntry{
-					{CurrentState: "selected", AsGlobalParam: globalParamName},
+					{CurrentState: "selected", As: "selected_slot"},
 				},
 			},
 		}
@@ -370,11 +367,11 @@ func (p *Planner) buildHintedProvider(providerType, targetType, targetName strin
 			ProvidedBy: providerType,
 			Confidence: "inferred",
 			Reasoning: fmt.Sprintf(
-				"choice imports %s.%s (array) → user picks one → writes selected to global param %q",
-				providerType, choiceImportKey, globalParamName),
+				"choice imports %s.%s (array) → user picks one → exposes selected as coordinator.selected_slot",
+				providerType, choiceImportKey),
 		})
-		// Terminal want imports the global param (not using: channel wiring)
-		chain.terminalImports = map[string]string{globalParamName: "selected_slot"}
+		// Terminal want imports selected_slot from coordinator state.
+		chain.terminalImports = map[string]string{"selected_slot": "selected_slot"}
 		chain.usingEntries = nil
 	}
 

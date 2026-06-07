@@ -814,25 +814,14 @@ func (n *Want) StartProgressionLoop(
 				continue // Go back to step 1: Check stop channel
 			}
 
-			// 3.9. If any using: entry carries a when: condition, gate Progress() on
-			// receiving data that satisfies the condition.  Wants without when: are
-			// unaffected — they continue to call Use()/UseForever() themselves.
-			if n.hasUsingWhenConditions() && len(currentPaths.In) > 0 {
-				if !n.UnusedExists(0) {
-					n.SetStatus(WantStatusIdle)
-					time.Sleep(GlobalExecutionInterval)
-					continue
-				}
-				// Evaluate when: conditions against the cached packet (from UnusedExists).
-				if !n.checkUsingWhenConditions() {
-					// Packet arrived but condition not met — discard and keep waiting.
-					n.cacheMutex.Lock()
-					n.cachedPacket = nil
-					n.cacheMutex.Unlock()
-					n.SetStatus(WantStatusIdle)
-					time.Sleep(GlobalExecutionInterval)
-					continue
-				}
+			// 3.9. Gate Progress() on imports: if any imported field is nil the
+			// upstream provider has not yet produced a value. Stay idle and poll
+			// until all imports resolve. This replaces the old using:when: packet
+			// mechanism which was not idempotent across restarts.
+			if n.hasUnresolvedImports() {
+				n.SetStatus(WantStatusIdle)
+				time.Sleep(GlobalExecutionInterval)
+				continue
 			}
 
 			// 4. Synchronize paths before execution (preconditions: providers + users)

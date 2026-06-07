@@ -99,6 +99,9 @@ type GenericRecipeConfig struct {
 	IsSatisfied     *RecipeIsSatisfied
 	Hints           []PlanHint
 	LabelConditions []want_spec.LabelCondition
+	// IsSatisfiedRecheckAfterAchieve: re-run the isSatisfied check want after the
+	// achieve chain completes, so the coordinator can confirm the goal was reached.
+	IsSatisfiedRecheckAfterAchieve bool
 }
 
 // GenericRecipeLoader manages loading and processing any type of recipe
@@ -267,15 +270,29 @@ func (grl *GenericRecipeLoader) LoadRecipe(recipePath string, params map[string]
 		}
 	}
 
+	// Secondary parse: extract recheckAfterAchieve which is not in the want-spec schema.
+	var recheckCheck struct {
+		Recipe struct {
+			IsSatisfied struct {
+				RecheckAfterAchieve bool `yaml:"recheckAfterAchieve"`
+			} `yaml:"isSatisfied"`
+		} `yaml:"recipe"`
+	}
+	recheckAfterAchieve := false
+	if err := yaml.Unmarshal(data, &recheckCheck); err == nil {
+		recheckAfterAchieve = recheckCheck.Recipe.IsSatisfied.RecheckAfterAchieve
+	}
+
 	return &GenericRecipeConfig{
-		Wants:           wants,
-		Parameters:      recipeContent.Parameters,
-		Metadata:        recipeContent.Metadata,
-		Result:          recipeContent.Result,
-		Achieve:         recipeContent.Achieve,
-		IsSatisfied:     recipeContent.IsSatisfied,
-		Hints:           recipeContent.Hints,
-		LabelConditions: recipeContent.LabelConditions,
+		Wants:                          wants,
+		Parameters:                     recipeContent.Parameters,
+		Metadata:                       recipeContent.Metadata,
+		Result:                         recipeContent.Result,
+		Achieve:                        recipeContent.Achieve,
+		IsSatisfied:                    recipeContent.IsSatisfied,
+		Hints:                          recipeContent.Hints,
+		LabelConditions:                recipeContent.LabelConditions,
+		IsSatisfiedRecheckAfterAchieve: recheckAfterAchieve,
 	}, nil
 }
 
