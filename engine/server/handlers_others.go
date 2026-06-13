@@ -1217,6 +1217,28 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
+	// Record memo entries for global params that have a SubType defined.
+	if s.memoStore != nil {
+		for _, def := range body.Definitions {
+			if def.SubType == "" {
+				continue
+			}
+			if def.RecordMemo != nil && !*def.RecordMemo {
+				continue
+			}
+			val, ok := body.Parameters[def.Name]
+			if !ok {
+				continue
+			}
+			str, ok := val.(string)
+			if !ok || str == "" {
+				continue
+			}
+			if err := s.memoStore.Record(def.SubType, str); err != nil {
+				mywant.WarnLog("[GlobalParams] failed to record memo %s=%q: %v", def.SubType, str, err)
+			}
+		}
+	}
 	params := mywant.GetAllGlobalParameters()
 	defs := mywant.GetAllGlobalParamDefs()
 	s.JSONResponse(w, http.StatusOK, map[string]any{
@@ -1284,12 +1306,28 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 
 // updateGUIState handles PUT /api/v1/gui/state
 // Merges the request body into the gui_state want's state and increments seq.
+// Supports optimistic locking via the standard If-Match header:
+//   - If-Match: "<seq>" → apply only when the server's current seq matches.
+//   - Mismatch → 412 Precondition Failed (client should wait for the next poll).
+//   - Omitted  → unconditional write (legacy / robot CLI path).
+//
 // If the payload carries robot fields with a new nonce, appends a RobotLogEntry.
 func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil {
 		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
 		return
+	}
+
+	// Optimistic locking: honour If-Match when present.
+	if ifMatch := strings.Trim(r.Header.Get("If-Match"), `"`); ifMatch != "" {
+		currentSeq := currentGUIStateSeq()
+		if ifMatch != fmt.Sprintf("%d", currentSeq) {
+			w.Header().Set("ETag", fmt.Sprintf(`"%d"`, currentSeq))
+			s.JSONError(w, r, http.StatusPreconditionFailed, "concurrent write conflict",
+				fmt.Sprintf("client seq %s, server seq %d", ifMatch, currentSeq))
+			return
+		}
 	}
 
 	var updates map[string]any
