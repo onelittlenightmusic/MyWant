@@ -18,7 +18,36 @@
 
 ## Quick Start
 
-### 1. Build and Install
+### Install via Homebrew (recommended for other Macs)
+
+The easiest way to install on another Mac is via the Homebrew tap.
+`brew trust` is required before installing from a third-party tap that ships binaries.
+
+```bash
+# Add the tap
+brew tap onelittlenightmusic/mywant
+
+# Trust the entire tap (required once — covers all formulae below)
+brew trust onelittlenightmusic/mywant
+
+# Install the packages
+brew install mywant        # core server + CLI
+brew install mywant-gui    # web dashboard GUI
+brew install mywant-rpg    # RPG extension (optional)
+```
+
+For upgrades on a machine that already has the tap but hasn't trusted it yet,
+run `brew trust` first, then `brew upgrade`:
+
+```bash
+brew trust onelittlenightmusic/mywant
+brew upgrade mywant mywant-gui mywant-rpg
+```
+
+> **Note:** If you skip `brew trust` you will see permission errors when Homebrew
+> tries to install the pre-built binary artifacts from the tap.
+
+### 1. Build and Install (from source)
 
 ```bash
 # Build the integrated CLI with embedded GUI
