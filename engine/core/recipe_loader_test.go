@@ -109,7 +109,7 @@ func TestRecipeWantCreation(t *testing.T) {
 			Labels: map[string]string{"category": "processor"},
 		},
 		Spec: struct {
-			Params map[string]any `yaml:"params"`
+			Params map[string]any  `yaml:"params"`
 			Using  []ws.UsingEntry `yaml:"using,omitempty"`
 		}{
 			Params: map[string]any{

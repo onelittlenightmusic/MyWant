@@ -159,6 +159,17 @@ func (s *Server) setupRoutes() {
 	// GET /planner/index — list all exposable fields
 	plannerR.HandleFunc("/index", s.getPlannerIndex).Methods("GET", "OPTIONS")
 
+	// Lifecycle webhooks — external push notifications on want creation
+	lifecycle := api.PathPrefix("/lifecycle-webhooks").Subrouter()
+	lifecycle.HandleFunc("", s.registerLifecycleWebhook).Methods("POST", "OPTIONS")
+	lifecycle.HandleFunc("", s.listLifecycleWebhooks).Methods("GET", "OPTIONS")
+	lifecycle.HandleFunc("/achievement-cache", s.resetAchievementCache).Methods("DELETE", "OPTIONS")
+	// Filtered rules (admission-webhook style) — must come before /{id}
+	lifecycle.HandleFunc("/rules", s.registerLifecycleRule).Methods("POST", "OPTIONS")
+	lifecycle.HandleFunc("/rules", s.listLifecycleRules).Methods("GET", "OPTIONS")
+	lifecycle.HandleFunc("/rules/{id}", s.deleteLifecycleRule).Methods("DELETE", "OPTIONS")
+	lifecycle.HandleFunc("/{id}", s.deleteLifecycleWebhook).Methods("DELETE", "OPTIONS")
+
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 
@@ -198,6 +209,7 @@ func (s *Server) setupRoutes() {
 	memo := api.PathPrefix("/memo").Subrouter()
 	memo.HandleFunc("", s.getMemo).Methods("GET", "OPTIONS")
 	memo.HandleFunc("", s.putMemo).Methods("PUT", "OPTIONS")
+	memo.HandleFunc("/subtypes", s.getMemoSubtypes).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)

@@ -25,7 +25,7 @@ type WantRecipe struct {
 		Labels map[string]string `yaml:"labels"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Params map[string]any      `yaml:"params"`
+		Params map[string]any  `yaml:"params"`
 		Using  []ws.UsingEntry `yaml:"using,omitempty"`
 	} `yaml:"spec"`
 	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
@@ -33,12 +33,12 @@ type WantRecipe struct {
 
 // DRYWantSpec defines minimal want specification in DRY format
 type DRYWantSpec struct {
-	Name      string              `yaml:"name"`
-	Type      string              `yaml:"type"`
-	Labels    map[string]string   `yaml:"labels,omitempty"`
-	Params    map[string]any      `yaml:"params,omitempty"`
-	Using     []ws.UsingEntry `yaml:"using,omitempty"`
-	TypeHints map[string]string   `yaml:"-"` // param_name -> type_tag
+	Name      string            `yaml:"name"`
+	Type      string            `yaml:"type"`
+	Labels    map[string]string `yaml:"labels,omitempty"`
+	Params    map[string]any    `yaml:"params,omitempty"`
+	Using     []ws.UsingEntry   `yaml:"using,omitempty"`
+	TypeHints map[string]string `yaml:"-"` // param_name -> type_tag
 }
 
 // DRYRecipeDefaults defines common defaults for all wants in a recipe

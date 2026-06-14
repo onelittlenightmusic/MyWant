@@ -90,8 +90,11 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		// YAML-only type: no Go implementation found.
 		// Use ScriptableWant factory for all cases — inline agents, lifecycle hooks,
 		// declarative achievement conditions, or passive containers with no behavior.
+		// Don't overwrite if a Go factory was already registered (e.g. custom_target).
 		registerInlineAgents(def, cb.agentRegistry)
-		cb.RegisterWantType(wantType, createScriptableFactory(def))
+		if _, alreadyRegistered := cb.registry[wantType]; !alreadyRegistered {
+			cb.RegisterWantType(wantType, createScriptableFactory(def))
+		}
 	}
 
 	// Store connectivity metadata for later use during want creation

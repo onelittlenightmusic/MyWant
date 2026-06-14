@@ -1,0 +1,79 @@
+wantType:
+  metadata:
+    name: transit
+    title: Transit Route
+    description: |
+      Public transit route query. Finds the best route between two stations
+      using trains, buses, or subways. Monitors real-time departure and
+      arrival information.
+    version: '1.0'
+    category: travel
+    pattern: independent
+    labels:
+      child-role: doer
+  finalResultField: recommended_departure
+  parameters:
+  - name: from
+    description: Departure station name
+    type: string
+    required: true
+    subType: station
+    example: Shinjuku
+  - name: to
+    description: Arrival station name
+    type: string
+    required: true
+    subType: station
+    example: Tokyo
+  - name: departure_date
+    description: Departure date in YYYY-MM-DD format
+    type: string
+    required: false
+    subType: date
+    example: '2024-12-25'
+  - name: departure_time
+    description: Desired departure time in HH:MM format
+    type: string
+    required: false
+    subType: time
+    example: '08:30'
+  state:
+  - name: transit_status
+    description: Query status (pending, done, failed)
+    type: string
+    persistent: false
+    label: current
+  - name: recommended_departure
+    description: Recommended departure time (HH:MM)
+    type: string
+    persistent: true
+    label: current
+  - name: estimated_arrival
+    description: Estimated arrival time (HH:MM)
+    type: string
+    persistent: true
+    label: current
+  - name: duration_minutes
+    description: Total journey duration in minutes
+    type: int
+    persistent: true
+    label: current
+  - name: first_vehicle
+    description: Name of the first transit vehicle
+    type: string
+    persistent: true
+    label: current
+  - name: boarding_stop
+    description: Name of the boarding stop/station
+    type: string
+    persistent: true
+    label: current
+  - name: transfers
+    description: Number of transfers required
+    type: int
+    persistent: true
+    label: current
+  agents:
+  - capability: transit_api_agency
+  connectivity:
+    require: none

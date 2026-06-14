@@ -90,10 +90,10 @@ type GenericRecipeMetadata = want_spec.GenericRecipeMetadata
 
 // GenericRecipeConfig represents the final configuration after recipe processing
 type GenericRecipeConfig struct {
-	Wants       []*Want
-	Parameters  []ParameterDef
-	Metadata    GenericRecipeMetadata
-	Result      *RecipeResult
+	Wants      []*Want
+	Parameters []ParameterDef
+	Metadata   GenericRecipeMetadata
+	Result     *RecipeResult
 	// Declarative planning fields — copied from RecipeContent if present
 	Achieve         []PlanTarget
 	IsSatisfied     *RecipeIsSatisfied

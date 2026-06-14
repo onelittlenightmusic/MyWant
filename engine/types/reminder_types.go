@@ -245,7 +245,7 @@ func (r *ReminderWant) Progress() {
 	switch status {
 	case WantStatusIdle:
 		r.handleStatusIdle(locals)
-	case WantStatusReaching, WantStatusWaitingUserAction:
+	case WantStatusReaching, WantStatusReachingWithWarning, WantStatusWaitingUserAction:
 		r.handleStatusReaching(locals)
 	case WantStatusAchieved, WantStatusFailed:
 		break
@@ -342,6 +342,7 @@ func (r *ReminderWant) completeReminder(locals *ReminderLocals, logMsg string) {
 	r.StoreLog("%s", logMsg)
 	r.SetStatus(WantStatusAchieved)
 	r.SetCurrent("auto_completed", true)
+	r.SetCurrent("reaction_result", "delivered")
 	locals.ReactionPacketEmitted = false
 	r.SetCurrent("achieving_percentage", 100)
 	r.ProvideDone()

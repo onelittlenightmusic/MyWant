@@ -70,8 +70,8 @@ type Target struct {
 
 	// isSatisfied gate — evaluated in Progress() once check want completes.
 	// Achieve chain wants use the Target itself as provider via _isSatisfied_gate label.
-	isSatisfiedCheckWant        *Want // reference to the pre-check want for condition evaluation
-	isSatisfiedGateFired        bool  // true once Target has evaluated and provided/achieved
+	isSatisfiedCheckWant           *Want // reference to the pre-check want for condition evaluation
+	isSatisfiedGateFired           bool  // true once Target has evaluated and provided/achieved
 	isSatisfiedRecheckAfterAchieve bool  // re-run check after achieve chain completes
 }
 
@@ -94,7 +94,11 @@ func NewTarget(metadata Metadata, spec WantSpec) *Target {
 
 	// Hook: whenever Want.MergeState is called on the embedded Want, signal stateNotify.
 	// This works even when the caller holds a *Want pointer (not *Target) due to embedding.
+	// Skip the wakeup when already achieved — prevents feedback loops from currentStateExposeHandler.
 	target.Want.onMergeState = func() {
+		if IsAchievedStatus(target.GetStatus()) {
+			return
+		}
 		select {
 		case target.stateNotify <- struct{}{}:
 		default:
@@ -155,14 +159,18 @@ func (tcs *TargetCompletionSubscription) OnEvent(ctx context.Context, event Want
 		}
 	}
 
-	// GUARD: If target is already achieved (with or without warnings), no need to process further completion events
-	if IsAchievedStatus(tcs.target.GetStatus()) {
-		return EventResponse{Handled: true}
-	}
-
 	// Only handle events targeted at this target
 	if completionEvent.TargetName != tcs.target.Metadata.Name {
 		return EventResponse{Handled: false}
+	}
+
+	// GUARD: If target is already achieved, re-aggregate final_result so that
+	// dynamically-added children (e.g. a hotel/reminder added after the target
+	// first achieved) are included in the summary visible on the canvas.
+	if IsAchievedStatus(tcs.target.GetStatus()) {
+		tcs.target.completedChildren.Store(completionEvent.ChildName, true)
+		tcs.target.computeFallbackResult()
+		return EventResponse{Handled: true}
 	}
 
 	// Track child completion
@@ -797,6 +805,15 @@ func (t *Target) Progress() {
 drained:
 
 	// Update achieving_percentage
+	// Ensure any dynamically-added children (added via API after target started) are adopted.
+	// Without this, checkAllChildrenComplete() returns true for empty childWants and the
+	// target achieves before children like route-search (slow Python script) have finished.
+	if len(t.childWants) == 0 && t.builder != nil {
+		for _, child := range t.builder.FindChildWantsByOwnerID(t.Metadata.ID) {
+			t.AdoptChild(child)
+		}
+	}
+
 	allComplete := t.checkAllChildrenComplete()
 
 	if len(t.childWants) > 0 {
@@ -1310,12 +1327,16 @@ func RegisterOwnerWantTypes(builder *ChainBuilder) {
 	recipeLoader := NewGenericRecipeLoader(RecipesDir)
 
 	// Register target type with recipe support
-	builder.RegisterWantType("target", func(metadata Metadata, spec WantSpec) Progressable {
+	targetFactory := func(metadata Metadata, spec WantSpec) Progressable {
 		target := NewTarget(metadata, spec)
 		target.SetBuilder(builder)           // Set builder reference for dynamic want creation
 		target.SetRecipeLoader(recipeLoader) // Set recipe loader for external recipes
 		return target
-	})
+	}
+	builder.RegisterWantType("target", targetFactory)
+	// custom_target has a YAML definition but must go through NewTarget() so that
+	// subscribeToChildCompletion() is called and child completion events are handled.
+	builder.RegisterWantType("custom_target", targetFactory)
 
 	// Note: OwnerAware wrapping is now automatic in ChainBuilder.createWantFunction() All wants with OwnerReferences are automatically wrapped at creation time, eliminating the need for registration-time wrapping and registration order dependencies.
 	// This means: 1. Domain types can be registered in any order (QNet, Travel, etc.) 2. No need for separate "NoOwner" builder variants 3. Wrapping happens at runtime based on actual metadata, not factory registration
@@ -1445,6 +1466,13 @@ func (t *Target) computeFallbackResult() {
 
 	t.StoreLog("🧮 Target %s: Using fallback result computation for %d child wants\n", t.Metadata.Name, len(childWants))
 
+	// For custom_target: aggregate children's final_result into parent's final_result.
+	if t.Metadata.Type == "custom_target" {
+		t.aggregateChildFinalResults(childWants)
+		t.childCount = len(childWants)
+		return
+	}
+
 	// Simple aggregate result from child wants using dynamic stats
 	totalProcessed := 0
 	for _, child := range childWants {
@@ -1457,6 +1485,78 @@ func (t *Target) computeFallbackResult() {
 	t.storeState("result", fmt.Sprintf("processed: %d", totalProcessed))
 	t.childCount = len(childWants)
 	t.StoreLog("[TARGET] ✅ Target %s: Fallback result computed - processed %d items from %d child wants\n", t.Metadata.Name, totalProcessed, len(childWants))
+}
+
+// aggregateChildFinalResults collects each child's final_result and writes a
+// composed summary to the parent's final_result state field.
+// Children are sorted by their canvas-y label (ascending) so the output order
+// matches visual top-to-bottom reading order on the Want Canvas.
+// Only children that have a non-empty final_result are included; if none do,
+// the parent's final_result is left unchanged so a previous value is preserved.
+func (t *Target) aggregateChildFinalResults(childWants []*Want) {
+	type entry struct {
+		name    string
+		role    string
+		result  any
+		canvasY int
+	}
+
+	var entries []entry
+	for _, child := range childWants {
+		fr, ok := child.getState("final_result")
+		if !ok || fr == nil {
+			continue
+		}
+		// Skip empty strings
+		if s, isStr := fr.(string); isStr && strings.TrimSpace(s) == "" {
+			continue
+		}
+		name := child.Metadata.Name
+		// strip parent-name prefix (e.g. "wife-target-weather-check" → "weather-check")
+		if prefix := t.Metadata.Name + "-"; strings.HasPrefix(name, prefix) {
+			name = strings.TrimPrefix(name, prefix)
+		}
+		role := child.Metadata.Labels["child-role"]
+
+		y := 0
+		if yStr, ok := child.Metadata.Labels["mywant.io/canvas-y"]; ok {
+			fmt.Sscanf(yStr, "%d", &y)
+		}
+		entries = append(entries, entry{name: name, role: role, result: fr, canvasY: y})
+	}
+
+	if len(entries) == 0 {
+		t.StoreLog("[TARGET] %s: no child final_results available yet", t.Metadata.Name)
+		return
+	}
+
+	// sort by canvas-y (top to bottom)
+	for i := 1; i < len(entries); i++ {
+		for j := i; j > 0 && entries[j].canvasY < entries[j-1].canvasY; j-- {
+			entries[j], entries[j-1] = entries[j-1], entries[j]
+		}
+	}
+
+	// Build JSON array: [{"name":"...","role":"...","result":...}, ...]
+	type jsonEntry struct {
+		Name   string `json:"name"`
+		Role   string `json:"role,omitempty"`
+		Result any    `json:"result"`
+	}
+	jsonEntries := make([]jsonEntry, len(entries))
+	for i, e := range entries {
+		jsonEntries[i] = jsonEntry{Name: e.name, Role: e.role, Result: e.result}
+	}
+	composed, err := json.Marshal(jsonEntries)
+	if err != nil {
+		t.StoreLog("[TARGET] ⚠️ %s: failed to marshal final_result to JSON: %v", t.Metadata.Name, err)
+		return
+	}
+
+	// Use storeState (lowercase) to avoid emitting a StateChangeEvent that would
+	// re-trigger currentStateExposeHandler → MergeParentState → onMergeState feedback loop.
+	t.storeState("final_result", json.RawMessage(composed))
+	t.StoreLog("[TARGET] ✅ %s: final_result aggregated from %d children:\n%s", t.Metadata.Name, len(entries), composed)
 }
 
 // === Test Helper Methods (for pkg/server tests) ===

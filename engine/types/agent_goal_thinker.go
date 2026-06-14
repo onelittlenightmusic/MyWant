@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 
-	. "mywant/engine/core"
 	ws "github.com/onelittlenightmusic/want-spec"
+	. "mywant/engine/core"
 )
 
 const goalThinkerAgentName = "goal_thinker"

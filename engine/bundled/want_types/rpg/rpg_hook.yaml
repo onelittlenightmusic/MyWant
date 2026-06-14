@@ -1,0 +1,220 @@
+wantType:
+  metadata:
+    name: rpg_hook
+    title: RPG Lifecycle Hook
+    description: |
+      Registers a filtered lifecycle webhook rule with the mywant server.
+      When a matching lifecycle event fires (want_created or want_achieved),
+      mywant POSTs the event plus embedded action metadata to the target URL.
+
+      Designed for skills-rpg integration: deploying this want installs the hook;
+      deleting it removes it automatically (similar to admission webhooks in k8s).
+    version: '1.0'
+    category: system
+    pattern: independent
+
+  finalResultField: hook_rule_id
+
+  onInitialize:
+    params:
+      rpg_event: event
+      rpg_match_type: match_type
+      rpg_match_owner: match_owner
+      rpg_match_name: match_name
+      rpg_target_url: target_url
+      mywant_url: mywant_url
+      rpg_activate: activate
+      rpg_skip_if_achievement: skip_if_achievement
+      rpg_require_achievements: require_achievements
+      rpg_run: run
+    plan:
+      rpg_hook_plan: "register"
+    executeAgents: true
+
+  onDelete:
+    plan:
+      rpg_hook_plan: "unregister"
+    executeAgents: true
+
+  parameters:
+    - name: event
+      description: Lifecycle event to subscribe to ("want_created" or "want_achieved")
+      type: string
+      required: true
+      validation:
+        enum: ["want_created", "want_achieved"]
+
+    - name: match_type
+      description: Only match wants with this type (e.g. "reminder")
+      type: string
+      required: false
+
+    - name: match_owner
+      description: Only match wants whose controller ownerReference has this name
+      type: string
+      required: false
+
+    - name: match_name
+      description: Only match wants with exactly this name
+      type: string
+      required: false
+
+    - name: target_url
+      description: URL to POST matching events to (e.g. "http://localhost:7100/api/v1/hooks/mywant")
+      type: string
+      required: true
+
+    - name: mywant_url
+      description: Base URL of the mywant server (used for in-process fallback HTTP)
+      type: string
+      required: false
+      default: "http://localhost:8080"
+
+    - name: activate
+      description: RPG achievement ID to activate when the event fires
+      type: string
+      required: false
+
+    - name: skip_if_achievement
+      description: Do not fire if this RPG achievement is already set
+      type: string
+      required: false
+
+    - name: require_achievements
+      description: JSON array of RPG achievement IDs that must ALL be present before firing
+      type: string
+      required: false
+
+    - name: run
+      description: JSON array of shell commands to run on the RPG server when the event fires
+      type: string
+      required: false
+
+  state:
+    - name: rpg_hook_plan
+      description: Lifecycle directive ("register" or "unregister")
+      type: string
+      persistent: false
+      label: plan
+      initialValue: ''
+
+    - name: rpg_event
+      description: Event type to subscribe to
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_match_type
+      description: Want type match criterion
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_match_owner
+      description: Owner name match criterion
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_match_name
+      description: Want name match criterion
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_target_url
+      description: Target URL for matching events
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: mywant_url
+      description: mywant server base URL
+      type: string
+      persistent: false
+      label: current
+      initialValue: 'http://localhost:8080'
+
+    - name: rpg_activate
+      description: RPG achievement to activate
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_skip_if_achievement
+      description: Skip firing if this achievement already set
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_require_achievements
+      description: JSON array of required achievements
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: rpg_run
+      description: JSON array of shell commands for RPG to run
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: hook_rule_id
+      description: ID of the registered lifecycle rule (returned by mywant)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: status
+      description: Hook registration status (running / stopped / failed)
+      type: string
+      persistent: true
+      label: current
+      initialValue: 'pending'
+
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      persistent: true
+      label: current
+      initialValue: 0
+
+  requires:
+    - rpg_hook_management
+
+  agents:
+    - name: rpg_hook_agent
+      role: action
+      description: Registers or unregisters a filtered lifecycle webhook rule with the mywant server.
+
+  examples:
+    - name: wife-reminder-hook
+      description: Fire RPG achievement when a reminder want under wife-target is created
+      want:
+        metadata:
+          name: hook-wife-created
+          type: rpg_hook
+        spec:
+          params:
+            event: want_created
+            match_type: reminder
+            match_owner: wife-target
+            target_url: "http://localhost:7100/api/v1/hooks/mywant"
+            activate: wife_remind_created
+            skip_if_achievement: wife_remind_created
+            run: '["mywant-gui say ''妻のリマインダーが加わった。'' --duration 4"]'
+      expectedBehavior: |
+        When deployed, registers a lifecycle rule that fires whenever a reminder want
+        is created with wife-target as owner.  The RPG server receives the event and
+        activates the wife_remind_created achievement.
+        When this want is deleted, the rule is automatically unregistered.

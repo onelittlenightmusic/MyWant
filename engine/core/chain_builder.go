@@ -19,6 +19,11 @@ import (
 // Global ChainBuilder instance for accessing retrigger functions
 var globalChainBuilder *ChainBuilder
 
+// OnWantAchieved is an optional callback invoked whenever a want transitions to
+// an achieved status.  It is called synchronously inside SetStatus so it must
+// not block.  Set once at server startup; nil means no-op.
+var OnWantAchieved func(w *Want)
+
 type ChangeEventType string
 
 const (
@@ -1274,6 +1279,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	// Automatically register labels in the global registry
 	cb.registerLabelsFromWant(wantConfig)
 }
+
 // FindChildWantsByOwnerID returns all runtime wants whose OwnerReferences
 // contain a controlling reference with the given owner ID.
 // Used by Target.Progress to detect children that survived a server restart.

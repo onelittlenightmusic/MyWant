@@ -203,8 +203,9 @@ var (
 
 // finalResultExposeSubscriberName returns the subscriber name for the auto-generated
 // final_result → parent propagation handler (registered when FinalResultField is set).
-func finalResultExposeSubscriberName(wantName string) string {
-	return fmt.Sprintf("%s:state-expose:final_result→.final_result", wantName)
+// parentName may be "" for top-level wants; must match GetSubscriberName() on currentStateExposeHandler.
+func finalResultExposeSubscriberName(wantName, parentName string) string {
+	return fmt.Sprintf("%s:state-expose:final_result→%s.final_result", wantName, parentName)
 }
 
 // getControllerParentName returns the parent want's name from OwnerReferences
@@ -357,12 +358,12 @@ func UnregisterWant(wantName string) {
 	if want == nil {
 		return
 	}
-	// Unsubscribe auto-generated FinalResultField handler
-	if want.Spec.FinalResultField != "" {
-		want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, finalResultExposeSubscriberName(wantName))
-	}
 	// Unsubscribe all expose handlers
 	parentName := getControllerParentName(want)
+	// Unsubscribe auto-generated FinalResultField handler (parentName must match GetSubscriberName)
+	if want.Spec.FinalResultField != "" {
+		want.GetSubscriptionSystem().Unsubscribe(EventTypeStateChange, finalResultExposeSubscriberName(wantName, parentName))
+	}
 	for _, entry := range want.Spec.Exposes {
 		if entry.Param != "" {
 			subscriberName := fmt.Sprintf("%s:param-expose:%s→%s", wantName, entry.As, entry.Param)

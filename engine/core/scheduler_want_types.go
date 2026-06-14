@@ -44,8 +44,11 @@ func (s *SchedulerWant) Progress() {
 		isTarget := want.Metadata.Type == "target" || want.Metadata.Type == "custom_target"
 
 		if isTarget {
-			// For targets, we just need to ensure they are started
-			// The builder will handle starting the progression loop if not already active
+			// After a server restart, targets restored in "reaching" state have no active
+			// goroutine. Reset to idle so startWant can restart the loop.
+			if IsReachingStatus(want.GetStatus()) && !want.goroutineActive.Load() {
+				want.RestartWant()
+			}
 			s.builder.startWant(name, rw)
 			continue // No need to create a scheduler agent for targets
 		}

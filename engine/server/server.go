@@ -253,10 +253,11 @@ func New(config Config) *Server {
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
-		memoStore: newMemoStore(),
+		memoStore:            newMemoStore(),
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},
+			&CanvasTileSizeHook{builder: globalBuilder},
 			&CanvasCoordinateHook{},
 		},
 	}
@@ -284,6 +285,12 @@ func (s *Server) Start() error {
 
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	go s.globalBuilder.ExecuteWithMode(true)
+
+	// Wire in-process rule registration so want agents can register without HTTP
+	wireRuleGlobals()
+
+	// Register push callback for want_achieved lifecycle webhooks
+	s.RegisterAchievementCallback()
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
@@ -405,6 +412,12 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.CanvasBgURL != "" {
 		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL
+	}
+	if s.config.CanvasBgColor != "" {
+		fullConfig["canvas_bg_color"] = s.config.CanvasBgColor
+	}
+	if s.config.CanvasDPad != nil {
+		fullConfig["canvas_dpad"] = *s.config.CanvasDPad
 	}
 
 	// 3. Save back to file

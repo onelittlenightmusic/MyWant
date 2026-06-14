@@ -65,6 +65,20 @@ wantType:
       persistent: false
       initialValue: 1.0
 
+    - name: canvas_cursor_x
+      description: X tile coordinate of the CursorMan on the 2D canvas (used for cross-tab cursor sync)
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: canvas_cursor_y
+      description: Y tile coordinate of the CursorMan on the 2D canvas (used for cross-tab cursor sync)
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
     # ── Robot cursor fields ────────────────────────────────────────────────────
     # Used by mywant-gui robot overlay (driven by CLI commands like `mywant gui wants open`)
 

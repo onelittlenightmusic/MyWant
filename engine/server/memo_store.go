@@ -1,6 +1,7 @@
 package server
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 	"sort"
@@ -8,6 +9,17 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed subtypes.yaml
+var subtypesYAML []byte
+
+// subtypeDefs is loaded once at init from the embedded subtypes.yaml.
+var subtypeDefs map[string]SubtypeInfo
+
+func init() {
+	subtypeDefs = make(map[string]SubtypeInfo)
+	_ = yaml.Unmarshal(subtypesYAML, &subtypeDefs)
+}
 
 // MemoStore persists user-entered values to ~/.mywant/memo.yaml, grouped by subtype.
 // Thread-safe; reads and writes are serialised via a mutex.
@@ -126,24 +138,24 @@ func (m *MemoStore) AllSubtypes() []string {
 	return keys
 }
 
-// subtypeToKey converts a subtype name to its memo.yaml section key.
-// "location" → "locations", "person" → "people", etc.
-var subtypeKeyMap = map[string]string{
-	"location": "locations",
-	"person":   "people",
-	"place":    "places",
-	"city":     "cities",
-	"country":  "countries",
-	"url":      "urls",
-	"email":    "emails",
-	"tag":      "tags",
-	"date":     "dates",
-	"keyword":  "keywords",
+// SubtypeInfo holds display metadata for a parameter subtype.
+type SubtypeInfo struct {
+	Key  string `json:"key"`  // memo.yaml section key (e.g. "cities")
+	Icon string `json:"icon"` // Lucide icon component name (e.g. "Building2")
+}
+
+// SubtypeDefinitions returns a copy of all known subtype definitions.
+func SubtypeDefinitions() map[string]SubtypeInfo {
+	out := make(map[string]SubtypeInfo, len(subtypeDefs))
+	for k, v := range subtypeDefs {
+		out[k] = v
+	}
+	return out
 }
 
 func subtypeToKey(subtype string) string {
-	if k, ok := subtypeKeyMap[subtype]; ok {
-		return k
+	if info, ok := subtypeDefs[subtype]; ok {
+		return info.Key
 	}
 	// Default: append "s"
 	return subtype + "s"

@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	ws "github.com/onelittlenightmusic/want-spec"
 	mywant "mywant/engine/core"
 	_ "mywant/engine/types"
-	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 func main() {

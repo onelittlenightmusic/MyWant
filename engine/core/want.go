@@ -413,6 +413,11 @@ func (n *Want) SetStatus(status WantStatus) {
 			// Automatically emit OwnerCompletionEvent to parent target if this want has an owner
 			// This is part of the standard progression cycle completion pattern
 			n.emitOwnerCompletionEventIfOwned()
+
+			// Fire global achievement callback (non-blocking; used by lifecycle webhooks)
+			if OnWantAchieved != nil {
+				go OnWantAchieved(n)
+			}
 		}
 
 		// OpenTelemetry: manage want lifecycle span
@@ -678,8 +683,6 @@ func (n *Want) checkPreconditions(paths Paths) bool {
 		checkCountBounds(len(paths.Out), cm.RequiredOutputs, cm.MaxOutputs)
 }
 
-
-
 // StartProgressionLoop starts the want execution loop in a goroutine
 //
 // Parameters (minimal interface):
@@ -782,7 +785,7 @@ func (n *Want) StartProgressionLoop(
 
 			// 3.2. Check for terminal/error status
 			status := n.GetStatus()
-			if status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError || status == WantStatusCancelled {
+			if IsAchievedStatus(status) || status == WantStatusFailed || status == WantStatusTerminated || status == WantStatusModuleError || status == WantStatusCancelled {
 				n.stopAgents("on terminal state")
 				return
 			}
@@ -1450,7 +1453,6 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	n.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
-
 // Init initializes the Want base type with metadata and spec, plus type-specific fields This is a helper method used by all want constructors to reduce boilerplate Usage in want types: func NewMyWant(metadata Metadata, spec WantSpec) *MyWant {
 // w := &MyWant{Want: Want{}} w.Init(metadata, spec)  // Common initialization w.WantType = "my_type"  // Type-specific fields w.ConnectivityMetadata = ConnectivityMetadata{...}
 func (n *Want) Init() {
@@ -1901,4 +1903,3 @@ func (w *Want) GetHTTPClient() *HTTPClient {
 	}
 	return cb.GetHTTPClient()
 }
-

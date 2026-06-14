@@ -56,10 +56,10 @@ type ExposeEntry struct {
 
 // WantSpec represents want specification
 type WantSpec struct {
-	Params  map[string]any      `json:"params"`
-	Using   []ws.UsingEntry     `json:"using,omitempty"`
-	When    []WhenSpec          `json:"when,omitempty"`
-	Exposes []ExposeEntry       `json:"exposes,omitempty" yaml:"exposes,omitempty"`
+	Params  map[string]any  `json:"params"`
+	Using   []ws.UsingEntry `json:"using,omitempty"`
+	When    []WhenSpec      `json:"when,omitempty"`
+	Exposes []ExposeEntry   `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 }
 
 // WhenSpec defines a scheduled execution time for a Want

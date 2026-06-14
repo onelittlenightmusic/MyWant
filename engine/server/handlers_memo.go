@@ -43,6 +43,14 @@ func (s *Server) getMemo(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, result)
 }
 
+// GET /api/v1/memo/subtypes
+// Returns all known subtype definitions (key and icon name), sorted by subtype name.
+func (s *Server) getMemoSubtypes(w http.ResponseWriter, r *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"subtypes": SubtypeDefinitions(),
+	})
+}
+
 // PUT /api/v1/memo
 // Replaces the entire memo with the provided map[string][]string.
 func (s *Server) putMemo(w http.ResponseWriter, r *http.Request) {

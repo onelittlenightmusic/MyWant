@@ -135,68 +135,152 @@ func (h *MemoHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) er
 // ── Built-in hook: canvas coordinate assignment ───────────────────────────────
 
 const (
-	canvasLabelX = "mywant.io/canvas-x"
-	canvasLabelY = "mywant.io/canvas-y"
+	canvasLabelX        = "mywant.io/canvas-x"
+	canvasLabelY        = "mywant.io/canvas-y"
+	canvasLabelRotation = "mywant.io/canvas-rotation"
+	canvasLabelLength   = "mywant.io/canvas-length"
 )
 
+// categoryDefaultLength maps want-type category → default extra-cell count.
+// length=0 means 1×1, length=1 means 1×2, etc.
+var categoryDefaultLength = map[string]int{
+	"travel":    1,
+	"transit":   1,
+	"transport": 1,
+	"tunnel":    1,
+}
+
+// CanvasTileSizeHook sets default canvas-rotation (0) and canvas-length (category-dependent)
+// on wants that do not already have them.  Must run before CanvasCoordinateHook.
+type CanvasTileSizeHook struct {
+	builder interface {
+		GetWantTypeDefinition(typeName string) *mywant.WantTypeDefinition
+	}
+}
+
+func (h *CanvasTileSizeHook) Name() string { return "canvas-tile-size" }
+
+func (h *CanvasTileSizeHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) error {
+	if want.Metadata.Labels == nil {
+		want.Metadata.Labels = make(map[string]string)
+	}
+	if want.Metadata.Labels[canvasLabelRotation] == "" {
+		want.Metadata.Labels[canvasLabelRotation] = "0"
+	}
+	if want.Metadata.Labels[canvasLabelLength] == "" {
+		defaultLen := 0
+		typeDef := h.builder.GetWantTypeDefinition(want.Metadata.Type)
+		if typeDef != nil {
+			if dl, ok := categoryDefaultLength[typeDef.Metadata.Category]; ok {
+				defaultLen = dl
+			}
+		}
+		want.Metadata.Labels[canvasLabelLength] = strconv.Itoa(defaultLen)
+	}
+	return nil
+}
+
+// tileFootprint returns all grid cells occupied by a want anchored at (ax, ay).
+// rotation: 0=right, 90=down, 180=left, 270=up. length = extra cells beyond the anchor.
+func tileFootprint(ax, ay, rotation, length int) [][2]int {
+	span := length + 1
+	cells := make([][2]int, span)
+	for i := range span {
+		switch rotation {
+		case 90:
+			cells[i] = [2]int{ax, ay + i}
+		case 180:
+			cells[i] = [2]int{ax - i, ay}
+		case 270:
+			cells[i] = [2]int{ax, ay - i}
+		default: // 0
+			cells[i] = [2]int{ax + i, ay}
+		}
+	}
+	return cells
+}
+
+// markWantOccupied adds all cells of a want (including multi-cell spans) into occupied.
+func markWantOccupied(w *mywant.Want, occupied map[[2]int]bool) {
+	if w.Metadata.Labels == nil {
+		return
+	}
+	rx, errX := strconv.Atoi(w.Metadata.Labels[canvasLabelX])
+	ry, errY := strconv.Atoi(w.Metadata.Labels[canvasLabelY])
+	if errX != nil || errY != nil {
+		return
+	}
+	rot := 0
+	length := 0
+	if v, err := strconv.Atoi(w.Metadata.Labels[canvasLabelRotation]); err == nil {
+		rot = v
+	}
+	if v, err := strconv.Atoi(w.Metadata.Labels[canvasLabelLength]); err == nil {
+		length = v
+	}
+	for _, c := range tileFootprint(rx, ry, rot, length) {
+		occupied[c] = true
+	}
+}
+
 // CanvasCoordinateHook assigns mywant.io/canvas-x and canvas-y labels to wants
-// that do not already have them.  It places each new want at the next free grid
-// cell, scanning row-by-row from (0,0), skipping cells occupied by existing or
-// already-assigned wants in the same batch.
+// that do not already have them.  It places each new want at the next free anchor
+// cell, scanning row-by-row from (0,0), accounting for multi-cell tile footprints.
 type CanvasCoordinateHook struct{}
 
 func (h *CanvasCoordinateHook) Name() string { return "canvas-coordinate" }
 
 func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {
-	// Skip if coordinates already set (e.g. want was explicitly positioned or is a child).
 	if want.Metadata.Labels == nil {
 		want.Metadata.Labels = make(map[string]string)
 	}
 	if want.Metadata.Labels[canvasLabelX] != "" && want.Metadata.Labels[canvasLabelY] != "" {
 		return nil
 	}
-	// Skip child wants (they are managed by their parent Target).
 	if len(want.Metadata.OwnerReferences) > 0 {
 		return nil
 	}
 
-	// Build occupied set from existing wants + already-assigned batch members.
-	type cell struct{ x, y int }
-	occupied := make(map[cell]bool)
+	// Read this want's own rotation/length (set by CanvasTileSizeHook).
+	myRot := 0
+	myLen := 0
+	if v, err := strconv.Atoi(want.Metadata.Labels[canvasLabelRotation]); err == nil {
+		myRot = v
+	}
+	if v, err := strconv.Atoi(want.Metadata.Labels[canvasLabelLength]); err == nil {
+		myLen = v
+	}
 
+	// Build occupied set, accounting for multi-cell spans of existing tiles.
+	occupied := make(map[[2]int]bool)
 	for _, w := range allWants {
-		if w.Metadata.Labels == nil {
-			continue
-		}
-		rx, errX := strconv.Atoi(w.Metadata.Labels[canvasLabelX])
-		ry, errY := strconv.Atoi(w.Metadata.Labels[canvasLabelY])
-		if errX == nil && errY == nil {
-			occupied[cell{rx, ry}] = true
-		}
+		markWantOccupied(w, occupied)
 	}
 	for _, bw := range newBatch {
 		if bw.Metadata.ID == want.Metadata.ID {
-			continue // skip self
-		}
-		if bw.Metadata.Labels == nil {
 			continue
 		}
-		rx, errX := strconv.Atoi(bw.Metadata.Labels[canvasLabelX])
-		ry, errY := strconv.Atoi(bw.Metadata.Labels[canvasLabelY])
-		if errX == nil && errY == nil {
-			occupied[cell{rx, ry}] = true
-		}
+		markWantOccupied(bw, occupied)
 	}
 
-	// Find the next free cell scanning left-to-right, top-to-bottom (row width = 10).
+	// Find the next free anchor scanning left-to-right, top-to-bottom (row width = 10).
 	const rowWidth = 10
 	for row := 0; ; row++ {
-		for col := 0; col < rowWidth; col++ {
-			c := cell{col, row}
-			if !occupied[c] {
+		for col := range rowWidth {
+			fp := tileFootprint(col, row, myRot, myLen)
+			allFree := true
+			for _, c := range fp {
+				if occupied[c] {
+					allFree = false
+					break
+				}
+			}
+			if allFree {
 				want.Metadata.Labels[canvasLabelX] = strconv.Itoa(col)
 				want.Metadata.Labels[canvasLabelY] = strconv.Itoa(row)
-				occupied[c] = true // claim for the next want in the batch
+				for _, c := range fp {
+					occupied[c] = true
+				}
 				return nil
 			}
 		}

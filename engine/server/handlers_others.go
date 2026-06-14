@@ -44,6 +44,8 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	if newConfig.IconFont != "" {
 		s.config.IconFont = newConfig.IconFont
 	}
+	s.config.CanvasBgColor = newConfig.CanvasBgColor
+	s.config.CanvasDPad = newConfig.CanvasDPad
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()

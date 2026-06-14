@@ -154,9 +154,9 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i, want := range runtimeWants {
-		dtoWants[i].Metadata.Labels   = want.Metadata.Labels
+		dtoWants[i].Metadata.Labels = want.Metadata.Labels
 		dtoWants[i].Metadata.OrderKey = want.Metadata.OrderKey
-		dtoWants[i].Spec.Requires     = want.Spec.Requires
+		dtoWants[i].Spec.Requires = want.Spec.Requires
 	}
 
 	executionID := generateWantID()
@@ -183,6 +183,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 		wantNames = append(wantNames, want.Metadata.Name)
 	}
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(runtimeWants)))
+	s.notifyWantCreated(runtimeWants)
 
 	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"id":       executionID,
@@ -445,6 +446,15 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 	if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
+	}
+
+	// Record memo entries for SubType params (same as creation hook) so that
+	// editing an existing want also updates suggestion history.
+	for _, hook := range s.wantCreationHooks {
+		if hook.Name() == "memo" {
+			_ = hook.Run(updatedWant, nil, nil)
+			break
+		}
 	}
 
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
