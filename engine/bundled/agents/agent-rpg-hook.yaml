@@ -1,7 +1,0 @@
-agents:
-  - name: rpg_hook_agent
-    runtime: localGo
-    type: do
-    capabilities:
-      - rpg_hook_management
-    description: "Registers and unregisters filtered lifecycle webhook rules with the mywant server for RPG integration."

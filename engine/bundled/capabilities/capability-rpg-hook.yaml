@@ -1,5 +1,0 @@
-capabilities:
-  - name: rpg_hook_management
-    gives:
-      -
-      - rpg_hook_management

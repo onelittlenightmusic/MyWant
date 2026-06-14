@@ -1,0 +1,5 @@
+capabilities:
+  - name: lifecycle_hook_management
+    gives:
+      -
+      - lifecycle_hook_management

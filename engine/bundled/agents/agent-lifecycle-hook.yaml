@@ -1,0 +1,6 @@
+agents:
+  - name: lifecycle_hook_agent
+    runtime: localGo
+    type: do
+    capabilities:
+      - lifecycle_hook_management
