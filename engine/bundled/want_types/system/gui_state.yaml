@@ -157,6 +157,27 @@ wantType:
       persistent: false
       initialValue: ""
 
+    - name: float_card_corner
+      description: Corner of the screen where the canvas float card is anchored ("top-left" | "top-right" | "bottom-left" | "bottom-right")
+      type: string
+      label: current
+      persistent: false
+      initialValue: "bottom-left"
+
+    - name: canvas_center_x
+      description: X canvas coordinate of the viewport center (used for cross-tab pan sync)
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: canvas_center_y
+      description: Y canvas coordinate of the viewport center (used for cross-tab pan sync)
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
     # ── Add Want form control (driven by CLI) ─────────────────────────────────
 
     - name: add_form_open

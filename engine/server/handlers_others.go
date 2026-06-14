@@ -1296,6 +1296,7 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 	seq := currentGUIStateSeq()
 	etagValue := fmt.Sprintf(`"%d"`, seq)
 	w.Header().Set("ETag", etagValue)
+	w.Header().Set("Cache-Control", "no-cache")
 	if r.Header.Get("If-None-Match") == etagValue {
 		w.WriteHeader(http.StatusNotModified)
 		return
