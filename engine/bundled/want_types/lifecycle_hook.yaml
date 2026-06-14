@@ -13,6 +13,8 @@ wantType:
     version: '1.0'
     category: system
     pattern: independent
+    labels:
+      type-icon: Webhook
 
   finalResultField: hook_rule_ids
 
