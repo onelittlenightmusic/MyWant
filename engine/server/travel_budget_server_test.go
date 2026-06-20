@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -134,12 +135,12 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 	t.Logf("Budget ID: %s", budgetWant.Metadata.ID)
 	t.Logf("Hotel ID:  %s", hotelWant.Metadata.ID)
 
-	verifyCorrelation := func(t *testing.T, w *mywant.Want, peerID string, label string) {
+	verifyCorrelation := func(t *testing.T, w *mywant.Want, peerID string, labelPrefix string) {
 		found := false
 		for _, entry := range w.Metadata.Correlation {
 			if entry.WantID == peerID {
 				for _, l := range entry.Labels {
-					if l == label {
+					if l == labelPrefix || strings.HasPrefix(l, labelPrefix+":") {
 						found = true
 						break
 					}
@@ -148,9 +149,9 @@ func TestTravelBudgetSystem_Integration(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("Want %s (%s): Correlation with %s via %s not found. Current entries: %v",
-				w.Metadata.Name, w.Metadata.ID, peerID, label, w.Metadata.Correlation)
+				w.Metadata.Name, w.Metadata.ID, peerID, labelPrefix, w.Metadata.Correlation)
 		} else {
-			t.Logf("✅ Want %s has correlation with %s via %s", w.Metadata.Name, peerID, label)
+			t.Logf("✅ Want %s has correlation with %s via %s", w.Metadata.Name, peerID, labelPrefix)
 		}
 	}
 
