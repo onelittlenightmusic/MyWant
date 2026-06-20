@@ -1,0 +1,49 @@
+# Data type catalog.
+# Top-level key  = type name used as identifier everywhere (parameter subType, fieldTypeMap values, etc.)
+# key            = memo.yaml section key for suggestion history (kept for backward compat)
+# icon           = Lucide React component name
+# color          = hex color for UI (roads, badges, parameter cards)
+# base_type      = parent primitive type; empty = primitive itself
+
+# ── Primitive types ────────────────────────────────────────────────────────────
+string:    { key: strings,    icon: Type,         color: "#94a3b8" }
+number:    { key: numbers,    icon: Hash,          color: "#3b82f6" }
+float64:   { key: floats,     icon: Hash,          color: "#3b82f6" }
+bool:      { key: booleans,   icon: ToggleLeft,    color: "#f97316" }
+array:     { key: arrays,     icon: Rows3,         color: "#22c55e" }
+object:    { key: objects,    icon: Box,           color: "#8b5cf6" }
+want_type: { key: want_types, icon: Zap,           color: "#a855f7" }
+
+# ── String subtypes ────────────────────────────────────────────────────────────
+image:     { key: images,     icon: Image,        color: "#a855f7", base_type: string }
+image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string }
+url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string }
+date:     { key: dates,     icon: Calendar,     color: "#f59e0b", base_type: string }
+time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string }
+city:     { key: cities,    icon: Building2,    color: "#06b6d4", base_type: string }
+station:  { key: stations,  icon: Train,        color: "#06b6d4", base_type: string }
+location: { key: locations, icon: MapPin,       color: "#06b6d4", base_type: string }
+place:    { key: places,    icon: MapPin,       color: "#06b6d4", base_type: string }
+country:  { key: countries, icon: Flag,         color: "#64748b", base_type: string }
+airport:  { key: airports,  icon: Plane,        color: "#06b6d4", base_type: string }
+landmark: { key: landmarks, icon: Landmark,     color: "#06b6d4", base_type: string }
+address:  { key: addresses, icon: Home,         color: "#64748b", base_type: string }
+email:    { key: emails,    icon: Mail,         color: "#64748b", base_type: string }
+phone:    { key: phones,    icon: Phone,        color: "#64748b", base_type: string }
+name:     { key: names,     icon: User,         color: "#64748b", base_type: string }
+person:   { key: people,    icon: User,         color: "#64748b", base_type: string }
+tag:      { key: tags,      icon: Tag,          color: "#64748b", base_type: string }
+keyword:  { key: keywords,  icon: Search,       color: "#64748b", base_type: string }
+secret:   { key: secrets,   icon: EyeOff,       color: "#64748b", base_type: string }
+hotel:    { key: hotels,    icon: Landmark,     color: "#06b6d4", base_type: string }
+shop:     { key: shops,     icon: ShoppingCart, color: "#64748b", base_type: string }
+product:  { key: products,  icon: Package,      color: "#64748b", base_type: string }
+price:    { key: prices,    icon: DollarSign,   color: "#3b82f6", base_type: string }
+amount:   { key: amounts,   icon: DollarSign,   color: "#3b82f6", base_type: string }
+job:      { key: jobs,      icon: Briefcase,    color: "#64748b", base_type: string }
+book:     { key: books,     icon: BookOpen,     color: "#64748b", base_type: string }
+music:    { key: musics,    icon: Music,        color: "#64748b", base_type: string }
+movie:    { key: movies,    icon: Film,         color: "#64748b", base_type: string }
+favorite: { key: favorites, icon: Heart,        color: "#f97316", base_type: string }
+rating:   { key: ratings,   icon: Star,         color: "#f59e0b", base_type: string }
+weather:  { key: weathers,  icon: Cloud,        color: "#38bdf8", base_type: string }

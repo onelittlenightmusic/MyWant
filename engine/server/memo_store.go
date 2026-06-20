@@ -10,15 +10,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-//go:embed subtypes.yaml
-var subtypesYAML []byte
+//go:embed datatypes.yaml
+var datatypesYAML []byte
 
-// subtypeDefs is loaded once at init from the embedded subtypes.yaml.
-var subtypeDefs map[string]SubtypeInfo
+// dataTypeDefs is loaded once at init from the embedded datatypes.yaml.
+var dataTypeDefs map[string]DataTypeInfo
 
 func init() {
-	subtypeDefs = make(map[string]SubtypeInfo)
-	_ = yaml.Unmarshal(subtypesYAML, &subtypeDefs)
+	dataTypeDefs = make(map[string]DataTypeInfo)
+	_ = yaml.Unmarshal(datatypesYAML, &dataTypeDefs)
 }
 
 // MemoStore persists user-entered values to ~/.mywant/memo.yaml, grouped by subtype.
@@ -138,23 +138,25 @@ func (m *MemoStore) AllSubtypes() []string {
 	return keys
 }
 
-// SubtypeInfo holds display metadata for a parameter subtype.
-type SubtypeInfo struct {
-	Key  string `json:"key"`  // memo.yaml section key (e.g. "cities")
-	Icon string `json:"icon"` // Lucide icon component name (e.g. "Building2")
+// DataTypeInfo holds display metadata for a data type (primitive or subtype).
+type DataTypeInfo struct {
+	Key      string `yaml:"key"       json:"memoKey"`            // memo.yaml section key (e.g. "cities")
+	Icon     string `yaml:"icon"      json:"icon"`               // Lucide icon component name
+	Color    string `yaml:"color"     json:"color"`              // hex color for UI
+	BaseType string `yaml:"base_type" json:"baseType,omitempty"` // parent primitive type; empty = primitive
 }
 
-// SubtypeDefinitions returns a copy of all known subtype definitions.
-func SubtypeDefinitions() map[string]SubtypeInfo {
-	out := make(map[string]SubtypeInfo, len(subtypeDefs))
-	for k, v := range subtypeDefs {
+// DataTypeDefinitions returns a copy of all known data type definitions.
+func DataTypeDefinitions() map[string]DataTypeInfo {
+	out := make(map[string]DataTypeInfo, len(dataTypeDefs))
+	for k, v := range dataTypeDefs {
 		out[k] = v
 	}
 	return out
 }
 
 func subtypeToKey(subtype string) string {
-	if info, ok := subtypeDefs[subtype]; ok {
+	if info, ok := dataTypeDefs[subtype]; ok {
 		return info.Key
 	}
 	// Default: append "s"

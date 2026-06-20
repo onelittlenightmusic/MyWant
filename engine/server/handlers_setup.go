@@ -170,6 +170,9 @@ func (s *Server) setupRoutes() {
 	lifecycle.HandleFunc("/rules/{id}", s.deleteLifecycleRule).Methods("DELETE", "OPTIONS")
 	lifecycle.HandleFunc("/{id}", s.deleteLifecycleWebhook).Methods("DELETE", "OPTIONS")
 
+	// Field types catalog (color + icon per semantic field type)
+	api.HandleFunc("/datatypes", s.getDataTypes).Methods("GET", "OPTIONS")
+
 	// OpenAPI Spec
 	api.HandleFunc("/spec", s.getSpec).Methods("GET")
 
@@ -225,6 +228,12 @@ func (s *Server) setupRoutes() {
 	reactions.HandleFunc("/{id}", s.addReactionToQueue).Methods("PUT")
 	reactions.HandleFunc("/{id}", s.deleteReactionQueue).Methods("DELETE")
 	reactions.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
+
+	// OAuth 2.0 callback — generic Authorization Code redirect endpoint.
+	// Providers set redirect_uri=http://localhost:8080/api/v1/oauth/callback and
+	// state=<want-name>. The handler stores query params as webhook_payload on that want.
+	api.HandleFunc("/oauth/callback", s.receiveOAuthCallback).Methods("GET")
+	api.HandleFunc("/oauth/callback", s.handleOptions).Methods("OPTIONS")
 
 	// Webhooks
 	webhooks := api.PathPrefix("/webhooks").Subrouter()

@@ -60,6 +60,16 @@ wantType:
     - name: weather_text
       description: One-line weather summary
       type: string
+      subType: weather
+      persistent: true
+      label: current
+      exposable: true
+      initialValue: ''
+
+    - name: weather_condition
+      description: Canonical condition (sunny/cloudy/rain/storm/snow/fog/default)
+      type: string
+      subType: weather
       persistent: true
       label: current
       exposable: true

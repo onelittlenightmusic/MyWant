@@ -256,7 +256,7 @@ func (s *Server) setWantStateKey(w http.ResponseWriter, r *http.Request) {
 	wantID := vars["id"]
 	key := vars["key"]
 
-	want := s.findWantByIDInAll(wantID)
+	want := s.findWantByIDOrName(wantID)
 	if want == nil {
 		s.JSONError(w, r, http.StatusNotFound, "want not found", "")
 		return

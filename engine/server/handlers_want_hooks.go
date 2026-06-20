@@ -223,19 +223,24 @@ func markWantOccupied(w *mywant.Want, occupied map[[2]int]bool) {
 	}
 }
 
-// CanvasCoordinateHook assigns mywant.io/canvas-x and canvas-y labels to wants
-// that do not already have them.  It places each new want at the next free anchor
-// cell, scanning row-by-row from (0,0), accounting for multi-cell tile footprints.
+// CanvasCoordinateHook assigns mywant.io/canvas-x and canvas-y labels to wants.
+// If a position is already set (e.g. from cursorman location), it verifies the
+// footprint is free; if occupied it spirals outward to find the nearest free cell.
+// Wants without a requested position are placed via a default row-by-row scan.
 type CanvasCoordinateHook struct{}
 
 func (h *CanvasCoordinateHook) Name() string { return "canvas-coordinate" }
 
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {
 	if want.Metadata.Labels == nil {
 		want.Metadata.Labels = make(map[string]string)
-	}
-	if want.Metadata.Labels[canvasLabelX] != "" && want.Metadata.Labels[canvasLabelY] != "" {
-		return nil
 	}
 	if len(want.Metadata.OwnerReferences) > 0 {
 		return nil
@@ -263,24 +268,57 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 		markWantOccupied(bw, occupied)
 	}
 
-	// Find the next free anchor scanning left-to-right, top-to-bottom (row width = 10).
+	isFreeAt := func(x, y int) bool {
+		for _, c := range tileFootprint(x, y, myRot, myLen) {
+			if occupied[c] {
+				return false
+			}
+		}
+		return true
+	}
+	placeAt := func(x, y int) {
+		want.Metadata.Labels[canvasLabelX] = strconv.Itoa(x)
+		want.Metadata.Labels[canvasLabelY] = strconv.Itoa(y)
+		for _, c := range tileFootprint(x, y, myRot, myLen) {
+			occupied[c] = true
+		}
+	}
+
+	// If a requested position was provided by the frontend (e.g. cursorman position),
+	// try it first; if occupied spiral outward (Chebyshev rings) to find nearest free cell.
+	if want.Metadata.Labels[canvasLabelX] != "" && want.Metadata.Labels[canvasLabelY] != "" {
+		reqX, errX := strconv.Atoi(want.Metadata.Labels[canvasLabelX])
+		reqY, errY := strconv.Atoi(want.Metadata.Labels[canvasLabelY])
+		if errX == nil && errY == nil {
+			if isFreeAt(reqX, reqY) {
+				placeAt(reqX, reqY)
+				return nil
+			}
+			for radius := 1; radius <= 100; radius++ {
+				for dx := -radius; dx <= radius; dx++ {
+					for dy := -radius; dy <= radius; dy++ {
+						if absInt(dx) != radius && absInt(dy) != radius {
+							continue
+						}
+						if isFreeAt(reqX+dx, reqY+dy) {
+							placeAt(reqX+dx, reqY+dy)
+							return nil
+						}
+					}
+				}
+			}
+		}
+		// Clear labels so the fallback scan can reassign.
+		want.Metadata.Labels[canvasLabelX] = ""
+		want.Metadata.Labels[canvasLabelY] = ""
+	}
+
+	// Fallback: scan left-to-right, top-to-bottom from (0,0).
 	const rowWidth = 10
 	for row := 0; ; row++ {
 		for col := range rowWidth {
-			fp := tileFootprint(col, row, myRot, myLen)
-			allFree := true
-			for _, c := range fp {
-				if occupied[c] {
-					allFree = false
-					break
-				}
-			}
-			if allFree {
-				want.Metadata.Labels[canvasLabelX] = strconv.Itoa(col)
-				want.Metadata.Labels[canvasLabelY] = strconv.Itoa(row)
-				for _, c := range fp {
-					occupied[c] = true
-				}
+			if isFreeAt(col, row) {
+				placeAt(col, row)
 				return nil
 			}
 		}

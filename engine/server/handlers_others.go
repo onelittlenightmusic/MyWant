@@ -46,6 +46,7 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	s.config.CanvasBgColor = newConfig.CanvasBgColor
 	s.config.CanvasDPad = newConfig.CanvasDPad
+	s.config.CanvasWeatherEffect = newConfig.CanvasWeatherEffect
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()

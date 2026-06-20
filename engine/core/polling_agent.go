@@ -79,6 +79,11 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 
 				if shouldStop {
 					p.want.StoreLog("[%s] Termination condition met for %s, stopping monitoring\n", p.name, w.Metadata.Name)
+					// Self-remove from backgroundAgents so ExecuteAgents() can restart this
+					// agent on the next Progress() tick without waiting for a full want restart.
+					w.backgroundMutex.Lock()
+					delete(w.backgroundAgents, p.id)
+					w.backgroundMutex.Unlock()
 					return
 				}
 			}

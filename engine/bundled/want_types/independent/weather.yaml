@@ -39,9 +39,20 @@ wantType:
     - name: weather_text
       description: Current weather summary text
       type: string
+      subType: weather
       persistent: true
       label: current
       initialValue: ''
+      exposable: true
+
+    - name: weather_condition
+      description: Canonical condition (sunny/cloudy/rain/storm/snow/fog/default)
+      type: string
+      subType: weather
+      persistent: true
+      label: current
+      initialValue: ''
+      exposable: true
 
     - name: weather_date
       description: Date when weather was last fetched (YYYY-MM-DD)

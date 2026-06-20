@@ -44,10 +44,10 @@ func (s *Server) getMemo(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/v1/memo/subtypes
-// Returns all known subtype definitions (key and icon name), sorted by subtype name.
+// Backward-compat alias — redirects callers to /api/v1/datatypes response shape.
 func (s *Server) getMemoSubtypes(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{
-		"subtypes": SubtypeDefinitions(),
+		"subtypes": DataTypeDefinitions(),
 	})
 }
 

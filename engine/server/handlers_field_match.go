@@ -48,10 +48,11 @@ type FieldRef struct {
 	WantID      string `json:"want_id"`
 	WantName    string `json:"want_name"`
 	FieldName   string `json:"field_name"`
-	FieldType   string `json:"field_type"`   // "array", "string", "number", "bool", "object"
-	Label       string `json:"label"`        // "current", "plan", "goal", or "" (unlabeled)
-	IsFinal     bool   `json:"is_final"`     // true if this is the want type's finalResultField
-	IsExposable bool   `json:"is_exposable"` // true if the want type declares exposable: true for this field
+	FieldType   string `json:"field_type"`             // runtime type: "array", "string", "number", "bool", "object"
+	DataType    string `json:"data_type,omitempty"`    // semantic type from want type def: "weather", "date", "url", etc.
+	Label       string `json:"label"`                  // "current", "plan", "goal", or "" (unlabeled)
+	IsFinal     bool   `json:"is_final"`               // true if this is the want type's finalResultField
+	IsExposable bool   `json:"is_exposable"`           // true if the want type declares exposable: true for this field
 }
 
 // ParamRef describes the target parameter to be written.
@@ -283,11 +284,15 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 	typeDef := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
 	finalField := ""
 	exposableFields := make(map[string]bool)
+	fieldDataTypes := make(map[string]string) // fieldName → semantic subtype from StateDef.SubType
 	if typeDef != nil {
 		finalField = typeDef.FinalResultField
 		for _, sd := range typeDef.State {
 			if sd.Exposable {
 				exposableFields[sd.Name] = true
+			}
+			if sd.SubType != "" {
+				fieldDataTypes[sd.Name] = sd.SubType
 			}
 		}
 	}
@@ -318,6 +323,7 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 			WantName:    want.Metadata.Name,
 			FieldName:   k,
 			FieldType:   runtimeTypeName(v),
+			DataType:    fieldDataTypes[k],
 			Label:       stateLabelString(effective),
 			IsFinal:     k == finalField,
 			IsExposable: exposableFields[k],
@@ -439,9 +445,25 @@ func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, 
 			continue
 		}
 
-		// Score: finalResultField >> exposable >> current >> plan/goal
+		// Check semantic type match: source DataType matches the target field's declared type.
+		// e.g. source field DataType="weather" and target localKey field has type="weather".
+		semanticMatch := false
+		if sf.DataType != "" {
+			if targetDef := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type); targetDef != nil {
+				for _, st := range targetDef.State {
+					if st.Name == localKey && st.SubType == sf.DataType {
+						semanticMatch = true
+						break
+					}
+				}
+			}
+		}
+
+		// Score: semantic type match >> finalResultField >> exposable >> current >> plan/goal
 		score := 0.3
-		if sf.IsFinal {
+		if semanticMatch {
+			score = 0.95
+		} else if sf.IsFinal {
 			score = 0.85
 		} else if sf.IsExposable {
 			score = 0.75

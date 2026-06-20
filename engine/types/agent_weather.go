@@ -48,9 +48,11 @@ func executeWeatherFetch(ctx context.Context, want *Want) error {
 		want.StoreLog("[WEATHER] Fetch failed: %v", err)
 		text = "天気情報を取得できませんでした"
 	}
+	cond := classifyWeatherCondition(text)
 	want.SetCurrent("weather_text", text)
+	want.SetCurrent("weather_condition", cond)
 	want.SetCurrent("weather_date", time.Now().Format("2006-01-02"))
-	want.StoreLog("[WEATHER] Done: %s", text)
+	want.StoreLog("[WEATHER] Done: %s → condition=%s", text, cond)
 	return nil
 }
 

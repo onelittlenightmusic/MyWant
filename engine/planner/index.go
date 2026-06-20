@@ -15,10 +15,10 @@ import (
 // ExposableField is an entry in the Planner's capability index.
 // Built by scanning all registered WantTypeDefinitions for Exposable:true state fields.
 type ExposableField struct {
-	WantType    string // want type that exposes this field
-	Field       string // StateDef.Name
-	Description string // StateDef.Description — used for semantic matching
-	DataType    string // StateDef.Type (e.g. "string", "array", "boolean")
+	WantType    string `json:"wantType"`
+	Field       string `json:"field"`       // StateDef.Name
+	Description string `json:"description"` // StateDef.Description — used for semantic matching
+	DataType    string `json:"dataType"`    // StateDef.Type (e.g. "string", "array", "boolean")
 }
 
 // ExposableIndex is a searchable collection of exposable fields across all want types.

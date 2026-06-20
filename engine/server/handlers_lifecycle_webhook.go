@@ -62,11 +62,11 @@ type LifecycleOwnerReference struct {
 // when the event and match criteria are satisfied.  Metadata is forwarded to the
 // caller so it can embed action instructions (e.g. RPG activate/run fields).
 type LifecycleWebhookRule struct {
-	ID        string               `json:"id"`
-	Event     string               `json:"event"`              // "want_created", "want_achieved", "want_deleted"
+	ID        string                    `json:"id"`
+	Event     string                    `json:"event"` // "want_created", "want_achieved", "want_deleted"
 	Match     mywant.LifecycleRuleMatch `json:"match"`
-	TargetURL string               `json:"target_url"`
-	Metadata  map[string]any       `json:"metadata,omitempty"` // forwarded to TargetURL as rule.metadata
+	TargetURL string                    `json:"target_url"`
+	Metadata  map[string]any            `json:"metadata,omitempty"` // forwarded to TargetURL as rule.metadata
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────

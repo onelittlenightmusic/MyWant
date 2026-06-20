@@ -227,8 +227,21 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 		// ThinkAgents use 2s interval by default
 		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
 	case *MonitorAgent:
-		// MonitorAgents now use PollingAgent to support the (bool, error) signature
-		pa := NewPollingAgent(bgID, 5*time.Second, agentName, string(agentType), a.Monitor)
+		// MonitorAgents use PollingAgent; interval is read from skill_poll_interval_ms state field (default 5s).
+		pollInterval := 5 * time.Second
+		if rawMs, ok := n.GetGoal("skill_poll_interval_ms"); ok && rawMs != nil {
+			switch v := rawMs.(type) {
+			case int:
+				if v > 0 {
+					pollInterval = time.Duration(v) * time.Millisecond
+				}
+			case int64:
+				if v > 0 {
+					pollInterval = time.Duration(v) * time.Millisecond
+				}
+			}
+		}
+		pa := NewPollingAgent(bgID, pollInterval, agentName, string(agentType), a.Monitor)
 		pa.execID = execID
 		bgAgent = pa
 	default:

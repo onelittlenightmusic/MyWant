@@ -1,0 +1,18 @@
+capabilities:
+  - name: dynamic_background_agency
+    gives:
+      - dynamic_background_agency
+    description: Monitors a source want's state field for an image URL and applies it as the canvas/dashboard background
+    stateAccess:
+      - name: current_image_url
+        type: string
+        description: Currently applied background image URL
+        accessType: readUpdate
+      - name: status
+        type: string
+        description: Status message
+        accessType: readUpdate
+      - name: last_error
+        type: string
+        description: Last error message
+        accessType: readUpdate

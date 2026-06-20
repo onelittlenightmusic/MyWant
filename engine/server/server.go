@@ -272,6 +272,14 @@ func (s *Server) Start() error {
 	})
 	s.setupRoutes()
 
+	// Register canvas_bg_url updater so built-in want types (e.g. dynamic_background)
+	// can update and persist the background without an HTTP round-trip.
+	mywant.RegisterCanvasBgURLUpdater(func(url string) error {
+		s.config.CanvasBgURL = url
+		s.saveFrontendConfig()
+		return nil
+	})
+
 	// Start pprof profiling server only in debug mode
 	if s.config.Debug {
 		go func() {
@@ -418,6 +426,9 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.CanvasDPad != nil {
 		fullConfig["canvas_dpad"] = *s.config.CanvasDPad
+	}
+	if s.config.CanvasWeatherEffect != "" {
+		fullConfig["canvas_weather_effect"] = s.config.CanvasWeatherEffect
 	}
 
 	// 3. Save back to file

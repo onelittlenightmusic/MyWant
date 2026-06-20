@@ -265,6 +265,7 @@ func (cb *ChainBuilder) correlationPhase() {
 		}
 
 		// ── Build CorrelationEntry slice ──────────────────────────────────────
+		typeDefs := cb.AllWantTypeDefinitions()
 		entries := make([]CorrelationEntry, 0, len(peerLabels))
 		for peerID, labelSet := range peerLabels {
 			labels := make([]string, 0, len(labelSet))
@@ -273,9 +274,10 @@ func (cb *ChainBuilder) correlationPhase() {
 			}
 			sort.Strings(labels)
 			entries = append(entries, CorrelationEntry{
-				WantID: peerID,
-				Labels: labels,
-				Rate:   correlationRate(labels),
+				WantID:   peerID,
+				Labels:   labels,
+				Rate:     correlationRate(labels),
+				DataType: resolveCorrelationDataType(labels, dirty, cb.wants[peerID], typeDefs),
 			})
 		}
 		// Sort by descending Rate for stable, readable output.
@@ -284,6 +286,59 @@ func (cb *ChainBuilder) correlationPhase() {
 		})
 		dirty.Metadata.Correlation = entries
 	}
+}
+
+// resolveCorrelationDataType returns the data type of the first expose field
+// in the correlation labels by looking up the provider's want type definition.
+// dirty is the want whose correlation entry we're building; peer is the other side.
+//
+// Label semantics (from dirty's perspective):
+//   "stateAccess/consumer:expose/X" → peer is the CONSUMER, dirty is the PROVIDER
+//   "stateAccess/provider:expose/X" → peer is the PROVIDER, dirty is the CONSUMER
+func resolveCorrelationDataType(labels []string, dirty *Want, peer *runtimeWant, typeDefs map[string]*WantTypeDefinition) string {
+	for _, l := range labels {
+		var providerType string
+		var globalKey string
+		var providerWant *Want
+		switch {
+		case strings.HasPrefix(l, "stateAccess/consumer:expose/"):
+			// dirty is the PROVIDER; X is the global expose key (Spec.Exposes[*].As)
+			globalKey = strings.TrimPrefix(l, "stateAccess/consumer:expose/")
+			providerType = dirty.Metadata.Type
+			providerWant = dirty
+		case strings.HasPrefix(l, "stateAccess/provider:expose/"):
+			// peer is the PROVIDER; X is the global expose key
+			globalKey = strings.TrimPrefix(l, "stateAccess/provider:expose/")
+			if peer != nil {
+				providerType = peer.want.Metadata.Type
+				providerWant = peer.want
+			}
+		}
+		if globalKey == "" || providerType == "" || providerWant == nil {
+			continue
+		}
+		// Resolve global key → currentState field name via Spec.Exposes
+		fieldName := ""
+		for _, e := range providerWant.Spec.Exposes {
+			if e.As == globalKey {
+				fieldName = e.CurrentState
+				break
+			}
+		}
+		if fieldName == "" {
+			continue
+		}
+		def, ok := typeDefs[providerType]
+		if !ok {
+			continue
+		}
+		for _, s := range def.State {
+			if s.Name == fieldName && s.SubType != "" {
+				return s.SubType
+			}
+		}
+	}
+	return ""
 }
 
 // correlationRate returns the weighted coupling strength for a set of
