@@ -1,0 +1,152 @@
+wantType:
+  metadata:
+    name: claude_info
+    title: Claude Usage
+    description: |
+      Shows Claude.ai current session and weekly usage limits as a gauge.
+      Reads data via Chrome CDP (chrome must be running with --remote-debugging-port=9222).
+      Updates every 30 seconds.
+      Script: ~/.mywant/skills/claude_info/main.py
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+
+  state:
+    - name: session_usage_pct
+      description: Current session usage percentage (0-100)
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+      exposable: true
+      fetchFrom: mrs_raw_output
+      onFetchData: "session_usage_pct"
+
+    - name: session_resets_in
+      description: Time until current session limit resets (e.g. "2 hr 27 min")
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "session_resets_in"
+
+    - name: weekly_usage_pct
+      description: Weekly usage percentage (0-100)
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+      exposable: true
+      fetchFrom: mrs_raw_output
+      onFetchData: "weekly_usage_pct"
+
+    - name: weekly_resets_at
+      description: When the weekly limit resets (e.g. "Fri 4:59 PM")
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "weekly_resets_at"
+
+    - name: achieving_percentage
+      description: Mirrors session_usage_pct to drive the card gauge
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+      fetchFrom: mrs_raw_output
+      onFetchData: "achieving_percentage"
+
+    - name: last_updated
+      description: ISO timestamp of last successful fetch
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "last_updated"
+
+    - name: last_error
+      description: Last error message
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "last_error"
+
+    # MRS agent config fields
+    - name: skill_path
+      description: Path to the monitor Python script
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: skill_json_arg_template
+      description: JSON arg template
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: skill_json_arg
+      description: Computed JSON arg string
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: skill_timeout_seconds
+      description: Script execution timeout in seconds
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 25
+
+    - name: skill_poll_interval_ms
+      description: MRS agent polling interval in milliseconds
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 5000
+
+    - name: last_poll_at
+      description: Unix timestamp (ms) of the last fetch
+      type: string
+      label: current
+      persistent: false
+      initialValue: "0"
+      fetchFrom: mrs_raw_output
+      onFetchData: "last_poll_at"
+
+    - name: mrs_raw_output
+      description: Raw JSON output from the monitor script
+      type: object
+      label: current
+      persistent: false
+      initialValue: null
+
+  onInitialize:
+    current:
+      skill_path: "~/.mywant/skills/claude_info/main.py"
+      skill_json_arg_template: '{"last_poll_at":"%{last_poll_at}"}'
+    goal:
+      skill_timeout_seconds: 25
+
+  requires:
+    - monitor_mrs_agent
+
+  examples:
+    - name: My Claude Usage
+      description: Show Claude.ai session usage as a gauge
+      want:
+        metadata:
+          name: my-claude-info
+          type: claude_info
+        spec:
+          params: {}

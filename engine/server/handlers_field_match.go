@@ -525,12 +525,53 @@ func bestLocalKey(s *Server, target *mywant.Want, sf FieldRef) string {
 		}
 	}
 
+	// 1b. SubType match: prefer state field whose subType matches the source DataType.
+	// This handles cases like source "percentage" matching target "value_pct" (subType=percentage).
+	if sf.DataType != "" {
+		var subTypeMatches []string
+		for _, st := range typeDef.State {
+			if st.SubType == sf.DataType {
+				subTypeMatches = append(subTypeMatches, st.Name)
+			}
+		}
+		if len(subTypeMatches) == 1 {
+			return subTypeMatches[0]
+		}
+		if len(subTypeMatches) > 1 {
+			srcWords := splitWords(sf.FieldName)
+			best, bestScore := subTypeMatches[0], -1
+			for _, name := range subTypeMatches {
+				overlap := len(wordIntersection(srcWords, splitWords(name)))
+				if overlap > bestScore {
+					bestScore, best = overlap, name
+				}
+			}
+			return best
+		}
+	}
+
 	// 2. Type-based match: prefer state fields whose declared type matches the source
 	//    runtime type. Among those, rank by name similarity to the source field.
+	// normalizeFieldType maps yaml-declared types to the runtime type names returned by
+	// runtimeTypeName so that "int"/"float" correctly match "number".
+	normalizeFieldType := func(t string) string {
+		switch strings.ToLower(t) {
+		case "int", "integer", "float", "float64", "double", "number":
+			return "number"
+		case "bool", "boolean":
+			return "bool"
+		case "array", "slice":
+			return "array"
+		case "object", "map":
+			return "object"
+		default:
+			return strings.ToLower(t)
+		}
+	}
 	var sameType []string
 	srcWords := splitWords(sf.FieldName)
 	for _, st := range typeDef.State {
-		if strings.EqualFold(st.Type, sf.FieldType) ||
+		if normalizeFieldType(st.Type) == sf.FieldType ||
 			(sf.FieldType == "array" && (strings.EqualFold(st.Type, "array") || strings.Contains(strings.ToLower(st.Type), "[]"))) {
 			sameType = append(sameType, st.Name)
 		}

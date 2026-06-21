@@ -601,6 +601,24 @@ func (n *Want) EndProgressCycle() {
 		}
 	}
 
+	// Auto-provide exposable state snapshot to downstream consumers (e.g. gauge type).
+	// Runs after fetchFrom so MRS-derived fields are up-to-date before publishing.
+	if !n.providedThisCycle && len(n.paths.Out) > 0 && n.WantTypeDefinition != nil {
+		snapshot := map[string]any{}
+		for _, sd := range n.WantTypeDefinition.State {
+			if !sd.Exposable {
+				continue
+			}
+			if val, ok := n.getState(sd.Name); ok {
+				snapshot[sd.Name] = val
+			}
+		}
+		if len(snapshot) > 0 {
+			n.provideRaw(snapshot)
+			n.providedThisCycle = true
+		}
+	}
+
 	// Auto-override final_result from FinalResultField if configured (handles dot-notation and zero-value skipping).
 	// Propagation to parent is handled via the currentStateExposeHandler subscribed in RegisterWant.
 	if field := n.Spec.FinalResultField; field != "" {

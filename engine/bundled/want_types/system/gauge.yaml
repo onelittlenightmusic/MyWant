@@ -1,0 +1,105 @@
+wantType:
+  metadata:
+    name: gauge
+    title: Gauge
+    description: |
+      Displays a numeric value imported from a connected provider want.
+      Connect via config `using` selector — the provider want must declare
+      exposable: true on the fields it shares.
+      Updates achieving_percentage to drive the built-in progress bar.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      type-icon: "Gauge"
+
+  parameters:
+    - name: source_field
+      description: State field name to read from the connected provider want
+      type: string
+      required: true
+      example: session_usage_pct
+
+    - name: min
+      description: Minimum value of the gauge range
+      type: float64
+      default: 0
+
+    - name: max
+      description: Maximum value of the gauge range
+      type: float64
+      default: 100
+
+    - name: unit
+      description: Unit string appended to the displayed value
+      type: string
+      default: "%"
+
+    - name: label
+      description: Display label shown above the gauge value
+      type: string
+      default: ""
+
+  state:
+    - name: value
+      description: Current gauge value received from the provider
+      type: float64
+      persistent: false
+      label: current
+      initialValue: 0
+
+    - name: source_field
+      description: Field name being read from the provider snapshot
+      type: string
+      persistent: true
+      label: current
+      initialValue: ""
+
+    - name: min
+      type: float64
+      persistent: true
+      label: current
+      initialValue: 0
+
+    - name: max
+      type: float64
+      persistent: true
+      label: current
+      initialValue: 100
+
+    - name: unit
+      type: string
+      persistent: true
+      label: current
+      initialValue: "%"
+
+    - name: gauge_label
+      type: string
+      persistent: true
+      label: current
+      initialValue: ""
+
+  require:
+    type: providers
+    providers:
+      - name: state_snapshot
+        type: want
+        description: Provider want exposing numeric state fields via exposable:true
+        required: true
+
+  examples:
+    - name: Claude Session Usage
+      description: Import session_usage_pct from claude_info and display as gauge
+      want:
+        metadata:
+          name: claude-session-gauge
+          type: gauge
+        spec:
+          params:
+            source_field: session_usage_pct
+            label: "Claude Session"
+            unit: "%"
+            min: 0
+            max: 100
+          using:
+            - role: claude-usage
