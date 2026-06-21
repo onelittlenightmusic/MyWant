@@ -237,8 +237,8 @@ func (s *Server) addRelation(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/wants/{id}/relations
 // Body: { "label": "expose/temperature" }
 //
-// The label must start with "expose/". The "expose/" prefix is stripped to obtain
-// the ExposeEntry.As key. Returns 404 if no matching entry is found.
+// The label must start with "expose/". Removes the ExposeEntry from the provider want
+// and also removes the matching import key from all consumer wants that reference it.
 func (s *Server) removeRelation(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	var req struct {
@@ -260,6 +260,7 @@ func (s *Server) removeRelation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Remove the ExposeEntry from the provider want.
 	newExposes := make([]mywant.ExposeEntry, 0, len(want.Spec.Exposes))
 	removed := false
 	for _, e := range want.Spec.Exposes {
@@ -273,9 +274,23 @@ func (s *Server) removeRelation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"expose entry not found"}`, http.StatusNotFound)
 		return
 	}
-
 	want.Spec.Exposes = newExposes
 	s.globalBuilder.UpdateWant(want)
+
+	// Remove the matching import key from all consumer wants that reference asKey.
+	for _, w := range s.globalBuilder.GetWants() {
+		if _, ok := w.Spec.Imports[asKey]; !ok {
+			continue
+		}
+		newImports := make(map[string]string, len(w.Spec.Imports)-1)
+		for k, v := range w.Spec.Imports {
+			if k != asKey {
+				newImports[k] = v
+			}
+		}
+		w.Spec.Imports = newImports
+		s.globalBuilder.UpdateWant(w)
+	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{"message": "removed"})
