@@ -9,6 +9,8 @@
 string:    { key: strings,    icon: Type,         color: "#94a3b8" }
 number:    { key: numbers,    icon: Hash,          color: "#3b82f6" }
 float64:   { key: floats,     icon: Hash,          color: "#3b82f6" }
+integer:   { key: integers,   icon: Hash,          color: "#3b82f6" }
+int:       { key: integers,   icon: Hash,          color: "#3b82f6" }
 bool:      { key: booleans,   icon: ToggleLeft,    color: "#f97316" }
 array:     { key: arrays,     icon: Rows3,         color: "#22c55e" }
 object:    { key: objects,    icon: Box,           color: "#8b5cf6" }
@@ -45,5 +47,8 @@ book:     { key: books,     icon: BookOpen,     color: "#64748b", base_type: str
 music:    { key: musics,    icon: Music,        color: "#64748b", base_type: string }
 movie:    { key: movies,    icon: Film,         color: "#64748b", base_type: string }
 favorite: { key: favorites, icon: Heart,        color: "#f97316", base_type: string }
-rating:   { key: ratings,   icon: Star,         color: "#f59e0b", base_type: string }
-weather:  { key: weathers,  icon: Cloud,        color: "#38bdf8", base_type: string }
+rating:      { key: ratings,      icon: Star,          color: "#f59e0b", base_type: string }
+weather:     { key: weathers,     icon: Cloud,         color: "#38bdf8", base_type: string }
+
+# ── Number subtypes ────────────────────────────────────────────────────────────
+percentage:  { key: percentages,  icon: Percent,        color: "#3b82f6", base_type: number }

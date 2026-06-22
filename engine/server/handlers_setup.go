@@ -61,6 +61,7 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/using/{key}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/relations", s.addRelation).Methods("POST")
 	wants.HandleFunc("/{id}/relations", s.removeRelation).Methods("DELETE")
+	wants.HandleFunc("/{id}/relations", s.listWantRelations).Methods("GET")
 	wants.HandleFunc("/{id}/relations", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/cluster", s.getWantCluster).Methods("GET")
 	wants.HandleFunc("/{id}/cluster", s.handleOptions).Methods("OPTIONS")
@@ -107,6 +108,13 @@ func (s *Server) setupRoutes() {
 	wantTypes.HandleFunc("/{name}", s.handleOptions).Methods("OPTIONS")
 	wantTypes.HandleFunc("/{name}/examples", s.getWantTypeExamples).Methods("GET")
 	wantTypes.HandleFunc("/{name}/examples", s.handleOptions).Methods("OPTIONS")
+
+	// Relations endpoints
+	relations := api.PathPrefix("/relations").Subrouter()
+	relations.HandleFunc("", s.listRelations).Methods("GET")
+	relations.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	relations.HandleFunc("/{id}", s.deleteRelationByID).Methods("DELETE")
+	relations.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
 
 	// Labels endpoints
 	labels := api.PathPrefix("/labels").Subrouter()

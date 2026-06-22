@@ -39,8 +39,9 @@ type Server struct {
 	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
 	httpServer           *http.Server                // HTTP server instance
 	otelShutdown         func(context.Context) error // OpenTelemetry shutdown hook
-	wantCreationHooks    []WantCreationHook          // Hooks called on POST /api/v1/wants
-	memoStore            *MemoStore                  // Persists user-entered values to ~/.mywant/memo.yaml
+	wantCreationHooks    []WantCreationHook                     // Hooks called on POST /api/v1/wants
+	memoStore            *MemoStore                             // Persists user-entered values to ~/.mywant/memo.yaml
+	exposableFieldsCache map[string][]ExposableFieldInfo        // type name → exposable state fields (built once at startup)
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -207,10 +208,20 @@ func New(config Config) *Server {
 	// Transfer loaded want type definitions to global builder for state initialization.
 	// This must happen in New() (not just Start()) so tests that call setupRoutes()
 	// directly also have StateLabels populated before ExecuteWithMode runs.
+	exposableFieldsCache := make(map[string][]ExposableFieldInfo)
 	if wantTypeLoader != nil {
 		allDefs := wantTypeLoader.GetAll()
 		for _, def := range allDefs {
 			globalBuilder.StoreWantTypeDefinition(def)
+			var fields []ExposableFieldInfo
+			for _, sd := range def.State {
+				if sd.Exposable {
+					fields = append(fields, ExposableFieldInfo{Name: sd.Name, Type: sd.Type, SubType: sd.SubType})
+				}
+			}
+			if len(fields) > 0 {
+				exposableFieldsCache[def.Metadata.Name] = fields
+			}
 		}
 	}
 
@@ -254,6 +265,7 @@ func New(config Config) *Server {
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
 		memoStore:            newMemoStore(),
+		exposableFieldsCache: exposableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},

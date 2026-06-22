@@ -260,7 +260,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		if !want.MatchesFilters(filters) {
 			continue
 		}
-		allWants = append(allWants, buildWantAPIResponse(want, false))
+		allWants = append(allWants, s.buildWantAPIResponse(want, false))
 	}
 
 	sort.Slice(allWants, func(i, j int) bool {
@@ -294,9 +294,32 @@ type hierarchicalState struct {
 	Internal    map[string]any `json:"internal,omitempty"`
 }
 
+// ExposableFieldInfo describes a state field that the want type has declared as exposable.
+type ExposableFieldInfo struct {
+	Name    string `json:"name"`
+	Type    string `json:"type,omitempty"`
+	SubType string `json:"subType,omitempty"`
+}
+
+// enrichedCorrelationEntry mirrors want_spec.CorrelationEntry with an added RelationID.
+type enrichedCorrelationEntry struct {
+	RelationID string   `json:"relationID,omitempty"`
+	WantID     string   `json:"wantID"`
+	Labels     []string `json:"labels"`
+	Rate       int      `json:"rate"`
+	DataType   string   `json:"dataType,omitempty"`
+}
+
+// apiMetadata mirrors mywant.Metadata for the API response, replacing Correlation with
+// enrichedCorrelationEntry so each entry carries a RelationID.
+type apiMetadata struct {
+	mywant.Metadata
+	Correlation []enrichedCorrelationEntry `json:"correlation,omitempty"`
+}
+
 // wantAPIResponse is the API-level representation of a Want with hierarchical state.
 type wantAPIResponse struct {
-	Metadata             mywant.Metadata             `json:"metadata"`
+	Metadata             apiMetadata                 `json:"metadata"`
 	Spec                 mywant.WantSpec             `json:"spec"`
 	Status               mywant.WantStatus           `json:"status,omitempty"`
 	State                hierarchicalState           `json:"state"`
@@ -305,12 +328,13 @@ type wantAPIResponse struct {
 	History              mywant.WantHistory          `json:"history"`
 	ConnectivityMetadata mywant.ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
 	Hash                 string                      `json:"hash,omitempty"`
+	ExposableFields      []ExposableFieldInfo        `json:"exposable_fields,omitempty"`
 }
 
 // buildWantAPIResponse constructs a wantAPIResponse from a live Want, grouping state fields
 // into current/goal/plan buckets. Unlabeled explicit state fields (including system-reserved
 // fields like final_result) fall into the current bucket.
-func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIResponse {
+func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIResponse {
 	explicitState := want.GetExplicitState()
 	current := make(map[string]any)
 	goal := make(map[string]any)
@@ -340,8 +364,38 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 		}
 	}
 
+	exposableFields := s.exposableFieldsCache[want.Metadata.Type]
+
+	// Build enriched correlation entries with RelationIDs.
+	enrichedCorr := make([]enrichedCorrelationEntry, 0, len(want.Metadata.Correlation))
+	for _, ce := range want.Metadata.Correlation {
+		var relationID string
+		for _, l := range ce.Labels {
+			if strings.HasPrefix(l, "stateAccess/consumer:expose/") {
+				// This want is the provider; compute ID from own ID + field name.
+				fn := strings.TrimPrefix(l, "stateAccess/consumer:expose/")
+				relationID = computeRelationID(want.Metadata.ID, fn)
+				break
+			}
+			if strings.HasPrefix(l, "stateAccess/provider:expose/") {
+				// This want is the consumer; provider is ce.WantID.
+				fn := strings.TrimPrefix(l, "stateAccess/provider:expose/")
+				relationID = computeRelationID(ce.WantID, fn)
+				break
+			}
+		}
+		enrichedCorr = append(enrichedCorr, enrichedCorrelationEntry{
+			RelationID: relationID,
+			WantID:     ce.WantID,
+			Labels:     ce.Labels,
+			Rate:       ce.Rate,
+			DataType:   ce.DataType,
+		})
+	}
+	meta := apiMetadata{Metadata: want.Metadata, Correlation: enrichedCorr}
+
 	resp := wantAPIResponse{
-		Metadata:        want.Metadata,
+		Metadata:        meta,
 		Spec:            want.Spec,
 		Status:          want.GetStatus(),
 		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
@@ -349,6 +403,7 @@ func buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIRe
 		HiddenState:     want.GetHiddenState(),
 		History:         want.BuildHistory(),
 		Hash:            mywant.CalculateWantHash(want),
+		ExposableFields: exposableFields,
 	}
 	if includeConnectivity {
 		resp.ConnectivityMetadata = want.ConnectivityMetadata
@@ -361,7 +416,7 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 
 	serveWantResponse := func(want *mywant.Want) {
-		resp := buildWantAPIResponse(want, includeConnectivity)
+		resp := s.buildWantAPIResponse(want, includeConnectivity)
 		w.Header().Set("ETag", `"`+resp.Hash+`"`)
 		ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
 		if ifNoneMatch != "" && ifNoneMatch == resp.Hash {
