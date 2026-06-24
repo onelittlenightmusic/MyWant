@@ -207,3 +207,23 @@ wantType:
       label: current
       persistent: false
       initialValue: 0
+
+    - name: devices
+      description: List of connected browser sessions (id, name, lastSeen).
+      type: object
+      label: current
+      persistent: true
+
+    - name: activeLocationDevice
+      description: ID of the browser device currently sending location data.
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: locationWantId
+      description: Want ID of the location want that receives geolocation updates.
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
