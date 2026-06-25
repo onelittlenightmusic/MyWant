@@ -268,6 +268,13 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
 	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
 
+	// Web Want endpoints — create and launch custom web want types
+	webWants := api.PathPrefix("/web-wants").Subrouter()
+	webWants.HandleFunc("/create", s.createWebWant).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/_nav/callback", s.navCallback).Methods("POST", "OPTIONS")
+
 	// External card plugins — compiled on-the-fly from ~/.mywant/custom-types/*/view/plugin.*
 	api.HandleFunc("/plugins", s.listPlugins).Methods("GET", "OPTIONS")
 	api.HandleFunc("/plugins/{filename}", s.servePlugin).Methods("GET", "OPTIONS")

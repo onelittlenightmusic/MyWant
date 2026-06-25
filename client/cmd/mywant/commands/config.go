@@ -33,7 +33,9 @@ type MyWantConfig struct {
 	SoundEnabled     *bool               `yaml:"sound_enabled"`      // true (default) or false
 	Environments     map[string]string   `yaml:"environments"`       // arbitrary env vars applied at startup
 	OTELEndpoint     string              `yaml:"otel_endpoint"`      // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
-	GoalThinker      GoalThinkerSettings `yaml:"goal_thinker"`       // Goal thinker settings
+	GoalThinker          GoalThinkerSettings `yaml:"goal_thinker"`           // Goal thinker settings
+	ActiveLocationDevice string              `yaml:"active_location_device"` // ID of the device sending location data
+	LocationWantId       string              `yaml:"location_want_id"`       // Want ID of the active location want
 }
 
 // ApplyEnvironments sets entries from the environments section as environment variables.

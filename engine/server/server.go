@@ -35,13 +35,13 @@ type Server struct {
 	robotLog             []RobotLogEntry                  // Store robot command log
 	robotLogMu           sync.Mutex                       // Protects robotLog slice
 	router               *mux.Router
-	reactionQueueManager *types.ReactionQueueManager // Reaction queue manager for reminder wants
-	interactionManager   *mywant.InteractionManager  // Interactive want creation manager
-	httpServer           *http.Server                // HTTP server instance
-	otelShutdown         func(context.Context) error // OpenTelemetry shutdown hook
-	wantCreationHooks    []WantCreationHook                     // Hooks called on POST /api/v1/wants
-	memoStore            *MemoStore                             // Persists user-entered values to ~/.mywant/memo.yaml
-	exposableFieldsCache map[string][]ExposableFieldInfo        // type name → exposable state fields (built once at startup)
+	reactionQueueManager *types.ReactionQueueManager     // Reaction queue manager for reminder wants
+	interactionManager   *mywant.InteractionManager      // Interactive want creation manager
+	httpServer           *http.Server                    // HTTP server instance
+	otelShutdown         func(context.Context) error     // OpenTelemetry shutdown hook
+	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
+	memoStore            *MemoStore                      // Persists user-entered values to ~/.mywant/memo.yaml
+	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -277,6 +277,8 @@ func New(config Config) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	mywant.SetGlobalMemoReader(s.memoStore)
+
 	// Register MemoHook here (after New) so it can reference s.memoStore and s.globalBuilder.
 	s.wantCreationHooks = append(s.wantCreationHooks, &MemoHook{
 		memo:    s.memoStore,
@@ -442,6 +444,9 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.CanvasWeatherEffect != "" {
 		fullConfig["canvas_weather_effect"] = s.config.CanvasWeatherEffect
 	}
+	// Device settings — always write (empty string clears the field)
+	fullConfig["active_location_device"] = s.config.ActiveLocationDevice
+	fullConfig["location_want_id"] = s.config.LocationWantId
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

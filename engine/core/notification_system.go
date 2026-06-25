@@ -81,11 +81,7 @@ func (h *currentStateExposeHandler) OnEvent(ctx context.Context, event WantEvent
 		return EventResponse{}
 	}
 	if h.parentKey == "final_result" {
-		// Special convention: set local final_result and propagate to parent/global via MergeParentState.
-		h.want.StoreState("final_result", sce.StateValue)
-		h.want.MergeParentState(map[string]any{
-			"wants": map[string]any{h.want.Metadata.Name: sce.StateValue},
-		})
+		// final_result is already stored by EndProgressCycle; no propagation to parent/global.
 		return EventResponse{Handled: true}
 	}
 	parent := findWantByName(h.parentName)

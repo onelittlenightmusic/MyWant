@@ -12,10 +12,20 @@ import (
 	mywant "mywant/engine/core"
 )
 
+// reloadUserCustomTypesAndSync reloads user custom types in the loader and syncs
+// new definitions into the global builder so deployed wants can use them immediately.
+func (s *Server) reloadUserCustomTypesAndSync() (loaded int, warnings []string) {
+	loaded, warnings = s.wantTypeLoader.ReloadUserCustomTypes()
+	for _, def := range s.wantTypeLoader.GetAll() {
+		s.globalBuilder.StoreWantTypeDefinition(def)
+	}
+	return
+}
+
 // reloadWantTypes handles POST /api/v1/want-types/reload
 // Re-scans ~/.mywant/custom-types/ and refreshes user custom type definitions without restart.
 func (s *Server) reloadWantTypes(w http.ResponseWriter, _ *http.Request) {
-	loaded, warnings := s.wantTypeLoader.ReloadUserCustomTypes()
+	loaded, warnings := s.reloadUserCustomTypesAndSync()
 	s.globalBuilder.LogAPIOperation("POST", "/want-types/reload", "", "reloaded", loaded, "", "")
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"loaded":   loaded,
@@ -110,6 +120,10 @@ func (s *Server) deleteWantType(w http.ResponseWriter, r *http.Request) {
 
 	// Remove from builder registry so new wants cannot use it.
 	s.globalBuilder.UnregisterWantType(name)
+
+	// Delete the custom-types directory on disk (best-effort).
+	customDir := filepath.Join(mywant.UserCustomTypesDir(), name)
+	_ = os.RemoveAll(customDir)
 
 	s.globalBuilder.LogAPIOperation("DELETE", "/want-types/"+name, name, "deleted", 0, "", "")
 	s.JSONResponse(w, http.StatusOK, map[string]any{

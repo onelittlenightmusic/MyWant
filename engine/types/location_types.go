@@ -47,6 +47,7 @@ func (lw *LocationWant) Progress() {
 
 		lw.SetCurrent("lat", lat)
 		lw.SetCurrent("lng", lng)
+		lw.SetCurrent("final_result", fmt.Sprintf(`{"lat":%f,"lng":%f}`, lat, lng))
 		if acc, ok := asFloat64(payload["accuracy"]); ok {
 			lw.SetCurrent("accuracy", acc)
 		}
@@ -63,10 +64,11 @@ func (lw *LocationWant) Progress() {
 			lw.SetCurrent("updated_at", ts)
 		}
 
-		// Reverse-geocode if position moved significantly (>~100m)
+		// Reverse-geocode if position moved significantly (>~100m) OR if city is not yet set
 		lastLat, _ := lw.GetStateFloat64("last_geocoded_lat", 0)
 		lastLng, _ := lw.GetStateFloat64("last_geocoded_lng", 0)
-		if haversineKm(lat, lng, lastLat, lastLng) > 0.1 {
+		currentCity := GetCurrent[string](&lw.Want, "city", "")
+		if currentCity == "" || haversineKm(lat, lng, lastLat, lastLng) > 0.1 {
 			if city, prefecture, address, err := reverseGeocode(lat, lng); err == nil {
 				lw.SetCurrent("city", city)
 				lw.SetCurrent("prefecture", prefecture)
@@ -83,14 +85,19 @@ func (lw *LocationWant) Progress() {
 type nominatimResponse struct {
 	DisplayName string `json:"display_name"`
 	Address     struct {
-		City         string `json:"city"`
-		Town         string `json:"town"`
-		Village      string `json:"village"`
-		County       string `json:"county"`
-		Province     string `json:"province"`
-		State        string `json:"state"`
-		ISO3166Lvl4  string `json:"ISO3166-2-lvl4"`
-		Country      string `json:"country"`
+		City          string `json:"city"`
+		Municipality  string `json:"municipality"`
+		Town          string `json:"town"`
+		Village       string `json:"village"`
+		CityDistrict  string `json:"city_district"`
+		Suburb        string `json:"suburb"`
+		Quarter       string `json:"quarter"`
+		Neighbourhood string `json:"neighbourhood"`
+		County        string `json:"county"`
+		Province      string `json:"province"`
+		State         string `json:"state"`
+		ISO3166Lvl4   string `json:"ISO3166-2-lvl4"`
+		Country       string `json:"country"`
 	} `json:"address"`
 }
 
@@ -139,21 +146,22 @@ func reverseGeocode(lat, lng float64) (city, prefecture, address string, err err
 		return
 	}
 
-	// city: prefer city > town > village > county
-	city = nr.Address.City
-	if city == "" {
-		city = nr.Address.Town
-	}
-	if city == "" {
-		city = nr.Address.Village
-	}
-	if city == "" {
-		city = nr.Address.County
+	for _, v := range []string{
+		nr.Address.City, nr.Address.Municipality, nr.Address.Town,
+		nr.Address.CityDistrict, nr.Address.Village, nr.Address.Suburb,
+		nr.Address.Quarter, nr.Address.County,
+	} {
+		if v != "" {
+			city = v
+			break
+		}
 	}
 
-	prefecture = nr.Address.Province
-	if prefecture == "" {
-		prefecture = nr.Address.State
+	for _, v := range []string{nr.Address.Province, nr.Address.State} {
+		if v != "" {
+			prefecture = v
+			break
+		}
 	}
 	if prefecture == "" {
 		if p, ok := jpPrefectures[nr.Address.ISO3166Lvl4]; ok {

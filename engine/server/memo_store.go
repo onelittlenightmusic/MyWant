@@ -117,6 +117,24 @@ func (m *MemoStore) Replace(data memoData) error {
 	return m.save(data)
 }
 
+// GetCategory returns all values stored under the given category key directly
+// (no subtype mapping applied). Implements core.MemoReader.
+func (m *MemoStore) GetCategory(key string) []string {
+	if key == "" {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data, err := m.load()
+	if err != nil {
+		return nil
+	}
+	vals := data[key]
+	out := make([]string, len(vals))
+	copy(out, vals)
+	return out
+}
+
 // All returns the full memo data as-is from disk.
 func (m *MemoStore) All() memoData {
 	m.mu.Lock()

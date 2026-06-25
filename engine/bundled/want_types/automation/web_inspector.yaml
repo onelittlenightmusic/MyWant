@@ -1,0 +1,144 @@
+wantType:
+  metadata:
+    name: web_inspector
+    title: Web Inspector
+    description: |
+      Attaches to an existing Chrome browser via CDP and opens the target URL
+      with an interactive overlay. Use arrow keys or a gamepad to navigate between
+      interactive elements (inputs, buttons, links). Press Enter (or A button) to
+      select an element and name it. Click "完了" when finished — the selected
+      element list is sent back to MyWant and can be saved as a reusable web want type.
+    version: '1.0'
+    category: web
+    pattern: independent
+    labels:
+      category-icon: "Globe"
+      category-bg-light: "linear-gradient(160deg, #bfdbfe 0%, #ddd6fe 100%)"
+      category-bg-dark:  "linear-gradient(160deg, #1e3a5f 0%, #2d1b69 100%)"
+
+  parameters:
+    - name: target_url
+      description: URL to open in the inspector tab
+      type: string
+      required: true
+      example: "https://example.com"
+
+    - name: debug_chrome_host
+      description: Hostname of the Chrome with --remote-debugging-port
+      type: string
+      required: false
+      default: "localhost"
+
+    - name: debug_chrome_port
+      description: Remote debugging port of Chrome
+      type: string
+      required: false
+      default: "9222"
+
+    - name: mywant_api_port
+      description: Port that the MyWant API server is listening on (for the done webhook)
+      type: string
+      required: false
+      default: "8080"
+
+  state:
+    - name: target_url
+      description: URL being inspected
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: debug_chrome_host
+      description: Chrome debug host (mirrored from param)
+      type: string
+      label: current
+      persistent: false
+      initialValue: "localhost"
+
+    - name: debug_chrome_port
+      description: Chrome debug port (mirrored from param)
+      type: string
+      label: current
+      persistent: false
+      initialValue: "9222"
+
+    - name: mywant_api_port
+      description: MyWant API port (mirrored from param)
+      type: string
+      label: current
+      persistent: false
+      initialValue: "8080"
+
+    - name: doneWebhookId
+      description: Webhook ID the overlay posts to when the user clicks Done
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: inspector_open
+      description: True once the inspector tab has been opened
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+
+    - name: inspector_error
+      description: Error message if opening the inspector failed
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: inspection_complete
+      description: True once the user has finished selecting elements
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+
+    - name: selected_elements
+      description: JSON object mapping hostname to selected element array
+      type: object
+      label: current
+      persistent: true
+      initialValue: {}
+
+    - name: action_by_agent
+      description: Name of the agent that last updated state
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: inspection_done_received
+      description: Signal set by webhook when user clicks Done (consumed by agent)
+      type: bool
+      label: current
+      persistent: false
+      initialValue: false
+
+  requires:
+    - web_inspection
+
+  finalizeWhen:
+    achieved:
+      field: inspection_complete
+      operator: "=="
+      value: true
+
+  finalResultField: selected_elements
+
+  examples:
+    - name: Inspect Google search page
+      description: Select the search box and search button on Google
+      want:
+        metadata:
+          name: inspect_google
+          type: web_inspector
+        spec:
+          params:
+            target_url: "https://www.google.com"
+            debug_chrome_host: "localhost"
+            debug_chrome_port: "9222"

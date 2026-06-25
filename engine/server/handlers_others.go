@@ -1302,9 +1302,17 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
+	state := guiFields(want)
+	// Restore device settings from config.yaml (want state resets on restart but config persists).
+	if s.config.ActiveLocationDevice != "" {
+		state["activeLocationDevice"] = s.config.ActiveLocationDevice
+	}
+	if s.config.LocationWantId != "" {
+		state["locationWantId"] = s.config.LocationWantId
+	}
 	s.JSONResponse(w, http.StatusOK, guiStateResponse{
 		Seq:   seq,
-		State: guiFields(want),
+		State: state,
 	})
 }
 
@@ -1342,6 +1350,20 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 
 	for key, val := range updates {
 		want.StoreState(key, val)
+	}
+
+	// Persist device settings to config.yaml so they survive server restarts.
+	configDirty := false
+	if v, ok := updates["activeLocationDevice"]; ok {
+		s.config.ActiveLocationDevice, _ = v.(string)
+		configDirty = true
+	}
+	if v, ok := updates["locationWantId"]; ok {
+		s.config.LocationWantId, _ = v.(string)
+		configDirty = true
+	}
+	if configDirty {
+		s.saveFrontendConfig()
 	}
 
 	// Append robot log entry when a new robot command arrives (visible=true, nonce present)

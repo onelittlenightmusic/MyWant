@@ -48,11 +48,11 @@ type FieldRef struct {
 	WantID      string `json:"want_id"`
 	WantName    string `json:"want_name"`
 	FieldName   string `json:"field_name"`
-	FieldType   string `json:"field_type"`             // runtime type: "array", "string", "number", "bool", "object"
-	DataType    string `json:"data_type,omitempty"`    // semantic type from want type def: "weather", "date", "url", etc.
-	Label       string `json:"label"`                  // "current", "plan", "goal", or "" (unlabeled)
-	IsFinal     bool   `json:"is_final"`               // true if this is the want type's finalResultField
-	IsExposable bool   `json:"is_exposable"`           // true if the want type declares exposable: true for this field
+	FieldType   string `json:"field_type"`          // runtime type: "array", "string", "number", "bool", "object"
+	DataType    string `json:"data_type,omitempty"` // semantic type from want type def: "weather", "date", "url", etc.
+	Label       string `json:"label"`               // "current", "plan", "goal", or "" (unlabeled)
+	IsFinal     bool   `json:"is_final"`            // true if this is the want type's finalResultField
+	IsExposable bool   `json:"is_exposable"`        // true if the want type declares exposable: true for this field
 }
 
 // ParamRef describes the target parameter to be written.

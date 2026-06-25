@@ -1,0 +1,156 @@
+wantType:
+  metadata:
+    name: location
+    title: Browser Location
+    description: "Receives geolocation data pushed from a browser device via webhook. Stores lat/lng/accuracy as exposable state fields."
+    version: "1.0"
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: MapPin
+
+  parameters:
+    - name: label
+      description: Display label for this location sensor
+      type: string
+      default: "My Location"
+      required: false
+
+  state:
+    - name: lat
+      description: Latitude in decimal degrees
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: lng
+      description: Longitude in decimal degrees
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: accuracy
+      description: Accuracy in metres
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: altitude
+      description: Altitude in metres (null if unavailable)
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: device_id
+      description: ID of the browser device that sent the last update
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: city
+      description: City or ward name (reverse geocoded)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: prefecture
+      description: Prefecture or state (reverse geocoded)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: address
+      description: Full address string (reverse geocoded)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: device_name
+      description: Human-readable name of the source device
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: updated_at
+      description: Unix ms timestamp of the last location update
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: label
+      description: Display label
+      type: string
+      label: current
+      persistent: true
+      initialValue: "My Location"
+    - name: webhook_payload
+      description: Raw payload from POST /api/v1/webhooks/{id}
+      type: object
+      label: current
+      persistent: false
+    - name: webhook_received_at
+      description: Timestamp of last received webhook
+      type: string
+      label: current
+      persistent: false
+    - name: achieved
+      description: Whether the want has achieved its goal
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+    - name: achieving_percentage
+      description: Progress percentage
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: completed
+      description: Whether execution has completed
+      type: bool
+      label: current
+      persistent: true
+      initialValue: false
+    - name: action_by_agent
+      description: Name of the agent that last acted on this want
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: final_result
+      description: Final output value
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: agent_result
+      description: Raw result object returned by agent execution
+      type: object
+      label: current
+      persistent: true
+    - name: desired_dispatch
+      description: Dispatch requests proposed by a thinker child
+      type: object
+      label: plan
+      persistent: false
+
+  examples:
+    - description: A location sensor for home
+      want:
+        metadata:
+          name: home-location
+          type: location
+        spec:
+          params:
+            label: "Home Device"

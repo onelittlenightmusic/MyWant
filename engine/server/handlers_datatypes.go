@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	planner "mywant/engine/planner"
 	ws "github.com/onelittlenightmusic/want-spec"
+	planner "mywant/engine/planner"
 )
 
 // GET /api/v1/datatypes

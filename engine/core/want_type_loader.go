@@ -73,7 +73,8 @@ type WantTypeLoader struct {
 	validPatterns   []string
 	validCategories map[string]bool
 	loadWarnings    []string
-	predefinedState []StateDef // Common state fields merged into every want type
+	predefinedState []StateDef      // Common state fields merged into every want type
+	userCustomNames map[string]bool // types loaded from ~/.mywant/custom-types/ (user-deletable)
 }
 
 // PredefinedStateFile is the special YAML file containing common state fields
@@ -96,6 +97,7 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		globalParamDefs: make(map[string]ParameterDef),
 		validPatterns:   []string{"generator", "processor", "sink", "independent", "coordinator"},
 		validCategories: make(map[string]bool),
+		userCustomNames: make(map[string]bool),
 	}
 }
 
@@ -394,6 +396,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		}
 		w.mergePredefinedState(def)
 		w.definitions[def.Metadata.Name] = def
+		w.userCustomNames[def.Metadata.Name] = true
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
@@ -531,31 +534,29 @@ func (w *WantTypeLoader) ReloadUserCustomTypes() (loaded int, warnings []string)
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// Remove previously loaded user custom types (those backed by inline agents or requires)
-	for name, def := range w.definitions {
-		if len(def.InlineAgents) > 0 || len(def.Requires) > 0 {
-			delete(w.definitions, name)
-			// Rebuild category/pattern indices after deletion
-			for cat, defs := range w.byCategory {
-				filtered := defs[:0]
-				for _, d := range defs {
-					if d.Metadata.Name != name {
-						filtered = append(filtered, d)
-					}
+	// Remove previously loaded user custom types (tracked by userCustomNames).
+	for name := range w.userCustomNames {
+		delete(w.definitions, name)
+		for cat, defs := range w.byCategory {
+			filtered := defs[:0]
+			for _, d := range defs {
+				if d.Metadata.Name != name {
+					filtered = append(filtered, d)
 				}
-				w.byCategory[cat] = filtered
 			}
-			for pat, defs := range w.byPattern {
-				filtered := defs[:0]
-				for _, d := range defs {
-					if d.Metadata.Name != name {
-						filtered = append(filtered, d)
-					}
+			w.byCategory[cat] = filtered
+		}
+		for pat, defs := range w.byPattern {
+			filtered := defs[:0]
+			for _, d := range defs {
+				if d.Metadata.Name != name {
+					filtered = append(filtered, d)
 				}
-				w.byPattern[pat] = filtered
 			}
+			w.byPattern[pat] = filtered
 		}
 	}
+	w.userCustomNames = make(map[string]bool)
 
 	beforeCount := len(w.definitions)
 	w.loadWarnings = nil
@@ -601,10 +602,11 @@ func (w *WantTypeLoader) UnregisterDefinition(name string) error {
 	if def.Metadata.SystemType {
 		return fmt.Errorf("want type %q is a system type and cannot be deleted", name)
 	}
-	if len(def.InlineAgents) == 0 && len(def.Requires) == 0 {
+	if !w.userCustomNames[name] {
 		return fmt.Errorf("want type %q is backed by Go code and cannot be deleted via API", name)
 	}
 	delete(w.definitions, name)
+	delete(w.userCustomNames, name)
 	w.rebuildGlobalParamIndex()
 	return nil
 }

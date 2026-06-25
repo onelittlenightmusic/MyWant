@@ -293,8 +293,9 @@ func (cb *ChainBuilder) correlationPhase() {
 // dirty is the want whose correlation entry we're building; peer is the other side.
 //
 // Label semantics (from dirty's perspective):
-//   "stateAccess/consumer:expose/X" → peer is the CONSUMER, dirty is the PROVIDER
-//   "stateAccess/provider:expose/X" → peer is the PROVIDER, dirty is the CONSUMER
+//
+//	"stateAccess/consumer:expose/X" → peer is the CONSUMER, dirty is the PROVIDER
+//	"stateAccess/provider:expose/X" → peer is the PROVIDER, dirty is the CONSUMER
 func resolveCorrelationDataType(labels []string, dirty *Want, peer *runtimeWant, typeDefs map[string]*WantTypeDefinition) string {
 	for _, l := range labels {
 		var providerType string

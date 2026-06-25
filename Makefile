@@ -230,7 +230,7 @@ fix-mcp:
 reload-want-type:
 	@./bin/mywant types reload
 
-install: release
+install: release build-playwright-app
 	@echo "📦 Installing mywant to $(INSTALL_DIR)..."
 	@mkdir -p $(INSTALL_DIR)
 	@cp bin/mywant $(INSTALL_DIR)/mywant

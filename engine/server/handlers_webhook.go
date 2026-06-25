@@ -37,9 +37,13 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// [replay webhook] Detect -start / -stop suffix for replay want type recording control
+	// Detect -start / -stop / -done suffixes for replay / web_inspector want types.
 	if want, action := s.findWantAndActionByWebhookID(wantID); want != nil {
-		s.handleReplayWebhook(w, want, action)
+		if action == "inspection_done" {
+			s.handleWebInspectorDone(w, want, payload)
+		} else {
+			s.handleReplayWebhook(w, want, action)
+		}
 		return
 	}
 
@@ -135,10 +139,16 @@ func (s *Server) handleWebhookReceiver(w http.ResponseWriter, r *http.Request, w
 	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
 }
 
-// findWantAndActionByWebhookID detects -start / -stop / -debug-start / -debug-stop suffixes
-// used by replay want type. Returns the matching Want and action string, or (nil, "") if no match.
+// findWantAndActionByWebhookID detects -start / -stop / -debug-start / -debug-stop / -done suffixes.
+// Returns the matching Want and action string, or (nil, "") if no match.
 func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) {
 	// Check longer suffixes first to avoid ambiguity
+	if strings.HasSuffix(id, "-done") {
+		baseID := strings.TrimSuffix(id, "-done")
+		if want := s.findWantByIDOrName(baseID); want != nil {
+			return want, "inspection_done"
+		}
+	}
 	if strings.HasSuffix(id, "-replay") {
 		baseID := strings.TrimSuffix(id, "-replay")
 		if want := s.findWantByIDOrName(baseID); want != nil {
@@ -170,6 +180,17 @@ func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) 
 		}
 	}
 	return nil, ""
+}
+
+// handleWebInspectorDone stores the selected elements and signals the web_inspector agent.
+func (s *Server) handleWebInspectorDone(w http.ResponseWriter, want *mywant.Want, payload map[string]any) {
+	mywant.StoreStateMulti(want, map[string]any{
+		"inspection_done_received": true,
+		"selected_elements":        payload,
+		"action_by_agent":          "webhook_handler",
+	})
+	log.Printf("[WEB-INSPECTOR-WEBHOOK] inspection_done for want %s: %d hostname(s)\n", want.Metadata.ID, len(payload))
+	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "action": "inspection_done"})
 }
 
 // handleReplayWebhook sets start/stop recording signal flags on a replay want's state.

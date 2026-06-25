@@ -28,12 +28,14 @@ func (c *ChoiceWant) Initialize() {
 		c.SetCurrent("selected", def)
 	}
 	c.StoreState("last_action_at", "")
+	c.refreshMemoChoices()
 }
 
 // IsAchieved always returns false — choice is a persistent control.
 func (c *ChoiceWant) IsAchieved() bool { return false }
 
 func (c *ChoiceWant) Progress() {
+	c.refreshMemoChoices()
 	ConsumeWebhookAction(&c.Want, "last_action_at", func(action string, pm map[string]any) bool {
 		if action != "select" {
 			return false
@@ -41,4 +43,22 @@ func (c *ChoiceWant) Progress() {
 		c.SetCurrent("selected", pm["value"])
 		return true
 	})
+}
+
+// refreshMemoChoices overwrites choices with memo values when globalMemoCategory is set.
+func (c *ChoiceWant) refreshMemoChoices() {
+	cat := c.GetStringParam("globalMemoCategory", "")
+	if cat == "" {
+		return
+	}
+	mr := GetGlobalMemoReader()
+	if mr == nil {
+		return
+	}
+	vals := mr.GetCategory(cat)
+	choices := make([]any, len(vals))
+	for i, v := range vals {
+		choices[i] = v
+	}
+	c.SetCurrent("choices", choices)
 }

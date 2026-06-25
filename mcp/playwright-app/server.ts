@@ -366,6 +366,79 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['session_id'],
       },
     },
+    {
+      name: 'open_inspector_tab',
+      description: 'Open a target URL in an existing Chrome (via CDP) and inject the Web Want Inspector overlay. The overlay lets users navigate interactive elements with arrow keys/gamepad and select them. When done, it POSTs selected elements to the mywant webhook. Returns immediately; user interaction is async.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cdp_url: {
+            type: 'string',
+            description: 'Chrome DevTools Protocol endpoint URL',
+            default: 'http://localhost:9222',
+          },
+          target_url: {
+            type: 'string',
+            description: 'URL to open in the new inspector tab',
+          },
+          done_webhook_url: {
+            type: 'string',
+            description: 'Full URL to POST selected elements to when the user clicks Done (e.g. http://localhost:8080/api/v1/webhooks/{id}-done)',
+          },
+        },
+        required: ['target_url', 'done_webhook_url'],
+      },
+    },
+    {
+      name: 'open_nav_tab',
+      description: 'Open a target URL in an existing Chrome (via CDP) and inject a navigation-only overlay for pre-saved elements. Arrow keys / gamepad cycle only through those elements — no full-page scan. Used after web_inspector has already identified the elements.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cdp_url: {
+            type: 'string',
+            description: 'Chrome DevTools Protocol endpoint URL',
+            default: 'http://localhost:9222',
+          },
+          target_url: {
+            type: 'string',
+            description: 'URL to open',
+          },
+          nav_elements: {
+            type: 'string',
+            description: 'JSON array of {role, name, selector} objects to navigate between',
+          },
+        },
+        required: ['target_url', 'nav_elements'],
+      },
+    },
+    {
+      name: 'fill_form',
+      description: 'Open a URL in an existing Chrome (via CDP), fill text inputs from field_values, then click buttons or press Enter to submit. Input elements are processed before buttons.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          cdp_url: {
+            type: 'string',
+            description: 'Chrome DevTools Protocol endpoint URL',
+            default: 'http://localhost:9222',
+          },
+          target_url: {
+            type: 'string',
+            description: 'URL to open',
+          },
+          elements: {
+            type: 'string',
+            description: 'JSON array of {role, name, selector, field_key} objects',
+          },
+          field_values: {
+            type: 'string',
+            description: 'JSON object mapping field_key to value string',
+          },
+        },
+        required: ['target_url', 'elements', 'field_values'],
+      },
+    },
   ],
 }));
 
@@ -691,11 +764,518 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  if (name === 'open_inspector_tab') {
+    const cdpUrl = (args?.cdp_url as string | undefined) ?? 'http://localhost:9222';
+    const targetUrl = (args?.target_url as string | undefined) ?? '';
+    const doneWebhookUrl = (args?.done_webhook_url as string | undefined) ?? '';
+
+    if (!targetUrl || !doneWebhookUrl) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: 'target_url and done_webhook_url are required' }) }],
+        isError: true,
+      };
+    }
+
+    let browser: Browser;
+    try {
+      browser = await chromium.connectOverCDP(cdpUrl, { timeout: 10000 });
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: `Failed to connect to Chrome at ${cdpUrl}: ${err}` }) }],
+        isError: true,
+      };
+    }
+
+    // Open a new page in the first available context
+    const ctx = browser.contexts()[0] ?? await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (err) {
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ error: `Failed to navigate to ${targetUrl}: ${err}` }) }],
+        isError: true,
+      };
+    }
+
+    await injectWebInspector(page, doneWebhookUrl);
+
+    // Close the tab automatically when the user clicks Done (__mwiDoneSignal is set in the overlay).
+    (async () => {
+      try {
+        await page.waitForFunction(() => !!(window as any).__mwiDoneSignal, { timeout: 600000 });
+      } catch (_) { /* timeout — close anyway */ }
+      try { await page.close(); } catch (_) {}
+    })();
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, url: page.url() }) }],
+    };
+  }
+
+  if (name === 'open_nav_tab') {
+    const cdpUrl     = (args?.cdp_url      as string | undefined) ?? 'http://localhost:9222';
+    const targetUrl  = (args?.target_url   as string | undefined) ?? '';
+    const navElems   = (args?.nav_elements as string | undefined) ?? '[]';
+
+    if (!targetUrl) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: 'target_url is required' }) }], isError: true };
+    }
+
+    let parsedElems: Array<{role: string; name: string; selector: string}>;
+    try {
+      parsedElems = JSON.parse(navElems);
+    } catch {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: 'nav_elements must be valid JSON' }) }], isError: true };
+    }
+
+    let browser: Browser;
+    try {
+      browser = await chromium.connectOverCDP(cdpUrl, { timeout: 10000 });
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: `CDP connect failed: ${err}` }) }], isError: true };
+    }
+
+    const ctx = browser.contexts()[0] ?? await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: `Navigation failed: ${err}` }) }], isError: true };
+    }
+
+    await injectNavOverlay(page, parsedElems);
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, url: page.url(), elements: parsedElems.length }) }],
+    };
+  }
+
+  if (name === 'fill_form') {
+    interface FillElement {
+      role: string;
+      name: string;
+      selector: string;
+      field_key?: string;
+    }
+
+    const cdpUrl    = (args?.cdp_url      as string | undefined) ?? 'http://localhost:9222';
+    const targetUrl = (args?.target_url   as string | undefined) ?? '';
+    const elemsRaw  = (args?.elements     as string | undefined) ?? '[]';
+    const fvRaw     = (args?.field_values as string | undefined) ?? '{}';
+
+    if (!targetUrl) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: 'target_url is required' }) }], isError: true };
+    }
+
+    let elements: FillElement[];
+    let fieldValues: Record<string, string>;
+    try {
+      elements    = JSON.parse(elemsRaw);
+      fieldValues = JSON.parse(fvRaw);
+    } catch {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: 'elements and field_values must be valid JSON' }) }], isError: true };
+    }
+
+    const isButtonRole = (role: string) => {
+      const r = role.toLowerCase();
+      return r === 'button' || r === 'submit' || r === 'link' || r === 'menuitem' || r === 'menuitemcheckbox';
+    };
+
+    let browser: Browser;
+    try {
+      browser = await chromium.connectOverCDP(cdpUrl, { timeout: 10000 });
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: `CDP connect failed: ${err}` }) }], isError: true };
+    }
+
+    const ctx = browser.contexts()[0] ?? await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (err) {
+      return { content: [{ type: 'text', text: JSON.stringify({ error: `Navigation failed: ${err}` }) }], isError: true };
+    }
+
+    const inputEls  = elements.filter(e => !isButtonRole(e.role));
+    const buttonEls = elements.filter(e => isButtonRole(e.role));
+
+    let lastSelector: string | null = null;
+    let filledCount = 0;
+
+    // Fill non-button elements first
+    for (const el of inputEls) {
+      const fk = el.field_key ?? '';
+      const value = fieldValues[fk];
+      if (!fk || value === undefined || value === '') continue;
+      try {
+        await page.waitForSelector(el.selector, { state: 'visible', timeout: 5000 });
+        await page.fill(el.selector, String(value));
+        lastSelector = el.selector;
+        filledCount++;
+      } catch (e) {
+        console.error(`[fill_form] fill "${el.selector}" failed: ${e}`);
+      }
+    }
+
+    // Buttons last: click each unless field_values explicitly sets it to "false".
+    // Backward compat: buttons with no field_key are always clicked.
+    if (buttonEls.length > 0) {
+      for (const btn of buttonEls) {
+        const fk = btn.field_key ?? '';
+        const flagVal = fk ? (fieldValues[fk] ?? 'true') : 'true';
+        if (flagVal === 'false' || flagVal === 'False') continue;
+        try {
+          await page.waitForSelector(btn.selector, { state: 'visible', timeout: 3000 });
+          await page.click(btn.selector);
+        } catch (e) {
+          console.error(`[fill_form] click "${btn.selector}" failed: ${e}`);
+        }
+      }
+    } else if (lastSelector) {
+      try {
+        await page.press(lastSelector, 'Enter');
+      } catch (e) {
+        console.error(`[fill_form] Enter on "${lastSelector}" failed: ${e}`);
+      }
+    }
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, filled: filledCount, url: page.url() }) }],
+    };
+  }
+
   return {
     content: [{ type: 'text', text: `Unknown tool: ${name}` }],
     isError: true,
   };
 });
+
+// ---------------------------------------------------------------------------
+// Web Want Inspector overlay injection
+// ---------------------------------------------------------------------------
+
+async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<void> {
+  await page.evaluate((webhookUrl: string) => {
+    if ((window as any).__mywantInspectorLoaded) return;
+    (window as any).__mywantInspectorLoaded = true;
+
+    const style = document.createElement('style');
+    style.textContent = `
+      .mwi-highlight { outline: 2px solid #6366f1 !important; outline-offset: 2px !important; }
+      .mwi-selected  { outline: 2px solid #22c55e !important; }
+      .mwi-focused   { outline: 3px solid #f59e0b !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.25) !important; }
+      .mwi-cursor { position:fixed; pointer-events:none; z-index:2147483647; transition:left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1); }
+      .mwi-panel {
+        position:fixed; top:12px; right:12px; background:rgba(15,23,42,0.97);
+        border:1px solid #334155; border-radius:10px; padding:12px 14px;
+        z-index:2147483646; color:#f1f5f9; font:13px/1.4 system-ui,sans-serif;
+        min-width:210px; max-width:280px; box-shadow:0 8px 32px rgba(0,0,0,.5);
+      }
+      .mwi-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; background:#1e293b; margin:3px 0; font-size:12px; }
+      .mwi-badge { padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700; }
+      .mwi-badge-input { background:#3b82f6; color:#fff; }
+      .mwi-badge-button { background:#8b5cf6; color:#fff; }
+      .mwi-btn { padding:6px 12px; border-radius:6px; border:none; cursor:pointer; font-size:12px; font-weight:600; margin:3px 2px; }
+      .mwi-btn-done { background:#22c55e; color:#fff; }
+      .mwi-btn-cancel { background:#475569; color:#cbd5e1; }
+      .mwi-dialog {
+        position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+        background:rgba(15,23,42,0.99); border:1px solid #475569; border-radius:10px;
+        padding:18px; z-index:2147483647; color:#f1f5f9; font:13px/1.4 system-ui,sans-serif;
+        min-width:260px; box-shadow:0 20px 60px rgba(0,0,0,.7);
+      }
+      .mwi-input { width:100%; padding:7px 10px; border-radius:6px; border:1px solid #475569; background:#1e293b; color:#f1f5f9; font-size:13px; margin:6px 0; box-sizing:border-box; }
+    `;
+    document.head.appendChild(style);
+
+    const getInteractive = () =>
+      Array.from(document.querySelectorAll<Element>(
+        'input:not([type=hidden]):not([disabled]),textarea:not([disabled]),select:not([disabled]),button:not([disabled]),a[href],[role=button],[role=textbox],[role=combobox],[role=searchbox]'
+      )).filter(el => {
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden' &&
+          !el.closest('.mwi-panel,.mwi-dialog,.mwi-cursor');
+      });
+
+    let elements: Element[] = [];
+    let focusIdx = 0;
+    const selected: Array<{role:string;name:string;selector:string}> = [];
+    let dialogOpen = false;
+
+    // Free cursor state (left stick) and page zoom (right stick)
+    let cursorX = window.innerWidth  / 2;
+    let cursorY = window.innerHeight / 2;
+    let pageZoom = 1.0;
+
+    const cursor = document.createElement('div');
+    cursor.className = 'mwi-cursor';
+    cursor.innerHTML = '<svg width="28" height="34" viewBox="0 0 24 29" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 0 6px #00e5ff) drop-shadow(0 0 12px #00b8d4)"><circle cx="12" cy="5" r="3.5" fill="#00e5ff"/><rect x="8.5" y="9.5" width="7" height="7" rx="1" fill="#00e5ff"/><line x1="8.5" y1="11" x2="5" y2="15" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="15.5" y1="11" x2="19" y2="15" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="10" y1="16.5" x2="8" y2="22" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="16.5" x2="16" y2="22" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="12" cy="23.5" rx="4" ry="1.5" fill="rgba(0,0,0,0.25)"/></svg>';
+    document.body.appendChild(cursor);
+
+    const panel = document.createElement('div');
+    panel.className = 'mwi-panel';
+    document.body.appendChild(panel);
+
+    const getRole = (el: Element) =>
+      el.getAttribute('role') ||
+      (['INPUT','TEXTAREA'].includes(el.tagName) ? 'textbox' :
+       el.tagName === 'SELECT' ? 'combobox' : 'button');
+
+    const getSelector = (el: Element) => {
+      if (el.id) return '#' + CSS.escape(el.id);
+      const name = el.getAttribute('name');
+      if (name) return `[name="${name}"]`;
+      const aria = el.getAttribute('aria-label');
+      if (aria) return `[aria-label="${aria}"]`;
+      return el.tagName.toLowerCase();
+    };
+
+    const getAutoName = (el: Element) =>
+      el.getAttribute('aria-label') || el.getAttribute('placeholder') ||
+      el.getAttribute('name') || (el as HTMLElement).innerText?.trim().slice(0,30) ||
+      el.id || `element ${selected.length + 1}`;
+
+    const renderPanel = () => {
+      panel.innerHTML = `
+        <div style="font-weight:700;margin-bottom:6px;color:#a5b4fc;font-size:13px">🔍 Web Want Inspector</div>
+        <div style="color:#64748b;font-size:11px;margin-bottom:8px">↑↓←→:近傍移動 · Enter:選択 · 🎮:A=選択 Y=完了</div>
+        <div id="mwi-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
+        <div style="margin-top:8px">
+          <button class="mwi-btn mwi-btn-done" onclick="window.__mwiDone()">✓ 完了 (${selected.length}個)</button>
+        </div>
+        <div style="margin-top:5px;color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
+      `;
+    };
+
+    const setFocus = (idx: number) => {
+      elements.forEach(e => e.classList.remove('mwi-focused'));
+      const el = elements[idx];
+      if (!el) return;
+      el.classList.add('mwi-focused');
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect();
+        cursorX = Math.max(4, Math.min(r.left + r.width / 2 - 14, window.innerWidth - 36));
+        cursorY = Math.max(4, Math.min(r.top - 38, window.innerHeight - 40));
+        cursor.style.left = cursorX + 'px';
+        cursor.style.top  = cursorY + 'px';
+      });
+    };
+
+    const refresh = () => {
+      elements.forEach(e => e.classList.remove('mwi-highlight','mwi-focused'));
+      elements = getInteractive();
+      elements.forEach(e => e.classList.add('mwi-highlight'));
+      focusIdx = Math.min(focusIdx, Math.max(0, elements.length - 1));
+      setFocus(focusIdx);
+      renderPanel();
+    };
+
+    (window as any).__mwiRemove = (idx: number) => { selected.splice(idx,1); renderPanel(); };
+
+    (window as any).__mwiDone = () => {
+      const hostname = window.location.hostname || window.location.href;
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [hostname]: selected }),
+      }).then(() => {
+        panel.innerHTML = '<div style="color:#22c55e;font-weight:700;padding:4px">✓ 保存完了！タブを閉じます...</div>';
+        (window as any).__mwiDoneSignal = true;
+      }).catch((e: Error) => {
+        panel.innerHTML = `<div style="color:#ef4444">エラー: ${e.message}</div>`;
+      });
+    };
+
+    const showDialog = (el: Element) => {
+      if (dialogOpen) return;
+      dialogOpen = true;
+      const role = getRole(el);
+      const autoName = getAutoName(el);
+      const sel = getSelector(el);
+
+      const d = document.createElement('div');
+      d.className = 'mwi-dialog';
+      d.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px;color:#a5b4fc">要素を追加</div>
+        <div style="color:#64748b;font-size:11px;margin-bottom:10px">role: ${role}</div>
+        <label style="font-size:11px;color:#94a3b8">名前</label>
+        <input class="mwi-input" id="mwi-name" value="${autoName.replace(/"/g,'&quot;')}" />
+        <div style="margin-top:10px;display:flex;justify-content:flex-end">
+          <button class="mwi-btn mwi-btn-cancel" onclick="window.__mwiCancel()">キャンセル</button>
+          <button class="mwi-btn mwi-btn-done" onclick="window.__mwiAdd('${role}','${sel.replace(/'/g,"\\'")}')">追加</button>
+        </div>
+      `;
+      document.body.appendChild(d);
+      const inp = document.getElementById('mwi-name') as HTMLInputElement;
+      inp?.focus(); inp?.select();
+      inp?.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') (window as any).__mwiAdd(role, sel);
+        if (e.key === 'Escape') (window as any).__mwiCancel();
+      });
+      (window as any).__mwiDialog = d;
+    };
+
+    (window as any).__mwiCancel = () => {
+      (window as any).__mwiDialog?.remove();
+      (window as any).__mwiDialog = null;
+      dialogOpen = false;
+    };
+
+    (window as any).__mwiAdd = (role: string, sel: string) => {
+      const name = (document.getElementById('mwi-name') as HTMLInputElement)?.value || 'element';
+      selected.push({ role, name, selector: sel });
+      elements[focusIdx]?.classList.add('mwi-selected');
+      (window as any).__mwiCancel();
+      renderPanel();
+    };
+
+    const blurActive = () => {
+      const a = document.activeElement as HTMLElement | null;
+      if (a && a !== document.body && a !== document.documentElement) a.blur();
+    };
+
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (!['ArrowDown','ArrowRight','ArrowUp','ArrowLeft','Enter'].includes(e.key)) return;
+      if (dialogOpen) return; // ダイアログ中はキーを通す（入力フィールド・ボタン用）
+      e.preventDefault();
+      e.stopPropagation();
+      blurActive();
+      if      (e.key === 'ArrowRight') { spatialNav('right'); }
+      else if (e.key === 'ArrowLeft')  { spatialNav('left');  }
+      else if (e.key === 'ArrowDown')  { spatialNav('down');  }
+      else if (e.key === 'ArrowUp')    { spatialNav('up');    }
+      else if (e.key === 'Enter') {
+        if (elements[focusIdx]) showDialog(elements[focusIdx]);
+      }
+    }, true);
+
+    // Initialize cursor at center
+    cursor.style.left = cursorX + 'px';
+    cursor.style.top  = cursorY + 'px';
+
+    // Closest interactive element to a viewport point
+    const closestElement = (x: number, y: number): Element | null => {
+      let best: Element | null = null;
+      let bestDist = Infinity;
+      for (const el of elements) {
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width  / 2;
+        const cy = r.top  + r.height / 2;
+        const d  = Math.hypot(cx - x, cy - y);
+        if (d < bestDist) { bestDist = d; best = el; }
+      }
+      return best;
+    };
+
+    // Spatial navigation: move to the nearest element in the pressed direction.
+    // Uses a weighted score: primary-axis distance + 1.5 * perpendicular distance,
+    // so elements that are more aligned in the target direction score better.
+    const spatialNav = (dir: 'up'|'down'|'left'|'right') => {
+      const cur = elements[focusIdx];
+      if (!cur) { if (elements.length) { focusIdx = 0; setFocus(0); } return; }
+      const cr  = cur.getBoundingClientRect();
+      const cx  = cr.left + cr.width  / 2;
+      const cy  = cr.top  + cr.height / 2;
+
+      let bestIdx   = -1;
+      let bestScore = Infinity;
+
+      elements.forEach((el, i) => {
+        if (i === focusIdx) return;
+        const r  = el.getBoundingClientRect();
+        const ex = r.left + r.width  / 2;
+        const ey = r.top  + r.height / 2;
+        const dx = ex - cx;
+        const dy = ey - cy;
+
+        let primary: number, perp: number, forward: boolean;
+        switch (dir) {
+          case 'right': forward = dx > 0; primary =  dx; perp = Math.abs(dy); break;
+          case 'left':  forward = dx < 0; primary = -dx; perp = Math.abs(dy); break;
+          case 'down':  forward = dy > 0; primary =  dy; perp = Math.abs(dx); break;
+          case 'up':    forward = dy < 0; primary = -dy; perp = Math.abs(dx); break;
+        }
+        if (!forward!) return;
+        const score = primary! + perp! * 1.5;
+        if (score < bestScore) { bestScore = score; bestIdx = i; }
+      });
+
+      if (bestIdx >= 0) { focusIdx = bestIdx; setFocus(focusIdx); }
+    };
+
+    let prevBtns: boolean[] = [];
+    let gpollActive = true;
+    const DEADZONE    = 0.15;
+    const CURSOR_SPD  = 10;   // px per frame at full deflection
+    const ZOOM_RATE   = 0.02; // scale per frame at full deflection
+
+    const gpoll = () => {
+      if (!gpollActive) return;
+      for (const gp of navigator.getGamepads?.() ?? []) {
+        if (!gp) continue;
+        const cur = gp.buttons.map((b: GamepadButton) => b.pressed);
+
+        // ── Left stick: free cursor movement (no element snap) ──────────────
+        const lx = Math.abs(gp.axes[0] ?? 0) > DEADZONE ? (gp.axes[0] ?? 0) : 0;
+        const ly = Math.abs(gp.axes[1] ?? 0) > DEADZONE ? (gp.axes[1] ?? 0) : 0;
+        if (lx !== 0 || ly !== 0) {
+          cursorX = Math.max(0, Math.min(window.innerWidth  - 28, cursorX + lx * CURSOR_SPD));
+          cursorY = Math.max(0, Math.min(window.innerHeight - 34, cursorY + ly * CURSOR_SPD));
+          cursor.style.transition = 'none';
+          cursor.style.left = cursorX + 'px';
+          cursor.style.top  = cursorY + 'px';
+        } else {
+          cursor.style.transition = 'left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1)';
+        }
+
+        // ── Right stick Y: zoom ─────────────────────────────────────────────
+        const rx = gp.axes.length > 2 ? (gp.axes[2] ?? 0) : 0;
+        const ry = gp.axes.length > 3 ? (gp.axes[3] ?? 0) : 0;
+        if (Math.abs(ry) > DEADZONE && Math.abs(ry) > Math.abs(rx)) {
+          pageZoom = Math.max(0.25, Math.min(4.0, pageZoom - ry * ZOOM_RATE));
+          (document.documentElement as HTMLElement).style.zoom = String(pageZoom);
+        }
+
+        // ── D-pad: spatial element navigation ──────────────────────────────
+        if (cur[12] && !prevBtns[12]) { blurActive(); spatialNav('up');    }
+        if (cur[13] && !prevBtns[13]) { blurActive(); spatialNav('down');  }
+        if (cur[14] && !prevBtns[14]) { blurActive(); spatialNav('left');  }
+        if (cur[15] && !prevBtns[15]) { blurActive(); spatialNav('right'); }
+
+        // ── A button: select element nearest to cursor (or focusIdx if D-pad was used) ──
+        if (cur[0] && !prevBtns[0]) {
+          if (!dialogOpen) {
+            const target = (lx !== 0 || ly !== 0)
+              ? closestElement(cursorX, cursorY)
+              : (elements[focusIdx] ?? closestElement(cursorX, cursorY));
+            if (target) showDialog(target);
+          }
+        }
+
+        // ── Y button: done ──────────────────────────────────────────────────
+        if (cur[3] && !prevBtns[3]) (window as any).__mwiDone();
+
+        prevBtns = cur;
+      }
+      requestAnimationFrame(gpoll);
+    };
+    requestAnimationFrame(gpoll);
+
+    // BFCache restore: re-run refresh and restart gpoll if it stopped
+    window.addEventListener('pageshow', (ev: PageTransitionEvent) => {
+      if (ev.persisted) {
+        gpollActive = true;
+        requestAnimationFrame(gpoll);
+        setTimeout(refresh, 200);
+      }
+    });
+
+    refresh();
+    setInterval(refresh, 4000);
+  }, doneWebhookUrl);
+}
 
 // ---------------------------------------------------------------------------
 // Debug recorder injection
@@ -779,6 +1359,152 @@ async function injectDebugRecorder(page: Page): Promise<void> {
       }
     }, true);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Nav overlay: navigate only pre-saved elements (no full-page scan)
+// ---------------------------------------------------------------------------
+
+async function injectNavOverlay(
+  page: Page,
+  elements: Array<{ role: string; name: string; selector: string }>,
+): Promise<void> {
+  await page.evaluate((navElements: Array<{ role: string; name: string; selector: string }>) => {
+    if ((window as any).__mywantNavLoaded) return;
+    (window as any).__mywantNavLoaded = true;
+
+    // ── Styles ────────────────────────────────────────────────────────────
+    const style = document.createElement('style');
+    style.textContent = `
+      .mwn-cursor { position:fixed; pointer-events:none; z-index:2147483647;
+        transition:left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1); }
+      .mwn-focused { outline:3px solid #f59e0b !important; box-shadow:0 0 0 4px rgba(245,158,11,.25) !important; }
+      .mwn-panel {
+        position:fixed; bottom:12px; right:12px; background:rgba(15,23,42,.97);
+        border:1px solid #334155; border-radius:10px; padding:10px 14px;
+        z-index:2147483646; color:#f1f5f9; font:13px/1.4 system-ui,sans-serif;
+        min-width:180px; box-shadow:0 8px 32px rgba(0,0,0,.5);
+      }
+      .mwn-name { font-weight:700; color:#f59e0b; font-size:14px; }
+      .mwn-role { font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; margin-left:4px; }
+      .mwn-role-textbox  { background:#3b82f6; color:#fff; }
+      .mwn-role-button   { background:#8b5cf6; color:#fff; }
+      .mwn-role-link     { background:#10b981; color:#fff; }
+      .mwn-role-other    { background:#475569; color:#fff; }
+      .mwn-hint { font-size:10px; color:#64748b; margin-top:6px; }
+      .mwn-pos  { font-size:11px; color:#94a3b8; margin-top:4px; }
+    `;
+    document.head.appendChild(style);
+
+    // ── CursorMan SVG ─────────────────────────────────────────────────────
+    const cursor = document.createElement('div');
+    cursor.className = 'mwn-cursor';
+    cursor.innerHTML = '<svg width="28" height="34" viewBox="0 0 24 29" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 0 6px #f59e0b) drop-shadow(0 0 12px #d97706)"><circle cx="12" cy="5" r="3.5" fill="#f59e0b"/><rect x="8.5" y="9.5" width="7" height="7" rx="1" fill="#f59e0b"/><line x1="8.5" y1="11" x2="5" y2="15" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><line x1="15.5" y1="11" x2="19" y2="15" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><line x1="10" y1="16.5" x2="8" y2="22" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="16.5" x2="16" y2="22" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="12" cy="23.5" rx="4" ry="1.5" fill="rgba(0,0,0,0.25)"/></svg>';
+    document.body.appendChild(cursor);
+
+    // ── Panel ─────────────────────────────────────────────────────────────
+    const panel = document.createElement('div');
+    panel.className = 'mwn-panel';
+    document.body.appendChild(panel);
+
+    // ── State ─────────────────────────────────────────────────────────────
+    let idx = 0;
+    let cursorX = window.innerWidth / 2;
+    let cursorY = window.innerHeight / 2;
+
+    const roleClass = (role: string) => {
+      const r = role.toLowerCase();
+      if (r.includes('text') || r.includes('input') || r.includes('search')) return 'mwn-role-textbox';
+      if (r.includes('button') || r.includes('submit')) return 'mwn-role-button';
+      if (r.includes('link')) return 'mwn-role-link';
+      return 'mwn-role-other';
+    };
+
+    const renderPanel = (el: { role: string; name: string } | null) => {
+      if (!el) { panel.innerHTML = '<div style="color:#ef4444">要素が見つかりません</div>'; return; }
+      const rClass = roleClass(el.role);
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="mwn-name">${el.name}</span>
+          <span class="mwn-role ${rClass}">${el.role}</span>
+        </div>
+        <div class="mwn-pos">${idx + 1} / ${navElements.length}</div>
+        <div class="mwn-hint">↑↓:移動 &nbsp;🎮:D-pad移動</div>
+      `;
+    };
+
+    const setFocus = (i: number) => {
+      // Remove previous focus
+      navElements.forEach(e => {
+        const el = document.querySelector(e.selector);
+        el?.classList.remove('mwn-focused');
+      });
+
+      const def = navElements[i];
+      if (!def) return;
+      const el = document.querySelector(def.selector) as HTMLElement | null;
+      if (!el) { renderPanel(def); return; }
+
+      el.classList.add('mwn-focused');
+      el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      requestAnimationFrame(() => {
+        const r = el.getBoundingClientRect();
+        cursorX = Math.max(4, Math.min(r.left + r.width / 2 - 14, window.innerWidth - 36));
+        cursorY = Math.max(4, Math.min(r.top - 38, window.innerHeight - 40));
+        cursor.style.left = cursorX + 'px';
+        cursor.style.top  = cursorY + 'px';
+      });
+      renderPanel(def);
+    };
+
+    // ── Keyboard (capture phase) ──────────────────────────────────────────
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (!['ArrowDown','ArrowRight','ArrowUp','ArrowLeft'].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        idx = (idx + 1) % navElements.length; setFocus(idx);
+      } else {
+        idx = (idx - 1 + navElements.length) % navElements.length; setFocus(idx);
+      }
+    }, true);
+
+    // ── Gamepad ───────────────────────────────────────────────────────────
+    const DEADZONE = 0.15;
+    const CURSOR_SPD = 10;
+    let prevBtns: boolean[] = [];
+
+    const gpoll = () => {
+      for (const gp of (navigator as any).getGamepads?.() ?? []) {
+        if (!gp) continue;
+        const cur = gp.buttons.map((b: GamepadButton) => b.pressed);
+        // Left stick: free cursor move
+        const lx = Math.abs(gp.axes[0] ?? 0) > DEADZONE ? (gp.axes[0] ?? 0) : 0;
+        const ly = Math.abs(gp.axes[1] ?? 0) > DEADZONE ? (gp.axes[1] ?? 0) : 0;
+        if (lx !== 0 || ly !== 0) {
+          cursorX = Math.max(0, Math.min(window.innerWidth - 28, cursorX + lx * CURSOR_SPD));
+          cursorY = Math.max(0, Math.min(window.innerHeight - 34, cursorY + ly * CURSOR_SPD));
+          cursor.style.transition = 'none';
+          cursor.style.left = cursorX + 'px';
+          cursor.style.top  = cursorY + 'px';
+        } else {
+          cursor.style.transition = 'left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1)';
+        }
+        // D-pad: cycle elements
+        if ((cur[13] && !prevBtns[13]) || (cur[15] && !prevBtns[15])) {
+          idx = (idx + 1) % navElements.length; setFocus(idx);
+        }
+        if ((cur[12] && !prevBtns[12]) || (cur[14] && !prevBtns[14])) {
+          idx = (idx - 1 + navElements.length) % navElements.length; setFocus(idx);
+        }
+        prevBtns = cur;
+      }
+      requestAnimationFrame(gpoll);
+    };
+    requestAnimationFrame(gpoll);
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    setFocus(0);
+  }, elements);
 }
 
 // ---------------------------------------------------------------------------

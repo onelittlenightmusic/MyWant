@@ -14,6 +14,10 @@ wantType:
     description: Initial selected value
     type: string
     required: false
+  - name: globalMemoCategory
+    description: If set, choices are automatically populated from the memo category with this key (e.g. "cities"). The list is refreshed on every progress tick.
+    type: string
+    required: false
   state:
   - name: choices
     description: List of available choices. Populate via spec.imports (e.g. imports.my_global_key = choices).
