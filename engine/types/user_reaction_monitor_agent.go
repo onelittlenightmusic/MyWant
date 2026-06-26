@@ -26,11 +26,6 @@ func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 		return true, nil
 	}
 
-	// Only poll the reaction queue when in the active reaction phase
-	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
-		return false, nil
-	}
-
 	err := monitorUserReactions(ctx, want)
 	if err != nil {
 		return false, err
@@ -48,18 +43,8 @@ func pollUserReactions(ctx context.Context, want *Want) (bool, error) {
 }
 
 func monitorUserReactions(ctx context.Context, want *Want) error {
-	if want.Metadata.Type != "reminder" {
-		return nil
-	}
-
-	status := want.GetStatus()
-	requireReaction := GetGoal(want, "require_reaction", false)
 	queueID := GetCurrent(want, "reaction_queue_id", "")
-
-	if status != WantStatusReaching && status != WantStatusWaitingUserAction {
-		return nil
-	}
-	if !requireReaction || queueID == "" {
+	if queueID == "" {
 		return nil
 	}
 

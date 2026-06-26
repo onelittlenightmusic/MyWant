@@ -19,20 +19,20 @@ type GoalThinkerSettings struct {
 
 // MyWantConfig represents the CLI configuration
 type MyWantConfig struct {
-	AgentMode        string              `yaml:"agent_mode"`         // local, webhook, grpc
-	ServerHost       string              `yaml:"server_host"`        // Main server host
-	ServerPort       int                 `yaml:"server_port"`        // Main server port
-	GUIHost          string              `yaml:"gui_host"`           // mywant-gui host
-	GUIPort          int                 `yaml:"gui_port"`           // mywant-gui port
-	AgentServiceHost string              `yaml:"agent_service_host"` // Agent service host (for webhook mode)
-	AgentServicePort int                 `yaml:"agent_service_port"` // Agent service port (for webhook mode)
-	MockFlightPort   int                 `yaml:"mock_flight_port"`   // Mock flight server port
-	HeaderPosition   string              `yaml:"header_position"`    // top or bottom
-	ColorMode        string              `yaml:"color_mode"`         // light, dark, system
-	CardHeight       string              `yaml:"card_height"`        // sm, md, lg
-	SoundEnabled     *bool               `yaml:"sound_enabled"`      // true (default) or false
-	Environments     map[string]string   `yaml:"environments"`       // arbitrary env vars applied at startup
-	OTELEndpoint     string              `yaml:"otel_endpoint"`      // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
+	AgentMode            string              `yaml:"agent_mode"`             // local, webhook, grpc
+	ServerHost           string              `yaml:"server_host"`            // Main server host
+	ServerPort           int                 `yaml:"server_port"`            // Main server port
+	GUIHost              string              `yaml:"gui_host"`               // mywant-gui host
+	GUIPort              int                 `yaml:"gui_port"`               // mywant-gui port
+	AgentServiceHost     string              `yaml:"agent_service_host"`     // Agent service host (for webhook mode)
+	AgentServicePort     int                 `yaml:"agent_service_port"`     // Agent service port (for webhook mode)
+	MockFlightPort       int                 `yaml:"mock_flight_port"`       // Mock flight server port
+	HeaderPosition       string              `yaml:"header_position"`        // top or bottom
+	ColorMode            string              `yaml:"color_mode"`             // light, dark, system
+	CardHeight           string              `yaml:"card_height"`            // sm, md, lg
+	SoundEnabled         *bool               `yaml:"sound_enabled"`          // true (default) or false
+	Environments         map[string]string   `yaml:"environments"`           // arbitrary env vars applied at startup
+	OTELEndpoint         string              `yaml:"otel_endpoint"`          // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
 	GoalThinker          GoalThinkerSettings `yaml:"goal_thinker"`           // Goal thinker settings
 	ActiveLocationDevice string              `yaml:"active_location_device"` // ID of the device sending location data
 	LocationWantId       string              `yaml:"location_want_id"`       // Want ID of the active location want

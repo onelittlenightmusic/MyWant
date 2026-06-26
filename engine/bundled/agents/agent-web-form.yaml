@@ -1,0 +1,12 @@
+agents:
+  - name: monitor_web_form_phase
+    runtime: localGo
+    type: monitor
+    description: Monitors plan fields and drives the waiting→ready→done approval flow for web form wants.
+    version: '1.0'
+    capabilities:
+      - web_form_monitoring
+    role: monitor
+    monitoring:
+      target: phase
+      check_interval: 1 second

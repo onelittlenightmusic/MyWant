@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -235,9 +237,9 @@ func buildWebWantYAML(name, title, url, hostname string, elements []WebWantEleme
 			if el.FieldKey != "" {
 				buttonStateFields.WriteString(fmt.Sprintf(`
     - name: %s
-      description: "Click \"%s\" (%s)"
+      description: "Click \"%s\" (%s) — set by the want after form submission"
       type: bool
-      label: plan
+      label: current
       persistent: true
       initialValue: false
 `, el.FieldKey, el.Name, el.Role))
@@ -302,7 +304,43 @@ func buildWebWantYAML(name, title, url, hostname string, elements []WebWantEleme
       label: current
       persistent: true
       initialValue: ""
+
+    - name: phase
+      description: "Submission phase: waiting / ready / done"
+      type: string
+      label: current
+      persistent: true
+      initialValue: "waiting"
+
+    - name: reaction_queue_id
+      description: Reaction queue ID for user approval
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: user_reaction
+      description: User reaction result from approval UI
+      type: object
+      label: current
+      persistent: true
+      initialValue: {}
+
+    - name: plan_snapshot
+      description: Snapshot of plan field values at last submission
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
 %s
+  triggers:
+    - onStateChange:
+        label: plan
+
+  requires:
+    - reminder_monitoring
+    - web_form_monitoring
+
   finalResultField: status
 `, name, title, url, hostname, elemComments.String(), url, url, elementStateBlock)
 }
@@ -380,18 +418,19 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Auto-fill mode when field_values are provided; otherwise open nav overlay.
+	// Auto-fill mode when field_values are provided; run in background and return immediately.
 	if len(body.FieldValues) > 0 {
-		if err := types.FillAndSubmitForm(r.Context(), cdpURL, targetURL, navElems, body.FieldValues); err != nil {
-			http.Error(w, "failed to fill form: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		s.JSONResponse(w, http.StatusOK, map[string]any{
+		go func() {
+			if err := types.FillAndSubmitForm(context.Background(), cdpURL, targetURL, navElems, body.FieldValues); err != nil {
+				log.Printf("[WEB-WANT] fill form error for %s: %v", name, err)
+			}
+		}()
+		s.JSONResponse(w, http.StatusAccepted, map[string]any{
 			"ok":      true,
 			"url":     targetURL,
 			"mode":    "fill",
 			"fields":  len(body.FieldValues),
-			"message": fmt.Sprintf("filled %d field(s) on %s", len(body.FieldValues), name),
+			"message": fmt.Sprintf("filling %d field(s) on %s (background)", len(body.FieldValues), name),
 		})
 		return
 	}

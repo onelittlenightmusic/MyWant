@@ -559,6 +559,18 @@ func (w *Want) DeleteBackgroundAgent(agentID string) error {
 }
 
 // StopAllBackgroundAgents stops all running background agents
+// TriggerMonitorAgents immediately wakes up all PollingAgent background agents.
+// Called when a trigger condition (e.g. plan state change) fires.
+func (w *Want) TriggerMonitorAgents() {
+	w.backgroundMutex.RLock()
+	defer w.backgroundMutex.RUnlock()
+	for _, agent := range w.backgroundAgents {
+		if pa, ok := agent.(*PollingAgent); ok {
+			pa.Trigger()
+		}
+	}
+}
+
 func (w *Want) StopAllBackgroundAgents() error {
 	w.backgroundMutex.Lock()
 	defer w.backgroundMutex.Unlock()

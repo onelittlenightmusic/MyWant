@@ -8,5 +8,5 @@ type MemoReader interface {
 
 var globalMemoReader MemoReader
 
-func GetGlobalMemoReader() MemoReader { return globalMemoReader }
+func GetGlobalMemoReader() MemoReader  { return globalMemoReader }
 func SetGlobalMemoReader(r MemoReader) { globalMemoReader = r }

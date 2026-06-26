@@ -297,20 +297,48 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 		}
 	}
 
+	// Build declared-type lookup for nil-value fallback.
+	declaredTypes := make(map[string]string)
+	if typeDef != nil {
+		for _, sd := range typeDef.State {
+			declaredTypes[sd.Name] = strings.ToLower(sd.Type)
+		}
+	}
+
 	// Build a set of framework-reserved field names to exclude from recommendations.
 	reservedFields := make(map[string]bool)
 	for _, f := range mywant.SystemReservedStateFields() {
 		reservedFields[f] = true
 	}
 
+	// normalizeDecl converts a StateDef declared type to a runtime type name.
+	normalizeDecl := func(t string) string {
+		switch strings.ToLower(t) {
+		case "string", "text":
+			return "string"
+		case "int", "integer", "float", "float64", "double", "number":
+			return "number"
+		case "bool", "boolean":
+			return "bool"
+		case "array", "slice":
+			return "array"
+		case "object", "map":
+			return "object"
+		default:
+			return "string" // any / unknown → default to string
+		}
+	}
+
 	state := want.GetExplicitState()
+
+	// Start with runtime state fields.
+	seen := make(map[string]bool)
 	var fields []FieldRef
 	for k, v := range state {
 		if strings.HasPrefix(k, "_") || reservedFields[k] {
-			continue // skip internal fields (underscore-prefixed) and framework-reserved fields
+			continue
 		}
 		label, hasLabel := want.StateLabels[k]
-		// Treat unlabeled fields as "current" so legacy types still expose outputs.
 		effective := label
 		if !hasLabel || label == mywant.LabelNone {
 			effective = mywant.LabelCurrent
@@ -318,16 +346,55 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 		if !allowedLabels[effective] {
 			continue
 		}
+		fieldType := runtimeTypeName(v)
+		if fieldType == "null" {
+			fieldType = normalizeDecl(declaredTypes[k])
+		}
+		seen[k] = true
 		fields = append(fields, FieldRef{
 			WantID:      want.Metadata.ID,
 			WantName:    want.Metadata.Name,
 			FieldName:   k,
-			FieldType:   runtimeTypeName(v),
+			FieldType:   fieldType,
 			DataType:    fieldDataTypes[k],
 			Label:       stateLabelString(effective),
 			IsFinal:     k == finalField,
 			IsExposable: exposableFields[k],
 		})
+	}
+
+	// Also include typeDef-declared fields that are not yet in the runtime state
+	// (e.g. choice.selected before any selection is made).
+	if typeDef != nil {
+		for _, sd := range typeDef.State {
+			if seen[sd.Name] || strings.HasPrefix(sd.Name, "_") || reservedFields[sd.Name] {
+				continue
+			}
+			var effective mywant.StateLabel
+			switch string(sd.Label) {
+			case "plan":
+				effective = mywant.LabelPlan
+			case "goal":
+				effective = mywant.LabelGoal
+			case "current":
+				effective = mywant.LabelCurrent
+			default:
+				effective = mywant.LabelCurrent
+			}
+			if !allowedLabels[effective] {
+				continue
+			}
+			fields = append(fields, FieldRef{
+				WantID:      want.Metadata.ID,
+				WantName:    want.Metadata.Name,
+				FieldName:   sd.Name,
+				FieldType:   normalizeDecl(string(sd.Type)),
+				DataType:    sd.SubType,
+				Label:       stateLabelString(effective),
+				IsFinal:     sd.Name == finalField,
+				IsExposable: sd.Exposable,
+			})
+		}
 	}
 	return fields
 }
@@ -470,6 +537,17 @@ func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, 
 		} else if sf.Label == "current" {
 			score = 0.55
 		}
+		// Boost score when the matched target field is plan/goal-labeled (it's an input slot).
+		if targetDef := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type); targetDef != nil {
+			for _, st := range targetDef.State {
+				if st.Name == localKey && (st.Label == "plan" || st.Label == "goal") {
+					if score < 0.8 {
+						score += 0.15
+					}
+					break
+				}
+			}
+		}
 
 		// ExposeAction only when the source has not yet exposed this global key.
 		var exposeAction *ExposeAction
@@ -568,6 +646,14 @@ func bestLocalKey(s *Server, target *mywant.Want, sf FieldRef) string {
 			return strings.ToLower(t)
 		}
 	}
+	// Build a label lookup for quick plan/goal detection.
+	planOrGoal := make(map[string]bool, len(typeDef.State))
+	for _, st := range typeDef.State {
+		if st.Label == "plan" || st.Label == "goal" {
+			planOrGoal[st.Name] = true
+		}
+	}
+
 	var sameType []string
 	srcWords := splitWords(sf.FieldName)
 	for _, st := range typeDef.State {
@@ -580,9 +666,23 @@ func bestLocalKey(s *Server, target *mywant.Want, sf FieldRef) string {
 		return sameType[0] // Only one candidate — use it.
 	}
 	if len(sameType) > 1 {
-		// Pick the one with the most word overlap with the source field name.
-		best, bestScore := sameType[0], -1
+		// Prefer plan/goal fields (they are inputs; current fields are outputs).
+		var planSameType []string
 		for _, name := range sameType {
+			if planOrGoal[name] {
+				planSameType = append(planSameType, name)
+			}
+		}
+		candidates := planSameType
+		if len(candidates) == 0 {
+			candidates = sameType // No plan fields — fall back to all matches.
+		}
+		if len(candidates) == 1 {
+			return candidates[0]
+		}
+		// Among candidates, pick the one with the most word overlap with the source field name.
+		best, bestScore := candidates[0], -1
+		for _, name := range candidates {
 			overlap := len(wordIntersection(srcWords, splitWords(name)))
 			if overlap > bestScore {
 				bestScore, best = overlap, name

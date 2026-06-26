@@ -1091,11 +1091,15 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	if cb.wantTypeDefinitions != nil {
 		if td, exists := cb.wantTypeDefinitions[wantConfig.Metadata.Type]; exists {
 			typeDef = td
-			// Apply Requires from want type definition if not already set in wantConfig
-			if len(wantConfig.Spec.Requires) == 0 && len(typeDef.Requires) > 0 {
-				wantConfig.Spec.Requires = typeDef.Requires
-				DebugLog("[CHAIN-BUILDER] Applied requires from want type definition for '%s': %v\n",
-					wantConfig.Metadata.Type, typeDef.Requires)
+			// Merge Requires from want type definition into wantConfig (add missing entries)
+			existingReqs := make(map[string]bool, len(wantConfig.Spec.Requires))
+			for _, r := range wantConfig.Spec.Requires {
+				existingReqs[r] = true
+			}
+			for _, r := range typeDef.Requires {
+				if !existingReqs[r] {
+					wantConfig.Spec.Requires = append(wantConfig.Spec.Requires, r)
+				}
 			}
 			// Apply FinalResultField from want type definition if not already set
 			if wantConfig.Spec.FinalResultField == "" && typeDef.FinalResultField != "" {

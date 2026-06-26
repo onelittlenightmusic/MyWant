@@ -1,0 +1,4 @@
+capabilities:
+  - name: web_form_monitoring
+    gives:
+      - web_form_monitoring

@@ -9,26 +9,26 @@ import (
 
 // Config holds server configuration
 type Config struct {
-	Port                int               `json:"port" yaml:"port"`
-	Host                string            `json:"host" yaml:"host"`
-	Debug               bool              `json:"debug" yaml:"debug"`
-	HeaderPosition      string            `json:"header_position" yaml:"header_position"`
-	ColorMode           string            `json:"color_mode" yaml:"color_mode"`
-	CardHeight          string            `json:"card_height" yaml:"card_height"`
-	SoundEnabled        *bool             `json:"sound_enabled" yaml:"sound_enabled"`
-	IconFont            string            `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
-	CanvasBgURL         string            `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
-	CanvasBgColor       string            `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
-	CanvasDPad          *bool             `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
+	Port                 int               `json:"port" yaml:"port"`
+	Host                 string            `json:"host" yaml:"host"`
+	Debug                bool              `json:"debug" yaml:"debug"`
+	HeaderPosition       string            `json:"header_position" yaml:"header_position"`
+	ColorMode            string            `json:"color_mode" yaml:"color_mode"`
+	CardHeight           string            `json:"card_height" yaml:"card_height"`
+	SoundEnabled         *bool             `json:"sound_enabled" yaml:"sound_enabled"`
+	IconFont             string            `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	CanvasBgURL          string            `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	CanvasBgColor        string            `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
+	CanvasDPad           *bool             `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
 	CanvasWeatherEffect  string            `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
 	ActiveLocationDevice string            `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
 	LocationWantId       string            `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
 	ConfigPath           string            `json:"config_path" yaml:"config_path"`
-	MemoryPath          string            `json:"memory_path" yaml:"memory_path"`
-	WantTypesDir        string            `json:"want_types_dir" yaml:"want_types_dir"`
-	WebFS               http.FileSystem   `json:"-" yaml:"-"`
-	OTELEndpoint        string            `json:"otel_endpoint" yaml:"otel_endpoint"`
-	GoalThinker         GoalThinkerConfig `json:"goal_thinker" yaml:"goal_thinker"`
+	MemoryPath           string            `json:"memory_path" yaml:"memory_path"`
+	WantTypesDir         string            `json:"want_types_dir" yaml:"want_types_dir"`
+	WebFS                http.FileSystem   `json:"-" yaml:"-"`
+	OTELEndpoint         string            `json:"otel_endpoint" yaml:"otel_endpoint"`
+	GoalThinker          GoalThinkerConfig `json:"goal_thinker" yaml:"goal_thinker"`
 }
 
 type GoalThinkerConfig struct {
