@@ -252,6 +252,9 @@ func (s *Server) updateWantState(w http.ResponseWriter, r *http.Request) {
 	if hasPlanChange {
 		want.TriggerMonitorAgents()
 	}
+	if s.globalBuilder != nil {
+		s.globalBuilder.TriggerSave()
+	}
 
 	s.JSONResponse(w, http.StatusOK, buildWantStateSnapshot(want, ""))
 }
@@ -286,6 +289,9 @@ func (s *Server) setWantStateKey(w http.ResponseWriter, r *http.Request) {
 		if approved, ok := value.(bool); ok && approved {
 			want.StoreState("plan_status", "approved")
 		}
+	}
+	if s.globalBuilder != nil {
+		s.globalBuilder.TriggerSave()
 	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{"key": key, "value": value})

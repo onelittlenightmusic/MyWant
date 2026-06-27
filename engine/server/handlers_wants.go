@@ -501,6 +501,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 
 	if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
+		s.globalBuilder.TriggerSave()
 	}
 
 	// Record memo entries for SubType params (same as creation hook) so that

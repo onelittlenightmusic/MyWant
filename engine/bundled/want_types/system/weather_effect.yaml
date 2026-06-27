@@ -1,0 +1,182 @@
+wantType:
+  metadata:
+    name: weather_effect
+    title: Weather Effect
+    description: |
+      Applies weather-based visual effects (rain, clouds, snow, fog) to the want canvas.
+
+      Two modes:
+        1. Source want mode: reads weather_condition from another want's state
+             source_want_id: "<id>"   (optional source_field, default: weather_condition)
+        2. Direct mode: fetches weather from wttr.in for the specified city
+             weather_city: "Tokyo"
+
+      The GUI automatically detects any active weather_effect want and renders
+      the corresponding canvas overlay animation.
+    version: '1.0'
+    category: ui
+    pattern: independent
+    labels:
+      user-control: "true"
+
+  parameters:
+    - name: source_want_id
+      description: ID of a weather want to read condition from (optional)
+      type: string
+      required: false
+    - name: source_field
+      description: State field name on the source want (default weather_condition)
+      type: string
+      required: false
+    - name: weather_city
+      description: City for direct wttr.in fetch when source_want_id is not set
+      type: string
+      required: false
+
+  state:
+    - name: source_want_id
+      description: ID of the source weather want
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: source_field
+      description: Field name to read from source want
+      type: string
+      label: current
+      persistent: true
+      initialValue: "weather_condition"
+
+    - name: weather_city
+      description: City for direct weather fetch
+      type: string
+      label: current
+      persistent: true
+      initialValue: "Tokyo"
+
+    - name: weather_condition
+      description: Canonical condition (rain/storm/cloudy/snow/fog/sunny/default)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "weather_condition"
+
+    - name: weather_intensity
+      description: Effect intensity 0-100
+      type: int
+      label: current
+      persistent: false
+      initialValue: 60
+      fetchFrom: mrs_raw_output
+      onFetchData: "weather_intensity"
+
+    - name: weather_raw
+      description: Raw weather text from source
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "weather_raw"
+
+    - name: current_condition
+      description: Last applied condition (for change detection)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "current_condition"
+
+    - name: status
+      description: Status message
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "status"
+
+    - name: last_error
+      description: Last error message
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "last_error"
+
+    # MRS agent fields
+    - name: skill_path
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: skill_json_arg_template
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+    - name: skill_json_arg
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: skill_timeout_seconds
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 10
+
+    - name: skill_poll_interval_ms
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 60000
+
+    - name: mrs_raw_output
+      type: object
+      label: current
+      persistent: false
+      initialValue: null
+
+  onInitialize:
+    current:
+      source_want_id: '${source_want_id}'
+      source_field: '${source_field}'
+      weather_city: '${weather_city}'
+      skill_path: "~/.mywant/custom-types/mywant-weather-effect/main.py"
+      skill_json_arg_template: '{"source_want_id":"%{source_want_id}","source_field":"%{source_field}","weather_city":"%{weather_city}","current_condition":"%{current_condition}"}'
+    goal:
+      skill_timeout_seconds: 10
+      skill_poll_interval_ms: 60000
+
+  requires:
+    - monitor_mrs_agent
+
+  examples:
+    - name: Weather Effect from weather want
+      description: Apply canvas effects based on an existing weather want
+      want:
+        metadata:
+          name: my-weather-effect
+          type: weather_effect
+        spec:
+          params:
+            source_want_id: "want-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+    - name: Weather Effect direct (Tokyo)
+      description: Fetch weather directly and apply effects
+      want:
+        metadata:
+          name: my-weather-effect
+          type: weather_effect
+        spec:
+          params:
+            weather_city: Tokyo

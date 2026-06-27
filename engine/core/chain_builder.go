@@ -163,6 +163,11 @@ type ChainBuilder struct {
 	globalState         sync.Map // key(string) -> value(any), key-level concurrency
 	globalStatePath     string   // ~/.mywant/global_state.yaml
 	lastGlobalStateHash string   // Hash of last written global state for change detection
+
+	// Debounced save: state/status changes enqueue a save; the goroutine coalesces
+	// rapid changes and writes after SaveDebounceDelay. Shutdown flushes immediately.
+	saveTrigger chan struct{}
+	saveStop    chan struct{}
 }
 
 // runtimeWant holds the runtime state of a want
@@ -221,6 +226,8 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		reconcileStop:          make(chan bool),
 		reconcileTrigger:       make(chan *TriggerCommand, 20), // Unified channel for reconciliation and control triggers
 		operationChan:          make(chan *WantOperation, 20),  // Unified channel for all operations
+		saveTrigger:            make(chan struct{}, 1),          // Buffered: coalesces rapid state-change saves
+		saveStop:               make(chan struct{}),
 		pathMap:                make(map[string]Paths),
 		running:                false,
 		warnedConnectionIssues: make(map[string]bool), // Track logged connectivity warnings
@@ -509,6 +516,54 @@ func (cb *ChainBuilder) reconcileLoop() {
 		case <-statsTicker.C:
 			cb.writeStatsToMemory()
 		}
+	}
+}
+
+// SaveDebounceDelay is the minimum time after the last state/status change before writing to disk.
+const SaveDebounceDelay = 3 * time.Second
+
+// debouncedSaveLoop coalesces rapid state/status changes and writes to disk after
+// SaveDebounceDelay has elapsed since the most recent trigger. Stopped by saveStop.
+func (cb *ChainBuilder) debouncedSaveLoop() {
+	timer := time.NewTimer(SaveDebounceDelay)
+	timer.Stop() // start inactive
+	pending := false
+	for {
+		select {
+		case <-cb.saveStop:
+			// Flush once on shutdown if there is a pending save.
+			if pending {
+				cb.writeStatsToMemory()
+			}
+			return
+		case <-cb.saveTrigger:
+			// (Re)arm the timer — coalesce any rapid changes.
+			if !pending || !timer.Stop() {
+				// Either first trigger or timer already fired; always reset.
+				// Drain the channel if Stop returned false (timer already expired).
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(SaveDebounceDelay)
+			pending = true
+		case <-timer.C:
+			if pending {
+				cb.writeStatsToMemory()
+				pending = false
+			}
+		}
+	}
+}
+
+// TriggerSave signals that state or status has changed and the memory file should be
+// persisted. The write is coalesced: multiple triggers within SaveDebounceDelay result
+// in a single disk write after the delay expires.
+func (cb *ChainBuilder) TriggerSave() {
+	select {
+	case cb.saveTrigger <- struct{}{}:
+	default: // already queued
 	}
 }
 
@@ -1648,6 +1703,9 @@ func (cb *ChainBuilder) ExecuteWithMode(serverMode bool) {
 	// Start reconcile loop in background - it will handle initial want creation
 	go cb.reconcileLoop()
 
+	// Start debounced-save goroutine: coalesces rapid state/status changes and writes after 3s
+	go cb.debouncedSaveLoop()
+
 	// Server mode: run indefinitely, never stop reconcile loop
 	if serverMode {
 		// Keep running forever - reconcile loop handles all want lifecycle
@@ -1725,6 +1783,12 @@ func (cb *ChainBuilder) Shutdown() {
 	}
 
 	cb.running = false
+
+	// Stop the debounced-save goroutine (it will flush any pending save before exiting).
+	select {
+	case cb.saveStop <- struct{}{}:
+	default:
+	}
 
 	// Final memory dump - ensure it completes before returning (silent - routine operation)
 	cb.dumpWantMemoryToYAML()

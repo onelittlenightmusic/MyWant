@@ -36,19 +36,24 @@ func (s *ScriptableWant) Initialize() {
 	s.agentRunGuard = sync.Map{}
 
 	// Copy spec params into state using declared labels.
-	labels := make(map[string]string, len(s.WantTypeDefinition.State))
-	for _, sd := range s.WantTypeDefinition.State {
-		labels[sd.Name] = string(sd.Label)
-	}
-	for k, v := range s.Spec.Params {
-		switch labels[k] {
-		case "goal":
-			s.SetGoal(k, v)
-		case "plan":
-			s.SetPlan(k, v)
-		default:
-			if _, isStateDefined := labels[k]; isStateDefined {
-				s.SetCurrent(k, v)
+	// Skip when resetOnRestart is explicitly false: state was already restored
+	// from the persisted snapshot and copying params would overwrite it with defaults.
+	skipParamCopy := s.Spec.ResetOnRestart != nil && !*s.Spec.ResetOnRestart
+	if !skipParamCopy {
+		labels := make(map[string]string, len(s.WantTypeDefinition.State))
+		for _, sd := range s.WantTypeDefinition.State {
+			labels[sd.Name] = string(sd.Label)
+		}
+		for k, v := range s.Spec.Params {
+			switch labels[k] {
+			case "goal":
+				s.SetGoal(k, v)
+			case "plan":
+				s.SetPlan(k, v)
+			default:
+				if _, isStateDefined := labels[k]; isStateDefined {
+					s.SetCurrent(k, v)
+				}
 			}
 		}
 	}

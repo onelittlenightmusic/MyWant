@@ -1,6 +1,10 @@
 package types
 
-import . "mywant/engine/core"
+import (
+	"log"
+
+	. "mywant/engine/core"
+)
 
 // ConsumeWebhookAction deduplicates and dispatches a pending webhook_payload for
 // user-control want types (button, switch, choice, slider, timer, etc.).
@@ -24,10 +28,12 @@ func ConsumeWebhookAction(w *Want, lastAtKey string, handler func(action string,
 	}
 	pm, ok := payload.(map[string]any)
 	if !ok {
+		log.Printf("[ConsumeWebhookAction] want=%s: webhook_payload is not a map (type=%T) — skipping", w.Metadata.Name, payload)
 		return false
 	}
 	action, _ := pm["action"].(string)
 	if !handler(action, pm) {
+		log.Printf("[ConsumeWebhookAction] want=%s: handler rejected action=%q", w.Metadata.Name, action)
 		return false
 	}
 	w.StoreState(lastAtKey, receivedAt)
