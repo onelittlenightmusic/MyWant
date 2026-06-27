@@ -1,9 +1,9 @@
 wantType:
   metadata:
-    name: heart_effect
-    title: Heart Effect
-    description: Triggers a heart effect on the web canvas when X button is pressed.
-    version: '1.1'
+    name: chime_effect
+    title: Chime Effect
+    description: Plays a sparkle chime sound (キラーん) on the web canvas when a button is pressed.
+    version: '1.0'
     category: effect
     pattern: independent
   parameters:
@@ -23,8 +23,8 @@ wantType:
       label: Trigger condition
       description: "empty-space = only when cursor is on empty canvas cell; leave blank for always"
   state:
-    - name: heart_triggers
-      description: Number of times the heart effect has been triggered
+    - name: chime_triggers
+      description: Number of times the chime has been triggered
       type: integer
       label: current
       persistent: true

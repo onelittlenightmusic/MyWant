@@ -4,7 +4,7 @@ wantType:
     title: Fireworks Effect
     description: Triggers a fireworks particle animation on the web canvas when a button is pressed.
     version: '1.0'
-    category: system
+    category: effect
     pattern: independent
   parameters:
     - name: input_button
