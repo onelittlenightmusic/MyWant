@@ -1,0 +1,31 @@
+wantType:
+  metadata:
+    name: heart_effect
+    title: Heart Effect
+    description: Triggers a heart effect on the web canvas when X button is pressed.
+    version: '1.1'
+    category: system
+    pattern: independent
+  parameters:
+    - name: input_button
+      type: string
+      default: "button-x"
+      label: Trigger button
+      description: "Button/key that triggers this want (e.g. button-x, y-button, menu-toggle)"
+    - name: input_action
+      type: string
+      default: "trigger"
+      label: Webhook action
+      description: Webhook action name to dispatch on button press
+    - name: input_condition
+      type: string
+      default: ""
+      label: Trigger condition
+      description: "empty-space = only when cursor is on empty canvas cell; leave blank for always"
+  state:
+    - name: heart_triggers
+      description: Number of times the heart effect has been triggered
+      type: integer
+      label: current
+      persistent: true
+      exposable: true

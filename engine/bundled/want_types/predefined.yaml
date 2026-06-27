@@ -13,6 +13,7 @@ predefined:
     - name: achieving_percentage
       description: Progress percentage towards the goal (0-100)
       type: int
+      subType: percentage
       label: current
       persistent: true
       initialValue: 0

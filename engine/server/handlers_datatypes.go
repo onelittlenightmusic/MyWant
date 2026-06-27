@@ -34,6 +34,12 @@ func (s *Server) getDataTypes(w http.ResponseWriter, r *http.Request) {
 		}
 		fieldTypeMap[f.Field] = key
 	}
+	// Always include well-known predefined percentage fields (not in exposable index).
+	for _, f := range []string{"achieving_percentage"} {
+		if _, seen := fieldTypeMap[f]; !seen {
+			fieldTypeMap[f] = "percentage"
+		}
+	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"types":        DataTypeDefinitions(),
@@ -69,6 +75,10 @@ func fieldTypeFromDataTypes(fieldName string) string {
 	case strings.Contains(lower, "_condition") ||
 		strings.HasSuffix(lower, "_status"):
 		return "string"
+	case strings.HasSuffix(lower, "_pct") ||
+		strings.HasSuffix(lower, "_percentage") ||
+		strings.Contains(lower, "percentage"):
+		return "percentage"
 	}
 	return ""
 }
