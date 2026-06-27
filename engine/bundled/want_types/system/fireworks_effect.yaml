@@ -6,6 +6,8 @@ wantType:
     version: '1.0'
     category: effect
     pattern: independent
+    labels:
+      type-icon: Sparkles
   parameters:
     - name: input_button
       type: string
