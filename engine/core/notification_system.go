@@ -163,30 +163,6 @@ func (h *planStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) E
 	return EventResponse{Handled: true}
 }
 
-// stateChangeTriggerHandler listens for StateChangeEvents on a want's own subscription
-// system and immediately wakes up all PollingAgent background agents when a state field
-// with the configured label changes. Registered via want type triggers[].onStateChange.
-type stateChangeTriggerHandler struct {
-	want        *Want
-	targetLabel StateLabel
-}
-
-func (h *stateChangeTriggerHandler) GetSubscriberName() string {
-	return fmt.Sprintf("%s:trigger:onStateChange:%s", h.want.Metadata.Name, h.targetLabel)
-}
-
-func (h *stateChangeTriggerHandler) OnEvent(_ context.Context, event WantEvent) EventResponse {
-	sce, ok := event.(*StateChangeEvent)
-	if !ok || sce.GetSourceName() != h.want.Metadata.Name {
-		return EventResponse{}
-	}
-	label, exists := h.want.StateLabels[sce.StateKey]
-	if !exists || label != h.targetLabel {
-		return EventResponse{}
-	}
-	h.want.TriggerMonitorAgents()
-	return EventResponse{Handled: true}
-}
 
 // globalParamExposeHandler handles StateChangeEvent and writes the value directly
 // to a named global parameter via SetGlobalParameter.
@@ -284,31 +260,6 @@ func RegisterWant(want *Want) {
 						parentName: parentName,
 						parentKey:  fieldName,
 					}
-					want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
-				}
-			}
-		}
-	}
-
-	// Register trigger subscriptions declared in the type definition.
-	// e.g. triggers: [{onStateChange: {label: plan}}] → TriggerMonitorAgents on plan change.
-	if cb := GetGlobalChainBuilder(); cb != nil {
-		typeDef := cb.GetWantTypeDefinition(want.Metadata.Type)
-		if typeDef != nil {
-			for _, trig := range typeDef.Triggers {
-				if t := trig.OnStateChange; t != nil && t.Label != "" {
-					var label StateLabel
-					switch t.Label {
-					case "plan":
-						label = LabelPlan
-					case "goal":
-						label = LabelGoal
-					case "current":
-						label = LabelCurrent
-					default:
-						continue
-					}
-					handler := &stateChangeTriggerHandler{want: want, targetLabel: label}
 					want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
 				}
 			}
