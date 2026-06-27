@@ -282,6 +282,7 @@ func (s *Server) setupRoutes() {
 	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/gui/pending-action", s.appendPendingDeviceAction).Methods("POST", "OPTIONS")
 
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")

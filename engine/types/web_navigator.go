@@ -127,6 +127,12 @@ func FillAndSubmitForm(ctx context.Context, cdpURL, targetURL string, elements [
 	return nil
 }
 
+// NavigateTab opens targetURL in the CDP browser without any overlay or form filling.
+// Used by the url-template execution path where the URL already contains all query params.
+func NavigateTab(ctx context.Context, cdpURL, targetURL string) error {
+	return FillAndSubmitForm(ctx, cdpURL, targetURL, []WebNavElement{}, map[string]string{})
+}
+
 // BuildNavJS builds the self-contained navigation overlay JS for the given elements.
 func BuildNavJS(elements []WebNavElement) string {
 	elemJSON, _ := json.Marshal(elements)

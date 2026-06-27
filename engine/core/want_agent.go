@@ -562,13 +562,24 @@ func (w *Want) DeleteBackgroundAgent(agentID string) error {
 // TriggerMonitorAgents immediately wakes up all PollingAgent background agents.
 // Called when a trigger condition (e.g. plan state change) fires.
 func (w *Want) TriggerMonitorAgents() {
-	w.backgroundMutex.RLock()
-	defer w.backgroundMutex.RUnlock()
-	for _, agent := range w.backgroundAgents {
-		if pa, ok := agent.(*PollingAgent); ok {
-			pa.Trigger()
-		}
+	w.EmitMonitorAgentEvent("")
+}
+
+// EmitMonitorAgentEvent wakes up the PollingAgent whose name matches agentName.
+// Pass "" to broadcast to all agents (equivalent to TriggerMonitorAgents).
+// The event is processed synchronously via the want's subscription system,
+// so only agents registered on this want are notified.
+func (w *Want) EmitMonitorAgentEvent(agentName string) {
+	event := &MonitorAgentEvent{
+		BaseEvent: BaseEvent{
+			EventType:  EventTypeMonitorAgent,
+			SourceName: w.Metadata.Name,
+			Timestamp:  time.Now(),
+			Priority:   5,
+		},
+		AgentName: agentName,
 	}
+	w.GetSubscriptionSystem().Emit(context.Background(), event)
 }
 
 func (w *Want) StopAllBackgroundAgents() error {

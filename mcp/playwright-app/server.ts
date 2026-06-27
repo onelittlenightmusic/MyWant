@@ -1074,12 +1074,30 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
 
     (window as any).__mwiRemove = (idx: number) => { selected.splice(idx,1); renderPanel(); };
 
+    let detectedUrlTemplate: string | null = null;
+
+    const detectGetUrlTemplate = (el: Element): string | null => {
+      const form = el.closest('form');
+      if (!form || (form as HTMLFormElement).method.toLowerCase() !== 'get') return null;
+      const action = (form as HTMLFormElement).action || window.location.href;
+      const parts: string[] = [];
+      Array.from((form as HTMLFormElement).elements).forEach((fe: Element) => {
+        const f = fe as HTMLInputElement;
+        if (f.name && f.type !== 'hidden' && f.type !== 'submit' && f.type !== 'button') {
+          parts.push(`${encodeURIComponent(f.name)}={{plan.${f.name}}}`);
+        }
+      });
+      return parts.length > 0 ? `${action}?${parts.join('&')}` : null;
+    };
+
     (window as any).__mwiDone = () => {
       const hostname = window.location.hostname || window.location.href;
+      const payload: Record<string, any> = { [hostname]: selected };
+      if (detectedUrlTemplate) payload.__url_template = detectedUrlTemplate;
       fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [hostname]: selected }),
+        body: JSON.stringify(payload),
       }).then(() => {
         panel.innerHTML = '<div style="color:#22c55e;font-weight:700;padding:4px">✓ 保存完了！タブを閉じます...</div>';
         (window as any).__mwiDoneSignal = true;
@@ -1125,8 +1143,13 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
 
     (window as any).__mwiAdd = (role: string, sel: string) => {
       const name = (document.getElementById('mwi-name') as HTMLInputElement)?.value || 'element';
-      selected.push({ role, name, selector: sel });
-      elements[focusIdx]?.classList.add('mwi-selected');
+      const el = elements[focusIdx];
+      const htmlName = (el as HTMLInputElement)?.name || '';
+      selected.push({ role, name, selector: sel, ...(htmlName ? { html_name: htmlName } : {}) });
+      el?.classList.add('mwi-selected');
+      if (!detectedUrlTemplate && el) {
+        detectedUrlTemplate = detectGetUrlTemplate(el);
+      }
       (window as any).__mwiCancel();
       renderPanel();
     };

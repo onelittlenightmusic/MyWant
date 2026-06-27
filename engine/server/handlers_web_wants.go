@@ -22,16 +22,18 @@ type WebWantElement struct {
 	Name     string `json:"name"`
 	Selector string `json:"selector,omitempty"`
 	FieldKey string `json:"field_key,omitempty"` // ASCII param key for textbox inputs (empty for buttons)
+	HtmlName string `json:"html_name,omitempty"` // HTML name attribute of the element (e.g. "q" for Google search)
 }
 
 // createWebWantRequest is the body for POST /api/v1/web-wants/create.
 type createWebWantRequest struct {
-	Name     string                      `json:"name"`
-	Title    string                      `json:"title,omitempty"`
-	URL      string                      `json:"url"`
-	Hostname string                      `json:"hostname,omitempty"`
-	Elements []WebWantElement            `json:"elements"`
-	AllData  map[string][]WebWantElement `json:"all_data,omitempty"`
+	Name        string                      `json:"name"`
+	Title       string                      `json:"title,omitempty"`
+	URL         string                      `json:"url"`
+	Hostname    string                      `json:"hostname,omitempty"`
+	Elements    []WebWantElement            `json:"elements"`
+	AllData     map[string][]WebWantElement `json:"all_data,omitempty"`
+	URLTemplate string                      `json:"url_template,omitempty"`
 }
 
 var validTypeName = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
@@ -181,7 +183,7 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	yamlContent := buildWebWantYAML(name, title, req.URL, hostname, elements)
+	yamlContent := buildWebWantYAML(name, title, req.URL, hostname, req.URLTemplate, elements)
 	if err := os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(yamlContent), 0o644); err != nil {
 		http.Error(w, "failed to write YAML: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -209,7 +211,7 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func buildWebWantYAML(name, title, url, hostname string, elements []WebWantElement) string {
+func buildWebWantYAML(name, title, url, hostname, urlTemplate string, elements []WebWantElement) string {
 	var elemComments strings.Builder
 	var inputStateFields strings.Builder
 	var buttonStateFields strings.Builder
@@ -255,6 +257,31 @@ func buildWebWantYAML(name, title, url, hostname string, elements []WebWantEleme
 		elementStateBlock += "\n    # — buttons —" + buttonStateFields.String()
 	}
 
+	// Rewrite url-template placeholders from HTML element names to field_keys.
+	// e.g. {{plan.q}} → {{plan.search}} when the user named the element "Search"
+	rewrittenTemplate := urlTemplate
+	for _, el := range elements {
+		if !isInputRole(el.Role) || el.FieldKey == "" {
+			continue
+		}
+		// Prefer the explicit html_name; fall back to extracting from selector.
+		htmlName := el.HtmlName
+		if htmlName == "" {
+			if m := reName.FindStringSubmatch(el.Selector); len(m) > 1 {
+				htmlName = m[1]
+			}
+		}
+		if htmlName != "" && htmlName != el.FieldKey {
+			rewrittenTemplate = strings.ReplaceAll(rewrittenTemplate,
+				"{{plan."+htmlName+"}}", "{{plan."+el.FieldKey+"}}")
+		}
+	}
+
+	urlTemplateLabel := ""
+	if rewrittenTemplate != "" {
+		urlTemplateLabel = fmt.Sprintf("\n      url-template: %q", rewrittenTemplate)
+	}
+
 	return fmt.Sprintf(`wantType:
   metadata:
     name: %s
@@ -269,7 +296,7 @@ func buildWebWantYAML(name, title, url, hostname string, elements []WebWantEleme
       category-icon: "Globe"
       category-bg-light: "linear-gradient(160deg, #bfdbfe 0%%, #ddd6fe 100%%)"
       category-bg-dark:  "linear-gradient(160deg, #1e3a5f 0%%, #2d1b69 100%%)"
-      source-url: %q
+      source-url: %q%s
 
   parameters:
     - name: target_url
@@ -332,17 +359,19 @@ func buildWebWantYAML(name, title, url, hostname string, elements []WebWantEleme
       label: current
       persistent: true
       initialValue: ""
-%s
-  triggers:
-    - onStateChange:
-        label: plan
 
+    - name: pending_device_action
+      description: Open-URL action pushed to connected devices (cleared after use)
+      type: object
+      label: current
+      persistent: false
+%s
   requires:
     - reminder_monitoring
     - web_form_monitoring
 
   finalResultField: status
-`, name, title, url, hostname, elemComments.String(), url, url, elementStateBlock)
+`, name, title, url, hostname, elemComments.String(), url, urlTemplateLabel, url, elementStateBlock)
 }
 
 // launchWebWant handles POST /api/v1/web-wants/{name}/launch
@@ -373,10 +402,11 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		TargetURL   string            `json:"target_url"`
-		CDPHost     string            `json:"cdp_host"`
-		CDPPort     string            `json:"cdp_port"`
-		FieldValues map[string]string `json:"field_values,omitempty"`
+		TargetURL    string            `json:"target_url"`
+		CDPHost      string            `json:"cdp_host"`
+		CDPPort      string            `json:"cdp_port"`
+		FieldValues  map[string]string `json:"field_values,omitempty"`
+		NavigateOnly bool              `json:"navigate_only,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
@@ -416,6 +446,22 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 			Selector: el.Selector,
 			FieldKey: el.FieldKey,
 		}
+	}
+
+	// navigate_only: just open the URL in Chrome without filling or overlay (url-template mode).
+	if body.NavigateOnly {
+		go func() {
+			if err := types.NavigateTab(context.Background(), cdpURL, targetURL); err != nil {
+				log.Printf("[WEB-WANT] navigate error for %s: %v", name, err)
+			}
+		}()
+		s.JSONResponse(w, http.StatusAccepted, map[string]any{
+			"ok":      true,
+			"url":     targetURL,
+			"mode":    "navigate",
+			"message": fmt.Sprintf("navigating to %s (background)", targetURL),
+		})
+		return
 	}
 
 	// Auto-fill mode when field_values are provided; run in background and return immediately.

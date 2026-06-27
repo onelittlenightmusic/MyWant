@@ -227,3 +227,9 @@ wantType:
       label: current
       persistent: true
       initialValue: ""
+
+    - name: pendingDeviceActions
+      description: Queue of open-url actions pushed by agents for connected browser clients.
+      type: object
+      label: current
+      persistent: false

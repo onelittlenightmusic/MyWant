@@ -1060,10 +1060,23 @@ func (s *Server) addReactionToQueue(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
-	id, err := s.reactionQueueManager.AddReactionToQueue(mux.Vars(r)["id"], req.Approved, req.Comment)
+	queueID := mux.Vars(r)["id"]
+	id, err := s.reactionQueueManager.AddReactionToQueue(queueID, req.Approved, req.Comment)
 	if err != nil {
 		s.JSONError(w, r, http.StatusNotFound, "Queue not found", err.Error())
 		return
+	}
+	// Immediately wake up the want that owns this queue so user_reaction_monitor
+	// polls without waiting for its next ticker interval.
+	if s.globalBuilder != nil {
+		for _, want := range s.globalBuilder.GetAllWantStates() {
+			if v, ok := want.GetCurrent("reaction_queue_id"); ok {
+				if rid, _ := v.(string); rid == queueID {
+					want.TriggerMonitorAgents()
+					break
+				}
+			}
+		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]string{"reaction_id": id})
 }
@@ -1400,6 +1413,37 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 			s.robotLogMu.Unlock()
 		}
 	}
+
+	s.JSONResponse(w, http.StatusOK, guiStateResponse{
+		Seq:   nextGUIStateSeq(),
+		State: guiFields(want),
+	})
+}
+
+// appendPendingDeviceAction handles POST /api/v1/gui/pending-action
+// Appends one action to the pendingDeviceActions array in GUI state.
+// Used by agents to push open-url actions to browser/device clients.
+func (s *Server) appendPendingDeviceAction(w http.ResponseWriter, r *http.Request) {
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		s.JSONError(w, r, http.StatusNotFound, "gui_state want not found", "")
+		return
+	}
+
+	var action map[string]any
+	if err := DecodeRequest(r, &action); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+
+	var actions []any
+	if existing, ok := want.GetAllState()["pendingDeviceActions"]; ok {
+		if arr, ok := existing.([]any); ok {
+			actions = arr
+		}
+	}
+	actions = append(actions, action)
+	want.StoreState("pendingDeviceActions", actions)
 
 	s.JSONResponse(w, http.StatusOK, guiStateResponse{
 		Seq:   nextGUIStateSeq(),

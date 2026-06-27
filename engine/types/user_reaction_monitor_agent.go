@@ -88,5 +88,9 @@ func monitorUserReactions(ctx context.Context, want *Want) error {
 		want.StoreLog("User rejected reminder reaction")
 	}
 
+	// Wake up the web form phase monitor immediately so it can act on the reaction
+	// without waiting for its next ticker tick. Targeted to avoid self-triggering.
+	want.EmitMonitorAgentEvent("monitor_web_form_phase")
+
 	return nil
 }

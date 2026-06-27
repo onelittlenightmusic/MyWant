@@ -242,8 +242,15 @@ func (s *Server) updateWantState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasPlanChange := false
 	for key, val := range updates {
 		want.StoreState(key, val)
+		if label, ok := want.StateLabels[key]; ok && label == mywant.LabelPlan {
+			hasPlanChange = true
+		}
+	}
+	if hasPlanChange {
+		want.TriggerMonitorAgents()
 	}
 
 	s.JSONResponse(w, http.StatusOK, buildWantStateSnapshot(want, ""))
@@ -269,6 +276,9 @@ func (s *Server) setWantStateKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	want.StoreState(key, value)
+	if label, ok := want.StateLabels[key]; ok && label == mywant.LabelPlan {
+		want.TriggerMonitorAgents()
+	}
 
 	// When plan_approved is set to true, atomically advance plan_status to 'approved'
 	// so the next GET already reflects the approval without waiting for Progress().

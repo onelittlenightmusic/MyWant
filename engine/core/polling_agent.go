@@ -2,8 +2,31 @@ package mywant
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
+
+// pollingAgentTriggerHandler subscribes to EventTypeMonitorAgent and triggers
+// this PollingAgent when AgentName matches (or is empty = broadcast).
+type pollingAgentTriggerHandler struct {
+	pa *PollingAgent
+}
+
+func (h *pollingAgentTriggerHandler) GetSubscriberName() string {
+	return fmt.Sprintf("polling-agent:%s:monitor-trigger", h.pa.id)
+}
+
+func (h *pollingAgentTriggerHandler) OnEvent(_ context.Context, event WantEvent) EventResponse {
+	mae, ok := event.(*MonitorAgentEvent)
+	if !ok {
+		return EventResponse{}
+	}
+	if mae.AgentName != "" && mae.AgentName != h.pa.name {
+		return EventResponse{}
+	}
+	h.pa.Trigger()
+	return EventResponse{Handled: true}
+}
 
 // PollFunc defines the signature for the polling logic.
 // It returns shouldStop=true if the monitoring should terminate.
@@ -50,6 +73,8 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 	p.ticker = time.NewTicker(p.interval)
 	p.trigger = make(chan struct{}, 1)
 	p.done = make(chan struct{})
+
+	w.GetSubscriptionSystem().Subscribe(EventTypeMonitorAgent, &pollingAgentTriggerHandler{pa: p})
 
 	go func() {
 		defer p.ticker.Stop()
@@ -106,6 +131,10 @@ func (p *PollingAgent) Trigger() {
 
 // Stop gracefully stops the monitoring.
 func (p *PollingAgent) Stop() error {
+	if p.want != nil {
+		p.want.GetSubscriptionSystem().Unsubscribe(EventTypeMonitorAgent,
+			fmt.Sprintf("polling-agent:%s:monitor-trigger", p.id))
+	}
 	if p.cancel != nil {
 		p.cancel()
 	}
