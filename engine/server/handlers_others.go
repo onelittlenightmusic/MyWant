@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1147,15 +1146,6 @@ func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 }
 
 // GlobalState
-func hashJSON(v any) string {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	h := sha256.Sum256(b)
-	return fmt.Sprintf("%x", h)[:16]
-}
-
 func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 	var stateMap map[string]any
 	if s.globalBuilder != nil {
@@ -1165,10 +1155,7 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 		stateMap = make(map[string]any)
 	}
 
-	etag := hashJSON(stateMap)
-	w.Header().Set("ETag", `"`+etag+`"`)
-	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
-	if ifNoneMatch != "" && ifNoneMatch == etag {
+	if checkETag(w, r, stateMap) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -1182,10 +1169,7 @@ func (s *Server) getGlobalState(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getGlobalParameters(w http.ResponseWriter, r *http.Request) {
 	params := mywant.GetAllGlobalParameters()
 
-	etag := hashJSON(params)
-	w.Header().Set("ETag", `"`+etag+`"`)
-	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
-	if ifNoneMatch != "" && ifNoneMatch == etag {
+	if checkETag(w, r, params) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -1308,10 +1292,8 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	seq := currentGUIStateSeq()
-	etagValue := fmt.Sprintf(`"%d"`, seq)
-	w.Header().Set("ETag", etagValue)
 	w.Header().Set("Cache-Control", "no-cache")
-	if r.Header.Get("If-None-Match") == etagValue {
+	if checkETagValue(w, r, fmt.Sprintf(`"%d"`, seq)) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
@@ -1362,7 +1344,11 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for key, val := range updates {
-		want.StoreState(key, val)
+		if val == nil {
+			want.DeleteState(key) // null from client means "remove this field"
+		} else {
+			want.StoreState(key, val)
+		}
 	}
 
 	// Persist device settings to config.yaml so they survive server restarts.
@@ -1414,10 +1400,9 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.JSONResponse(w, http.StatusOK, guiStateResponse{
-		Seq:   nextGUIStateSeq(),
-		State: guiFields(want),
-	})
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: guiFields(want)}
+	go broadcastSSE("gui_state", resp)
+	s.JSONResponse(w, http.StatusOK, resp)
 }
 
 // appendPendingDeviceAction handles POST /api/v1/gui/pending-action

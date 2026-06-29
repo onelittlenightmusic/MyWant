@@ -268,6 +268,16 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
 	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
 
+	// Characters CRUD
+	characters := api.PathPrefix("/characters").Subrouter()
+	characters.HandleFunc("", s.listCharacters).Methods("GET", "OPTIONS")
+	characters.HandleFunc("", s.createCharacter).Methods("POST", "OPTIONS")
+	characters.HandleFunc("/prune-devices", s.pruneCharacterDevices).Methods("POST", "OPTIONS")
+	characters.HandleFunc("/{id}", s.getCharacter).Methods("GET", "OPTIONS")
+	characters.HandleFunc("/{id}", s.updateCharacter).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
+	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")
+
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()
 	webWants.HandleFunc("/create", s.createWebWant).Methods("POST", "OPTIONS")
@@ -283,6 +293,14 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/gui/pending-action", s.appendPendingDeviceAction).Methods("POST", "OPTIONS")
+
+	// Multi-cursor: per-character canvas cursor positions (in-memory, TTL-based, no locking)
+	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
+	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")
+
+	// Server-Sent Events: real-time push for cursors, gui_state, want_changed
+	api.HandleFunc("/events", s.sseEvents).Methods("GET")
 
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")
