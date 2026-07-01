@@ -162,20 +162,20 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 
 	// Pass CLI args if skill_json_arg is configured (supports param-driven monitor tasks).
 	args := mrsBuildArgs(want)
-	want.StoreLog("[MRS-MONITOR] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
+	DebugLog("[%s] [MRS-MONITOR] executing skill: %s args=%v (timeout: %ds)", want.Metadata.Name, scriptPath, args, timeoutSec)
 	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
 		if msg != "" {
 			want.SetCurrent("summary", msg)
 		}
-		want.StoreLog("[MRS-MONITOR] progress %d%%: %s", pct, msg)
+		DebugLog("[%s] [MRS-MONITOR] progress %d%%: %s", want.Metadata.Name, pct, msg)
 	})
 	if err != nil {
 		// If the parent or skill context was cancelled externally (e.g., want restart via
 		// StopAllBackgroundAgents), the script was killed intentionally — don't record this
 		// as an error so the restarted want can begin fresh without a stale error state.
 		if ctx.Err() != nil || skillCtx.Err() != nil {
-			want.StoreLog("[MRS-MONITOR] skill interrupted by context cancellation (not an error)")
+			DebugLog("[%s] [MRS-MONITOR] skill interrupted by context cancellation", want.Metadata.Name)
 			return false, nil
 		}
 		want.StoreLog("[MRS-MONITOR] skill failed: %v", err)
@@ -185,11 +185,10 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	}
 
 	want.SetCurrent("mrs_raw_output", raw)
-	// Return true (shouldStop) so the PollingAgent goroutine exits immediately after
-	// a successful execution. This prevents a buffered ticker tick (Go ticker channel
-	// size=1) from starting a spurious second execution while the execution loop is
-	// concurrently calling StopAllBackgroundAgents(), which would SIGKILL the script.
-	return true, nil
+	// Return false so the PollingAgent stays alive and fires on the next ticker tick.
+	// Concurrent-execution protection is already provided by TryStartAgentRun inside
+	// PollingAgent.runPoll, and context-cancellation SIGKILL is handled above.
+	return false, nil
 }
 
 // doMRSAgentFn executes a Machine-Readable Skill script with optional CLI arguments

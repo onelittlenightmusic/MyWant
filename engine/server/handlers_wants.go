@@ -397,7 +397,7 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 
 	resp := wantAPIResponse{
 		Metadata:        meta,
-		Spec:            want.Spec,
+		Spec:            *want.GetSpec(),
 		Status:          want.GetStatus(),
 		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
 		StateTimestamps: want.GetStateTimestamps(),

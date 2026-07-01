@@ -1691,11 +1691,29 @@ func (n *Want) IncrementIntState(key string) int {
 
 	return newValue
 }
+// GetSpec returns a deep copy of the want's Spec, with Params and Imports maps
+// snapshotted under metadataMutex to prevent concurrent-map-read/write panics
+// when UpdateParameter is called from a concurrent goroutine.
 func (w *Want) GetSpec() *WantSpec {
 	if w == nil {
 		return nil
 	}
-	return &w.Spec
+	w.metadataMutex.RLock()
+	defer w.metadataMutex.RUnlock()
+	spec := w.Spec
+	if w.Spec.Params != nil {
+		spec.Params = make(map[string]any, len(w.Spec.Params))
+		for k, v := range w.Spec.Params {
+			spec.Params[k] = v
+		}
+	}
+	if w.Spec.Imports != nil {
+		spec.Imports = make(map[string]string, len(w.Spec.Imports))
+		for k, v := range w.Spec.Imports {
+			spec.Imports[k] = v
+		}
+	}
+	return &spec
 }
 func (w *Want) GetMetadata() Metadata {
 	if w == nil {

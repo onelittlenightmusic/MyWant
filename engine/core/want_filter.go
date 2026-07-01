@@ -78,7 +78,7 @@ func CalculateWantHash(w *Want) string {
 		State    map[string]any `json:"state"`
 	}{
 		Metadata: w.Metadata,
-		Spec:     w.Spec,
+		Spec:     *w.GetSpec(),
 		Status:   w.Status,
 		State:    w.GetAllState(),
 	}
