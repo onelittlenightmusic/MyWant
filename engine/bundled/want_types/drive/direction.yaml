@@ -2,8 +2,8 @@ wantType:
   metadata:
     name: direction
     title: Direction (Heading)
-    description: A 0-360° heading control that targets one or more characters (0=east/+X, increases clockwise toward +Y). When multiple direction wants target the same character, the drive engine resolves the effective heading as the vector sum of each targeting want's unit heading vector.
-    version: '1.0'
+    description: A grid-vector heading control that targets one or more characters (0=east/+X, increases clockwise toward +Y). The vector's magnitude (1-5 grid cells) acts as a weight when multiple direction wants target the same character — the drive engine resolves the effective heading as the vector sum of every targeting want's (dx, dy).
+    version: '2.0'
     category: drive
     pattern: independent
     labels:
@@ -18,14 +18,26 @@ wantType:
     type: array
     subType: character_ids
     required: false
-  - name: default
-    description: Initial heading in degrees (0=east/+X, increases clockwise toward +Y)
+  - name: dx
+    description: Initial grid-cell X offset of the heading vector (0=east/+X); magnitude capped at 5
+    type: float64
+    default: 1
+    required: false
+  - name: dy
+    description: Initial grid-cell Y offset of the heading vector (0=south/+Y); magnitude capped at 5
     type: float64
     default: 0
     required: false
   state:
-  - name: degrees
-    description: Current heading in degrees (0=east/+X, increases clockwise toward +Y)
+  - name: dx
+    description: Current grid-cell X offset of the heading vector
+    type: float64
+    label: current
+    persistent: true
+    exposable: true
+    initialValue: 1
+  - name: dy
+    description: Current grid-cell Y offset of the heading vector
     type: float64
     label: current
     persistent: true
@@ -45,12 +57,13 @@ wantType:
     type: string
     label: current
   examples:
-  - title: Head east
-    description: Sets a character's heading to due east
+  - title: Head east with extra weight
+    description: Sets a character's heading vector to (4, 0) — due east, magnitude 4
     want:
       metadata:
         name: cart-direction
         type: direction
       spec:
         params:
-          default: 90
+          dx: 4
+          dy: 0

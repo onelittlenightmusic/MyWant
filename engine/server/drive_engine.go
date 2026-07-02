@@ -87,16 +87,23 @@ func driveEngineTickOnce() {
 				t.gearMultiplier *= gearVal
 			}
 		case "direction":
-			degrees, _ := want.GetCurrent("degrees")
-			degVal, ok := degrees.(float64)
-			if !ok {
-				degVal = 0
+			dxCur, _ := want.GetCurrent("dx")
+			dyCur, _ := want.GetCurrent("dy")
+			dxVal, ok1 := dxCur.(float64)
+			dyVal, ok2 := dyCur.(float64)
+			if !ok1 {
+				dxVal = 0
 			}
-			rad := degVal * math.Pi / 180
+			if !ok2 {
+				dyVal = 0
+			}
 			for _, charID := range characterIDsOf(want) {
 				t := getTarget(charID)
-				t.dirVectorX += math.Cos(rad)
-				t.dirVectorY += math.Sin(rad)
+				// Raw (unnormalized) vector: a want's magnitude acts as its
+				// weight when combined with other direction wants targeting
+				// the same character.
+				t.dirVectorX += dxVal
+				t.dirVectorY += dyVal
 				t.hasDirection = true
 			}
 		}
