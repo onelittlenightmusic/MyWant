@@ -53,6 +53,32 @@ func (n *Want) GetStringParam(key string, defaultValue string) string {
 	return defaultValue
 }
 
+// GetStringSliceParam returns a []string parameter, accepting both a native
+// []string (set programmatically) and the []any shape produced by YAML/JSON
+// unmarshaling. Returns nil if the key is absent or not a recognizable slice.
+func (n *Want) GetStringSliceParam(key string) []string {
+	n.metadataMutex.RLock()
+	value, ok := n.Spec.Params[key]
+	n.metadataMutex.RUnlock()
+	if !ok {
+		return nil
+	}
+	switch v := value.(type) {
+	case []string:
+		return v
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	n.metadataMutex.RLock()
 	value, ok := n.Spec.Params[key]

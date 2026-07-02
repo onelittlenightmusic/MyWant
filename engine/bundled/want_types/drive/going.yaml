@@ -1,0 +1,56 @@
+wantType:
+  metadata:
+    name: going
+    title: Going / Stopped
+    description: A going/stopped toggle that targets one or more characters. The drive engine reads this state every tick to decide whether the targeted characters should move; when multiple going wants target the same character, stopped wins.
+    version: '1.0'
+    category: drive
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "Footprints"
+      category-icon: "Car"
+      category-bg-light: "linear-gradient(160deg, #a7f3d0 0%, #93c5fd 100%)"
+      category-bg-dark: "linear-gradient(160deg, #065f46 0%, #1e3a8a 100%)"
+  parameters:
+  - name: characters
+    description: Character IDs this want targets
+    type: array
+    subType: character_ids
+    required: false
+  - name: default
+    description: Initial going state (true = going, false = stopped)
+    type: boolean
+    default: false
+    required: false
+  state:
+  - name: going
+    description: Current going state (true = going, false = stopped)
+    type: boolean
+    label: current
+    persistent: true
+    exposable: true
+    initialValue: false
+  - name: characters
+    description: Character IDs this want targets
+    type: array
+    label: current
+    persistent: true
+  - name: webhook_payload
+    description: Payload received via POST /api/v1/webhooks/{id}; consumed by Progress()
+    type: object
+    label: current
+  - name: webhook_received_at
+    description: Timestamp of the last received webhook
+    type: string
+    label: current
+  examples:
+  - title: Start a character going
+    description: Marks a character as going so the drive engine moves it
+    want:
+      metadata:
+        name: cart-going
+        type: going
+      spec:
+        params:
+          default: true

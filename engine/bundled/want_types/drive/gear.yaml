@@ -1,0 +1,89 @@
+wantType:
+  metadata:
+    name: gear
+    title: Gear (Speed)
+    description: A speed-multiplier control that targets one or more characters. When multiple gear wants target the same character, the drive engine multiplies their values together to compute the effective speed multiplier.
+    version: '1.0'
+    category: drive
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "Gauge"
+      category-icon: "Car"
+      category-bg-light: "linear-gradient(160deg, #a7f3d0 0%, #93c5fd 100%)"
+      category-bg-dark: "linear-gradient(160deg, #065f46 0%, #1e3a8a 100%)"
+  parameters:
+  - name: characters
+    description: Character IDs this want targets
+    type: array
+    subType: character_ids
+    required: false
+  - name: default
+    description: Initial speed multiplier
+    type: float64
+    default: 1
+    required: false
+  - name: min
+    description: Minimum speed multiplier
+    type: float64
+    default: 0
+    required: false
+  - name: max
+    description: Maximum speed multiplier
+    type: float64
+    default: 5
+    required: false
+  - name: step
+    description: Step increment
+    type: float64
+    default: 0.1
+    required: false
+  state:
+  - name: value
+    description: Current speed multiplier
+    type: float64
+    label: current
+    persistent: true
+    exposable: true
+    initialValue: 1
+  - name: min
+    description: Minimum value
+    type: float64
+    label: current
+    persistent: true
+    initialValue: 0
+  - name: max
+    description: Maximum value
+    type: float64
+    label: current
+    persistent: true
+    initialValue: 5
+  - name: step
+    description: Step increment
+    type: float64
+    label: current
+    persistent: true
+    initialValue: 0.1
+  - name: characters
+    description: Character IDs this want targets
+    type: array
+    label: current
+    persistent: true
+  - name: webhook_payload
+    description: Payload received via POST /api/v1/webhooks/{id}; consumed by Progress()
+    type: object
+    label: current
+  - name: webhook_received_at
+    description: Timestamp of the last received webhook
+    type: string
+    label: current
+  examples:
+  - title: Double speed
+    description: Doubles the base speed of a character
+    want:
+      metadata:
+        name: cart-gear
+        type: gear
+      spec:
+        params:
+          default: 2.0
