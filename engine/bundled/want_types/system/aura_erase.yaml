@@ -1,0 +1,58 @@
+wantType:
+  metadata:
+    name: aura_erase
+    title: Aura Erase
+    description: Erases aura cells within a radius of the target character's current position, across every "aura" want in the graph (drive-want-style character binding, separate want instance from the aura it clears).
+    version: '1.0'
+    category: effect
+    pattern: independent
+    labels:
+      type-icon: "Eraser"
+  parameters:
+    - name: characters
+      description: Character ID whose position drives the erase (drive-style single-target binding)
+      type: array
+      subType: character_ids
+      required: false
+    - name: erase_radius
+      description: Erase radius in grid cells around the character's position (Chebyshev/square)
+      type: int
+      default: 1
+      required: false
+    - name: input_button
+      type: string
+      default: "button-x"
+      label: Trigger button
+      description: "Button/key that erases aura around the character's current position"
+    - name: input_action
+      type: string
+      default: "erase"
+      label: Webhook action
+      description: Webhook action name to dispatch on button press
+  state:
+    - name: characters
+      description: Character ID this want targets
+      type: array
+      label: current
+      persistent: true
+    - name: erase_radius
+      description: Current erase radius in grid cells
+      type: int
+      label: current
+      persistent: true
+      initialValue: 1
+    - name: webhook_queue
+      description: Every payload received via POST /api/v1/webhooks/{id} since the last Progress() tick, in order; drained (not just the latest) so rapid movement-driven erases never get silently dropped
+      type: array
+      label: current
+  examples:
+    - title: Bind an eraser to a character
+      description: Erases a 2-cell radius of aura around the character when x is pressed
+      want:
+        metadata:
+          name: player-aura-erase
+          type: aura_erase
+        spec:
+          params:
+            characters: ["chr-abc123"]
+            erase_radius: 2

@@ -1,0 +1,60 @@
+wantType:
+  metadata:
+    name: aura
+    title: Aura
+    description: Paints a color onto the canvas grid cell where it's placed. With "characters" set (drive-want-style binding), it paints that character's registered color. Left unbound, it paints with whatever fallback color the client sends — used for the default (unselected) cursorman, which has no character record to look a color up from. Placing an aura cell that closes a loop of this want's own cells fills the enclosed interior with the same color. Multiple characters' auras stack in a cell rather than overwriting each other.
+    version: '1.0'
+    category: effect
+    pattern: independent
+    labels:
+      type-icon: "Sparkles"
+  parameters:
+    - name: characters
+      description: Character ID whose color is painted (drive-style single-target binding)
+      type: array
+      subType: character_ids
+      required: false
+    - name: input_button
+      type: string
+      default: "button-x"
+      label: Trigger button
+      description: "Button/key that places an aura cell at the character's current position"
+    - name: input_action
+      type: string
+      default: "place"
+      label: Webhook action
+      description: Webhook action name to dispatch on button press
+  state:
+    - name: characters
+      description: Character ID this want targets
+      type: array
+      label: current
+      persistent: true
+    - name: cells
+      description: Painted grid cells, each with the list of character colors present there
+      type: array
+      label: current
+      persistent: true
+      exposable: true
+    - name: webhook_queue
+      description: Every payload received via POST /api/v1/webhooks/{id} since the last Progress() tick, in order; drained (not just the latest) so rapid movement-driven placements never get silently dropped
+      type: array
+      label: current
+  examples:
+    - title: Bind aura to a character
+      description: Places aura cells colored with the bound character's color when x is pressed. Replace characters with a real character ID from GET /api/v1/characters — an unresolvable ID silently rejects every placement.
+      want:
+        metadata:
+          name: player-aura
+          type: aura
+        spec:
+          params:
+            characters: ["chr-abc123"]
+    - title: Default cursorman aura (no character bound)
+      description: Leave characters unset to paint with whichever color the client sends as a fallback (the default cursorman's color) — fires only while no character is selected.
+      want:
+        metadata:
+          name: default-cursorman-aura
+          type: aura
+        spec:
+          params: {}

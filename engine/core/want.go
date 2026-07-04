@@ -1086,6 +1086,76 @@ func (n *Want) MergeState(updates map[string]any) {
 	}
 }
 
+// stateToAnySlice normalizes an array-typed state value back into []any,
+// regardless of whether it's the freshly-appended native form or the
+// JSON-roundtripped form it takes on after a reload from persisted state.
+func stateToAnySlice(v any) []any {
+	switch list := v.(type) {
+	case []any:
+		return list
+	case nil:
+		return nil
+	default:
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Slice {
+			return nil
+		}
+		out := make([]any, rv.Len())
+		for i := range out {
+			out[i] = rv.Index(i).Interface()
+		}
+		return out
+	}
+}
+
+// AppendState atomically appends value to the array-typed state field at
+// key, creating the array if it doesn't exist yet. Uses the same per-key
+// mutex as MergeState for atomicity.
+//
+// Pairs with DrainState. Intended for want types where a fast producer
+// (e.g. a client sending one webhook per movement step) can otherwise race
+// a slower consumer (Progress() ticks) — StoreState/SetCurrent overwrite a
+// single slot and silently lose events sent faster than the reconcile
+// interval; AppendState/DrainState never lose one.
+func (n *Want) AppendState(key string, value any) {
+	muRaw, _ := n.keyMutexes.LoadOrStore(key, &sync.Mutex{})
+	mu := muRaw.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
+	list := stateToAnySlice(n.getRawStateValue(key))
+	list = append(list, value)
+	n.State.Store(key, list)
+	n.stateTimestamps.Store(key, time.Now())
+	n.getHistoryManager().AddStateEntry(key, list)
+}
+
+// DrainState atomically reads and clears the array-typed state field at
+// key, returning whatever had accumulated since the last drain (nil if
+// nothing had). Pairs with AppendState.
+func (n *Want) DrainState(key string) []any {
+	muRaw, _ := n.keyMutexes.LoadOrStore(key, &sync.Mutex{})
+	mu := muRaw.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
+	list := stateToAnySlice(n.getRawStateValue(key))
+	if len(list) == 0 {
+		return nil
+	}
+	n.State.Store(key, []any{})
+	n.stateTimestamps.Store(key, time.Now())
+	return list
+}
+
+// getRawStateValue reads a state value directly from the sync.Map without
+// the imported-field / label indirection getState() applies — AppendState
+// and DrainState operate purely on this want's own local state.
+func (n *Want) getRawStateValue(key string) any {
+	v, _ := n.State.Load(key)
+	return v
+}
+
 // StoreStateMulti is the batch variant of StoreState: it writes all key-value pairs
 // in updates into this want's State in a single mutex-protected pass and stages
 // them all for history recording.

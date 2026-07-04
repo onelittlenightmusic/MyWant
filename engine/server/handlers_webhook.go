@@ -67,6 +67,22 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Queue-based user-control wants (declare webhook_queue instead of
+	// webhook_payload) accumulate every payload — a fast producer (e.g. one
+	// webhook per movement step) can otherwise send faster than Progress()
+	// ticks consume webhook_payload's single overwritable slot, silently
+	// losing events. AppendState/DrainState (see engine/core/want.go) never
+	// lose one; Progress() drains and processes the whole queue each tick.
+	if label, ok := want.StateLabels["webhook_queue"]; ok && label == mywant.LabelCurrent {
+		want.AppendState("webhook_queue", map[string]any{
+			"payload":    payload,
+			"receivedAt": time.Now().Format(time.RFC3339Nano),
+		})
+		log.Printf("[WEBHOOK] Appended to webhook_queue for want %s (type=%s)\n", wantID, want.Metadata.Type)
+		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
+		return
+	}
+
 	// User-control wants (button, switch, etc.) declare webhook_payload as a current-labeled
 	// state field and consume it in Progress(). Store the raw payload there directly.
 	if label, ok := want.StateLabels["webhook_payload"]; ok && label == mywant.LabelCurrent {
