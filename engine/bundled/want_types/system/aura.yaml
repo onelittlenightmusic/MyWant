@@ -36,6 +36,13 @@ wantType:
       label: current
       persistent: true
       exposable: true
+    - name: active
+      description: On/off toggle for this aura's blink highlight. Set via POST /api/v1/webhooks/{id} with {"action":"activate"} / {"action":"deactivate"} (e.g. the AuraCardPlugin toggle switch). Purely visual — placement (paint/fill) works the same regardless of this value.
+      type: bool
+      label: current
+      persistent: true
+      exposable: true
+      initialValue: false
     - name: webhook_queue
       description: Every payload received via POST /api/v1/webhooks/{id} since the last Progress() tick, in order; drained (not just the latest) so rapid movement-driven placements never get silently dropped
       type: array

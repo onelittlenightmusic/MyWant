@@ -45,6 +45,9 @@ func (a *AuraWant) Initialize() {
 	if _, ok := a.GetCurrent("cells"); !ok {
 		a.SetCurrent("cells", []AuraCell{})
 	}
+	if _, ok := a.GetCurrent("active"); !ok {
+		a.SetCurrent("active", false)
+	}
 
 	// Painted ground is accumulated progress, not configuration — it must
 	// survive a restart (e.g. triggered by editing this want's params, such
@@ -82,23 +85,28 @@ func (a *AuraWant) Progress() {
 		if !ok {
 			continue
 		}
-		if action, _ := pm["action"].(string); action != "place" {
-			continue
+		action, _ := pm["action"].(string)
+		switch action {
+		case "activate":
+			a.SetCurrent("active", true)
+		case "deactivate":
+			a.SetCurrent("active", false)
+		case "place":
+			x, ok1 := intFromAny(pm["x"])
+			y, ok2 := intFromAny(pm["y"])
+			if !ok1 || !ok2 {
+				continue
+			}
+			actingCharacterID, _ := pm["characterId"].(string)
+			payloadColor, _ := pm["color"].(string)
+			color := a.characterColor(actingCharacterID, payloadColor)
+			if color == "" {
+				continue
+			}
+			cells = paintCell(cells, x, y, []string{color})
+			cells = fillEnclosedRegions(cells, x, y)
+			changed = true
 		}
-		x, ok1 := intFromAny(pm["x"])
-		y, ok2 := intFromAny(pm["y"])
-		if !ok1 || !ok2 {
-			continue
-		}
-		actingCharacterID, _ := pm["characterId"].(string)
-		payloadColor, _ := pm["color"].(string)
-		color := a.characterColor(actingCharacterID, payloadColor)
-		if color == "" {
-			continue
-		}
-		cells = paintCell(cells, x, y, []string{color})
-		cells = fillEnclosedRegions(cells, x, y)
-		changed = true
 	}
 	if changed {
 		a.SetCurrent("cells", cells)
