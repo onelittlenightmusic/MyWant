@@ -451,6 +451,8 @@ func (s *Server) saveFrontendConfig() {
 	// Device settings — always write (empty string clears the field)
 	fullConfig["active_location_device"] = s.config.ActiveLocationDevice
 	fullConfig["location_want_id"] = s.config.LocationWantId
+	fullConfig["web_inspector_lan_host"] = s.config.WebInspectorLANHost
+	fullConfig["web_inspector_ca_cert_path"] = s.config.WebInspectorCACertPath
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

@@ -41,6 +41,18 @@ wantType:
       required: false
       default: "8080"
 
+    - name: characterId
+      description: ID of the character marking elements this session (color resolved server-side for attribution)
+      type: string
+      required: false
+      default: ""
+
+    - name: wantTypeName
+      description: Existing web want type name to reopen (review mode) — its saved elements.json is shown via the nav CursorMan
+      type: string
+      required: false
+      default: ""
+
   state:
     - name: target_url
       description: URL being inspected
@@ -69,6 +81,20 @@ wantType:
       label: current
       persistent: false
       initialValue: "8080"
+
+    - name: characterId
+      description: Acting character ID (mirrored from param)
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+    - name: wantTypeName
+      description: Existing web want type name being reopened, if any (mirrored from param)
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
 
     - name: doneWebhookId
       description: Webhook ID the overlay posts to when the user clicks Done

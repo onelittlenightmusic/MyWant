@@ -27,13 +27,22 @@ func init() {
 }
 
 func monitorWebInspector(ctx context.Context, want *mywant.Want) (bool, error) {
-	// First run: register webhook ID and open browser with inspector overlay.
+	// First run: register webhook ID and open browser with inspector overlay —
+	// unless launch_mode=manual, meaning the browser side is a desktop
+	// bookmarklet or iOS Shortcut instead of a CDP-controlled Chrome tab (see
+	// WebInspectorModal.tsx). In that case there's nothing to drive here: just
+	// register the webhook and wait — the standalone overlay finds this want
+	// itself via GET /api/v1/web-wants/active-inspection (handlers_web_wants.go).
 	doneWebhookID := mywant.GetCurrent(want, "doneWebhookId", "")
 	if doneWebhookID == "" {
 		webhookID := want.Metadata.ID + "-done"
 		want.SetCurrent("doneWebhookId", webhookID)
 		want.StoreLog("[WEB-INSPECTOR] Registered webhook ID: %s", webhookID)
 		want.SetCurrent("action_by_agent", webInspectorAgentName)
+		if paramOrCurrent(want, "launch_mode") == "manual" {
+			want.StoreLog("[WEB-INSPECTOR] launch_mode=manual — skipping CDP auto-launch")
+			return false, nil
+		}
 		return false, openInspectorTab(ctx, want, webhookID)
 	}
 

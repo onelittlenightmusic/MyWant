@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -541,6 +545,232 @@ func (s *Server) suggestElementName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.JSONResponse(w, http.StatusOK, suggestNameResponse{Name: name})
+}
+
+// activeInspectionResponse is the payload for GET /api/v1/web-wants/active-inspection —
+// everything a standalone (non-CDP) overlay loader needs to run itself, mirroring
+// the args openInspectorTab (engine/types/agent_web_inspector.go) passes to the
+// Playwright tool for the Chrome/CDP path.
+type activeInspectionResponse struct {
+	WantID         string                  `json:"want_id"`
+	TargetURL      string                  `json:"target_url"`
+	DoneWebhookURL string                  `json:"done_webhook_url"`
+	SuggestNameURL string                  `json:"suggest_name_url"`
+	CharacterID    string                  `json:"character_id"`
+	Color          string                  `json:"color"`
+	Avatar         string                  `json:"avatar"`
+	ExistingMarks  []mywant.WebElementMark `json:"existing_marks"`
+	NavElements    []WebWantElement        `json:"nav_elements"`
+}
+
+// paramOrCurrentStr reads a string field via its current-labeled mirror first,
+// falling back to the raw request param (Spec.Params) — mirrors engine/types'
+// unexported paramOrCurrent, duplicated here since it isn't exported.
+func paramOrCurrentStr(want *mywant.Want, key string) string {
+	if v := mywant.GetCurrent(want, key, ""); v != "" {
+		return v
+	}
+	if v, ok := want.Spec.Params[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// hostnameOfURL returns targetURL's hostname, or "" if it doesn't parse.
+func hostnameOfURL(targetURL string) string {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
+// wantNameTimestamp extracts the trailing "-<epoch-ms>" suffix web_inspector
+// want names always carry (see WebInspectorModal.tsx's `web-inspector-${Date.now()}`).
+// Metadata has no CreatedAt field to sort by, so this is the only way to tell
+// which of several open inspection wants is newest.
+func wantNameTimestamp(name string) int64 {
+	idx := strings.LastIndex(name, "-")
+	if idx < 0 {
+		return 0
+	}
+	ts, err := strconv.ParseInt(name[idx+1:], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return ts
+}
+
+// loadWebWantNavElements mirrors engine/types' unexported loadWantTypeNavElements —
+// reads the same elements.json a want type's Launch action uses, flattened
+// across hostnames.
+func loadWebWantNavElements(wantTypeName string) []WebWantElement {
+	elemFile := filepath.Join(mywant.UserCustomTypesDir(), wantTypeName, "elements.json")
+	data, err := os.ReadFile(elemFile)
+	if err != nil {
+		return nil
+	}
+	var allElems map[string][]WebWantElement
+	if err := json.Unmarshal(data, &allElems); err != nil {
+		return nil
+	}
+	var elements []WebWantElement
+	for _, elems := range allElems {
+		elements = append(elements, elems...)
+	}
+	return elements
+}
+
+// activeInspection lets a static, session-agnostic overlay loader — a desktop
+// bookmarklet or an iOS Shortcut, neither of which can have a want ID baked in
+// since both are meant to be installed once and reused across sessions —
+// discover which web_inspector want it's acting on. Prefers a want whose
+// target_url hostname matches the page the loader is running on (passed as
+// ?url=); falls back to the most recently created still-open one.
+func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
+	pageHost := hostnameOfURL(r.URL.Query().Get("url"))
+
+	var matched, all []*mywant.Want
+	for _, want := range s.globalBuilder.GetAllWantStates() {
+		if want.Metadata.Type != "web_inspector" {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspection_complete", false) {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspector_error", "") != "" {
+			continue
+		}
+		all = append(all, want)
+		if pageHost != "" && hostnameOfURL(mywant.GetCurrent(want, "target_url", "")) == pageHost {
+			matched = append(matched, want)
+		}
+	}
+
+	pool := matched
+	if len(pool) == 0 {
+		pool = all
+	}
+	if len(pool) == 0 {
+		s.JSONResponse(w, http.StatusNotFound, map[string]string{"error": "no active inspection"})
+		return
+	}
+	sort.Slice(pool, func(i, j int) bool {
+		return wantNameTimestamp(pool[i].Metadata.Name) > wantNameTimestamp(pool[j].Metadata.Name)
+	})
+	want := pool[0]
+
+	targetURL := mywant.GetCurrent(want, "target_url", "")
+	webhookID := mywant.GetCurrent(want, "doneWebhookId", want.Metadata.ID+"-done")
+	mywantPort := mywant.GetCurrent(want, "mywant_api_port", "8080")
+
+	// Built from the request's own Host header, not a hardcoded "localhost" —
+	// this handler is only ever reached by a browser fetch from the
+	// standalone (non-CDP) overlay loader (see WebInspectorModal.tsx), which
+	// may be a phone on the LAN via mywant-gui's reverse proxy (port 8081,
+	// bound to all interfaces) rather than this machine itself (mywant's own
+	// port 8080 is loopback-only — see project memory
+	// project_web_inspector_manual_launch — so "localhost" would be wrong and
+	// unreachable from that same caller). Go's default reverse proxy forwards
+	// the original Host header through unchanged, so r.Host here is exactly
+	// whatever origin the caller used to reach us, and is guaranteed
+	// reachable by that same caller.
+	//
+	// Scheme comes from X-Forwarded-Proto (set by Caddy — see
+	// mywant-gui/docs/WebInspectorIPhone.md), not r.TLS, since TLS is
+	// terminated at Caddy and this backend only ever sees plain HTTP from
+	// the proxy chain. Getting this wrong sends the overlay a plain-http
+	// webhook URL, which then fails the exact same mixed-content block
+	// (fetch, not just <script src>) that Caddy was added to fix.
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		scheme = "http"
+	}
+	origin := scheme + "://" + r.Host
+	if r.Host == "" {
+		origin = fmt.Sprintf("http://localhost:%s", mywantPort)
+	}
+
+	characterID := paramOrCurrentStr(want, "characterId")
+	color, avatar := "", ""
+	if character, ok := mywant.GetCharacter(characterID); ok {
+		color = character.Color
+		avatar = character.Avatar
+	}
+
+	var navElements []WebWantElement
+	if wantTypeName := paramOrCurrentStr(want, "wantTypeName"); wantTypeName != "" {
+		navElements = loadWebWantNavElements(wantTypeName)
+	}
+
+	s.JSONResponse(w, http.StatusOK, activeInspectionResponse{
+		WantID:         want.Metadata.ID,
+		TargetURL:      targetURL,
+		DoneWebhookURL: origin + "/api/v1/webhooks/" + webhookID,
+		SuggestNameURL: origin + "/api/v1/web-wants/suggest-name",
+		CharacterID:    characterID,
+		Color:          color,
+		Avatar:         avatar,
+		ExistingMarks:  mywant.GetWebMarks(hostnameOfURL(targetURL)),
+		NavElements:    navElements,
+	})
+}
+
+// resolveInspectorOverlayPath returns the absolute path to the standalone
+// overlay bundle built by mcp/playwright-app's build-standalone-overlay.js —
+// mirrors resolvePlaywrightServerPath's search strategy (see
+// engine/types/agent_playwright_record.go).
+func resolveInspectorOverlayPath() string {
+	rel := "mcp/playwright-app/dist/inspector-overlay.standalone.js"
+	if _, err := os.Stat(rel); err == nil {
+		abs, _ := filepath.Abs(rel)
+		return abs
+	}
+	if _, filename, _, ok := runtime.Caller(0); ok {
+		sourceRoot := filepath.Join(filepath.Dir(filename), "..", "..")
+		p := filepath.Join(sourceRoot, rel)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// serveInspectorOverlay serves the standalone (non-CDP) overlay bundle at
+// GET /api/v1/web-wants/inspector-overlay.js — the target of the desktop
+// bookmarklet's/iOS Shortcut's <script src> loader (see WebInspectorModal.tsx).
+// CORS is already global via corsMiddleware, so any site's page can load it.
+func (s *Server) serveInspectorOverlay(w http.ResponseWriter, r *http.Request) {
+	p := resolveInspectorOverlayPath()
+	if p == "" {
+		http.Error(w, "inspector-overlay.js not built — run `npm run build` in mcp/playwright-app", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, p)
+}
+
+// serveCACert serves the CA root certificate configured via
+// web_inspector_ca_cert_path (see mywant-gui/docs/WebInspectorIPhone.md) —
+// lets a phone download and trust the Caddy internal CA straight from its
+// own Safari instead of needing the cert AirDropped from the Mac.
+// application/x-x509-ca-cert is the MIME type iOS recognizes to offer
+// "Install Profile" on download, rather than treating it as an opaque file.
+func (s *Server) serveCACert(w http.ResponseWriter, r *http.Request) {
+	p := s.config.WebInspectorCACertPath
+	if p == "" {
+		http.Error(w, "web_inspector_ca_cert_path not configured — set it from the Web Inspector modal's iPhone tab", http.StatusNotFound)
+		return
+	}
+	if _, err := os.Stat(p); err != nil {
+		http.Error(w, "configured CA cert not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
+	w.Header().Set("Content-Disposition", `attachment; filename="mywant-ca.crt"`)
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeFile(w, r, p)
 }
 
 func buildWebWantMainPy(url string, elements []WebWantElement) string {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,9 +24,31 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// detectLANIP returns this machine's LAN-facing IPv4 address (the one used
+// to reach the public internet), or "" if it can't be determined. Used only
+// as a suggested default for web_inspector_lan_host — "localhost" (what a
+// browser sees when the GUI is opened on the same machine as the mywant
+// server) is meaningless to a phone on the same Wi-Fi, which needs the
+// actual LAN address instead. No packets are actually sent — dialing UDP
+// just asks the OS which local interface/IP it would use for that route.
+func detectLANIP() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	addr, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return ""
+	}
+	return addr.IP.String()
+}
+
 // Config
 func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
-	s.JSONResponse(w, http.StatusOK, s.config)
+	resp := s.config
+	resp.DetectedLANIP = detectLANIP()
+	s.JSONResponse(w, http.StatusOK, resp)
 }
 
 func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
@@ -46,6 +69,8 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.CanvasBgColor = newConfig.CanvasBgColor
 	s.config.CanvasDPad = newConfig.CanvasDPad
 	s.config.CanvasWeatherEffect = newConfig.CanvasWeatherEffect
+	s.config.WebInspectorLANHost = newConfig.WebInspectorLANHost
+	s.config.WebInspectorCACertPath = newConfig.WebInspectorCACertPath
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()

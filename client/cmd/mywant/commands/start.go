@@ -145,20 +145,22 @@ var StartCmd = &cobra.Command{
 		}
 
 		cfg := server.Config{
-			Port:                 port,
-			Host:                 host,
-			Debug:                debug,
-			HeaderPosition:       config.HeaderPosition,
-			ColorMode:            config.ColorMode,
-			CardHeight:           config.CardHeight,
-			SoundEnabled:         config.SoundEnabled,
-			ConfigPath:           getConfigPath(),
-			MemoryPath:           filepath.Join(getMyWantDir(), "state.yaml"),
-			WebFS:                nil,
-			OTELEndpoint:         config.OTELEndpoint,
-			GoalThinker:          server.GoalThinkerConfig{UseStub: config.GoalThinker.UseStub},
-			ActiveLocationDevice: config.ActiveLocationDevice,
-			LocationWantId:       config.LocationWantId,
+			Port:                   port,
+			Host:                   host,
+			Debug:                  debug,
+			HeaderPosition:         config.HeaderPosition,
+			ColorMode:              config.ColorMode,
+			CardHeight:             config.CardHeight,
+			SoundEnabled:           config.SoundEnabled,
+			ConfigPath:             getConfigPath(),
+			MemoryPath:             filepath.Join(getMyWantDir(), "state.yaml"),
+			WebFS:                  nil,
+			OTELEndpoint:           config.OTELEndpoint,
+			GoalThinker:            server.GoalThinkerConfig{UseStub: config.GoalThinker.UseStub},
+			ActiveLocationDevice:   config.ActiveLocationDevice,
+			LocationWantId:         config.LocationWantId,
+			WebInspectorLANHost:    config.WebInspectorLANHost,
+			WebInspectorCACertPath: config.WebInspectorCACertPath,
 		}
 
 		fmt.Printf("Starting MyWant Server on http://%s:%d (debug=%v)...\n", host, port, debug)

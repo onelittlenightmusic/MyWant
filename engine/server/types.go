@@ -9,26 +9,40 @@ import (
 
 // Config holds server configuration
 type Config struct {
-	Port                 int               `json:"port" yaml:"port"`
-	Host                 string            `json:"host" yaml:"host"`
-	Debug                bool              `json:"debug" yaml:"debug"`
-	HeaderPosition       string            `json:"header_position" yaml:"header_position"`
-	ColorMode            string            `json:"color_mode" yaml:"color_mode"`
-	CardHeight           string            `json:"card_height" yaml:"card_height"`
-	SoundEnabled         *bool             `json:"sound_enabled" yaml:"sound_enabled"`
-	IconFont             string            `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
-	CanvasBgURL          string            `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
-	CanvasBgColor        string            `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
-	CanvasDPad           *bool             `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
-	CanvasWeatherEffect  string            `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
-	ActiveLocationDevice string            `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
-	LocationWantId       string            `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
-	ConfigPath           string            `json:"config_path" yaml:"config_path"`
-	MemoryPath           string            `json:"memory_path" yaml:"memory_path"`
-	WantTypesDir         string            `json:"want_types_dir" yaml:"want_types_dir"`
-	WebFS                http.FileSystem   `json:"-" yaml:"-"`
-	OTELEndpoint         string            `json:"otel_endpoint" yaml:"otel_endpoint"`
-	GoalThinker          GoalThinkerConfig `json:"goal_thinker" yaml:"goal_thinker"`
+	Port                 int    `json:"port" yaml:"port"`
+	Host                 string `json:"host" yaml:"host"`
+	Debug                bool   `json:"debug" yaml:"debug"`
+	HeaderPosition       string `json:"header_position" yaml:"header_position"`
+	ColorMode            string `json:"color_mode" yaml:"color_mode"`
+	CardHeight           string `json:"card_height" yaml:"card_height"`
+	SoundEnabled         *bool  `json:"sound_enabled" yaml:"sound_enabled"`
+	IconFont             string `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	CanvasBgURL          string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	CanvasBgColor        string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
+	CanvasDPad           *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
+	CanvasWeatherEffect  string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
+	ActiveLocationDevice string `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
+	LocationWantId       string `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
+	// WebInspectorLANHost is the mywant server's LAN-reachable address (host
+	// only, no scheme/port) — needed because a phone on the same Wi-Fi can't
+	// use "localhost" (that resolves to the phone itself). User-confirmed/
+	// editable; DetectedLANIP below is only an unconfirmed suggestion.
+	WebInspectorLANHost string `json:"web_inspector_lan_host,omitempty" yaml:"web_inspector_lan_host,omitempty"`
+	// WebInspectorCACertPath is the filesystem path to Caddy's internal CA
+	// root cert (see mywant-gui/docs/WebInspectorIPhone.md) — served at
+	// GET /api/v1/web-wants/ca-cert so it can be downloaded straight from an
+	// iPhone's own Safari instead of AirDropped from the Mac.
+	WebInspectorCACertPath string `json:"web_inspector_ca_cert_path,omitempty" yaml:"web_inspector_ca_cert_path,omitempty"`
+	// DetectedLANIP is computed fresh on every GET /api/v1/config (see
+	// detectLANIP in handlers_others.go) — never persisted (yaml:"-") and
+	// never accepted from PUT (updateConfig doesn't read it back).
+	DetectedLANIP string            `json:"detected_lan_ip,omitempty" yaml:"-"`
+	ConfigPath    string            `json:"config_path" yaml:"config_path"`
+	MemoryPath    string            `json:"memory_path" yaml:"memory_path"`
+	WantTypesDir  string            `json:"want_types_dir" yaml:"want_types_dir"`
+	WebFS         http.FileSystem   `json:"-" yaml:"-"`
+	OTELEndpoint  string            `json:"otel_endpoint" yaml:"otel_endpoint"`
+	GoalThinker   GoalThinkerConfig `json:"goal_thinker" yaml:"goal_thinker"`
 }
 
 type GoalThinkerConfig struct {
