@@ -277,10 +277,12 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}", s.updateCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}/aura-defaults", s.setCharacterAuraDefault).Methods("PUT", "OPTIONS")
 
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()
 	webWants.HandleFunc("/create", s.createWebWant).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/suggest-name", s.suggestElementName).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/_nav/callback", s.navCallback).Methods("POST", "OPTIONS")

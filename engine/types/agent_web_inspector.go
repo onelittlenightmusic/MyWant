@@ -2,7 +2,11 @@ package types
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
 	"time"
 
 	mywant "mywant/engine/core"
@@ -65,11 +69,57 @@ func openInspectorTab(ctx context.Context, want *mywant.Want, webhookID string) 
 
 	mywantPort := mywant.GetCurrent(want, "mywant_api_port", "8080")
 	doneWebhookURL := fmt.Sprintf("http://localhost:%s/api/v1/webhooks/%s", mywantPort, webhookID)
+	suggestNameURL := fmt.Sprintf("http://localhost:%s/api/v1/web-wants/suggest-name", mywantPort)
+
+	// Resolve the acting character's color server-side (never trust a
+	// client-supplied color) so marks left in the inspector overlay are
+	// attributed and colored consistently with aura marks elsewhere.
+	// paramOrCurrent falls back to the original request param when the
+	// current-labeled mirror is still empty (e.g. want was created before
+	// ScriptableWant's Initialize() had a chance to copy it, or any other
+	// reason the mirror didn't take) — Spec.Params always reflects exactly
+	// what the frontend sent, so this guarantees we never silently drop the
+	// acting character back to the cyan default.
+	characterID := paramOrCurrent(want, "characterId")
+	color := ""
+	avatar := ""
+	if character, ok := mywant.GetCharacter(characterID); ok {
+		color = character.Color
+		avatar = character.Avatar
+	}
+
+	var existingMarksJSON string
+	if hostname := hostnameOf(targetURL); hostname != "" {
+		if marks := mywant.GetWebMarks(hostname); len(marks) > 0 {
+			if b, err := json.Marshal(marks); err == nil {
+				existingMarksJSON = string(b)
+			}
+		}
+	}
+
+	// When reopening the inspector for an existing web want type (review mode),
+	// also load the elements that type's Launch action uses — the frontend passes
+	// which type this is via wantTypeName so the overlay can show the same
+	// CursorMan navigation over them that Launch itself displays.
+	var navElementsJSON string
+	if wantTypeName := paramOrCurrent(want, "wantTypeName"); wantTypeName != "" {
+		if navElements := loadWantTypeNavElements(wantTypeName); len(navElements) > 0 {
+			if b, err := json.Marshal(navElements); err == nil {
+				navElementsJSON = string(b)
+			}
+		}
+	}
 
 	toolArgs := map[string]any{
 		"cdp_url":          cdpURL,
 		"target_url":       targetURL,
 		"done_webhook_url": doneWebhookURL,
+		"suggest_name_url": suggestNameURL,
+		"character_id":     characterID,
+		"color":            color,
+		"avatar":           avatar,
+		"existing_marks":   existingMarksJSON,
+		"nav_elements":     navElementsJSON,
 	}
 
 	want.StoreLog("[WEB-INSPECTOR] Opening inspector tab: cdp=%s url=%s webhook=%s", cdpURL, targetURL, doneWebhookURL)
@@ -107,4 +157,49 @@ func openInspectorTab(ctx context.Context, want *mywant.Want, webhookID string) 
 	want.SetCurrent("inspector_open", true)
 	want.StoreLog("[WEB-INSPECTOR] Inspector tab opened successfully")
 	return nil
+}
+
+// paramOrCurrent reads a string field via its current-labeled mirror first,
+// falling back to the raw request param (Spec.Params) if the mirror is
+// empty. Spec.Params always holds exactly what the frontend sent at want
+// creation, regardless of whether/when the current-labeled copy was made.
+func paramOrCurrent(want *mywant.Want, key string) string {
+	if v := mywant.GetCurrent(want, key, ""); v != "" {
+		return v
+	}
+	if v, ok := want.Spec.Params[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// hostnameOf returns targetURL's hostname, matching what the injected
+// overlay computes client-side via window.location.hostname at Done time —
+// this is the key web marks are stored/looked-up under.
+func hostnameOf(targetURL string) string {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
+}
+
+// loadWantTypeNavElements reads the same elements.json a web want type's
+// Launch action reads (see handlers_web_wants.go's launchWebWant), flattened
+// across hostnames, for display in the inspector overlay.
+func loadWantTypeNavElements(wantTypeName string) []WebNavElement {
+	elemFile := filepath.Join(mywant.UserCustomTypesDir(), wantTypeName, "elements.json")
+	data, err := os.ReadFile(elemFile)
+	if err != nil {
+		return nil
+	}
+	var allElems map[string][]WebNavElement
+	if err := json.Unmarshal(data, &allElems); err != nil {
+		return nil
+	}
+	var elements []WebNavElement
+	for _, elems := range allElems {
+		elements = append(elements, elems...)
+	}
+	return elements
 }

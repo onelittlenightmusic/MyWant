@@ -385,6 +385,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description: 'Full URL to POST selected elements to when the user clicks Done (e.g. http://localhost:8080/api/v1/webhooks/{id}-done)',
           },
+          suggest_name_url: {
+            type: 'string',
+            description: 'Optional full URL to POST {html} to for a speculative AI-suggested element name (e.g. http://localhost:8080/api/v1/web-wants/suggest-name). Omit to disable speculative naming.',
+          },
+          character_id: {
+            type: 'string',
+            description: 'ID of the character marking elements this session — echoed back in the Done payload for attribution.',
+          },
+          color: {
+            type: 'string',
+            description: 'Hex color for character_id, resolved server-side — new selections are outlined in this color.',
+          },
+          avatar: {
+            type: 'string',
+            description: 'Emoji avatar for character_id, resolved server-side — the shared CursorMan shows this emoji in a colored circle instead of the default stick-figure SVG, matching mywant-gui\'s CursorManIcon.',
+          },
+          existing_marks: {
+            type: 'string',
+            description: 'JSON array of {role,name,selector,fieldKey,htmlName,characterId,color} previously recorded for this hostname (any character), rendered as read-only indicators.',
+          },
+          nav_elements: {
+            type: 'string',
+            description: 'JSON array of {role,name,selector} — the same saved elements a web want type\'s Launch action navigates, shown here via an amber CursorMan cycled with Cmd+Arrow keys / gamepad L1+D-pad so it does not conflict with the inspector\'s own plain-arrow element navigation.',
+          },
         },
         required: ['target_url', 'done_webhook_url'],
       },
@@ -768,12 +792,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const cdpUrl = (args?.cdp_url as string | undefined) ?? 'http://localhost:9222';
     const targetUrl = (args?.target_url as string | undefined) ?? '';
     const doneWebhookUrl = (args?.done_webhook_url as string | undefined) ?? '';
+    const suggestNameUrl = (args?.suggest_name_url as string | undefined) ?? '';
+    const characterId = (args?.character_id as string | undefined) ?? '';
+    const color = (args?.color as string | undefined) ?? '';
+    const avatar = (args?.avatar as string | undefined) ?? '';
+    const existingMarksRaw = (args?.existing_marks as string | undefined) ?? '';
+    const navElementsRaw = (args?.nav_elements as string | undefined) ?? '';
 
     if (!targetUrl || !doneWebhookUrl) {
       return {
         content: [{ type: 'text', text: JSON.stringify({ error: 'target_url and done_webhook_url are required' }) }],
         isError: true,
       };
+    }
+
+    let existingMarks: Array<{role:string;name:string;selector:string;characterId:string;color:string}> = [];
+    if (existingMarksRaw) {
+      try { existingMarks = JSON.parse(existingMarksRaw); } catch { existingMarks = []; }
+    }
+
+    let navElements: Array<{role:string;name:string;selector:string}> = [];
+    if (navElementsRaw) {
+      try { navElements = JSON.parse(navElementsRaw); } catch { navElements = []; }
     }
 
     let browser: Browser;
@@ -798,13 +838,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    await injectWebInspector(page, doneWebhookUrl);
+    await injectWebInspector(page, doneWebhookUrl, suggestNameUrl, characterId, color, avatar, existingMarks, navElements);
 
     // Close the tab automatically when the user clicks Done (__mwiDoneSignal is set in the overlay).
+    // No timeout here — inspection sessions can legitimately run long (reviewing
+    // many elements, waiting on AI name suggestions), so we wait indefinitely
+    // for the explicit Done signal rather than force-closing the tab out from
+    // under an in-progress session. If the tab/page is closed some other way
+    // (e.g. the user closes it manually), waitForFunction rejects and the
+    // catch below just no-ops the redundant page.close().
     (async () => {
       try {
-        await page.waitForFunction(() => !!(window as any).__mwiDoneSignal, { timeout: 600000 });
-      } catch (_) { /* timeout — close anyway */ }
+        await page.waitForFunction(() => !!(window as any).__mwiDoneSignal, { timeout: 0 });
+      } catch (_) { /* page/context already closed — nothing to do */ }
       try { await page.close(); } catch (_) {}
     })();
 
@@ -955,23 +1001,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Web Want Inspector overlay injection
 // ---------------------------------------------------------------------------
 
-async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<void> {
-  await page.evaluate((webhookUrl: string) => {
+async function injectWebInspector(
+  page: Page,
+  doneWebhookUrl: string,
+  suggestNameUrl: string,
+  myCharacterId: string,
+  myColor: string,
+  myAvatar: string,
+  existingMarks: Array<{role:string;name:string;selector:string;characterId:string;color:string}>,
+  navElements: Array<{role:string;name:string;selector:string}>,
+): Promise<void> {
+  await page.evaluate(({ webhookUrl, suggestNameUrl, myCharacterId, myColor, myAvatar, existingMarks, navElements }: {
+    webhookUrl: string;
+    suggestNameUrl: string;
+    myCharacterId: string;
+    myColor: string;
+    myAvatar: string;
+    existingMarks: Array<{role:string;name:string;selector:string;characterId:string;color:string}>;
+    navElements: Array<{role:string;name:string;selector:string}>;
+  }) => {
     if ((window as any).__mywantInspectorLoaded) return;
     (window as any).__mywantInspectorLoaded = true;
+
+    // My character's aura/cursor color — used both for the shared CursorMan
+    // SVG (see cursorColor below) and to tint the "Launch保存済み要素" section
+    // of the sidebar, so the saved-elements area visually matches whichever
+    // character (aaa/hero/etc, or the cyan default when none is set as
+    // mycursor) is doing the inspecting.
+    const navColor = myColor || '#f59e0b';
 
     const style = document.createElement('style');
     style.textContent = `
       .mwi-highlight { outline: 2px solid #6366f1 !important; outline-offset: 2px !important; }
-      .mwi-selected  { outline: 2px solid #22c55e !important; }
+      .mwi-selected  { outline-width: 2px !important; outline-style: solid !important; }
       .mwi-focused   { outline: 3px solid #f59e0b !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.25) !important; }
+      .mwi-mark-dot  { position:fixed; width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.8); pointer-events:none; z-index:2147483645; box-shadow:0 1px 3px rgba(0,0,0,.5); }
       .mwi-cursor { position:fixed; pointer-events:none; z-index:2147483647; transition:left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1); }
+      .mwi-nav-member { outline: 2px dashed ${navColor} !important; outline-offset: 3px !important; }
+      .mwi-nav-name { font-weight:700; color:${navColor}; font-size:12px; margin-bottom:4px; }
+      .mwi-nav-hint { font-size:10px; color:#64748b; margin:4px 0 8px; }
+      .mwi-nav-list { flex:none; max-height:140px; overflow-y:auto; margin-bottom:4px; border-left:2px solid ${navColor}55; padding-left:8px; }
+      .mwi-nav-item-focused { outline:1px solid ${navColor} !important; }
       .mwi-panel {
-        position:fixed; top:12px; right:12px; background:rgba(15,23,42,0.97);
-        border:1px solid #334155; border-radius:10px; padding:12px 14px;
+        position:fixed; top:0; right:0; bottom:0; background:rgba(15,23,42,0.97);
+        border-left:1px solid #334155; padding:14px;
         z-index:2147483646; color:#f1f5f9; font:13px/1.4 system-ui,sans-serif;
-        min-width:210px; max-width:280px; box-shadow:0 8px 32px rgba(0,0,0,.5);
+        width:270px; box-shadow:-6px 0 32px rgba(0,0,0,.5);
+        display:flex; flex-direction:column;
       }
+      .mwi-panel-hint { color:#64748b; font-size:11px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #334155; }
+      .mwi-panel-list { flex:1; overflow-y:auto; min-height:0; }
+      .mwi-panel-footer { margin-top:10px; padding-top:10px; border-top:1px solid #334155; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
       .mwi-item { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px; background:#1e293b; margin:3px 0; font-size:12px; }
       .mwi-badge { padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700; }
       .mwi-badge-input { background:#3b82f6; color:#fff; }
@@ -986,6 +1066,12 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
         min-width:260px; box-shadow:0 20px 60px rgba(0,0,0,.7);
       }
       .mwi-input { width:100%; padding:7px 10px; border-radius:6px; border:1px solid #475569; background:#1e293b; color:#f1f5f9; font-size:13px; margin:6px 0; box-sizing:border-box; }
+      .mwi-spinner {
+        display:inline-block; width:11px; height:11px; margin-left:6px; vertical-align:middle;
+        border:2px solid #475569; border-top-color:#f59e0b; border-radius:50%;
+        animation: mwi-spin 0.7s linear infinite;
+      }
+      @keyframes mwi-spin { to { transform: rotate(360deg); } }
     `;
     document.head.appendChild(style);
 
@@ -1000,22 +1086,60 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
 
     let elements: Element[] = [];
     let focusIdx = 0;
-    const selected: Array<{role:string;name:string;selector:string}> = [];
+    const selected: Array<{role:string;name:string;selector:string;html_name?:string;characterId:string;color:string}> = [];
     let dialogOpen = false;
+    // Single-slot state for the currently-open dialog's keyboard handler and
+    // in-flight speculative name-suggestion fetch — only one dialog can be
+    // open at a time, so these must be torn down in __mwiCancel/__mwiAdd to
+    // avoid leaking into the next dialog instance.
+    let dialogKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+    let suggestController: AbortController | null = null;
 
     // Free cursor state (left stick) and page zoom (right stick)
     let cursorX = window.innerWidth  / 2;
     let cursorY = window.innerHeight / 2;
     let pageZoom = 1.0;
 
+    // Single CursorMan for the whole overlay — matches mywant-gui's
+    // CursorManIcon.tsx exactly: when a character is bound, show its emoji
+    // avatar in a colored circle; otherwise fall back to the default
+    // stick-figure SVG in cursorColor (cyan when no character is bound at
+    // all). Used both for plain-arrow spatial nav over all elements and for
+    // the Cmd+Arrow jump to the saved (Launch) element subset — one cursor,
+    // two granularities, matching Dashboard.tsx's moveCursorMan /
+    // canvasWantFocusNav split.
+    const cursorColor = myColor || '#00e5ff';
     const cursor = document.createElement('div');
     cursor.className = 'mwi-cursor';
-    cursor.innerHTML = '<svg width="28" height="34" viewBox="0 0 24 29" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 0 6px #00e5ff) drop-shadow(0 0 12px #00b8d4)"><circle cx="12" cy="5" r="3.5" fill="#00e5ff"/><rect x="8.5" y="9.5" width="7" height="7" rx="1" fill="#00e5ff"/><line x1="8.5" y1="11" x2="5" y2="15" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="15.5" y1="11" x2="19" y2="15" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="10" y1="16.5" x2="8" y2="22" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="16.5" x2="16" y2="22" stroke="#00e5ff" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="12" cy="23.5" rx="4" ry="1.5" fill="rgba(0,0,0,0.25)"/></svg>';
+    if (myAvatar) {
+      const circleSize = 30;
+      const fontSize = Math.round(circleSize * 0.58);
+      cursor.innerHTML = `<div style="width:${circleSize}px;height:${circleSize}px;border-radius:50%;background-color:${cursorColor}33;border:2px solid ${cursorColor};display:flex;align-items:center;justify-content:center;font-size:${fontSize}px;line-height:1;filter:drop-shadow(0 0 6px ${cursorColor}99)">${myAvatar}</div>`;
+    } else {
+      cursor.innerHTML = `<svg width="28" height="34" viewBox="0 0 24 29" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 0 6px ${cursorColor}99) drop-shadow(0 0 14px ${cursorColor}55)"><circle cx="12" cy="5" r="3.5" fill="${cursorColor}"/><rect x="8.5" y="9.5" width="7" height="7" rx="1" fill="${cursorColor}"/><line x1="8.5" y1="11" x2="5" y2="15" stroke="${cursorColor}" stroke-width="2.5" stroke-linecap="round"/><line x1="15.5" y1="11" x2="19" y2="15" stroke="${cursorColor}" stroke-width="2.5" stroke-linecap="round"/><line x1="10" y1="16.5" x2="8" y2="22" stroke="${cursorColor}" stroke-width="2.5" stroke-linecap="round"/><line x1="14" y1="16.5" x2="16" y2="22" stroke="${cursorColor}" stroke-width="2.5" stroke-linecap="round"/><ellipse cx="12" cy="23.5" rx="4" ry="1.5" fill="rgba(0,0,0,0.25)"/></svg>`;
+    }
     document.body.appendChild(cursor);
 
     const panel = document.createElement('div');
     panel.className = 'mwi-panel';
     document.body.appendChild(panel);
+
+    // ── Saved-elements list (same elements a want type's Launch action
+    // navigates) — merged into the main sidebar panel (rendered inside
+    // renderPanel() below) rather than a separate floating box. The shared
+    // cursor jumps to them via Cmd+Arrow / gamepad L1+D-pad (see jumpToNav
+    // below), which updates navFocusIdx to highlight the current one. All
+    // members also get a persistent dashed outline (mwi-nav-member, applied
+    // in refresh()) so the saved subset stays visible regardless of where
+    // the cursor currently is.
+    let navFocusIdx = -1;
+
+    // Reapply the persistent "part of the saved set" outline to every
+    // navElement currently present in the DOM (called from refresh()).
+    const renderNavMembers = () => {
+      document.querySelectorAll('.mwi-nav-member').forEach(e => e.classList.remove('mwi-nav-member'));
+      navElements.forEach(e => { try { document.querySelector(e.selector)?.classList.add('mwi-nav-member'); } catch {} });
+    };
 
     const getRole = (el: Element) =>
       el.getAttribute('role') ||
@@ -1037,14 +1161,20 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       el.id || `element ${selected.length + 1}`;
 
     const renderPanel = () => {
+      const navSection = navElements.length > 0 ? `
+        <div class="mwi-nav-name">🤖 Launch保存済み要素 (${navElements.length})</div>
+        <div class="mwi-nav-list">${navElements.map((e,i)=>`<div class="mwi-item${i===navFocusIdx ? ' mwi-nav-item-focused' : ''}"><span class="mwi-badge mwi-badge-${e.role==='textbox'?'input':'button'}">${e.role}</span><span style="flex:1">${e.name}</span></div>`).join('')}</div>
+        <div class="mwi-nav-hint">⌘+↑↓←→ / 🎮 L1+D-pad:ジャンプ</div>
+      ` : '';
       panel.innerHTML = `
         <div style="font-weight:700;margin-bottom:6px;color:#a5b4fc;font-size:13px">🔍 Web Want Inspector</div>
-        <div style="color:#64748b;font-size:11px;margin-bottom:8px">↑↓←→:近傍移動 · Enter:選択 · 🎮:A=選択 Y=完了</div>
-        <div id="mwi-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
-        <div style="margin-top:8px">
+        <div class="mwi-panel-hint">↑↓←→:近傍移動 · X:選択・命名 · Esc:キャンセル · Enter/🎮A:完了</div>
+        ${navSection}
+        <div id="mwi-list" class="mwi-panel-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
+        <div class="mwi-panel-footer">
+          <div style="color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
           <button class="mwi-btn mwi-btn-done" onclick="window.__mwiDone()">✓ 完了 (${selected.length}個)</button>
         </div>
-        <div style="margin-top:5px;color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
       `;
     };
 
@@ -1063,6 +1193,51 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       });
     };
 
+    // Dot badges for other characters' marks — pinned near each matched
+    // element's top-left corner, one per distinct other-character color.
+    let markDots: HTMLDivElement[] = [];
+    const renderExistingMarks = () => {
+      markDots.forEach(d => d.remove());
+      markDots = [];
+      const byColorPerElement = new Map<Element, Set<string>>();
+      let seededAny = false;
+      for (const mark of existingMarks) {
+        let el: Element | null;
+        try { el = document.querySelector(mark.selector); } catch { el = null; }
+        if (!el) continue;
+        if (mark.characterId === myCharacterId) {
+          // My own prior mark — persistent solid outline in my color, same
+          // treatment as a fresh in-session selection. Also seed it into
+          // `selected` (once, deduped by selector) so it shows up in the
+          // #mwi-list panel and is re-included in the payload when "完了" is
+          // pressed — otherwise pressing Done without touching it would drop
+          // it from the saved elements.json for this hostname.
+          (el as HTMLElement).style.setProperty('outline-color', myColor, 'important');
+          el.classList.add('mwi-selected');
+          if (!selected.some(s => s.selector === mark.selector)) {
+            selected.push({ role: mark.role, name: mark.name, selector: mark.selector, characterId: myCharacterId, color: myColor });
+            seededAny = true;
+          }
+          continue;
+        }
+        if (!byColorPerElement.has(el)) byColorPerElement.set(el, new Set());
+        byColorPerElement.get(el)!.add(mark.color);
+      }
+      byColorPerElement.forEach((colors, el) => {
+        const r = el.getBoundingClientRect();
+        Array.from(colors).forEach((color, i) => {
+          const dot = document.createElement('div');
+          dot.className = 'mwi-mark-dot';
+          dot.style.background = color;
+          dot.style.left = (r.left - 4 + i * 12) + 'px';
+          dot.style.top = (r.top - 4) + 'px';
+          document.body.appendChild(dot);
+          markDots.push(dot);
+        });
+      });
+      if (seededAny) renderPanel();
+    };
+
     const refresh = () => {
       elements.forEach(e => e.classList.remove('mwi-highlight','mwi-focused'));
       elements = getInteractive();
@@ -1070,6 +1245,8 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       focusIdx = Math.min(focusIdx, Math.max(0, elements.length - 1));
       setFocus(focusIdx);
       renderPanel();
+      renderExistingMarks();
+      renderNavMembers();
     };
 
     (window as any).__mwiRemove = (idx: number) => { selected.splice(idx,1); renderPanel(); };
@@ -1094,6 +1271,7 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       const hostname = window.location.hostname || window.location.href;
       const payload: Record<string, any> = { [hostname]: selected };
       if (detectedUrlTemplate) payload.__url_template = detectedUrlTemplate;
+      if (myCharacterId) { payload.characterId = myCharacterId; payload.color = myColor; }
       fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1118,7 +1296,7 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       d.innerHTML = `
         <div style="font-weight:700;margin-bottom:4px;color:#a5b4fc">要素を追加</div>
         <div style="color:#64748b;font-size:11px;margin-bottom:10px">role: ${role}</div>
-        <label style="font-size:11px;color:#94a3b8">名前</label>
+        <label style="font-size:11px;color:#94a3b8">名前<span id="mwi-spinner" class="mwi-spinner" style="display:none"></span></label>
         <input class="mwi-input" id="mwi-name" value="${autoName.replace(/"/g,'&quot;')}" />
         <div style="margin-top:10px;display:flex;justify-content:flex-end">
           <button class="mwi-btn mwi-btn-cancel" onclick="window.__mwiCancel()">キャンセル</button>
@@ -1127,15 +1305,50 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       `;
       document.body.appendChild(d);
       const inp = document.getElementById('mwi-name') as HTMLInputElement;
-      inp?.focus(); inp?.select();
-      inp?.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Enter') (window as any).__mwiAdd(role, sel);
-        if (e.key === 'Escape') (window as any).__mwiCancel();
-      });
+      const spinner = document.getElementById('mwi-spinner') as HTMLElement | null;
+
+      // No auto-focus here — this is the crux of the speculative-naming
+      // feature below: as long as focus hasn't been given yet, we treat the
+      // user as "not editing" and let the AI suggestion land in the field.
+      dialogKeyHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Enter')  { e.preventDefault(); e.stopPropagation(); (window as any).__mwiAdd(role, sel); }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); (window as any).__mwiCancel(); }
+      };
+      document.addEventListener('keydown', dialogKeyHandler, true);
+
+      if (suggestNameUrl) {
+        const context = (el.closest('[class],[id]') as HTMLElement | null) ?? (el as HTMLElement);
+        const html = (context.outerHTML || '').slice(0, 3000);
+        suggestController = new AbortController();
+        if (spinner) spinner.style.display = 'inline-block';
+        fetch(suggestNameUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html }),
+          signal: suggestController.signal,
+        })
+          .then(r => r.json())
+          .then((data: { name?: string }) => {
+            if (spinner) spinner.style.display = 'none';
+            if (data?.name && inp && document.activeElement !== inp) {
+              inp.value = data.name;
+            }
+          })
+          .catch(() => { if (spinner) spinner.style.display = 'none'; });
+
+        inp?.addEventListener('focus', () => {
+          suggestController?.abort();
+          suggestController = null;
+          if (spinner) spinner.style.display = 'none';
+        });
+      }
+
       (window as any).__mwiDialog = d;
     };
 
     (window as any).__mwiCancel = () => {
+      if (suggestController) { suggestController.abort(); suggestController = null; }
+      if (dialogKeyHandler) { document.removeEventListener('keydown', dialogKeyHandler, true); dialogKeyHandler = null; }
       (window as any).__mwiDialog?.remove();
       (window as any).__mwiDialog = null;
       dialogOpen = false;
@@ -1145,7 +1358,8 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       const name = (document.getElementById('mwi-name') as HTMLInputElement)?.value || 'element';
       const el = elements[focusIdx];
       const htmlName = (el as HTMLInputElement)?.name || '';
-      selected.push({ role, name, selector: sel, ...(htmlName ? { html_name: htmlName } : {}) });
+      selected.push({ role, name, selector: sel, characterId: myCharacterId, color: myColor, ...(htmlName ? { html_name: htmlName } : {}) });
+      if (el) (el as HTMLElement).style.setProperty('outline-color', myColor, 'important');
       el?.classList.add('mwi-selected');
       if (!detectedUrlTemplate && el) {
         detectedUrlTemplate = detectGetUrlTemplate(el);
@@ -1160,8 +1374,37 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
     };
 
     document.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (!['ArrowDown','ArrowRight','ArrowUp','ArrowLeft','Enter'].includes(e.key)) return;
-      if (dialogOpen) return; // ダイアログ中はキーを通す（入力フィールド・ボタン用）
+      if (dialogOpen) return; // ダイアログ中はキーを通す（Enter/Escapeはdialog側のキーハンドラが処理）
+
+      // Enter (no dialog open): finish the whole inspection — same as
+      // gamepad A and the "✓ 完了" button. Selecting/naming an element is
+      // x/X only (see below), not Enter/A.
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        (window as any).__mwiDone();
+        return;
+      }
+
+      const isX = e.key.toLowerCase() === 'x';
+      if (!['ArrowDown','ArrowRight','ArrowUp','ArrowLeft'].includes(e.key) && !isX) return;
+
+      // Cmd+Arrow jumps the shared cursor to the nearest saved (Launch)
+      // element in that direction — same cursor as plain-arrow spatial nav,
+      // just a different target subset (mirrors the want-canvas's
+      // Cmd+Arrow-vs-plain-arrow split). Cmd+x is excluded the same way, so
+      // it falls through to the metaKey no-op below.
+      if (e.metaKey && navElements.length > 0 && !isX) {
+        e.preventDefault();
+        e.stopPropagation();
+        if      (e.key === 'ArrowRight') jumpToNav('right');
+        else if (e.key === 'ArrowLeft')  jumpToNav('left');
+        else if (e.key === 'ArrowDown')  jumpToNav('down');
+        else if (e.key === 'ArrowUp')    jumpToNav('up');
+        return;
+      }
+      if (e.metaKey) return;
+
       e.preventDefault();
       e.stopPropagation();
       blurActive();
@@ -1169,7 +1412,7 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       else if (e.key === 'ArrowLeft')  { spatialNav('left');  }
       else if (e.key === 'ArrowDown')  { spatialNav('down');  }
       else if (e.key === 'ArrowUp')    { spatialNav('up');    }
-      else if (e.key === 'Enter') {
+      else if (isX) {
         if (elements[focusIdx]) showDialog(elements[focusIdx]);
       }
     }, true);
@@ -1228,6 +1471,67 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
       if (bestIdx >= 0) { focusIdx = bestIdx; setFocus(focusIdx); }
     };
 
+    // Cmd+Arrow / gamepad L1+D-pad: jump the same cursor directly to the
+    // nearest saved (Launch) element in the pressed direction — mirrors the
+    // want-canvas's Cmd+Arrow behavior (Dashboard.tsx's canvasWantFocusNav +
+    // WantCanvas.findNearest: half-plane filter, primary + 2×perpendicular
+    // score) rather than plain-arrow's element-by-element spatial walk.
+    const jumpToNav = (dir: 'up'|'down'|'left'|'right') => {
+      if (navElements.length === 0) return;
+      const cur = elements[focusIdx];
+      const cr = cur ? cur.getBoundingClientRect() : { left: cursorX, top: cursorY, width: 0, height: 0 };
+      const cx = cr.left + cr.width  / 2;
+      const cy = cr.top  + cr.height / 2;
+
+      let bestEl: Element | null = null;
+      let bestIdxInNav = -1;
+      let bestScore = Infinity;
+
+      navElements.forEach((def, i) => {
+        let el: Element | null;
+        try { el = document.querySelector(def.selector); } catch { el = null; }
+        if (!el || el === cur) return;
+        const r = el.getBoundingClientRect();
+        const ex = r.left + r.width  / 2;
+        const ey = r.top  + r.height / 2;
+        const dx = ex - cx;
+        const dy = ey - cy;
+
+        let primary: number, perp: number, forward: boolean;
+        switch (dir) {
+          case 'right': forward = dx > 0; primary =  dx; perp = Math.abs(dy); break;
+          case 'left':  forward = dx < 0; primary = -dx; perp = Math.abs(dy); break;
+          case 'down':  forward = dy > 0; primary =  dy; perp = Math.abs(dx); break;
+          case 'up':    forward = dy < 0; primary = -dy; perp = Math.abs(dx); break;
+        }
+        if (!forward!) return;
+        const score = primary! + perp! * 2;
+        if (score < bestScore) { bestScore = score; bestEl = el; bestIdxInNav = i; }
+      });
+
+      if (!bestEl || bestIdxInNav < 0) return;
+      const matchIdx = elements.indexOf(bestEl);
+      if (matchIdx >= 0) {
+        focusIdx = matchIdx;
+        setFocus(focusIdx);
+      } else {
+        // Saved element isn't part of the current interactive scan (rare) —
+        // move the cursor there directly without touching focusIdx/elements.
+        elements.forEach(e => e.classList.remove('mwi-focused'));
+        (bestEl as Element).classList.add('mwi-focused');
+        (bestEl as Element).scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        requestAnimationFrame(() => {
+          const r = (bestEl as Element).getBoundingClientRect();
+          cursorX = Math.max(4, Math.min(r.left + r.width / 2 - 14, window.innerWidth - 36));
+          cursorY = Math.max(4, Math.min(r.top - 38, window.innerHeight - 40));
+          cursor.style.left = cursorX + 'px';
+          cursor.style.top  = cursorY + 'px';
+        });
+      }
+      navFocusIdx = bestIdxInNav;
+      renderPanel();
+    };
+
     let prevBtns: boolean[] = [];
     let gpollActive = true;
     const DEADZONE    = 0.15;
@@ -1261,14 +1565,25 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
           (document.documentElement as HTMLElement).style.zoom = String(pageZoom);
         }
 
-        // ── D-pad: spatial element navigation ──────────────────────────────
-        if (cur[12] && !prevBtns[12]) { blurActive(); spatialNav('up');    }
-        if (cur[13] && !prevBtns[13]) { blurActive(); spatialNav('down');  }
-        if (cur[14] && !prevBtns[14]) { blurActive(); spatialNav('left');  }
-        if (cur[15] && !prevBtns[15]) { blurActive(); spatialNav('right'); }
+        // ── D-pad: spatial element navigation, or — while L1 (button 4) is
+        // held and saved elements exist — jump the same cursor to the nearest
+        // saved element in that direction instead, mirroring the Cmd+Arrow
+        // keyboard binding above. ────────────────────────────────────────────
+        const navHeld = !!cur[4] && navElements.length > 0;
+        if (navHeld) {
+          if (cur[12] && !prevBtns[12]) jumpToNav('up');
+          if (cur[13] && !prevBtns[13]) jumpToNav('down');
+          if (cur[14] && !prevBtns[14]) jumpToNav('left');
+          if (cur[15] && !prevBtns[15]) jumpToNav('right');
+        } else {
+          if (cur[12] && !prevBtns[12]) { blurActive(); spatialNav('up');    }
+          if (cur[13] && !prevBtns[13]) { blurActive(); spatialNav('down');  }
+          if (cur[14] && !prevBtns[14]) { blurActive(); spatialNav('left');  }
+          if (cur[15] && !prevBtns[15]) { blurActive(); spatialNav('right'); }
+        }
 
-        // ── A button: select element nearest to cursor (or focusIdx if D-pad was used) ──
-        if (cur[0] && !prevBtns[0]) {
+        // ── X button: select element nearest to cursor (or focusIdx if D-pad was used) ──
+        if (cur[2] && !prevBtns[2]) {
           if (!dialogOpen) {
             const target = (lx !== 0 || ly !== 0)
               ? closestElement(cursorX, cursorY)
@@ -1277,8 +1592,8 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
           }
         }
 
-        // ── Y button: done ──────────────────────────────────────────────────
-        if (cur[3] && !prevBtns[3]) (window as any).__mwiDone();
+        // ── A button: done — same as Enter and the "✓ 完了" button ──────────
+        if (cur[0] && !prevBtns[0] && !dialogOpen) (window as any).__mwiDone();
 
         prevBtns = cur;
       }
@@ -1297,7 +1612,7 @@ async function injectWebInspector(page: Page, doneWebhookUrl: string): Promise<v
 
     refresh();
     setInterval(refresh, 4000);
-  }, doneWebhookUrl);
+  }, { webhookUrl: doneWebhookUrl, suggestNameUrl, myCharacterId, myColor, myAvatar, existingMarks, navElements });
 }
 
 // ---------------------------------------------------------------------------

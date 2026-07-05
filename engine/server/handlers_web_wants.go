@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	mywant "mywant/engine/core"
@@ -498,6 +499,42 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 // navCallback is a no-op endpoint consumed by the navigation overlay's "Done" post.
 func (s *Server) navCallback(w http.ResponseWriter, _ *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// suggestNameRequest is the body for POST /api/v1/web-wants/suggest-name.
+type suggestNameRequest struct {
+	HTML string `json:"html"`
+}
+
+// suggestNameResponse always returns HTTP 200 — this is a fail-open, best-effort
+// suggestion; callers should just check Name for truthiness and never branch on
+// HTTP status.
+type suggestNameResponse struct {
+	Name  string `json:"name"`
+	Error string `json:"error,omitempty"`
+}
+
+// suggestElementName asks the lightweight one-shot `claude --print` helper for
+// a short name describing an inspector element's surrounding HTML. Invoked by
+// the Web Inspector overlay (injected into the page being inspected, hence a
+// cross-origin fetch — see corsMiddleware) speculatively while its naming
+// dialog is open and not yet focused by the user.
+func (s *Server) suggestElementName(w http.ResponseWriter, r *http.Request) {
+	var req suggestNameRequest
+	if err := DecodeRequest(r, &req); err != nil || req.HTML == "" {
+		s.JSONResponse(w, http.StatusOK, suggestNameResponse{Error: "html is required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+
+	name, err := types.SuggestElementName(ctx, req.HTML)
+	if err != nil {
+		s.JSONResponse(w, http.StatusOK, suggestNameResponse{Error: err.Error()})
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, suggestNameResponse{Name: name})
 }
 
 func buildWebWantMainPy(url string, elements []WebWantElement) string {
