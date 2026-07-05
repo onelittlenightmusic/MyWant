@@ -23,6 +23,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -848,9 +849,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // (e.g. the user closes it manually), waitForFunction rejects and the
     // catch below just no-ops the redundant page.close().
     (async () => {
+      let done = false;
       try {
         await page.waitForFunction(() => !!(window as any).__mwiDoneSignal, { timeout: 0 });
+        done = true;
       } catch (_) { /* page/context already closed — nothing to do */ }
+
+      // Best-effort completion snapshot — captured here (Node/Playwright side)
+      // because page.screenshot() isn't available from the in-page overlay JS.
+      // This happens *after* the overlay's own elements webhook POST already
+      // fired (see __mwiDone in injectWebInspector), so it's a separate
+      // follow-up POST to the same done-webhook rather than part of that
+      // payload — handleWebInspectorDone (Go) merges it into want state
+      // without touching selected_elements.
+      if (done && doneWebhookUrl) {
+        try {
+          const filename = await captureAndSaveScreenshot(page);
+          if (filename) {
+            const screenshotUrl = new URL('/api/v1/screenshots/' + filename, doneWebhookUrl).toString();
+            await fetch(doneWebhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ __screenshot_url: screenshotUrl }),
+            });
+          }
+        } catch (e) {
+          console.error('[WEB-INSPECTOR] screenshot capture/post failed:', e);
+        }
+      }
+
       try { await page.close(); } catch (_) {}
     })();
 
@@ -998,6 +1025,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // ---------------------------------------------------------------------------
+// Web Want Inspector completion snapshot
+// ---------------------------------------------------------------------------
+
+/**
+ * Saves a PNG screenshot of the page to ~/.mywant/screenshots/ — the same
+ * directory the replay feature's moveReplayScreenshot (agent_playwright_record.go)
+ * uses, served by the Go backend at /api/v1/screenshots/<filename>.
+ * Returns the saved filename, or null on failure.
+ */
+async function captureAndSaveScreenshot(page: Page): Promise<string | null> {
+  try {
+    const buffer = await page.screenshot({ type: 'png' });
+    const dir = path.join(os.homedir(), '.mywant', 'screenshots');
+    fs.mkdirSync(dir, { recursive: true });
+    const filename = `web-inspector-${crypto.randomUUID()}.png`;
+    fs.writeFileSync(path.join(dir, filename), buffer);
+    return filename;
+  } catch (e) {
+    console.error('[WEB-INSPECTOR] screenshot capture failed:', e);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Web Want Inspector overlay injection
 // ---------------------------------------------------------------------------
 
@@ -1030,10 +1081,17 @@ async function injectWebInspector(
     // mycursor) is doing the inspecting.
     const navColor = myColor || '#f59e0b';
 
+    // Same aura color/fallback as the shared CursorMan (cursorColor below) —
+    // used to give already-saved elements (outlined via .mwi-selected, see
+    // renderExistingMarks) a soft glow at inspector launch, instead of a flat
+    // solid outline, so they visually read as "marked with my aura" the same
+    // way the CursorMan and aura ground-painting do elsewhere in the app.
+    const auraColor = myColor || '#00e5ff';
+
     const style = document.createElement('style');
     style.textContent = `
       .mwi-highlight { outline: 2px solid #6366f1 !important; outline-offset: 2px !important; }
-      .mwi-selected  { outline-width: 2px !important; outline-style: solid !important; }
+      .mwi-selected  { outline-width: 2px !important; outline-style: solid !important; filter: drop-shadow(0 0 6px ${auraColor}99) drop-shadow(0 0 12px ${auraColor}55); }
       .mwi-focused   { outline: 3px solid #f59e0b !important; box-shadow: 0 0 0 4px rgba(245,158,11,0.25) !important; }
       .mwi-mark-dot  { position:fixed; width:10px; height:10px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.8); pointer-events:none; z-index:2147483645; box-shadow:0 1px 3px rgba(0,0,0,.5); }
       .mwi-cursor { position:fixed; pointer-events:none; z-index:2147483647; transition:left .15s cubic-bezier(0.34,1.56,0.64,1),top .15s cubic-bezier(0.34,1.56,0.64,1); }

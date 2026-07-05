@@ -199,12 +199,56 @@ func (s *Server) findWantAndActionByWebhookID(id string) (*mywant.Want, string) 
 }
 
 // handleWebInspectorDone stores the selected elements and signals the web_inspector agent.
+//
+// The overlay's own elements webhook POST (see __mwiDone in server.ts) and the
+// Node-side completion-screenshot POST (see captureAndSaveScreenshot) hit this
+// same endpoint as two separate requests — the screenshot capture can only
+// happen after page.screenshot() completes, so it can't be bundled into the
+// elements payload. A screenshot-only payload (marked by __screenshot_url and
+// nothing else) is handled here as a follow-up merge, not a replacement, so it
+// never clobbers the already-stored selected_elements.
 func (s *Server) handleWebInspectorDone(w http.ResponseWriter, want *mywant.Want, payload map[string]any) {
+	if screenshotURL, ok := payload["__screenshot_url"].(string); ok && len(payload) == 1 {
+		want.SetCurrent("screenshot_url", screenshotURL)
+		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "action": "screenshot"})
+		return
+	}
+
 	mywant.StoreStateMulti(want, map[string]any{
 		"inspection_done_received": true,
 		"selected_elements":        payload,
 		"action_by_agent":          "webhook_handler",
 	})
+
+	characterID, _ := payload["characterId"].(string)
+	color, _ := payload["color"].(string)
+	if characterID != "" {
+		for hostname, raw := range payload {
+			if hostname == "__url_template" || hostname == "characterId" || hostname == "color" {
+				continue
+			}
+			elems, ok := raw.([]any)
+			if !ok {
+				continue
+			}
+			marks := make([]mywant.WebElementMark, 0, len(elems))
+			for _, e := range elems {
+				em, ok := e.(map[string]any)
+				if !ok {
+					continue
+				}
+				marks = append(marks, mywant.WebElementMark{
+					Role:     stringField(em, "role"),
+					Name:     stringField(em, "name"),
+					Selector: stringField(em, "selector"),
+					FieldKey: stringField(em, "field_key"),
+					HtmlName: stringField(em, "html_name"),
+				})
+			}
+			mywant.AddWebMarks(hostname, characterID, color, marks)
+		}
+	}
+
 	log.Printf("[WEB-INSPECTOR-WEBHOOK] inspection_done for want %s: %d hostname(s)\n", want.Metadata.ID, len(payload))
 	s.JSONResponse(w, http.StatusOK, map[string]string{"status": "ok", "action": "inspection_done"})
 }

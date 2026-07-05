@@ -84,6 +84,13 @@ wantType:
       persistent: true
       initialValue: false
 
+    - name: screenshot_url
+      description: URL of the completion snapshot (/api/v1/screenshots/...), captured just before the tab closes
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
     - name: inspector_error
       description: Error message if opening the inspector failed
       type: string
