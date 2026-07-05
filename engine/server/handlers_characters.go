@@ -43,6 +43,7 @@ func (s *Server) createCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	created := mywant.AddCharacter(c)
+	go broadcastSSE("character_changed", created.ID)
 	s.JSONResponse(w, http.StatusCreated, created)
 }
 
@@ -60,6 +61,7 @@ func (s *Server) updateCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, _ := mywant.GetCharacter(id)
+	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
@@ -71,6 +73,7 @@ func (s *Server) deleteCharacter(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted", "id": id})
 }
 
@@ -94,6 +97,36 @@ func (s *Server) assignDevicesToCharacter(w http.ResponseWriter, r *http.Request
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// setCharacterAuraDefault marks (or, with an empty value, clears) a want's
+// aura-default selection for a character.
+// Body: { "wantId": "want-id", "section": "current", "key": "selected", "value": "..." }
+func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		WantID  string `json:"wantId"`
+		Section string `json:"section"`
+		Key     string `json:"key"`
+		Value   string `json:"value"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	if req.WantID == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "wantId is required", "")
+		return
+	}
+	mark := mywant.AuraMark{Section: req.Section, Key: req.Key, Value: req.Value}
+	c, ok := mywant.SetCharacterAuraDefault(id, req.WantID, mark)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
@@ -109,5 +142,6 @@ func (s *Server) pruneCharacterDevices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mywant.PruneCharacterDevices(req.DeviceIDs)
+	go broadcastSSE("character_changed", req.DeviceIDs)
 	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "pruned"})
 }

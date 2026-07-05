@@ -8,6 +8,7 @@ wantType:
     pattern: independent
     labels:
       type-icon: "Sparkles"
+      user-control: "true"
   parameters:
     - name: characters
       description: Character ID whose color is painted (drive-style single-target binding)
@@ -43,6 +44,12 @@ wantType:
       persistent: true
       exposable: true
       initialValue: false
+    - name: targets
+      description: IDs of every other want whose canvas position overlaps one of this aura's painted cells. Recomputed each time "cells" changes.
+      type: array
+      label: current
+      persistent: true
+      exposable: true
     - name: webhook_queue
       description: Every payload received via POST /api/v1/webhooks/{id} since the last Progress() tick, in order; drained (not just the latest) so rapid movement-driven placements never get silently dropped
       type: array

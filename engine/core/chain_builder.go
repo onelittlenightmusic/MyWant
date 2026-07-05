@@ -1376,6 +1376,19 @@ func (cb *ChainBuilder) FindWantByID(wantID string) (*Want, string, bool) {
 	return nil, "", false
 }
 
+// FindWantFunctionByID returns the concrete registered want implementation
+// (e.g. *ChoiceWant) for a runtime want, so other packages can do an
+// optional-interface check (e.g. AuraDefaultApplier) the way core itself does
+// for OnDeletable/Failable — FindWantByID only exposes the base *Want.
+func (cb *ChainBuilder) FindWantFunctionByID(wantID string) (any, bool) {
+	cb.reconcileMutex.RLock()
+	defer cb.reconcileMutex.RUnlock()
+	if rw, exists := cb.wants[wantID]; exists {
+		return rw.function, true
+	}
+	return nil, false
+}
+
 // FindWantByName searches for a want by its metadata name
 func (cb *ChainBuilder) FindWantByName(wantName string) (*Want, bool) {
 	cb.reconcileMutex.RLock()

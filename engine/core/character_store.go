@@ -21,6 +21,24 @@ type Character struct {
 	Color             string   `yaml:"color"             json:"color"`     // hex e.g. "#6366f1"
 	CreatedAt         int64    `yaml:"createdAt"         json:"createdAt"` // Unix ms
 	AssignedDeviceIDs []string `yaml:"assignedDeviceIds" json:"assignedDeviceIds"`
+	// AuraDefaults maps a target want's ID to the aura-default mark this
+	// character has set for it — shown as an aura-colored dog-ear flag/star on
+	// the marked option/state in that want's card UI, toggled via the X key/button.
+	AuraDefaults map[string]AuraMark `yaml:"auraDefaults,omitempty" json:"auraDefaults,omitempty"`
+}
+
+// AuraMark records one character's aura-default pick for a target want: which
+// state section (current/goal/plan/internal) and key within it — or
+// "parameter" for a spec parameter — the value applies to, plus the
+// stringified value itself (JSON-stringified for object values, plain string
+// otherwise — mirrors the frontend's getChoiceValue encoding). Section and key
+// are captured at mark time by the card that owns the field, so applying a
+// mark (see engine/types/aura_types.go) doesn't need to know about specific
+// want types.
+type AuraMark struct {
+	Section string `yaml:"section" json:"section"`
+	Key     string `yaml:"key"     json:"key"`
+	Value   string `yaml:"value"   json:"value"`
 }
 
 // characterStoreFile is the root document persisted to ~/.mywant/characters.yaml.
@@ -149,6 +167,7 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			if updated.AssignedDeviceIDs == nil {
 				updated.AssignedDeviceIDs = []string{}
 			}
+			updated.AuraDefaults = c.AuraDefaults // preserve aura-default marks
 			m.store.Characters[i] = updated
 			m.save()
 			return true
@@ -222,6 +241,30 @@ func (m *characterManager) AssignDevices(characterID string, deviceIDs []string)
 	return &cp, true
 }
 
+// SetAuraDefault marks the given want's aura-default selection for a
+// character, or clears it when mark.Value is "".
+func (m *characterManager) SetAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		if mark.Value == "" {
+			delete(m.store.Characters[i].AuraDefaults, wantID)
+		} else {
+			if m.store.Characters[i].AuraDefaults == nil {
+				m.store.Characters[i].AuraDefaults = map[string]AuraMark{}
+			}
+			m.store.Characters[i].AuraDefaults[wantID] = mark
+		}
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
 // PruneDevices removes the given device IDs from all characters (called when devices go offline).
 func (m *characterManager) PruneDevices(deviceIDs []string) {
 	m.mu.Lock()
@@ -261,3 +304,6 @@ func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bo
 	return GetCharacterManager().AssignDevices(charID, deviceIDs)
 }
 func PruneCharacterDevices(deviceIDs []string) { GetCharacterManager().PruneDevices(deviceIDs) }
+func SetCharacterAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
+	return GetCharacterManager().SetAuraDefault(characterID, wantID, mark)
+}

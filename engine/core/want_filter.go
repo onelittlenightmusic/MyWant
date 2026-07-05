@@ -68,9 +68,20 @@ func FilterWants(wants []*Want, filters WantFilters) []*Want {
 	return filtered
 }
 
-// CalculateWantHash computes a hash of want's metadata, spec, all state fields, and status
-// This hash is used for change detection to avoid unnecessary frontend re-renders
+// CalculateWantHash computes a hash of want's metadata, spec, all state fields, and status.
+// State fields declared as volatile: true in the want type are excluded so that
+// high-frequency writes (e.g. progress_ms, last_state_poll_at) don't trigger
+// unnecessary frontend re-renders.
 func CalculateWantHash(w *Want) string {
+	state := w.GetAllState()
+	if w.WantTypeDefinition != nil {
+		for _, sd := range w.WantTypeDefinition.State {
+			if sd.Volatile {
+				delete(state, sd.Name)
+			}
+		}
+	}
+
 	hashData := struct {
 		Metadata Metadata       `json:"metadata"`
 		Spec     WantSpec       `json:"spec"`
@@ -80,7 +91,7 @@ func CalculateWantHash(w *Want) string {
 		Metadata: w.Metadata,
 		Spec:     *w.GetSpec(),
 		Status:   w.Status,
-		State:    w.GetAllState(),
+		State:    state,
 	}
 
 	jsonData, err := json.Marshal(hashData)

@@ -1,7 +1,9 @@
 package types
 
 import (
+	"encoding/json"
 	"math"
+	"strconv"
 
 	. "mywant/engine/core"
 )
@@ -89,6 +91,12 @@ func (a *AuraWant) Progress() {
 		switch action {
 		case "activate":
 			a.SetCurrent("active", true)
+			// Recompute targets fresh rather than trusting the last-stored value:
+			// "targets" is otherwise only refreshed by this want's own placements,
+			// so a target want that moved (or was created) into already-painted
+			// territory since the last placement would otherwise be missed here.
+			a.updateTargets(a.loadCells())
+			a.applyAuraDefaults()
 		case "deactivate":
 			a.SetCurrent("active", false)
 		case "place":
@@ -110,7 +118,211 @@ func (a *AuraWant) Progress() {
 	}
 	if changed {
 		a.SetCurrent("cells", cells)
+		a.updateTargets(cells)
 	}
+}
+
+// updateTargets recomputes "targets" — every other want whose canvas
+// footprint overlaps one of this aura's painted cells — and derives this
+// want's achieving_percentage as the average of those targets' own
+// achieving_percentage (e.g. one target at 100% + one at 50% = 75%). With no
+// targets, achieving_percentage is 0.
+func (a *AuraWant) updateTargets(cells []AuraCell) {
+	painted := map[auraPoint]bool{}
+	for _, c := range cells {
+		painted[auraPoint{c.X, c.Y}] = true
+	}
+
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return
+	}
+	selfID := a.Metadata.ID
+	targetIDs := make([]string, 0)
+	sum := 0.0
+	for _, w := range cb.GetWants() {
+		if w.Metadata.ID == selfID {
+			continue
+		}
+		onAura := false
+		for _, fp := range wantFootprint(w) {
+			if painted[auraPoint{fp[0], fp[1]}] {
+				onAura = true
+				break
+			}
+		}
+		if !onAura {
+			continue
+		}
+		targetIDs = append(targetIDs, w.Metadata.ID)
+		if raw, ok := w.GetCurrent("achieving_percentage"); ok {
+			if pct, ok := floatFromAny(raw); ok {
+				sum += pct
+			}
+		}
+	}
+
+	a.SetCurrent("targets", targetIDs)
+	if len(targetIDs) == 0 {
+		a.SetCurrent("achieving_percentage", 0.0)
+		return
+	}
+	a.SetCurrent("achieving_percentage", sum/float64(len(targetIDs)))
+}
+
+// applyAuraDefaults selects/toggles each target want's aura-default value —
+// the option or on/off state one of this aura's bound characters marked (via
+// the x/X dog-ear mark on the choice/going/switch card) as their default for
+// that want — the moment the aura is activated. Lets a saved per-character
+// preference apply automatically to every want the aura currently covers.
+func (a *AuraWant) applyAuraDefaults() {
+	raw, ok := a.GetCurrent("characters")
+	if !ok {
+		return
+	}
+	chars := stringSliceFromAny(raw)
+	if len(chars) == 0 {
+		return
+	}
+
+	targetsRaw, _ := a.GetCurrent("targets")
+	targetIDs := stringSliceFromAny(targetsRaw)
+	if len(targetIDs) == 0 {
+		return
+	}
+
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return
+	}
+	for _, targetID := range targetIDs {
+		mark, ok := auraDefaultFor(chars, targetID)
+		if !ok {
+			continue
+		}
+		want, _, found := cb.FindWantByID(targetID)
+		if !found {
+			continue
+		}
+		applyAuraDefaultToWant(cb, want, mark)
+	}
+}
+
+// auraDefaultFor returns the aura-default mark the first (in bind order) of
+// characterIDs has set for targetID — an aura want can be bound to more than
+// one character (see characterColor's actingCharacterID handling), and any of
+// them may hold the relevant mark, not just the first-bound one.
+func auraDefaultFor(characterIDs []string, targetID string) (AuraMark, bool) {
+	for _, id := range characterIDs {
+		character, ok := GetCharacter(id)
+		if !ok {
+			continue
+		}
+		if mark, ok := character.AuraDefaults[targetID]; ok {
+			return mark, true
+		}
+	}
+	return AuraMark{}, false
+}
+
+// AuraDefaultApplier is an optional extension a want type implements when it
+// needs to validate or transform an aura-default mark itself instead of the
+// generic apply-by-section/key path (e.g. "choice" must check the value is
+// still one of its current options). Returning true means "handled" —
+// implementing this interface opts a want type fully out of the generic path.
+type AuraDefaultApplier interface {
+	ApplyAuraDefault(section, key, value string) bool
+}
+
+// applyAuraDefaultToWant applies one aura-default mark to the target want.
+// Want types that need their own validation/transform (see choice_types.go's
+// ChoiceWant.ApplyAuraDefault) opt out of the generic path by implementing
+// AuraDefaultApplier; everything else falls through to applyAuraDefaultGeneric.
+func applyAuraDefaultToWant(cb *ChainBuilder, want *Want, mark AuraMark) {
+	if fn, ok := cb.FindWantFunctionByID(want.Metadata.ID); ok {
+		if applier, ok := fn.(AuraDefaultApplier); ok {
+			applier.ApplyAuraDefault(mark.Section, mark.Key, mark.Value)
+			return
+		}
+	}
+	applyAuraDefaultGeneric(want, mark)
+}
+
+// applyAuraDefaultGeneric writes mark.Value into the section/key the mark
+// declares, converting the string to match whatever type is already stored
+// there (or already declared as a parameter) — no want-type knowledge needed.
+func applyAuraDefaultGeneric(want *Want, mark AuraMark) {
+	if mark.Section == "parameter" {
+		existing, _ := want.GetParameter(mark.Key)
+		want.UpdateParameter(mark.Key, convertAuraValue(existing, mark.Value))
+		return
+	}
+	var existing any
+	switch mark.Section {
+	case "current":
+		existing, _ = want.GetCurrent(mark.Key)
+		want.SetCurrent(mark.Key, convertAuraValue(existing, mark.Value))
+	case "plan":
+		existing, _ = want.GetPlan(mark.Key)
+		want.SetPlan(mark.Key, convertAuraValue(existing, mark.Value))
+	case "goal":
+		existing, _ = want.GetGoal(mark.Key)
+		want.SetGoal(mark.Key, convertAuraValue(existing, mark.Value))
+	case "internal":
+		existing, _ = want.GetInternal(mark.Key)
+		want.SetInternal(mark.Key, convertAuraValue(existing, mark.Value))
+	}
+}
+
+// convertAuraValue converts an aura mark's string form back to the Go type
+// already stored at the target key, mirroring the frontend's getChoiceValue
+// encoding (object values JSON-stringified, everything else via String()).
+func convertAuraValue(existing any, raw string) any {
+	switch existing.(type) {
+	case bool:
+		return ToBool(raw, false)
+	case float64, int:
+		return ToFloat64(raw, 0)
+	case map[string]any, []any:
+		var decoded any
+		if err := json.Unmarshal([]byte(raw), &decoded); err == nil {
+			return decoded
+		}
+	}
+	return raw
+}
+
+// wantFootprint returns every canvas grid cell a want occupies, including
+// multi-cell spans, from its mywant.io/canvas-x/y/rotation/length labels.
+// Mirrors the server package's CanvasCoordinateHook tile-footprint logic
+// (unexported there); duplicated here since engine/types cannot import
+// engine/server (server already imports types).
+func wantFootprint(w *Want) [][2]int {
+	if w.Metadata.Labels == nil {
+		return nil
+	}
+	x, errX := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-x"])
+	y, errY := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-y"])
+	if errX != nil || errY != nil {
+		return nil
+	}
+	rotation, _ := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-rotation"])
+	length, _ := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-length"])
+	span := length + 1
+	cells := make([][2]int, span)
+	for i := range span {
+		switch rotation {
+		case 90:
+			cells[i] = [2]int{x, y + i}
+		case 180:
+			cells[i] = [2]int{x - i, y}
+		case 270:
+			cells[i] = [2]int{x, y - i}
+		default:
+			cells[i] = [2]int{x + i, y}
+		}
+	}
+	return cells
 }
 
 // characterColor resolves the color to paint with. When "characters" is
@@ -160,6 +372,17 @@ func intFromAny(v any) (int, bool) {
 		return int(math.Round(n)), true
 	case int:
 		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func floatFromAny(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
 	default:
 		return 0, false
 	}
