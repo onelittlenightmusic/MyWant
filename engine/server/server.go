@@ -448,11 +448,15 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.CanvasWeatherEffect != "" {
 		fullConfig["canvas_weather_effect"] = s.config.CanvasWeatherEffect
 	}
+	if s.config.CanvasDesign != "" {
+		fullConfig["canvas_design"] = s.config.CanvasDesign
+	}
 	// Device settings — always write (empty string clears the field)
 	fullConfig["active_location_device"] = s.config.ActiveLocationDevice
 	fullConfig["location_want_id"] = s.config.LocationWantId
 	fullConfig["web_inspector_lan_host"] = s.config.WebInspectorLANHost
 	fullConfig["web_inspector_ca_cert_path"] = s.config.WebInspectorCACertPath
+	fullConfig["web_inspector_external_host"] = s.config.WebInspectorExternalHost
 
 	// 3. Save back to file
 	newData, err := yaml.Marshal(fullConfig)

@@ -130,6 +130,27 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
+// setCharacterDesign sets the tile/aura design-plugin ids for a character.
+// Body: { "tile_design": "forest", "aura_design": "forest" } (either may be "" = inherit).
+func (s *Server) setCharacterDesign(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		TileDesign string `json:"tile_design"`
+		AuraDesign string `json:"aura_design"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	c, ok := mywant.SetCharacterDesign(id, req.TileDesign, req.AuraDesign)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
 // pruneCharacterDevices removes stale device IDs from all character assignments.
 // Called by the frontend's device heartbeat cleanup path.
 // Body: { "deviceIds": ["stale-device-id", ...] }

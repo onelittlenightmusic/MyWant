@@ -44,6 +44,11 @@ type MyWantConfig struct {
 	// cert, served at GET /api/v1/web-wants/ca-cert so an iPhone can download
 	// and trust it directly from Safari.
 	WebInspectorCACertPath string `yaml:"web_inspector_ca_cert_path"`
+	// WebInspectorExternalHost: public hostname (no scheme/port) that reaches
+	// this machine from outside the LAN, e.g. a Cloudflare Tunnel hostname.
+	// TLS is terminated at the tunnel provider's edge with a publicly-trusted
+	// cert, so unlike WebInspectorLANHost this needs no local CA setup.
+	WebInspectorExternalHost string `yaml:"web_inspector_external_host"`
 }
 
 // ApplyEnvironments sets entries from the environments section as environment variables.

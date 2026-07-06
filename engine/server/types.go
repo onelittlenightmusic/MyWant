@@ -21,6 +21,7 @@ type Config struct {
 	CanvasBgColor        string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
 	CanvasDPad           *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
 	CanvasWeatherEffect  string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
+	CanvasDesign         string `json:"canvas_design,omitempty" yaml:"canvas_design,omitempty"`
 	ActiveLocationDevice string `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
 	LocationWantId       string `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
 	// WebInspectorLANHost is the mywant server's LAN-reachable address (host
@@ -33,6 +34,12 @@ type Config struct {
 	// GET /api/v1/web-wants/ca-cert so it can be downloaded straight from an
 	// iPhone's own Safari instead of AirDropped from the Mac.
 	WebInspectorCACertPath string `json:"web_inspector_ca_cert_path,omitempty" yaml:"web_inspector_ca_cert_path,omitempty"`
+	// WebInspectorExternalHost is a public hostname (no scheme/port) that
+	// reaches this machine from outside the LAN — e.g. a Cloudflare Tunnel
+	// hostname. Unlike WebInspectorLANHost, TLS is terminated at the tunnel
+	// provider's edge with a publicly-trusted cert, so WebInspectorCACertPath
+	// doesn't apply here.
+	WebInspectorExternalHost string `json:"web_inspector_external_host,omitempty" yaml:"web_inspector_external_host,omitempty"`
 	// DetectedLANIP is computed fresh on every GET /api/v1/config (see
 	// detectLANIP in handlers_others.go) — never persisted (yaml:"-") and
 	// never accepted from PUT (updateConfig doesn't read it back).

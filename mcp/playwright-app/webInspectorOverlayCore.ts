@@ -54,6 +54,23 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
       z-index:2147483646; color:#f1f5f9; font:13px/1.4 system-ui,sans-serif;
       width:270px; box-shadow:-6px 0 32px rgba(0,0,0,.5);
       display:flex; flex-direction:column;
+      transition: width .18s ease, padding .18s ease;
+      overflow:hidden;
+    }
+    .mwi-panel.mwi-collapsed { width:44px; padding:10px 6px; }
+    .mwi-panel-header { display:flex; align-items:center; justify-content:space-between; gap:6px; flex:none; }
+    .mwi-panel-body { display:flex; flex-direction:column; flex:1; min-height:0; margin-top:8px; }
+    .mwi-panel.mwi-collapsed .mwi-panel-body { display:none; }
+    .mwi-collapse-btn {
+      position:relative; cursor:pointer; flex:none; width:26px; height:26px;
+      display:flex; align-items:center; justify-content:center;
+      background:#1e293b; border:1px solid #334155; border-radius:6px;
+      font-size:13px; color:#a5b4fc;
+    }
+    .mwi-panel-badge {
+      position:absolute; top:-6px; right:-6px; min-width:14px; text-align:center;
+      background:#22c55e; color:#052e13; font-size:9px; font-weight:800; line-height:1;
+      border-radius:8px; padding:2px 4px;
     }
     .mwi-panel-hint { color:#64748b; font-size:11px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #334155; }
     .mwi-panel-list { flex:1; overflow-y:auto; min-height:0; }
@@ -140,6 +157,31 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
   // the cursor currently is.
   let navFocusIdx = -1;
 
+  // Auto-collapse the sidebar on narrow viewports (iPhone portrait etc) —
+  // at 270px wide it eats most of a ~390px phone screen, leaving barely
+  // enough room to see/tap the page underneath. Below COLLAPSE_WIDTH it
+  // starts collapsed to a 44px tab instead; the user can still tap the tab
+  // to expand it. Once the user manually toggles, we stop overriding their
+  // choice on resize/rotate (panelCollapseManual).
+  const COLLAPSE_WIDTH = 480;
+  let panelCollapsed = window.innerWidth < COLLAPSE_WIDTH;
+  let panelCollapseManual = false;
+
+  (window as any).__mwiToggleCollapse = () => {
+    panelCollapsed = !panelCollapsed;
+    panelCollapseManual = true;
+    renderPanel();
+  };
+
+  window.addEventListener('resize', () => {
+    if (panelCollapseManual) return;
+    const shouldCollapse = window.innerWidth < COLLAPSE_WIDTH;
+    if (shouldCollapse !== panelCollapsed) {
+      panelCollapsed = shouldCollapse;
+      renderPanel();
+    }
+  });
+
   // Reapply the persistent "part of the saved set" outline to every
   // navElement currently present in the DOM (called from refresh()).
   const renderNavMembers = () => {
@@ -167,19 +209,31 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
     el.id || `element ${selected.length + 1}`;
 
   const renderPanel = () => {
+    panel.classList.toggle('mwi-collapsed', panelCollapsed);
     const navSection = navElements.length > 0 ? `
       <div class="mwi-nav-name">🤖 Launch保存済み要素 (${navElements.length})</div>
       <div class="mwi-nav-list">${navElements.map((e,i)=>`<div class="mwi-item${i===navFocusIdx ? ' mwi-nav-item-focused' : ''}"><span class="mwi-badge mwi-badge-${e.role==='textbox'?'input':'button'}">${e.role}</span><span style="flex:1">${e.name}</span></div>`).join('')}</div>
       <div class="mwi-nav-hint">⌘+↑↓←→ / 🎮 L1+D-pad:ジャンプ</div>
     ` : '';
+    const badge = selected.length > 0 ? `<span class="mwi-panel-badge">${selected.length}</span>` : '';
+    const header = panelCollapsed
+      ? `<div class="mwi-panel-header" style="justify-content:center">
+          <div class="mwi-collapse-btn" onclick="window.__mwiToggleCollapse()" title="サイドバーを開く">◀${badge}</div>
+        </div>`
+      : `<div class="mwi-panel-header">
+          <div style="font-weight:700;color:#a5b4fc;font-size:13px">🔍 Web Want Inspector</div>
+          <div class="mwi-collapse-btn" onclick="window.__mwiToggleCollapse()" title="サイドバーを折りたたむ">▶</div>
+        </div>`;
     panel.innerHTML = `
-      <div style="font-weight:700;margin-bottom:6px;color:#a5b4fc;font-size:13px">🔍 Web Want Inspector</div>
-      <div class="mwi-panel-hint">↑↓←→:近傍移動 · X/タップ:選択・命名 · Esc:キャンセル · Enter/🎮A:完了</div>
-      ${navSection}
-      <div id="mwi-list" class="mwi-panel-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
-      <div class="mwi-panel-footer">
-        <div style="color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
-        <button class="mwi-btn mwi-btn-done" onclick="window.__mwiDone()">✓ 完了 (${selected.length}個)</button>
+      ${header}
+      <div class="mwi-panel-body">
+        <div class="mwi-panel-hint">↑↓←→:近傍移動 · X/タップ:選択・命名 · Esc:キャンセル · Enter/🎮A:完了</div>
+        ${navSection}
+        <div id="mwi-list" class="mwi-panel-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
+        <div class="mwi-panel-footer">
+          <div style="color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
+          <button class="mwi-btn mwi-btn-done" onclick="window.__mwiDone()">✓ 完了 (${selected.length}個)</button>
+        </div>
       </div>
     `;
   };

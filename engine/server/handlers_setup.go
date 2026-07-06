@@ -278,6 +278,7 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/aura-defaults", s.setCharacterAuraDefault).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}/design", s.setCharacterDesign).Methods("PUT", "OPTIONS")
 
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()
@@ -293,6 +294,10 @@ func (s *Server) setupRoutes() {
 	// External card plugins — compiled on-the-fly from ~/.mywant/custom-types/*/view/plugin.*
 	api.HandleFunc("/plugins", s.listPlugins).Methods("GET", "OPTIONS")
 	api.HandleFunc("/plugins/{filename}", s.servePlugin).Methods("GET", "OPTIONS")
+
+	// External design plugins (canvas skins) — compiled on-the-fly from ~/.mywant/design-plugin/*/plugin.*
+	api.HandleFunc("/design-plugins", s.listDesignPlugins).Methods("GET", "OPTIONS")
+	api.HandleFunc("/design-plugins/{filename}", s.serveDesignPlugin).Methods("GET", "OPTIONS")
 
 	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")

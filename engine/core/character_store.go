@@ -25,6 +25,11 @@ type Character struct {
 	// character has set for it — shown as an aura-colored dog-ear flag/star on
 	// the marked option/state in that want's card UI, toggled via the X key/button.
 	AuraDefaults map[string]AuraMark `yaml:"auraDefaults,omitempty" json:"auraDefaults,omitempty"`
+	// TileDesign / AuraDesign are the design-plugin ids this character picks for
+	// the want tiles and aura they own on the canvas (e.g. "cubic", "forest").
+	// Empty = inherit the canvas-level design (config.canvas_design).
+	TileDesign string `yaml:"tileDesign,omitempty" json:"tile_design,omitempty"`
+	AuraDesign string `yaml:"auraDesign,omitempty" json:"aura_design,omitempty"`
 }
 
 // AuraMark records one character's aura-default pick for a target want: which
@@ -168,6 +173,8 @@ func (m *characterManager) Update(id string, updated Character) bool {
 				updated.AssignedDeviceIDs = []string{}
 			}
 			updated.AuraDefaults = c.AuraDefaults // preserve aura-default marks
+			updated.TileDesign = c.TileDesign     // preserve design picks (set via /design)
+			updated.AuraDesign = c.AuraDesign
 			m.store.Characters[i] = updated
 			m.save()
 			return true
@@ -265,6 +272,24 @@ func (m *characterManager) SetAuraDefault(characterID, wantID string, mark AuraM
 	return nil, false
 }
 
+// SetDesign sets the tile/aura design-plugin ids for a character (empty string
+// = inherit the canvas-level design).
+func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].TileDesign = tileDesign
+		m.store.Characters[i].AuraDesign = auraDesign
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
 // PruneDevices removes the given device IDs from all characters (called when devices go offline).
 func (m *characterManager) PruneDevices(deviceIDs []string) {
 	m.mu.Lock()
@@ -306,4 +331,7 @@ func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bo
 func PruneCharacterDevices(deviceIDs []string) { GetCharacterManager().PruneDevices(deviceIDs) }
 func SetCharacterAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
 	return GetCharacterManager().SetAuraDefault(characterID, wantID, mark)
+}
+func SetCharacterDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
+	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign)
 }
