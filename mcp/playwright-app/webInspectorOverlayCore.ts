@@ -208,7 +208,13 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
     el.getAttribute('name') || (el as HTMLElement).innerText?.trim().slice(0,30) ||
     el.id || `element ${selected.length + 1}`;
 
+  // Once __mwiDone has replaced the panel with its completion/error banner,
+  // renderPanel must stop repainting — the 4s refresh interval (and any focus/
+  // selection re-render) would otherwise clobber the banner within seconds.
+  let sessionDone = false;
+
   const renderPanel = () => {
+    if (sessionDone) return;
     panel.classList.toggle('mwi-collapsed', panelCollapsed);
     const navSection = navElements.length > 0 ? `
       <div class="mwi-nav-name">🤖 Launch保存済み要素 (${navElements.length})</div>
@@ -332,15 +338,33 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
     const payload: Record<string, any> = { [hostname]: selected };
     if (detectedUrlTemplate) payload.__url_template = detectedUrlTemplate;
     if (myCharacterId) { payload.characterId = myCharacterId; payload.color = myColor; }
+    // Page context for the always-on capture endpoint (/web-wants/capture),
+    // which derives the type's url/title/name from these since there is no
+    // GUI form anymore. Harmless on the want-bound webhook path: its handler
+    // skips non-array payload keys.
+    payload.__page_url = window.location.href;
+    payload.__page_title = document.title;
     fetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-    }).then(() => {
-      panel.innerHTML = '<div style="color:#22c55e;font-weight:700;padding:4px">✓ 保存完了！タブを閉じます...</div>';
+    }).then(r => {
+      if (!r.ok) {
+        return r.text().then((t: string) => { throw new Error(t || ('HTTP ' + r.status)); });
+      }
+      return r.json().catch(() => ({}));
+    }).then((d: any) => {
+      // The capture endpoint returns {name: "<created type>"}; the review
+      // webhook returns {"status":"ok"} — pick the banner accordingly.
+      sessionDone = true;
+      panel.innerHTML = d && d.name
+        ? `<div style="color:#22c55e;font-weight:700;padding:8px">✓ 作成完了: ${d.name}</div>`
+        : '<div style="color:#22c55e;font-weight:700;padding:8px">✓ 保存完了！タブを閉じます...</div>';
       (window as any).__mwiDoneSignal = true;
     }).catch((e: Error) => {
-      panel.innerHTML = `<div style="color:#ef4444">エラー: ${e.message}</div>`;
+      // Error banner is NOT sticky: the user can fix the selection (e.g. "no
+      // elements selected") and press 完了 again, so let renders resume.
+      panel.innerHTML = `<div style="color:#ef4444;padding:8px">エラー: ${e.message}</div>`;
     });
   };
 

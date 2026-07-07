@@ -283,6 +283,7 @@ func (s *Server) setupRoutes() {
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()
 	webWants.HandleFunc("/create", s.createWebWant).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/capture", s.captureWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/suggest-name", s.suggestElementName).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/active-inspection", s.activeInspection).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/inspector-overlay.js", s.serveInspectorOverlay).Methods("GET", "OPTIONS")

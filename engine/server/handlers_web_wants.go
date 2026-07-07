@@ -173,40 +173,13 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Enrich elements with field_key for textbox-like roles
-	elements = enrichElements(elements)
-
-	dir := filepath.Join(mywant.UserCustomTypesDir(), name)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		http.Error(w, "failed to create directory: "+err.Error(), http.StatusInternalServerError)
+	dir, loaded, warnings, err := s.writeWebWantType(name, title, req.URL, hostname, req.URLTemplate, req.ScreenshotURL, elements)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Write elements.json (includes field_key for textboxes)
-	elemJSON, _ := json.MarshalIndent(map[string][]WebWantElement{hostname: elements}, "", "  ")
-	if err := os.WriteFile(filepath.Join(dir, "elements.json"), elemJSON, 0o644); err != nil {
-		http.Error(w, "failed to write elements.json: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	yamlContent := buildWebWantYAML(name, title, req.URL, hostname, req.URLTemplate, req.ScreenshotURL, elements)
-	if err := os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(yamlContent), 0o644); err != nil {
-		http.Error(w, "failed to write YAML: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "main.py"), []byte(buildWebWantMainPy(req.URL, elements)), 0o755); err != nil {
-		http.Error(w, "failed to write main.py: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(buildWebWantSkillMd(name, title, req.URL, elements)), 0o644); err != nil {
-		http.Error(w, "failed to write SKILL.md: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	loaded, warnings := s.reloadUserCustomTypesAndSync()
 	s.globalBuilder.LogAPIOperation("POST", "/web-wants/create", name, "created", loaded, "", "")
+	go broadcastSSE("want_type_changed", name)
 
 	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"name":     name,
@@ -214,6 +187,190 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 		"loaded":   loaded,
 		"warnings": warnings,
 		"message":  fmt.Sprintf("web want type %q created successfully", name),
+	})
+}
+
+// writeWebWantType writes a web want type's on-disk artifacts (elements.json,
+// <name>.yaml, main.py, SKILL.md) under UserCustomTypesDir()/<name>/ and reloads
+// the type registry. name must already be validated against validTypeName.
+// Shared by createWebWant (GUI-driven) and captureWebWant (bookmarklet-driven).
+func (s *Server) writeWebWantType(name, title, pageURL, hostname, urlTemplate, screenshotURL string, elements []WebWantElement) (dir string, loaded int, warnings []string, err error) {
+	// Enrich elements with field_key for textbox-like roles
+	elements = enrichElements(elements)
+
+	dir = filepath.Join(mywant.UserCustomTypesDir(), name)
+	if err = os.MkdirAll(dir, 0o755); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Write elements.json (includes field_key for textboxes)
+	elemJSON, _ := json.MarshalIndent(map[string][]WebWantElement{hostname: elements}, "", "  ")
+	if err = os.WriteFile(filepath.Join(dir, "elements.json"), elemJSON, 0o644); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to write elements.json: %w", err)
+	}
+
+	yamlContent := buildWebWantYAML(name, title, pageURL, hostname, urlTemplate, screenshotURL, elements)
+	if err = os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(yamlContent), 0o644); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to write YAML: %w", err)
+	}
+
+	if err = os.WriteFile(filepath.Join(dir, "main.py"), []byte(buildWebWantMainPy(pageURL, elements)), 0o755); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to write main.py: %w", err)
+	}
+
+	if err = os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte(buildWebWantSkillMd(name, title, pageURL, elements)), 0o644); err != nil {
+		return "", 0, nil, fmt.Errorf("failed to write SKILL.md: %w", err)
+	}
+
+	loaded, warnings = s.reloadUserCustomTypesAndSync()
+	return dir, loaded, warnings, nil
+}
+
+// deriveWebWantName derives a want-type name from a page hostname, mirroring
+// the GUI's suggestName (hostname dots→underscores + "_web"). Browsers
+// serialize IDN hosts as punycode in location.href, so input is effectively
+// ASCII already; the sanitizer squashes anything else to '_' regardless.
+func deriveWebWantName(hostname string) string {
+	var b strings.Builder
+	for _, c := range strings.ToLower(hostname) {
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') {
+			b.WriteRune(c)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	host := b.String()
+	if host == "" {
+		return "my_web_want"
+	}
+	if host[0] < 'a' || host[0] > 'z' {
+		// validTypeName requires a leading letter (IP hosts start with a digit).
+		host = "w" + host
+	}
+	// Leave room for the "-N" uniquifying suffix under validTypeName's 64-char cap.
+	if len(host) > 56 {
+		host = host[:56]
+	}
+	name := host + "_web"
+	if !validTypeName.MatchString(name) {
+		return "my_web_want"
+	}
+	return name
+}
+
+// reserveWebWantTypeDir atomically claims a unique type directory under
+// UserCustomTypesDir() for base, trying base, base-2, base-3, …. os.Mkdir
+// fails with EEXIST on collision, so concurrent captures can never claim the
+// same name (no mutex needed). Repeat captures of the same site therefore
+// always create a NEW numbered type, never merging into an existing one.
+func reserveWebWantTypeDir(base string) (name, dir string, err error) {
+	root := mywant.UserCustomTypesDir()
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", "", err
+	}
+	for i := 1; i <= 100; i++ {
+		name = base
+		if i > 1 {
+			name = fmt.Sprintf("%s-%d", base, i)
+		}
+		dir = filepath.Join(root, name)
+		err = os.Mkdir(dir, 0o755)
+		if err == nil {
+			return name, dir, nil
+		}
+		if !os.IsExist(err) {
+			return "", "", err
+		}
+	}
+	return "", "", fmt.Errorf("no free type name for %q after 100 attempts", base)
+}
+
+// captureWebWant handles POST /api/v1/web-wants/capture — the always-on ingest
+// for bookmarklet-driven captures. Unlike createWebWant it needs no
+// pre-registered web_inspector want and no user-entered metadata: the overlay
+// sends its selected elements keyed by hostname plus __page_url / __page_title
+// taken from the page itself, and the type name is derived from the hostname
+// (uniquified via reserveWebWantTypeDir). Deliberately unauthenticated and
+// CORS-open like the rest of /web-wants (local tool); mitigations are the
+// 2 MB body cap, the element-count cap, the http(s) scheme whitelist and
+// validTypeName on the derived name (which also blocks path traversal).
+func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	str := func(key string) string {
+		var v string
+		if rawV, ok := raw[key]; ok {
+			_ = json.Unmarshal(rawV, &v)
+		}
+		return v
+	}
+	pageURL := str("__page_url")
+	pageTitle := str("__page_title")
+	urlTemplate := str("__url_template")
+	// Strip reserved/metadata keys — the same set the GUI's handleSave strips,
+	// plus the two page-context keys — so only hostname→elements entries remain.
+	for _, k := range []string{"__page_url", "__page_title", "__url_template", "characterId", "color", "__screenshot_url"} {
+		delete(raw, k)
+	}
+
+	u, err := url.Parse(pageURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		http.Error(w, "__page_url is required and must be an http(s) URL", http.StatusBadRequest)
+		return
+	}
+
+	var elements []WebWantElement
+	for _, v := range raw {
+		var els []WebWantElement
+		if err := json.Unmarshal(v, &els); err != nil {
+			continue // tolerate non-array fields, like the GUI's Array.isArray filter
+		}
+		elements = append(elements, els...)
+	}
+	if len(elements) == 0 {
+		http.Error(w, "no elements selected", http.StatusBadRequest)
+		return
+	}
+	if len(elements) > 500 {
+		http.Error(w, "too many elements", http.StatusBadRequest)
+		return
+	}
+
+	hostname := u.Hostname()
+	name, dir, err := reserveWebWantTypeDir(deriveWebWantName(hostname))
+	if err != nil {
+		http.Error(w, "failed to reserve type name: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	title := strings.TrimSpace(pageTitle)
+	if title == "" {
+		title = name
+	}
+
+	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, hostname, urlTemplate, "", elements)
+	if werr != nil {
+		// Remove the reserved dir so the failed attempt doesn't poison future
+		// uniquification with an empty husk.
+		os.RemoveAll(dir)
+		http.Error(w, werr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/web-wants/capture", name, "created", loaded, "", "")
+	go broadcastSSE("want_type_changed", name)
+
+	s.JSONResponse(w, http.StatusCreated, map[string]any{
+		"name":     name,
+		"dir":      dir,
+		"loaded":   loaded,
+		"warnings": warnings,
+		"message":  fmt.Sprintf("web want type %q created from capture", name),
 	})
 }
 
@@ -647,12 +804,38 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// NOTE: an open web_inspector want always wins over the always-on capture
+	// fallback below — even for a bookmarklet click on an unrelated site (the
+	// fall-back-to-`all` when no hostname matches). This is longstanding
+	// behavior that review mode depends on; while a review session is open,
+	// bookmarklet clicks bind to it rather than creating a new type.
 	pool := matched
 	if len(pool) == 0 {
 		pool = all
 	}
 	if len(pool) == 0 {
-		s.JSONResponse(w, http.StatusNotFound, map[string]string{"error": "no active inspection"})
+		// Always-on capture fallback: no open web_inspector want. Instead of
+		// 404ing (which used to force the GUI's 検査開始 step before the
+		// bookmarklet could do anything), hand the overlay the always-on
+		// capture endpoint so a bookmarklet click on ANY site can create a
+		// web want type directly (see captureWebWant). No want → no
+		// character/nav context; existing marks are still served per-hostname
+		// for display. Origin derivation matches the want branch below (see
+		// the comment there); the r.Host=="" fallback uses the default port
+		// since there is no want to read mywant_api_port from.
+		scheme := r.Header.Get("X-Forwarded-Proto")
+		if scheme == "" {
+			scheme = "http"
+		}
+		origin := scheme + "://" + r.Host
+		if r.Host == "" {
+			origin = "http://localhost:8080"
+		}
+		s.JSONResponse(w, http.StatusOK, activeInspectionResponse{
+			DoneWebhookURL: origin + "/api/v1/web-wants/capture",
+			SuggestNameURL: origin + "/api/v1/web-wants/suggest-name",
+			ExistingMarks:  mywant.GetWebMarks(pageHost),
+		})
 		return
 	}
 	sort.Slice(pool, func(i, j int) bool {
