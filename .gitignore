@@ -80,6 +80,7 @@ demo-restart.sh
 *.json
 !mcp/playwright-app/package.json
 !mcp/playwright-app/tsconfig.json
+!mcp/playwright-app/chrome-extension/manifest.json
 demo_*.yaml
 
 # Mock server binaries

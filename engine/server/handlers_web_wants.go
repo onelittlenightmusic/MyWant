@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -841,8 +842,15 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(pool, func(i, j int) bool {
 		return wantNameTimestamp(pool[i].Metadata.Name) > wantNameTimestamp(pool[j].Metadata.Name)
 	})
-	want := pool[0]
+	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(pool[0], r))
+}
 
+// buildActiveInspectionResponse assembles the payload a browser-side overlay
+// loader (bookmarklet, iOS Shortcut, or the Chrome extension's content.js)
+// needs to run itself against want — shared by activeInspection (looked up by
+// the page's own hostname or "most recent") and pendingAutoLaunch (looked up
+// by claim, for the extension's own auto-tab-open path).
+func buildActiveInspectionResponse(want *mywant.Want, r *http.Request) activeInspectionResponse {
 	targetURL := mywant.GetCurrent(want, "target_url", "")
 	webhookID := mywant.GetCurrent(want, "doneWebhookId", want.Metadata.ID+"-done")
 	mywantPort := mywant.GetCurrent(want, "mywant_api_port", "8080")
@@ -886,7 +894,7 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		navElements = loadWebWantNavElements(wantTypeName)
 	}
 
-	s.JSONResponse(w, http.StatusOK, activeInspectionResponse{
+	return activeInspectionResponse{
 		WantID:         want.Metadata.ID,
 		TargetURL:      targetURL,
 		DoneWebhookURL: origin + "/api/v1/webhooks/" + webhookID,
@@ -896,7 +904,62 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		Avatar:         avatar,
 		ExistingMarks:  mywant.GetWebMarks(hostnameOfURL(targetURL)),
 		NavElements:    navElements,
+	}
+}
+
+// autoLaunchClaimMu serializes pendingAutoLaunch's read-then-claim so two
+// near-simultaneous polls (e.g. the Chrome extension firing its alarm right
+// as a second one wakes) can never both claim the same want and open two
+// tabs for it.
+var autoLaunchClaimMu sync.Mutex
+
+// pendingAutoLaunch is GET /api/v1/web-wants/pending-auto-launch — polled by
+// the Chrome extension's background service worker (see chrome-extension/
+// background.js) to discover a web_inspector want created with
+// launch_mode=manual that has no tab open for it yet, so the extension can
+// open one itself instead of the server driving a CDP-controlled Chrome (see
+// openInspectorTab in engine/types/agent_web_inspector.go, the CDP path this
+// mode replaces). Returns an empty body ({}) when nothing is pending.
+//
+// The oldest unclaimed candidate wins (FIFO) so wants opened while the
+// extension is offline are worked through in creation order once it comes
+// back, and the matched want is marked auto_launch_claimed=true before
+// responding so this same want is never handed out again even if opening/
+// injecting the tab takes a while.
+func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
+	autoLaunchClaimMu.Lock()
+	defer autoLaunchClaimMu.Unlock()
+
+	var candidates []*mywant.Want
+	for _, want := range s.globalBuilder.GetAllWantStates() {
+		if want.Metadata.Type != "web_inspector" {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspection_complete", false) {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspector_error", "") != "" {
+			continue
+		}
+		if mywant.GetCurrent(want, "auto_launch_claimed", false) {
+			continue
+		}
+		if paramOrCurrentStr(want, "launch_mode") != "manual" {
+			continue
+		}
+		candidates = append(candidates, want)
+	}
+	if len(candidates) == 0 {
+		s.JSONResponse(w, http.StatusOK, activeInspectionResponse{})
+		return
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return wantNameTimestamp(candidates[i].Metadata.Name) < wantNameTimestamp(candidates[j].Metadata.Name)
 	})
+	want := candidates[0]
+	want.SetCurrent("auto_launch_claimed", true)
+
+	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(want, r))
 }
 
 // resolveInspectorOverlayPath returns the absolute path to the standalone
