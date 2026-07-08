@@ -38,7 +38,13 @@ func startLiveServer(want *mywant.Want) (int, error) {
 
 	want.StoreLog("[INFO] Executing: %s %v", binPath, args)
 	cmd := exec.Command(binPath, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Setsid (not just Setpgid) fully detaches the child into its own session
+	// with no controlling terminal. Without this, a child that touches /dev/tty
+	// (e.g. caddy's "you might be prompted for password" root-CA-install step)
+	// gets SIGTTOU'd into a stopped (T) state by the kernel — the TCP listener
+	// still accepts connections via the backlog, but nothing ever answers the
+	// handshake, which looks like the server is silently unreachable.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	var logFileHandle *os.File
 	if logFile != "" {

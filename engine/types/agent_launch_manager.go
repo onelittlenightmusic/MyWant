@@ -143,6 +143,26 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 		want.SetCurrent("launch_summary", string(summaryJSON))
 	}
 
+	// Optional: some process-based wants declare fixed config.yaml values (e.g.
+	// a Caddy want persisting web_inspector_ca_cert_path / https_path) that
+	// should land in server config once the process is confirmed running —
+	// unlike url_regex/result_field below, these aren't extracted from log
+	// output, so they're applied unconditionally here.
+	if caCertPath := mywant.GetCurrent(want, "ca_cert_path", ""); caCertPath != "" {
+		if err := mywant.SetCACertPath(caCertPath); err != nil {
+			want.StoreLog("[LAUNCH] Failed to persist web_inspector_ca_cert_path: %v", err)
+		} else {
+			want.StoreLog("[LAUNCH] Persisted web_inspector_ca_cert_path: %s", caCertPath)
+		}
+	}
+	if httpsPath := mywant.GetCurrent(want, "https_path", ""); httpsPath != "" {
+		if err := mywant.SetHTTPSPath(httpsPath); err != nil {
+			want.StoreLog("[LAUNCH] Failed to persist https_path: %v", err)
+		} else {
+			want.StoreLog("[LAUNCH] Persisted https_path: %s", httpsPath)
+		}
+	}
+
 	// Optional: extract a URL from the log using url_regex → store in result_field
 	urlRegex := mywant.GetCurrent(want, "url_regex", "")
 	if urlRegex != "" {
@@ -151,7 +171,7 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 		want.StoreLog("[LAUNCH] Waiting for URL pattern in log (max %d retries)...", maxRetries)
 		if url := waitForPattern(ctx, want, logFile, urlRegex, maxRetries); url != "" {
 			want.StoreLog("[LAUNCH] Captured URL: %s → %s", url, resultField)
-			want.SetCurrent(resultField, url)
+			storeLaunchResultURL(want, resultField, url)
 		} else {
 			want.StoreLog("[LAUNCH] Warning: url_regex did not match within %d retries", maxRetries)
 			// Fallback: query a local JSON API for the URL (e.g. ngrok at localhost:4040).
@@ -160,7 +180,7 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 			if apiURL := mywant.GetCurrent(want, "fallback_url_api", ""); apiURL != "" {
 				if url := queryFallbackURLAPI(want, apiURL); url != "" {
 					want.StoreLog("[LAUNCH] Captured URL from fallback API: %s → %s", url, resultField)
-					want.SetCurrent(resultField, url)
+					storeLaunchResultURL(want, resultField, url)
 				} else {
 					want.StoreLog("[LAUNCH] Fallback API also returned no URL")
 				}
@@ -169,6 +189,21 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 	}
 
 	return nil
+}
+
+// storeLaunchResultURL saves the captured URL as want state and, when
+// result_field is "tunnel_url" (as set by cloudflared/ngrok managed_launch
+// configs), also persists it to ~/.mywant/config.yaml so other wants (e.g.
+// web_inspector) and the GUI can read it. Mirrors how dynamic_background
+// persists canvas_bg_url via SetCanvasBgURL.
+func storeLaunchResultURL(want *mywant.Want, resultField, url string) {
+	want.SetCurrent(resultField, url)
+	if resultField != "tunnel_url" {
+		return
+	}
+	if err := mywant.SetTunnelURL(url); err != nil {
+		want.StoreLog("[LAUNCH] Failed to persist tunnel_url: %v", err)
+	}
 }
 
 func launchProcessStop(want *mywant.Want) error {

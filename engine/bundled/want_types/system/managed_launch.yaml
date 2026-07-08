@@ -226,6 +226,16 @@ wantType:
       label: current
       initialValue: ''
 
+    - name: tunnel_url
+      description: |
+        URL captured from log by url_regex when result_field is "tunnel_url"
+        (e.g. cloudflared/ngrok tunnels). Also persisted to ~/.mywant/config.yaml
+        tunnel_url — see storeLaunchResultURL in agent_launch_manager.go.
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
     - name: achieving_percentage
       description: Progress percentage
       type: int

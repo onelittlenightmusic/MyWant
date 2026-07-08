@@ -286,10 +286,30 @@ func (s *Server) Start() error {
 	})
 	s.setupRoutes()
 
-	// Register canvas_bg_url updater so built-in want types (e.g. dynamic_background)
-	// can update and persist the background without an HTTP round-trip.
-	mywant.RegisterCanvasBgURLUpdater(func(url string) error {
+	// Register config.yaml field updaters so built-in want types can update and
+	// persist server config without an HTTP round-trip to their own server.
+	mywant.RegisterConfigFieldUpdater("canvas_bg_url", func(url string) error {
 		s.config.CanvasBgURL = url
+		s.saveFrontendConfig()
+		return nil
+	})
+	// tunnel_url: captured public URL from a managed_launch want running
+	// cloudflared/ngrok (result_field: tunnel_url).
+	mywant.RegisterConfigFieldUpdater("tunnel_url", func(url string) error {
+		s.config.TunnelURL = url
+		s.saveFrontendConfig()
+		return nil
+	})
+	// web_inspector_ca_cert_path / https_path: written by a Caddy reverse-proxy
+	// want once it confirms the process is running, so the Web Inspector
+	// bookmarklet setup can auto-detect a certificate-confirmed https:// origin.
+	mywant.RegisterConfigFieldUpdater("web_inspector_ca_cert_path", func(path string) error {
+		s.config.WebInspectorCACertPath = path
+		s.saveFrontendConfig()
+		return nil
+	})
+	mywant.RegisterConfigFieldUpdater("https_path", func(url string) error {
+		s.config.HTTPSPath = url
 		s.saveFrontendConfig()
 		return nil
 	})
@@ -438,6 +458,12 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.CanvasBgURL != "" {
 		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL
+	}
+	if s.config.TunnelURL != "" {
+		fullConfig["tunnel_url"] = s.config.TunnelURL
+	}
+	if s.config.HTTPSPath != "" {
+		fullConfig["https_path"] = s.config.HTTPSPath
 	}
 	if s.config.CanvasBgColor != "" {
 		fullConfig["canvas_bg_color"] = s.config.CanvasBgColor

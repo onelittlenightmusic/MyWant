@@ -9,15 +9,18 @@ import (
 
 // Config holds server configuration
 type Config struct {
-	Port                 int    `json:"port" yaml:"port"`
-	Host                 string `json:"host" yaml:"host"`
-	Debug                bool   `json:"debug" yaml:"debug"`
-	HeaderPosition       string `json:"header_position" yaml:"header_position"`
-	ColorMode            string `json:"color_mode" yaml:"color_mode"`
-	CardHeight           string `json:"card_height" yaml:"card_height"`
-	SoundEnabled         *bool  `json:"sound_enabled" yaml:"sound_enabled"`
-	IconFont             string `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
-	CanvasBgURL          string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	Port           int    `json:"port" yaml:"port"`
+	Host           string `json:"host" yaml:"host"`
+	Debug          bool   `json:"debug" yaml:"debug"`
+	HeaderPosition string `json:"header_position" yaml:"header_position"`
+	ColorMode      string `json:"color_mode" yaml:"color_mode"`
+	CardHeight     string `json:"card_height" yaml:"card_height"`
+	SoundEnabled   *bool  `json:"sound_enabled" yaml:"sound_enabled"`
+	IconFont       string `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	CanvasBgURL    string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	// TunnelURL is the public URL captured from a managed_launch want (e.g.
+	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.
+	TunnelURL            string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
 	CanvasBgColor        string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
 	CanvasDPad           *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
 	CanvasWeatherEffect  string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
@@ -40,6 +43,10 @@ type Config struct {
 	// provider's edge with a publicly-trusted cert, so WebInspectorCACertPath
 	// doesn't apply here.
 	WebInspectorExternalHost string `json:"web_inspector_external_host,omitempty" yaml:"web_inspector_external_host,omitempty"`
+	// HTTPSPath is a certificate-confirmed https:// origin (e.g.
+	// "https://localhost:8443") auto-persisted by a local reverse-proxy want
+	// (e.g. Caddy) once it confirms the process is running — see SetHTTPSPath.
+	HTTPSPath string `json:"https_path,omitempty" yaml:"https_path,omitempty"`
 	// DetectedLANIP is computed fresh on every GET /api/v1/config (see
 	// detectLANIP in handlers_others.go) — never persisted (yaml:"-") and
 	// never accepted from PUT (updateConfig doesn't read it back).
