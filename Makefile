@@ -1,4 +1,4 @@
-.PHONY: clean build build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
+.PHONY: clean build build-cli build-mywant-gui build-playwright-app build-chrome-extension release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
 
 INSTALL_DIR ?= $(HOME)/.local/bin
 
@@ -47,6 +47,13 @@ build-playwright-app:
 	@echo "🎭 Building Playwright MCP App Server..."
 	@cd mcp/playwright-app && npm install && npm run build
 	@echo "✅ playwright-app built: mcp/playwright-app/dist/server.js"
+
+# npm run build (above) already produces this as part of the same tsc pass —
+# this target exists for discoverability, since the Chrome extension has its
+# own install step (chrome://extensions) separate from the rest of mywant.
+build-chrome-extension: build-playwright-app
+	@echo "✅ Chrome extension built: mcp/playwright-app/dist/chrome-extension/"
+	@echo "   Load via chrome://extensions → デベロッパーモード → パッケージ化されていない拡張機能を読み込む"
 
 install-playwright-browsers:
 	@echo "🌐 Installing Playwright browsers (Chromium)..."
@@ -173,6 +180,7 @@ help:
 	@echo "  build-mock                - Build mock flight server (bin/flight-server)"
 	@echo "  build-mock-plugin         - Build mock CLI plugin (bin/mywant-mock)"
 	@echo "  build-playwright-app      - Build Playwright MCP App Server (Node.js)"
+	@echo "  build-chrome-extension    - Build the Web Inspector Chrome extension (dist/chrome-extension/)"
 	@echo "  install-playwright-browsers - Install Chromium for Playwright (first-time setup)"
 	@echo ""
 	@echo "🏃 Run Examples:"

@@ -10,7 +10,7 @@
 // captures — because Playwright serializes this function via .toString() to
 // run it in-page, and the standalone bootstrap does the same thing after
 // fetching params from GET /api/v1/web-wants/active-inspection.
-export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacterId, myColor, myAvatar, existingMarks, navElements }: {
+export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacterId, myColor, myAvatar, existingMarks, navElements, fetchImpl }: {
   webhookUrl: string;
   suggestNameUrl: string;
   myCharacterId: string;
@@ -18,9 +18,19 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
   myAvatar: string;
   existingMarks: Array<{role:string;name:string;selector:string;characterId:string;color:string}>;
   navElements: Array<{role:string;name:string;selector:string}>;
+  // Overridable transport for the two outbound calls below (webhookUrl,
+  // suggestNameUrl). Defaults to the page's own `fetch`, which is what the
+  // CDP path and the standalone Safari/iPhone bootstrap both still use. The
+  // Chrome-extension bootstrap passes a message-relay shim here instead,
+  // since content-script fetches inherit the host page's CSP connect-src
+  // and would be blocked on CSP-strict sites (e.g. x.com) — see
+  // chrome-extension/build-chrome-extension.js.
+  fetchImpl?: typeof fetch;
 }): void {
   if ((window as any).__mywantInspectorLoaded) return;
   (window as any).__mywantInspectorLoaded = true;
+
+  const doFetch = fetchImpl || fetch;
 
   // My character's aura/cursor color — used both for the shared CursorMan
   // SVG (see cursorColor below) and to tint the "Launch保存済み要素" section
@@ -224,24 +234,38 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
     const badge = selected.length > 0 ? `<span class="mwi-panel-badge">${selected.length}</span>` : '';
     const header = panelCollapsed
       ? `<div class="mwi-panel-header" style="justify-content:center">
-          <div class="mwi-collapse-btn" onclick="window.__mwiToggleCollapse()" title="サイドバーを開く">◀${badge}</div>
+          <div class="mwi-collapse-btn" title="サイドバーを開く">◀${badge}</div>
         </div>`
       : `<div class="mwi-panel-header">
           <div style="font-weight:700;color:#a5b4fc;font-size:13px">🔍 Web Want Inspector</div>
-          <div class="mwi-collapse-btn" onclick="window.__mwiToggleCollapse()" title="サイドバーを折りたたむ">▶</div>
+          <div class="mwi-collapse-btn" title="サイドバーを折りたたむ">▶</div>
         </div>`;
     panel.innerHTML = `
       ${header}
       <div class="mwi-panel-body">
         <div class="mwi-panel-hint">↑↓←→:近傍移動 · X/タップ:選択・命名 · Esc:キャンセル · Enter/🎮A:完了</div>
         ${navSection}
-        <div id="mwi-list" class="mwi-panel-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span onclick="window.__mwiRemove(${i})" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
+        <div id="mwi-list" class="mwi-panel-list">${selected.map((s,i)=>`<div class="mwi-item"><span class="mwi-badge mwi-badge-${s.role==='textbox'?'input':'button'}">${s.role}</span><span style="flex:1">${s.name}</span><span class="mwi-remove-btn" data-idx="${i}" style="cursor:pointer;color:#ef4444;font-size:14px">✕</span></div>`).join('')}</div>
         <div class="mwi-panel-footer">
           <div style="color:#475569;font-size:11px">${elements.length} 個のinteractive要素</div>
-          <button class="mwi-btn mwi-btn-done" onclick="window.__mwiDone()">✓ 完了 (${selected.length}個)</button>
+          <button class="mwi-btn mwi-btn-done">✓ 完了 (${selected.length}個)</button>
         </div>
       </div>
     `;
+    // Inline onclick="..." attributes are blocked by CSP script-src on
+    // strict sites (x.com etc — confirmed via CDP: "unsafe-inline is ignored
+    // because a nonce is present"), even though the elements themselves were
+    // created by a content script. Real addEventListener-bound listeners are
+    // unaffected by that restriction, so every interactive control here must
+    // be wired up this way instead of via HTML attribute strings.
+    panel.querySelector('.mwi-collapse-btn')?.addEventListener('click', () => (window as any).__mwiToggleCollapse());
+    panel.querySelectorAll('.mwi-remove-btn').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt((el as HTMLElement).dataset.idx || '-1', 10);
+        if (idx >= 0) (window as any).__mwiRemove(idx);
+      });
+    });
+    panel.querySelector('.mwi-btn-done')?.addEventListener('click', () => (window as any).__mwiDone());
   };
 
   const setFocus = (idx: number) => {
@@ -344,7 +368,7 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
     // skips non-array payload keys.
     payload.__page_url = window.location.href;
     payload.__page_title = document.title;
-    fetch(webhookUrl, {
+    doFetch(webhookUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -383,11 +407,16 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
       <label style="font-size:11px;color:#94a3b8">名前<span id="mwi-spinner" class="mwi-spinner" style="display:none"></span></label>
       <input class="mwi-input" id="mwi-name" value="${autoName.replace(/"/g,'&quot;')}" />
       <div style="margin-top:10px;display:flex;justify-content:flex-end">
-        <button class="mwi-btn mwi-btn-cancel" onclick="window.__mwiCancel()">キャンセル</button>
-        <button class="mwi-btn mwi-btn-done" onclick="window.__mwiAdd('${role}','${sel.replace(/'/g,"\\'")}')">追加</button>
+        <button class="mwi-btn mwi-btn-cancel">キャンセル</button>
+        <button class="mwi-btn mwi-btn-done">追加</button>
       </div>
     `;
     document.body.appendChild(d);
+    // See renderPanel's comment above: inline onclick="..." is blocked by
+    // CSP script-src on strict sites, so wire these via addEventListener.
+    // Also sidesteps the role/sel string-escaping this used to need.
+    d.querySelector('.mwi-btn-cancel')?.addEventListener('click', () => (window as any).__mwiCancel());
+    d.querySelector('.mwi-btn-done')?.addEventListener('click', () => (window as any).__mwiAdd(role, sel));
     const inp = document.getElementById('mwi-name') as HTMLInputElement;
     const spinner = document.getElementById('mwi-spinner') as HTMLElement | null;
 
@@ -405,7 +434,7 @@ export function webInspectorOverlayCore({ webhookUrl, suggestNameUrl, myCharacte
       const html = (context.outerHTML || '').slice(0, 3000);
       suggestController = new AbortController();
       if (spinner) spinner.style.display = 'inline-block';
-      fetch(suggestNameUrl, {
+      doFetch(suggestNameUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ html }),

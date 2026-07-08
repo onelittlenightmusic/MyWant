@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MyWant Web Inspector 設定</title>
+<style>
+  body { font: 13px/1.5 system-ui, sans-serif; padding: 16px; width: 340px; color: #1e293b; }
+  label { display: block; margin-bottom: 6px; font-weight: 600; }
+  input { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 6px; }
+  button { padding: 6px 14px; border: none; border-radius: 6px; background: #2563eb; color: #fff; font-weight: 600; cursor: pointer; }
+  button:hover { background: #1d4ed8; }
+  #status { margin-top: 10px; font-size: 12px; }
+  p.hint { color: #64748b; font-size: 11px; margin-top: 0; }
+</style>
+</head>
+<body>
+  <label for="origin">mywantサーバーのオリジン</label>
+  <input id="origin" type="text" placeholder="http://localhost:8080" />
+  <p class="hint">スキーム＋ホスト＋ポートのみ（例: http://localhost:8080、https://192.168.1.10:8443）。変更すると初回のみ該当オリジンへのアクセス許可を求められます。</p>
+  <button id="save">保存</button>
+  <div id="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

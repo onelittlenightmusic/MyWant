@@ -4,7 +4,7 @@
   "description": "Playwright MCP App Server - records browser interactions and streams screenshots",
   "main": "dist/server.js",
   "scripts": {
-    "build": "tsc && node build-standalone-overlay.js",
+    "build": "tsc && node build-standalone-overlay.js && node build-chrome-extension.js",
     "start": "node dist/server.js",
     "dev": "ts-node server.ts"
   },
