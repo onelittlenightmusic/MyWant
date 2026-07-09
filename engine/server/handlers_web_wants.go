@@ -633,19 +633,22 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-fill mode when field_values are provided; run in background and return immediately.
+	// Auto-fill mode when field_values are provided — this is what
+	// agent_web_form_monitor.go's webFormMonitorSubmit calls when a web want
+	// deployed as a want card has its plan fields filled in and approved.
+	// Queued for the extension the same way as the default branch below
+	// (see navLaunchClaim) rather than driving CDP directly — the extension
+	// side (chrome-extension/background.js's pollForNavLaunch) branches on
+	// FieldValues being present to run mywantFillAndSubmit instead of the
+	// read-only mywantNavOverlay.
 	if len(body.FieldValues) > 0 {
-		go func() {
-			if err := types.FillAndSubmitForm(context.Background(), cdpURL, targetURL, navElems, body.FieldValues); err != nil {
-				log.Printf("[WEB-WANT] fill form error for %s: %v", name, err)
-			}
-		}()
-		s.JSONResponse(w, http.StatusAccepted, map[string]any{
+		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues})
+		s.JSONResponse(w, http.StatusOK, map[string]any{
 			"ok":      true,
 			"url":     targetURL,
 			"mode":    "fill",
 			"fields":  len(body.FieldValues),
-			"message": fmt.Sprintf("filling %d field(s) on %s (background)", len(body.FieldValues), name),
+			"message": fmt.Sprintf("queued %s (%d field(s)) for the Chrome extension", name, len(body.FieldValues)),
 		})
 		return
 	}
@@ -680,6 +683,10 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 type navLaunchClaim struct {
 	TargetURL string           `json:"target_url"`
 	Elements  []WebWantElement `json:"nav_elements"`
+	// Present only for the auto-fill mode (webFormMonitorSubmit) — tells the
+	// extension to run mywantFillAndSubmit instead of the read-only
+	// mywantNavOverlay. Keyed by WebWantElement.FieldKey.
+	FieldValues map[string]string `json:"field_values,omitempty"`
 }
 
 var (

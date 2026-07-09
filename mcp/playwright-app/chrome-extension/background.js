@@ -103,14 +103,18 @@ function pollForAutoLaunch() {
 
 // ---------------------------------------------------------------------------
 // Nav-launch polling: the CDP-free equivalent of engine/types/web_navigator.go's
-// OpenWebNavigator, for the GUI's "Inspect" action (WebWantPage.tsx's
-// handleInspect → POST /web-wants/{name}/launch with no navigate_only/
-// field_values) — unlike auto-launch above, this never creates a want, so it
-// can't reuse pending-auto-launch; handlers_web_wants.go's launchWebWant
-// queues onto the parallel pending-nav-launch endpoint instead. Injected via
-// executeScript's func+args (elements passed directly, no round-trip fetch
-// needed) rather than a separate content.js file, since mywantNavOverlay is
-// small and self-contained.
+// OpenWebNavigator/FillAndSubmitForm — covers both the GUI's "Inspect" action
+// (WebWantPage.tsx's handleInspect → POST /web-wants/{name}/launch with no
+// navigate_only/field_values → read-only nav-highlight overlay) and a web
+// want deployed as a want card having its plan fields filled in and approved
+// (agent_web_form_monitor.go's webFormMonitorSubmit → same endpoint, with
+// field_values → fills + submits instead). Neither ever creates a want, so
+// neither can reuse pending-auto-launch; handlers_web_wants.go's
+// launchWebWant queues onto the parallel pending-nav-launch endpoint for
+// both, distinguished by whether field_values is present. Injected via
+// executeScript's func+args (elements/values passed directly, no round-trip
+// fetch needed) rather than a separate content.js file, since both overlay
+// functions below are small and self-contained.
 function pollForNavLaunch() {
   withMywantOrigin(function (origin) {
     fetch(origin + '/api/v1/web-wants/pending-nav-launch')
@@ -118,8 +122,12 @@ function pollForNavLaunch() {
       .then(function (claim) {
         if (!claim || !claim.target_url) return;
         var elements = claim.nav_elements || [];
+        var fieldValues = claim.field_values || null;
         openTabAndRun(claim.target_url, function (tabId) {
-          chrome.scripting.executeScript({ target: { tabId: tabId }, func: mywantNavOverlay, args: [elements] })
+          var injection = fieldValues
+            ? { target: { tabId: tabId }, func: mywantFillAndSubmit, args: [elements, fieldValues] }
+            : { target: { tabId: tabId }, func: mywantNavOverlay, args: [elements] };
+          chrome.scripting.executeScript(injection)
             .catch(function (err) {
               console.error('[mywant] nav-launch inject failed for tab', tabId, err);
             });
@@ -178,6 +186,98 @@ function mywantNavOverlay(elements) {
   };
   requestAnimationFrame(gp);
   setFocus(0);
+}
+
+// Runs inside the target page (via chrome.scripting.executeScript's func).
+// Fills each non-button element from fieldValues (keyed by field_key), then
+// clicks buttons or presses Enter to submit — a hand-written JS port of
+// mcp/playwright-app/server.ts's fill_form Playwright tool (same role
+// classification, same fill-then-click-then-Enter-fallback order), since
+// that one drives the page from outside via CDP/Playwright's page.fill()/
+// page.click(), which has no content-script equivalent to call into.
+// Waits briefly for each selector to exist, matching Playwright's
+// waitForSelector — elements loaded async by the page (SPA hydration etc.)
+// may not be in the DOM yet the instant this runs.
+function mywantFillAndSubmit(elements, fieldValues) {
+  if (window.__mywantFillLoaded) return;
+  window.__mywantFillLoaded = true;
+
+  function waitFor(selector, timeoutMs) {
+    return new Promise(function (resolve) {
+      var existing = document.querySelector(selector);
+      if (existing) { resolve(existing); return; }
+      var elapsed = 0;
+      var iv = setInterval(function () {
+        var el = document.querySelector(selector);
+        elapsed += 100;
+        if (el || elapsed >= timeoutMs) {
+          clearInterval(iv);
+          resolve(el);
+        }
+      }, 100);
+    });
+  }
+
+  function isButtonRole(role) {
+    var r = (role || '').toLowerCase();
+    return r === 'button' || r === 'submit' || r === 'link' || r === 'menuitem' || r === 'menuitemcheckbox';
+  }
+
+  // Set .value through the native setter so frameworks that wrap onChange
+  // (React etc.) still see the update — a direct el.value= assignment is
+  // invisible to their synthetic event system.
+  function setNativeValue(el, value) {
+    var proto = el.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    var setter = Object.getOwnPropertyDescriptor(proto, 'value');
+    if (setter && setter.set) setter.set.call(el, value); else el.value = value;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  (async function () {
+    var inputEls = elements.filter(function (e) { return !isButtonRole(e.role); });
+    var buttonEls = elements.filter(function (e) { return isButtonRole(e.role); });
+    var lastEl = null;
+
+    for (var i = 0; i < inputEls.length; i++) {
+      var el = inputEls[i];
+      var fk = el.field_key || '';
+      var value = fieldValues[fk];
+      if (!fk || value === undefined || value === '') continue;
+      try {
+        var target = await waitFor(el.selector, 5000);
+        if (!target) continue;
+        target.focus();
+        setNativeValue(target, String(value));
+        lastEl = target;
+      } catch (e) {
+        console.error('[mywant] fill failed for', el.selector, e);
+      }
+    }
+
+    if (buttonEls.length > 0) {
+      for (var j = 0; j < buttonEls.length; j++) {
+        var btn = buttonEls[j];
+        var bfk = btn.field_key || '';
+        var flagVal = bfk ? (fieldValues[bfk] !== undefined ? fieldValues[bfk] : 'true') : 'true';
+        if (flagVal === 'false' || flagVal === 'False') continue;
+        try {
+          var btnTarget = await waitFor(btn.selector, 3000);
+          if (btnTarget) btnTarget.click();
+        } catch (e) {
+          console.error('[mywant] click failed for', btn.selector, e);
+        }
+      }
+    } else if (lastEl) {
+      try {
+        lastEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+        var form = lastEl.closest('form');
+        if (form) { form.requestSubmit ? form.requestSubmit() : form.submit(); }
+      } catch (e) {
+        console.error('[mywant] submit failed', e);
+      }
+    }
+  })();
 }
 
 // Relay for content.js: content-script fetches inherit the host page's CSP
