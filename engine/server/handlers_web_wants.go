@@ -455,8 +455,8 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
     name: %s
     title: %s
     description: |
-      Opens %s in an existing Chrome browser.  Set plan state fields to
-      auto-fill form elements.  Pre-configured elements for %s:
+      Opens %s via the MyWant Web Inspector Chrome extension.  Set plan state
+      fields to auto-fill form elements.  Pre-configured elements for %s:
 %s    version: '1.0'
     category: web
     pattern: independent
@@ -472,18 +472,6 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
       type: string
       required: false
       default: %q
-
-    - name: debug_chrome_host
-      description: Hostname of Chrome with --remote-debugging-port
-      type: string
-      required: false
-      default: "localhost"
-
-    - name: debug_chrome_port
-      description: Remote debugging port
-      type: string
-      required: false
-      default: "9222"
 
   state:
     - name: status
