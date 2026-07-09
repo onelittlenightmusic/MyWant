@@ -1,9 +1,10 @@
 // Default mywant server origin, used until the user sets a different one via
 // the options page (options.html/options.js), which persists it to
-// chrome.storage.local under "mywantApiOrigin" and requests the matching
-// optional_host_permissions entry so this background worker can actually
-// reach it. Also covered by manifest.json's static host_permissions, so the
-// extension works out of the box with no setup for the common desktop case.
+// chrome.storage.local under "mywantApiOrigin". manifest.json's
+// host_permissions already covers http(s)://*/* statically — required
+// because the auto-launch poll below opens/injects tabs with no user
+// gesture, so activeTab and chrome.permissions.request() (which needs one)
+// can't help here — so this works for any origin with no setup.
 var DEFAULT_MYWANT_API_ORIGIN = 'http://localhost:8080';
 
 chrome.action.onClicked.addListener(function (tab) {
@@ -50,15 +51,38 @@ function pollForAutoLaunch() {
         chrome.tabs.create({ url: want.target_url, active: true }, function (tab) {
           if (!tab || !tab.id) return;
           var tabId = tab.id;
-          function onUpdated(updatedTabId, info) {
-            if (updatedTabId !== tabId || info.status !== 'complete') return;
+          var injected = false;
+          function inject() {
+            if (injected) return;
+            injected = true;
             chrome.tabs.onUpdated.removeListener(onUpdated);
             // content.js re-derives everything it needs (webhook URL, marks,
             // nav elements) from GET active-inspection?url=<this tab's URL> —
             // it doesn't need anything from the pending-auto-launch response.
-            chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content.js'] });
+            chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content.js'] })
+              .catch(function (err) {
+                // Was silent before — a host-permission gap here (e.g. a
+                // chrome:// target_url that can never be scripted) previously
+                // meant the tab just opened with no visible sign the
+                // auto-launch had failed. Logging at least makes it
+                // debuggable from the service worker's console.
+                console.error('[mywant] auto-launch inject failed for tab', tabId, err);
+              });
+          }
+          function onUpdated(updatedTabId, info) {
+            if (updatedTabId !== tabId || info.status !== 'complete') return;
+            inject();
           }
           chrome.tabs.onUpdated.addListener(onUpdated);
+          // Race guard: fast-loading pages (e.g. example.com) can reach
+          // status "complete" before the listener above is registered — the
+          // multiple async hops above (storage.local.get, fetch, two .then
+          // chains, this callback) all eat into that window. Re-check the
+          // tab's current status immediately so an already-missed
+          // "complete" transition still triggers the injection.
+          chrome.tabs.get(tabId, function (t) {
+            if (t && t.status === 'complete') inject();
+          });
         });
       })
       .catch(function () { /* server unreachable — retry on the next alarm tick */ });

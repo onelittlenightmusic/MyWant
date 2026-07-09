@@ -5,10 +5,6 @@
   "description": "Injects the MyWant Web Want Inspector overlay into the current page, bypassing page CSP via a content script.",
   "permissions": ["storage", "scripting", "activeTab", "tabs", "alarms"],
   "host_permissions": [
-    "http://localhost:8080/*",
-    "http://127.0.0.1:8080/*"
-  ],
-  "optional_host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
