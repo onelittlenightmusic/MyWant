@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -649,18 +650,64 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := types.OpenWebNavigator(r.Context(), cdpURL, targetURL, navElems); err != nil {
-		http.Error(w, "failed to launch navigator: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Default ("Inspect" in the GUI, WebWantPage.tsx's handleInspect): queue
+	// for the Chrome extension's own poll instead of driving CDP directly —
+	// same reasoning as launch_mode=manual for web_inspector wants (see
+	// pendingAutoLaunch above): this never creates a want, so it can't reuse
+	// that mechanism, but the extension side is symmetric (see
+	// pollForNavLaunch in chrome-extension/background.js). No CDP fallback,
+	// matching that same precedent — if nothing is polling
+	// pending-nav-launch, this silently does nothing until something does.
+	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"ok":       true,
 		"url":      targetURL,
 		"mode":     "nav",
 		"elements": len(elements),
-		"message":  fmt.Sprintf("launched %s with %d elements", name, len(elements)),
+		"message":  fmt.Sprintf("queued %s (%d elements) for the Chrome extension", name, len(elements)),
 	})
+}
+
+// navLaunchClaim is a pending "Inspect" request (POST /web-wants/{name}/launch
+// with no navigate_only/field_values) waiting for the Chrome extension to
+// open a tab for and inject the read-only nav-highlight overlay into —
+// chrome-extension/background.js's JS equivalent of BuildNavJS below, run via
+// chrome.scripting.executeScript's func+args instead of a CDP-injected
+// string, so it isn't subject to page CSP the way build-standalone-overlay.js
+// injecting a <script src> would be (see webInspectorOverlayCore.ts's
+// fetchImpl comment for the same CSP story on the web_inspector side).
+type navLaunchClaim struct {
+	TargetURL string           `json:"target_url"`
+	Elements  []WebWantElement `json:"nav_elements"`
+}
+
+var (
+	navLaunchMu    sync.Mutex
+	navLaunchQueue []navLaunchClaim
+)
+
+func enqueueNavLaunch(claim navLaunchClaim) {
+	navLaunchMu.Lock()
+	defer navLaunchMu.Unlock()
+	navLaunchQueue = append(navLaunchQueue, claim)
+}
+
+// pendingNavLaunch is GET /api/v1/web-wants/pending-nav-launch — polled by
+// the Chrome extension's background service worker alongside
+// pending-auto-launch (same alarm tick, see pollForNavLaunch). FIFO, one
+// claim consumed per call so two near-simultaneous polls can't both open a
+// tab for the same request. Returns an empty body ({}) when nothing is queued.
+func (s *Server) pendingNavLaunch(w http.ResponseWriter, r *http.Request) {
+	navLaunchMu.Lock()
+	defer navLaunchMu.Unlock()
+	if len(navLaunchQueue) == 0 {
+		s.JSONResponse(w, http.StatusOK, navLaunchClaim{})
+		return
+	}
+	claim := navLaunchQueue[0]
+	navLaunchQueue = navLaunchQueue[1:]
+	s.JSONResponse(w, http.StatusOK, claim)
 }
 
 // navCallback is a no-op endpoint consumed by the navigation overlay's "Done" post.
@@ -841,8 +888,15 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(pool, func(i, j int) bool {
 		return wantNameTimestamp(pool[i].Metadata.Name) > wantNameTimestamp(pool[j].Metadata.Name)
 	})
-	want := pool[0]
+	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(pool[0], r))
+}
 
+// buildActiveInspectionResponse assembles the payload a browser-side overlay
+// loader (bookmarklet, iOS Shortcut, or the Chrome extension's content.js)
+// needs to run itself against want — shared by activeInspection (looked up by
+// the page's own hostname or "most recent") and pendingAutoLaunch (looked up
+// by claim, for the extension's own auto-tab-open path).
+func buildActiveInspectionResponse(want *mywant.Want, r *http.Request) activeInspectionResponse {
 	targetURL := mywant.GetCurrent(want, "target_url", "")
 	webhookID := mywant.GetCurrent(want, "doneWebhookId", want.Metadata.ID+"-done")
 	mywantPort := mywant.GetCurrent(want, "mywant_api_port", "8080")
@@ -886,7 +940,7 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		navElements = loadWebWantNavElements(wantTypeName)
 	}
 
-	s.JSONResponse(w, http.StatusOK, activeInspectionResponse{
+	return activeInspectionResponse{
 		WantID:         want.Metadata.ID,
 		TargetURL:      targetURL,
 		DoneWebhookURL: origin + "/api/v1/webhooks/" + webhookID,
@@ -896,7 +950,62 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		Avatar:         avatar,
 		ExistingMarks:  mywant.GetWebMarks(hostnameOfURL(targetURL)),
 		NavElements:    navElements,
+	}
+}
+
+// autoLaunchClaimMu serializes pendingAutoLaunch's read-then-claim so two
+// near-simultaneous polls (e.g. the Chrome extension firing its alarm right
+// as a second one wakes) can never both claim the same want and open two
+// tabs for it.
+var autoLaunchClaimMu sync.Mutex
+
+// pendingAutoLaunch is GET /api/v1/web-wants/pending-auto-launch — polled by
+// the Chrome extension's background service worker (see chrome-extension/
+// background.js) to discover a web_inspector want created with
+// launch_mode=manual that has no tab open for it yet, so the extension can
+// open one itself instead of the server driving a CDP-controlled Chrome (see
+// openInspectorTab in engine/types/agent_web_inspector.go, the CDP path this
+// mode replaces). Returns an empty body ({}) when nothing is pending.
+//
+// The oldest unclaimed candidate wins (FIFO) so wants opened while the
+// extension is offline are worked through in creation order once it comes
+// back, and the matched want is marked auto_launch_claimed=true before
+// responding so this same want is never handed out again even if opening/
+// injecting the tab takes a while.
+func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
+	autoLaunchClaimMu.Lock()
+	defer autoLaunchClaimMu.Unlock()
+
+	var candidates []*mywant.Want
+	for _, want := range s.globalBuilder.GetAllWantStates() {
+		if want.Metadata.Type != "web_inspector" {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspection_complete", false) {
+			continue
+		}
+		if mywant.GetCurrent(want, "inspector_error", "") != "" {
+			continue
+		}
+		if mywant.GetCurrent(want, "auto_launch_claimed", false) {
+			continue
+		}
+		if paramOrCurrentStr(want, "launch_mode") != "manual" {
+			continue
+		}
+		candidates = append(candidates, want)
+	}
+	if len(candidates) == 0 {
+		s.JSONResponse(w, http.StatusOK, activeInspectionResponse{})
+		return
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return wantNameTimestamp(candidates[i].Metadata.Name) < wantNameTimestamp(candidates[j].Metadata.Name)
 	})
+	want := candidates[0]
+	want.SetCurrent("auto_launch_claimed", true)
+
+	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(want, r))
 }
 
 // resolveInspectorOverlayPath returns the absolute path to the standalone
