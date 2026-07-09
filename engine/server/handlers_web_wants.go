@@ -585,9 +585,9 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	// deployed as a want card has its plan fields filled in and approved.
 	// Queued for the extension the same way as the default branch below
 	// (see navLaunchClaim) rather than driving CDP directly — the extension
-	// side (chrome-extension/background.js's pollForNavLaunch) branches on
-	// FieldValues being present to run mywantFillAndSubmit instead of the
-	// read-only mywantNavOverlay.
+	// side (background.js's handleNavLaunch) branches on FieldValues being
+	// present to run mywantFillAndSubmit instead of the read-only
+	// mywantNavOverlay.
 	if len(body.FieldValues) > 0 {
 		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues})
 		s.JSONResponse(w, http.StatusOK, map[string]any{
@@ -602,12 +602,12 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 
 	// Default ("Inspect" in the GUI, WebWantPage.tsx's handleInspect): queue
 	// for the Chrome extension's own poll instead of driving CDP directly —
-	// same reasoning as pendingAutoLaunch above for web_inspector wants: this
-	// never creates a want, so it can't reuse that mechanism, but the
-	// extension side is symmetric (see pollForNavLaunch in chrome-extension/
+	// same reasoning as claimPendingAutoLaunch above for web_inspector
+	// wants: this never creates a want, so it can't reuse that mechanism,
+	// but the extension side is symmetric (see handleNavLaunch in
 	// background.js). No CDP fallback, matching that same precedent — if
-	// nothing is polling pending-nav-launch, this silently does nothing
-	// until something does.
+	// nothing is polling pending-action, this silently does nothing until
+	// something does.
 	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
@@ -636,32 +636,41 @@ type navLaunchClaim struct {
 	FieldValues map[string]string `json:"field_values,omitempty"`
 }
 
-var (
-	navLaunchMu    sync.Mutex
-	navLaunchQueue []navLaunchClaim
-)
-
-func enqueueNavLaunch(claim navLaunchClaim) {
-	navLaunchMu.Lock()
-	defer navLaunchMu.Unlock()
-	navLaunchQueue = append(navLaunchQueue, claim)
+// claimQueue is a generic mutex-guarded FIFO — the shared shape behind
+// nav-launch and browser-run's "enqueue now, extension dequeues later via
+// polling" queues (see pendingBrowserAction). Auto-launch doesn't use this:
+// it claims by setting a flag directly on the want's own state rather than
+// through a separate queue, so a still-open want is never handed out twice
+// even across service worker restarts — that lifecycle is different enough
+// from a plain FIFO that folding it into claimQueue would just hide the
+// distinction rather than remove it.
+type claimQueue[T any] struct {
+	mu    sync.Mutex
+	items []T
 }
 
-// pendingNavLaunch is GET /api/v1/web-wants/pending-nav-launch — polled by
-// the Chrome extension's background service worker alongside
-// pending-auto-launch (same alarm tick, see pollForNavLaunch). FIFO, one
-// claim consumed per call so two near-simultaneous polls can't both open a
-// tab for the same request. Returns an empty body ({}) when nothing is queued.
-func (s *Server) pendingNavLaunch(w http.ResponseWriter, r *http.Request) {
-	navLaunchMu.Lock()
-	defer navLaunchMu.Unlock()
-	if len(navLaunchQueue) == 0 {
-		s.JSONResponse(w, http.StatusOK, navLaunchClaim{})
-		return
+func (q *claimQueue[T]) enqueue(item T) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.items = append(q.items, item)
+}
+
+func (q *claimQueue[T]) dequeue() (T, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	var zero T
+	if len(q.items) == 0 {
+		return zero, false
 	}
-	claim := navLaunchQueue[0]
-	navLaunchQueue = navLaunchQueue[1:]
-	s.JSONResponse(w, http.StatusOK, claim)
+	item := q.items[0]
+	q.items = q.items[1:]
+	return item, true
+}
+
+var navLaunchQueue = &claimQueue[navLaunchClaim]{}
+
+func enqueueNavLaunch(claim navLaunchClaim) {
+	navLaunchQueue.enqueue(claim)
 }
 
 // navCallback is a no-op endpoint consumed by the navigation overlay's "Done" post.
@@ -847,8 +856,8 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 // buildActiveInspectionResponse assembles the payload a browser-side overlay
 // loader (bookmarklet, iOS Shortcut, or the Chrome extension's content.js)
 // needs to run itself against want — shared by activeInspection (looked up by
-// the page's own hostname or "most recent") and pendingAutoLaunch (looked up
-// by claim, for the extension's own auto-tab-open path).
+// the page's own hostname or "most recent") and claimPendingAutoLaunch
+// (looked up by claim, for the extension's own auto-tab-open path).
 func buildActiveInspectionResponse(want *mywant.Want, r *http.Request) activeInspectionResponse {
 	targetURL := mywant.GetCurrent(want, "target_url", "")
 	webhookID := mywant.GetCurrent(want, "doneWebhookId", want.Metadata.ID+"-done")
@@ -906,24 +915,24 @@ func buildActiveInspectionResponse(want *mywant.Want, r *http.Request) activeIns
 	}
 }
 
-// autoLaunchClaimMu serializes pendingAutoLaunch's read-then-claim so two
+// autoLaunchClaimMu serializes claimPendingAutoLaunch's read-then-claim so two
 // near-simultaneous polls (e.g. the Chrome extension firing its alarm right
 // as a second one wakes) can never both claim the same want and open two
 // tabs for it.
 var autoLaunchClaimMu sync.Mutex
 
-// pendingAutoLaunch is GET /api/v1/web-wants/pending-auto-launch — polled by
-// the Chrome extension's background service worker (see chrome-extension/
-// background.js) to discover a web_inspector want that has no tab open for
-// it yet, so the extension can open one itself. Returns an empty body ({})
-// when nothing is pending.
+// claimPendingAutoLaunch finds and claims the oldest web_inspector want with
+// no tab open for it yet, so the extension can open one itself — the
+// auto-launch branch of pendingBrowserAction (see its doc comment for why
+// this stays a separate want-flag claim rather than a claimQueue). Returns
+// nil if nothing is pending.
 //
 // The oldest unclaimed candidate wins (FIFO) so wants opened while the
 // extension is offline are worked through in creation order once it comes
 // back, and the matched want is marked auto_launch_claimed=true before
-// responding so this same want is never handed out again even if opening/
+// returning so this same want is never handed out again even if opening/
 // injecting the tab takes a while.
-func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
+func (s *Server) claimPendingAutoLaunch(r *http.Request) *activeInspectionResponse {
 	autoLaunchClaimMu.Lock()
 	defer autoLaunchClaimMu.Unlock()
 
@@ -944,8 +953,7 @@ func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
 		candidates = append(candidates, want)
 	}
 	if len(candidates) == 0 {
-		s.JSONResponse(w, http.StatusOK, activeInspectionResponse{})
-		return
+		return nil
 	}
 	sort.Slice(candidates, func(i, j int) bool {
 		return wantNameTimestamp(candidates[i].Metadata.Name) < wantNameTimestamp(candidates[j].Metadata.Name)
@@ -953,7 +961,159 @@ func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
 	want := candidates[0]
 	want.SetCurrent("auto_launch_claimed", true)
 
-	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(want, r))
+	resp := buildActiveInspectionResponse(want, r)
+	return &resp
+}
+
+// browserRunClaim is a pending request queued for the Chrome extension to
+// open a tab for and run via @puppeteer/replay's Step/UserFlow schema (see
+// mcp/playwright-app/webext-src/browser-run-interpreter.ts) — the
+// CDP-free replacement for the various ~/.mywant/custom-types plugins
+// (gmail, smartgolf, ...) that used to Playwright-connect_over_cdp to an
+// existing --remote-debugging-port Chrome. Steps is left as raw JSON on
+// purpose: Go never interprets it, only the extension's TypeScript does, so
+// there's no schema to keep in sync on this side.
+type browserRunClaim struct {
+	RequestID  string          `json:"request_id"`
+	URL        string          `json:"url"`
+	Steps      json.RawMessage `json:"steps"`
+	KeepOpen   bool            `json:"keep_open,omitempty"`
+	Background bool            `json:"background,omitempty"` // open the tab non-active (see handleBrowserRun) — for callers polled often enough that stealing focus every run would be disruptive (e.g. claude_info's 60s gauge poll)
+}
+
+// browserRunResult is both what the extension POSTs back (browserRunResult
+// handler) and what browserRun ultimately responds to the Python caller
+// with — same shape on both ends of the relay.
+type browserRunResult struct {
+	RequestID string         `json:"request_id"`
+	Result    map[string]any `json:"result,omitempty"`
+	Error     string         `json:"error,omitempty"`
+}
+
+var browserRunQueue = &claimQueue[browserRunClaim]{}
+
+var (
+	browserRunPendingMu sync.Mutex
+	browserRunPending   = map[string]chan browserRunResult{}
+)
+
+const defaultBrowserRunTimeoutMs = 90000
+
+// browserRun is POST /api/v1/web-wants/browser-run — the synchronous,
+// Python-facing entry point (see the generated browser_run() helper in
+// buildWebWantMainPy-style skill scripts, and the hand-written equivalent in
+// ~/.mywant/custom-types/*/main.py for gmail/smartgolf). Queues the request
+// for the extension's pollForPendingAction (same 1-minute alarm tick as
+// auto-launch/nav-launch) and blocks until browserRunResult delivers a
+// result or the timeout elapses — the caller gets a single ordinary HTTP
+// response either way, no separate polling needed on the Python side.
+func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		URL        string          `json:"url"`
+		Steps      json.RawMessage `json:"steps"`
+		KeepOpen   bool            `json:"keep_open,omitempty"`
+		Background bool            `json:"background,omitempty"`
+		TimeoutMs  int             `json:"timeout_ms,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.URL == "" {
+		http.Error(w, "url is required", http.StatusBadRequest)
+		return
+	}
+	timeoutMs := req.TimeoutMs
+	if timeoutMs <= 0 {
+		timeoutMs = defaultBrowserRunTimeoutMs
+	}
+
+	requestID := generateWantID()
+	resultCh := make(chan browserRunResult, 1)
+
+	browserRunPendingMu.Lock()
+	browserRunPending[requestID] = resultCh
+	browserRunPendingMu.Unlock()
+	browserRunQueue.enqueue(browserRunClaim{
+		RequestID:  requestID,
+		URL:        req.URL,
+		Steps:      req.Steps,
+		KeepOpen:   req.KeepOpen,
+		Background: req.Background,
+	})
+
+	select {
+	case res := <-resultCh:
+		s.JSONResponse(w, http.StatusOK, res)
+	case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+		browserRunPendingMu.Lock()
+		delete(browserRunPending, requestID)
+		browserRunPendingMu.Unlock()
+		s.JSONResponse(w, http.StatusGatewayTimeout, browserRunResult{
+			RequestID: requestID,
+			Error:     "timed out waiting for the browser extension to run this request",
+		})
+	}
+}
+
+// pendingActionResponse is the single envelope GET
+// /api/v1/web-wants/pending-action returns — replaces the formerly separate
+// pending-auto-launch/pending-nav-launch/pending-browser-run endpoints (and
+// background.js's three separate poll functions) with one polled endpoint,
+// dispatched by Kind. The three underlying mechanisms keep their own
+// distinct lifecycles (see claimPendingAutoLaunch's doc comment); only the
+// poll transport and response envelope are unified.
+type pendingActionResponse struct {
+	Kind       string                    `json:"kind"` // "auto_launch" | "nav_launch" | "browser_run" | "" when nothing is pending
+	AutoLaunch *activeInspectionResponse `json:"auto_launch,omitempty"`
+	NavLaunch  *navLaunchClaim           `json:"nav_launch,omitempty"`
+	BrowserRun *browserRunClaim          `json:"browser_run,omitempty"`
+}
+
+// pendingBrowserAction is GET /api/v1/web-wants/pending-action — polled by
+// the extension's background service worker on a single alarm tick (see
+// pollForPendingAction in background.js) in place of the three separate
+// polls this used to require. Checked in priority order — auto-launch, then
+// nav-launch, then browser-run — and returns the first one found; an idle
+// poll (nothing pending anywhere) gets back {kind: ""}.
+func (s *Server) pendingBrowserAction(w http.ResponseWriter, r *http.Request) {
+	if resp := s.claimPendingAutoLaunch(r); resp != nil {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "auto_launch", AutoLaunch: resp})
+		return
+	}
+	if claim, ok := navLaunchQueue.dequeue(); ok {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "nav_launch", NavLaunch: &claim})
+		return
+	}
+	if claim, ok := browserRunQueue.dequeue(); ok {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "browser_run", BrowserRun: &claim})
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
+}
+
+// browserRunResultHandler is POST /api/v1/web-wants/browser-run-result — the
+// extension posts here once it's run the steps (or failed to). Wakes up the
+// matching browserRun call, if it's still waiting; a late/duplicate post
+// (e.g. after the requester already timed out) is just dropped.
+func (s *Server) browserRunResultHandler(w http.ResponseWriter, r *http.Request) {
+	var res browserRunResult
+	if err := json.NewDecoder(r.Body).Decode(&res); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	browserRunPendingMu.Lock()
+	ch, ok := browserRunPending[res.RequestID]
+	if ok {
+		delete(browserRunPending, res.RequestID)
+	}
+	browserRunPendingMu.Unlock()
+
+	if ok {
+		ch <- res
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 // resolveInspectorOverlayPath returns the absolute path to the standalone

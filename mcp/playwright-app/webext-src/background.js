@@ -13,12 +13,14 @@ chrome.action.onClicked.addListener(function (tab) {
 });
 
 // Opens url in a new tab, then calls inject(tabId) once it finishes loading.
-// Shared by pollForAutoLaunch (web_inspector wants, launch_mode=manual) and
-// pollForNavLaunch (POST /web-wants/{name}/launch's default "Inspect" mode)
-// below — both need the exact same "wait for the tab, then run some
-// injection" shape, just with a different injection step.
-function openTabAndRun(url, inject) {
-  chrome.tabs.create({ url: url, active: true }, function (tab) {
+// Shared by all three pollForPendingAction branches (handleAutoLaunch,
+// handleNavLaunch, handleBrowserRun below) — they all need the exact same
+// "wait for the tab, then run some injection" shape, just with a different
+// injection step. active defaults to true (foreground tab, matching prior
+// behavior); handleBrowserRun passes false for claims marked `background`
+// (e.g. claude_info's 60s gauge poll) so a run doesn't steal focus every tick.
+function openTabAndRun(url, inject, active) {
+  chrome.tabs.create({ url: url, active: active !== false }, function (tab) {
     if (!tab || !tab.id) return;
     var tabId = tab.id;
     var done = false;
@@ -45,30 +47,34 @@ function openTabAndRun(url, inject) {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-launch polling: opens a new tab for a web_inspector want created with
-// launch_mode=manual, instead of requiring the user to navigate there and
-// click the toolbar icon themselves. This is the CDP-free equivalent of
-// engine/types/agent_web_inspector.go's openInspectorTab — the server never
-// drives a browser directly here, it only tells us (via the claim below)
-// which want is waiting so exactly one tab gets opened for it.
+// Pending-action polling: a single alarm-driven poll against GET
+// /api/v1/web-wants/pending-action, dispatched by response.kind to one of
+// the three handlers below. This used to be three separate polls (one fetch
+// each to pending-auto-launch/pending-nav-launch/pending-browser-run, same
+// alarm tick) — collapsed into one poll/one endpoint since the lifecycles
+// they each drive only diverge *after* the claim is dequeued, not in how
+// it's polled for. See handlers_web_wants.go's pendingBrowserAction for the
+// server-side counterpart (still three internally distinct claim sources —
+// want-flag for auto-launch, FIFO queues for the other two — just merged
+// into one response envelope).
 //
 // chrome.alarms is the only MV3-safe way to run recurring background work —
 // a plain setInterval would die whenever this service worker is suspended
 // (usually within ~30s of inactivity) — but its minimum period is 1 minute,
-// so there's up to ~1min latency between want creation and the tab opening.
-var AUTO_LAUNCH_ALARM = 'mywant-auto-launch-poll';
+// so there's up to ~1min latency between a claim being queued and this
+// picking it up.
+var PENDING_ACTION_ALARM = 'mywant-pending-action-poll';
 
 chrome.runtime.onInstalled.addListener(function () {
-  chrome.alarms.create(AUTO_LAUNCH_ALARM, { periodInMinutes: 1 });
+  chrome.alarms.create(PENDING_ACTION_ALARM, { periodInMinutes: 1 });
 });
 chrome.runtime.onStartup.addListener(function () {
-  chrome.alarms.create(AUTO_LAUNCH_ALARM, { periodInMinutes: 1 });
+  chrome.alarms.create(PENDING_ACTION_ALARM, { periodInMinutes: 1 });
 });
 
 chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (alarm.name !== AUTO_LAUNCH_ALARM) return;
-  pollForAutoLaunch();
-  pollForNavLaunch();
+  if (alarm.name !== PENDING_ACTION_ALARM) return;
+  pollForPendingAction();
 });
 
 function withMywantOrigin(fn) {
@@ -77,63 +83,142 @@ function withMywantOrigin(fn) {
   });
 }
 
-function pollForAutoLaunch() {
+function pollForPendingAction() {
   withMywantOrigin(function (origin) {
-    fetch(origin + '/api/v1/web-wants/pending-auto-launch')
-      .then(function (res) { return res.ok ? res.json() : null; })
-      .then(function (want) {
-        // pending-auto-launch already claimed this want server-side (see
-        // handlers_web_wants.go's pendingAutoLaunch) before returning it, so
-        // a second poll tick will never see the same want again even if
-        // opening/injecting this tab takes a while.
-        if (!want || !want.target_url) return;
-        openTabAndRun(want.target_url, function (tabId) {
-          // content.js re-derives everything it needs (webhook URL, marks,
-          // nav elements) from GET active-inspection?url=<this tab's URL> —
-          // it doesn't need anything from the pending-auto-launch response.
-          chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content.js'] })
-            .catch(function (err) {
-              console.error('[mywant] auto-launch inject failed for tab', tabId, err);
-            });
-        });
-      })
-      .catch(function () { /* server unreachable — retry on the next alarm tick */ });
+    drainPendingActions(origin);
   });
 }
 
-// ---------------------------------------------------------------------------
-// Nav-launch polling: the CDP-free equivalent of engine/types/web_navigator.go's
-// OpenWebNavigator/FillAndSubmitForm — covers both the GUI's "Inspect" action
-// (WebWantPage.tsx's handleInspect → POST /web-wants/{name}/launch with no
-// navigate_only/field_values → read-only nav-highlight overlay) and a web
-// want deployed as a want card having its plan fields filled in and approved
-// (agent_web_form_monitor.go's webFormMonitorSubmit → same endpoint, with
-// field_values → fills + submits instead). Neither ever creates a want, so
-// neither can reuse pending-auto-launch; handlers_web_wants.go's
-// launchWebWant queues onto the parallel pending-nav-launch endpoint for
-// both, distinguished by whether field_values is present. Injected via
-// executeScript's func+args (elements/values passed directly, no round-trip
-// fetch needed) rather than a separate content.js file, since both overlay
-// functions below are small and self-contained.
-function pollForNavLaunch() {
-  withMywantOrigin(function (origin) {
-    fetch(origin + '/api/v1/web-wants/pending-nav-launch')
-      .then(function (res) { return res.ok ? res.json() : null; })
-      .then(function (claim) {
-        if (!claim || !claim.target_url) return;
-        var elements = claim.nav_elements || [];
-        var fieldValues = claim.field_values || null;
-        openTabAndRun(claim.target_url, function (tabId) {
-          var injection = fieldValues
-            ? { target: { tabId: tabId }, func: mywantFillAndSubmit, args: [elements, fieldValues] }
-            : { target: { tabId: tabId }, func: mywantNavOverlay, args: [elements] };
-          chrome.scripting.executeScript(injection)
-            .catch(function (err) {
-              console.error('[mywant] nav-launch inject failed for tab', tabId, err);
-            });
+// Dequeues and dispatches claims one at a time (each pending-action GET is a
+// cheap FIFO pop — see pendingBrowserAction in handlers_web_wants.go), but
+// does NOT await a claim's own handler before dequeuing the next one — each
+// handler opens its own tab and runs independently, so multiple queued
+// claims (e.g. smartgolf-list's 3-store parallel fetch, each its own
+// browser_run call) execute concurrently instead of being throttled to one
+// per 1-minute alarm tick. Recursion bottoms out as soon as the queue is
+// empty ({kind: ""}).
+function drainPendingActions(origin) {
+  fetch(origin + '/api/v1/web-wants/pending-action')
+    .then(function (res) { return res.ok ? res.json() : null; })
+    .then(function (action) {
+      if (!action || !action.kind) return;
+      if (action.kind === 'auto_launch') handleAutoLaunch(action.auto_launch);
+      else if (action.kind === 'nav_launch') handleNavLaunch(action.nav_launch);
+      else if (action.kind === 'browser_run') handleBrowserRun(action.browser_run);
+      drainPendingActions(origin);
+    })
+    .catch(function () { /* server unreachable — retry on the next alarm tick */ });
+}
+
+// Opens a tab for a web_inspector want created with launch_mode=manual,
+// instead of requiring the user to navigate there and click the toolbar
+// icon themselves. This is the CDP-free equivalent of
+// engine/types/agent_web_inspector.go's openInspectorTab — the server never
+// drives a browser directly here, it only tells us (via the claim) which
+// want is waiting so exactly one tab gets opened for it.
+function handleAutoLaunch(want) {
+  if (!want || !want.target_url) return;
+  openTabAndRun(want.target_url, function (tabId) {
+    // content.js re-derives everything it needs (webhook URL, marks, nav
+    // elements) from GET active-inspection?url=<this tab's URL> — it
+    // doesn't need anything from the pending-action response.
+    chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['content.js'] })
+      .catch(function (err) {
+        console.error('[mywant] auto-launch inject failed for tab', tabId, err);
+      });
+  });
+}
+
+// The CDP-free equivalent of engine/types/web_navigator.go's
+// OpenWebNavigator/FillAndSubmitForm — covers both the GUI's "Inspect"
+// action (WebWantPage.tsx's handleInspect → POST /web-wants/{name}/launch
+// with no navigate_only/field_values → read-only nav-highlight overlay) and
+// a web want deployed as a want card having its plan fields filled in and
+// approved (agent_web_form_monitor.go's webFormMonitorSubmit → same
+// endpoint, with field_values → fills + submits instead). Neither ever
+// creates a want, so neither can reuse the auto-launch claim; distinguished
+// by whether field_values is present. Injected via executeScript's
+// func+args (elements/values passed directly, no round-trip fetch needed)
+// rather than a separate content.js file, since both overlay functions
+// below are small and self-contained.
+function handleNavLaunch(claim) {
+  if (!claim || !claim.target_url) return;
+  var elements = claim.nav_elements || [];
+  var fieldValues = claim.field_values || null;
+  openTabAndRun(claim.target_url, function (tabId) {
+    var injection = fieldValues
+      ? { target: { tabId: tabId }, func: mywantFillAndSubmit, args: [elements, fieldValues] }
+      : { target: { tabId: tabId }, func: mywantNavOverlay, args: [elements] };
+    chrome.scripting.executeScript(injection)
+      .catch(function (err) {
+        console.error('[mywant] nav-launch inject failed for tab', tabId, err);
+      });
+  });
+}
+
+// The CDP-free replacement for ~/.mywant/custom-types plugins (gmail,
+// smartgolf, ...) that used to Playwright-connect_over_cdp to an existing
+// --remote-debugging-port Chrome to scrape/interact with a site.
+// handlers_web_wants.go's browserRun queues a claim here and blocks
+// (synchronously, from the Python caller's point of view) until
+// browser-run-result arrives or it times out — see webext-src/
+// browser-run-interpreter.ts (bundled into browser-run-bundle.js by
+// build-webext.js) for the actual @puppeteer/replay-based step runner this
+// injects and calls.
+function handleBrowserRun(claim) {
+  if (!claim || !claim.request_id || !claim.url) return;
+  var steps = claim.steps || [];
+  openTabAndRun(claim.url, function (tabId) {
+    // Two-step injection: browser-run-bundle.js (a files: injection, since
+    // it's an esbuild-bundled npm dependency rather than one small
+    // function) defines window.MywantBrowserRun as a side effect; the
+    // second call's func+args then passes `steps` as real arguments to the
+    // already-loaded runBrowserSteps — both injections share the same
+    // page/tab, so state persists between them within the same page load.
+    //
+    // world: 'MAIN' (unlike every other injection in this file) — the
+    // reactChange customStep reads a target element's own
+    // __reactProps$xxx expando property to reach the page's React fiber
+    // directly (see browser-run-interpreter.ts). Expando properties set by
+    // the page's own scripts on a DOM node are invisible from the default
+    // ISOLATED world (a separate JS realm that shares the DOM's built-in
+    // structure but not custom properties other scripts attached to it) —
+    // confirmed empirically (Object.keys() on the element came back empty
+    // from ISOLATED, non-empty from MAIN). Both injections must agree on
+    // the same world since window.MywantBrowserRun (set by the first) is
+    // itself a MAIN/ISOLATED-scoped global, invisible across worlds.
+    chrome.scripting.executeScript({ target: { tabId: tabId }, files: ['browser-run-bundle.js'], world: 'MAIN' })
+      .then(function () {
+        return chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          world: 'MAIN',
+          func: function (steps) { return window.MywantBrowserRun.runBrowserSteps(steps); },
+          args: [steps],
         });
       })
-      .catch(function () { /* server unreachable — retry on the next alarm tick */ });
+      .then(function (results) {
+        var result = results && results[0] ? results[0].result : {};
+        postBrowserRunResult({ request_id: claim.request_id, result: result });
+      })
+      .catch(function (err) {
+        console.error('[mywant] browser-run failed for tab', tabId, err);
+        postBrowserRunResult({ request_id: claim.request_id, error: String(err) });
+      })
+      .finally(function () {
+        if (!claim.keep_open) chrome.tabs.remove(tabId).catch(function () {});
+      });
+  }, !claim.background);
+}
+
+function postBrowserRunResult(payload) {
+  withMywantOrigin(function (origin) {
+    fetch(origin + '/api/v1/web-wants/browser-run-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).catch(function (err) {
+      console.error('[mywant] failed to post browser-run result', err);
+    });
   });
 }
 

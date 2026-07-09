@@ -21,12 +21,13 @@ func init() {
 }
 
 // monitorWebInspector registers the done webhook and waits — the browser
-// side is always the Chrome extension's own auto-launch poll (see
-// mcp/playwright-app/chrome-extension/background.js's pollForAutoLaunch and
-// handlers_web_wants.go's pendingAutoLaunch) or a desktop bookmarklet/iOS
-// Shortcut (see WebInspectorModal.tsx), never a CDP-controlled Chrome driven
-// from here. Either way, the browser side finds this want itself via GET
-// /api/v1/web-wants/active-inspection (handlers_web_wants.go).
+// side is always the extension's own auto-launch poll (see
+// mcp/playwright-app/webext-src/background.js's pollForPendingAction/
+// handleAutoLaunch and handlers_web_wants.go's claimPendingAutoLaunch) or a
+// desktop bookmarklet/iOS Shortcut (see WebInspectorModal.tsx), never a
+// CDP-controlled Chrome driven from here. Either way, the browser side
+// finds this want itself via GET /api/v1/web-wants/active-inspection
+// (handlers_web_wants.go).
 func monitorWebInspector(ctx context.Context, want *mywant.Want) (bool, error) {
 	doneWebhookID := mywant.GetCurrent(want, "doneWebhookId", "")
 	if doneWebhookID == "" {

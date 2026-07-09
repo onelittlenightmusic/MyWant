@@ -14,14 +14,17 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@puppeteer/replay": "^4.0.2",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.13",
+    "esbuild": "^0.28.1",
     "typescript": "^5.7.0"
   },
   "engines": {
     "node": ">=20"
   },
   "allowScripts": {
-    "fsevents@2.3.2": true
+    "fsevents@2.3.2": true,
+    "esbuild@0.28.1": true
   }
 }
