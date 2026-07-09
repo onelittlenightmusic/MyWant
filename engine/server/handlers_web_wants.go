@@ -650,18 +650,64 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := types.OpenWebNavigator(r.Context(), cdpURL, targetURL, navElems); err != nil {
-		http.Error(w, "failed to launch navigator: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// Default ("Inspect" in the GUI, WebWantPage.tsx's handleInspect): queue
+	// for the Chrome extension's own poll instead of driving CDP directly —
+	// same reasoning as launch_mode=manual for web_inspector wants (see
+	// pendingAutoLaunch above): this never creates a want, so it can't reuse
+	// that mechanism, but the extension side is symmetric (see
+	// pollForNavLaunch in chrome-extension/background.js). No CDP fallback,
+	// matching that same precedent — if nothing is polling
+	// pending-nav-launch, this silently does nothing until something does.
+	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"ok":       true,
 		"url":      targetURL,
 		"mode":     "nav",
 		"elements": len(elements),
-		"message":  fmt.Sprintf("launched %s with %d elements", name, len(elements)),
+		"message":  fmt.Sprintf("queued %s (%d elements) for the Chrome extension", name, len(elements)),
 	})
+}
+
+// navLaunchClaim is a pending "Inspect" request (POST /web-wants/{name}/launch
+// with no navigate_only/field_values) waiting for the Chrome extension to
+// open a tab for and inject the read-only nav-highlight overlay into —
+// chrome-extension/background.js's JS equivalent of BuildNavJS below, run via
+// chrome.scripting.executeScript's func+args instead of a CDP-injected
+// string, so it isn't subject to page CSP the way build-standalone-overlay.js
+// injecting a <script src> would be (see webInspectorOverlayCore.ts's
+// fetchImpl comment for the same CSP story on the web_inspector side).
+type navLaunchClaim struct {
+	TargetURL string           `json:"target_url"`
+	Elements  []WebWantElement `json:"nav_elements"`
+}
+
+var (
+	navLaunchMu    sync.Mutex
+	navLaunchQueue []navLaunchClaim
+)
+
+func enqueueNavLaunch(claim navLaunchClaim) {
+	navLaunchMu.Lock()
+	defer navLaunchMu.Unlock()
+	navLaunchQueue = append(navLaunchQueue, claim)
+}
+
+// pendingNavLaunch is GET /api/v1/web-wants/pending-nav-launch — polled by
+// the Chrome extension's background service worker alongside
+// pending-auto-launch (same alarm tick, see pollForNavLaunch). FIFO, one
+// claim consumed per call so two near-simultaneous polls can't both open a
+// tab for the same request. Returns an empty body ({}) when nothing is queued.
+func (s *Server) pendingNavLaunch(w http.ResponseWriter, r *http.Request) {
+	navLaunchMu.Lock()
+	defer navLaunchMu.Unlock()
+	if len(navLaunchQueue) == 0 {
+		s.JSONResponse(w, http.StatusOK, navLaunchClaim{})
+		return
+	}
+	claim := navLaunchQueue[0]
+	navLaunchQueue = navLaunchQueue[1:]
+	s.JSONResponse(w, http.StatusOK, claim)
 }
 
 // navCallback is a no-op endpoint consumed by the navigation overlay's "Done" post.
