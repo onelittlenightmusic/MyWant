@@ -453,7 +453,7 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
 	return fmt.Sprintf(`wantType:
   metadata:
     name: %s
-    title: %s
+    title: %q
     description: |
       Opens %s via the MyWant Web Inspector Chrome extension.  Set plan state
       fields to auto-fill form elements.  Pre-configured elements for %s:
