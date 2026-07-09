@@ -81,7 +81,8 @@ demo-restart.sh
 !mcp/playwright-app/package.json
 !mcp/playwright-app/package-lock.json
 !mcp/playwright-app/tsconfig.json
-!mcp/playwright-app/chrome-extension/manifest.json
+!mcp/playwright-app/webext-src/manifest.chrome.json
+!mcp/playwright-app/webext-src/manifest.firefox.json
 demo_*.yaml
 
 # Mock server binaries

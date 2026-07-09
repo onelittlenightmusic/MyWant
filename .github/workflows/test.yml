@@ -52,8 +52,8 @@ jobs:
         cd client
         go test -v ./...
 
-  build-chrome-extension:
-    name: Build Web Inspector Chrome Extension
+  build-webext:
+    name: Build Web Inspector Browser Extensions
     runs-on: ubuntu-latest
 
     steps:
@@ -70,11 +70,16 @@ jobs:
     - name: Install dependencies
       run: cd mcp/playwright-app && npm ci
 
-    - name: Build (tsc + standalone overlay + chrome extension)
+    - name: Build (tsc + standalone overlay + chrome/firefox extensions)
       run: cd mcp/playwright-app && npm run build
 
-    - name: Verify chrome-extension build output
+    - name: Verify chrome-extension and firefox-extension build output
       run: |
-        for f in manifest.json background.js content.js options.html options.js; do
-          test -s "mcp/playwright-app/dist/chrome-extension/$f" || { echo "missing or empty: $f"; exit 1; }
+        for browser in chrome firefox; do
+          for f in manifest.json background.js content.js options.html options.js; do
+            test -s "mcp/playwright-app/dist/${browser}-extension/$f" || { echo "missing or empty: ${browser}-extension/$f"; exit 1; }
+          done
         done
+        # Safari ships as a native app via `make build-safari-extension`
+        # (xcrun safari-web-extension-converter) — macOS/Xcode-only, not
+        # coverable by this Linux runner.
