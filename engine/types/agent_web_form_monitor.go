@@ -198,8 +198,6 @@ func webFormMonitorSubmit(_ context.Context, want *Want) error {
 	}
 	payload := map[string]any{
 		"target_url":   want.GetStringParam("target_url", ""),
-		"cdp_host":     want.GetStringParam("debug_chrome_host", "localhost"),
-		"cdp_port":     want.GetStringParam("debug_chrome_port", "9222"),
 		"field_values": fieldValues,
 	}
 

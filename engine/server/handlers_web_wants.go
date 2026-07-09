@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -571,22 +570,10 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		TargetURL    string            `json:"target_url"`
-		CDPHost      string            `json:"cdp_host"`
-		CDPPort      string            `json:"cdp_port"`
-		FieldValues  map[string]string `json:"field_values,omitempty"`
-		NavigateOnly bool              `json:"navigate_only,omitempty"`
+		TargetURL   string            `json:"target_url"`
+		FieldValues map[string]string `json:"field_values,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
-
-	cdpHost := body.CDPHost
-	if cdpHost == "" {
-		cdpHost = "localhost"
-	}
-	cdpPort := body.CDPPort
-	if cdpPort == "" {
-		cdpPort = "9222"
-	}
 
 	targetURL := body.TargetURL
 	if targetURL == "" {
@@ -602,34 +589,6 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(elements) == 0 {
 		http.Error(w, "no elements found in elements.json", http.StatusBadRequest)
-		return
-	}
-
-	cdpURL := fmt.Sprintf("http://%s:%s", cdpHost, cdpPort)
-
-	navElems := make([]types.WebNavElement, len(elements))
-	for i, el := range elements {
-		navElems[i] = types.WebNavElement{
-			Role:     el.Role,
-			Name:     el.Name,
-			Selector: el.Selector,
-			FieldKey: el.FieldKey,
-		}
-	}
-
-	// navigate_only: just open the URL in Chrome without filling or overlay (url-template mode).
-	if body.NavigateOnly {
-		go func() {
-			if err := types.NavigateTab(context.Background(), cdpURL, targetURL); err != nil {
-				log.Printf("[WEB-WANT] navigate error for %s: %v", name, err)
-			}
-		}()
-		s.JSONResponse(w, http.StatusAccepted, map[string]any{
-			"ok":      true,
-			"url":     targetURL,
-			"mode":    "navigate",
-			"message": fmt.Sprintf("navigating to %s (background)", targetURL),
-		})
 		return
 	}
 
@@ -655,12 +614,12 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 
 	// Default ("Inspect" in the GUI, WebWantPage.tsx's handleInspect): queue
 	// for the Chrome extension's own poll instead of driving CDP directly —
-	// same reasoning as launch_mode=manual for web_inspector wants (see
-	// pendingAutoLaunch above): this never creates a want, so it can't reuse
-	// that mechanism, but the extension side is symmetric (see
-	// pollForNavLaunch in chrome-extension/background.js). No CDP fallback,
-	// matching that same precedent — if nothing is polling
-	// pending-nav-launch, this silently does nothing until something does.
+	// same reasoning as pendingAutoLaunch above for web_inspector wants: this
+	// never creates a want, so it can't reuse that mechanism, but the
+	// extension side is symmetric (see pollForNavLaunch in chrome-extension/
+	// background.js). No CDP fallback, matching that same precedent — if
+	// nothing is polling pending-nav-launch, this silently does nothing
+	// until something does.
 	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
@@ -759,9 +718,8 @@ func (s *Server) suggestElementName(w http.ResponseWriter, r *http.Request) {
 }
 
 // activeInspectionResponse is the payload for GET /api/v1/web-wants/active-inspection —
-// everything a standalone (non-CDP) overlay loader needs to run itself, mirroring
-// the args openInspectorTab (engine/types/agent_web_inspector.go) passes to the
-// Playwright tool for the Chrome/CDP path.
+// everything the standalone overlay loader (Chrome extension, bookmarklet, or
+// iOS Shortcut — see webInspectorOverlayCore.ts) needs to run itself.
 type activeInspectionResponse struct {
 	WantID         string                  `json:"want_id"`
 	TargetURL      string                  `json:"target_url"`
@@ -968,11 +926,9 @@ var autoLaunchClaimMu sync.Mutex
 
 // pendingAutoLaunch is GET /api/v1/web-wants/pending-auto-launch — polled by
 // the Chrome extension's background service worker (see chrome-extension/
-// background.js) to discover a web_inspector want created with
-// launch_mode=manual that has no tab open for it yet, so the extension can
-// open one itself instead of the server driving a CDP-controlled Chrome (see
-// openInspectorTab in engine/types/agent_web_inspector.go, the CDP path this
-// mode replaces). Returns an empty body ({}) when nothing is pending.
+// background.js) to discover a web_inspector want that has no tab open for
+// it yet, so the extension can open one itself. Returns an empty body ({})
+// when nothing is pending.
 //
 // The oldest unclaimed candidate wins (FIFO) so wants opened while the
 // extension is offline are worked through in creation order once it comes
@@ -995,9 +951,6 @@ func (s *Server) pendingAutoLaunch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if mywant.GetCurrent(want, "auto_launch_claimed", false) {
-			continue
-		}
-		if paramOrCurrentStr(want, "launch_mode") != "manual" {
 			continue
 		}
 		candidates = append(candidates, want)
@@ -1084,7 +1037,7 @@ TARGET_URL = %q
 ELEMENTS   = %s
 WANT_NAME  = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 
-_SYSTEM_PARAMS = {"target_url", "debug_chrome_host", "debug_chrome_port"}
+_SYSTEM_PARAMS = {"target_url"}
 
 
 def report(p, m=""):
@@ -1107,8 +1060,6 @@ def main():
     raw = sys.argv[1] if len(sys.argv) > 1 else "{}"
     arg = json.loads(raw or "{}")
     target_url = arg.get("target_url", TARGET_URL)
-    cdp_host   = arg.get("debug_chrome_host", "localhost")
-    cdp_port   = arg.get("debug_chrome_port", "9222")
 
     # Collect field values for input elements that have a field_key in params
     field_values = {}
@@ -1119,8 +1070,6 @@ def main():
 
     launch_payload = {
         "target_url": target_url,
-        "cdp_host":   cdp_host,
-        "cdp_port":   cdp_port,
     }
     if field_values:
         launch_payload["field_values"] = field_values

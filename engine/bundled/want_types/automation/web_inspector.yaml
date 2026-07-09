@@ -3,11 +3,14 @@ wantType:
     name: web_inspector
     title: Web Inspector
     description: |
-      Attaches to an existing Chrome browser via CDP and opens the target URL
-      with an interactive overlay. Use arrow keys or a gamepad to navigate between
-      interactive elements (inputs, buttons, links). Press Enter (or A button) to
-      select an element and name it. Click "完了" when finished — the selected
-      element list is sent back to MyWant and can be saved as a reusable web want type.
+      Opens the target URL with an interactive overlay via the MyWant Web
+      Inspector Chrome extension (mcp/playwright-app/chrome-extension/) — its
+      background service worker polls for this want and opens/injects the tab
+      itself, no CDP-debuggable Chrome required. Use arrow keys or a gamepad
+      to navigate between interactive elements (inputs, buttons, links).
+      Press Enter (or A button) to select an element and name it. Click
+      "完了" when finished — the selected element list is sent back to
+      MyWant and can be saved as a reusable web want type.
     version: '1.0'
     category: web
     pattern: independent
@@ -22,18 +25,6 @@ wantType:
       type: string
       required: true
       example: "https://example.com"
-
-    - name: debug_chrome_host
-      description: Hostname of the Chrome with --remote-debugging-port
-      type: string
-      required: false
-      default: "localhost"
-
-    - name: debug_chrome_port
-      description: Remote debugging port of Chrome
-      type: string
-      required: false
-      default: "9222"
 
     - name: mywant_api_port
       description: Port that the MyWant API server is listening on (for the done webhook)
@@ -53,18 +44,6 @@ wantType:
       required: false
       default: ""
 
-    - name: launch_mode
-      description: >-
-        "cdp" (default) drives an existing --remote-debugging-port Chrome
-        directly. "manual" skips the CDP auto-launch — either the user opens
-        the target URL and clicks the Chrome extension's toolbar icon
-        themselves, or the extension's own background poll
-        (GET /api/v1/web-wants/pending-auto-launch) opens a new tab for it
-        automatically.
-      type: string
-      required: false
-      default: "cdp"
-
   state:
     - name: target_url
       description: URL being inspected
@@ -72,20 +51,6 @@ wantType:
       label: current
       persistent: false
       initialValue: ""
-
-    - name: debug_chrome_host
-      description: Chrome debug host (mirrored from param)
-      type: string
-      label: current
-      persistent: false
-      initialValue: "localhost"
-
-    - name: debug_chrome_port
-      description: Chrome debug port (mirrored from param)
-      type: string
-      label: current
-      persistent: false
-      initialValue: "9222"
 
     - name: mywant_api_port
       description: MyWant API port (mirrored from param)
@@ -115,18 +80,11 @@ wantType:
       persistent: true
       initialValue: ""
 
-    - name: inspector_open
-      description: True once the inspector tab has been opened
-      type: bool
-      label: current
-      persistent: true
-      initialValue: false
-
     - name: auto_launch_claimed
       description: >-
         True once the Chrome extension's background poll has claimed this
-        want to open a tab for (launch_mode=manual only) — prevents a second
-        poll tick from opening a duplicate tab for the same want.
+        want to open a tab for — prevents a second poll tick from opening a
+        duplicate tab for the same want.
       type: bool
       label: current
       persistent: true
@@ -195,5 +153,3 @@ wantType:
         spec:
           params:
             target_url: "https://www.google.com"
-            debug_chrome_host: "localhost"
-            debug_chrome_port: "9222"
