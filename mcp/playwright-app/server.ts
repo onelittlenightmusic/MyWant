@@ -24,7 +24,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as os from 'os';
-import { webInspectorOverlayCore } from './webInspectorOverlayCore';
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -698,51 +697,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     isError: true,
   };
 });
-
-// ---------------------------------------------------------------------------
-// Web Want Inspector completion snapshot
-// ---------------------------------------------------------------------------
-
-/**
- * Saves a PNG screenshot of the page to ~/.mywant/screenshots/ — the same
- * directory the replay feature's moveReplayScreenshot (agent_playwright_record.go)
- * uses, served by the Go backend at /api/v1/screenshots/<filename>.
- * Returns the saved filename, or null on failure.
- */
-async function captureAndSaveScreenshot(page: Page): Promise<string | null> {
-  try {
-    const buffer = await page.screenshot({ type: 'png' });
-    const dir = path.join(os.homedir(), '.mywant', 'screenshots');
-    fs.mkdirSync(dir, { recursive: true });
-    const filename = `web-inspector-${crypto.randomUUID()}.png`;
-    fs.writeFileSync(path.join(dir, filename), buffer);
-    return filename;
-  } catch (e) {
-    console.error('[WEB-INSPECTOR] screenshot capture failed:', e);
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Web Want Inspector overlay injection
-// ---------------------------------------------------------------------------
-
-async function injectWebInspector(
-  page: Page,
-  doneWebhookUrl: string,
-  suggestNameUrl: string,
-  myCharacterId: string,
-  myColor: string,
-  myAvatar: string,
-  existingMarks: Array<{role:string;name:string;selector:string;characterId:string;color:string}>,
-  navElements: Array<{role:string;name:string;selector:string}>,
-): Promise<void> {
-  // The in-page logic itself lives in webInspectorOverlayCore.ts — shared
-  // verbatim with the standalone (non-CDP) bootstrap served to Safari/iPhone
-  // Chrome — see build-standalone-overlay.mjs. Passed by reference (not
-  // inlined) so Playwright serializes and runs the exact same function here.
-  await page.evaluate(webInspectorOverlayCore, { webhookUrl: doneWebhookUrl, suggestNameUrl, myCharacterId, myColor, myAvatar, existingMarks, navElements });
-}
 
 // ---------------------------------------------------------------------------
 // Debug recorder injection

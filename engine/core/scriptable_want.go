@@ -35,6 +35,27 @@ func (s *ScriptableWant) Initialize() {
 	// Reset agentRunGuard so DoAgents can run again on restart.
 	s.agentRunGuard = sync.Map{}
 
+	// Fill in declared parameter defaults for any key the deployed want didn't
+	// override. Unlike recipe-based wants (which resolve defaults via
+	// ParameterDefsToMap at recipe-expansion time), a directly-deployed
+	// custom want type has no other point where its `parameters:` defaults
+	// ever reach Spec.Params — leaving onInitialize's params mapping (and any
+	// GetParameter/GetStringParam call) to see an unset value even though a
+	// default was declared.
+	if len(s.WantTypeDefinition.Parameters) > 0 {
+		if s.Spec.Params == nil {
+			s.Spec.Params = make(map[string]any)
+		}
+		for _, paramDef := range s.WantTypeDefinition.Parameters {
+			if paramDef.Default == nil {
+				continue
+			}
+			if _, exists := s.Spec.Params[paramDef.Name]; !exists {
+				s.Spec.Params[paramDef.Name] = paramDef.Default
+			}
+		}
+	}
+
 	// Copy spec params into state using declared labels.
 	// Skip when resetOnRestart is explicitly false: state was already restored
 	// from the persisted snapshot and copying params would overwrite it with defaults.

@@ -136,6 +136,48 @@ wantType:
       persistent: false
       initialValue: 0
 
+    - name: robot_tab_index
+      description: >
+        1-based browser tab index (as seen in the tab bar) that `robot move`
+        targets for the browser-extension overlay. 0 means no override — the
+        extension falls back to whichever tab is currently active.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: robot_x
+      description: >
+        Explicit viewport x position (px). Used two ways: (1) the
+        browser-extension robot overlay on the tab targeted by
+        robot_tab_index, and (2) mywant-gui's own native RobotCursor, when
+        robot_target_type is 'none'/empty — the extension always skips its
+        own host tab (see background.js), so this is what lets `robot move`
+        reposition the robot inside mywant-gui itself. Ignored when
+        robot_mark_name is set (mark position takes precedence) or, for the
+        native cursor, when robot_target_type names a DOM target.
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: robot_y
+      description: Explicit viewport y position (px) — see robot_x.
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: robot_mark_name
+      description: >
+        Name of an existing Web Inspector mark (WebElementMark.Name) to snap
+        the browser-extension robot overlay to, on the tab targeted by
+        robot_tab_index. Takes precedence over robot_x/robot_y when set.
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
     - name: nav_route
       description: Client-side navigation route to push (e.g. "/agents", "/recipes")
       type: string

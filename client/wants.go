@@ -101,6 +101,127 @@ func (c *Client) RestartWants(ids []string) error {
 	return c.Request("POST", "/api/v1/wants/restart", BatchOperationRequest{IDs: ids}, nil)
 }
 
+// ResolveWantID resolves a want name or ID to a want ID.
+// If nameOrID already matches a want's metadata.id, it is returned as-is.
+// Otherwise the wants list is searched for a want whose metadata.name matches.
+func (c *Client) ResolveWantID(nameOrID string) (string, error) {
+	resp, err := c.ListWants("", nil, nil, false, false)
+	if err != nil {
+		return "", err
+	}
+	for _, w := range resp.Wants {
+		if w.Metadata.ID == nameOrID || w.Metadata.Name == nameOrID {
+			return w.Metadata.ID, nil
+		}
+	}
+	return "", fmt.Errorf("want not found: %q", nameOrID)
+}
+
+// FieldMatchRec mirrors a recommendation returned by the field-match-recommendations API.
+type FieldMatchRec struct {
+	Score        float64 `json:"score"`
+	Description  string  `json:"description"`
+	ExposeAction *struct {
+		WantID    string `json:"want_id"`
+		WantName  string `json:"want_name"`
+		FieldName string `json:"field_name"`
+		GlobalKey string `json:"global_key"`
+	} `json:"expose_action,omitempty"`
+	ImportAction *struct {
+		WantID    string `json:"want_id"`
+		WantName  string `json:"want_name"`
+		GlobalKey string `json:"global_key"`
+		LocalKey  string `json:"local_key"`
+	} `json:"import_action,omitempty"`
+}
+
+// ConnectWants fetches field-match recommendations between sourceID and targetID
+// (trying both role orderings) and applies the highest-scoring recommendation.
+func (c *Client) ConnectWants(sourceID, targetID string) (*FieldMatchRec, error) {
+	const labels = "current,plan,goal"
+	type recResp struct {
+		Recommendations []FieldMatchRec `json:"recommendations"`
+	}
+
+	// Try source→target then target→source; pick whichever returns recommendations.
+	pairs := [][2]string{{sourceID, targetID}, {targetID, sourceID}}
+	var chosen *FieldMatchRec
+	var chosenSrc, chosenTgt string
+	for _, pair := range pairs {
+		src, tgt := pair[0], pair[1]
+		var resp recResp
+		path := "/api/v1/wants/field-match-recommendations?source_id=" + src + "&target_id=" + tgt + "&exposed_labels=" + labels
+		if err := c.Request("GET", path, nil, &resp); err != nil {
+			continue
+		}
+		if len(resp.Recommendations) > 0 {
+			r := resp.Recommendations[0]
+			chosen = &r
+			chosenSrc, chosenTgt = src, tgt
+			break
+		}
+	}
+	if chosen == nil {
+		return nil, fmt.Errorf("no field-match recommendations found between the two wants")
+	}
+
+	body := map[string]any{
+		"source_id": chosenSrc,
+		"target_id": chosenTgt,
+	}
+	if chosen.ExposeAction != nil {
+		body["expose_action"] = chosen.ExposeAction
+	}
+	if chosen.ImportAction != nil {
+		body["import_action"] = chosen.ImportAction
+	}
+	if err := c.Request("POST", "/api/v1/wants/field-match-recommendations/apply", body, nil); err != nil {
+		return nil, fmt.Errorf("apply recommendation: %w", err)
+	}
+	return chosen, nil
+}
+
+// DisconnectWants removes the expose/import link between two wants.
+// It inspects both wants to find which is provider and which is consumer,
+// then deletes the matching expose entry from the provider.
+func (c *Client) DisconnectWants(idA, idB string) (string, error) {
+	wantA, err := c.GetWant(idA, false)
+	if err != nil {
+		return "", err
+	}
+	wantB, err := c.GetWant(idB, false)
+	if err != nil {
+		return "", err
+	}
+
+	// Find a global key that A exposes and B imports (or vice versa).
+	providerID, globalKey := findExposeImportMatch(wantA, wantB)
+	if providerID == "" {
+		// Try the reverse direction.
+		providerID, globalKey = findExposeImportMatch(wantB, wantA)
+	}
+	if providerID == "" {
+		return "", fmt.Errorf("no expose/import link found between the two wants")
+	}
+
+	label := "expose/" + globalKey
+	if err := c.Request("DELETE", "/api/v1/wants/"+providerID+"/relations", map[string]any{"label": label}, nil); err != nil {
+		return "", fmt.Errorf("delete relation: %w", err)
+	}
+	return label, nil
+}
+
+// findExposeImportMatch returns (providerID, globalKey) if provider exposes a key
+// that consumer imports; empty strings if no match.
+func findExposeImportMatch(provider, consumer *Want) (string, string) {
+	for _, exp := range provider.Spec.Exposes {
+		if _, ok := consumer.Spec.Imports[exp.As]; ok {
+			return provider.Metadata.ID, exp.As
+		}
+	}
+	return "", ""
+}
+
 // ExportWants exports all wants as YAML
 func (c *Client) ExportWants() ([]byte, error) {
 	return c.RawRequest("POST", "/api/v1/wants/export", nil, "application/json")

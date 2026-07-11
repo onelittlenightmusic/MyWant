@@ -1457,10 +1457,9 @@ func (s *Server) appendPendingDeviceAction(w http.ResponseWriter, r *http.Reques
 	actions = append(actions, action)
 	want.StoreState("pendingDeviceActions", actions)
 
-	s.JSONResponse(w, http.StatusOK, guiStateResponse{
-		Seq:   nextGUIStateSeq(),
-		State: guiFields(want),
-	})
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: guiFields(want)}
+	go broadcastSSE("gui_state", resp)
+	s.JSONResponse(w, http.StatusOK, resp)
 }
 
 // ── Robot Log ─────────────────────────────────────────────────────────────────

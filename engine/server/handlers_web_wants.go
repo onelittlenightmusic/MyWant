@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -622,11 +621,12 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 // navLaunchClaim is a pending "Inspect" request (POST /web-wants/{name}/launch
 // with no navigate_only/field_values) waiting for the Chrome extension to
 // open a tab for and inject the read-only nav-highlight overlay into —
-// chrome-extension/background.js's JS equivalent of BuildNavJS below, run via
-// chrome.scripting.executeScript's func+args instead of a CDP-injected
-// string, so it isn't subject to page CSP the way build-standalone-overlay.js
-// injecting a <script src> would be (see webInspectorOverlayCore.ts's
-// fetchImpl comment for the same CSP story on the web_inspector side).
+// background.js's JS equivalent of BuildNavJS below (in mywant-gui's
+// webext/), run via chrome.scripting.executeScript's func+args instead of a
+// CDP-injected string, so it isn't subject to page CSP the way
+// build-standalone-overlay.js injecting a <script src> would be (see
+// webInspectorOverlayCore.ts's fetchImpl comment for the same CSP story on
+// the web_inspector side).
 type navLaunchClaim struct {
 	TargetURL string           `json:"target_url"`
 	Elements  []WebWantElement `json:"nav_elements"`
@@ -671,6 +671,7 @@ var navLaunchQueue = &claimQueue[navLaunchClaim]{}
 
 func enqueueNavLaunch(claim navLaunchClaim) {
 	navLaunchQueue.enqueue(claim)
+	go broadcastSSE("pending_action", nil)
 }
 
 // navCallback is a no-op endpoint consumed by the navigation overlay's "Done" post.
@@ -967,7 +968,7 @@ func (s *Server) claimPendingAutoLaunch(r *http.Request) *activeInspectionRespon
 
 // browserRunClaim is a pending request queued for the Chrome extension to
 // open a tab for and run via @puppeteer/replay's Step/UserFlow schema (see
-// mcp/playwright-app/webext-src/browser-run-interpreter.ts) — the
+// mywant-gui's webext/webext-src/browser-run-interpreter.ts) — the
 // CDP-free replacement for the various ~/.mywant/custom-types plugins
 // (gmail, smartgolf, ...) that used to Playwright-connect_over_cdp to an
 // existing --remote-debugging-port Chrome. Steps is left as raw JSON on
@@ -1041,6 +1042,7 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 		KeepOpen:   req.KeepOpen,
 		Background: req.Background,
 	})
+	go broadcastSSE("pending_action", nil)
 
 	select {
 	case res := <-resultCh:
@@ -1114,41 +1116,6 @@ func (s *Server) browserRunResultHandler(w http.ResponseWriter, r *http.Request)
 		ch <- res
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]bool{"ok": true})
-}
-
-// resolveInspectorOverlayPath returns the absolute path to the standalone
-// overlay bundle built by mcp/playwright-app's build-standalone-overlay.js —
-// mirrors resolvePlaywrightServerPath's search strategy (see
-// engine/types/agent_playwright_record.go).
-func resolveInspectorOverlayPath() string {
-	rel := "mcp/playwright-app/dist/inspector-overlay.standalone.js"
-	if _, err := os.Stat(rel); err == nil {
-		abs, _ := filepath.Abs(rel)
-		return abs
-	}
-	if _, filename, _, ok := runtime.Caller(0); ok {
-		sourceRoot := filepath.Join(filepath.Dir(filename), "..", "..")
-		p := filepath.Join(sourceRoot, rel)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return ""
-}
-
-// serveInspectorOverlay serves the standalone (non-CDP) overlay bundle at
-// GET /api/v1/web-wants/inspector-overlay.js — the target of the desktop
-// bookmarklet's/iOS Shortcut's <script src> loader (see WebInspectorModal.tsx).
-// CORS is already global via corsMiddleware, so any site's page can load it.
-func (s *Server) serveInspectorOverlay(w http.ResponseWriter, r *http.Request) {
-	p := resolveInspectorOverlayPath()
-	if p == "" {
-		http.Error(w, "inspector-overlay.js not built — run `npm run build` in mcp/playwright-app", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, p)
 }
 
 // serveCACert serves the CA root certificate configured via

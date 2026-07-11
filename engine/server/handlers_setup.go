@@ -289,7 +289,6 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/pending-action", s.pendingBrowserAction).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/browser-run", s.browserRun).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run-result", s.browserRunResultHandler).Methods("POST", "OPTIONS")
-	webWants.HandleFunc("/inspector-overlay.js", s.serveInspectorOverlay).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/ca-cert", s.serveCACert).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")

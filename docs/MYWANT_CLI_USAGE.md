@@ -32,6 +32,8 @@ Most commands have short versions for convenience.
 | | `resume` | `res` | Resume executions |
 | | `start` | `sta` | Start executions |
 | | `stop` | `st` | Stop executions |
+| | `connect` | - | Connect two wants (auto-applies best field-match) |
+| | `disconnect` | - | Disconnect two wants (removes expose/import link) |
 | `recipes` | - | `r` | Manage recipes |
 | | `list` | `l` | List recipes |
 | | `get` | `g` | Get recipe details |
@@ -131,6 +133,12 @@ List, view, and manage lifecycle of wants.
 ./bin/mywant wants export -o backup.yaml
 # Short version:
 ./bin/mywant w e -o backup.yaml
+
+# Connect two wants (auto-applies the best expose/import field-match recommendation)
+./bin/mywant wants connect <NAME-OR-ID-A> <NAME-OR-ID-B>
+
+# Disconnect two wants (removes the expose/import link between them)
+./bin/mywant wants disconnect <NAME-OR-ID-A> <NAME-OR-ID-B>
 ```
 
 ### Recipe Management
