@@ -293,7 +293,11 @@ func reserveWebWantTypeDir(base string) (name, dir string, err error) {
 // CORS-open like the rest of /web-wants (local tool); mitigations are the
 // 2 MB body cap, the element-count cap, the http(s) scheme whitelist and
 // validTypeName on the derived name (which also blocks path traversal).
-func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
+// parseWebWantElementsBody reads the shared capture/overwrite request body
+// ({__page_url, __page_title, __url_template, [hostname]: []WebWantElement})
+// into its parts. On any validation failure it writes the HTTP error itself and
+// returns ok=false, so callers just `if !ok { return }`.
+func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate string, u *url.URL, elements []WebWantElement, ok bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
@@ -303,27 +307,27 @@ func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
 
 	str := func(key string) string {
 		var v string
-		if rawV, ok := raw[key]; ok {
+		if rawV, okk := raw[key]; okk {
 			_ = json.Unmarshal(rawV, &v)
 		}
 		return v
 	}
-	pageURL := str("__page_url")
-	pageTitle := str("__page_title")
-	urlTemplate := str("__url_template")
+	pageURL = str("__page_url")
+	pageTitle = str("__page_title")
+	urlTemplate = str("__url_template")
 	// Strip reserved/metadata keys — the same set the GUI's handleSave strips,
-	// plus the two page-context keys — so only hostname→elements entries remain.
+	// plus the page-context keys — so only hostname→elements entries remain.
 	for _, k := range []string{"__page_url", "__page_title", "__url_template", "characterId", "color", "__screenshot_url"} {
 		delete(raw, k)
 	}
 
-	u, err := url.Parse(pageURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+	var perr error
+	u, perr = url.Parse(pageURL)
+	if perr != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 		http.Error(w, "__page_url is required and must be an http(s) URL", http.StatusBadRequest)
 		return
 	}
 
-	var elements []WebWantElement
 	for _, v := range raw {
 		var els []WebWantElement
 		if err := json.Unmarshal(v, &els); err != nil {
@@ -337,6 +341,15 @@ func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(elements) > 500 {
 		http.Error(w, "too many elements", http.StatusBadRequest)
+		return
+	}
+	ok = true
+	return
+}
+
+func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
+	pageURL, pageTitle, urlTemplate, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	if !ok {
 		return
 	}
 
@@ -370,6 +383,68 @@ func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
 		"loaded":   loaded,
 		"warnings": warnings,
 		"message":  fmt.Sprintf("web want type %q created from capture", name),
+	})
+}
+
+// getWebWantElements handles GET /api/v1/web-wants/{name} — returns the stored
+// elements.json ({hostname: []WebWantElement}) for an existing web want type so
+// the Inspect overlay can preload the current marks before an overwrite (PUT).
+func (s *Server) getWebWantElements(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !validTypeName.MatchString(name) {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid type name", "")
+		return
+	}
+	data, err := os.ReadFile(filepath.Join(mywant.UserCustomTypesDir(), name, "elements.json"))
+	if err != nil {
+		s.JSONError(w, r, http.StatusNotFound, "web want type not found", "")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write(data) // already {hostname: [elements]}
+}
+
+// updateWebWant handles PUT /api/v1/web-wants/{name} — the "上書き保存" (overwrite)
+// path used by the Inspect flow. Unlike captureWebWant it never reserves a new
+// name: it replaces the named (existing) type's files in place with the full
+// element set in the body (the overlay preloads via GET, edits, then PUTs the
+// whole set — PUT semantics = replace).
+func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !validTypeName.MatchString(name) {
+		http.Error(w, "invalid type name", http.StatusBadRequest)
+		return
+	}
+	dir := filepath.Join(mywant.UserCustomTypesDir(), name)
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		http.Error(w, "web want type not found", http.StatusNotFound)
+		return
+	}
+
+	pageURL, pageTitle, urlTemplate, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	if !ok {
+		return
+	}
+
+	title := strings.TrimSpace(pageTitle)
+	if title == "" {
+		title = name
+	}
+
+	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, u.Hostname(), urlTemplate, "", elements)
+	if werr != nil {
+		http.Error(w, werr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("PUT", "/web-wants/"+name, name, "updated", loaded, "", "")
+	go broadcastSSE("want_type_changed", name)
+
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"name":     name,
+		"loaded":   loaded,
+		"warnings": warnings,
+		"message":  fmt.Sprintf("web want type %q overwritten", name),
 	})
 }
 

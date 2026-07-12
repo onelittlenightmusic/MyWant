@@ -135,7 +135,27 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 
 	go broadcastSSE("cursor", snapshotCursors())
 
+	// Log to ~/.mywant/work.log.
+	// important=true only when an effect (aura / want interaction) is triggered;
+	// plain position updates are kept for 1 hour then discarded by rotation.
+	AppendWorkLog(WorkLogEntry{
+		Type:      "cursor",
+		Important: body.EffectType != "",
+		Data: map[string]any{
+			"character_id": characterID,
+			"device_id":    body.DeviceID,
+			"x":            body.X,
+			"y":            body.Y,
+			"avatar":       body.Avatar,
+			"color":        body.Color,
+			"name":         body.Name,
+			"effect_type":  body.EffectType,
+			"effect_nonce": body.EffectNonce,
+		},
+	})
+
 	w.WriteHeader(http.StatusNoContent)
+
 }
 
 // deleteCursor handles DELETE /api/v1/cursors/:characterId

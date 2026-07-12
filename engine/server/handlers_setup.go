@@ -293,6 +293,11 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/_nav/callback", s.navCallback).Methods("POST", "OPTIONS")
+	// Inspect flow: GET preloads an existing type's marks, PUT overwrites them
+	// ("上書き保存"). Registered after the literal single-segment routes above
+	// (create/capture/…) so those still match first.
+	webWants.HandleFunc("/{name}", s.getWebWantElements).Methods("GET", "OPTIONS")
+	webWants.HandleFunc("/{name}", s.updateWebWant).Methods("PUT", "OPTIONS")
 
 	// External card plugins — compiled on-the-fly from ~/.mywant/custom-types/*/view/plugin.*
 	api.HandleFunc("/plugins", s.listPlugins).Methods("GET", "OPTIONS")

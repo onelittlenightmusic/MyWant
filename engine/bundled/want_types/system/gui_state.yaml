@@ -178,6 +178,57 @@ wantType:
       persistent: false
       initialValue: ""
 
+    # ── Roaming CursorMan fields ────────────────────────────────────────────────
+    # Used by the browser extension to place the user's own CursorMan avatar on an
+    # external browser tab (via `mywant-gui cursor tab`), after which the injected
+    # overlay self-drives free movement (gamepad/keyboard) and tab-to-tab hops.
+    # Distinct from canvas_cursor_x/y above, which is the CursorMan's tile position
+    # on mywant-gui's own 2D canvas (a different coordinate space entirely).
+
+    - name: cursor_visible
+      description: Whether the roaming CursorMan overlay is shown on a browser tab
+      type: bool
+      label: current
+      persistent: false
+      initialValue: false
+
+    - name: cursor_tab_index
+      description: >
+        1-based browser tab index (as seen in the tab bar) that `cursor tab`
+        targets for the browser-extension CursorMan overlay. 0 means no override —
+        the extension falls back to whichever tab is currently active.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: cursor_x
+      description: >
+        Explicit viewport x position (px) for the roaming CursorMan overlay on the
+        tab targeted by cursor_tab_index. The injected overlay updates this as it
+        moves; 0 with cursor_y 0 is treated as "not given" (centered default).
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: cursor_y
+      description: Explicit viewport y position (px) for the roaming CursorMan overlay — see cursor_x.
+      type: float64
+      label: current
+      persistent: false
+      initialValue: 0
+
+    - name: cursor_nonce
+      description: >
+        Monotonically increasing counter (unix ms); each `cursor tab` CLI command
+        bumps this so the frontend relay detects a new command even when the target
+        is unchanged. Mirrors robot_nonce.
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+
     - name: nav_route
       description: Client-side navigation route to push (e.g. "/agents", "/recipes")
       type: string

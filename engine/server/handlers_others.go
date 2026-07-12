@@ -1424,6 +1424,49 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 				s.robotLog = s.robotLog[len(s.robotLog)-500:]
 			}
 			s.robotLogMu.Unlock()
+
+			// Also persist to ~/.mywant/work.log.
+			// A robot command with a real action or explicit target is "important"
+			// (survives the 1-hour rotation); a plain say-with-no-target is not.
+			action := entry.Action
+			target := entry.TargetType
+			isImportant := action != "" || (target != "" && target != "none")
+			AppendWorkLog(WorkLogEntry{
+				Ts:        entry.Timestamp,
+				Type:      "robot",
+				Important: isImportant,
+				Data: map[string]any{
+					"id":              entry.ID,
+					"message":         entry.Message,
+					"target_type":     entry.TargetType,
+					"target_id":       entry.TargetID,
+					"action":          entry.Action,
+					"action_payload":  entry.ActionPayload,
+					"nav_route":       entry.NavRoute,
+					"nonce":           entry.Nonce,
+					"sidebar_open":    entry.SidebarOpen,
+					"sidebar_want_id": entry.SidebarWantID,
+					"sidebar_tab":     entry.SidebarTab,
+				},
+			})
+		}
+	}
+
+	// Log want-selection events (sidebar_want_id set by the user / robot).
+	// These are always important: they record which want the user navigated to.
+	if wantID, ok := updates["sidebar_want_id"]; ok {
+		if id, _ := wantID.(string); id != "" {
+			source := stringField(updates, "source")
+			AppendWorkLog(WorkLogEntry{
+				Type:      "gui_state",
+				Important: true,
+				Data: map[string]any{
+					"event":              "want_selected",
+					"sidebar_want_id":    id,
+					"sidebar_active_tab": stringField(updates, "sidebar_active_tab"),
+					"source":             source,
+				},
+			})
 		}
 	}
 
@@ -1431,6 +1474,7 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	go broadcastSSE("gui_state", resp)
 	s.JSONResponse(w, http.StatusOK, resp)
 }
+
 
 // appendPendingDeviceAction handles POST /api/v1/gui/pending-action
 // Appends one action to the pendingDeviceActions array in GUI state.
