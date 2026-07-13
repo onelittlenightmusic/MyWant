@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
+	want_spec "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 	mywant "mywant/engine/core"
 )
@@ -355,12 +356,29 @@ func loadRecipeFilesIntoRegistryWithLoader(loader *mywant.GenericRecipeLoader, r
 		recipeID := uuid.New().String()
 		recipeConfig.Metadata.ID = recipeID
 
+		// Lightweight want summary (type + name) so the GUI can show which want
+		// types a recipe contains — recipe cards render their icons. Full want
+		// specs are intentionally omitted to keep the list response small; the
+		// deploy path still builds concrete wants from the config separately.
+		wantSummaries := make([]want_spec.RecipeWant, 0, len(recipeConfig.Wants))
+		for _, cw := range recipeConfig.Wants {
+			if cw == nil {
+				continue
+			}
+			wantSummaries = append(wantSummaries, want_spec.RecipeWant{
+				Metadata: want_spec.Metadata{
+					Name: cw.Metadata.Name,
+					Type: cw.Metadata.Type,
+				},
+			})
+		}
+
 		// Convert back to GenericRecipe structure
 		recipe := mywant.GenericRecipe{
 			Recipe: mywant.RecipeContent{
 				Metadata:   recipeConfig.Metadata,
 				Parameters: recipeConfig.Parameters,
-				Wants:      nil, // Populated via config
+				Wants:      wantSummaries,
 			},
 		}
 

@@ -111,8 +111,15 @@ func (a *AuraWant) Progress() {
 			if color == "" {
 				continue
 			}
-			cells = paintCell(cells, x, y, []string{color})
-			cells = fillEnclosedRegions(cells, x, y)
+			// Toggle: pressing X on a cell that already carries this color
+			// erases it (and drops the cell when no colors remain) instead of
+			// re-painting a no-op; an empty cell paints + fills as before.
+			if cellHasColor(cells, x, y, color) {
+				cells = eraseCellColor(cells, x, y, color)
+			} else {
+				cells = paintCell(cells, x, y, []string{color})
+				cells = fillEnclosedRegions(cells, x, y)
+			}
 			changed = true
 		}
 	}
@@ -431,6 +438,38 @@ func cellsFromAny(raw any) []AuraCell {
 
 // paintCell adds each of colors to the cell at (x, y), creating it if
 // missing and de-duplicating colors already present there.
+// cellHasColor reports whether the cell at (x, y) already carries color.
+func cellHasColor(cells []AuraCell, x, y int, color string) bool {
+	for i := range cells {
+		if cells[i].X == x && cells[i].Y == y {
+			return containsString(cells[i].Colors, color)
+		}
+	}
+	return false
+}
+
+// eraseCellColor removes color from the cell at (x, y), dropping the cell
+// entirely once it has no colors left. Used for the X-on-existing-aura toggle.
+func eraseCellColor(cells []AuraCell, x, y int, color string) []AuraCell {
+	for i := range cells {
+		if cells[i].X != x || cells[i].Y != y {
+			continue
+		}
+		remaining := make([]string, 0, len(cells[i].Colors))
+		for _, c := range cells[i].Colors {
+			if c != color {
+				remaining = append(remaining, c)
+			}
+		}
+		if len(remaining) == 0 {
+			return append(cells[:i], cells[i+1:]...)
+		}
+		cells[i].Colors = remaining
+		return cells
+	}
+	return cells
+}
+
 func paintCell(cells []AuraCell, x, y int, colors []string) []AuraCell {
 	for i := range cells {
 		if cells[i].X != x || cells[i].Y != y {
