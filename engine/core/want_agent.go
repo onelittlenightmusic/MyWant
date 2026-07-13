@@ -228,18 +228,15 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 		bgAgent = NewThinkingAgent(bgID, 2*time.Second, agentName, a.Think)
 	case *MonitorAgent:
 		// MonitorAgents use PollingAgent; interval is read from skill_poll_interval_ms state field (default 5s).
+		// Read through GetGoal[int]/convertToType (ToInt) rather than a raw int/int64
+		// type switch: the value is frequently NOT a Go int — it round-trips through
+		// YAML/JSON persistence and comes back as a string (e.g. "60000" in state.yaml)
+		// or float64, which the old int/int64-only switch silently ignored, so a
+		// configured 60s interval fell back to the 5s default and the monitor polled
+		// (and, for claude_info, reloaded its scrape tab) ~12× too often.
 		pollInterval := 5 * time.Second
-		if rawMs, ok := n.GetGoal("skill_poll_interval_ms"); ok && rawMs != nil {
-			switch v := rawMs.(type) {
-			case int:
-				if v > 0 {
-					pollInterval = time.Duration(v) * time.Millisecond
-				}
-			case int64:
-				if v > 0 {
-					pollInterval = time.Duration(v) * time.Millisecond
-				}
-			}
+		if ms := GetGoal[int](n, "skill_poll_interval_ms", 0); ms > 0 {
+			pollInterval = time.Duration(ms) * time.Millisecond
 		}
 		pa := NewPollingAgent(bgID, pollInterval, agentName, string(agentType), a.Monitor)
 		pa.execID = execID
