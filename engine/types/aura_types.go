@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"math"
 	"strconv"
+	"sync"
+	"time"
 
 	. "mywant/engine/core"
 )
@@ -111,10 +113,12 @@ func (a *AuraWant) Progress() {
 			if color == "" {
 				continue
 			}
-			// Toggle: pressing X on a cell that already carries this color
-			// erases it (and drops the cell when no colors remain) instead of
-			// re-painting a no-op; an empty cell paints + fills as before.
-			if cellHasColor(cells, x, y, color) {
+			// Drag-mode lock: the FIRST press of an X-held drag decides paint vs
+			// erase from that cell (erase if it already has this colour, else
+			// paint), and the whole drag keeps that mode — so dragging over mixed
+			// cells never flips between adding and removing. A lone tap after a
+			// gap is its own one-cell drag, so taps still toggle.
+			if auraDragMode(a.Metadata.ID, color, x, y, cells) == "erase" {
 				cells = eraseCellColor(cells, x, y, color)
 			} else {
 				cells = paintCell(cells, x, y, []string{color})
@@ -438,6 +442,44 @@ func cellsFromAny(raw any) []AuraCell {
 
 // paintCell adds each of colors to the cell at (x, y), creating it if
 // missing and de-duplicating colors already present there.
+// Per-(want,colour) drag state for auraDragMode. In-memory only (transient
+// interaction state); the ~400ms gap between drags means at most a handful of
+// stale entries ever accumulate.
+type auraDragState struct {
+	mode   string // "paint" | "erase"
+	lastMs int64
+}
+
+var (
+	auraDragsMu sync.Mutex
+	auraDrags   = map[string]*auraDragState{}
+)
+
+// auraDragMode returns the locked "paint"/"erase" mode for an X-press at (x, y).
+// The first press after a gap (a new drag) locks the mode from that cell — erase
+// if it already carries this colour, paint otherwise — and every press within
+// the drag reuses it, so an X-held drag never flips between adding and removing.
+func auraDragMode(wantID, color string, x, y int, cells []AuraCell) string {
+	nowMs := time.Now().UnixMilli()
+	key := wantID + "|" + color
+	auraDragsMu.Lock()
+	defer auraDragsMu.Unlock()
+	ds := auraDrags[key]
+	if ds == nil {
+		ds = &auraDragState{}
+		auraDrags[key] = ds
+	}
+	if nowMs-ds.lastMs > 400 {
+		if cellHasColor(cells, x, y, color) {
+			ds.mode = "erase"
+		} else {
+			ds.mode = "paint"
+		}
+	}
+	ds.lastMs = nowMs
+	return ds.mode
+}
+
 // cellHasColor reports whether the cell at (x, y) already carries color.
 func cellHasColor(cells []AuraCell, x, y int, color string) bool {
 	for i := range cells {
