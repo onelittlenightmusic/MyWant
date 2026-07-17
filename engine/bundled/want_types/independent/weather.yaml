@@ -12,6 +12,7 @@ wantType:
     - name: weather_city
       description: City name for weather query
       type: string
+      subType: city
       default: Tokyo
       required: false
 
@@ -25,6 +26,7 @@ wantType:
     - name: weather_city
       description: City name for weather query (copied from param by Initialize)
       type: string
+      subType: city
       persistent: false
       label: current
       initialValue: ''

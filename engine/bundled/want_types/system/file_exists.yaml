@@ -46,6 +46,7 @@ wantType:
     - name: url
       description: Download URL (curl and docker_wget methods)
       type: string
+      subType: url
       required: false
 
     - name: prerequisites
@@ -129,6 +130,7 @@ wantType:
 
     - name: url
       type: string
+      subType: url
       persistent: false
       label: current
       description: Download URL (copied from param)

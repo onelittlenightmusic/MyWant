@@ -125,6 +125,7 @@ wantType:
   - name: webhook_url
     description: Full URL for webhook-based reaction (populated when reaction_type is webhook)
     type: string
+    subType: url
     persistent: true
     initialValue: ''
     label: current

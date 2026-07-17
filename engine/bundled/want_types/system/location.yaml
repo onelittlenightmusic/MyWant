@@ -70,6 +70,7 @@ wantType:
     - name: city
       description: City or town name from reverse geocoding (Nominatim)
       type: string
+      subType: city
       label: current
       persistent: true
       initialValue: ""
@@ -84,6 +85,7 @@ wantType:
     - name: address
       description: Full human-readable address from reverse geocoding
       type: string
+      subType: address
       label: current
       persistent: true
       initialValue: ""

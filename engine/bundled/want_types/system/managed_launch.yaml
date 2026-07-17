@@ -75,6 +75,7 @@ wantType:
     - name: health_check_url
       description: HTTP URL to poll for readiness (both modes). Achieved once URL returns 2xx.
       type: string
+      subType: url
       required: false
 
     - name: health_check_interval
@@ -180,6 +181,7 @@ wantType:
     - name: server_health_check_url
       description: Health check URL
       type: string
+      subType: url
       persistent: false
       label: current
       initialValue: ''
@@ -222,6 +224,7 @@ wantType:
     - name: server_url
       description: URL captured from log by url_regex (process mode)
       type: string
+      subType: url
       persistent: true
       label: current
       initialValue: ''
@@ -232,6 +235,7 @@ wantType:
         (e.g. cloudflared/ngrok tunnels). Also persisted to ~/.mywant/config.yaml
         tunnel_url — see storeLaunchResultURL in agent_launch_manager.go.
       type: string
+      subType: url
       persistent: true
       label: current
       initialValue: ''

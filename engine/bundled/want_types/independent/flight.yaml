@@ -50,6 +50,7 @@ wantType:
   - name: server_url
     description: URL of the flight booking API server
     type: string
+    subType: url
     default: 'http://localhost:8090'
     required: false
     example: 'http://localhost:8090'
@@ -80,6 +81,7 @@ wantType:
   - name: server_url
     description: Flight API server URL (copied from param by Initialize)
     type: string
+    subType: url
     persistent: false
     label: current
     initialValue: 'http://localhost:8090'

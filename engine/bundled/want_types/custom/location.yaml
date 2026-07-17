@@ -56,6 +56,7 @@ wantType:
     - name: city
       description: City or ward name (reverse geocoded)
       type: string
+      subType: city
       label: current
       persistent: true
       initialValue: ""
@@ -70,6 +71,7 @@ wantType:
     - name: address
       description: Full address string (reverse geocoded)
       type: string
+      subType: address
       label: current
       persistent: true
       initialValue: ""

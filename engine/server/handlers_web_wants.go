@@ -297,7 +297,7 @@ func reserveWebWantTypeDir(base string) (name, dir string, err error) {
 // ({__page_url, __page_title, __url_template, [hostname]: []WebWantElement})
 // into its parts. On any validation failure it writes the HTTP error itself and
 // returns ok=false, so callers just `if !ok { return }`.
-func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate string, u *url.URL, elements []WebWantElement, ok bool) {
+func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate, screenshotURL string, u *url.URL, elements []WebWantElement, ok bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
@@ -315,6 +315,7 @@ func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request
 	pageURL = str("__page_url")
 	pageTitle = str("__page_title")
 	urlTemplate = str("__url_template")
+	screenshotURL = str("__screenshot_url")
 	// Strip reserved/metadata keys — the same set the GUI's handleSave strips,
 	// plus the page-context keys — so only hostname→elements entries remain.
 	for _, k := range []string{"__page_url", "__page_title", "__url_template", "characterId", "color", "__screenshot_url"} {
@@ -348,7 +349,7 @@ func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
-	pageURL, pageTitle, urlTemplate, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, ok := s.parseWebWantElementsBody(w, r)
 	if !ok {
 		return
 	}
@@ -365,7 +366,7 @@ func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
 		title = name
 	}
 
-	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, hostname, urlTemplate, "", elements)
+	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, hostname, urlTemplate, screenshotURL, elements)
 	if werr != nil {
 		// Remove the reserved dir so the failed attempt doesn't poison future
 		// uniquification with an empty husk.
@@ -421,7 +422,7 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageURL, pageTitle, urlTemplate, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, ok := s.parseWebWantElementsBody(w, r)
 	if !ok {
 		return
 	}
@@ -431,7 +432,7 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 		title = name
 	}
 
-	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, u.Hostname(), urlTemplate, "", elements)
+	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, u.Hostname(), urlTemplate, screenshotURL, elements)
 	if werr != nil {
 		http.Error(w, werr.Error(), http.StatusInternalServerError)
 		return

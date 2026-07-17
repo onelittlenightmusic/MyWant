@@ -52,3 +52,15 @@ weather:     { key: weathers,     icon: Cloud,         color: "#38bdf8", base_ty
 
 # ── Number subtypes ────────────────────────────────────────────────────────────
 percentage:  { key: percentages,  icon: Percent,        color: "#3b82f6", base_type: number }
+
+# ── Object (JSON) subtypes ────────────────────────────────────────────────────
+# Self-descriptive convention: unlike string/number subtypes (identified only by
+# the declaring StateDef/ParameterDef's `subType`), an object subtype's runtime
+# VALUE must itself carry a `type` field naming the subtype, e.g.:
+#   { lat: 35.6, lng: 139.7, type: "location_coordinate" }
+# This lets any consumer (GUI card, log viewer, ...) resolve icon/color for a
+# JSON value directly from its own `type` field, without first looking up the
+# declaring want type's schema. StateDef/ParameterDef `subType: location_coordinate`
+# is still recommended (drives the "add field" JSON picker, docs, etc.) but the
+# value's own `type` field takes precedence when both are present.
+location_coordinate: { key: location_coordinates, icon: MapPin, color: "#06b6d4", base_type: object }

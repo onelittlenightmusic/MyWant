@@ -23,6 +23,7 @@ wantType:
     - name: target_url
       description: URL to open in the inspector tab
       type: string
+      subType: url
       required: true
       example: "https://example.com"
 
@@ -48,6 +49,7 @@ wantType:
     - name: target_url
       description: URL being inspected
       type: string
+      subType: url
       label: current
       persistent: false
       initialValue: ""
@@ -93,6 +95,7 @@ wantType:
     - name: screenshot_url
       description: URL of the completion snapshot (/api/v1/screenshots/...), captured just before the tab closes
       type: string
+      subType: url
       label: current
       persistent: true
       initialValue: ""

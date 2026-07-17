@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	mywant "mywant/engine/core"
+
 	"github.com/gorilla/mux"
 )
 
@@ -138,7 +140,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// Log to ~/.mywant/work.log.
 	// important=true only when an effect (aura / want interaction) is triggered;
 	// plain position updates are kept for 1 hour then discarded by rotation.
-	AppendWorkLog(WorkLogEntry{
+	mywant.AppendWorkLog(mywant.WorkLogEntry{
 		Type:      "cursor",
 		Important: body.EffectType != "",
 		Data: map[string]any{

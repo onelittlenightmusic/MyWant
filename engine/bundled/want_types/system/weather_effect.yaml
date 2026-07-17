@@ -31,6 +31,7 @@ wantType:
     - name: weather_city
       description: City for direct wttr.in fetch when source_want_id is not set
       type: string
+      subType: city
       required: false
 
   state:
@@ -51,6 +52,7 @@ wantType:
     - name: weather_city
       description: City for direct weather fetch
       type: string
+      subType: city
       label: current
       persistent: true
       initialValue: "Tokyo"

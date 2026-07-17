@@ -601,6 +601,11 @@ func (n *Want) EndProgressCycle() {
 		}
 	}
 
+	// User-defined computed fields (GUI-authored, stored in a label). Runs here,
+	// after fetchFrom, so they see up-to-date source fields; change-driven since
+	// this whole block runs per reconcile, not on a fixed tick.
+	n.evaluateDerivedFields()
+
 	// Auto-provide exposable state snapshot to downstream consumers (e.g. gauge type).
 	// Runs after fetchFrom so MRS-derived fields are up-to-date before publishing.
 	if !n.providedThisCycle && len(n.paths.Out) > 0 && n.WantTypeDefinition != nil {

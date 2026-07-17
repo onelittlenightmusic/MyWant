@@ -60,6 +60,7 @@ wantType:
   - name: date
     description: Selected date (YYYY-MM-DD)
     type: string
+    subType: date
     label: current
     persistent: true
     initialValue: ""

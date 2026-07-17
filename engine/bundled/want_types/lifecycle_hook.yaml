@@ -49,11 +49,13 @@ wantType:
     - name: target_url
       description: Default HTTP endpoint to POST matching events to (can be overridden per rule)
       type: string
+      subType: url
       required: false
 
     - name: mywant_url
       description: Base URL of the mywant server (used for in-process fallback HTTP)
       type: string
+      subType: url
       required: false
       default: "http://localhost:8080"
 
@@ -75,6 +77,7 @@ wantType:
     - name: hook_target_url
       description: Default target URL for all rules
       type: string
+      subType: url
       persistent: false
       label: current
       initialValue: ''
@@ -82,6 +85,7 @@ wantType:
     - name: mywant_url
       description: mywant server base URL
       type: string
+      subType: url
       persistent: false
       label: current
       initialValue: 'http://localhost:8080'

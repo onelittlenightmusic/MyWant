@@ -1454,6 +1454,12 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 		rw.want.Metadata = wantConfig.Metadata
 		rw.want.Spec = wantConfig.Spec
 		rw.want.metadataMutex.Unlock()
+
+		// Recompute GUI-authored derived fields synchronously so a saved definition's
+		// key appears in state immediately, rather than waiting for the want's own
+		// progression loop to cycle again (it may never cycle again if the want has
+		// already reached a terminal/achieved status).
+		rw.want.evaluateDerivedFields()
 	}
 	cb.wantsMu.RUnlock()
 

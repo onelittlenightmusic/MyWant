@@ -1,0 +1,74 @@
+wantType:
+  metadata:
+    name: work_log
+    title: Work Log
+    description: |
+      Watches state fields imported via spec.imports (e.g. a globally-exposed
+      "location" field from a location want) and appends an entry to
+      ~/.mywant/work.log whenever one changes — timestamp + previous value.
+      Output is throttled by flush_interval so a fast-changing field doesn't
+      flood the log; each change still keeps its own true detection time and
+      previous value regardless of how long it waits to be flushed.
+      Connect via the Import tab: import any global-param-exposed field under
+      whatever local name you want tracked.
+    version: "1.0"
+    category: system
+    pattern: independent
+    labels:
+      type-icon: NotebookPen
+
+  parameters:
+    - name: flush_interval
+      description: >-
+        How often buffered field changes are written to work.log. Accepts Go
+        duration syntax (e.g. "30s", "5m", "1h") or "Nmin" shorthand (e.g.
+        "5min"). Set to "0" to write each detected change immediately instead
+        of batching. Detection itself is always near-real-time — this only
+        throttles how often work.log is written to.
+      type: string
+      default: "5m"
+      required: false
+      example: "5min"
+
+  state:
+    - name: flush_interval
+      description: Effective flush interval currently in use
+      type: string
+      label: current
+      persistent: true
+      initialValue: "5m"
+    - name: tracked_fields
+      description: Local (imported) field names currently being watched
+      type: array
+      label: current
+      persistent: false
+    - name: pending_count
+      description: Number of detected changes buffered and not yet flushed
+      type: int
+      label: current
+      persistent: false
+      initialValue: 0
+    - name: total_logged
+      description: Cumulative number of change entries written to work.log
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: last_flush_at
+      description: RFC3339 timestamp of the last time changes were flushed to work.log
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+
+  examples:
+    - description: Log every change to a location want's exposed "city" field, flushed every 5 minutes
+      want:
+        metadata:
+          name: location-work-log
+          type: work_log
+        spec:
+          params:
+            flush_interval: "5min"
+          imports:
+            global_location_instance_city: city

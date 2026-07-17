@@ -257,6 +257,20 @@ wantType:
       persistent: false
       initialValue: "bottom-left"
 
+    - name: form_situation
+      description: Dashboard form/interaction mode ("type-selection" | "fields" | "closed" | "select-mode" | "batch-action")
+      type: string
+      label: current
+      persistent: false
+      initialValue: "closed"
+
+    - name: canvas_mode
+      description: Whether the dashboard is showing the 2D canvas view (true) or the list/grid view (false)
+      type: bool
+      label: current
+      persistent: false
+      initialValue: false
+
     - name: canvas_center_x
       description: X canvas coordinate of the viewport center (used for cross-tab pan sync)
       type: float64

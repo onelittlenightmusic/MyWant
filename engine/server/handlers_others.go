@@ -1431,7 +1431,7 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 			action := entry.Action
 			target := entry.TargetType
 			isImportant := action != "" || (target != "" && target != "none")
-			AppendWorkLog(WorkLogEntry{
+			mywant.AppendWorkLog(mywant.WorkLogEntry{
 				Ts:        entry.Timestamp,
 				Type:      "robot",
 				Important: isImportant,
@@ -1457,7 +1457,7 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	if wantID, ok := updates["sidebar_want_id"]; ok {
 		if id, _ := wantID.(string); id != "" {
 			source := stringField(updates, "source")
-			AppendWorkLog(WorkLogEntry{
+			mywant.AppendWorkLog(mywant.WorkLogEntry{
 				Type:      "gui_state",
 				Important: true,
 				Data: map[string]any{

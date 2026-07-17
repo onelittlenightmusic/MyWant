@@ -52,6 +52,7 @@ wantType:
   - name: webhook_secret
     description: HMAC secret for webhook signature verification (optional)
     type: string
+    subType: secret
     required: false
     default: ""
 
@@ -288,6 +289,7 @@ wantType:
   - name: webhook_url
     description: Webhook endpoint URL (auto-set on init)
     type: string
+    subType: url
     persistent: true
     initialValue: ""
     label: current
