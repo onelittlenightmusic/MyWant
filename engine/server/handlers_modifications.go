@@ -43,7 +43,7 @@ func (s *Server) exportableWants(includeSystemWants bool) []*mywant.Want {
 
 	allWants := make([]*mywant.Want, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant {
+		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
 		}
 		allWants = append(allWants, want)

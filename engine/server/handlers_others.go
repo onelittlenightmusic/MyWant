@@ -1376,6 +1376,13 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 			want.DeleteState(key) // null from client means "remove this field"
 		} else {
 			want.StoreState(key, val)
+			// gui_state keys are frequently per-character (e.g. canvas_scale_<id>),
+			// so the static YAML schema can't enumerate them in advance. Register
+			// any new key as explicit state so GET returns it instead of dropping
+			// it into hidden state (same pattern as derived_fields.go).
+			if !mywant.Contains(want.ProvidedStateFields, key) {
+				want.ProvidedStateFields = append(want.ProvidedStateFields, key)
+			}
 		}
 	}
 

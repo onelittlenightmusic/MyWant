@@ -53,8 +53,8 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Claude Code / coding webhook: structured message handling
-	if want.Metadata.Type == "claude_code_thread" || want.Metadata.Type == "coding" {
+	// Claude Code / coding / robot webhook: structured message handling
+	if want.Metadata.Type == "claude_code_thread" || want.Metadata.Type == "coding" || want.Metadata.Type == "robot" {
 		text, _ := payload["text"].(string)
 		sender, _ := payload["sender"].(string)
 		storeWebhookMessage(want, webhookMessage{

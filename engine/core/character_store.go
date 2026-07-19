@@ -25,6 +25,13 @@ type Character struct {
 	// character has set for it — shown as an aura-colored dog-ear flag/star on
 	// the marked option/state in that want's card UI, toggled via the X key/button.
 	AuraDefaults map[string]AuraMark `yaml:"auraDefaults,omitempty" json:"auraDefaults,omitempty"`
+	// AuraCardWantID is the want this character has bookmarked as their "aura
+	// card" — an ordinary want whose tile/card visually represents this
+	// character wherever it appears (dashboard grid or canvas), toggled via
+	// the ★ button on any want card. One want per character; distinct from
+	// AuraDefaults, which marks a single value within a specific want's
+	// controls rather than the whole want. Empty = no aura card set.
+	AuraCardWantID string `yaml:"auraCardWantId,omitempty" json:"auraCardWantId,omitempty"`
 	// TileDesign / AuraDesign are the design-plugin ids this character picks for
 	// the want tiles and aura they own on the canvas (e.g. "cubic", "forest").
 	// Empty = inherit the canvas-level design (config.canvas_design).
@@ -74,6 +81,7 @@ func GetCharacterManager() *characterManager {
 		path := filepath.Join(home, ".mywant", "characters.yaml")
 		m := &characterManager{path: path}
 		m.load()
+		m.ensureDefaultCharacters()
 		globalCharacterStore = m
 	})
 	return globalCharacterStore
@@ -172,8 +180,9 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			if updated.AssignedDeviceIDs == nil {
 				updated.AssignedDeviceIDs = []string{}
 			}
-			updated.AuraDefaults = c.AuraDefaults // preserve aura-default marks
-			updated.TileDesign = c.TileDesign     // preserve design picks (set via /design)
+			updated.AuraDefaults = c.AuraDefaults     // preserve aura-default marks
+			updated.AuraCardWantID = c.AuraCardWantID // preserve aura-card pick
+			updated.TileDesign = c.TileDesign         // preserve design picks (set via /design)
 			updated.AuraDesign = c.AuraDesign
 			m.store.Characters[i] = updated
 			m.save()
@@ -272,6 +281,52 @@ func (m *characterManager) SetAuraDefault(characterID, wantID string, mark AuraM
 	return nil, false
 }
 
+// SetAuraCardWant sets (or clears, with wantID == "") the want this character
+// has bookmarked as their aura card. One want per character — setting a new
+// one replaces any previous pick.
+func (m *characterManager) SetAuraCardWant(characterID, wantID string) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].AuraCardWantID = wantID
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
+// ensureDefaultCharacters seeds characters that must always exist, run once
+// after loading from disk. Currently just "robot" — the always-on chat
+// companion — pre-bound to the "robot" system want (same fixed ID) as its
+// aura card, so it shows the right avatar/color without a manual ★ press.
+// Guarded on ID so a user's later changes (rename, re-picked aura card, ...)
+// are never overwritten on subsequent restarts.
+func (m *characterManager) ensureDefaultCharacters() {
+	m.mu.Lock()
+	for _, c := range m.store.Characters {
+		if c.ID == "robot" {
+			m.mu.Unlock()
+			return
+		}
+	}
+	m.store.Characters = append(m.store.Characters, Character{
+		ID:                "robot",
+		Name:              "robot",
+		Avatar:            "🤖",
+		Color:             "#8b5cf6",
+		CreatedAt:         time.Now().UnixMilli(),
+		AssignedDeviceIDs: []string{},
+		AuraCardWantID:    "robot",
+	})
+	m.save()
+	m.mu.Unlock()
+	log.Printf("[CharacterStore] Seeded default 'robot' character")
+}
+
 // SetDesign sets the tile/aura design-plugin ids for a character (empty string
 // = inherit the canvas-level design).
 func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
@@ -331,6 +386,9 @@ func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bo
 func PruneCharacterDevices(deviceIDs []string) { GetCharacterManager().PruneDevices(deviceIDs) }
 func SetCharacterAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
 	return GetCharacterManager().SetAuraDefault(characterID, wantID, mark)
+}
+func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
+	return GetCharacterManager().SetAuraCardWant(characterID, wantID)
 }
 func SetCharacterDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
 	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign)

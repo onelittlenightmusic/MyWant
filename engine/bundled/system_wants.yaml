@@ -16,3 +16,11 @@ system_wants:
     spec:
       params:
         scan_interval: 60
+
+  - id: robot
+    name: robot
+    type: robot
+    spec:
+      params:
+        provider: claude_code
+        permission_mode: bypassPermissions

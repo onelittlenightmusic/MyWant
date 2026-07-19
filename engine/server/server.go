@@ -175,13 +175,32 @@ func New(config Config) *Server {
 		log.Printf("[WARN] Failed to load system wants: %v", err)
 	}
 	systemTypes := mywant.SystemWantTypes(systemWants)
+	// Most system wants (gui_state, capability_manager, scheduler) are pure
+	// control-plane and always start fresh from system_wants.yaml. "robot" is
+	// the one exception: it must resume its own chat thread and wandered
+	// canvas position across restarts, so its persisted instance (if any) is
+	// kept instead of being replaced by the fresh yaml definition.
+	statefulSystemTypes := map[string]bool{"robot": true}
 	filtered := initialWants[:0]
+	restoredStateful := map[string]bool{}
 	for _, w := range initialWants {
 		if !systemTypes[w.Metadata.Type] {
 			filtered = append(filtered, w)
+			continue
+		}
+		if statefulSystemTypes[w.Metadata.Type] {
+			w.Metadata.IsSystemWant = true
+			filtered = append(filtered, w)
+			restoredStateful[w.Metadata.Type] = true
 		}
 	}
-	initialWants = append(filtered, systemWants...)
+	for _, sw := range systemWants {
+		if restoredStateful[sw.Metadata.Type] {
+			continue
+		}
+		filtered = append(filtered, sw)
+	}
+	initialWants = filtered
 
 	globalBuilder.SetConfigInternal(initialWants)
 	globalBuilder.SetServerMode(true)

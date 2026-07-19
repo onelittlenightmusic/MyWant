@@ -143,9 +143,14 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		msgCount := GetCurrent(want, "cc_message_count", 0)
 		if msgCount > lastProcessedCount {
 			if text, ok := latestMsg["text"].(string); ok && text != "" {
-				want.StoreLog("[CC_THINK] Webhook message received, overriding auto_request")
-				want.SetCurrent("webhook_auto_request", text)
-				want.SetCurrent("cc_webhook_processed", msgCount)
+				if want.Metadata.Type == "robot" && tryRunSlashCommand(want, text) {
+					want.StoreLog("[CC_THINK] Handled as a slash command, not forwarding to LLM")
+					want.SetCurrent("cc_webhook_processed", msgCount)
+				} else {
+					want.StoreLog("[CC_THINK] Webhook message received, overriding auto_request")
+					want.SetCurrent("webhook_auto_request", text)
+					want.SetCurrent("cc_webhook_processed", msgCount)
+				}
 			}
 		}
 	}

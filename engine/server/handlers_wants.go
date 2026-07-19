@@ -18,6 +18,46 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// alwaysVisibleSystemWantTypes are system-want types that still appear in the
+// default want list despite IsSystemWant=true — currently only "robot", which
+// must always show as a dashboard card, unlike control-plane system wants
+// (gui_state/capability_manager/scheduler) that stay hidden from the UI.
+var alwaysVisibleSystemWantTypes = map[string]bool{
+	"robot": true,
+}
+
+// shouldHideSystemWant centralizes the include-system-wants filter used by
+// every want-listing endpoint, carving out alwaysVisibleSystemWantTypes.
+func shouldHideSystemWant(want *mywant.Want, includeSystemWants bool) bool {
+	if includeSystemWants || !want.Metadata.IsSystemWant {
+		return false
+	}
+	return !alwaysVisibleSystemWantTypes[want.Metadata.Type]
+}
+
+// isProtectedSystemWant reports whether a want must never be deleted or
+// suspended via the API — system wants are always-on infrastructure
+// (gui_state, scheduler, robot, ...), not user-managed tasks.
+func (s *Server) isProtectedSystemWant(wantID string) bool {
+	if s.globalBuilder == nil {
+		return false
+	}
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	return found && want.Metadata.IsSystemWant
+}
+
+// dropProtectedWantIDs filters out IDs of protected system wants from a batch
+// delete/suspend request, so the rest of the batch still proceeds.
+func (s *Server) dropProtectedWantIDs(ids []string) []string {
+	kept := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if !s.isProtectedSystemWant(id) {
+			kept = append(kept, id)
+		}
+	}
+	return kept
+}
+
 // computeCollectionHash computes a stable hash over a sorted slice of want hashes.
 func computeCollectionHash(hashes []string) string {
 	sorted := make([]string, len(hashes))
@@ -51,7 +91,7 @@ func (s *Server) listWantHashes(w http.ResponseWriter, r *http.Request) {
 	entries := make([]wantHashEntry, 0, len(wantsByID))
 	rawHashes := make([]string, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant {
+		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
 		}
 		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
@@ -230,7 +270,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	// Compute collection ETag before building full responses
 	rawHashes := make([]string, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant {
+		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
 		}
 		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
@@ -252,7 +292,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 
 	allWants := make([]wantAPIResponse, 0, len(wantsByID))
 	for _, want := range wantsByID {
-		if !includeSystemWants && want.Metadata.IsSystemWant {
+		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
 		}
 		if !includeCancelled && want.GetStatus() == mywant.WantStatusCancelled {
@@ -533,6 +573,11 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 
+	if s.isProtectedSystemWant(wantID) {
+		s.JSONError(w, r, http.StatusForbidden, "System wants cannot be deleted", "")
+		return
+	}
+
 	if s.globalBuilder != nil {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			want.SetStatus(mywant.WantStatusDeleting)
@@ -548,7 +593,11 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteWants(w http.ResponseWriter, r *http.Request) {
 	idsParam := r.URL.Query().Get("ids")
 	if idsParam != "" {
-		wantIDs := strings.Split(idsParam, ",")
+		wantIDs := s.dropProtectedWantIDs(strings.Split(idsParam, ","))
+		if len(wantIDs) == 0 {
+			s.JSONError(w, r, http.StatusForbidden, "System wants cannot be deleted", "")
+			return
+		}
 		if err := s.globalBuilder.QueueWantDelete(wantIDs); err != nil {
 			s.JSONError(w, r, http.StatusInternalServerError, "Batch deletion failed", err.Error())
 			return
@@ -582,6 +631,11 @@ func (s *Server) startWant(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSingleLifecycle(w http.ResponseWriter, r *http.Request, wantID, operation string) {
+	if operation == "suspend" && s.isProtectedSystemWant(wantID) {
+		s.JSONError(w, r, http.StatusForbidden, "System wants cannot be suspended", "")
+		return
+	}
+
 	var err error
 	switch operation {
 	case "suspend":
@@ -635,6 +689,14 @@ func (s *Server) handleBatchOperation(w http.ResponseWriter, r *http.Request, op
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
+	}
+
+	if operation == "delete" || operation == "suspend" {
+		body.IDs = s.dropProtectedWantIDs(body.IDs)
+		if len(body.IDs) == 0 {
+			s.JSONError(w, r, http.StatusForbidden, "System wants cannot be "+operation+"d", "")
+			return
+		}
 	}
 
 	var err error

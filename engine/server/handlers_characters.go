@@ -130,6 +130,27 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
+// setCharacterAuraCardWant sets (or, with an empty wantId, clears) the want a
+// character has bookmarked as their aura card.
+// Body: { "wantId": "want-id" }
+func (s *Server) setCharacterAuraCardWant(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		WantID string `json:"wantId"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	c, ok := mywant.SetCharacterAuraCardWant(id, req.WantID)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
 // setCharacterDesign sets the tile/aura design-plugin ids for a character.
 // Body: { "tile_design": "forest", "aura_design": "forest" } (either may be "" = inherit).
 func (s *Server) setCharacterDesign(w http.ResponseWriter, r *http.Request) {

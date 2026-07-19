@@ -285,6 +285,7 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/aura-defaults", s.setCharacterAuraDefault).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}/aura-card", s.setCharacterAuraCardWant).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/design", s.setCharacterDesign).Methods("PUT", "OPTIONS")
 
 	// Web Want endpoints — create and launch custom web want types
