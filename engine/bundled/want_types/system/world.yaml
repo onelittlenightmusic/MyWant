@@ -1,0 +1,55 @@
+wantType:
+  metadata:
+    name: world
+    title: World
+    description: |
+      A canvas-grid portal to a named world (a saved snapshot of the whole
+      want set under ~/.mywant/worlds/<world_name>.yaml — see
+      GET/POST /api/v1/worlds). Interacting with it (the "Open World" button
+      on its canvas card) switches the running server to that world:
+      auto-saves the currently-open world, clears the current wants, and
+      loads the target world's saved wants.
+
+      spawn_x/spawn_y (optional) place CursorMan at that grid position right
+      after the switch completes.
+
+      Purely a canvas-grid fixture: it is not shown in the want dashboard's
+      card list (labels.list-visible: "false").
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "Milestone"
+      list-visible: "false"
+
+  parameters:
+    - name: world_name
+      description: Name of the world this portal opens (a ~/.mywant/worlds/<world_name>.yaml snapshot)
+      type: string
+      required: true
+    - name: spawn_x
+      description: Grid x-coordinate to place CursorMan at after switching to this world
+      type: int
+      required: false
+      default: 0
+    - name: spawn_y
+      description: Grid y-coordinate to place CursorMan at after switching to this world
+      type: int
+      required: false
+      default: 0
+
+  examples:
+    - title: Portal to another room
+      description: Placed at the edge of a room; opens "room2" and places CursorMan at (2, 2) there.
+      want:
+        metadata:
+          name: to-room2
+          type: world
+          labels:
+            mywant.io/canvas-x: "6"
+            mywant.io/canvas-y: "2"
+        spec:
+          params:
+            world_name: room2
+            spawn_x: 2
+            spawn_y: 2

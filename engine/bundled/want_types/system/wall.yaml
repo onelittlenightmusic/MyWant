@@ -1,0 +1,37 @@
+wantType:
+  metadata:
+    name: wall
+    title: Wall
+    description: |
+      A static, impassable obstacle placed on the canvas grid. CursorMan cannot
+      move onto a cell occupied by a wall — it blocks movement in both discrete
+      (keyboard/D-pad) and analog-stick drag navigation.
+
+      Purely a canvas-grid fixture: it has no runtime behavior and is not shown
+      in the want dashboard's card list (labels.list-visible: "false").
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "BrickWall"
+      category-icon: "BrickWall"
+      list-visible: "false"
+
+  parameters:
+    - name: _dummy
+      description: Internal dummy parameter
+      type: string
+      required: false
+
+  examples:
+    - title: Place a wall
+      description: A single-cell wall blocking passage at a fixed canvas position.
+      want:
+        metadata:
+          name: wall-1
+          type: wall
+          labels:
+            mywant.io/canvas-x: "3"
+            mywant.io/canvas-y: "2"
+        spec:
+          params: {}

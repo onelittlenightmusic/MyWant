@@ -18,12 +18,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
-	includeSystemWants := false
-	if includeSystemWantsStr := r.URL.Query().Get("includeSystemWants"); includeSystemWantsStr != "" {
-		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
-	}
-
+// exportableWants builds fresh, detached *Want copies (metadata/spec/status/
+// history/explicit-state) of every currently-running want, stably sorted by
+// orderKey then ID. System wants (gui_state etc.) are excluded unless
+// includeSystemWants is true. Shared by exportWants and the world-snapshot
+// save logic in handlers_worlds.go.
+func (s *Server) exportableWants(includeSystemWants bool) []*mywant.Want {
 	wantsByID := make(map[string]*mywant.Want)
 
 	if s.globalBuilder != nil {
@@ -64,6 +64,17 @@ func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
 		}
 		return allWants[i].Metadata.ID < allWants[j].Metadata.ID
 	})
+
+	return allWants
+}
+
+func (s *Server) exportWants(w http.ResponseWriter, r *http.Request) {
+	includeSystemWants := false
+	if includeSystemWantsStr := r.URL.Query().Get("includeSystemWants"); includeSystemWantsStr != "" {
+		includeSystemWants = strings.ToLower(includeSystemWantsStr) == "true"
+	}
+
+	allWants := s.exportableWants(includeSystemWants)
 
 	yamlData, err := yaml.Marshal(allWants)
 	if err != nil {
@@ -134,6 +145,15 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	var req struct{ Key, Value string }
 	json.NewDecoder(r.Body).Decode(&req)
 
+	// Game mode locks canvas tile positions — reject only if the value
+	// actually changes (mirrors the guard in updateWant).
+	if s.config.InteractionMode == "game" && (req.Key == canvasLabelX || req.Key == canvasLabelY) {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found && want.Metadata.Labels[req.Key] != req.Value {
+			http.Error(w, "Tile movement is disabled in game mode", http.StatusConflict)
+			return
+		}
+	}
+
 	if err := s.globalBuilder.QueueWantAddLabel(wantID, req.Key, req.Value); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
@@ -144,7 +164,16 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) removeLabelFromWant(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	if err := s.globalBuilder.QueueWantRemoveLabel(vars["id"], vars["key"]); err != nil {
+	key := vars["key"]
+
+	// Game mode locks canvas tile positions — removing the x/y label would
+	// reset placement back to auto-layout, so block it same as a move.
+	if s.config.InteractionMode == "game" && (key == canvasLabelX || key == canvasLabelY) {
+		http.Error(w, "Tile movement is disabled in game mode", http.StatusConflict)
+		return
+	}
+
+	if err := s.globalBuilder.QueueWantRemoveLabel(vars["id"], key); err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}

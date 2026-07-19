@@ -1,0 +1,133 @@
+wantType:
+  metadata:
+    name: door
+    title: Door
+    description: |
+      A canvas-grid obstacle that conditionally blocks CursorMan, depending on
+      its "locked" state: locked (true) behaves like a wall — CursorMan cannot
+      move onto its cell; unlocked (false) is passable, like open floor.
+
+      Purely a canvas-grid fixture: it is not shown in the want dashboard's
+      card list (labels.list-visible: "false"). Toggle "locked" via the
+      canvas tile's detail sidebar, `mywant state set`, or another want/agent
+      (e.g. a key-triggered unlock).
+
+      Optionally syncs "locked" live from a skills-rpg rpg-server door: set
+      rpg_stage_id/rpg_door_id to poll GET http://127.0.0.1:7100/api/v1/state
+      every 2s (via monitor_mrs_agent + ~/.mywant/custom-types/mywant-door-rpg-sync/main.py)
+      and mirror stages.<rpg_stage_id>.doors.<rpg_door_id>.locked. Left unset,
+      this door behaves exactly like a plain manually-toggled door — the sync
+      script no-ops and never overwrites "locked" when the target IDs are empty.
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "DoorClosed"
+      list-visible: "false"
+
+  parameters:
+    - name: locked
+      description: Whether the door starts locked (blocks CursorMan) or unlocked (passable)
+      type: bool
+      required: false
+      default: true
+    - name: rpg_stage_id
+      description: skills-rpg stage id to sync "locked" from (e.g. "stage1"). Leave unset for a plain, unsynced door.
+      type: string
+      required: false
+    - name: rpg_door_id
+      description: skills-rpg door id within rpg_stage_id (e.g. "door1"). Leave unset for a plain, unsynced door.
+      type: string
+      required: false
+
+  state:
+    - name: locked
+      description: Whether the door currently blocks CursorMan passage. Overwritten by the rpg-server sync poll while rpg_stage_id/rpg_door_id are set (see fetchFrom below).
+      type: bool
+      label: current
+      persistent: true
+      initialValue: true
+      fetchFrom: mrs_raw_output
+      onFetchData: "locked"
+    - name: rpg_stage_id
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: rpg_door_id
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_path
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_json_arg_template
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_json_arg
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: skill_timeout_seconds
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 5
+    - name: skill_poll_interval_ms
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 2000
+    - name: mrs_raw_output
+      type: object
+      label: current
+      persistent: false
+      initialValue: null
+
+  onInitialize:
+    current:
+      rpg_stage_id: '${rpg_stage_id}'
+      rpg_door_id: '${rpg_door_id}'
+      skill_path: "~/.mywant/custom-types/mywant-door-rpg-sync/main.py"
+      skill_json_arg_template: '{"rpg_stage_id":"%{rpg_stage_id}","rpg_door_id":"%{rpg_door_id}"}'
+    goal:
+      skill_timeout_seconds: 5
+      skill_poll_interval_ms: 2000
+
+  requires:
+    - monitor_mrs_agent
+
+  examples:
+    - title: Locked door blocking a corridor
+      description: A locked door at a fixed canvas position; set locked to false to let CursorMan through.
+      want:
+        metadata:
+          name: door-1
+          type: door
+          labels:
+            mywant.io/canvas-x: "5"
+            mywant.io/canvas-y: "2"
+        spec:
+          params:
+            locked: true
+
+    - title: Door synced with a skills-rpg stage
+      description: Mirrors stages.stage1.doors.door1's "locked" from a running rpg-server (port 7100).
+      want:
+        metadata:
+          name: door-stage1-door1
+          type: door
+          labels:
+            mywant.io/canvas-x: "5"
+            mywant.io/canvas-y: "2"
+        spec:
+          params:
+            locked: true
+            rpg_stage_id: stage1
+            rpg_door_id: door1

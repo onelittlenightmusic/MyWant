@@ -60,6 +60,13 @@ wantType:
       label: current
       persistent: true
       initialValue: ""
+    - name: recent_entries
+      description: >-
+        Most-recently-flushed changes (newest first, capped at 5) — a rolling
+        window for the GUI want card. The full history stays in work.log.
+      type: array
+      label: current
+      persistent: true
 
   examples:
     - description: Log every change to a location want's exposed "city" field, flushed every 5 minutes

@@ -115,7 +115,9 @@ func geminiRequester(ctx context.Context, want *Want) error {
 	want.SetCurrent("last_request_at", time.Now().Unix())
 
 	cmd := exec.CommandContext(ctx, "gemini", args...)
-	cmd.Env = os.Environ()
+	// See sanitizedSubprocessEnv (agent_claude_code.go) — strips vars that
+	// indicate a nested Claude Code / API-key auth context before exec.
+	cmd.Env = sanitizedSubprocessEnv()
 	if workingDir := GetGoal(want, "working_dir", ""); workingDir != "" {
 		cmd.Dir = workingDir
 	}

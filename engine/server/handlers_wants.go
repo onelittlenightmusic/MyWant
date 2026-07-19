@@ -500,6 +500,17 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		updatedWant.Spec.FinalResultField = foundWant.Spec.FinalResultField
 	}
 
+	// Game mode locks canvas tile positions — reject only if the x/y label
+	// values actually changed (many unrelated PUTs, e.g. `params set`,
+	// re-send the untouched canvas-x/-y labels as part of the full metadata).
+	if s.config.InteractionMode == "game" {
+		if foundWant.Metadata.Labels[canvasLabelX] != updatedWant.Metadata.Labels[canvasLabelX] ||
+			foundWant.Metadata.Labels[canvasLabelY] != updatedWant.Metadata.Labels[canvasLabelY] {
+			s.JSONError(w, r, http.StatusConflict, "Tile movement is disabled in game mode", "")
+			return
+		}
+	}
+
 	if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
 		s.globalBuilder.TriggerSave()

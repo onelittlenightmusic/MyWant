@@ -2,20 +2,46 @@ package mywant
 
 // want_param.go — typed parameter accessors (GetIntParam, GetStringParam, etc.)
 
-// GetParameter returns the raw parameter value and an existence flag.
-func (n *Want) GetParameter(paramName string) (any, bool) {
-	n.metadataMutex.RLock()
-	defer n.metadataMutex.RUnlock()
+// setResolvedParam records the runtime-resolved value of a spec.params entry
+// that was declared as a {fromGlobalParam: key} reference — see the
+// resolvedParams field doc comment on Want for why this is kept separate from
+// Spec.Params.
+func (n *Want) setResolvedParam(key string, value any) {
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	if n.resolvedParams == nil {
+		n.resolvedParams = make(map[string]any)
+	}
+	n.resolvedParams[key] = value
+}
+
+// getRawParamLocked returns the effective raw value for key: the resolved
+// value if this param was a {fromGlobalParam: key} reference, otherwise
+// whatever is in Spec.Params. Caller must hold metadataMutex (read or write).
+func (n *Want) getRawParamLocked(key string) (any, bool) {
+	if n.resolvedParams != nil {
+		if v, ok := n.resolvedParams[key]; ok {
+			return v, true
+		}
+	}
 	if n.Spec.Params == nil {
 		return nil, false
 	}
-	value, exists := n.Spec.Params[paramName]
+	value, exists := n.Spec.Params[key]
 	return value, exists
+}
+
+// GetParameter returns the effective parameter value (resolved, if the param
+// is a {fromGlobalParam: key} reference) and an existence flag.
+func (n *Want) GetParameter(paramName string) (any, bool) {
+	n.metadataMutex.RLock()
+	defer n.metadataMutex.RUnlock()
+	return n.getRawParamLocked(paramName)
 }
 
 func (n *Want) GetIntParam(key string, defaultValue int) int {
 	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
+	value, ok := n.getRawParamLocked(key)
 	n.metadataMutex.RUnlock()
 	if ok {
 		if intVal, ok := value.(int); ok {
@@ -29,7 +55,7 @@ func (n *Want) GetIntParam(key string, defaultValue int) int {
 
 func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
+	value, ok := n.getRawParamLocked(key)
 	n.metadataMutex.RUnlock()
 	if ok {
 		if floatVal, ok := value.(float64); ok {
@@ -43,7 +69,7 @@ func (n *Want) GetFloatParam(key string, defaultValue float64) float64 {
 
 func (n *Want) GetStringParam(key string, defaultValue string) string {
 	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
+	value, ok := n.getRawParamLocked(key)
 	n.metadataMutex.RUnlock()
 	if ok {
 		if strVal, ok := value.(string); ok {
@@ -58,7 +84,7 @@ func (n *Want) GetStringParam(key string, defaultValue string) string {
 // unmarshaling. Returns nil if the key is absent or not a recognizable slice.
 func (n *Want) GetStringSliceParam(key string) []string {
 	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
+	value, ok := n.getRawParamLocked(key)
 	n.metadataMutex.RUnlock()
 	if !ok {
 		return nil
@@ -81,7 +107,7 @@ func (n *Want) GetStringSliceParam(key string) []string {
 
 func (n *Want) GetBoolParam(key string, defaultValue bool) bool {
 	n.metadataMutex.RLock()
-	value, ok := n.Spec.Params[key]
+	value, ok := n.getRawParamLocked(key)
 	n.metadataMutex.RUnlock()
 	if ok {
 		if boolVal, ok := value.(bool); ok {

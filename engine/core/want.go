@@ -308,6 +308,16 @@ type Want struct {
 	// Metadata protection
 	metadataMutex sync.RWMutex `json:"-" yaml:"-"`
 
+	// resolvedParams holds the runtime-resolved values of spec.params entries
+	// that were declared as {fromGlobalParam: key} references. Populated by
+	// SetWantTypeDefinition; deliberately NOT written back into Spec.Params so
+	// the reference form survives persistence (writeStatsToMemory serializes
+	// Spec.Params verbatim) — otherwise the reference gets permanently baked
+	// into a literal value on the first state-file write, silently severing
+	// the want from future changes to the global parameter. Param accessors
+	// (GetStringParam etc.) check this before falling back to Spec.Params.
+	resolvedParams map[string]any `json:"-" yaml:"-"`
+
 	// Retry mechanism for failed phases
 	PhaseRetryCount map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`
@@ -1682,16 +1692,19 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 		n.Spec.Params = make(map[string]any)
 	}
 
-	// Priority 2: resolve any {fromGlobalParam: key} entries in spec.params in-place.
+	// Priority 2: resolve any {fromGlobalParam: key} entries. Resolved values go
+	// into n.resolvedParams, NOT n.Spec.Params — see the resolvedParams field
+	// doc comment for why mutating Spec.Params here is unsafe.
 	for k, v := range n.Spec.Params {
 		if ref, ok := v.(map[string]any); ok {
 			if key, ok := ref["fromGlobalParam"].(string); ok && key != "" {
 				if resolved, ok := GetGlobalParameter(key); ok {
-					n.Spec.Params[k] = resolved
-				} else {
-					// Key exists but no value yet — remove so lower priorities can fill
-					delete(n.Spec.Params, k)
+					n.setResolvedParam(k, resolved)
 				}
+				// else: leave the reference in Spec.Params untouched — it will
+				// resolve as soon as the global parameter exists (next
+				// reconcile/restart) instead of permanently falling back to a
+				// lower-priority default.
 			}
 		}
 	}

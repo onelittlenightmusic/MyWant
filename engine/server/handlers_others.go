@@ -70,6 +70,7 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.CanvasDPad = newConfig.CanvasDPad
 	s.config.CanvasWeatherEffect = newConfig.CanvasWeatherEffect
 	s.config.CanvasDesign = newConfig.CanvasDesign
+	s.config.InteractionMode = newConfig.InteractionMode
 	s.config.WebInspectorLANHost = newConfig.WebInspectorLANHost
 	s.config.WebInspectorCACertPath = newConfig.WebInspectorCACertPath
 	s.config.WebInspectorExternalHost = newConfig.WebInspectorExternalHost

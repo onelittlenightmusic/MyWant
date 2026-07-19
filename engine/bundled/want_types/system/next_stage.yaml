@@ -1,0 +1,135 @@
+wantType:
+  metadata:
+    name: next_stage
+    title: Next Stage
+    description: |
+      A canvas-grid portal that advances a running skills-rpg (rpg-server,
+      port 7100, no auth) to a specific stage and warps CursorMan to
+      target_x/target_y (normally a `startpoint` want's position in that next
+      stage) on this same mywant canvas.
+
+      Pressing the "Next Stage" button (on this want's canvas card) writes
+      rpg_next_stage_id into the "pending_jump" state field; a
+      monitor_mrs_agent poll (~1s) notices it, calls rpg-server's
+      POST /api/v1/debug/jump, and clears pending_jump back to "" once done
+      (see ~/.mywant/custom-types/mywant-next-stage-trigger/main.py). The
+      canvas-side CursorMan warp fires immediately on click — it does not
+      wait for rpg-server's jump to actually complete, so the two are only
+      loosely (~1s) synchronized.
+
+      Purely a canvas-grid fixture: it is not shown in the want dashboard's
+      card list (labels.list-visible: "false").
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "LogIn"
+      list-visible: "false"
+
+  parameters:
+    - name: rpg_next_stage_id
+      description: skills-rpg stage id to jump to (e.g. "stage2")
+      type: string
+      required: true
+    - name: target_x
+      description: Grid x-coordinate to place CursorMan at after triggering (normally the next stage's startpoint)
+      type: int
+      required: false
+      default: 0
+    - name: target_y
+      description: Grid y-coordinate to place CursorMan at after triggering (normally the next stage's startpoint)
+      type: int
+      required: false
+      default: 0
+
+  state:
+    - name: rpg_next_stage_id
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: target_x
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: target_y
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: pending_jump
+      description: Set (to rpg_next_stage_id) by the canvas "Next Stage" button; cleared back to "" once the poll has called rpg-server's debug/jump. Empty = idle.
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "pending_jump"
+    - name: last_jump_result
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      fetchFrom: mrs_raw_output
+      onFetchData: "last_jump_result"
+    - name: skill_path
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_json_arg_template
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_json_arg
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: skill_timeout_seconds
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 5
+    - name: skill_poll_interval_ms
+      type: int
+      label: goal
+      persistent: true
+      initialValue: 1000
+    - name: mrs_raw_output
+      type: object
+      label: current
+      persistent: false
+      initialValue: null
+
+  onInitialize:
+    current:
+      rpg_next_stage_id: '${rpg_next_stage_id}'
+      target_x: '${target_x}'
+      target_y: '${target_y}'
+      skill_path: "~/.mywant/custom-types/mywant-next-stage-trigger/main.py"
+      skill_json_arg_template: '{"pending_jump":"%{pending_jump}"}'
+    goal:
+      skill_timeout_seconds: 5
+      skill_poll_interval_ms: 1000
+
+  requires:
+    - monitor_mrs_agent
+
+  examples:
+    - title: Portal to stage2, landing at its start point
+      description: Advances rpg-server to stage2 and warps CursorMan to (8, 12) — wherever stage2's startpoint want sits.
+      want:
+        metadata:
+          name: stage1-to-stage2
+          type: next_stage
+          labels:
+            mywant.io/canvas-x: "4"
+            mywant.io/canvas-y: "2"
+        spec:
+          params:
+            rpg_next_stage_id: stage2
+            target_x: 8
+            target_y: 12

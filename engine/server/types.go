@@ -25,6 +25,14 @@ type Config struct {
 	CanvasDPad           *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
 	CanvasWeatherEffect  string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
 	CanvasDesign         string `json:"canvas_design,omitempty" yaml:"canvas_design,omitempty"`
+	// InteractionMode is "edit" (default, canvas tiles draggable) or "game"
+	// (tile positions locked — see the game-mode barrier in updateWant and
+	// the label-mutation endpoints in handlers_modifications.go).
+	InteractionMode string `json:"interaction_mode,omitempty" yaml:"interaction_mode,omitempty"`
+	// CurrentWorld is the name of the currently-open world snapshot
+	// (~/.mywant/worlds/<name>.yaml) — see handlers_worlds.go. Empty means no
+	// world has been opened yet (ad-hoc wants, not yet snapshotted).
+	CurrentWorld         string `json:"current_world,omitempty" yaml:"current_world,omitempty"`
 	ActiveLocationDevice string `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
 	LocationWantId       string `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
 	// WebInspectorLANHost is the mywant server's LAN-reachable address (host

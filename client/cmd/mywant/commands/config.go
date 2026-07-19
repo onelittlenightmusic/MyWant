@@ -36,6 +36,8 @@ type MyWantConfig struct {
 	GoalThinker          GoalThinkerSettings `yaml:"goal_thinker"`           // Goal thinker settings
 	ActiveLocationDevice string              `yaml:"active_location_device"` // ID of the device sending location data
 	LocationWantId       string              `yaml:"location_want_id"`       // Want ID of the active location want
+	// CurrentWorld is the name of the currently-open world snapshot (~/.mywant/worlds/<name>.yaml).
+	CurrentWorld string `yaml:"current_world"`
 	// WebInspectorLANHost: this machine's LAN-reachable address (no scheme/
 	// port), used to build phone-usable Web Inspector URLs instead of
 	// "localhost" (meaningless to a phone on the same Wi-Fi).

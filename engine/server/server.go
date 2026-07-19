@@ -477,6 +477,9 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.CanvasDesign != "" {
 		fullConfig["canvas_design"] = s.config.CanvasDesign
 	}
+	if s.config.CurrentWorld != "" {
+		fullConfig["current_world"] = s.config.CurrentWorld
+	}
 	// Device settings — always write (empty string clears the field)
 	fullConfig["active_location_device"] = s.config.ActiveLocationDevice
 	fullConfig["location_want_id"] = s.config.LocationWantId

@@ -95,6 +95,12 @@ func (s *Server) setupRoutes() {
 	recipes.HandleFunc("/{id}/examples", s.getRecipeExamples).Methods("GET")
 	recipes.HandleFunc("/{id}/examples", s.handleOptions).Methods("OPTIONS")
 
+	// Worlds — named snapshots of the current want set (~/.mywant/worlds/<name>.yaml)
+	worlds := api.PathPrefix("/worlds").Subrouter()
+	worlds.HandleFunc("", s.listWorlds).Methods("GET", "OPTIONS")
+	worlds.HandleFunc("/{name}/open", s.openWorld).Methods("POST", "OPTIONS")
+	worlds.HandleFunc("/{name}/save", s.saveWorld).Methods("POST", "OPTIONS")
+
 	// Want Type endpoints
 	wantTypes := api.PathPrefix("/want-types").Subrouter()
 	wantTypes.HandleFunc("", s.listWantTypes).Methods("GET")

@@ -159,6 +159,7 @@ var StartCmd = &cobra.Command{
 			GoalThinker:              server.GoalThinkerConfig{UseStub: config.GoalThinker.UseStub},
 			ActiveLocationDevice:     config.ActiveLocationDevice,
 			LocationWantId:           config.LocationWantId,
+			CurrentWorld:             config.CurrentWorld,
 			WebInspectorLANHost:      config.WebInspectorLANHost,
 			WebInspectorCACertPath:   config.WebInspectorCACertPath,
 			WebInspectorExternalHost: config.WebInspectorExternalHost,

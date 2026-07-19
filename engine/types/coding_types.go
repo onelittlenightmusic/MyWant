@@ -134,6 +134,20 @@ func (w *CodingWant) Progress() {
 			w.SetCurrent("phase", CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
+
+	case CCPhaseRequesting:
+		// Reaching this phase at the *start* of a Progress() call (rather
+		// than passing through it synchronously within the TriggerReady
+		// case above, in the same call) means a previous request was
+		// interrupted mid-flight — most likely the mywant server itself was
+		// restarted while ExecuteAgents() was still running. There is no
+		// live agent still processing it, and nothing else here ever
+		// revisits this phase, so without this case the want would stay
+		// stuck in "requesting" forever, silently ignoring all future
+		// trigger messages. Recover via the existing error/retry path.
+		w.StoreLog("[CODING] Found stale 'requesting' phase (likely interrupted by a server restart) — recovering")
+		w.SetCurrent("phase", CCPhaseError)
+		w.SetCurrent("last_error", "request was interrupted (e.g. server restart) before completing")
 	}
 }
 

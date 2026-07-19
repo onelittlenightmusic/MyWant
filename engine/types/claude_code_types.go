@@ -149,6 +149,16 @@ func (w *ClaudeCodeThreadWant) Progress() {
 			w.SetCurrent("phase", CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
+
+	case CCPhaseRequesting:
+		// See the identical case in coding_types.go's CodingWant.Progress —
+		// reaching this phase at the start of a Progress() call means a
+		// previous request was interrupted mid-flight (e.g. a server
+		// restart during ExecuteAgents()) and would otherwise stay stuck
+		// here forever. Recover via the existing error/retry path.
+		w.StoreLog("[CLAUDE_CODE] Found stale 'requesting' phase (likely interrupted by a server restart) — recovering")
+		w.SetCurrent("phase", CCPhaseError)
+		w.SetCurrent("last_error", "request was interrupted (e.g. server restart) before completing")
 	}
 }
 

@@ -31,6 +31,21 @@ const workLogDetectInterval = 1 * time.Second
 // to parse.
 const defaultFlushInterval = 5 * time.Minute
 
+// recentEntriesLimit caps how many of the most-recently-flushed changes are
+// kept in state.recent_entries for the GUI want card to show — a rolling
+// window, not the full history (that lives in work.log itself).
+const recentEntriesLimit = 5
+
+// workLogRecentEntry is one flushed change as surfaced in state.recent_entries
+// (newest first) — a trimmed-down view of workLogChange for GUI display.
+type workLogRecentEntry struct {
+	Ts            string `json:"ts"`
+	Field         string `json:"field"`
+	Event         string `json:"event"`
+	PreviousValue any    `json:"previous_value"`
+	NewValue      any    `json:"new_value"`
+}
+
 // workLogChange is one detected field change, buffered until the next flush.
 type workLogChange struct {
 	Ts        time.Time
@@ -46,10 +61,11 @@ type workLogChange struct {
 // want type's Locals) — restarting a want because its config changed is
 // expected behavior, not something work_log needs to survive.
 type WorkLogLocals struct {
-	mu         sync.Mutex
-	lastValues map[string]any
-	pending    []workLogChange
-	lastFlush  time.Time
+	mu            sync.Mutex
+	lastValues    map[string]any
+	pending       []workLogChange
+	lastFlush     time.Time
+	recentEntries []workLogRecentEntry // newest first, capped at recentEntriesLimit
 }
 
 // WorkLogWant watches state fields imported via spec.imports (e.g. a
@@ -70,6 +86,7 @@ func (w *WorkLogWant) Initialize() {
 	locals.lastValues = map[string]any{}
 	locals.pending = nil
 	locals.lastFlush = time.Now()
+	locals.recentEntries = nil
 	locals.mu.Unlock()
 
 	flushInterval := w.GetStringParam("flush_interval", "5m")
@@ -78,6 +95,7 @@ func (w *WorkLogWant) Initialize() {
 	w.SetCurrent("pending_count", 0)
 	w.SetCurrent("total_logged", 0)
 	w.SetCurrent("last_flush_at", "")
+	w.SetCurrent("recent_entries", []workLogRecentEntry{})
 
 	// Register imported local keys as explicit state so their raw values show
 	// up in the GUI's Current section instead of Hidden State (same fix as
@@ -204,6 +222,32 @@ func workLogAgentPoll(_ context.Context, want *Want) (bool, error) {
 	total, _ := want.GetStateInt("total_logged", 0)
 	want.SetCurrent("total_logged", total+len(toFlush))
 	want.SetCurrent("last_flush_at", now.UTC().Format(time.RFC3339Nano))
+
+	// Prepend this flush's changes (newest first, latest change last within a
+	// single flush goes first) and trim to the rolling display window — the
+	// full history stays in work.log itself, this is just for the want card.
+	locals.mu.Lock()
+	for i := len(toFlush) - 1; i >= 0; i-- {
+		change := toFlush[i]
+		event := "change"
+		if change.Initial {
+			event = "initial"
+		}
+		locals.recentEntries = append([]workLogRecentEntry{{
+			Ts:            change.Ts.UTC().Format(time.RFC3339Nano),
+			Field:         change.Field,
+			Event:         event,
+			PreviousValue: change.Previous,
+			NewValue:      change.New,
+		}}, locals.recentEntries...)
+	}
+	if len(locals.recentEntries) > recentEntriesLimit {
+		locals.recentEntries = locals.recentEntries[:recentEntriesLimit]
+	}
+	recentEntries := append([]workLogRecentEntry(nil), locals.recentEntries...)
+	locals.mu.Unlock()
+
+	want.SetCurrent("recent_entries", recentEntries)
 
 	return false, nil
 }

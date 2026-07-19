@@ -1,0 +1,40 @@
+wantType:
+  metadata:
+    name: startpoint
+    title: Start Point
+    description: |
+      A canvas-grid marker for where CursorMan lands when entering this area
+      (typically the first room of a stage). Purely positional — other wants
+      (e.g. `next_stage`) reference a start point's coordinates as their
+      teleport target rather than looking it up at runtime, so moving a
+      start point does not retroactively repoint anything that already
+      references its old position.
+
+      Purely a canvas-grid fixture: it is not shown in the want dashboard's
+      card list (labels.list-visible: "false").
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "Flag"
+      list-visible: "false"
+
+  parameters:
+    - name: label
+      description: Optional human-readable name for this start point (e.g. "stage2 entrance")
+      type: string
+      required: false
+
+  examples:
+    - title: Stage entrance marker
+      description: Marks where CursorMan should land when arriving at this stage.
+      want:
+        metadata:
+          name: stage2-start
+          type: startpoint
+          labels:
+            mywant.io/canvas-x: "8"
+            mywant.io/canvas-y: "12"
+        spec:
+          params:
+            label: "stage2 entrance"

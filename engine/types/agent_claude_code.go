@@ -232,6 +232,27 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 // DoAgent: Execute Claude Code CLI request
 // ---------------------------------------------------------------------------
 
+// sanitizedSubprocessEnv returns a copy of mywant's own process environment
+// with vars stripped that indicate a nested Claude Code / API-key auth
+// context (ANTHROPIC_API_KEY, CLAUDECODE, CLAUDE_CODE_*). Provider CLIs
+// (claude, gemini) inherit whatever shell mywant itself happened to be
+// launched from — if that shell is itself a live Claude Code session (or has
+// ANTHROPIC_API_KEY set for unrelated reasons), the claude CLI detects it and
+// disables claude.ai-connector auth ("claude.ai connectors are disabled
+// because ANTHROPIC_API_KEY or another auth source is set"), breaking the
+// `coding` want type regardless of how mywant was started.
+func sanitizedSubprocessEnv() []string {
+	out := make([]string, 0, len(os.Environ()))
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if name == "ANTHROPIC_API_KEY" || name == "CLAUDECODE" || strings.HasPrefix(name, "CLAUDE_CODE_") {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
+}
+
 func claudeCodeRequester(ctx context.Context, want *Want) error {
 	if GetGoal(want, "provider", "claude_code") == "gemini" {
 		return geminiRequester(ctx, want)
@@ -286,7 +307,7 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 	want.SetCurrent("last_request_at", time.Now().Unix())
 
 	cmd := exec.CommandContext(ctx, "claude", args...)
-	cmd.Env = os.Environ()
+	cmd.Env = sanitizedSubprocessEnv()
 	if workingDir := GetGoal(want, "working_dir", ""); workingDir != "" {
 		cmd.Dir = workingDir
 	}
