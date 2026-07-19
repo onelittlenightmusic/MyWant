@@ -24,11 +24,30 @@ jobs:
           go-version: 'stable'
           cache: true
 
-      - name: Run GoReleaser
+      - name: Install GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          args: release --clean
+          install-only: true
+
+      - name: Run GoReleaser
+        # mywant / mywant-gui / mywant-rpg all push their Homebrew formula to
+        # the same onelittlenightmusic/homebrew-mywant tap. If two releases
+        # land around the same time, whichever pushes second can lose an
+        # optimistic-lock race on the tap repo (409) even though the GitHub
+        # release itself published fine. Retry a few times with backoff so
+        # the second attempt runs after the other release's tap commit has
+        # landed. replace_existing_artifacts (.goreleaser.yaml) makes re-runs
+        # safe even though the previous attempt already uploaded assets.
+        run: |
+          for attempt in 1 2 3; do
+            if goreleaser release --clean; then
+              exit 0
+            fi
+            echo "GoReleaser failed (attempt $attempt/3), retrying after backoff..."
+            sleep $((attempt * 20))
+          done
+          exit 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
