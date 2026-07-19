@@ -56,10 +56,11 @@ func (c *Client) GetWant(id string, connectivityMetadata bool) (*Want, error) {
 	return &result, nil
 }
 
-// CreateWant creates a new want execution from config
+// CreateWant creates a new want execution from config.
+// The server expects a bare array of wants (Config wrapper was removed in v0.0.46).
 func (c *Client) CreateWant(config Config) (*CreateWantResponse, error) {
 	var result CreateWantResponse
-	err := c.Request("POST", "/api/v1/wants", config, &result)
+	err := c.Request("POST", "/api/v1/wants", config.Wants, &result)
 	if err != nil {
 		return nil, err
 	}
