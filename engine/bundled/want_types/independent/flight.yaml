@@ -19,6 +19,7 @@ wantType:
     pattern: independent
     labels:
       child-role: doer
+      type-tone-color: "#5b8fce"
   finalResultField: reservation_name
   parameters:
   - name: flight_type

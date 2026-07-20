@@ -16,6 +16,7 @@ wantType:
       type-icon: "BrickWall"
       category-icon: "BrickWall"
       list-visible: "false"
+      type-tone-color: "#7a5230"
 
   parameters:
     - name: _dummy

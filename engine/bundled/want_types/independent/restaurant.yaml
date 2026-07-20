@@ -8,6 +8,7 @@ wantType:
     pattern: independent
     labels:
       child-role: doer
+      type-tone-color: "#a05240"
   finalResultField: reservation_name
   parameters:
   - name: restaurant_type

@@ -21,6 +21,7 @@ wantType:
     pattern: independent
     labels:
       child-role: doer
+      type-tone-color: "#c8a035"
   finalResultField: reservation_name
   parameters:
   - name: buffet_type

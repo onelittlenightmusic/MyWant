@@ -18,6 +18,8 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: sink
+    labels:
+      type-tone-color: "#2d8a7a"
   finalResultField: filtered
   parameters:
   - name: min_value

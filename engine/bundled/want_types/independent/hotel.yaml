@@ -21,6 +21,7 @@ wantType:
     pattern: independent
     labels:
       child-role: doer
+      type-tone-color: "#8b7355"
   finalResultField: reservation_name
   parameters:
   - name: hotel_type

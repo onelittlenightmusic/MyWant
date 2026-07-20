@@ -100,6 +100,8 @@ func (s *Server) setupRoutes() {
 	worlds.HandleFunc("", s.listWorlds).Methods("GET", "OPTIONS")
 	worlds.HandleFunc("/{name}/open", s.openWorld).Methods("POST", "OPTIONS")
 	worlds.HandleFunc("/{name}/save", s.saveWorld).Methods("POST", "OPTIONS")
+	worlds.HandleFunc("/{name}/thumbnail", s.serveWorldThumbnail).Methods("GET")
+	worlds.HandleFunc("/{name}/thumbnail", s.uploadWorldThumbnail).Methods("POST", "OPTIONS")
 
 	// Want Type endpoints
 	wantTypes := api.PathPrefix("/want-types").Subrouter()
@@ -198,6 +200,7 @@ func (s *Server) setupRoutes() {
 	// Config endpoint
 	api.HandleFunc("/config", s.getConfig).Methods("GET", "OPTIONS")
 	api.HandleFunc("/config", s.updateConfig).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/config", s.patchConfig).Methods("PATCH", "OPTIONS")
 	// Canvas background image upload/serve/delete
 	api.HandleFunc("/config/canvas-bg", s.serveCanvasBg).Methods("GET")
 	api.HandleFunc("/config/canvas-bg", s.uploadCanvasBg).Methods("POST", "OPTIONS")

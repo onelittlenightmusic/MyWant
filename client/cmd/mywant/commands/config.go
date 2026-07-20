@@ -30,7 +30,18 @@ type MyWantConfig struct {
 	HeaderPosition       string              `yaml:"header_position"`        // top or bottom
 	ColorMode            string              `yaml:"color_mode"`             // light, dark, system
 	CardHeight           string              `yaml:"card_height"`            // sm, md, lg
+	CardOpacity          *float64            `yaml:"card_opacity"`           // 0.0–1.0 card background layer opacity
 	SoundEnabled         *bool               `yaml:"sound_enabled"`          // true (default) or false
+	// Appearance settings edited from the GUI Settings modal. These are saved
+	// to config.yaml by the server, so they must be read back here too —
+	// otherwise they survive on disk but not across a server restart.
+	IconFont            string `yaml:"icon_font"`             // lucide, lucide-thin, heroicons-outline, heroicons-solid
+	CanvasBgURL         string `yaml:"canvas_bg_url"`         // canvas background image URL
+	CanvasBgColor       string `yaml:"canvas_bg_color"`       // canvas background colour (hex)
+	CanvasDPad          *bool  `yaml:"canvas_dpad"`           // software D-Pad overlay
+	CanvasWeatherEffect string `yaml:"canvas_weather_effect"` // manual weather override ("" = auto)
+	CanvasDesign        string `yaml:"canvas_design"`         // canvas skin id (cubic, forest, simple, sky)
+	InteractionMode     string `yaml:"interaction_mode"`      // edit or game
 	Environments         map[string]string   `yaml:"environments"`           // arbitrary env vars applied at startup
 	OTELEndpoint         string              `yaml:"otel_endpoint"`          // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
 	GoalThinker          GoalThinkerSettings `yaml:"goal_thinker"`           // Goal thinker settings

@@ -469,6 +469,9 @@ func (s *Server) saveFrontendConfig() {
 	fullConfig["header_position"] = s.config.HeaderPosition
 	fullConfig["color_mode"] = s.config.ColorMode
 	fullConfig["card_height"] = s.config.CardHeight
+	if s.config.CardOpacity != nil {
+		fullConfig["card_opacity"] = *s.config.CardOpacity
+	}
 	if s.config.SoundEnabled != nil {
 		fullConfig["sound_enabled"] = *s.config.SoundEnabled
 	}

@@ -15,6 +15,10 @@ type Config struct {
 	HeaderPosition string `json:"header_position" yaml:"header_position"`
 	ColorMode      string `json:"color_mode" yaml:"color_mode"`
 	CardHeight     string `json:"card_height" yaml:"card_height"`
+	// CardOpacity is how strongly a card's category background layer (gradient
+	// or image) is painted, 0.0–1.0. Pointer so an explicit 0 (fully flat
+	// cards) is distinguishable from "not set", which falls back to 0.7.
+	CardOpacity    *float64 `json:"card_opacity,omitempty" yaml:"card_opacity,omitempty"`
 	SoundEnabled   *bool  `json:"sound_enabled" yaml:"sound_enabled"`
 	IconFont       string `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
 	CanvasBgURL    string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`

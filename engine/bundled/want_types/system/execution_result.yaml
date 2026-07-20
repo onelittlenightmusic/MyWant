@@ -6,6 +6,8 @@ wantType:
     version: '1.0'
     category: system
     pattern: independent
+    labels:
+      type-tone-color: "#3a6a4f"
 
   finalResultField: stdout
 

@@ -16,6 +16,8 @@ wantType:
     version: '1.0'
     category: approval
     pattern: independent
+    labels:
+      type-tone-color: "#4a6080"
   finalResultField: evidence
   parameters:
   - name: evidence_type

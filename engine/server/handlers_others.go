@@ -51,17 +51,15 @@ func (s *Server) getConfig(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, resp)
 }
 
-func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
-	var newConfig Config
-	if err := DecodeRequest(r, &newConfig); err != nil {
-		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
-		return
-	}
-
-	// Update in-memory config
+// applyFrontendConfig copies the frontend-editable fields of newConfig onto
+// s.config and persists them. Server-owned fields (Port, Host, Debug,
+// DetectedLANIP, …) are deliberately absent: a client must not be able to
+// rewrite them through the config endpoint.
+func (s *Server) applyFrontendConfig(newConfig Config) {
 	s.config.HeaderPosition = newConfig.HeaderPosition
 	s.config.ColorMode = newConfig.ColorMode
 	s.config.CardHeight = newConfig.CardHeight
+	s.config.CardOpacity = newConfig.CardOpacity
 	s.config.SoundEnabled = newConfig.SoundEnabled
 	if newConfig.IconFont != "" {
 		s.config.IconFont = newConfig.IconFont
@@ -77,7 +75,64 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Persist to ~/.mywant/config.yaml using the helper
 	s.saveFrontendConfig()
+}
 
+// updateConfig is a full replace: every frontend-editable field is taken from
+// the request body, so a field the caller omits is RESET, not preserved.
+// Prefer PATCH unless you genuinely intend to overwrite the whole set.
+func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
+	var newConfig Config
+	if err := DecodeRequest(r, &newConfig); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	s.applyFrontendConfig(newConfig)
+	s.JSONResponse(w, http.StatusOK, s.config)
+}
+
+// patchConfig is a partial update: only the keys present in the request body
+// change, everything else keeps its current value. This is what UI toggles
+// should use — a PUT that forgets to echo back an unrelated field (say
+// web_inspector_lan_host) silently wipes it.
+//
+// The merge happens on the JSON representation rather than field by field, so
+// adding a field to Config makes it patchable with no change here.
+func (s *Server) patchConfig(w http.ResponseWriter, r *http.Request) {
+	var patch map[string]any
+	if err := DecodeRequest(r, &patch); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	currentJSON, err := json.Marshal(s.config)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to read current config", err.Error())
+		return
+	}
+	merged := make(map[string]any)
+	if err := json.Unmarshal(currentJSON, &merged); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to read current config", err.Error())
+		return
+	}
+	// An explicit null/"" in the patch clears that field — only absent keys are
+	// left alone.
+	for k, v := range patch {
+		merged[k] = v
+	}
+
+	mergedJSON, err := json.Marshal(merged)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid patch", err.Error())
+		return
+	}
+	var newConfig Config
+	if err := json.Unmarshal(mergedJSON, &newConfig); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid patch", err.Error())
+		return
+	}
+
+	s.applyFrontendConfig(newConfig)
 	s.JSONResponse(w, http.StatusOK, s.config)
 }
 

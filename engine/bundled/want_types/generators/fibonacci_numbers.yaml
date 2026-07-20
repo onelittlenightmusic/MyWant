@@ -18,6 +18,8 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: generator
+    labels:
+      type-tone-color: "#2d8a7a"
   finalResultField: sent_count
   parameters:
   - name: count

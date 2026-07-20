@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,12 +29,28 @@ func worldFilePath(dir, name string) string {
 	return filepath.Join(dir, name+".yaml")
 }
 
+// worldThumbPath returns <worldsDir>/thumbs/<name>.png — the canvas screenshot
+// the GUI uploads periodically for the world that is currently open. The
+// subdirectory keeps them out of listWorlds' *.yaml scan.
+func worldThumbPath(dir, name string) string {
+	return filepath.Join(dir, "thumbs", name+".png")
+}
+
+// safeWorldName rejects names that would escape the worlds directory.
+func safeWorldName(name string) bool {
+	return name != "" && !strings.ContainsAny(name, `/\`) && name != "." && name != ".."
+}
+
 // WorldSummary is the list-view shape returned by GET /api/v1/worlds.
 type WorldSummary struct {
 	Name       string `json:"name"`
 	WantCount  int    `json:"want_count"`
 	ModifiedAt string `json:"modified_at"`
 	Current    bool   `json:"current"`
+	// ThumbnailAt is the mtime (RFC3339) of the world's canvas screenshot, or ""
+	// when none has been captured yet. Doubles as a cache-buster for the
+	// GET /api/v1/worlds/{name}/thumbnail URL.
+	ThumbnailAt string `json:"thumbnail_at,omitempty"`
 }
 
 func (s *Server) listWorlds(w http.ResponseWriter, r *http.Request) {
@@ -67,11 +84,17 @@ func (s *Server) listWorlds(w http.ResponseWriter, r *http.Request) {
 			count = len(wants)
 		}
 
+		thumbnailAt := ""
+		if info, err := os.Stat(worldThumbPath(dir, name)); err == nil {
+			thumbnailAt = info.ModTime().Format(time.RFC3339)
+		}
+
 		summaries = append(summaries, WorldSummary{
-			Name:       name,
-			WantCount:  count,
-			ModifiedAt: modifiedAt,
-			Current:    name == s.config.CurrentWorld,
+			Name:        name,
+			WantCount:   count,
+			ModifiedAt:  modifiedAt,
+			Current:     name == s.config.CurrentWorld,
+			ThumbnailAt: thumbnailAt,
 		})
 	}
 
@@ -193,8 +216,28 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 			s.JSONError(w, r, http.StatusInternalServerError, "Failed to load world", err.Error())
 			return
 		}
-		if len(wants) > 0 {
-			wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(wants)
+
+		// Snapshots can contain "always visible" system wants (e.g. robot) that
+		// clearNonSystemWants never tore down, since they're long-lived
+		// infrastructure. Re-adding them via AddWantsAsyncWithTracking would
+		// collide with the still-running instance, so update those in place
+		// instead of adding them as new wants.
+		newWants := make([]*mywant.Want, 0, len(wants))
+		existingWants := make([]*mywant.Want, 0)
+		for _, want := range wants {
+			if _, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
+				existingWants = append(existingWants, want)
+			} else {
+				newWants = append(newWants, want)
+			}
+		}
+
+		for _, want := range existingWants {
+			s.globalBuilder.UpdateWant(want)
+		}
+
+		if len(newWants) > 0 {
+			wantIDs, err := s.globalBuilder.AddWantsAsyncWithTracking(newWants)
 			if err != nil {
 				s.JSONError(w, r, http.StatusInternalServerError, "Failed to load world wants", err.Error())
 				return
@@ -205,13 +248,13 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
-			// AddWantsAsyncWithTracking re-initializes each want, which can
-			// reset state to its declared defaults — restore the state we
-			// actually loaded from the snapshot (same fix-up importWants does).
-			for _, want := range wants {
-				if rw, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
-					mywant.StoreStateMulti(rw, want.GetAllState())
-				}
+		}
+		// AddWantsAsyncWithTracking re-initializes each want, which can
+		// reset state to its declared defaults — restore the state we
+		// actually loaded from the snapshot (same fix-up importWants does).
+		for _, want := range wants {
+			if rw, _, found := s.globalBuilder.FindWantByID(want.Metadata.ID); found {
+				mywant.StoreStateMulti(rw, want.GetAllState())
 			}
 		}
 		loadedCount = len(wants)
@@ -224,4 +267,94 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 		"name":       name,
 		"want_count": loadedCount,
 	})
+}
+
+// uploadWorldThumbnail handles POST /api/v1/worlds/{name}/thumbnail — stores a
+// PNG screenshot of the want canvas for that world. The GUI captures one
+// periodically while a world is open, so the worlds page can show each world by
+// what its canvas looks like. Body is multipart/form-data with an "image" field.
+func (s *Server) uploadWorldThumbnail(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !safeWorldName(name) {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid world name", name)
+		return
+	}
+
+	const maxSize = 8 << 20 // 8 MB
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+	if err := r.ParseMultipartForm(maxSize); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "File too large or bad multipart", err.Error())
+		return
+	}
+
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Missing 'image' field", err.Error())
+		return
+	}
+	defer file.Close()
+
+	if ct := header.Header.Get("Content-Type"); ct != "" && ct != "image/png" {
+		s.JSONError(w, r, http.StatusBadRequest, "Thumbnail must be image/png", ct)
+		return
+	}
+
+	dir, err := s.worldsDir()
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to access worlds directory", err.Error())
+		return
+	}
+	destPath := worldThumbPath(dir, name)
+	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to create thumbs directory", err.Error())
+		return
+	}
+
+	// Write to a temp file and rename so a reader never sees a half-written PNG.
+	tmpPath := destPath + ".tmp"
+	out, err := os.Create(tmpPath)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to create file", err.Error())
+		return
+	}
+	if _, err := io.Copy(out, file); err != nil {
+		out.Close()
+		os.Remove(tmpPath)
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to save file", err.Error())
+		return
+	}
+	out.Close()
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		os.Remove(tmpPath)
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to store thumbnail", err.Error())
+		return
+	}
+
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"name":         name,
+		"thumbnail_at": time.Now().Format(time.RFC3339),
+	})
+}
+
+// serveWorldThumbnail handles GET /api/v1/worlds/{name}/thumbnail.
+func (s *Server) serveWorldThumbnail(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !safeWorldName(name) {
+		http.NotFound(w, r)
+		return
+	}
+	dir, err := s.worldsDir()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	path := worldThumbPath(dir, name)
+	if _, err := os.Stat(path); err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	// Callers append ?t=<thumbnail_at>, so a long cache is safe.
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	http.ServeFile(w, r, path)
 }

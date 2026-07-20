@@ -17,6 +17,8 @@ wantType:
     version: '1.0'
     category: mathematics
     pattern: processor
+    labels:
+      type-tone-color: "#2d8a7a"
   finalResultField: foundPrimes
   parameters:
   - name: prime
