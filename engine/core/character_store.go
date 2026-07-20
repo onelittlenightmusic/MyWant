@@ -375,11 +375,11 @@ func (m *characterManager) PruneDevices(deviceIDs []string) {
 }
 
 // Package-level functions
-func ListCharacters() []Character                     { return GetCharacterManager().List() }
-func GetCharacter(id string) (*Character, bool)       { return GetCharacterManager().Get(id) }
-func AddCharacter(c Character) Character              { return GetCharacterManager().Add(c) }
-func UpdateCharacter(id string, c Character) bool     { return GetCharacterManager().Update(id, c) }
-func DeleteCharacter(id string) bool                  { return GetCharacterManager().Delete(id) }
+func ListCharacters() []Character                 { return GetCharacterManager().List() }
+func GetCharacter(id string) (*Character, bool)   { return GetCharacterManager().Get(id) }
+func AddCharacter(c Character) Character          { return GetCharacterManager().Add(c) }
+func UpdateCharacter(id string, c Character) bool { return GetCharacterManager().Update(id, c) }
+func DeleteCharacter(id string) bool              { return GetCharacterManager().Delete(id) }
 func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bool) {
 	return GetCharacterManager().AssignDevices(charID, deviceIDs)
 }

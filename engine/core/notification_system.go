@@ -163,7 +163,6 @@ func (h *planStateExposeHandler) OnEvent(ctx context.Context, event WantEvent) E
 	return EventResponse{Handled: true}
 }
 
-
 // globalParamExposeHandler handles StateChangeEvent and writes the value directly
 // to a named global parameter via SetGlobalParameter.
 // Used for exposes entries with CurrentState + AsGlobalParam fields.

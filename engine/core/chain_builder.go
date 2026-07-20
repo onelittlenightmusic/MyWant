@@ -226,7 +226,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 		reconcileStop:          make(chan bool),
 		reconcileTrigger:       make(chan *TriggerCommand, 20), // Unified channel for reconciliation and control triggers
 		operationChan:          make(chan *WantOperation, 20),  // Unified channel for all operations
-		saveTrigger:            make(chan struct{}, 1),          // Buffered: coalesces rapid state-change saves
+		saveTrigger:            make(chan struct{}, 1),         // Buffered: coalesces rapid state-change saves
 		saveStop:               make(chan struct{}),
 		pathMap:                make(map[string]Paths),
 		running:                false,

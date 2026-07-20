@@ -18,17 +18,17 @@ type Config struct {
 	// CardOpacity is how strongly a card's category background layer (gradient
 	// or image) is painted, 0.0–1.0. Pointer so an explicit 0 (fully flat
 	// cards) is distinguishable from "not set", which falls back to 0.7.
-	CardOpacity    *float64 `json:"card_opacity,omitempty" yaml:"card_opacity,omitempty"`
-	SoundEnabled   *bool  `json:"sound_enabled" yaml:"sound_enabled"`
-	IconFont       string `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
-	CanvasBgURL    string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	CardOpacity  *float64 `json:"card_opacity,omitempty" yaml:"card_opacity,omitempty"`
+	SoundEnabled *bool    `json:"sound_enabled" yaml:"sound_enabled"`
+	IconFont     string   `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	CanvasBgURL  string   `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
 	// TunnelURL is the public URL captured from a managed_launch want (e.g.
 	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.
-	TunnelURL            string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
-	CanvasBgColor        string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
-	CanvasDPad           *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
-	CanvasWeatherEffect  string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
-	CanvasDesign         string `json:"canvas_design,omitempty" yaml:"canvas_design,omitempty"`
+	TunnelURL           string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
+	CanvasBgColor       string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
+	CanvasDPad          *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
+	CanvasWeatherEffect string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
+	CanvasDesign        string `json:"canvas_design,omitempty" yaml:"canvas_design,omitempty"`
 	// InteractionMode is "edit" (default, canvas tiles draggable) or "game"
 	// (tile positions locked — see the game-mode barrier in updateWant and
 	// the label-mutation endpoints in handlers_modifications.go).

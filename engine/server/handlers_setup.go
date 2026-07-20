@@ -100,6 +100,8 @@ func (s *Server) setupRoutes() {
 	worlds.HandleFunc("", s.listWorlds).Methods("GET", "OPTIONS")
 	worlds.HandleFunc("/{name}/open", s.openWorld).Methods("POST", "OPTIONS")
 	worlds.HandleFunc("/{name}/save", s.saveWorld).Methods("POST", "OPTIONS")
+	worlds.HandleFunc("/{name}/export", s.exportWorld).Methods("GET", "OPTIONS")
+	worlds.HandleFunc("/{name}/import", s.importWorld).Methods("POST", "OPTIONS")
 	worlds.HandleFunc("/{name}/thumbnail", s.serveWorldThumbnail).Methods("GET")
 	worlds.HandleFunc("/{name}/thumbnail", s.uploadWorldThumbnail).Methods("POST", "OPTIONS")
 

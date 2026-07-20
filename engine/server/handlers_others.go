@@ -1538,7 +1538,6 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, resp)
 }
 
-
 // appendPendingDeviceAction handles POST /api/v1/gui/pending-action
 // Appends one action to the pendingDeviceActions array in GUI state.
 // Used by agents to push open-url actions to browser/device clients.

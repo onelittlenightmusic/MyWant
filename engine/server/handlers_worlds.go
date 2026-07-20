@@ -135,6 +135,100 @@ func (s *Server) saveWorld(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"name": name})
 }
 
+// exportWorld handles GET /api/v1/worlds/{name}/export — downloads a world's
+// snapshot as YAML. The currently-open world is snapshotted first so the
+// download reflects the live wants rather than the last switch.
+func (s *Server) exportWorld(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !safeWorldName(name) {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid world name", name)
+		return
+	}
+
+	if name == s.config.CurrentWorld {
+		if err := s.saveWorldSnapshot(name); err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "Failed to snapshot current world", err.Error())
+			return
+		}
+	}
+
+	dir, err := s.worldsDir()
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to access worlds directory", err.Error())
+		return
+	}
+
+	data, err := os.ReadFile(worldFilePath(dir, name))
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.JSONError(w, r, http.StatusNotFound, "World not found", name)
+			return
+		}
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to read world", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+name+".yaml\"")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+// importWorld handles POST /api/v1/worlds/{name}/import — stores an uploaded
+// wants YAML as <name>.yaml, creating a new world without opening it. Refuses
+// to clobber an existing world unless ?overwrite=true is passed.
+func (s *Server) importWorld(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	if !safeWorldName(name) {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid world name", name)
+		return
+	}
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Failed to read request body", err.Error())
+		return
+	}
+
+	// Validate before writing so a malformed upload can't create a broken world.
+	var wants []*mywant.Want
+	if err := yaml.Unmarshal(data, &wants); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid wants YAML", err.Error())
+		return
+	}
+	for _, want := range wants {
+		if want == nil || want.Metadata.ID == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "Imported wants must have IDs", "")
+			return
+		}
+	}
+
+	dir, err := s.worldsDir()
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to access worlds directory", err.Error())
+		return
+	}
+
+	path := worldFilePath(dir, name)
+	overwrite := strings.ToLower(r.URL.Query().Get("overwrite")) == "true"
+	if !overwrite {
+		if _, err := os.Stat(path); err == nil {
+			s.JSONError(w, r, http.StatusConflict, "World already exists", name)
+			return
+		}
+	}
+
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to write world", err.Error())
+		return
+	}
+
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"name":       name,
+		"want_count": len(wants),
+	})
+}
+
 // clearNonSystemWants deletes every currently-running non-system want and
 // waits (bounded, ~2s) for the deletions to take effect before returning, so
 // a subsequent world-load doesn't race with wants still being torn down.

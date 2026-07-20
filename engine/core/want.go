@@ -1779,6 +1779,7 @@ func (n *Want) IncrementIntState(key string) int {
 
 	return newValue
 }
+
 // GetSpec returns a deep copy of the want's Spec, with Params and Imports maps
 // snapshotted under metadataMutex to prevent concurrent-map-read/write panics
 // when UpdateParameter is called from a concurrent goroutine.
