@@ -1838,6 +1838,67 @@ func (n *Want) GetLabels() map[string]string {
 	return result
 }
 
+// SetLabel sets one label under the metadata write lock.
+//
+// Writing n.Metadata.Labels directly is a crash, not just a race: GetLabels
+// iterates the same map under RLock, and Go's runtime aborts the whole
+// process with "concurrent map iteration and map write" — a fatal error that
+// recover() cannot catch. Every mutation of Metadata.Labels must go through
+// these helpers.
+func (n *Want) SetLabel(key, value string) {
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	if n.Metadata.Labels == nil {
+		n.Metadata.Labels = make(map[string]string)
+	}
+	n.Metadata.Labels[key] = value
+}
+
+// SetLabels merges the given labels in under the metadata write lock.
+func (n *Want) SetLabels(labels map[string]string) {
+	if len(labels) == 0 {
+		return
+	}
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	if n.Metadata.Labels == nil {
+		n.Metadata.Labels = make(map[string]string, len(labels))
+	}
+	maps.Copy(n.Metadata.Labels, labels)
+}
+
+// DeleteLabel removes one label under the metadata write lock.
+func (n *Want) DeleteLabel(key string) {
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	delete(n.Metadata.Labels, key)
+}
+
+// ReplaceLabels swaps the whole label map under the metadata write lock. The
+// caller's map is copied, so it stays safe to mutate afterwards.
+func (n *Want) ReplaceLabels(labels map[string]string) {
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	replacement := make(map[string]string, len(labels))
+	maps.Copy(replacement, labels)
+	n.Metadata.Labels = replacement
+}
+
+// GetLabel reads one label under the metadata read lock.
+func (n *Want) GetLabel(key string) string {
+	n.metadataMutex.RLock()
+	defer n.metadataMutex.RUnlock()
+	return n.Metadata.Labels[key]
+}
+
+// LookupLabel reads one label and reports whether it was present.
+func (n *Want) LookupLabel(key string) (string, bool) {
+	n.metadataMutex.RLock()
+	defer n.metadataMutex.RUnlock()
+	v, ok := n.Metadata.Labels[key]
+	return v, ok
+}
+
 // matchesSelector checks if want labels match the selector criteria
 func (n *Want) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
 	for key, value := range selector {

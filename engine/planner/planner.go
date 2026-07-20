@@ -59,6 +59,8 @@ func (p *Planner) PlanFromWantType(typeName, category string, plan *ws.WantTypeP
 			// Assign a unique gate label to this monitor want.
 			gateLabelKey := "isSatisfied-gate"
 			gateLabelValue := w.Metadata.Name
+			// RecipeWant is a spec struct built locally here, not a live *Want
+			// shared with the HTTP handlers — no lock needed or available.
 			if w.Metadata.Labels == nil {
 				w.Metadata.Labels = make(map[string]string)
 			}

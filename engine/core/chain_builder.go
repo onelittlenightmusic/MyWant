@@ -1231,6 +1231,9 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		preservedLabels := wantPtr.Metadata.Labels
 		wantPtr.Metadata = wantConfig.Metadata
 		if len(preservedLabels) > 0 {
+			// Direct map access on purpose: metadataMutex is already held by
+			// this function (see the Lock above). The Set/GetLabel helpers take
+			// the same non-reentrant RWMutex, so calling them here deadlocks.
 			if wantPtr.Metadata.Labels == nil {
 				wantPtr.Metadata.Labels = make(map[string]string)
 			}

@@ -89,20 +89,17 @@ func (w *RobotWant) Initialize() {
 // it (or a user drag) already resumed from — labels are ordinary Want
 // metadata, so they already persist and restore across restarts on their own.
 func (w *RobotWant) ensureCanvasPosition() {
-	if w.Metadata.Labels == nil {
-		w.Metadata.Labels = make(map[string]string)
+	if _, err := strconv.Atoi(w.GetLabel("mywant.io/canvas-x")); err != nil {
+		w.SetLabel("mywant.io/canvas-x", strconv.Itoa(w.GetIntParam("spawn_x", 5)))
 	}
-	if _, err := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-x"]); err != nil {
-		w.Metadata.Labels["mywant.io/canvas-x"] = strconv.Itoa(w.GetIntParam("spawn_x", 5))
+	if _, err := strconv.Atoi(w.GetLabel("mywant.io/canvas-y")); err != nil {
+		w.SetLabel("mywant.io/canvas-y", strconv.Itoa(w.GetIntParam("spawn_y", 5)))
 	}
-	if _, err := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-y"]); err != nil {
-		w.Metadata.Labels["mywant.io/canvas-y"] = strconv.Itoa(w.GetIntParam("spawn_y", 5))
+	if w.GetLabel("mywant.io/canvas-rotation") == "" {
+		w.SetLabel("mywant.io/canvas-rotation", "0")
 	}
-	if w.Metadata.Labels["mywant.io/canvas-rotation"] == "" {
-		w.Metadata.Labels["mywant.io/canvas-rotation"] = "0"
-	}
-	if w.Metadata.Labels["mywant.io/canvas-length"] == "" {
-		w.Metadata.Labels["mywant.io/canvas-length"] = "0"
+	if w.GetLabel("mywant.io/canvas-length") == "" {
+		w.SetLabel("mywant.io/canvas-length", "0")
 	}
 }
 
@@ -122,8 +119,8 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	}
 	w.SetCurrent("last_wander_at", now)
 
-	x, errX := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-x"])
-	y, errY := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-y"])
+	x, errX := strconv.Atoi(w.GetLabel("mywant.io/canvas-x"))
+	y, errY := strconv.Atoi(w.GetLabel("mywant.io/canvas-y"))
 	if errX != nil || errY != nil {
 		return
 	}
@@ -155,10 +152,10 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	}
 
 	if nx != x {
-		w.Metadata.Labels["mywant.io/canvas-x"] = strconv.Itoa(nx)
+		w.SetLabel("mywant.io/canvas-x", strconv.Itoa(nx))
 	}
 	if ny != y {
-		w.Metadata.Labels["mywant.io/canvas-y"] = strconv.Itoa(ny)
+		w.SetLabel("mywant.io/canvas-y", strconv.Itoa(ny))
 	}
 }
 

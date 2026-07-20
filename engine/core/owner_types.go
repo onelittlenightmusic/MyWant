@@ -342,10 +342,7 @@ func (t *Target) CreateChildWants() []*Want {
 			// Apply child-role label from planner step role so the GUI balloon
 			// shows the correct category (Thinker / Doer / Monitor etc.).
 			if i < len(result.Steps) {
-				if w.Metadata.Labels == nil {
-					w.Metadata.Labels = make(map[string]string)
-				}
-				w.Metadata.Labels["child-role"] = plannerRoleToChildRole(result.Steps[i].Role)
+				w.SetLabel("child-role", plannerRoleToChildRole(result.Steps[i].Role))
 			}
 			planWants = append(planWants, w)
 		}
@@ -361,7 +358,7 @@ func (t *Target) CreateChildWants() []*Want {
 		// and enable AutoExpose so its exposable state fields are automatically
 		// propagated to this coordinator want when they change.
 		for _, w := range planWants {
-			if w.Metadata.Labels["child-role"] == "monitor" && t.isSatisfiedCheckWant == nil {
+			if w.GetLabel("child-role") == "monitor" && t.isSatisfiedCheckWant == nil {
 				t.isSatisfiedCheckWant = w
 				w.Spec.AutoExpose = true
 			}
@@ -732,7 +729,7 @@ func (t *Target) Progress() {
 	// Also try to wire up isSatisfiedCheckWant after restart if not yet set.
 	if t.RecipeIsSatisfied != nil && t.isSatisfiedCheckWant == nil && t.builder != nil {
 		for _, child := range t.builder.FindChildWantsByOwnerID(t.Metadata.ID) {
-			if child.Metadata.Labels["child-role"] == "monitor" {
+			if child.GetLabel("child-role") == "monitor" {
 				t.isSatisfiedCheckWant = child
 				break
 			}

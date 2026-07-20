@@ -96,6 +96,7 @@ var StartCmd = &cobra.Command{
 			}
 
 			logFilePath := filepath.Join(logDir, "server.log")
+			rotateLogIfLarge(logFilePath)
 			logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 			if err != nil {
 				fmt.Printf("Failed to open log file: %v\n", err)
@@ -250,4 +251,29 @@ func startAgentService(host string, port int, debug bool, detach bool) {
 		fmt.Printf("Agent Service error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// maxServerLogBytes is the size at which server.log is rotated on startup.
+// The server appends to one file for its whole lifetime, so without this the
+// log just grows — it had reached 230 MB in practice, which made it slow to
+// even grep when investigating a crash.
+const maxServerLogBytes = 50 << 20 // 50 MiB
+
+// rotateLogIfLarge moves an oversized server.log aside to server.log.1 before
+// the server reopens it, keeping exactly one previous generation. Rotating at
+// startup (rather than mid-run) keeps this dependency-free: the running server
+// holds the file open, so renaming underneath it would silently send its
+// output to an unlinked inode.
+func rotateLogIfLarge(logPath string) {
+	info, err := os.Stat(logPath)
+	if err != nil || info.Size() < maxServerLogBytes {
+		return
+	}
+	prev := logPath + ".1"
+	_ = os.Remove(prev)
+	if err := os.Rename(logPath, prev); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not rotate %s: %v\n", logPath, err)
+		return
+	}
+	fmt.Printf("Rotated %s (%d MB) to %s\n", logPath, info.Size()>>20, prev)
 }

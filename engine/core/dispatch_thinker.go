@@ -299,7 +299,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 			}
 			namespacedDir := fmt.Sprintf("%s:%s", w.Metadata.Name, direction)
 			for _, child := range cb.GetWants() {
-				if child.Metadata.Labels["direction"] == namespacedDir && w.isOwnerOf(child) {
+				if child.GetLabel("direction") == namespacedDir && w.isOwnerOf(child) {
 					if IsAchievedStatus(child.Status) {
 						if len(req.Sets) > 0 {
 							for k, v := range req.Sets {
@@ -381,7 +381,7 @@ func NewDispatchThinker(id string) *ThinkingAgent {
 			namespacedDir := fmt.Sprintf("%s:%s", w.Metadata.Name, direction)
 			if strings.HasPrefix(wantID, "pending-") {
 				for _, child := range cb.GetWants() {
-					if child.Metadata.Labels["direction"] == namespacedDir && w.isOwnerOf(child) {
+					if child.GetLabel("direction") == namespacedDir && w.isOwnerOf(child) {
 						wantID = child.Metadata.ID
 						dispatched[direction] = wantID
 						w.StoreLog("[%s] Resolved pending direction '%s' to want '%s'", DispatchThinkerName, direction, wantID)

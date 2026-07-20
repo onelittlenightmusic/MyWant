@@ -161,13 +161,10 @@ type CanvasTileSizeHook struct {
 func (h *CanvasTileSizeHook) Name() string { return "canvas-tile-size" }
 
 func (h *CanvasTileSizeHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) error {
-	if want.Metadata.Labels == nil {
-		want.Metadata.Labels = make(map[string]string)
+	if want.GetLabel(canvasLabelRotation) == "" {
+		want.SetLabel(canvasLabelRotation, "0")
 	}
-	if want.Metadata.Labels[canvasLabelRotation] == "" {
-		want.Metadata.Labels[canvasLabelRotation] = "0"
-	}
-	if want.Metadata.Labels[canvasLabelLength] == "" {
+	if want.GetLabel(canvasLabelLength) == "" {
 		defaultLen := 0
 		typeDef := h.builder.GetWantTypeDefinition(want.Metadata.Type)
 		if typeDef != nil {
@@ -175,7 +172,7 @@ func (h *CanvasTileSizeHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywan
 				defaultLen = dl
 			}
 		}
-		want.Metadata.Labels[canvasLabelLength] = strconv.Itoa(defaultLen)
+		want.SetLabel(canvasLabelLength, strconv.Itoa(defaultLen))
 	}
 	return nil
 }
@@ -202,20 +199,20 @@ func tileFootprint(ax, ay, rotation, length int) [][2]int {
 
 // markWantOccupied adds all cells of a want (including multi-cell spans) into occupied.
 func markWantOccupied(w *mywant.Want, occupied map[[2]int]bool) {
-	if w.Metadata.Labels == nil {
-		return
-	}
-	rx, errX := strconv.Atoi(w.Metadata.Labels[canvasLabelX])
-	ry, errY := strconv.Atoi(w.Metadata.Labels[canvasLabelY])
+	// One snapshot under the read lock: reading label-by-label would let a
+	// concurrent move land between the x and y reads.
+	labels := w.GetLabels()
+	rx, errX := strconv.Atoi(labels[canvasLabelX])
+	ry, errY := strconv.Atoi(labels[canvasLabelY])
 	if errX != nil || errY != nil {
 		return
 	}
 	rot := 0
 	length := 0
-	if v, err := strconv.Atoi(w.Metadata.Labels[canvasLabelRotation]); err == nil {
+	if v, err := strconv.Atoi(labels[canvasLabelRotation]); err == nil {
 		rot = v
 	}
-	if v, err := strconv.Atoi(w.Metadata.Labels[canvasLabelLength]); err == nil {
+	if v, err := strconv.Atoi(labels[canvasLabelLength]); err == nil {
 		length = v
 	}
 	for _, c := range tileFootprint(rx, ry, rot, length) {
@@ -239,9 +236,6 @@ func absInt(x int) int {
 }
 
 func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {
-	if want.Metadata.Labels == nil {
-		want.Metadata.Labels = make(map[string]string)
-	}
 	if len(want.Metadata.OwnerReferences) > 0 {
 		return nil
 	}
@@ -249,10 +243,10 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 	// Read this want's own rotation/length (set by CanvasTileSizeHook).
 	myRot := 0
 	myLen := 0
-	if v, err := strconv.Atoi(want.Metadata.Labels[canvasLabelRotation]); err == nil {
+	if v, err := strconv.Atoi(want.GetLabel(canvasLabelRotation)); err == nil {
 		myRot = v
 	}
-	if v, err := strconv.Atoi(want.Metadata.Labels[canvasLabelLength]); err == nil {
+	if v, err := strconv.Atoi(want.GetLabel(canvasLabelLength)); err == nil {
 		myLen = v
 	}
 
@@ -277,8 +271,8 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 		return true
 	}
 	placeAt := func(x, y int) {
-		want.Metadata.Labels[canvasLabelX] = strconv.Itoa(x)
-		want.Metadata.Labels[canvasLabelY] = strconv.Itoa(y)
+		want.SetLabel(canvasLabelX, strconv.Itoa(x))
+		want.SetLabel(canvasLabelY, strconv.Itoa(y))
 		for _, c := range tileFootprint(x, y, myRot, myLen) {
 			occupied[c] = true
 		}
@@ -286,9 +280,9 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 
 	// If a requested position was provided by the frontend (e.g. cursorman position),
 	// try it first; if occupied spiral outward (Chebyshev rings) to find nearest free cell.
-	if want.Metadata.Labels[canvasLabelX] != "" && want.Metadata.Labels[canvasLabelY] != "" {
-		reqX, errX := strconv.Atoi(want.Metadata.Labels[canvasLabelX])
-		reqY, errY := strconv.Atoi(want.Metadata.Labels[canvasLabelY])
+	if want.GetLabel(canvasLabelX) != "" && want.GetLabel(canvasLabelY) != "" {
+		reqX, errX := strconv.Atoi(want.GetLabel(canvasLabelX))
+		reqY, errY := strconv.Atoi(want.GetLabel(canvasLabelY))
 		if errX == nil && errY == nil {
 			if isFreeAt(reqX, reqY) {
 				placeAt(reqX, reqY)
@@ -309,8 +303,8 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 			}
 		}
 		// Clear labels so the fallback scan can reassign.
-		want.Metadata.Labels[canvasLabelX] = ""
-		want.Metadata.Labels[canvasLabelY] = ""
+		want.SetLabel(canvasLabelX, "")
+		want.SetLabel(canvasLabelY, "")
 	}
 
 	// Fallback: scan left-to-right, top-to-bottom from (0,0).
