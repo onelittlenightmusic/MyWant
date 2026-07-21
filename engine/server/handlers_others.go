@@ -1426,6 +1426,16 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Snapshot the prior values of the character-presence keys before the merge
+	// so we can tell an actual ride/web-location change from a no-op rewrite
+	// (the dashboard rewrites the whole gui_state block on every debounce).
+	priorPresence := map[string]any{}
+	for key := range updates {
+		if isPresenceTraceKey(key) {
+			priorPresence[key] = want.GetAllState()[key]
+		}
+	}
+
 	for key, val := range updates {
 		if val == nil {
 			want.DeleteState(key) // null from client means "remove this field"
@@ -1440,6 +1450,9 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	// Archive ride / web-presence transitions as durable traces.
+	logPresenceTraces(priorPresence, updates)
 
 	// Persist device settings to config.yaml so they survive server restarts.
 	configDirty := false
@@ -1563,9 +1576,73 @@ func (s *Server) appendPendingDeviceAction(w http.ResponseWriter, r *http.Reques
 	actions = append(actions, action)
 	want.StoreState("pendingDeviceActions", actions)
 
+	// A call invite is a deliberate social act between two players — archive it
+	// so it survives work.log rotation and can inform later visitors.
+	if stringField(action, "type") == "call-invite" {
+		mywant.AppendWorkLog(mywant.WorkLogEntry{
+			Type:      "call",
+			Important: true,
+			Data: map[string]any{
+				"from_character_id": stringField(action, "from_character_id"),
+				"to_device_id":      stringField(action, "device_id"),
+				"url":               stringField(action, "url"),
+				"x":                 action["x"],
+				"y":                 action["y"],
+			},
+		})
+	}
+
 	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: guiFields(want)}
 	go broadcastSSE("gui_state", resp)
 	s.JSONResponse(w, http.StatusOK, resp)
+}
+
+// ── Character presence traces ─────────────────────────────────────────────────
+
+// Per-character gui_state key prefixes whose transitions are worth archiving:
+// who is riding whom, and which web page a character is standing on. Both are
+// written as "<prefix><characterId>" (see the frontend's per-character key
+// convention, e.g. canvas_cursor_x_<id>).
+const (
+	ridingKeyPrefix = "cursor_riding_"
+	webURLKeyPrefix = "cursor_web_url_"
+)
+
+func isPresenceTraceKey(key string) bool {
+	return strings.HasPrefix(key, ridingKeyPrefix) || strings.HasPrefix(key, webURLKeyPrefix)
+}
+
+// logPresenceTraces appends one durable work.log entry per ride/web-presence
+// key that actually changed value. The dashboard rewrites its whole gui_state
+// block on every debounce, so comparing against the pre-merge snapshot is what
+// keeps this from logging a trace on every idle write.
+func logPresenceTraces(prior map[string]any, updates map[string]any) {
+	for key, val := range updates {
+		if !isPresenceTraceKey(key) {
+			continue
+		}
+		if fmt.Sprint(prior[key]) == fmt.Sprint(val) {
+			continue
+		}
+		entryType, prefix := "ride", ridingKeyPrefix
+		if strings.HasPrefix(key, webURLKeyPrefix) {
+			entryType, prefix = "web_presence", webURLKeyPrefix
+		}
+		// val == nil means the key was deleted: dropped off a mount, or left
+		// the web page. Recorded as an empty value so the trail shows the end.
+		value := ""
+		if val != nil {
+			value = fmt.Sprint(val)
+		}
+		mywant.AppendWorkLog(mywant.WorkLogEntry{
+			Type:      entryType,
+			Important: true,
+			Data: map[string]any{
+				"character_id": strings.TrimPrefix(key, prefix),
+				"value":        value,
+			},
+		})
+	}
 }
 
 // ── Robot Log ─────────────────────────────────────────────────────────────────

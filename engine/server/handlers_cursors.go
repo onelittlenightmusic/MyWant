@@ -14,6 +14,10 @@ import (
 
 const cursorTTL = 8 * time.Second // entries older than this are excluded from GET
 
+// sayTTL is how long a speech bubble stays up. Mirrors sayTtlMs() in
+// web/src/shared/characterPresence.ts.
+const sayTTL = 8 * time.Second
+
 type cursorEntry struct {
 	DeviceID    string  `json:"deviceId,omitempty"`
 	X           float64 `json:"x"`
@@ -24,6 +28,12 @@ type cursorEntry struct {
 	LastSeen    int64   `json:"lastSeen"` // Unix ms
 	EffectType  string  `json:"effectType,omitempty"`
 	EffectNonce int64   `json:"effectNonce,omitempty"`
+	// Speech-bubble text set by `i say` / the canvas Say action. The client
+	// keeps resending it on each position PUT while the bubble should stay
+	// up, so it expires naturally with the entry's own cursorTTL — there is
+	// no separate clear call.
+	Message   string `json:"message,omitempty"`
+	MessageAt int64  `json:"messageAt,omitempty"` // Unix ms the message was first said
 }
 
 var (
@@ -43,6 +53,8 @@ type cursorResponse struct {
 	LastSeen    int64   `json:"lastSeen"`
 	EffectType  string  `json:"effectType,omitempty"`
 	EffectNonce int64   `json:"effectNonce,omitempty"`
+	Message     string  `json:"message,omitempty"`
+	MessageAt   int64   `json:"messageAt,omitempty"`
 }
 
 // snapshotCursors returns all non-stale cursor entries as a response slice.
@@ -66,6 +78,8 @@ func snapshotCursors() []cursorResponse {
 			LastSeen:    e.LastSeen,
 			EffectType:  e.EffectType,
 			EffectNonce: e.EffectNonce,
+			Message:     e.Message,
+			MessageAt:   e.MessageAt,
 		})
 	}
 	cursorsMu.RUnlock()
@@ -115,6 +129,8 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		Name        string  `json:"name,omitempty"`
 		EffectType  string  `json:"effectType,omitempty"`
 		EffectNonce int64   `json:"effectNonce,omitempty"`
+		Message     string  `json:"message,omitempty"`
+		MessageAt   int64   `json:"messageAt,omitempty"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -122,6 +138,22 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cursorsMu.Lock()
+	prev := cursors[characterID]
+	// Only the FIRST PUT carrying a given messageAt is a real utterance — that's
+	// the one worth archiving. Later PUTs just carry it along.
+	isNewMessage := body.Message != "" && prev.MessageAt != body.MessageAt
+
+	// A live speech bubble survives position updates that say nothing about it.
+	// Without this, a message set by one writer is wiped by the next position
+	// PUT from another: `mywant-gui i say` publishes the message, the SSE echo
+	// makes the speaker's own browser re-sync and re-PUT its position, and that
+	// PUT — which knows nothing of the CLI's message — would blank the bubble
+	// milliseconds after it appeared.
+	message, messageAt := body.Message, body.MessageAt
+	if message == "" && prev.Message != "" && time.Since(time.UnixMilli(prev.MessageAt)) < sayTTL {
+		message, messageAt = prev.Message, prev.MessageAt
+	}
+
 	cursors[characterID] = cursorEntry{
 		DeviceID:    body.DeviceID,
 		X:           body.X,
@@ -132,17 +164,21 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		LastSeen:    time.Now().UnixMilli(),
 		EffectType:  body.EffectType,
 		EffectNonce: body.EffectNonce,
+		Message:     message,
+		MessageAt:   messageAt,
 	}
 	cursorsMu.Unlock()
 
 	go broadcastSSE("cursor", snapshotCursors())
 
 	// Log to ~/.mywant/work.log.
-	// important=true only when an effect (aura / want interaction) is triggered;
-	// plain position updates are kept for 1 hour then discarded by rotation.
+	// important=true only when an effect (aura / want interaction) fired or a
+	// new Say message was uttered — those are the traces worth keeping for
+	// future players. Plain position updates are kept for 1 hour then
+	// discarded by rotation.
 	mywant.AppendWorkLog(mywant.WorkLogEntry{
 		Type:      "cursor",
-		Important: body.EffectType != "",
+		Important: body.EffectType != "" || isNewMessage,
 		Data: map[string]any{
 			"character_id": characterID,
 			"device_id":    body.DeviceID,
@@ -153,6 +189,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 			"name":         body.Name,
 			"effect_type":  body.EffectType,
 			"effect_nonce": body.EffectNonce,
+			"message":      body.Message,
 		},
 	})
 
