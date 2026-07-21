@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"math"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -207,33 +208,53 @@ func (a *AuraWant) applyAuraDefaults() {
 		return
 	}
 	for _, targetID := range targetIDs {
-		mark, ok := auraDefaultFor(chars, targetID)
-		if !ok {
-			continue
-		}
 		want, _, found := cb.FindWantByID(targetID)
 		if !found {
 			continue
 		}
-		applyAuraDefaultToWant(cb, want, mark)
+		for _, mark := range auraDefaultsFor(chars, want.Metadata.Type) {
+			applyAuraDefaultToWant(cb, want, mark)
+		}
 	}
 }
 
-// auraDefaultFor returns the aura-default mark the first (in bind order) of
-// characterIDs has set for targetID — an aura want can be bound to more than
-// one character (see characterColor's actingCharacterID handling), and any of
-// them may hold the relevant mark, not just the first-bound one.
-func auraDefaultFor(characterIDs []string, targetID string) (AuraMark, bool) {
+// auraDefaultsFor returns the aura-default marks the first (in bind order) of
+// characterIDs has set for the given want type — an aura want can be bound to
+// more than one character (see characterColor's actingCharacterID handling),
+// and any of them may hold the relevant marks, not just the first-bound one.
+//
+// Marks are addressed by want type, not by want instance, so one mark covers
+// every want of that type the aura happens to cover — that is what makes a
+// mark reusable rather than a property of one deployed card. A character may
+// hold several marks for the same type (different paths within it), so all of
+// them apply, in target-key order for determinism. Endorse-mode marks record a
+// good observed value without claiming it should be written back, so they are
+// skipped here.
+func auraDefaultsFor(characterIDs []string, wantType string) []AuraMark {
+	if wantType == "" {
+		return nil
+	}
 	for _, id := range characterIDs {
 		character, ok := GetCharacter(id)
 		if !ok {
 			continue
 		}
-		if mark, ok := character.AuraDefaults[targetID]; ok {
-			return mark, true
+		var marks []AuraMark
+		for _, mark := range character.AuraDefaults {
+			if mark.Target.Kind == AuraTargetKindWantType &&
+				mark.Target.Name == wantType &&
+				mark.Mode != AuraModeEndorse {
+				marks = append(marks, mark)
+			}
+		}
+		if len(marks) > 0 {
+			sort.Slice(marks, func(i, j int) bool {
+				return marks[i].Target.Key() < marks[j].Target.Key()
+			})
+			return marks
 		}
 	}
-	return AuraMark{}, false
+	return nil
 }
 
 // AuraDefaultApplier is an optional extension a want type implements when it
@@ -250,9 +271,10 @@ type AuraDefaultApplier interface {
 // ChoiceWant.ApplyAuraDefault) opt out of the generic path by implementing
 // AuraDefaultApplier; everything else falls through to applyAuraDefaultGeneric.
 func applyAuraDefaultToWant(cb *ChainBuilder, want *Want, mark AuraMark) {
+	section, key := mark.Target.SectionKey()
 	if fn, ok := cb.FindWantFunctionByID(want.Metadata.ID); ok {
 		if applier, ok := fn.(AuraDefaultApplier); ok {
-			applier.ApplyAuraDefault(mark.Section, mark.Key, mark.Value)
+			applier.ApplyAuraDefault(section, key, mark.Value)
 			return
 		}
 	}
@@ -263,25 +285,26 @@ func applyAuraDefaultToWant(cb *ChainBuilder, want *Want, mark AuraMark) {
 // declares, converting the string to match whatever type is already stored
 // there (or already declared as a parameter) — no want-type knowledge needed.
 func applyAuraDefaultGeneric(want *Want, mark AuraMark) {
-	if mark.Section == "parameter" {
-		existing, _ := want.GetParameter(mark.Key)
-		want.UpdateParameter(mark.Key, convertAuraValue(existing, mark.Value))
+	section, key := mark.Target.SectionKey()
+	if section == "parameter" {
+		existing, _ := want.GetParameter(key)
+		want.UpdateParameter(key, convertAuraValue(existing, mark.Value))
 		return
 	}
 	var existing any
-	switch mark.Section {
+	switch section {
 	case "current":
-		existing, _ = want.GetCurrent(mark.Key)
-		want.SetCurrent(mark.Key, convertAuraValue(existing, mark.Value))
+		existing, _ = want.GetCurrent(key)
+		want.SetCurrent(key, convertAuraValue(existing, mark.Value))
 	case "plan":
-		existing, _ = want.GetPlan(mark.Key)
-		want.SetPlan(mark.Key, convertAuraValue(existing, mark.Value))
+		existing, _ = want.GetPlan(key)
+		want.SetPlan(key, convertAuraValue(existing, mark.Value))
 	case "goal":
-		existing, _ = want.GetGoal(mark.Key)
-		want.SetGoal(mark.Key, convertAuraValue(existing, mark.Value))
+		existing, _ = want.GetGoal(key)
+		want.SetGoal(key, convertAuraValue(existing, mark.Value))
 	case "internal":
-		existing, _ = want.GetInternal(mark.Key)
-		want.SetInternal(mark.Key, convertAuraValue(existing, mark.Value))
+		existing, _ = want.GetInternal(key)
+		want.SetInternal(key, convertAuraValue(existing, mark.Value))
 	}
 }
 

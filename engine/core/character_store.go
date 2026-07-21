@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,9 +22,12 @@ type Character struct {
 	Color             string   `yaml:"color"             json:"color"`     // hex e.g. "#6366f1"
 	CreatedAt         int64    `yaml:"createdAt"         json:"createdAt"` // Unix ms
 	AssignedDeviceIDs []string `yaml:"assignedDeviceIds" json:"assignedDeviceIds"`
-	// AuraDefaults maps a target want's ID to the aura-default mark this
-	// character has set for it — shown as an aura-colored dog-ear flag/star on
-	// the marked option/state in that want's card UI, toggled via the X key/button.
+	// AuraDefaults maps an AuraTarget key (see AuraTarget.Key) to the aura-default
+	// mark this character has set for it — shown as an aura-colored dog-ear
+	// flag/star on the marked option/state in that want's card UI, toggled via
+	// the X key/button. Keyed by target rather than by want instance so a mark is
+	// a shareable asset: it survives redeploys and means the same thing in
+	// another install, where the instance UUIDs it used to name do not exist.
 	AuraDefaults map[string]AuraMark `yaml:"auraDefaults,omitempty" json:"auraDefaults,omitempty"`
 	// AuraCardWantID is the want this character has bookmarked as their "aura
 	// card" — an ordinary want whose tile/card visually represents this
@@ -39,19 +43,70 @@ type Character struct {
 	AuraDesign string `yaml:"auraDesign,omitempty" json:"aura_design,omitempty"`
 }
 
-// AuraMark records one character's aura-default pick for a target want: which
-// state section (current/goal/plan/internal) and key within it — or
-// "parameter" for a spec parameter — the value applies to, plus the
-// stringified value itself (JSON-stringified for object values, plain string
-// otherwise — mirrors the frontend's getChoiceValue encoding). Section and key
-// are captured at mark time by the card that owns the field, so applying a
-// mark (see engine/types/aura_types.go) doesn't need to know about specific
-// want types.
-type AuraMark struct {
-	Section string `yaml:"section" json:"section"`
-	Key     string `yaml:"key"     json:"key"`
-	Value   string `yaml:"value"   json:"value"`
+// AuraTarget addresses one variable point an aura mark can pin down. Scope
+// (Kind+Name) names something that exists identically in any install — a want
+// type, and later a site catalog, a place catalog, a world — never an instance
+// UUID, which is what makes a mark portable. Path locates the point within that
+// scope, and its grammar belongs to the Kind: only the resolver for a Kind
+// parses it, so a new Kind adds a resolver rather than changing this struct.
+//
+// Kind "wantType": Name is the want type name, Path is "<section>/<key>" where
+// section is one of current/goal/plan/internal or "parameter" for a spec param.
+type AuraTarget struct {
+	Kind string `yaml:"kind" json:"kind"`
+	Name string `yaml:"name" json:"name"`
+	Path string `yaml:"path" json:"path"`
 }
+
+// AuraTargetKindWantType is the only target kind resolved today.
+const AuraTargetKindWantType = "wantType"
+
+// Key is the AuraTarget's canonical string form, used as the AuraDefaults map
+// key. "|" separates scope from path because a Path may itself contain "/".
+func (t AuraTarget) Key() string { return t.Kind + ":" + t.Name + "|" + t.Path }
+
+// Valid reports whether the target names a scope and a point within it.
+func (t AuraTarget) Valid() bool { return t.Kind != "" && t.Name != "" && t.Path != "" }
+
+// SectionKey splits a wantType Path into its section and key halves.
+func (t AuraTarget) SectionKey() (string, string) {
+	if i := strings.Index(t.Path, "/"); i >= 0 {
+		return t.Path[:i], t.Path[i+1:]
+	}
+	return t.Path, ""
+}
+
+// AuraMark records one character's aura-default pick: the target it pins and
+// the stringified value pinned there (JSON-stringified for object values, plain
+// string otherwise — mirrors the frontend's getChoiceValue encoding). The
+// target is captured at mark time by the card that owns the field, so applying
+// a mark (see engine/types/aura_types.go) needs no want-type knowledge.
+type AuraMark struct {
+	Target AuraTarget `yaml:"target" json:"target"`
+	Value  string     `yaml:"value"  json:"value"`
+	// Mode distinguishes a mark that should be applied to the target
+	// (AuraModeSet, the default) from one that only records "this observed
+	// value is the good one" (AuraModeEndorse) and is never written back.
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	// By is the ID of the character who signed this mark — an aura is a shared
+	// asset, so it carries its author rather than being owned by the record it
+	// currently sits in.
+	By string `yaml:"by,omitempty" json:"by,omitempty"`
+
+	// legacySection/legacyKey are only ever populated by unmarshalling a
+	// pre-target characters.yaml, where a mark was keyed by want instance ID and
+	// carried a flat section/key pair. MigrateAuraDefaults consumes and clears
+	// them; they are never written back (omitempty + always empty after
+	// migration) and are invisible to the API.
+	LegacySection string `yaml:"section,omitempty" json:"-"`
+	LegacyKey     string `yaml:"key,omitempty"     json:"-"`
+}
+
+// Aura mark modes.
+const (
+	AuraModeSet     = "set"
+	AuraModeEndorse = "endorse"
+)
 
 // characterStoreFile is the root document persisted to ~/.mywant/characters.yaml.
 type characterStoreFile struct {
@@ -257,28 +312,87 @@ func (m *characterManager) AssignDevices(characterID string, deviceIDs []string)
 	return &cp, true
 }
 
-// SetAuraDefault marks the given want's aura-default selection for a
-// character, or clears it when mark.Value is "".
-func (m *characterManager) SetAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
+// SetAuraDefault pins mark.Value at mark.Target for a character, or clears the
+// mark on that target when mark.Value is "".
+func (m *characterManager) SetAuraDefault(characterID string, mark AuraMark) (*Character, bool) {
+	if !mark.Target.Valid() {
+		return nil, false
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, c := range m.store.Characters {
 		if c.ID != characterID {
 			continue
 		}
+		key := mark.Target.Key()
 		if mark.Value == "" {
-			delete(m.store.Characters[i].AuraDefaults, wantID)
+			delete(m.store.Characters[i].AuraDefaults, key)
 		} else {
+			if mark.Mode == "" {
+				mark.Mode = AuraModeSet
+			}
+			mark.By = characterID
 			if m.store.Characters[i].AuraDefaults == nil {
 				m.store.Characters[i].AuraDefaults = map[string]AuraMark{}
 			}
-			m.store.Characters[i].AuraDefaults[wantID] = mark
+			m.store.Characters[i].AuraDefaults[key] = mark
 		}
 		m.save()
 		cp := m.store.Characters[i]
 		return &cp, true
 	}
 	return nil, false
+}
+
+// MigrateAuraDefaults rewrites pre-target aura marks — keyed by want instance
+// UUID, carrying a flat section/key pair — into target-keyed form, using
+// resolveWantType to turn each stored want ID into the want type the mark
+// should from now on belong to. Marks whose want no longer exists cannot be
+// re-addressed and are dropped. Idempotent: already-migrated marks are left
+// alone, so it is safe to call on every startup.
+func (m *characterManager) MigrateAuraDefaults(resolveWantType func(wantID string) (string, bool)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	migrated, dropped := 0, 0
+	for i := range m.store.Characters {
+		old := m.store.Characters[i].AuraDefaults
+		if len(old) == 0 {
+			continue
+		}
+		next := make(map[string]AuraMark, len(old))
+		for key, mark := range old {
+			if mark.Target.Valid() {
+				next[key] = mark // already target-keyed
+				continue
+			}
+			wantType, ok := resolveWantType(key)
+			if !ok {
+				log.Printf("[CharacterStore] Dropping aura mark for unknown want %s (character %s)",
+					key, m.store.Characters[i].Name)
+				dropped++
+				continue
+			}
+			mark.Target = AuraTarget{
+				Kind: AuraTargetKindWantType,
+				Name: wantType,
+				Path: mark.LegacySection + "/" + mark.LegacyKey,
+			}
+			mark.LegacySection, mark.LegacyKey = "", ""
+			if mark.Mode == "" {
+				mark.Mode = AuraModeSet
+			}
+			if mark.By == "" {
+				mark.By = m.store.Characters[i].ID
+			}
+			next[mark.Target.Key()] = mark
+			migrated++
+		}
+		m.store.Characters[i].AuraDefaults = next
+	}
+	if migrated > 0 || dropped > 0 {
+		m.save()
+		log.Printf("[CharacterStore] Migrated %d aura mark(s) to target keys, dropped %d", migrated, dropped)
+	}
 }
 
 // SetAuraCardWant sets (or clears, with wantID == "") the want this character
@@ -384,8 +498,11 @@ func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bo
 	return GetCharacterManager().AssignDevices(charID, deviceIDs)
 }
 func PruneCharacterDevices(deviceIDs []string) { GetCharacterManager().PruneDevices(deviceIDs) }
-func SetCharacterAuraDefault(characterID, wantID string, mark AuraMark) (*Character, bool) {
-	return GetCharacterManager().SetAuraDefault(characterID, wantID, mark)
+func SetCharacterAuraDefault(characterID string, mark AuraMark) (*Character, bool) {
+	return GetCharacterManager().SetAuraDefault(characterID, mark)
+}
+func MigrateCharacterAuraDefaults(resolveWantType func(wantID string) (string, bool)) {
+	GetCharacterManager().MigrateAuraDefaults(resolveWantType)
 }
 func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
 	return GetCharacterManager().SetAuraCardWant(characterID, wantID)

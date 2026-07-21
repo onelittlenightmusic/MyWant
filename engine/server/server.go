@@ -354,6 +354,17 @@ func (s *Server) Start() error {
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()
 
+	// Re-address any aura marks still keyed by want instance UUID (pre-target
+	// characters.yaml) to their want type, now that the restored wants are
+	// available to resolve those IDs against. No-op once migrated.
+	mywant.MigrateCharacterAuraDefaults(func(wantID string) (string, bool) {
+		want, _, found := s.globalBuilder.FindWantByID(wantID)
+		if !found || want.Metadata.Type == "" {
+			return "", false
+		}
+		return want.Metadata.Type, true
+	})
+
 	// Register push callback for want_achieved lifecycle webhooks
 	s.RegisterAchievementCallback()
 

@@ -101,9 +101,14 @@ func (s *Server) assignDevicesToCharacter(w http.ResponseWriter, r *http.Request
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
-// setCharacterAuraDefault marks (or, with an empty value, clears) a want's
+// setCharacterAuraDefault marks (or, with an empty value, clears) an
 // aura-default selection for a character.
-// Body: { "wantId": "want-id", "section": "current", "key": "selected", "value": "..." }
+//
+// The caller names the want it is marking, but what gets stored is that want's
+// *type* plus the section/key path — an address that means the same thing in
+// any install, so the mark stays valid across redeploys and can be handed to
+// someone else. The instance ID is only ever used to look the type up here.
+// Body: { "wantId": "want-id", "section": "current", "key": "selected", "value": "...", "mode": "set" }
 func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var req struct {
@@ -111,6 +116,7 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 		Section string `json:"section"`
 		Key     string `json:"key"`
 		Value   string `json:"value"`
+		Mode    string `json:"mode"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
@@ -120,8 +126,25 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 		s.JSONError(w, r, http.StatusBadRequest, "wantId is required", "")
 		return
 	}
-	mark := mywant.AuraMark{Section: req.Section, Key: req.Key, Value: req.Value}
-	c, ok := mywant.SetCharacterAuraDefault(id, req.WantID, mark)
+	want, _, found := s.globalBuilder.FindWantByID(req.WantID)
+	if !found {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", req.WantID)
+		return
+	}
+	if want.Metadata.Type == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "Want has no type to address the mark to", req.WantID)
+		return
+	}
+	mark := mywant.AuraMark{
+		Target: mywant.AuraTarget{
+			Kind: mywant.AuraTargetKindWantType,
+			Name: want.Metadata.Type,
+			Path: req.Section + "/" + req.Key,
+		},
+		Value: req.Value,
+		Mode:  req.Mode,
+	}
+	c, ok := mywant.SetCharacterAuraDefault(id, mark)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
