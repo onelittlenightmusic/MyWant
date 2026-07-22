@@ -325,6 +325,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/gui/pending-action", s.appendPendingDeviceAction).Methods("POST", "OPTIONS")
 
+	// Riff: propose absurd wirings between named things and effect toys, and
+	// deploy one straight from its structure (no LLM round-trip).
+	api.HandleFunc("/riff", s.getRiffs).Methods("GET", "OPTIONS")
+	api.HandleFunc("/riff/deploy", s.deployRiff).Methods("POST", "OPTIONS")
+
 	// Multi-cursor: per-character canvas cursor positions (in-memory, TTL-based, no locking)
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")

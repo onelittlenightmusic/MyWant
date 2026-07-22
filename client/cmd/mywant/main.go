@@ -49,6 +49,8 @@ func main() {
 
 	rootCmd.AddCommand(commands.InteractCmd)
 
+	rootCmd.AddCommand(commands.RiffCmd)
+
 	rootCmd.AddCommand(commands.LogsCmd)
 
 	rootCmd.AddCommand(commands.StartCmd)

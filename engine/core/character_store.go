@@ -555,6 +555,23 @@ func (m *characterManager) AuraDefinitions(kind string) map[string]AuraMark {
 	return out
 }
 
+// AllAuraDefinitions returns every definition mark across all characters and
+// kinds — the whole named vocabulary someone has built. Binding marks are
+// excluded. Used as raw material for generating riffs.
+func (m *characterManager) AllAuraDefinitions() []AuraMark {
+	out := []AuraMark{}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, c := range m.store.Characters {
+		for _, mark := range c.AuraDefaults {
+			if !mark.Target.IsBinding() {
+				out = append(out, mark)
+			}
+		}
+	}
+	return out
+}
+
 // Package-level functions
 func ListCharacters() []Character                 { return GetCharacterManager().List() }
 func ResolveAuraDefinition(kind, name, path string) (any, bool) {
@@ -563,6 +580,7 @@ func ResolveAuraDefinition(kind, name, path string) (any, bool) {
 func AuraDefinitions(kind string) map[string]AuraMark {
 	return GetCharacterManager().AuraDefinitions(kind)
 }
+func AllAuraDefinitions() []AuraMark { return GetCharacterManager().AllAuraDefinitions() }
 func GetCharacter(id string) (*Character, bool)   { return GetCharacterManager().Get(id) }
 func AddCharacter(c Character) Character          { return GetCharacterManager().Add(c) }
 func UpdateCharacter(id string, c Character) bool { return GetCharacterManager().Update(id, c) }
