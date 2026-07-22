@@ -1,0 +1,57 @@
+wantType:
+  metadata:
+    name: place_arrival
+    title: Place Arrival
+    description: >-
+      Geofence trigger. Watches the live location want against a place you named
+      (an aura definition) and fires a reaction want the moment you cross into
+      that place's radius — the trigger half of a "「会社」に着いたら〜する" riff.
+    version: '1.0'
+    category: trigger
+    pattern: independent
+    labels:
+      type-icon: MapPin
+      category-icon: MapPin
+      category-bg-light: "linear-gradient(160deg, #bbf7d0 0%, #bfdbfe 100%)"
+      category-bg-dark:  "linear-gradient(160deg, #14532d 0%, #1e3a8a 100%)"
+  parameters:
+    - name: place
+      type: string
+      required: true
+      label: Named place
+      description: Name of the place (aura definition) to watch for arrival at, e.g. "会社"
+      subType: place
+    - name: reaction_want_id
+      type: string
+      required: true
+      label: Reaction want
+      description: ID of the want to fire (its webhook trigger) on arrival
+    - name: radius_m
+      type: number
+      default: 120
+      label: Radius (m)
+      description: How close counts as "arrived", in meters
+  state:
+    - name: inside
+      description: Whether the device is currently within the place's radius
+      type: bool
+      label: current
+      persistent: true
+      exposable: true
+      initialValue: false
+    - name: distance_m
+      description: Current distance to the place, in meters
+      type: number
+      label: current
+      persistent: true
+      exposable: true
+    # Imported from the location want's published global state (device_lat/lng)
+    # via spec.imports set at deploy — read-only, resolved live.
+    - name: here_lat
+      description: Device latitude, imported from global state
+      type: number
+      label: internal
+    - name: here_lng
+      description: Device longitude, imported from global state
+      type: number
+      label: internal

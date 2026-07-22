@@ -70,10 +70,12 @@ func (s *Server) deployRiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name := fmt.Sprintf("riff-%s-%d", p.ReactionType, time.Now().UnixMilli()%100000)
-	dto := &ws.Want{
+	suffix := time.Now().UnixMilli() % 100000
+	reactionID := generateWantID()
+	name := fmt.Sprintf("riff-%s-%d", p.ReactionType, suffix)
+	dtos := []*ws.Want{{
 		Metadata: ws.Metadata{
-			ID:   generateWantID(),
+			ID:   reactionID,
 			Name: name,
 			Type: p.ReactionType,
 			Labels: map[string]string{
@@ -83,9 +85,46 @@ func (s *Server) deployRiff(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 		Spec: ws.WantSpec{Params: map[string]any{}},
+	}}
+
+	// A named-place trigger ("「会社」に着いたら…") gets a real geofence: a
+	// place_arrival want that watches the live location against that named place
+	// and fires this reaction on arrival. Source triggers don't wire yet, so
+	// they deploy the reaction alone (the intent stays on the reaction's labels).
+	wired := false
+	if p.TriggerKind == "named" && p.TriggerName != "" {
+		dtos = append(dtos, &ws.Want{
+			Metadata: ws.Metadata{
+				ID:   generateWantID(),
+				Name: fmt.Sprintf("arrival-%s-%d", p.TriggerName, suffix),
+				Type: "place_arrival",
+				Labels: map[string]string{
+					"origin":            "riff",
+					"riff-trigger-name": p.TriggerName,
+				},
+			},
+			Spec: ws.WantSpec{
+				Params: map[string]any{
+					"place":            p.TriggerName,
+					"reaction_want_id": reactionID,
+				},
+				// Import the device position the location want publishes to
+				// global state, rather than reading its want state directly.
+				Imports: map[string]string{
+					"device_lat": "here_lat",
+					"device_lng": "here_lng",
+				},
+			},
+		})
+		// Making the two ends meet is riff's job: the geofence imports
+		// device_lat/device_lng, so ensure the location want actually exposes
+		// them. Doing this by hand every time is exactly the friction riff
+		// exists to remove.
+		s.ensureDeviceLocationExposes()
+		wired = true
 	}
 
-	runtime := mywant.WantDTOSliceToRuntime([]*ws.Want{dto})
+	runtime := mywant.WantDTOSliceToRuntime(dtos)
 	if err := s.validateWantTypes(runtime); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Unknown reaction want type", err.Error())
 		return
@@ -104,7 +143,42 @@ func (s *Server) deployRiff(w http.ResponseWriter, r *http.Request) {
 		"wantId": wantID,
 		"name":   name,
 		"text":   p.Text,
+		"wired":  wired, // true = trigger geofence deployed; false = reaction only
 	})
+}
+
+// ensureDeviceLocationExposes makes every location want publish its lat/lng to
+// the global keys place_arrival imports (device_lat/device_lng), adding the
+// exposes and re-registering if they are missing. Idempotent: a location that
+// already exposes them is left alone. This is what lets a place riff "just
+// work" without the user hand-wiring expose/import.
+func (s *Server) ensureDeviceLocationExposes() {
+	want := map[string]string{"lat": "device_lat", "lng": "device_lng"}
+	for _, w := range s.globalBuilder.GetWants() {
+		if w.Metadata.Type != "location" {
+			continue
+		}
+		have := map[string]bool{}
+		for _, e := range w.Spec.Exposes {
+			if want[e.CurrentState] == e.As {
+				have[e.CurrentState] = true
+			}
+		}
+		exposes := w.Spec.Exposes
+		changed := false
+		for local, global := range want {
+			if !have[local] {
+				exposes = append(exposes, ws.ExposeEntry{CurrentState: local, As: global})
+				changed = true
+			}
+		}
+		if !changed {
+			continue
+		}
+		cfg := &mywant.Want{Metadata: w.Metadata, Spec: w.Spec}
+		cfg.Spec.Exposes = exposes
+		s.globalBuilder.UpdateWant(cfg)
+	}
 }
 
 // buildRiffInput gathers named things, deployed source wants, and effect want
