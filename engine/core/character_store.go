@@ -43,32 +43,43 @@ type Character struct {
 	AuraDesign string `yaml:"auraDesign,omitempty" json:"aura_design,omitempty"`
 }
 
-// AuraTarget addresses one variable point an aura mark can pin down. Scope
-// (Kind+Name) names something that exists identically in any install — a want
-// type, and later a site catalog, a place catalog, a world — never an instance
-// UUID, which is what makes a mark portable. Path locates the point within that
-// scope, and its grammar belongs to the Kind: only the resolver for a Kind
-// parses it, so a new Kind adds a resolver rather than changing this struct.
+// AuraTarget addresses what an aura mark is about. Scope (Kind+Name) names
+// something that exists identically in any install — never an instance UUID,
+// which is what makes a mark portable. Path locates a point within that scope,
+// and its grammar belongs to the Kind: only the resolver for a Kind parses it,
+// so a new Kind adds a resolver rather than changing this struct.
 //
-// Kind "wantType": Name is the want type name, Path is "<section>/<key>" where
-// section is one of current/goal/plan/internal or "parameter" for a spec param.
+// A mark's Kind also says what the mark *does* (see AuraMark.Role):
+//   - "wantType" is a BINDING target. Name is the want type name, Path is
+//     "<section>/<key>" (section: current/goal/plan/internal, or "parameter"
+//     for a spec param). The mark's value is applied to that field.
+//   - a CATALOG kind (e.g. "place", "site") is a DEFINITION target. Name is the
+//     name being defined, Path is empty (the whole object) or a sub-field. The
+//     mark's value *is* the definition that name resolves to — nothing is
+//     "applied"; other things reference it by name.
 type AuraTarget struct {
 	Kind string `yaml:"kind" json:"kind"`
 	Name string `yaml:"name" json:"name"`
 	Path string `yaml:"path" json:"path"`
 }
 
-// AuraTargetKindWantType is the only target kind resolved today.
+// AuraTargetKindWantType is the binding kind — marks on want-type fields.
 const AuraTargetKindWantType = "wantType"
 
 // Key is the AuraTarget's canonical string form, used as the AuraDefaults map
 // key. "|" separates scope from path because a Path may itself contain "/".
 func (t AuraTarget) Key() string { return t.Kind + ":" + t.Name + "|" + t.Path }
 
-// Valid reports whether the target names a scope and a point within it.
-func (t AuraTarget) Valid() bool { return t.Kind != "" && t.Name != "" && t.Path != "" }
+// Valid reports whether the target names a scope. Path is required for binding
+// targets (which field) but optional for definition targets (empty Path defines
+// the whole named object), so it is not checked here.
+func (t AuraTarget) Valid() bool { return t.Kind != "" && t.Name != "" }
 
-// SectionKey splits a wantType Path into its section and key halves.
+// IsBinding reports whether this target addresses a want field (so a mark on it
+// applies its value), as opposed to defining a catalog entry.
+func (t AuraTarget) IsBinding() bool { return t.Kind == AuraTargetKindWantType }
+
+// SectionKey splits a binding Path into its section and key halves.
 func (t AuraTarget) SectionKey() (string, string) {
 	if i := strings.Index(t.Path, "/"); i >= 0 {
 		return t.Path[:i], t.Path[i+1:]
@@ -76,17 +87,26 @@ func (t AuraTarget) SectionKey() (string, string) {
 	return t.Path, ""
 }
 
-// AuraMark records one character's aura-default pick: the target it pins and
-// the stringified value pinned there (JSON-stringified for object values, plain
-// string otherwise — mirrors the frontend's getChoiceValue encoding). The
-// target is captured at mark time by the card that owns the field, so applying
-// a mark (see engine/types/aura_types.go) needs no want-type knowledge.
+// AuraMark is one character's mark on a target. It does one of two things,
+// decided by whether its target is a binding or a definition:
+//
+//   - BINDING (Target.IsBinding): Value is a scalar applied to a want field
+//     when an aura covering that want activates. Mode set/endorse governs
+//     whether it is written back at all.
+//   - DEFINITION (catalog target): Value is the object the target's name
+//     resolves to — e.g. place "会社" → {lat, lng, radius}. It is stored and
+//     read by name; nothing applies it to a want.
+//
+// Value is `any` precisely so it can hold both a scalar and a structured
+// definition. A pre-existing mark whose value was a plain string simply
+// unmarshals as a string here — no migration needed for the widening.
 type AuraMark struct {
 	Target AuraTarget `yaml:"target" json:"target"`
-	Value  string     `yaml:"value"  json:"value"`
-	// Mode distinguishes a mark that should be applied to the target
+	Value  any        `yaml:"value"  json:"value"`
+	// Mode distinguishes a binding that should be applied to its field
 	// (AuraModeSet, the default) from one that only records "this observed
 	// value is the good one" (AuraModeEndorse) and is never written back.
+	// Ignored for definition marks.
 	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
 	// By is the ID of the character who signed this mark — an aura is a shared
 	// asset, so it carries its author rather than being owned by the record it
@@ -102,11 +122,21 @@ type AuraMark struct {
 	LegacyKey     string `yaml:"key,omitempty"     json:"-"`
 }
 
-// Aura mark modes.
+// Aura mark modes (binding marks only).
 const (
 	AuraModeSet     = "set"
 	AuraModeEndorse = "endorse"
 )
+
+// IsEmpty reports whether the mark carries no value — the signal to clear it.
+// Covers both a nil/absent value and the empty string a binding clear sends.
+func (m AuraMark) IsEmpty() bool {
+	if m.Value == nil {
+		return true
+	}
+	s, ok := m.Value.(string)
+	return ok && s == ""
+}
 
 // characterStoreFile is the root document persisted to ~/.mywant/characters.yaml.
 type characterStoreFile struct {
@@ -313,7 +343,7 @@ func (m *characterManager) AssignDevices(characterID string, deviceIDs []string)
 }
 
 // SetAuraDefault pins mark.Value at mark.Target for a character, or clears the
-// mark on that target when mark.Value is "".
+// mark on that target when the value is empty (see AuraMark.IsEmpty).
 func (m *characterManager) SetAuraDefault(characterID string, mark AuraMark) (*Character, bool) {
 	if !mark.Target.Valid() {
 		return nil, false
@@ -325,10 +355,12 @@ func (m *characterManager) SetAuraDefault(characterID string, mark AuraMark) (*C
 			continue
 		}
 		key := mark.Target.Key()
-		if mark.Value == "" {
+		if mark.IsEmpty() {
 			delete(m.store.Characters[i].AuraDefaults, key)
 		} else {
-			if mark.Mode == "" {
+			// Mode is meaningful only for bindings; definition marks leave it
+			// empty so nothing tries to "apply" them.
+			if mark.Mode == "" && mark.Target.IsBinding() {
 				mark.Mode = AuraModeSet
 			}
 			mark.By = characterID
@@ -488,8 +520,49 @@ func (m *characterManager) PruneDevices(deviceIDs []string) {
 	}
 }
 
+// ResolveAuraDefinition returns the definition value any character has set for
+// the catalog entry (kind, name) — the payload a definition mark carries, e.g.
+// place "会社" → {lat, lng, radius}. Consumers resolve a catalog name to its
+// object through this without knowing which character authored it. Binding
+// marks (want-type targets) are never returned. Whole-object definitions use an
+// empty path; ok is false when no such definition exists.
+func (m *characterManager) ResolveAuraDefinition(kind, name, path string) (any, bool) {
+	key := AuraTarget{Kind: kind, Name: name, Path: path}.Key()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, c := range m.store.Characters {
+		if mark, ok := c.AuraDefaults[key]; ok && !mark.Target.IsBinding() {
+			return mark.Value, true
+		}
+	}
+	return nil, false
+}
+
+// AuraDefinitions returns every definition mark of the given catalog kind
+// across all characters, keyed by the entry name — the readable catalog for
+// that kind (e.g. all known places). Binding marks are excluded.
+func (m *characterManager) AuraDefinitions(kind string) map[string]AuraMark {
+	out := map[string]AuraMark{}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, c := range m.store.Characters {
+		for _, mark := range c.AuraDefaults {
+			if mark.Target.Kind == kind && !mark.Target.IsBinding() {
+				out[mark.Target.Name] = mark
+			}
+		}
+	}
+	return out
+}
+
 // Package-level functions
 func ListCharacters() []Character                 { return GetCharacterManager().List() }
+func ResolveAuraDefinition(kind, name, path string) (any, bool) {
+	return GetCharacterManager().ResolveAuraDefinition(kind, name, path)
+}
+func AuraDefinitions(kind string) map[string]AuraMark {
+	return GetCharacterManager().AuraDefinitions(kind)
+}
 func GetCharacter(id string) (*Character, bool)   { return GetCharacterManager().Get(id) }
 func AddCharacter(c Character) Character          { return GetCharacterManager().Add(c) }
 func UpdateCharacter(id string, c Character) bool { return GetCharacterManager().Update(id, c) }

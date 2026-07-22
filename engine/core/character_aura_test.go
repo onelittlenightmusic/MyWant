@@ -112,6 +112,68 @@ func TestAuraTargetSectionKey(t *testing.T) {
 	}
 }
 
+// A definition mark carries a structured object as its value and is addressed
+// by a catalog target (empty path = the whole object). It is stored and read by
+// name, and never treated as a binding.
+func TestAuraDefinitionMarkStoresAndResolves(t *testing.T) {
+	m := newTestCharacterManager(t, Character{ID: "char-1", Name: "Tester"})
+
+	office := map[string]any{"lat": 35.68, "lng": 139.76, "radius": 120.0}
+	_, ok := m.SetAuraDefault("char-1", AuraMark{
+		Target: AuraTarget{Kind: "place", Name: "会社"},
+		Value:  office,
+	})
+	if !ok {
+		t.Fatal("SetAuraDefault returned not-ok for a valid definition mark")
+	}
+
+	got, ok := m.ResolveAuraDefinition("place", "会社", "")
+	if !ok {
+		t.Fatal("ResolveAuraDefinition did not find the place")
+	}
+	obj, isMap := got.(map[string]any)
+	if !isMap || obj["radius"] != 120.0 {
+		t.Fatalf("definition value not preserved: %#v", got)
+	}
+
+	// A definition target is not a binding, so it must never leak into the
+	// per-want-type apply lookup.
+	stored := m.store.Characters[0].AuraDefaults[AuraTarget{Kind: "place", Name: "会社"}.Key()]
+	if stored.Target.IsBinding() {
+		t.Error("place definition mark wrongly classified as a binding")
+	}
+	if stored.Mode != "" {
+		t.Errorf("definition mark should carry no mode, got %q", stored.Mode)
+	}
+
+	// AuraDefinitions lists it under its entry name.
+	places := m.AuraDefinitions("place")
+	if _, ok := places["会社"]; !ok || len(places) != 1 {
+		t.Fatalf("AuraDefinitions(place) = %v, want just 会社", keysOf(places))
+	}
+}
+
+// The widening of Value to `any` must not change binding behaviour: a scalar
+// value round-trips, and clearing still works via an empty value.
+func TestAuraBindingValueRoundTripsAndClears(t *testing.T) {
+	m := newTestCharacterManager(t, Character{ID: "char-1"})
+	target := AuraTarget{Kind: AuraTargetKindWantType, Name: "going", Path: "current/going"}
+
+	m.SetAuraDefault("char-1", AuraMark{Target: target, Value: "true"})
+	mark := m.store.Characters[0].AuraDefaults[target.Key()]
+	if mark.Value != "true" {
+		t.Fatalf("binding value = %#v, want \"true\"", mark.Value)
+	}
+	if mark.Mode != AuraModeSet {
+		t.Errorf("binding defaulted to mode %q, want %q", mark.Mode, AuraModeSet)
+	}
+
+	m.SetAuraDefault("char-1", AuraMark{Target: target, Value: ""})
+	if _, ok := m.store.Characters[0].AuraDefaults[target.Key()]; ok {
+		t.Error("empty value did not clear the binding mark")
+	}
+}
+
 func keysOf(m map[string]AuraMark) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

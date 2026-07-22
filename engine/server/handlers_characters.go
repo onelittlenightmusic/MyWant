@@ -101,49 +101,67 @@ func (s *Server) assignDevicesToCharacter(w http.ResponseWriter, r *http.Request
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
-// setCharacterAuraDefault marks (or, with an empty value, clears) an
-// aura-default selection for a character.
+// setCharacterAuraDefault marks (or, with an empty value, clears) an aura mark
+// for a character. It accepts either of two shapes:
 //
-// The caller names the want it is marking, but what gets stored is that want's
-// *type* plus the section/key path — an address that means the same thing in
-// any install, so the mark stays valid across redeploys and can be handed to
-// someone else. The instance ID is only ever used to look the type up here.
-// Body: { "wantId": "want-id", "section": "current", "key": "selected", "value": "...", "mode": "set" }
+//   - BINDING (want-field shorthand): { wantId, section, key, value, mode }.
+//     The caller names the want it is marking; what gets stored is that want's
+//     *type* plus section/key — an address that means the same thing in any
+//     install. The instance ID is only used to look the type up here.
+//
+//   - DEFINITION (explicit target): { target: {kind, name, path}, value }.
+//     value may be an object — the definition the target's name resolves to
+//     (e.g. a place → {lat, lng, radius}). Nothing is applied to a want.
+//
+// value is decoded as an arbitrary JSON value so a definition can carry an
+// object while a binding carries a scalar. An empty value clears the mark.
 func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var req struct {
+		// binding shorthand
 		WantID  string `json:"wantId"`
 		Section string `json:"section"`
 		Key     string `json:"key"`
-		Value   string `json:"value"`
 		Mode    string `json:"mode"`
+		// explicit target (definitions, and any non-want-field mark)
+		Target *mywant.AuraTarget `json:"target"`
+		// value: scalar for a binding, object for a definition
+		Value any `json:"value"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
-	if req.WantID == "" {
-		s.JSONError(w, r, http.StatusBadRequest, "wantId is required", "")
-		return
-	}
-	want, _, found := s.globalBuilder.FindWantByID(req.WantID)
-	if !found {
-		s.JSONError(w, r, http.StatusNotFound, "Want not found", req.WantID)
-		return
-	}
-	if want.Metadata.Type == "" {
-		s.JSONError(w, r, http.StatusBadRequest, "Want has no type to address the mark to", req.WantID)
-		return
-	}
-	mark := mywant.AuraMark{
-		Target: mywant.AuraTarget{
+
+	var target mywant.AuraTarget
+	switch {
+	case req.Target != nil:
+		target = *req.Target
+	case req.WantID != "":
+		want, _, found := s.globalBuilder.FindWantByID(req.WantID)
+		if !found {
+			s.JSONError(w, r, http.StatusNotFound, "Want not found", req.WantID)
+			return
+		}
+		if want.Metadata.Type == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "Want has no type to address the mark to", req.WantID)
+			return
+		}
+		target = mywant.AuraTarget{
 			Kind: mywant.AuraTargetKindWantType,
 			Name: want.Metadata.Type,
 			Path: req.Section + "/" + req.Key,
-		},
-		Value: req.Value,
-		Mode:  req.Mode,
+		}
+	default:
+		s.JSONError(w, r, http.StatusBadRequest, "Either target or wantId is required", "")
+		return
 	}
+	if !target.Valid() {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid aura target (kind and name are required)", "")
+		return
+	}
+
+	mark := mywant.AuraMark{Target: target, Value: req.Value, Mode: req.Mode}
 	c, ok := mywant.SetCharacterAuraDefault(id, mark)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)

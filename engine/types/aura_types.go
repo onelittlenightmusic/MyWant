@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"sort"
 	"strconv"
@@ -274,11 +275,29 @@ func applyAuraDefaultToWant(cb *ChainBuilder, want *Want, mark AuraMark) {
 	section, key := mark.Target.SectionKey()
 	if fn, ok := cb.FindWantFunctionByID(want.Metadata.ID); ok {
 		if applier, ok := fn.(AuraDefaultApplier); ok {
-			applier.ApplyAuraDefault(section, key, mark.Value)
+			applier.ApplyAuraDefault(section, key, auraValueString(mark.Value))
 			return
 		}
 	}
 	applyAuraDefaultGeneric(want, mark)
+}
+
+// auraValueString renders a binding mark's value the way the string-based
+// apply/validate paths expect: an object or slice as JSON, everything else via
+// fmt.Sprint. Bindings are scalar in practice, so this is almost always a plain
+// stringify — it just also copes with a value that arrived pre-parsed.
+func auraValueString(v any) string {
+	switch val := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return val
+	case map[string]any, []any:
+		if b, err := json.Marshal(val); err == nil {
+			return string(b)
+		}
+	}
+	return fmt.Sprint(v)
 }
 
 // applyAuraDefaultGeneric writes mark.Value into the section/key the mark
@@ -286,25 +305,26 @@ func applyAuraDefaultToWant(cb *ChainBuilder, want *Want, mark AuraMark) {
 // there (or already declared as a parameter) — no want-type knowledge needed.
 func applyAuraDefaultGeneric(want *Want, mark AuraMark) {
 	section, key := mark.Target.SectionKey()
+	raw := auraValueString(mark.Value)
 	if section == "parameter" {
 		existing, _ := want.GetParameter(key)
-		want.UpdateParameter(key, convertAuraValue(existing, mark.Value))
+		want.UpdateParameter(key, convertAuraValue(existing, raw))
 		return
 	}
 	var existing any
 	switch section {
 	case "current":
 		existing, _ = want.GetCurrent(key)
-		want.SetCurrent(key, convertAuraValue(existing, mark.Value))
+		want.SetCurrent(key, convertAuraValue(existing, raw))
 	case "plan":
 		existing, _ = want.GetPlan(key)
-		want.SetPlan(key, convertAuraValue(existing, mark.Value))
+		want.SetPlan(key, convertAuraValue(existing, raw))
 	case "goal":
 		existing, _ = want.GetGoal(key)
-		want.SetGoal(key, convertAuraValue(existing, mark.Value))
+		want.SetGoal(key, convertAuraValue(existing, raw))
 	case "internal":
 		existing, _ = want.GetInternal(key)
-		want.SetInternal(key, convertAuraValue(existing, mark.Value))
+		want.SetInternal(key, convertAuraValue(existing, raw))
 	}
 }
 
