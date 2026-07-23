@@ -195,49 +195,31 @@ func (s *Server) buildRiffInput() mywant.RiffInput {
 		})
 	}
 
-	// Toys (reactions) and deployed sources come from the want-type registry and
-	// the live wants. A want type in the "effect" category is a toy; a deployed
-	// want that is not itself an effect (and not world-plumbing) can be a
-	// trigger source.
+	// Reactions and sources are opt-in: a want type declares its riff role with
+	// a `riffable` label rather than being guessed from category or excluded by a
+	// blacklist. This is what keeps a nonsensical pairing (arrive → aura, which
+	// is a persistent painter, not a one-shot effect) or a noise trigger
+	// (gauge/claude-info) out — a type only appears if it named itself fit.
+	//   riffable: reaction — a one-shot effect the world can perform on trigger
+	//   riffable: source   — an evocative thing whose change makes a good trigger
 	defs := s.globalBuilder.AllWantTypeDefinitions()
-	effectTypes := map[string]bool{}
+	sourceType := map[string]bool{}
 	for name, def := range defs {
 		if def == nil {
 			continue
 		}
-		if def.Metadata.Category == "effect" {
-			effectTypes[name] = true
-			in.Reactions = append(in.Reactions, mywant.RiffReaction{
-				Type:  name,
-				Title: def.Metadata.Title,
-			})
+		switch def.Metadata.Labels["riffable"] {
+		case "reaction":
+			in.Reactions = append(in.Reactions, mywant.RiffReaction{Type: name, Title: def.Metadata.Title})
+		case "source":
+			sourceType[name] = true
 		}
 	}
 
 	for _, want := range s.globalBuilder.GetWants() {
-		t := want.Metadata.Type
-		// A single noise trigger ("system-scheduler が変わったら…") kills the whole
-		// list's charm, so the filter is deliberately strict: framework-managed
-		// system wants, world-machinery types, and effects themselves are all out.
-		// What survives should read as a real thing in the user's life.
-		if t == "" || want.Metadata.IsSystemWant || effectTypes[t] || isRiffPlumbing(t) {
-			continue
+		if sourceType[want.Metadata.Type] {
+			in.Sources = append(in.Sources, mywant.RiffSource{Type: want.Metadata.Type, Name: want.Metadata.Name})
 		}
-		in.Sources = append(in.Sources, mywant.RiffSource{Type: t, Name: want.Metadata.Name})
 	}
 	return in
-}
-
-// isRiffPlumbing excludes want types that are structural/world-machinery rather
-// than evocative real-world triggers, so riffs stay grounded in things that
-// mean something to the user. (System-managed wants are excluded separately via
-// Metadata.IsSystemWant; this covers user-deployable-but-not-evocative types.)
-func isRiffPlumbing(wantType string) bool {
-	switch wantType {
-	case "aura", "aura_erase", "wall", "world", "robot", "going", "gear", "direction",
-		"note", "timer", "button", "switch", "dynamic_background", "caddy", "cloudflare",
-		"ngrok", "localtunnel", "managed_process", "managed_launch", "web_inspector", "replay":
-		return true
-	}
-	return false
 }

@@ -10,6 +10,7 @@ wantType:
     category: weather
     pattern: independent
     labels:
+      riffable: source
       user-control: 'true'
       full-screen-display: 'true'
       category-icon: CloudSun

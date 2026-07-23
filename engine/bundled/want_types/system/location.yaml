@@ -7,6 +7,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      riffable: source
       user-control: "true"
       type-icon: MapPin
 
@@ -31,6 +32,13 @@ wantType:
       label: current
       persistent: true
       initialValue: 0
+      exposable: true
+    - name: coordinate
+      description: Current position as a single {lat,lng} object, so it can be named as a place in one X-press
+      type: object
+      subType: location_coordinate
+      label: current
+      persistent: true
       exposable: true
     - name: accuracy
       description: Accuracy in metres

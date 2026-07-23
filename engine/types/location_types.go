@@ -47,6 +47,11 @@ func (lw *LocationWant) Progress() {
 
 		lw.SetCurrent("lat", lat)
 		lw.SetCurrent("lng", lng)
+		// A single self-described coordinate object, so the current position can
+		// be named as a place in one X-press (naming lat alone would capture only
+		// the latitude number). Its "type" makes the naming UI file it under the
+		// location_coordinate catalog, which place_arrival resolves.
+		lw.SetCurrent("coordinate", map[string]any{"lat": lat, "lng": lng, "type": "location_coordinate"})
 		lw.SetCurrent("final_result", fmt.Sprintf(`{"lat":%f,"lng":%f}`, lat, lng))
 		if acc, ok := asFloat64(payload["accuracy"]); ok {
 			lw.SetCurrent("accuracy", acc)
