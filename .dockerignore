@@ -1,0 +1,25 @@
+# Only engine/ and client/ are needed to build the backend binary.
+.git
+.github
+bin
+recall_id.txt
+*.db
+*.log
+*.pid
+
+# Docs, tooling, and unrelated sub-projects
+docs
+homebrew
+check-reserved
+mcp
+tools
+examples
+container
+web
+
+# Node / editor cruft
+**/node_modules
+**/dist
+.DS_Store
+.idea
+.vscode

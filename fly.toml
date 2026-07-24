@@ -1,0 +1,49 @@
+# Fly.io config for the MyWant backend (API).
+#
+# Architecture: the backend runs ALWAYS-ON (min_machines_running = 1) because it
+# hosts the reconcile loop, MonitorAgents, and time-based wants (reminders) that
+# must keep running even when nobody is connected. The GUI (mywant-gui) is a
+# SEPARATE Fly app configured for autostop/event-driven scaling — see
+# docs/DEPLOY_FLY.md.
+#
+# Rename `app` and run `fly launch --no-deploy` (or `fly apps create`) first.
+
+app = "mywant-backend"
+primary_region = "nrt"  # Tokyo. Use `fly platform regions` to pick another.
+
+[build]
+
+[env]
+  # ~/.mywant state is written under $HOME; point it at the mounted volume.
+  HOME = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Keep the backend running: do NOT scale to zero (background jobs would stop).
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "get"
+    path = "/health"
+    protocol = "http"
+    timeout = "2s"
+
+# shared-cpu keeps this at ~$2-3/month. Bump memory to 256mb to trim cost, or
+# higher if you see OOM restarts under heavier want workloads.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
+
+# Persistent state (~/.mywant): state.yaml, memo.yaml, achievements.yaml,
+# recipes/, custom-types/. Create with:
+#   fly volumes create mywant_data --region nrt --size 1
+[[mounts]]
+  source = "mywant_data"
+  destination = "/data"
