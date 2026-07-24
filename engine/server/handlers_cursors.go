@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,16 +19,63 @@ const cursorTTL = 8 * time.Second // entries older than this are excluded from G
 // web/src/shared/characterPresence.ts.
 const sayTTL = 8 * time.Second
 
+// effectEvent is one effect firing, carried on the cursor so a burst of them
+// survives to the client. A single scalar effectType/nonce loses rapid repeats:
+// the client's setState coalesces snapshots, so only the last nonce is seen and
+// only one animation plays. A short list lets one snapshot piggyback every
+// recent fire, and the client replays each nonce it hasn't seen. Trimmed by age
+// (effectTTL) so it stays tiny and old fires don't replay on a fresh connect.
+type effectEvent struct {
+	Type  string  `json:"type"`
+	Nonce int64   `json:"nonce"` // Unix ms, monotonic across client and server sources
+	X     float64 `json:"x"`
+	Y     float64 `json:"y"`
+}
+
+const effectTTL = 3 * time.Second
+
+// trimEffects drops events older than effectTTL.
+func trimEffects(prev []effectEvent) []effectEvent {
+	cutoff := time.Now().Add(-effectTTL).UnixMilli()
+	out := make([]effectEvent, 0, len(prev))
+	for _, e := range prev {
+		if e.Nonce >= cutoff {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// appendNoop just ages the list (used on effect-less position PUTs).
+func appendNoop(prev []effectEvent) []effectEvent { return trimEffects(prev) }
+
+// appendEffect ages the list and adds ev.
+func appendEffect(prev []effectEvent, ev effectEvent) []effectEvent {
+	return append(trimEffects(prev), ev)
+}
+
+// splitEffectTypes splits a comma-separated effectType into non-empty types.
+func splitEffectTypes(s string) []string {
+	out := []string{}
+	for _, t := range strings.Split(s, ",") {
+		if t = strings.TrimSpace(t); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 type cursorEntry struct {
-	DeviceID    string  `json:"deviceId,omitempty"`
-	X           float64 `json:"x"`
-	Y           float64 `json:"y"`
-	Avatar      string  `json:"avatar,omitempty"`
-	Color       string  `json:"color,omitempty"`
-	Name        string  `json:"name,omitempty"`
-	LastSeen    int64   `json:"lastSeen"` // Unix ms
-	EffectType  string  `json:"effectType,omitempty"`
-	EffectNonce int64   `json:"effectNonce,omitempty"`
+	DeviceID    string        `json:"deviceId,omitempty"`
+	X           float64       `json:"x"`
+	Y           float64       `json:"y"`
+	Avatar      string        `json:"avatar,omitempty"`
+	Color       string        `json:"color,omitempty"`
+	Name        string        `json:"name,omitempty"`
+	LastSeen    int64         `json:"lastSeen"` // Unix ms
+	Effects     []effectEvent `json:"effects,omitempty"`
+	EffectType  string        `json:"effectType,omitempty"`
+	EffectNonce int64         `json:"effectNonce,omitempty"`
 	// Speech-bubble text set by `i say` / the canvas Say action. The client
 	// keeps resending it on each position PUT while the bubble should stay
 	// up, so it expires naturally with the entry's own cursorTTL — there is
@@ -49,12 +97,13 @@ type cursorResponse struct {
 	Y           float64 `json:"y"`
 	Avatar      string  `json:"avatar,omitempty"`
 	Color       string  `json:"color,omitempty"`
-	Name        string  `json:"name,omitempty"`
-	LastSeen    int64   `json:"lastSeen"`
-	EffectType  string  `json:"effectType,omitempty"`
-	EffectNonce int64   `json:"effectNonce,omitempty"`
-	Message     string  `json:"message,omitempty"`
-	MessageAt   int64   `json:"messageAt,omitempty"`
+	Name        string        `json:"name,omitempty"`
+	LastSeen    int64         `json:"lastSeen"`
+	Effects     []effectEvent `json:"effects,omitempty"`
+	EffectType  string        `json:"effectType,omitempty"`
+	EffectNonce int64         `json:"effectNonce,omitempty"`
+	Message     string        `json:"message,omitempty"`
+	MessageAt   int64         `json:"messageAt,omitempty"`
 }
 
 // snapshotCursors returns all non-stale cursor entries as a response slice.
@@ -76,6 +125,7 @@ func snapshotCursors() []cursorResponse {
 			Color:       e.Color,
 			Name:        e.Name,
 			LastSeen:    e.LastSeen,
+			Effects:     e.Effects,
 			EffectType:  e.EffectType,
 			EffectNonce: e.EffectNonce,
 			Message:     e.Message,
@@ -154,6 +204,21 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		message, messageAt = prev.Message, prev.MessageAt
 	}
 
+	// Carry the recent-effects list across position PUTs (which say nothing
+	// about effects), appending any newly fired ones so a rapid burst all rides
+	// the snapshot. effectType may be comma-separated (several effects fired by
+	// one press).
+	effects := appendNoop(prev.Effects)
+	if body.EffectType != "" {
+		nonce := body.EffectNonce
+		if nonce == 0 {
+			nonce = time.Now().UnixMilli()
+		}
+		for _, t := range splitEffectTypes(body.EffectType) {
+			effects = appendEffect(effects, effectEvent{Type: t, Nonce: nonce, X: body.X, Y: body.Y})
+		}
+	}
+
 	cursors[characterID] = cursorEntry{
 		DeviceID:    body.DeviceID,
 		X:           body.X,
@@ -162,6 +227,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		Color:       body.Color,
 		Name:        body.Name,
 		LastSeen:    time.Now().UnixMilli(),
+		Effects:     effects,
 		EffectType:  body.EffectType,
 		EffectNonce: body.EffectNonce,
 		Message:     message,
@@ -223,11 +289,12 @@ func FireCharacterEffect(characterID, effectType string) {
 		cursorsMu.Unlock()
 		return // character has no cursor on screen — nothing to animate
 	}
+	// Wall-clock ms, the same unit the client dispatcher uses, so the frontend's
+	// monotonic per-event guard stays consistent whichever source fired.
+	nonce := time.Now().UnixMilli()
+	e.Effects = appendEffect(e.Effects, effectEvent{Type: effectType, Nonce: nonce, X: e.X, Y: e.Y})
 	e.EffectType = effectType
-	// Wall-clock ms, the same unit the client dispatcher uses for its nonce, so
-	// the frontend's monotonic "nonce > last" guard stays consistent whichever
-	// source fired the effect.
-	e.EffectNonce = time.Now().UnixMilli()
+	e.EffectNonce = nonce
 	e.LastSeen = time.Now().UnixMilli()
 	cursors[characterID] = e
 	cursorsMu.Unlock()
