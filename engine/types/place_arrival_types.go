@@ -73,8 +73,38 @@ func (p *PlaceArrivalWant) Progress() {
 	// Fire only on the outside→inside edge: arrival, not presence.
 	if nowInside && wasInside != true {
 		fireReaction(reactionID)
+		// The effect belongs to whoever arrived — the character whose device is
+		// reporting this position — so play it on their cursor too, and it
+		// animates on every client via the cursor stream (see FireCharacterEffect).
+		if effectType, charID := reactionEffectAndArriver(reactionID); effectType != "" && charID != "" {
+			FireCharacterEffect(charID, effectType)
+		}
 		p.StoreLog("[PLACE-ARRIVAL] arrived at %q (%.0fm ≤ %.0fm) — fired %s", place, dist, radius, reactionID)
 	}
+}
+
+// reactionEffectAndArriver resolves the reaction want's type (the effect to
+// play) and the character who arrived — the owner of the location want feeding
+// the position. Either may be empty if not resolvable (e.g. a CLI-deployed riff
+// with no owning character), in which case the effect still updates state but
+// no cursor animates.
+func reactionEffectAndArriver(reactionID string) (effectType, characterID string) {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return "", ""
+	}
+	if want, _, ok := cb.FindWantByID(reactionID); ok {
+		effectType = want.Metadata.Type
+	}
+	for _, w := range cb.GetWants() {
+		if w.Metadata.Type == "location" {
+			if id := w.Metadata.Labels["mywant.io/owner-character"]; id != "" {
+				characterID = id
+				break
+			}
+		}
+	}
+	return effectType, characterID
 }
 
 // resolvePlaceCoords looks the named place up in the aura catalog. The naming UI

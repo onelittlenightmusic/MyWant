@@ -354,6 +354,10 @@ func (s *Server) Start() error {
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()
 
+	// Let server-side triggers (e.g. a place_arrival geofence) play effects on a
+	// character's cursor, so they animate on every client via the cursor stream.
+	mywant.OnCharacterEffectFire = FireCharacterEffect
+
 	// Re-address any aura marks still keyed by want instance UUID (pre-target
 	// characters.yaml) to their want type, now that the restored wants are
 	// available to resolve those IDs against. No-op once migrated.

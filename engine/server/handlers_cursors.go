@@ -206,3 +206,31 @@ func (s *Server) deleteCursor(w http.ResponseWriter, r *http.Request) {
 	cursorsMu.Unlock()
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// FireCharacterEffect plays an effect on a character's cursor by bumping its
+// EffectType/EffectNonce in place (keeping its current position) and
+// broadcasting the cursor roster — the same path an X-press takes, so every
+// client animates the effect at that character's cursor. Used by server-side
+// triggers such as a place_arrival geofence, which have no client of their own.
+// No-op if the character has no live cursor entry.
+func FireCharacterEffect(characterID, effectType string) {
+	if characterID == "" || effectType == "" {
+		return
+	}
+	cursorsMu.Lock()
+	e, ok := cursors[characterID]
+	if !ok {
+		cursorsMu.Unlock()
+		return // character has no cursor on screen — nothing to animate
+	}
+	e.EffectType = effectType
+	// Wall-clock ms, the same unit the client dispatcher uses for its nonce, so
+	// the frontend's monotonic "nonce > last" guard stays consistent whichever
+	// source fired the effect.
+	e.EffectNonce = time.Now().UnixMilli()
+	e.LastSeen = time.Now().UnixMilli()
+	cursors[characterID] = e
+	cursorsMu.Unlock()
+
+	go broadcastSSE("cursor", snapshotCursors())
+}
