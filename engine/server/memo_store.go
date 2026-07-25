@@ -162,6 +162,10 @@ type DataTypeInfo struct {
 	Icon     string `yaml:"icon"      json:"icon"`               // Lucide icon component name
 	Color    string `yaml:"color"     json:"color"`              // hex color for UI
 	BaseType string `yaml:"base_type" json:"baseType,omitempty"` // parent primitive type; empty = primitive
+	// Catalog is the catalog kind a value of this subtype is NAMED into. Usually
+	// the subtype itself; set it when the data subtype and the catalog it names
+	// into differ — e.g. a location_coordinate value is named as a "place".
+	Catalog string `yaml:"catalog" json:"catalog,omitempty"`
 }
 
 // DataTypeDefinitions returns a copy of all known data type definitions.

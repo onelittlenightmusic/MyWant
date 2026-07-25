@@ -1,7 +1,11 @@
 package server
 
 import (
+	"encoding/json"
+	"math"
 	"net/http"
+	"reflect"
+	"strings"
 
 	mywant "mywant/engine/core"
 
@@ -167,6 +171,14 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	// A definition mark (a catalog kind, not a want-type binding) names a value:
+	// record that name in the memo under its kind, so every name you give shows
+	// up as a reusable suggestion alongside the ones wants record automatically.
+	if !target.IsBinding() && req.Value != nil && req.Value != "" {
+		if err := s.memoStore.Record(target.Kind, target.Name); err != nil {
+			mywant.WarnLog("[aura] failed to record memo %s=%q: %v", target.Kind, target.Name, err)
+		}
+	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
@@ -190,6 +202,160 @@ func (s *Server) setCharacterAuraCardWant(w http.ResponseWriter, r *http.Request
 	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// cardNameKindValue resolves, for a want's final-result field, the catalog kind
+// its value is NAMED into and the field's current value. The kind comes from the
+// value's self-described `type` (or the field's declared subType), mapped through
+// the data type's catalog relationship (e.g. location_coordinate → place). The
+// client names only the want; the server owns which field and which catalog.
+func (s *Server) cardNameKindValue(wantID string) (kind string, value any, ok bool) {
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found || want.Metadata.Type == "" {
+		return "", nil, false
+	}
+	def := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
+	if def == nil || def.FinalResultField == "" {
+		return "", nil, false
+	}
+	frf := def.FinalResultField
+	value, _ = want.GetCurrent(frf)
+
+	sub := ""
+	if m, isMap := value.(map[string]any); isMap {
+		if t, isStr := m["type"].(string); isStr {
+			sub = t
+		}
+	}
+	if sub == "" {
+		for _, sd := range def.State {
+			if sd.Name == frf {
+				sub = sd.SubType
+				break
+			}
+		}
+	}
+	if sub == "" {
+		sub = "value"
+	}
+	kind = sub
+	if info, has := DataTypeDefinitions()[sub]; has && info.Catalog != "" {
+		kind = info.Catalog
+	}
+	return kind, value, true
+}
+
+// cardAuraName names a want's final-result value into its catalog — pressing X
+// on a card, the same as naming a field. The server resolves the catalog kind;
+// the name is also recorded in the memo. PUT /api/v1/characters/{id}/card-aura-name
+// Body: { "wantId": "want-id", "name": "自宅" }
+func (s *Server) cardAuraName(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		WantID string `json:"wantId"`
+		Name   string `json:"name"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	kind, value, ok := s.cardNameKindValue(req.WantID)
+	if !ok {
+		s.JSONError(w, r, http.StatusBadRequest, "Want has no final-result field to name", req.WantID)
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "name is required", "")
+		return
+	}
+	mark := mywant.AuraMark{Target: mywant.AuraTarget{Kind: kind, Name: name}, Value: value}
+	c, ok := mywant.SetCharacterAuraDefault(id, mark)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	if err := s.memoStore.Record(kind, name); err != nil {
+		mywant.WarnLog("[aura] failed to record memo %s=%q: %v", kind, name, err)
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"character": c, "kind": kind, "name": name})
+}
+
+// getCardAuraMark reports the catalog names a want's final-result value carries
+// — the definitions of its kind that match its current value (coordinates by
+// proximity, else exact) — so a card shows them without knowing which field or
+// kind it is. GET /api/v1/characters/{id}/card-aura-mark?wantId=want-id
+func (s *Server) getCardAuraMark(w http.ResponseWriter, r *http.Request) {
+	wantID := r.URL.Query().Get("wantId")
+	kind, value, ok := s.cardNameKindValue(wantID)
+	if !ok {
+		s.JSONResponse(w, http.StatusOK, map[string]any{"names": []any{}})
+		return
+	}
+	type named struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+	names := []named{}
+	for _, ch := range mywant.ListCharacters() {
+		for _, m := range ch.AuraDefaults {
+			if m.Target.Kind != kind || m.Target.Path != "" {
+				continue
+			}
+			if auraValuesMatch(m.Value, value) {
+				names = append(names, named{Name: m.Target.Name, Color: ch.Color})
+			}
+		}
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"names": names})
+}
+
+// auraValuesMatch compares a definition value to a field value: coordinates by
+// proximity (GPS jitter never reproduces the captured value exactly), else by
+// deep equality.
+func auraValuesMatch(a, b any) bool {
+	if ca, cb := coordOf(a), coordOf(b); ca != nil && cb != nil {
+		return metersBetween(ca, cb) <= placeMatchRadiusM
+	}
+	return reflect.DeepEqual(a, b)
+}
+
+type latLng struct{ lat, lng float64 }
+
+const placeMatchRadiusM = 150.0
+
+func coordOf(v any) *latLng {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	lat, okLat := floatFrom(m["lat"])
+	lng, okLng := floatFrom(m["lng"])
+	if !okLat || !okLng {
+		return nil
+	}
+	return &latLng{lat, lng}
+}
+
+func floatFrom(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	}
+	return 0, false
+}
+
+func metersBetween(a, b *latLng) float64 {
+	const R, rad = 6371000.0, math.Pi / 180
+	dLat, dLng := (b.lat-a.lat)*rad, (b.lng-a.lng)*rad
+	s := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(a.lat*rad)*math.Cos(b.lat*rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
+	return R * 2 * math.Atan2(math.Sqrt(s), math.Sqrt(1-s))
 }
 
 // setCharacterDesign sets the tile/aura design-plugin ids for a character.

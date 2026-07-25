@@ -10,6 +10,9 @@ wantType:
       riffable: source
       user-control: "true"
       type-icon: MapPin
+  # The coordinate object is the location's result — so an X-press on the card
+  # aura-marks it (see cardAuraMark), and it names a place in one press.
+  finalResultField: coordinate
 
   parameters:
     - name: label

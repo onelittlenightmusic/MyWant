@@ -19,7 +19,8 @@ want_type: { key: want_types, icon: Zap,           color: "#a855f7" }
 # ── String subtypes ────────────────────────────────────────────────────────────
 image:     { key: images,     icon: Image,        color: "#a855f7", base_type: string }
 image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string }
-url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string }
+url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string, catalog: webpage }
+webpage:   { key: webpages,   icon: Globe,        color: "#8b5cf6", base_type: string }
 date:     { key: dates,     icon: Calendar,     color: "#f59e0b", base_type: string }
 time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string }
 city:     { key: cities,    icon: Building2,    color: "#06b6d4", base_type: string }
@@ -63,4 +64,5 @@ percentage:  { key: percentages,  icon: Percent,        color: "#3b82f6", base_t
 # declaring want type's schema. StateDef/ParameterDef `subType: location_coordinate`
 # is still recommended (drives the "add field" JSON picker, docs, etc.) but the
 # value's own `type` field takes precedence when both are present.
-location_coordinate: { key: location_coordinates, icon: MapPin, color: "#06b6d4", base_type: object }
+# catalog: place — a coordinate object is NAMED as a place.
+location_coordinate: { key: location_coordinates, icon: MapPin, color: "#06b6d4", base_type: object, catalog: place }
