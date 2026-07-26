@@ -236,6 +236,17 @@ func (s *Server) setupRoutes() {
 	memo.HandleFunc("/events", s.getMemoEvents).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/stats", s.getMemoStats).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
+	// Per-memo-value labels (general facility; groups ride on group/* keys)
+	memo.HandleFunc("/labels", s.getMemoLabels).Methods("GET", "OPTIONS")
+	memo.HandleFunc("/labels", s.setMemoLabel).Methods("POST")
+	memo.HandleFunc("/labels/remove", s.removeMemoLabel).Methods("POST", "OPTIONS")
+
+	// Groups API (label-backed facade: group/<name> labels on memo values / wants)
+	groups := api.PathPrefix("/groups").Subrouter()
+	groups.HandleFunc("", s.getGroups).Methods("GET", "OPTIONS")
+	groups.HandleFunc("", s.createGroup).Methods("POST", "OPTIONS")
+	groups.HandleFunc("/{name}", s.updateGroup).Methods("PUT", "OPTIONS")
+	groups.HandleFunc("/{name}", s.deleteGroup).Methods("DELETE", "OPTIONS")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")
