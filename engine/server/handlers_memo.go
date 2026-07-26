@@ -51,6 +51,31 @@ func (s *Server) getMemoSubtypes(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/v1/memo/events
+// Returns memo provenance events, most-recent first.
+// Query params: limit (default 200); catalog + value to filter to one named value.
+func (s *Server) getMemoEvents(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	catalog := r.URL.Query().Get("catalog")
+	value := r.URL.Query().Get("value")
+
+	var events []MemoEvent
+	if catalog != "" && value != "" {
+		events = s.memoEvents.ForValue(catalog, value, limit)
+	} else {
+		events = s.memoEvents.All(limit)
+	}
+	if events == nil {
+		events = []MemoEvent{}
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"events": events})
+}
+
 // PUT /api/v1/memo
 // Replaces the entire memo with the provided map[string][]string.
 func (s *Server) putMemo(w http.ResponseWriter, r *http.Request) {

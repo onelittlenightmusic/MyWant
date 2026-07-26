@@ -21,6 +21,9 @@ type Config struct {
 	CardOpacity  *float64 `json:"card_opacity,omitempty" yaml:"card_opacity,omitempty"`
 	SoundEnabled *bool    `json:"sound_enabled" yaml:"sound_enabled"`
 	IconFont     string   `json:"icon_font,omitempty" yaml:"icon_font,omitempty"`
+	// SystemFontSize scales card-face names and the hamburger menu together:
+	// "small" | "medium" | "large" (absent = "large", the current sizes).
+	SystemFontSize string `json:"system_font_size,omitempty" yaml:"system_font_size,omitempty"`
 	CanvasBgURL  string   `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
 	// TunnelURL is the public URL captured from a managed_launch want (e.g.
 	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.

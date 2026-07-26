@@ -41,6 +41,7 @@ type Server struct {
 	otelShutdown         func(context.Context) error     // OpenTelemetry shutdown hook
 	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
 	memoStore            *MemoStore                      // Persists user-entered values to ~/.mywant/memo.yaml
+	memoEvents           *MemoEventStore                 // Provenance timeline for named values (~/.mywant/memo-events.yaml)
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 }
 
@@ -284,6 +285,7 @@ func New(config Config) *Server {
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
 		memoStore:            newMemoStore(),
+		memoEvents:           newMemoEventStore(),
 		exposableFieldsCache: exposableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
@@ -301,6 +303,7 @@ func (s *Server) Start() error {
 	// Register MemoHook here (after New) so it can reference s.memoStore and s.globalBuilder.
 	s.wantCreationHooks = append(s.wantCreationHooks, &MemoHook{
 		memo:    s.memoStore,
+		events:  s.memoEvents,
 		builder: s.globalBuilder,
 	})
 	s.setupRoutes()
@@ -492,6 +495,9 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.IconFont != "" {
 		fullConfig["icon_font"] = s.config.IconFont
+	}
+	if s.config.SystemFontSize != "" {
+		fullConfig["system_font_size"] = s.config.SystemFontSize
 	}
 	if s.config.CanvasBgURL != "" {
 		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL

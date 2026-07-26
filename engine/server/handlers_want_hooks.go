@@ -97,6 +97,7 @@ func (h *WantTypeDefaultsHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*myw
 // WantTypeDefinition declares a non-empty SubType.
 type MemoHook struct {
 	memo    *MemoStore
+	events  *MemoEventStore
 	builder interface {
 		GetWantTypeDefinition(typeName string) *mywant.WantTypeDefinition
 	}
@@ -127,6 +128,17 @@ func (h *MemoHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) er
 		}
 		if err := h.memo.Record(pd.SubType, str); err != nil {
 			mywant.WarnLog("[MemoHook] failed to record %s=%q: %v", pd.SubType, str, err)
+		}
+		if h.events != nil {
+			_ = h.events.Record(MemoEvent{
+				Catalog:  subtypeToKey(pd.SubType),
+				Subtype:  pd.SubType,
+				Value:    str,
+				Source:   MemoSourceWantParam,
+				WantID:   want.Metadata.ID,
+				WantName: want.Metadata.Name,
+				WantType: want.Metadata.Type,
+			})
 		}
 	}
 	return nil

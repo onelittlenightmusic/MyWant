@@ -178,9 +178,37 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 		if err := s.memoStore.Record(target.Kind, target.Name); err != nil {
 			mywant.WarnLog("[aura] failed to record memo %s=%q: %v", target.Kind, target.Name, err)
 		}
+		s.recordMemoEvent(target.Kind, target.Name, MemoSourceAuraDefinition, req.WantID, c)
 	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// recordMemoEvent appends a memo provenance event for a value named via an aura
+// (a catalog definition or a card X-name). subtype is the catalog kind; wantID,
+// when present, is resolved to its want name/type. A nil event store is a no-op.
+func (s *Server) recordMemoEvent(subtype, value, source, wantID string, c *mywant.Character) {
+	if s.memoEvents == nil || value == "" {
+		return
+	}
+	ev := MemoEvent{
+		Catalog: subtypeToKey(subtype),
+		Subtype: subtype,
+		Value:   value,
+		Source:  source,
+	}
+	if c != nil {
+		ev.CharacterID = c.ID
+		ev.CharacterName = c.Name
+	}
+	if wantID != "" {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			ev.WantID = want.Metadata.ID
+			ev.WantName = want.Metadata.Name
+			ev.WantType = want.Metadata.Type
+		}
+	}
+	_ = s.memoEvents.Record(ev)
 }
 
 // setCharacterAuraCardWant sets (or, with an empty wantId, clears) the want a
@@ -278,6 +306,7 @@ func (s *Server) cardAuraName(w http.ResponseWriter, r *http.Request) {
 	if err := s.memoStore.Record(kind, name); err != nil {
 		mywant.WarnLog("[aura] failed to record memo %s=%q: %v", kind, name, err)
 	}
+	s.recordMemoEvent(kind, name, MemoSourceCardName, req.WantID, c)
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"character": c, "kind": kind, "name": name})
 }
