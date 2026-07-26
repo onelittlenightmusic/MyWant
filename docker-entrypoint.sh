@@ -8,7 +8,9 @@ mkdir -p "$HOME"
 
 if [ "$(id -u)" = "0" ]; then
     chown -R app:app "$HOME" 2>/dev/null || true
-    exec su-exec app "$@"
+    # su-exec resets HOME to the target user's /etc/passwd entry, which would
+    # send ~/.mywant to the ephemeral /home/app instead of the mounted volume.
+    exec su-exec app env HOME="$HOME" "$@"
 fi
 
 exec "$@"
