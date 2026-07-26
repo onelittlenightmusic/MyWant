@@ -1395,17 +1395,9 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	state := guiFields(want)
-	// Restore device settings from config.yaml (want state resets on restart but config persists).
-	if s.config.ActiveLocationDevice != "" {
-		state["activeLocationDevice"] = s.config.ActiveLocationDevice
-	}
-	if s.config.LocationWantId != "" {
-		state["locationWantId"] = s.config.LocationWantId
-	}
 	s.JSONResponse(w, http.StatusOK, guiStateResponse{
 		Seq:   seq,
-		State: state,
+		State: s.guiStateWithConfig(want),
 	})
 }
 
@@ -1561,7 +1553,7 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: guiFields(want)}
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: s.guiStateWithConfig(want)}
 	go broadcastSSE("gui_state", resp)
 	s.JSONResponse(w, http.StatusOK, resp)
 }
@@ -1607,7 +1599,7 @@ func (s *Server) appendPendingDeviceAction(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: guiFields(want)}
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: s.guiStateWithConfig(want)}
 	go broadcastSSE("gui_state", resp)
 	s.JSONResponse(w, http.StatusOK, resp)
 }
@@ -1786,6 +1778,23 @@ func (s *Server) replayRobotLog(w http.ResponseWriter, r *http.Request) {
 }
 
 // guiFields returns the declared GUI state fields via ProvidedStateFields.
+// guiStateWithConfig returns the gui_state want's fields with device settings
+// restored from config.yaml. The gui_state want's own state resets on a server
+// restart, but config.yaml persists activeLocationDevice / locationWantId — so
+// applying them here keeps location sending alive across restarts for both the
+// GET response and every SSE broadcast (an unrelated PUT must not push an empty
+// activeLocationDevice that would turn the sending device off).
+func (s *Server) guiStateWithConfig(want *mywant.Want) map[string]any {
+	state := guiFields(want)
+	if s.config.ActiveLocationDevice != "" {
+		state["activeLocationDevice"] = s.config.ActiveLocationDevice
+	}
+	if s.config.LocationWantId != "" {
+		state["locationWantId"] = s.config.LocationWantId
+	}
+	return state
+}
+
 func guiFields(want *mywant.Want) map[string]any {
 	return want.GetExplicitState()
 }
