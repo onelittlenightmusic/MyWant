@@ -23,13 +23,13 @@ url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: s
 webpage:   { key: webpages,   icon: Globe,        color: "#8b5cf6", base_type: string }
 date:     { key: dates,     icon: Calendar,     color: "#f59e0b", base_type: string }
 time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string }
-city:     { key: cities,    icon: Building2,    color: "#06b6d4", base_type: string }
-station:  { key: stations,  icon: Train,        color: "#06b6d4", base_type: string }
-location: { key: locations, icon: MapPin,       color: "#06b6d4", base_type: string }
-place:    { key: places,    icon: MapPin,       color: "#06b6d4", base_type: string }
+city:     { key: cities,    icon: Building2,    color: "#2563eb", base_type: string }
+station:  { key: stations,  icon: Train,        color: "#059669", base_type: string }
+location: { key: locations, icon: MapPin,       color: "#7c3aed", base_type: string }
+place:    { key: places,    icon: MapPin,       color: "#db2777", base_type: string }
 country:  { key: countries, icon: Flag,         color: "#64748b", base_type: string }
-airport:  { key: airports,  icon: Plane,        color: "#06b6d4", base_type: string }
-landmark: { key: landmarks, icon: Landmark,     color: "#06b6d4", base_type: string }
+airport:  { key: airports,  icon: Plane,        color: "#0284c7", base_type: string }
+landmark: { key: landmarks, icon: Landmark,     color: "#ea580c", base_type: string }
 address:  { key: addresses, icon: Home,         color: "#64748b", base_type: string }
 email:    { key: emails,    icon: Mail,         color: "#64748b", base_type: string }
 phone:    { key: phones,    icon: Phone,        color: "#64748b", base_type: string }
@@ -38,7 +38,7 @@ person:   { key: people,    icon: User,         color: "#64748b", base_type: str
 tag:      { key: tags,      icon: Tag,          color: "#64748b", base_type: string }
 keyword:  { key: keywords,  icon: Search,       color: "#64748b", base_type: string }
 secret:   { key: secrets,   icon: EyeOff,       color: "#64748b", base_type: string }
-hotel:    { key: hotels,    icon: Landmark,     color: "#06b6d4", base_type: string }
+hotel:    { key: hotels,    icon: Landmark,     color: "#dc2626", base_type: string }
 shop:     { key: shops,     icon: ShoppingCart, color: "#64748b", base_type: string }
 product:  { key: products,  icon: Package,      color: "#64748b", base_type: string }
 price:    { key: prices,    icon: DollarSign,   color: "#3b82f6", base_type: string }
@@ -65,4 +65,4 @@ percentage:  { key: percentages,  icon: Percent,        color: "#3b82f6", base_t
 # is still recommended (drives the "add field" JSON picker, docs, etc.) but the
 # value's own `type` field takes precedence when both are present.
 # catalog: place — a coordinate object is NAMED as a place.
-location_coordinate: { key: location_coordinates, icon: MapPin, color: "#06b6d4", base_type: object, catalog: place }
+location_coordinate: { key: location_coordinates, icon: MapPin, color: "#db2777", base_type: object, catalog: place }

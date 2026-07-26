@@ -234,6 +234,7 @@ func (s *Server) setupRoutes() {
 	memo.HandleFunc("", s.putMemo).Methods("PUT", "OPTIONS")
 	memo.HandleFunc("/subtypes", s.getMemoSubtypes).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/events", s.getMemoEvents).Methods("GET", "OPTIONS")
+	memo.HandleFunc("/stats", s.getMemoStats).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)

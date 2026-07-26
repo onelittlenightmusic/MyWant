@@ -76,6 +76,13 @@ func (s *Server) getMemoEvents(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"events": events})
 }
 
+// GET /api/v1/memo/stats
+// Per-value usage stats (count + lastUsed), derived from the event log, keyed
+// by catalog then value.
+func (s *Server) getMemoStats(w http.ResponseWriter, r *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{"stats": s.memoEvents.Stats()})
+}
+
 // PUT /api/v1/memo
 // Replaces the entire memo with the provided map[string][]string.
 func (s *Server) putMemo(w http.ResponseWriter, r *http.Request) {

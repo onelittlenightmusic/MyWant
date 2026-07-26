@@ -204,7 +204,6 @@ func (s *Server) recordMemoEvent(subtype, value, source, wantID string, c *mywan
 	if wantID != "" {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			ev.WantID = want.Metadata.ID
-			ev.WantName = want.Metadata.Name
 			ev.WantType = want.Metadata.Type
 		}
 	}

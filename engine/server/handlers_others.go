@@ -868,14 +868,26 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	defs := s.wantTypeLoader.GetAll()
 	res := make([]map[string]any, len(defs))
 	for i, d := range defs {
+		// Distinct non-empty parameter subtypes — lets the client filter want
+		// types by the subtype of a memo value (memo-seeded Add Want) without
+		// fetching every full definition.
+		paramSubtypes := []string{}
+		seen := map[string]bool{}
+		for _, p := range d.Parameters {
+			if p.SubType != "" && !seen[p.SubType] {
+				seen[p.SubType] = true
+				paramSubtypes = append(paramSubtypes, p.SubType)
+			}
+		}
 		res[i] = map[string]any{
-			"name":        d.Metadata.Name,
-			"title":       d.Metadata.Title,
-			"category":    d.Metadata.Category,
-			"pattern":     d.Metadata.Pattern,
-			"version":     d.Metadata.Version,
-			"system_type": d.Metadata.SystemType,
-			"labels":      d.Metadata.Labels,
+			"name":          d.Metadata.Name,
+			"title":         d.Metadata.Title,
+			"category":      d.Metadata.Category,
+			"pattern":       d.Metadata.Pattern,
+			"version":       d.Metadata.Version,
+			"system_type":   d.Metadata.SystemType,
+			"labels":        d.Metadata.Labels,
+			"paramSubtypes": paramSubtypes,
 		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"wantTypes": res, "count": len(res)})

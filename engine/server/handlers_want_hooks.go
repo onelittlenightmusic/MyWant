@@ -136,7 +136,6 @@ func (h *MemoHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) er
 				Value:    str,
 				Source:   MemoSourceWantParam,
 				WantID:   want.Metadata.ID,
-				WantName: want.Metadata.Name,
 				WantType: want.Metadata.Type,
 			})
 		}
