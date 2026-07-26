@@ -1,115 +1,86 @@
 # Deploying MyWant on Fly.io
 
-This guide deploys MyWant as **two separate Fly.io apps**, matching how the two
-tiers actually behave:
-
-| App | Repo | Scaling | Why | Cost |
-|-----|------|---------|-----|------|
-| **Backend (API)** | this repo | **Always-on** (`min_machines_running = 1`) | Runs the reconcile loop, MonitorAgents, and time-based wants (reminders) that must keep firing even when nobody is connected. | ~$2–3/mo (shared-cpu) |
-| **Frontend (GUI)** | [`mywant-gui`](https://github.com/onelittlenightmusic/mywant-gui) | **Autostop / event-driven** (`min_machines_running = 0`) | Static React SPA + API proxy. Needs no CPU while idle; wakes on request. | ~$0 (stopped when idle) |
-
-Splitting them means you only pay for always-on CPU where it's actually
-required (the backend), while the lightweight frontend scales to zero.
-
----
-
-## 1. Backend (this repo)
-
-### Files
-
-- `Dockerfile` — multi-stage build of the `mywant` CLI (static, non-root).
-- `docker-entrypoint.sh` — makes the mounted volume writable, drops to a
-  non-root user.
-- `fly.toml` — always-on config, health check on `/health`, volume mount.
-
-State (`~/.mywant`: `state.yaml`, `memo.yaml`, `achievements.yaml`, `recipes/`,
-`custom-types/`) is persisted by pointing `HOME=/data` at a Fly **volume**.
-
-### Deploy
-
-```bash
-# 0. Install flyctl and log in
-#    https://fly.io/docs/flyctl/install/
-fly auth login
-
-# 1. Create the app (pick a unique name; update `app` in fly.toml to match)
-fly apps create mywant-backend
-
-# 2. Create the persistent volume in the same region as fly.toml (nrt = Tokyo)
-fly volumes create mywant_data --region nrt --size 1   # 1 GB
-
-# 3. Deploy
-fly deploy
-
-# 4. Verify
-fly status
-curl https://mywant-backend.fly.dev/health
-# -> {"server":"mywant","status":"healthy",...}
-```
-
-### Scaling / cost knobs
-
-- **Memory**: `fly.toml` uses `512mb`. Drop to `256mb` to trim cost, or raise it
-  if you see OOM restarts (`fly logs`) under heavier want workloads.
-- **Stay always-on**: `min_machines_running = 1` + `auto_stop_machines = false`
-  keep the background loops alive. Do **not** set these to scale-to-zero unless
-  you accept that reminders/monitors won't fire while stopped.
-
-### Security note
-
-`fly deploy` exposes the backend publicly at `https://<app>.fly.dev`. MyWant's
-API has no built-in auth, so consider one of:
-
-- **Keep it private** (recommended): remove the public service and let only the
-  frontend reach it over Fly's private network. Replace the `[http_service]`
-  block's public exposure with a Flycast/private setup and have `mywant-gui`
-  proxy to `http://mywant-backend.internal:8080`. See
-  https://fly.io/docs/networking/private-networking/.
-- Or put an authenticating proxy / Fly Machines `[[services]]` in front.
-
----
-
-## 2. Frontend — `mywant-gui` (separate repo)
-
-`mywant-gui` is a separate repository. It serves the React SPA and proxies API
-calls to the backend. Deploy it as its own Fly app configured to **autostop**.
-
-Point it at the backend via its API base / proxy target env var (e.g. the
-backend's `https://mywant-backend.fly.dev`, or `http://mywant-backend.internal:8080`
-if you kept the backend private).
-
-Example `fly.toml` for the GUI app (adjust to that repo's Dockerfile / port):
-
-```toml
-app = "mywant-gui"
-primary_region = "nrt"
-
-[http_service]
-  internal_port = 8080          # match mywant-gui's listen port
-  force_https = true
-  auto_stop_machines = "suspend"  # scale to zero when idle
-  auto_start_machines = true
-  min_machines_running = 0        # <-- event-driven: no always-on cost
-
-[[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory = "256mb"
-```
-
-`auto_stop_machines = "suspend"` snapshots memory for fast wake-ups;
-`min_machines_running = 0` means you pay nothing for compute while idle.
-
----
-
-## Summary
+MyWant runs on Fly.io as **two apps**, built from **two source repositories**,
+deployed by a **third repository** that owns the environment configuration.
 
 ```
 Browser
    │
    ▼
-mywant-gui (Fly app, AUTOSTOP)  ──proxy /api──►  mywant-backend (Fly app, ALWAYS-ON)
-   React SPA, ~$0 idle                              reconcile loop / agents / reminders
-                                                    Volume: /data (~/.mywant)
-                                                    ~$2–3/mo
+mywant-gui (Fly app, AUTOSTOP, ~$0 idle)  ──proxy /api──►  mywant-backend (Fly app, ALWAYS-ON)
+  embedded React SPA + reverse proxy         private network   reconcile loop / agents / reminders
+                                                              Volume: /data (~/.mywant), ~$2–3/mo
 ```
+
+| App | Scaling | Why |
+|-----|---------|-----|
+| **Backend (this repo)** | **Always-on** (`min_machines_running = 1`) | Runs the reconcile loop, MonitorAgents, and time-based wants (reminders), which must keep firing even when nobody is connected. |
+| **GUI** ([`mywant-gui`](https://github.com/onelittlenightmusic/mywant-gui)) | **Autostop** (`min_machines_running = 0`) | Stateless SPA + API proxy. No CPU needed while idle; wakes on request. |
+
+## Why deployment lives in a separate repository
+
+This repository builds a **container image**. It does not deploy it, and holds
+no Fly.io credential.
+
+The `fly.toml` files, app names, regions, scaling knobs, and the Fly API token
+live in **[`mywant-deploy`](https://github.com/onelittlenightmusic/mywant-deploy)**
+(private). Two reasons:
+
+1. **The two apps must stay in lockstep.** The GUI's `MYWANT_BACKEND` has to
+   match the backend's app name, so the pair only makes sense configured
+   together. Split across two source repos, that coupling is invisible.
+2. **This repository is public.** Deployment specifics and the Fly credential
+   stay out of it.
+
+This mirrors how releases already work here: the source repo produces the
+artifact, a separate repo publishes it (`homebrew-mywant`, `mywant-gui-dist`).
+
+## What this repository provides
+
+- `Dockerfile` — multi-stage build of the `mywant` CLI (static, `CGO_ENABLED=0`,
+  non-root runtime on alpine). Same build invocation as `make build-cli`.
+- `docker-entrypoint.sh` — makes the Fly-mounted volume writable, then drops to
+  a non-root user. Preserves `HOME` across `su-exec` so `~/.mywant` lands on the
+  volume rather than the container's ephemeral layer.
+- `.dockerignore` — limits the build context to `engine/` and `client/`.
+- `.github/workflows/image.yml` — builds `linux/amd64` and pushes to
+  `ghcr.io/<owner>/mywant-backend` on every push to the default branch, tagged
+  `sha-<commit>` and `latest`.
+
+### State persistence
+
+State (`~/.mywant`: `state.yaml`, `memo.yaml`, `achievements.yaml`, `recipes/`,
+`custom-types/`) is persisted by pointing `HOME` at a Fly **volume** mounted at
+`/data`. The volume, mount, and `HOME` env are configured in `mywant-deploy`.
+
+Note that `su-exec` resets `HOME` to the target user's `/etc/passwd` entry, so
+`ENV HOME=/data` alone is not enough — `docker-entrypoint.sh` re-applies it
+explicitly. Without that, every restart and redeploy silently loses all state.
+
+## Building the image locally
+
+```bash
+docker build -t mywant-backend .
+docker run --rm -p 8080:8080 -v mywant-data:/data mywant-backend
+curl http://localhost:8080/health
+# -> {"server":"mywant","status":"healthy",...}
+```
+
+## Deploying
+
+See the README in `mywant-deploy`. In short: that repo pulls the published
+image, retags it into `registry.fly.io`, and runs `flyctl deploy --image`
+against its own `fly.toml`. Deployment is triggered manually, on a config
+change, or by a `repository_dispatch` from this repo's image workflow (enabled
+by setting a `DEPLOY_DISPATCH_TOKEN` secret here; without it the step no-ops).
+
+## Security note
+
+MyWant's API has **no authentication**. The backend is therefore deployed with
+**no public IP** — only a private ingress address — so it is reachable solely
+from the GUI over Fly's private network (`http://<backend-app>.internal:8080`).
+
+Be aware that this protects the backend from *direct* access only. The GUI
+proxies `/api/*` publicly, so anyone who knows the GUI's URL can still create
+and delete wants. Put authentication in front of the GUI before treating this
+deployment as anything other than a personal sandbox.
