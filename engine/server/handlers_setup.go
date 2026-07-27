@@ -145,6 +145,12 @@ func (s *Server) setupRoutes() {
 	logs.HandleFunc("", s.clearLogs).Methods("DELETE")
 	logs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
+	notifications := api.PathPrefix("/notifications").Subrouter()
+	notifications.HandleFunc("", s.recordNotification).Methods("POST")
+	notifications.HandleFunc("", s.getNotifications).Methods("GET")
+	notifications.HandleFunc("", s.clearNotifications).Methods("DELETE")
+	notifications.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
 	robotLogs := api.PathPrefix("/robot/logs").Subrouter()
 	robotLogs.HandleFunc("", s.getRobotLogs).Methods("GET")
 	robotLogs.HandleFunc("", s.clearRobotLogs).Methods("DELETE")
