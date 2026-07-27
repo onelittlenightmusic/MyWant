@@ -38,7 +38,9 @@ artifact, a separate repo publishes it (`homebrew-mywant`, `mywant-gui-dist`).
 ## What this repository provides
 
 - `Dockerfile` — multi-stage build of the `mywant` CLI (static, `CGO_ENABLED=0`,
-  non-root runtime on alpine). Same build invocation as `make build-cli`.
+  non-root runtime on alpine). Same build invocation as `make build-cli`. The
+  runtime image carries `git` because `POST /api/v1/customs` clones the
+  requested package onto the server's own filesystem.
 - `docker-entrypoint.sh` — makes the Fly-mounted volume writable, then drops to
   a non-root user. Preserves `HOME` across `su-exec` so `~/.mywant` lands on the
   volume rather than the container's ephemeral layer.
