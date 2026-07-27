@@ -3,6 +3,8 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+
+	mywant "mywant/engine/core"
 )
 
 // ListWantTypes retrieves available want types
@@ -95,4 +97,63 @@ func (c *Client) GetLogs() (*APILogsResponse, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Customs (installable packages living on the server's filesystem)
+// ---------------------------------------------------------------------------
+
+// CustomsResponse is the payload of GET /api/v1/customs.
+type CustomsResponse struct {
+	Customs   []mywant.CustomRecord    `json:"customs"`
+	Untracked []mywant.UntrackedCustom `json:"untracked"`
+}
+
+// ListCustoms retrieves the customs installed on the server's machine.
+func (c *Client) ListCustoms() (*CustomsResponse, error) {
+	var result CustomsResponse
+	if err := c.Request("GET", "/api/v1/customs", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// InstallCustom asks the server to install a custom onto its own filesystem.
+// kind is a comma separated list of component kinds, empty means auto-detect.
+func (c *Client) InstallCustom(source, name, kind string, force bool) (map[string]any, error) {
+	body, err := json.Marshal(map[string]any{
+		"source": source,
+		"name":   name,
+		"kind":   kind,
+		"force":  force,
+	})
+	if err != nil {
+		return nil, err
+	}
+	raw, err := c.RawRequest("POST", "/api/v1/customs", body, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return result, nil
+}
+
+// UninstallCustom removes a custom from the server's machine.
+func (c *Client) UninstallCustom(name string, force bool) (map[string]any, error) {
+	path := fmt.Sprintf("/api/v1/customs/%s", name)
+	if force {
+		path += "?force=true"
+	}
+	raw, err := c.RawRequest("DELETE", path, nil, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return result, nil
 }

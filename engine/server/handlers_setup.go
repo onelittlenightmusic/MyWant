@@ -120,6 +120,14 @@ func (s *Server) setupRoutes() {
 	wantTypes.HandleFunc("/{name}/examples", s.getWantTypeExamples).Methods("GET")
 	wantTypes.HandleFunc("/{name}/examples", s.handleOptions).Methods("OPTIONS")
 
+	// Custom (addon) endpoints - install packages onto the server's own filesystem
+	customs := api.PathPrefix("/customs").Subrouter()
+	customs.HandleFunc("", s.listCustoms).Methods("GET")
+	customs.HandleFunc("", s.installCustom).Methods("POST")
+	customs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+	customs.HandleFunc("/{name}", s.uninstallCustom).Methods("DELETE")
+	customs.HandleFunc("/{name}", s.handleOptions).Methods("OPTIONS")
+
 	// Relations endpoints
 	relations := api.PathPrefix("/relations").Subrouter()
 	relations.HandleFunc("", s.listRelations).Methods("GET")
