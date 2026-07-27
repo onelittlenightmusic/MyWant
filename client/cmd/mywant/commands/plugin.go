@@ -12,10 +12,13 @@ import (
 var PluginCmd = &cobra.Command{
 	Use:   "plugin",
 	Short: "Manage mywant plugins",
-	Long: `Manage mywant plugins.
+	Long: `Manage mywant CLI plugins.
 
 Plugins are executables named "mywant-<name>" found in PATH.
-They are invoked transparently: "mywant <name> [args]" runs "mywant-<name> [args]".`,
+They are invoked transparently: "mywant <name> [args]" runs "mywant-<name> [args]".
+
+This extends the CLI only. To extend the running system with want types, design
+plugins, recipes or icon styles, use "mywant custom".`,
 }
 
 var pluginListCmd = &cobra.Command{

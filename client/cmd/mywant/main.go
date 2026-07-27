@@ -73,6 +73,10 @@ func main() {
 
 	rootCmd.AddCommand(commands.SkillsCmd)
 
+	rootCmd.AddCommand(commands.CustomCmd)
+
+	rootCmd.AddCommand(commands.WorldCmd)
+
 	// kubectl-style plugin dispatch: if the first arg is not a known command,
 	// look for mywant-<arg> in PATH and exec it.
 	if len(os.Args) > 1 {

@@ -51,21 +51,45 @@ Most commands have short versions for convenience.
 | | `list` | `l` | List types |
 | | `get` | `g` | Get type details |
 | | `reload` | - | Reload user custom types from `~/.mywant/custom-types/` |
+| `custom` | - | `customs` | Manage customs (`~/.mywant/customs.yaml`) |
+| | `list` | - | List installed customs |
+| | `install` | - | Install a custom from git URL / GitHub shorthand / local dir |
+| | `uninstall` | `remove` | Remove a custom and its links |
 | `interact` | - | `i` | Interactive creation |
 | | `start` | `st` | Start session |
 | | `send` | `s` | Send message |
 | | `deploy` | `d` | Deploy recommendation |
 | | `end` | `e` | End session |
 | | `shell` | `sh` | Interactive shell |
-| `memo` | - | `m` | Manage global state (memo) |
-| | `get` | `g` | Display current global state |
-| | `clear` | - | Clear all global state |
+| `memo` | - | `m` | Manage the memo catalog |
+| | `list` | `l` | List catalogs and their values |
+| | `get` | `g` | Show values of one catalog |
+| | `add` / `remove` | `rm` | Add or remove values |
+| | `events` | - | Value provenance log |
+| | `stats` | - | Per-value usage counts |
+| | `labels` / `label` | - | List / set / remove value labels |
+| | `groups` | - | list / create / update / delete groups |
+| `world` | - | `worlds`, `wo` | Manage worlds (want snapshots) |
+| | `list` | `l` | List saved worlds |
+| | `open` | `switch`, `use` | Switch world (auto-saves current) |
+| | `save` | - | Snapshot without switching |
+| | `export` | `e` | Export world YAML |
+| | `import` | - | Import a wants YAML as a world |
 | `params` | - | `pa` | Manage global parameters |
 | | `get` | `g` | List all parameters |
 | | `set` | - | Set a parameter |
 | | `delete` | `del`, `rm` | Delete a parameter |
 | | `import` | - | Import parameters from YAML/JSON file |
 | | `export` | - | Export parameters to stdout or file |
+| `state` | - | `states` | Cross-want state CRUD |
+| | `list` | - | List state for all wants |
+| | `search` | - | Search state by field |
+| | `get` / `set` / `delete` | - | Read or edit one want's state |
+| | `clear` | - | Clear a want's state |
+| | `global` | `g` | get / set / delete / clear global state |
+| `achievements` | - | `ach` | Manage achievements and rules |
+| `plugin` | - | - | List CLI plugins (`mywant-<name>` in PATH) |
+| `skills` | - | - | Install MyWant skills for agents |
 | `gui` | - | - | Control the web GUI |
 | | `show` | - | Navigate the GUI to a specific view |
 | | `dashboard` | - | Navigate to the dashboard |
@@ -224,6 +248,84 @@ Save recipe 'my-trip-planner'? (y/N): y
 
 サーバー起動時に両ディレクトリを自動スキャンしてレジストリに登録します。
 
+### Custom Management (Addons)
+
+`custom` はサーバーを拡張するパッケージ（want type / design plugin / recipe / icon style）の
+インストール・アンインストールを行います。実体は `~/.mywant/customs/<name>` に置かれ、
+種別ごとのランタイムディレクトリへシンボリックリンクされます。
+
+| kind | リンク先 | 検出条件（`custom.yaml` が無い場合） |
+| :--- | :--- | :--- |
+| `custom-type` | `~/.mywant/custom-types/<name>` | `wantType:` または `agent:` を含む YAML |
+| `design` | `~/.mywant/design-plugin/<name>` | ルートに `plugin.jsx` / `.tsx` / `.js` / `.ts` |
+| `recipe` | `~/.mywant/recipes/<name>/`（YAML を個別リンク） | `recipe:` を含む YAML |
+| `icon` | `~/.mywant/icons/<name>` | `icons/` ディレクトリ or `icon-style.yaml`（※サーバー未対応） |
+
+```bash
+# 一覧（未管理ディレクトリも別枠で表示される）
+./bin/mywant custom list
+
+# インストール（bare name → https://github.com/onelittlenightmusic/mywant-<name>）
+./bin/mywant custom install transit-plugin
+./bin/mywant custom install onelittlenightmusic/mywant-transit-plugin
+./bin/mywant custom install https://github.com/owner/repo.git
+./bin/mywant custom install ./my-skin --kind design --name neon
+
+# 同じ名前で再実行すると git pull で更新
+./bin/mywant custom install transit-plugin
+
+# アンインストール（リンクとストアの両方を削除）
+./bin/mywant custom uninstall mywant-transit-plugin
+```
+
+**フラグ:** `--name`（インストール名）• `--kind`（種別を明示、カンマ区切り）• `--force`（既存を置換／git clone でないものを削除）• `--no-reload`（サーバーへの want type リロードを行わない）
+
+**管理ファイル:** `~/.mywant/customs.yaml` にインストール元・コミット・作成したリンクを記録します。
+インストール／アンインストール後は自動的に `POST /api/v1/want-types/reload` を呼びます
+（agent 定義は起動時のみ読まれるため、agent を含む custom はサーバー再起動が必要）。
+
+**`custom.yaml`（任意、パッケージ側に置く）:**
+
+```yaml
+custom:
+  name: my-pack
+  description: Want types and a canvas skin
+  components:
+    - kind: custom-type
+      path: types
+    - kind: design
+      path: skins/neon
+      name: neon        # リンク先の名前（省略時は custom 名）
+```
+
+> **Note:** CLI 自体を拡張する `mywant plugin`（PATH 上の `mywant-<name>` 実行ファイル）とは別物です。
+
+**`--context` / リモートバックエンド:** custom はサーバーを動かしているマシンの
+ファイルシステム上に存在するため、コマンドは**アクティブな context が指すマシン**を対象にします。
+
+| context | 動作 |
+| :--- | :--- |
+| ローカル（localhost / 127.0.0.1） | CLI プロセス内で直接 `~/.mywant` を操作。サーバー未起動でもインストール可能（リロードのみスキップ） |
+| リモート（`--context fly` など） | サーバーの `/api/v1/customs` 経由で、**サーバー側のマシン**にインストール／削除 |
+
+```bash
+# fly 上のサーバーに custom をインストール（git URL のみ。ローカルディレクトリは不可）
+./bin/mywant --context fly custom install onelittlenightmusic/mywant-transit-plugin
+./bin/mywant --context fly custom list
+./bin/mywant --context fly custom uninstall mywant-transit-plugin
+
+# ローカルを対象にしたいときは他のコマンドと同じく context を切り替える
+./bin/mywant --context local custom list
+```
+
+対象は毎回 1行目に表示されます（`Customs on https://…` / `Customs on this machine (~/.mywant)`）。
+
+**API:** `GET /api/v1/customs` • `POST /api/v1/customs` （`{source, name, kind, force}`）• `DELETE /api/v1/customs/{name}?force=true`。
+インストール／削除後にサーバーが want type を自動リロードし、結果（`reloaded` / `warnings` /
+`restart_needed`）を返します。**このエンドポイントは任意の git リポジトリをサーバー上に
+clone してプラグインコードを配置する**ため、他の API と同じ認証の内側に置いてください
+（context の username/password で保護されます）。
+
 ### System Inspection
 
 Explore available types and agents.
@@ -253,23 +355,65 @@ Explore available types and agents.
 ./bin/mywant l
 ```
 
-### Global State (Memo)
+### Memo (remembered input values)
 
-Wants can persist key-value pairs via `StoreGlobalState`. The `memo` command lets you inspect and clear that data from the CLI.
+Memo is the catalog of values the user has entered, keyed by catalog (`stations`,
+`cities`, ...). Wants record what was typed; the server keeps provenance
+(events)、使用回数 (stats)、値ごとのラベル、そしてラベルを土台にした groups を持ちます。
 
 ```bash
-# Display all current global state
-./bin/mywant memo get
-# Short version:
-./bin/mywant m g
+# カタログ一覧と値
+./bin/mywant memo list
+./bin/mywant memo get stations --limit 5
 
-# Output as JSON
-./bin/mywant memo get --json
+# 値の追加・削除（PUT /api/v1/memo の read-modify-write）
+./bin/mywant memo add stations 渋谷 新宿
+./bin/mywant memo remove stations 新宿      # 値を削除
+./bin/mywant memo remove stations           # カタログごと削除
 
-# Clear all global state (prompts for confirmation)
-./bin/mywant memo clear
-# Skip confirmation
-./bin/mywant memo clear -y
+# どこから来た値か / どれだけ使われたか
+./bin/mywant memo events --limit 20
+./bin/mywant memo events --catalog cities --value Kokubunji
+./bin/mywant memo stats
+
+# 値ラベル（値の識別子は <catalog>::<value>）
+./bin/mywant memo labels
+./bin/mywant memo label cities::Kyoto favourite true
+./bin/mywant memo label cities::Kyoto favourite      # 値を省略すると削除
+
+# グループ（"group/<name>" ラベルのファサード。memo 値と want の両方に使える）
+./bin/mywant memo groups list
+./bin/mywant memo groups create favourites --kind memo --member cities::Kyoto
+./bin/mywant memo groups update favourites --kind memo --name faves
+./bin/mywant memo groups delete faves --kind memo
+```
+
+> **Note:** 以前の `mywant memo get` / `memo clear` は**グローバル状態**を操作していました。
+> グローバル状態は `mywant state global` に移動し、`memo` は memo API を扱うようになりました。
+
+### Global State
+
+Wants can persist key-value pairs via `StoreGlobalState`.
+
+```bash
+./bin/mywant state global get
+./bin/mywant state global get --json
+./bin/mywant state global set trip_budget 1000     # 値は JSON として解釈（失敗したら文字列）
+./bin/mywant state global delete trip_budget
+./bin/mywant state global clear -y
+```
+
+### Worlds
+
+World は非システム want 全体の名前付きスナップショット（`~/.mywant/worlds/<name>.yaml`）です。
+`open` は**現在の world を自動保存してから**切り替えるので、切り替えで作業を失いません。
+
+```bash
+./bin/mywant world list                                  # * が現在の world
+./bin/mywant world open travel-demo
+./bin/mywant world save travel-demo                      # 切り替えずにスナップショット
+./bin/mywant world export travel-demo -o travel.yaml     # -o 省略で標準出力
+./bin/mywant world import travel-demo -f travel.yaml
 ```
 
 ### GUI Control

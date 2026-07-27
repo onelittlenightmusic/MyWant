@@ -16,8 +16,9 @@ import (
 
 // StateCmd is the root command for cross-want state operations.
 var StateCmd = &cobra.Command{
-	Use:     "state",
-	Aliases: []string{"st"},
+	Use: "state",
+	// "st" belongs to stop; "states" is the natural plural for this one.
+	Aliases: []string{"states"},
 	Short:   "Cross-want state CRUD",
 	Long:    `List, search, get, set, and delete state across all wants and global state.`,
 }
@@ -255,6 +256,115 @@ Examples:
 	},
 }
 
+// ─── global ────────────────────────────────────────────────────────────────
+
+// StateGlobalCmd covers the global state that wants persist via
+// StoreGlobalState. It used to live under "mywant memo", which now manages the
+// memo catalog instead.
+var stateGlobalCmd = &cobra.Command{
+	Use:     "global",
+	Aliases: []string{"g"},
+	Short:   "Read and edit global state",
+	Long: `Global state is the key-value store wants persist via StoreGlobalState.
+
+Examples:
+  mywant state global get
+  mywant state global set trip_budget 1000
+  mywant state global delete trip_budget
+  mywant state global clear`,
+}
+
+var stateGlobalGetCmd = &cobra.Command{
+	Use:     "get",
+	Aliases: []string{"show"},
+	Short:   "Display the current global state",
+	Args:    cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		jsonFlag, _ := cmd.Flags().GetBool("json")
+		c := client.NewClient(viper.GetString("server"))
+		resp, err := c.GetGlobalState()
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if jsonFlag {
+			data, _ := json.MarshalIndent(resp.State, "", "  ")
+			fmt.Println(string(data))
+			return
+		}
+
+		fmt.Printf("Global State  (updated: %s)\n", resp.Timestamp)
+		fmt.Println(strings.Repeat("─", 50))
+		if len(resp.State) == 0 {
+			fmt.Println("(empty)")
+			return
+		}
+		printFlatMap(resp.State, "")
+	},
+}
+
+var stateGlobalSetCmd = &cobra.Command{
+	Use:   "set <key> <value>",
+	Short: "Set one global state key",
+	Args:  cobra.ExactArgs(2),
+	Run: func(cmd *cobra.Command, args []string) {
+		key, raw := args[0], args[1]
+
+		// Accept JSON so numbers, booleans and objects survive; fall back to string.
+		var value any
+		if err := json.Unmarshal([]byte(raw), &value); err != nil {
+			value = raw
+		}
+
+		c := client.NewClient(viper.GetString("server"))
+		if err := c.SetGlobalStateKey(key, value); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Set global state key %q.\n", key)
+	},
+}
+
+var stateGlobalDeleteCmd = &cobra.Command{
+	Use:     "delete <key>",
+	Aliases: []string{"rm", "del"},
+	Short:   "Delete one global state key",
+	Args:    cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		if err := c.DeleteGlobalStateKey(args[0]); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Deleted global state key %q.\n", args[0])
+	},
+}
+
+var stateGlobalClearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Clear the entire global state",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+		if !yes {
+			fmt.Print("This will delete ALL global state keys. Continue? [y/N]: ")
+			reader := bufio.NewReader(os.Stdin)
+			line, _ := reader.ReadString('\n')
+			if line = strings.TrimSpace(strings.ToLower(line)); line != "y" && line != "yes" {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+		c := client.NewClient(viper.GetString("server"))
+		if err := c.ClearGlobalState(); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Global state cleared.")
+	},
+}
+
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 func printHierarchicalState(s client.HierarchicalState) {
@@ -304,4 +414,12 @@ func init() {
 	StateCmd.AddCommand(stateSetCmd)
 	StateCmd.AddCommand(stateDeleteCmd)
 	StateCmd.AddCommand(stateClearCmd)
+
+	stateGlobalGetCmd.Flags().Bool("json", false, "Output as JSON")
+	stateGlobalClearCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
+	stateGlobalCmd.AddCommand(stateGlobalGetCmd)
+	stateGlobalCmd.AddCommand(stateGlobalSetCmd)
+	stateGlobalCmd.AddCommand(stateGlobalDeleteCmd)
+	stateGlobalCmd.AddCommand(stateGlobalClearCmd)
+	StateCmd.AddCommand(stateGlobalCmd)
 }

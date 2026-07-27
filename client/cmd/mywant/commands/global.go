@@ -15,67 +15,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ─── memo (global state) ───────────────────────────────────────────────────
-
-var MemoCmd = &cobra.Command{
-	Use:     "memo",
-	Aliases: []string{"m"},
-	Short:   "Manage global state (memo)",
-	Long:    `View and clear global state persisted by wants via StoreGlobalState.`,
-}
-
-var memoGetCmd = &cobra.Command{
-	Use:     "get",
-	Aliases: []string{"g", "show"},
-	Short:   "Display current global state",
-	Run: func(cmd *cobra.Command, args []string) {
-		jsonFlag, _ := cmd.Flags().GetBool("json")
-		c := client.NewClient(viper.GetString("server"))
-		resp, err := c.GetGlobalState()
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-
-		if jsonFlag {
-			data, _ := json.MarshalIndent(resp.State, "", "  ")
-			fmt.Println(string(data))
-			return
-		}
-
-		fmt.Printf("Global State  (updated: %s)\n", resp.Timestamp)
-		fmt.Println(strings.Repeat("─", 50))
-		if len(resp.State) == 0 {
-			fmt.Println("(empty)")
-			return
-		}
-		printFlatMap(resp.State, "")
-	},
-}
-
-var memoClearCmd = &cobra.Command{
-	Use:   "clear",
-	Short: "Clear all global state",
-	Run: func(cmd *cobra.Command, args []string) {
-		yes, _ := cmd.Flags().GetBool("yes")
-		if !yes {
-			fmt.Print("Clear all global state? [y/N]: ")
-			var answer string
-			fmt.Scanln(&answer)
-			if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-				fmt.Println("Cancelled.")
-				return
-			}
-		}
-		c := client.NewClient(viper.GetString("server"))
-		if err := c.DeleteGlobalState(); err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("Global state cleared.")
-	},
-}
-
 // ─── params (global parameters) ───────────────────────────────────────────
 
 var ParamsCmd = &cobra.Command{
@@ -296,7 +235,7 @@ Examples:
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
-func sortedKeys(m map[string]any) []string {
+func sortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -324,12 +263,6 @@ func printFlatMap(m map[string]any, prefix string) {
 }
 
 func init() {
-	// memo subcommands
-	memoGetCmd.Flags().Bool("json", false, "Output as JSON")
-	memoClearCmd.Flags().BoolP("yes", "y", false, "Skip confirmation prompt")
-	MemoCmd.AddCommand(memoGetCmd)
-	MemoCmd.AddCommand(memoClearCmd)
-
 	// params subcommands
 	paramsGetCmd.Flags().Bool("json", false, "Output as JSON")
 	paramsImportCmd.Flags().StringP("file", "f", "", "Path to YAML or JSON file")
