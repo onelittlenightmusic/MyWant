@@ -40,7 +40,10 @@ artifact, a separate repo publishes it (`homebrew-mywant`, `mywant-gui-dist`).
 - `Dockerfile` — multi-stage build of the `mywant` CLI (static, `CGO_ENABLED=0`,
   non-root runtime on alpine). Same build invocation as `make build-cli`. The
   runtime image carries `git` because `POST /api/v1/customs` clones the
-  requested package onto the server's own filesystem.
+  requested package onto the server's own filesystem, and `python3` because
+  customs ship script-backed agents that the server executes as `main.py`.
+  Those scripts must stick to the standard library — the image has no pip
+  packages and no browser, so a plugin that needs Playwright will not run here.
 - `docker-entrypoint.sh` — makes the Fly-mounted volume writable, then drops to
   a non-root user. Preserves `HOME` across `su-exec` so `~/.mywant` lands on the
   volume rather than the container's ephemeral layer.
