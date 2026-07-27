@@ -8,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"mywant/client"
 	"mywant/client/cmd/mywant/commands"
 
 	"github.com/spf13/cobra"
@@ -15,9 +16,10 @@ import (
 )
 
 var (
-	cfgFile string
-	server  string
-	version = "dev"
+	cfgFile     string
+	server      string
+	contextName string
+	version     = "dev"
 )
 
 var rootCmd = &cobra.Command{
@@ -114,7 +116,8 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mywant/config.yaml)")
-	rootCmd.PersistentFlags().StringVar(&server, "server", "http://localhost:8080", "MyWant server URL")
+	rootCmd.PersistentFlags().StringVar(&server, "server", commands.DefaultServerURL, "MyWant server URL (overrides the active context)")
+	rootCmd.PersistentFlags().StringVar(&contextName, "context", "", "Use this context from config.yaml instead of current_context")
 
 	viper.BindPFlag("server", rootCmd.PersistentFlags().Lookup("server"))
 }
@@ -124,6 +127,34 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 	if cfgFile != "" {
 		commands.SetConfigPath(cfgFile)
 	}
+}
+
+// applyServerContext resolves the backend the CLI should talk to from the
+// active context and installs it as viper's default for "server".
+//
+// It has to be a *default* rather than viper.Set: an explicit --server must
+// still win, and viper only consults a bound flag's value ahead of defaults
+// when the user actually changed it.
+func applyServerContext() {
+	if cfgFile != "" {
+		commands.SetConfigPath(cfgFile)
+	}
+	commands.SetContextOverride(contextName)
+
+	config, err := commands.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to load config: %v\n", err)
+		return
+	}
+
+	url, auth, err := commands.ResolveServer(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	viper.SetDefault("server", url)
+	client.SetDefaultAuth(auth)
 }
 
 func initConfig() {
@@ -146,6 +177,9 @@ func initConfig() {
 		viper.SetConfigType("yaml")
 	}
 
+	// Namespace env lookups so "server" reads MYWANT_SERVER rather than the
+	// far too generic SERVER.
+	viper.SetEnvPrefix("MYWANT")
 	viper.AutomaticEnv()
 
 	// Log the config path before reading
@@ -156,4 +190,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		// fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
+
+	applyServerContext()
 }

@@ -8,7 +8,7 @@
 
 ## Documentation
 
-[Want System](docs/want-system.md) • [Agent System](docs/agent-system.md) • [Execution Modes](docs/AgentExecutionModes.md) • [Developer Guide](docs/WantDeveloperGuide.md) • [Want Card Plugin System](docs/WantCardPluginSystem.md) • [Agent Catalog](AGENTS.md) • [CLI Usage](docs/MYWANT_CLI_USAGE.md) • [Examples](docs/agent-examples.md) • [Webhook (Teams/Slack)](docs/TEAMS_WEBHOOK_SPEC.md) • [Shortcuts](web/SHORTCUTS_AND_MCP_TESTING.md)
+[Want System](docs/want-system.md) • [Agent System](docs/agent-system.md) • [Execution Modes](docs/AgentExecutionModes.md) • [Developer Guide](docs/WantDeveloperGuide.md) • [Want Card Plugin System](docs/WantCardPluginSystem.md) • [Agent Catalog](AGENTS.md) • [CLI Usage](docs/MYWANT_CLI_USAGE.md) • [Auth / Remote Backends](docs/auth.md) • [Examples](docs/agent-examples.md) • [Webhook (Teams/Slack)](docs/TEAMS_WEBHOOK_SPEC.md) • [Shortcuts](web/SHORTCUTS_AND_MCP_TESTING.md)
 
 ## Core Architecture
 
@@ -28,6 +28,10 @@
 ```sh
 ./bin/mywant config set/get/reset
 ./bin/mywant --config /path/to/config.yaml config get  # Custom config (~/.mywant/config.yaml default)
+
+# Backend contexts (kubectl-style): switch destination by editing config.yaml
+./bin/mywant config set-context fly --server https://x.fly.dev --username admin --password-env MYWANT_AUTH_PASSWORD
+./bin/mywant config get-contexts / use-context <name> / current-context / delete-context <name>
 ```
 
 **Quick Start:**
@@ -120,7 +124,11 @@ description: "Luxury hotel bookings with automated upgrades."
 **Config (`~/.mywant/config.yaml`):**
 ```yaml
 agent_mode: local              # local/webhook/grpc
-server_host: localhost
+current_context: local         # which entry of `contexts` the CLI talks to
+contexts:                      # named backends (see docs/MYWANT_CLI_USAGE.md)
+  local: {server: "http://localhost:8080"}
+  fly:   {server: "https://x.fly.dev", username: admin, password_env: MYWANT_AUTH_PASSWORD}
+server_host: localhost         # start/stop/ps only — NOT the API destination
 server_port: 8080
 agent_service_host: localhost
 agent_service_port: 8081

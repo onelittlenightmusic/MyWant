@@ -10,26 +10,50 @@ import (
 	"time"
 )
 
+// Auth holds the credentials sent with every request. A remote MyWant
+// deployment usually sits behind an authenticating proxy (the fly.io GUI app
+// terminates Basic auth in front of the private backend), so talking to
+// anything other than a local server needs these.
+//
+// Token wins over Username/Password when both are set.
+type Auth struct {
+	Username string
+	Password string
+	Token    string
+}
+
+// IsZero reports whether no credential at all is configured.
+func (a Auth) IsZero() bool {
+	return a.Username == "" && a.Password == "" && a.Token == ""
+}
+
+// defaultAuth is applied to clients built by NewClient/NewClientWithTimeout.
+// The CLI resolves credentials once at startup (from the active context) and
+// installs them here, so the ~40 NewClient call sites stay unchanged.
+var defaultAuth Auth
+
+// SetDefaultAuth sets the credentials used by subsequently created clients.
+func SetDefaultAuth(a Auth) {
+	defaultAuth = a
+}
+
 // Client is the MyWant API client
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
+	Auth       Auth
 }
 
 // NewClient creates a new API client
 func NewClient(baseURL string) *Client {
-	return &Client{
-		BaseURL: baseURL,
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
+	return NewClientWithTimeout(baseURL, 30*time.Second)
 }
 
 // NewClientWithTimeout creates a new API client with custom timeout
 func NewClientWithTimeout(baseURL string, timeout time.Duration) *Client {
 	return &Client{
 		BaseURL: baseURL,
+		Auth:    defaultAuth,
 		HTTPClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -103,6 +127,13 @@ func (c *Client) doRequest(method, path string, body any, contentType string) (*
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("User-Agent", "mywant/1.0.0")
 
+	switch {
+	case c.Auth.Token != "":
+		req.Header.Set("Authorization", "Bearer "+c.Auth.Token)
+	case c.Auth.Username != "" || c.Auth.Password != "":
+		req.SetBasicAuth(c.Auth.Username, c.Auth.Password)
+	}
+
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -112,6 +143,10 @@ func (c *Client) doRequest(method, path string, body any, contentType string) (*
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		if (resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden) && c.Auth.IsZero() {
+			return nil, fmt.Errorf("API error (status %d): %s\n(no credentials sent — set username/password on the active context: mywant config set-context <name> --username ...)",
+				resp.StatusCode, string(respBody))
+		}
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(respBody))
 	}
 

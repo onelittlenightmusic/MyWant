@@ -19,19 +19,25 @@ type GoalThinkerSettings struct {
 
 // MyWantConfig represents the CLI configuration
 type MyWantConfig struct {
-	AgentMode        string   `yaml:"agent_mode"`         // local, webhook, grpc
-	ServerHost       string   `yaml:"server_host"`        // Main server host
-	ServerPort       int      `yaml:"server_port"`        // Main server port
-	GUIHost          string   `yaml:"gui_host"`           // mywant-gui host
-	GUIPort          int      `yaml:"gui_port"`           // mywant-gui port
-	AgentServiceHost string   `yaml:"agent_service_host"` // Agent service host (for webhook mode)
-	AgentServicePort int      `yaml:"agent_service_port"` // Agent service port (for webhook mode)
-	MockFlightPort   int      `yaml:"mock_flight_port"`   // Mock flight server port
-	HeaderPosition   string   `yaml:"header_position"`    // top or bottom
-	ColorMode        string   `yaml:"color_mode"`         // light, dark, system
-	CardHeight       string   `yaml:"card_height"`        // sm, md, lg
-	CardOpacity      *float64 `yaml:"card_opacity"`       // 0.0–1.0 card background layer opacity
-	SoundEnabled     *bool    `yaml:"sound_enabled"`      // true (default) or false
+	AgentMode string `yaml:"agent_mode"` // local, webhook, grpc
+	// CurrentContext names the entry in Contexts the CLI talks to. Empty
+	// means fall back to ServerHost/ServerPort.
+	CurrentContext string `yaml:"current_context,omitempty"`
+	// Contexts are the named backends the CLI can point at (local, fly, …).
+	// See contexts.go for how a destination is resolved.
+	Contexts         map[string]ServerContext `yaml:"contexts,omitempty"`
+	ServerHost       string                   `yaml:"server_host"`        // Main server host (local processes; see CurrentContext for the API destination)
+	ServerPort       int                      `yaml:"server_port"`        // Main server port
+	GUIHost          string                   `yaml:"gui_host"`           // mywant-gui host
+	GUIPort          int                      `yaml:"gui_port"`           // mywant-gui port
+	AgentServiceHost string                   `yaml:"agent_service_host"` // Agent service host (for webhook mode)
+	AgentServicePort int                      `yaml:"agent_service_port"` // Agent service port (for webhook mode)
+	MockFlightPort   int                      `yaml:"mock_flight_port"`   // Mock flight server port
+	HeaderPosition   string                   `yaml:"header_position"`    // top or bottom
+	ColorMode        string                   `yaml:"color_mode"`         // light, dark, system
+	CardHeight       string                   `yaml:"card_height"`        // sm, md, lg
+	CardOpacity      *float64                 `yaml:"card_opacity"`       // 0.0–1.0 card background layer opacity
+	SoundEnabled     *bool                    `yaml:"sound_enabled"`      // true (default) or false
 	// Appearance settings edited from the GUI Settings modal. These are saved
 	// to config.yaml by the server, so they must be read back here too —
 	// otherwise they survive on disk but not across a server restart.
@@ -130,7 +136,13 @@ func LoadConfig() (*MyWantConfig, error) {
 	return config, nil
 }
 
-// SaveConfig saves configuration to file
+// SaveConfig saves configuration to file.
+//
+// The write merges onto whatever is already on disk instead of replacing it:
+// the server writes its own keys into the same file (see
+// Server.saveFrontendConfig), and several of them — system_font_size,
+// tunnel_url, https_path — have no field on MyWantConfig. A plain marshal of
+// this struct would silently drop them on every `mywant config set`.
 func (c *MyWantConfig) Save() error {
 	configPath := getConfigPath()
 
@@ -139,7 +151,53 @@ func (c *MyWantConfig) Save() error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	var ours map[string]any
+	if err := yaml.Unmarshal(data, &ours); err != nil {
+		return fmt.Errorf("failed to normalize config: %w", err)
+	}
+
+	merged := map[string]any{}
+	if existing, err := os.ReadFile(configPath); err == nil {
+		_ = yaml.Unmarshal(existing, &merged)
+	}
+	if merged == nil {
+		merged = map[string]any{}
+	}
+	for k, v := range ours {
+		merged[k] = v
+	}
+	// Keys with `omitempty` vanish from `ours` once cleared, so they have to be
+	// dropped from the merge explicitly — otherwise the stale value on disk
+	// survives (e.g. delete-context leaving current_context behind).
+	if c.CurrentContext == "" {
+		delete(merged, "current_context")
+	}
+	if len(c.Contexts) == 0 {
+		delete(merged, "contexts")
+	}
+
+	out, err := yaml.Marshal(merged)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, out, 0600); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	return nil
+}
+
+// SaveReplacing overwrites the config file with exactly this struct, dropping
+// any key it does not know about. Only `config reset` wants this; everything
+// else should use Save.
+func (c *MyWantConfig) SaveReplacing() error {
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(getConfigPath(), data, 0600); err != nil {
 		return fmt.Errorf("failed to write config: %w", err)
 	}
 
@@ -163,7 +221,7 @@ var configSetCmd = &cobra.Command{
 
 Or run without arguments for interactive setup.
 
-Valid keys: agent_mode, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint`,
+Valid keys: agent_mode, current_context, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Non-interactive: config set <key> <value>
 		if len(args) == 2 {
@@ -333,7 +391,7 @@ var configResetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		config := DefaultConfig()
 
-		if err := config.Save(); err != nil {
+		if err := config.SaveReplacing(); err != nil {
 			fmt.Printf("❌ Failed to save config: %v\n", err)
 			os.Exit(1)
 		}
@@ -375,7 +433,16 @@ func displayConfig(config *MyWantConfig) {
 	fmt.Println("📋 Current Configuration")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("Agent Mode:         %s\n", config.AgentMode)
-	fmt.Printf("Server:             %s:%d\n", config.ServerHost, config.ServerPort)
+
+	url, _, err := ResolveServer(config)
+	if err != nil {
+		fmt.Printf("Server:             (error: %v)\n", err)
+	} else if name := ActiveContextName(config); name != "" {
+		fmt.Printf("Server:             %s  [context: %s]\n", url, name)
+	} else {
+		fmt.Printf("Server:             %s\n", url)
+	}
+	fmt.Printf("Local Server:       %s:%d\n", config.ServerHost, config.ServerPort)
 
 	if config.AgentMode == "webhook" || config.AgentMode == "grpc" {
 		fmt.Printf("Agent Service:      %s:%d\n", config.AgentServiceHost, config.AgentServicePort)
@@ -402,6 +469,11 @@ func applyConfigKey(config *MyWantConfig, key, value string) error {
 	switch key {
 	case "agent_mode":
 		config.AgentMode = value
+	case "current_context":
+		if _, ok := config.Contexts[value]; !ok {
+			return fmt.Errorf("context %q not found (available: %s)", value, strings.Join(contextNames(config), ", "))
+		}
+		config.CurrentContext = value
 	case "server_host":
 		config.ServerHost = value
 	case "server_port":
@@ -431,7 +503,7 @@ func applyConfigKey(config *MyWantConfig, key, value string) error {
 	case "otel_endpoint":
 		config.OTELEndpoint = value
 	default:
-		return fmt.Errorf("unknown config key %q. Valid keys: agent_mode, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint", key)
+		return fmt.Errorf("unknown config key %q. Valid keys: agent_mode, current_context, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint", key)
 	}
 	return nil
 }

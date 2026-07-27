@@ -81,6 +81,10 @@ MyWant's API has **no authentication**. The backend is therefore deployed with
 from the GUI over Fly's private network (`http://<backend-app>.internal:8080`).
 
 Be aware that this protects the backend from *direct* access only. The GUI
-proxies `/api/*` publicly, so anyone who knows the GUI's URL can still create
-and delete wants. Put authentication in front of the GUI before treating this
-deployment as anything other than a personal sandbox.
+proxies `/api/*` publicly, so **the GUI's HTTP Basic auth is the only line of
+defence** for the API. It is enabled by setting the `MYWANT_AUTH_PASSWORD` Fly
+secret on the GUI app — and **auth is off while that secret is unset**, so a
+fresh deployment is open to anyone who knows the URL.
+
+See [認証ガイド](auth.md) for setting and rotating that password, and for
+pointing the `mywant` CLI at an authenticated deployment.

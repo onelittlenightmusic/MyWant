@@ -384,8 +384,65 @@ To enable completion in your current session (Zsh example):
 source <(./bin/mywant completion zsh)
 ```
 
+## Contexts (backend の切り替え)
+
+kubectl と同じ要領で、接続先バックエンドを `~/.mywant/config.yaml` の
+`contexts:` に名前付きで並べ、`current_context:` で選ぶ。設定ファイルを
+書き換えるだけで全コマンドの宛先が変わる。
+
+```yaml
+current_context: fly
+
+contexts:
+  local:
+    server: http://localhost:8080
+  fly:
+    server: https://osaki-mywant-gui.fly.dev
+    username: admin
+    password_env: MYWANT_AUTH_PASSWORD   # 環境変数名。パスワード自体は書かない
+```
+
+fly.io 構成では backend が private ingress なので、公開されている GUI アプリ
+（Basic 認証付きで `/api/*` をプロキシしている）を `server` に指定する。
+
+```bash
+# コンテキストの作成・更新
+./bin/mywant config set-context fly \
+    --server https://osaki-mywant-gui.fly.dev \
+    --username admin --password-env MYWANT_AUTH_PASSWORD
+
+# 一覧（* が現在のコンテキスト。認証情報は伏せて表示される）
+./bin/mywant config get-contexts
+
+# 切り替え
+./bin/mywant config use-context fly
+./bin/mywant config current-context
+
+# 削除
+./bin/mywant config delete-context fly
+```
+
+Bearer トークン認証の場合は `--token-env` / `token_env:` を使う（Basic 認証より優先される）。
+`--password` / `--token` で直接値を渡すこともできるが config.yaml に平文で残る。
+
+パスワードの生成・ローテーション（`fly secrets`）、macOS Keychain との連携など、
+認証まわりの詳細は [認証ガイド](auth.md) を参照。
+
+**宛先の決定順（上が優先）:**
+
+1. `--server` フラグ（URL のみ上書き。認証情報はコンテキストのものが使われる）
+2. `MYWANT_SERVER` / `MYWANT_TOKEN` / `MYWANT_USERNAME` / `MYWANT_PASSWORD` 環境変数
+3. `--context <name>` で指定したコンテキスト
+4. `current_context` のコンテキスト
+5. `server_host` + `server_port`（スキームは http 固定）
+6. `http://localhost:8080`
+
+なお `start` / `stop` / `ps` はローカルプロセスを管理するコマンドなので、
+コンテキストではなく `server_host` / `server_port` を見る。
+
 ## Global Flags
 
-- `--server`: Specify MyWant server URL (default: `http://localhost:8080`)
+- `--server`: Specify MyWant server URL (overrides the active context)
+- `--context`: Use a named context from config.yaml for this invocation
 - `--config`: Specify a custom CLI config file (default: `~/.mywant/config.yaml`)
 - `-h, --help`: Show help for any command
