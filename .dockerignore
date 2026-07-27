@@ -23,3 +23,13 @@ web
 .DS_Store
 .idea
 .vscode
+
+# Credentials. The final image is built from a separate stage and contains only
+# the compiled binary, so nothing here would be baked in — but the whole build
+# context is uploaded to the remote builder, and none of these belong there.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+credentials*.json
