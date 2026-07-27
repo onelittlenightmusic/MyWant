@@ -42,6 +42,7 @@ type Server struct {
 	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
 	memoStore            *MemoStore                      // Persists user-entered values to ~/.mywant/memo.yaml
 	memoEvents           *MemoEventStore                 // Provenance timeline for named values (~/.mywant/memo-events.yaml)
+	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
 	memoLabels           *MemoLabelStore                 // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 }
@@ -287,6 +288,7 @@ func New(config Config) *Server {
 		otelShutdown:         otelShutdown,
 		memoStore:            newMemoStore(),
 		memoEvents:           newMemoEventStore(),
+		notifications:        newNotificationStore(),
 		memoLabels:           newMemoLabelStore(),
 		exposableFieldsCache: exposableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
