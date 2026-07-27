@@ -27,7 +27,8 @@ FROM alpine:3.20
 # ca-certificates: outbound HTTPS (agents/APIs). su-exec: drop root in entrypoint.
 # tzdata: correct time handling for time-based wants (reminders).
 # git: POST /api/v1/customs clones the requested package onto this filesystem.
-RUN apk add --no-cache ca-certificates git su-exec tzdata \
+# python3: script-backed agents shipped by customs run as "main.py".
+RUN apk add --no-cache ca-certificates git python3 su-exec tzdata \
     && adduser -D -u 10001 app
 
 COPY --from=builder /out/mywant /usr/local/bin/mywant
