@@ -57,6 +57,18 @@ make release                                        # Build CLI only
 ./bin/mywant recipes create --from-want <ID> --name "my-recipe"  # from want
 ./bin/mywant recipes create -i                      # interactive
 
+# Customs (addons: want types / design plugins / recipes / icon styles)
+./bin/mywant custom list
+./bin/mywant custom install <git-url | owner/repo | name | ./dir> [--kind ...] [--name ...]
+./bin/mywant custom uninstall <name>
+./bin/mywant --context fly custom install owner/repo   # installs on the remote server (API)
+./bin/mywant --context local custom list               # act on this machine
+
+# Memo (remembered input values) / worlds / global state
+./bin/mywant memo list|get|add|remove|events|stats|labels|label|groups
+./bin/mywant world list|open|save|export|import        # named snapshots of all wants
+./bin/mywant state global get|set|delete|clear         # moved here from `memo`
+
 # System
 ./bin/mywant types/agents/capabilities list
 ./bin/mywant logs
@@ -120,6 +132,9 @@ description: "Luxury hotel bookings with automated upgrades."
 ## System Directories
 
 **`~/.mywant/`** - config.yaml • server.pid/log • agent-service.pid/port/log • flight-server.log
+
+**Customs (`mywant custom`):** `customs.yaml` (registry) • `customs/<name>/` (store) → linked into `custom-types/` • `design-plugin/` • `recipes/` • `icons/`
+Logic lives in `engine/core/custom_store.go` (shared by CLI and server); API in `engine/server/handlers_customs.go` (`/api/v1/customs`). Remote contexts install onto the server's machine.
 
 **Config (`~/.mywant/config.yaml`):**
 ```yaml
