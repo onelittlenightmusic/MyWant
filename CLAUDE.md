@@ -30,7 +30,7 @@
 ./bin/mywant --config /path/to/config.yaml config get  # Custom config (~/.mywant/config.yaml default)
 
 # Backend contexts (kubectl-style): switch destination by editing config.yaml
-./bin/mywant config set-context fly --server https://x.fly.dev --username admin --password-env MYWANT_AUTH_PASSWORD
+./bin/mywant config set-context fly --server https://x.fly.dev --username mywant --password-env MYWANT_AUTH_PASSWORD
 ./bin/mywant config get-contexts / use-context <name> / current-context / delete-context <name>
 ```
 
@@ -142,7 +142,7 @@ agent_mode: local              # local/webhook/grpc
 current_context: local         # which entry of `contexts` the CLI talks to
 contexts:                      # named backends (see docs/MYWANT_CLI_USAGE.md)
   local: {server: "http://localhost:8080"}
-  fly:   {server: "https://x.fly.dev", username: admin, password_env: MYWANT_AUTH_PASSWORD}
+  fly:   {server: "https://x.fly.dev", username: mywant, password_env: MYWANT_AUTH_PASSWORD}
 server_host: localhost         # start/stop/ps only — NOT the API destination
 server_port: 8080
 agent_service_host: localhost

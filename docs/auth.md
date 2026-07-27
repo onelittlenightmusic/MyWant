@@ -188,7 +188,22 @@ curl -s -o /dev/null -w '%{http_code}\n' https://osaki-mywant-gui.fly.dev/health
 - `fly secrets list` は名前とダイジェストしか返しません。**現在の値は誰にも読めない**ので、
   控えを失った場合はローテーションするしかありません
 - デプロイのスモークテスト用に `GUI_SMOKE_AUTH`（`user:password` 形式）を設定している場合、
-  ローテーション時に一緒に更新しないとテストが落ちます
+  ローテーション時に一緒に更新しないとテストが落ちます。
+  シークレット名は **`GUI_SMOKE_AUTH`**（`mywant-deploy` リポジトリ）です。ワークフローのログには
+  `SMOKE_AUTH: ***` と出ますが、これは受け取る側の環境変数名なので取り違えないでください
+  （`deploy.yml`: `SMOKE_AUTH: ${{ secrets.GUI_SMOKE_AUTH }}`）。
+
+  このときの失敗はこう見えます。**デプロイ自体は成功していて、その後のスモークテストだけが落ちます。**
+
+  ```
+  /healthz -> 200
+  / (no credentials) -> 401        ← 認証は正しく動いている
+  / (with credentials) -> 401      ← CI が持っている値が古い
+  ```
+
+  サーバーもコードも正常で、CI 側の値だけが古い状態です。backend のみをデプロイした
+  実行は GUI のスモークテストが `skipped` になるため成功して見える点にも注意してください
+  （失敗が隠れるだけで、直っているわけではありません）。
 
 ## mywant CLI からの使い方
 
