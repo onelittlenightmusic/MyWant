@@ -379,6 +379,14 @@ func (s *Server) Start() error {
 	// Register push callback for want_achieved lifecycle webhooks
 	s.RegisterAchievementCallback()
 
+	// Seed "default" so a fresh install is never worldless. Until now a world
+	// file only appeared when you switched worlds (openWorld auto-saves the
+	// outgoing set under "default"), so a new deployment showed "No worlds yet"
+	// with no way to leave that state from the GUI except importing a YAML.
+	// Runs here, after the restored wants are addressable, so the snapshot is
+	// the world you are actually in rather than an empty one.
+	s.ensureDefaultWorld()
+
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	s.httpServer = &http.Server{

@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,6 +28,44 @@ func (s *Server) worldsDir() (string, error) {
 
 func worldFilePath(dir, name string) string {
 	return filepath.Join(dir, name+".yaml")
+}
+
+// defaultWorldName is the world a server falls back to when none is open —
+// both the auto-save target in openWorld and the seed below.
+const defaultWorldName = "default"
+
+// ensureDefaultWorld creates <worlds>/default.yaml when no world file exists at
+// all, so a fresh install starts with the world it is already in rather than
+// with nothing. Guarded on "no *.yaml present", not on "default.yaml missing",
+// so a user who renamed or deleted default in favour of their own worlds never
+// gets it silently recreated. Failures are logged, not fatal: a missing seed
+// costs a listing entry, and must not stop the server from starting.
+func (s *Server) ensureDefaultWorld() {
+	dir, err := s.worldsDir()
+	if err != nil {
+		log.Printf("[WARN] worlds: cannot access worlds directory: %v", err)
+		return
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Printf("[WARN] worlds: cannot list worlds directory: %v", err)
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".yaml") {
+			return
+		}
+	}
+
+	if err := s.saveWorldSnapshot(defaultWorldName); err != nil {
+		log.Printf("[WARN] worlds: failed to seed %q: %v", defaultWorldName, err)
+		return
+	}
+	if s.config.CurrentWorld == "" {
+		s.config.CurrentWorld = defaultWorldName
+		s.saveFrontendConfig()
+	}
+	log.Printf("[Worlds] Seeded default world at %s", worldFilePath(dir, defaultWorldName))
 }
 
 // worldThumbPath returns <worldsDir>/thumbs/<name>.png — the canvas screenshot
