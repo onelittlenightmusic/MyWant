@@ -1154,7 +1154,35 @@ type pendingActionResponse struct {
 // polls this used to require. Checked in priority order — auto-launch, then
 // nav-launch, then browser-run — and returns the first one found; an idle
 // poll (nothing pending anywhere) gets back {kind: ""}.
+// homeBrowserDevice is the gui_state key naming the browser that browser work
+// is pinned to. Empty means unpinned.
+const homeBrowserDeviceKey = "homeBrowserDevice"
+
+// pollerIsHomeBrowser reports whether this poller may claim work.
+//
+// Every extension polling this server used to be interchangeable, so whichever
+// asked first got the job — with two browsers signed in, a tab could open on
+// the wrong machine entirely. A device can now be named home, after which only
+// it is served; work then waits for that browser rather than going somewhere
+// the user cannot see. With no home named, any poller is served, which is the
+// behaviour every existing install has.
+func (s *Server) pollerIsHomeBrowser(r *http.Request) bool {
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		return true
+	}
+	home := mywant.GetCurrent(want, homeBrowserDeviceKey, "")
+	if home == "" {
+		return true
+	}
+	return r.URL.Query().Get("device") == home
+}
+
 func (s *Server) pendingBrowserAction(w http.ResponseWriter, r *http.Request) {
+	if !s.pollerIsHomeBrowser(r) {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
+		return
+	}
 	if resp := s.claimPendingAutoLaunch(r); resp != nil {
 		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "auto_launch", AutoLaunch: resp})
 		return
