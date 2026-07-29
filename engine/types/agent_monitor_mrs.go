@@ -80,6 +80,10 @@ func mrsCheckRequiredParams(want *Want) bool {
 //     If the imported value is a map (e.g. a selected_slot object), its sub-keys are also
 //     available as %{key} so the template can reference nested fields directly.
 //  2. Spec.Params — the statically declared parameter value.
+//  3. The want's own identity: %{want_name} and %{want_id}. Scripts that call back
+//     into the API (OAuth state, state PUTs) need to name the want they belong to,
+//     which is otherwise invisible to them. Lowest priority, so a param or state
+//     field of the same name still wins.
 //
 // IMPORTANT: The placeholder syntax is %{key} (percent-brace), NOT ${key}.
 // The onInitialize interpolation engine uses ${key} and would pre-expand those
@@ -95,8 +99,15 @@ func mrsRebuildSkillArg(want *Want) {
 		return // no template; keep existing skill_json_arg unchanged
 	}
 
-	// Build a merged params map: spec.params as base, overlaid by imported/live state values.
+	// Build a merged params map: want identity as base, then spec.params,
+	// overlaid by imported/live state values.
 	merged := make(map[string]any)
+	if want.Metadata.Name != "" {
+		merged["want_name"] = want.Metadata.Name
+	}
+	if want.Metadata.ID != "" {
+		merged["want_id"] = want.Metadata.ID
+	}
 	for k, v := range want.Spec.Params {
 		merged[k] = v
 	}
