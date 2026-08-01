@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -69,7 +70,11 @@ func GenerateOrderKeyBefore(key string) string {
 		return key[:len(key)-1]
 	}
 
-	panic("Cannot generate key before minimum key")
+	// Single minimum character ("0"): there is genuinely nothing before it in
+	// this alphabet. Returning the key unchanged means a caller ends up with a
+	// tie, which SortWantsByOrderKey breaks deterministically — an HTTP handler
+	// reordering cards must not be able to panic the whole server over it.
+	return key
 }
 
 // GenerateOrderKeyBetween generates a key between two keys
@@ -103,24 +108,41 @@ func GenerateOrderKeyBetween(keyA, keyB string) string {
 
 	// They are identical up to the shorter length
 	if i == minLength {
-		// If keyA is shorter, we can append to it
+		// keyB extends keyA, so every candidate must also start with keyA.
 		if len(keyA) < len(keyB) {
-			nextChar := keyB[i]
-			nextCharIndex := strings.IndexByte(baseChars, nextChar)
-
-			if nextCharIndex > 0 {
-				// Can insert between by using a character before nextChar
-				midCharIndex := nextCharIndex / 2
-				return keyA + string(baseChars[midCharIndex])
+			// Walk past keyB's leading minimum characters: at those positions
+			// there is no character below keyB's, so no split is possible
+			// there. The first position that does have room is where we split.
+			//
+			// (The old code split at position i unconditionally, appending the
+			// midpoint character when keyB[i] was '0'. That produced a key
+			// GREATER than keyB — e.g. between "zz" and "zz0" it returned
+			// "zzV" — silently placing the want on the wrong side of its
+			// intended neighbour.)
+			j := i
+			for j < len(keyB) && keyB[j] == baseChars[0] {
+				j++
 			}
-
-			// nextChar is '0', we need something between keyA and keyA + "0..."
-			// The only way is to append to keyA but with a very small increment,
-			// or in this case, just append to keyA.
-			return keyA + string(baseChars[base/2])
+			if j < len(keyB) {
+				// keyB[j] > '0' here, so baseChars[idx/2] < keyB[j], which makes
+				// keyB[:j]+mid strictly less than keyB and strictly greater than
+				// keyA (it is keyA plus at least one more character).
+				idx := strings.IndexByte(baseChars, keyB[j])
+				return keyB[:j] + string(baseChars[idx/2])
+			}
+			// keyB is keyA followed only by minimum characters ("a0" / "a000").
+			// Any proper prefix of keyB longer than keyA sorts between them.
+			if len(keyB) > len(keyA)+1 {
+				return keyB[:len(keyB)-1]
+			}
+			// keyB is exactly keyA + "0": nothing fits between them in this
+			// alphabet. Tie with keyB and let the sort's id tiebreak settle it.
+			return keyB
 		}
 
-		// keyA is longer or equal (should not happen if keyA < keyB), append to keyA
+		// keyA is longer or equal, which means the caller passed neighbours
+		// that are not in ascending order (duplicate or corrupted keys). Land
+		// after keyA rather than inventing something between them.
 		return GenerateOrderKeyAfter(keyA)
 	}
 
@@ -171,10 +193,14 @@ func AssignOrderKeys(wants []*Want) int {
 	var needsKey []*Want
 	var lastKey string
 
-	// First, find the last assigned key (for appending)
+	// Take the MAXIMUM existing key, not the last one encountered: `wants` is
+	// not required to be sorted, and appending after a non-maximal key hands
+	// the new wants keys that collide with, or sort before, existing ones.
 	for _, want := range wants {
 		if want.Metadata.OrderKey != "" {
-			lastKey = want.Metadata.OrderKey
+			if want.Metadata.OrderKey > lastKey {
+				lastKey = want.Metadata.OrderKey
+			}
 		} else {
 			needsKey = append(needsKey, want)
 		}
@@ -209,25 +235,51 @@ func AssignOrderKeys(wants []*Want) int {
 	return len(needsKey)
 }
 
-// SortWantsByOrderKey sorts wants by their order keys
-func SortWantsByOrderKey(wants []*Want) {
-	// Simple bubble sort for now (can optimize later if needed)
-	n := len(wants)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			keyA := wants[j].Metadata.OrderKey
-			keyB := wants[j+1].Metadata.OrderKey
-
-			// If either key is empty, maintain current order
-			if keyA == "" || keyB == "" {
-				continue
-			}
-
-			if strings.Compare(keyA, keyB) > 0 {
-				wants[j], wants[j+1] = wants[j+1], wants[j]
-			}
+// BackfillMissingOrderKeys gives an order key to every want that lacks one and
+// returns just those wants, so the caller can persist them.
+//
+// A want with no order key is invisible to fractional indexing: asked to place
+// something next to it, GenerateOrderKeyBetween reads the empty string as
+// "there is no neighbour on that side" and drops the moved want past it
+// entirely. Wants can reach that state by being created off the normal API path
+// (dynamically spawned children, for instance, which never run OrderKeyHook), so
+// anything that is about to compute a position needs to heal them first rather
+// than assume they cannot exist.
+func BackfillMissingOrderKeys(wants []*Want) []*Want {
+	var missing []*Want
+	for _, want := range wants {
+		if want != nil && want.Metadata.OrderKey == "" {
+			missing = append(missing, want)
 		}
 	}
+	if len(missing) == 0 {
+		return nil
+	}
+	AssignOrderKeys(wants)
+	return missing
+}
+
+// SortWantsByOrderKey sorts wants by their order keys.
+//
+// The comparison is a total order: wants missing a key sort after those that
+// have one, and ties fall back to the want id. The previous implementation
+// skipped any comparison involving an empty key, which is not a valid ordering
+// relation — the result depended on the input permutation and disagreed with
+// the client, which sorts a keyless want by its id.
+func SortWantsByOrderKey(wants []*Want) {
+	sort.SliceStable(wants, func(i, j int) bool {
+		keyA, keyB := wants[i].Metadata.OrderKey, wants[j].Metadata.OrderKey
+		if keyA != keyB {
+			if keyA == "" {
+				return false
+			}
+			if keyB == "" {
+				return true
+			}
+			return keyA < keyB
+		}
+		return wants[i].Metadata.ID < wants[j].Metadata.ID
+	})
 }
 
 // ValidateOrderKey validates that an order key is properly formatted
