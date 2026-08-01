@@ -33,6 +33,12 @@ type ExposeAction struct {
 	FieldName string `json:"field_name"`
 	// GlobalKey is the expose "as" key (global state key). Defaults to FieldName if empty.
 	GlobalKey string `json:"global_key,omitempty"`
+	// AsGlobalParam publishes the field as a global PARAMETER rather than global
+	// state. Parameters are wired through the parameter side of the system
+	// (asGlobalParam out, fromGlobalParam in); imports carry state and would
+	// leave a parameter holding a key it cannot resolve — and would silently
+	// make the target's own writes to that state key no-ops.
+	AsGlobalParam string `json:"as_global_param,omitempty"`
 }
 
 // ImportAction describes the import entry that will be added to the target want's Spec.Imports.
@@ -47,6 +53,13 @@ type ImportAction struct {
 type FieldRef struct {
 	WantID      string `json:"want_id"`
 	WantName    string `json:"want_name"`
+	// WantType lets a caller draw the provider's icon: with several wants
+	// offering the same field name, the name alone does not say which is which.
+	WantType    string `json:"want_type,omitempty"`
+	// CurrentValue is what the field holds right now. A recommendation carries
+	// the field NAME as its param value (that is how the expose wiring reads),
+	// which tells a person nothing — this is what to show them.
+	CurrentValue any    `json:"current_value,omitempty"`
 	FieldName   string `json:"field_name"`
 	FieldType   string `json:"field_type"`          // runtime type: "array", "string", "number", "bool", "object"
 	DataType    string `json:"data_type,omitempty"` // semantic type from want type def: "weather", "date", "url", etc.
@@ -136,6 +149,7 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 	var recs []FieldMatchRecommendation
 	for _, src := range sources {
 		recs = append(recs, computeExposeImportRecommendations(s, src, targetWant, exposedLabels)...)
+		recs = append(recs, computeStateParamRecommendations(s, src, targetWant, exposedLabels)...)
 	}
 	// Remembered values stand alongside live want fields as candidates.
 	recs = append(recs, computeMemoRecommendations(s, targetWant)...)
@@ -217,6 +231,9 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 	var req struct {
 		SourceID     string        `json:"source_id"`
 		SourceType   string        `json:"source_type"`
+		// SourceField names the field to connect from. Its presence is what
+		// asks for a connection rather than a plain value write.
+		SourceField  string        `json:"source_field"`
 		TargetID     string        `json:"target_id"`
 		ParamChange  *ParamChange  `json:"param_change,omitempty"`
 		ExposeAction *ExposeAction `json:"expose_action,omitempty"`
@@ -255,6 +272,44 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		"success":   true,
 		"source_id": req.SourceID,
 		"target_id": req.TargetID,
+	}
+
+	// ── Mode 0: Connect a source field to a target parameter ───────────────
+	// The caller names the two ends; the wiring is chosen here. A parameter is
+	// fed from the parameter side (asGlobalParam out, fromGlobalParam in) —
+	// imports carry state, and would leave the parameter holding a key it never
+	// resolves while silently voiding the target's own writes to that key.
+	if req.SourceField != "" && req.ParamChange != nil && req.ParamChange.ParamName != "" {
+		sourceWant, _, ok := s.globalBuilder.FindWantByID(req.SourceID)
+		if !ok {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", req.SourceID), "")
+			return
+		}
+		paramKey := slugifyWantKey(sourceWant.Metadata.Name) + "_" + req.SourceField
+		if !hasExposeAsGlobalParam(sourceWant, paramKey) {
+			srcUpdated := &mywant.Want{Metadata: sourceWant.Metadata, Spec: sourceWant.Spec}
+			srcUpdated.Spec.Exposes = append(append([]mywant.ExposeEntry{}, sourceWant.Spec.Exposes...), mywant.ExposeEntry{
+				CurrentState: req.SourceField, AsGlobalParam: paramKey,
+			})
+			s.globalBuilder.UpdateWant(srcUpdated)
+		}
+		ref := map[string]any{"fromGlobalParam": paramKey}
+		result["exposed_global_param"] = paramKey
+		if targetPending {
+			result["pending_param_change"] = map[string]any{"param_name": req.ParamChange.ParamName, "value": ref}
+		} else if tw, _, ok := s.globalBuilder.FindWantByID(req.TargetID); ok {
+			newParams := make(map[string]any, len(tw.Spec.Params)+1)
+			maps.Copy(newParams, tw.Spec.Params)
+			newParams[req.ParamChange.ParamName] = ref
+			updated := &mywant.Want{Metadata: tw.Metadata, Spec: tw.Spec}
+			updated.Metadata.OwnerReferences = tw.Metadata.OwnerReferences
+			updated.Spec.Params = newParams
+			s.globalBuilder.UpdateWant(updated)
+			result["param_name"] = req.ParamChange.ParamName
+			result["value"] = ref
+		}
+		s.JSONResponse(w, http.StatusOK, result)
+		return
 	}
 
 	// ── Mode 1: Param-change (legacy) ──────────────────────────────────────
@@ -309,7 +364,16 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 			globalKey = ea.FieldName
 		}
 		if sourceWant, _, ok := s.globalBuilder.FindWantByID(ea.WantID); ok {
-			if !hasExposeAs(sourceWant, globalKey) {
+			if ea.AsGlobalParam != "" {
+				if !hasExposeAsGlobalParam(sourceWant, ea.AsGlobalParam) {
+					srcUpdated := &mywant.Want{Metadata: sourceWant.Metadata, Spec: sourceWant.Spec}
+					srcUpdated.Spec.Exposes = append(append([]mywant.ExposeEntry{}, sourceWant.Spec.Exposes...), mywant.ExposeEntry{
+						CurrentState: ea.FieldName, AsGlobalParam: ea.AsGlobalParam,
+					})
+					s.globalBuilder.UpdateWant(srcUpdated)
+				}
+				result["exposed_global_param"] = ea.AsGlobalParam
+			} else if !hasExposeAs(sourceWant, globalKey) {
 				srcUpdated := &mywant.Want{Metadata: sourceWant.Metadata, Spec: sourceWant.Spec}
 				srcUpdated.Spec.Exposes = append(append([]mywant.ExposeEntry{}, sourceWant.Spec.Exposes...), mywant.ExposeEntry{
 					As: globalKey, CurrentState: ea.FieldName,
@@ -350,6 +414,15 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 }
 
 // hasExposeAs returns true if the want already has an expose entry with the given As key.
+func hasExposeAsGlobalParam(w *mywant.Want, key string) bool {
+	for _, e := range w.Spec.Exposes {
+		if e.AsGlobalParam == key {
+			return true
+		}
+	}
+	return false
+}
+
 func hasExposeAs(w *mywant.Want, asKey string) bool {
 	for _, e := range w.Spec.Exposes {
 		if e.As == asKey {
@@ -436,9 +509,11 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 		}
 		seen[k] = true
 		fields = append(fields, FieldRef{
-			WantID:      want.Metadata.ID,
-			WantName:    want.Metadata.Name,
-			FieldName:   k,
+			WantID:       want.Metadata.ID,
+			WantName:     want.Metadata.Name,
+			WantType:     want.Metadata.Type,
+			CurrentValue: v,
+			FieldName:    k,
 			FieldType:   fieldType,
 			DataType:    fieldDataTypes[k],
 			Label:       stateLabelString(effective),
@@ -471,6 +546,7 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 			fields = append(fields, FieldRef{
 				WantID:      want.Metadata.ID,
 				WantName:    want.Metadata.Name,
+				WantType:    want.Metadata.Type,
 				FieldName:   sd.Name,
 				FieldType:   normalizeDecl(string(sd.Type)),
 				DataType:    sd.SubType,
@@ -549,6 +625,66 @@ func wordIntersection(a, b []string) []string {
 // computeExposeImportRecommendations suggests connecting source → target via the
 // expose/import mechanism (Spec.Exposes + Spec.Imports) rather than a param change.
 // This is the preferred approach for the generic data-flow linkage between any two wants.
+// computeStateParamRecommendations offers a deployed want's state fields for a
+// target's parameters, matched on subtype alone.
+//
+// This is what chains two searches: one transit search holds the station it
+// arrived at and the time it arrives, the next one needs a station and a time.
+// Nothing declares "the arrival feeds the departure" — the subtypes say a
+// station fits a station parameter, and the user picks which. A declared chain
+// would only describe this one pair of types and would not read backwards.
+//
+// Unlike memo values these are not literals: applying one exposes the source
+// field and imports it, so the second leg follows the first when it moves.
+func computeStateParamRecommendations(s *Server, source, target *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldMatchRecommendation {
+	def := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type)
+	if def == nil || source.Metadata.ID == target.Metadata.ID {
+		return nil
+	}
+	fields := collectSourceFields(s, source, allowedLabels)
+	if len(fields) == 0 {
+		return nil
+	}
+
+	var recs []FieldMatchRecommendation
+	for _, p := range def.Parameters {
+		if p.SubType == "" {
+			continue
+		}
+		if v, ok := target.Spec.Params[p.Name]; ok && v != nil && v != "" {
+			continue
+		}
+		for _, sf := range fields {
+			if sf.DataType != p.SubType {
+				continue
+			}
+			// Says only what could fill what. HOW the two get connected — as a
+			// global parameter here, since the target is a parameter — is decided
+			// when one is applied, not when it is offered. The value carried is
+			// the field's current one, which is also what apply falls back to if
+			// the wiring cannot be made.
+			recs = append(recs, FieldMatchRecommendation{
+				// Above every memo value: a station a want is standing at now
+				// beats one merely remembered.
+				Score:       0.9,
+				Description: fmt.Sprintf("Take %s's %s as %s", source.Metadata.Name, sf.FieldName, p.Name),
+				Source:      sf,
+				Target: ParamRef{
+					WantID:    target.Metadata.ID,
+					WantName:  target.Metadata.Name,
+					ParamName: p.Name,
+				},
+				ParamChange: ParamChange{
+					WantID:    target.Metadata.ID,
+					ParamName: p.Name,
+					Value:     sf.CurrentValue,
+				},
+			})
+		}
+	}
+	return recs
+}
+
 // memoRecommendationLimit caps how many remembered values one parameter offers.
 const memoRecommendationLimit = 3
 

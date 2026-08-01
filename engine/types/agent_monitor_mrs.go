@@ -58,8 +58,10 @@ func mrsCheckRequiredParams(want *Want) bool {
 		if stateVal, ok := allState[p]; ok && stateVal != nil && strings.TrimSpace(fmt.Sprintf("%v", stateVal)) != "" {
 			continue // provided via import or current state
 		}
-		// Priority 2: check Spec.Params
-		val, exists := want.Spec.Params[p]
+		// Priority 2: the parameter's effective value — GetParameter, not
+		// Spec.Params, so a {fromGlobalParam} reference reads as the value it
+		// resolves to rather than as the declaration.
+		val, exists := want.GetParameter(p)
 		if !exists || val == nil || strings.TrimSpace(fmt.Sprintf("%v", val)) == "" {
 			missing = append(missing, p)
 		}
@@ -108,8 +110,14 @@ func mrsRebuildSkillArg(want *Want) {
 	if want.Metadata.ID != "" {
 		merged["want_id"] = want.Metadata.ID
 	}
-	for k, v := range want.Spec.Params {
-		merged[k] = v
+	// GetParameter, not Spec.Params: a param declared as
+	// {fromGlobalParam: key} keeps that reference in Spec.Params by design, and
+	// its resolved value lives beside it. Reading the raw map put the reference
+	// object itself into the skill arguments.
+	for k := range want.Spec.Params {
+		if v, ok := want.GetParameter(k); ok {
+			merged[k] = v
+		}
 	}
 	// Overlay imported values (Priority 1): imported values take precedence over spec.params.
 	allState := want.GetAllState()

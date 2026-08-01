@@ -65,7 +65,16 @@ func (s *ScriptableWant) Initialize() {
 		for _, sd := range s.WantTypeDefinition.State {
 			labels[sd.Name] = string(sd.Label)
 		}
-		for k, v := range s.Spec.Params {
+		for k := range s.Spec.Params {
+			// GetParameter, not the raw map: a param declared as
+			// {fromGlobalParam: key} keeps that declaration in Spec.Params by
+			// design, and its resolved value lives beside it. Copying the raw
+			// map put the declaration itself into state, where everything
+			// downstream — skill arguments included — read it as the value.
+			v, ok := s.GetParameter(k)
+			if !ok {
+				continue
+			}
 			switch labels[k] {
 			case "goal":
 				s.SetGoal(k, v)

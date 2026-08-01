@@ -21,8 +21,13 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 		return false
 	}
 
-	// Compare spec
-	if !reflect.DeepEqual(a.Spec.Params, b.Spec.Params) {
+	// Compare spec. Params are compared by their EFFECTIVE values: a param
+	// declared as {fromGlobalParam: key} keeps that declaration in Spec.Params
+	// for good reason (it must survive persistence as a reference), so two
+	// snapshots of a want wired to another want's value look identical even
+	// after that value moves. Resolving here is what lets reconcile see the
+	// change and restart the want, the same as any other config change.
+	if !reflect.DeepEqual(resolveParamRefs(a.Spec.Params), resolveParamRefs(b.Spec.Params)) {
 		return false
 	}
 
@@ -43,6 +48,62 @@ func (cb *ChainBuilder) wantsEqual(a, b *Want) bool {
 	}
 
 	return true
+}
+
+// hasParamRef reports whether any configured want has a parameter declared as
+// {fromGlobalParam: key}.
+func (cb *ChainBuilder) hasParamRef(key string) bool {
+	cb.wantsMu.RLock()
+	defer cb.wantsMu.RUnlock()
+	for _, w := range cb.config {
+		for _, v := range w.Spec.Params {
+			if paramRefKey(v) == key {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// paramRefKey returns the global parameter a value references, or "" if the
+// value is a plain one. Persistence can bring the map back keyed by `any`.
+func paramRefKey(v any) string {
+	switch m := v.(type) {
+	case map[string]any:
+		k, _ := m["fromGlobalParam"].(string)
+		return k
+	case map[string]string:
+		return m["fromGlobalParam"]
+	case map[any]any:
+		for mk, mv := range m {
+			if ks, ok := mk.(string); ok && ks == "fromGlobalParam" {
+				k, _ := mv.(string)
+				return k
+			}
+		}
+	}
+	return ""
+}
+
+// resolveParamRefs returns params with every {fromGlobalParam: key} replaced by
+// the value that key currently holds. An unresolved reference keeps its
+// declaration, so a want waiting on a parameter that does not exist yet stays
+// equal to itself instead of restarting on every reconcile.
+func resolveParamRefs(params map[string]any) map[string]any {
+	if params == nil {
+		return nil
+	}
+	out := make(map[string]any, len(params))
+	for k, v := range params {
+		if key := paramRefKey(v); key != "" {
+			if resolved, ok := GetGlobalParameter(key); ok {
+				out[k] = resolved
+				continue
+			}
+		}
+		out[k] = v
+	}
+	return out
 }
 
 // mapsEqual compares two string maps for equality
