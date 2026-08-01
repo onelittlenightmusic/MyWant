@@ -181,6 +181,129 @@ func TestValidateOrderKey(t *testing.T) {
 	}
 }
 
+// GenerateOrderKeyBetween must always land strictly inside the interval it is
+// given. The prefix cases below are the ones that used to escape it: when keyB
+// extended keyA with a minimum character ("zz" / "zz0"), the old split returned
+// "zzV", which sorts AFTER keyB — the want ended up on the wrong side of the
+// neighbour it was dropped next to.
+func TestGenerateOrderKeyBetweenStaysInInterval(t *testing.T) {
+	pairs := [][2]string{
+		{"a0", "a1"},   // adjacent characters
+		{"a0", "a0V"},  // keyB extends keyA
+		{"a0V", "a1"},  // deeper key against a shallow one
+		{"a0V", "a0W"}, // adjacent at depth
+		{"zz", "zz0V"}, // keyB extends keyA past a minimum character
+		{"a0", "a00V"}, // several minimum characters before room appears
+		{"az", "b0"},   // carry boundary
+		{"a9", "aA"},   // digit/uppercase boundary
+		{"aZ", "aa"},   // uppercase/lowercase boundary
+	}
+
+	for _, p := range pairs {
+		keyA, keyB := p[0], p[1]
+		got := GenerateOrderKeyBetween(keyA, keyB)
+		if !(got > keyA && got < keyB) {
+			t.Errorf("GenerateOrderKeyBetween(%q, %q) = %q, want strictly between", keyA, keyB, got)
+		}
+	}
+}
+
+// Repeatedly inserting into the same gap must keep producing keys inside the
+// ever-shrinking interval — this is the operation a user performs by dragging a
+// card into the same slot over and over.
+func TestGenerateOrderKeyBetweenRepeatedInsertion(t *testing.T) {
+	lo, hi := "a0", "a1"
+	for i := 0; i < 50; i++ {
+		mid := GenerateOrderKeyBetween(lo, hi)
+		if !(mid > lo && mid < hi) {
+			t.Fatalf("iteration %d: GenerateOrderKeyBetween(%q, %q) = %q, want strictly between", i, lo, hi, mid)
+		}
+		// Alternate which side we keep, so both the "extend" and "adjacent"
+		// branches get exercised as the interval narrows.
+		if i%2 == 0 {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+}
+
+func TestAssignOrderKeysUsesMaximumExistingKey(t *testing.T) {
+	// Deliberately unsorted: the highest key is not the last one in the slice.
+	wants := []*Want{
+		{Metadata: Metadata{Name: "high", OrderKey: "a9"}},
+		{Metadata: Metadata{Name: "new"}},
+		{Metadata: Metadata{Name: "low", OrderKey: "a0"}},
+	}
+
+	if assigned := AssignOrderKeys(wants); assigned != 1 {
+		t.Fatalf("expected 1 want to be assigned a key, got %d", assigned)
+	}
+
+	got := wants[1].Metadata.OrderKey
+	if got <= "a9" {
+		t.Errorf("new want got key %q, expected it to sort after the maximum existing key %q", got, "a9")
+	}
+}
+
+func TestBackfillMissingOrderKeys(t *testing.T) {
+	wants := []*Want{
+		{Metadata: Metadata{ID: "1", Name: "has-key", OrderKey: "a0"}},
+		{Metadata: Metadata{ID: "2", Name: "no-key"}},
+		{Metadata: Metadata{ID: "3", Name: "also-no-key"}},
+	}
+
+	healed := BackfillMissingOrderKeys(wants)
+	if len(healed) != 2 {
+		t.Fatalf("expected 2 healed wants, got %d", len(healed))
+	}
+	for _, w := range wants {
+		if w.Metadata.OrderKey == "" {
+			t.Errorf("want %q still has no order key", w.Metadata.Name)
+		}
+	}
+	// Nothing left to do the second time around.
+	if healed := BackfillMissingOrderKeys(wants); healed != nil {
+		t.Errorf("expected no wants to need healing on a second pass, got %d", len(healed))
+	}
+}
+
+// A keyless want must land in a defined place rather than wherever the input
+// permutation happens to put it — the client sorts the same list independently,
+// and the two orders have to agree.
+func TestSortWantsByOrderKeyIsTotal(t *testing.T) {
+	build := func() []*Want {
+		return []*Want{
+			{Metadata: Metadata{ID: "c", OrderKey: "a2"}},
+			{Metadata: Metadata{ID: "keyless"}},
+			{Metadata: Metadata{ID: "a", OrderKey: "a0"}},
+			{Metadata: Metadata{ID: "b", OrderKey: "a1"}},
+		}
+	}
+
+	first := build()
+	SortWantsByOrderKey(first)
+
+	// Same set, different starting permutation → same result.
+	second := build()
+	second[0], second[3] = second[3], second[0]
+	SortWantsByOrderKey(second)
+
+	for i := range first {
+		if first[i].Metadata.ID != second[i].Metadata.ID {
+			t.Fatalf("sort is permutation-dependent: got %q vs %q at index %d",
+				first[i].Metadata.ID, second[i].Metadata.ID, i)
+		}
+	}
+
+	wantOrder := []string{"a", "b", "c", "keyless"}
+	for i, id := range wantOrder {
+		if first[i].Metadata.ID != id {
+			t.Errorf("at index %d expected %q, got %q", i, id, first[i].Metadata.ID)
+		}
+	}
+}
+
 // Benchmark for key generation
 func BenchmarkGenerateOrderKeyBetween(b *testing.B) {
 	for i := 0; i < b.N; i++ {

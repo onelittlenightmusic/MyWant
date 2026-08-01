@@ -767,6 +767,21 @@ func (s *Server) updateWantOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Heal any want that is missing an order key before reading the
+	// neighbours' keys. GenerateOrderKeyBetween cannot tell "this neighbour has
+	// no key" apart from "there is no neighbour on this side", so a keyless
+	// neighbour made the dragged want jump past it to the end (or start) of the
+	// list instead of landing where it was dropped.
+	allStates := s.globalBuilder.GetAllWantStates()
+	allWants := make([]*mywant.Want, 0, len(allStates))
+	for _, existing := range allStates {
+		allWants = append(allWants, existing)
+	}
+	mywant.SortWantsByOrderKey(allWants)
+	for _, healed := range mywant.BackfillMissingOrderKeys(allWants) {
+		s.globalBuilder.UpdateWant(healed)
+	}
+
 	var prevKey, nextKey string
 	if req.PreviousWantID != "" {
 		if pw, _, found := s.globalBuilder.FindWantByID(req.PreviousWantID); found && pw != nil {
