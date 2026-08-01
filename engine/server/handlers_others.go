@@ -306,11 +306,15 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	wantsCount := len(s.wants)
 	s.wantsMu.RUnlock()
 
+	version, commit := BuildInfo()
 	health := map[string]any{
 		"status":  "healthy",
 		"wants":   wantsCount,
-		"version": "1.0.0",
+		"version": version,
 		"server":  "mywant",
+	}
+	if commit != "" {
+		health["commit"] = commit
 	}
 	s.JSONResponse(w, http.StatusOK, health)
 }

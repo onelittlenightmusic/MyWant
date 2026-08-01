@@ -32,6 +32,10 @@ to solve your wants based on their capabilities.`,
 }
 
 func main() {
+	// Let a server started by `mywant start` report this build's version on
+	// /health rather than a hardcoded placeholder.
+	commands.SetVersion(version)
+
 	// Set up persistent pre-run to handle config file
 	rootCmd.PersistentPreRun = preRunConfig
 

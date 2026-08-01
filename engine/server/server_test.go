@@ -40,6 +40,11 @@ func TestHealthCheck(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.Equal(t, "healthy", resp["status"])
 	assert.Equal(t, "mywant", resp["server"])
+
+	// The version must come from the build, never a hardcoded literal.
+	wantVersion, _ := BuildInfo()
+	assert.Equal(t, wantVersion, resp["version"])
+	assert.NotEmpty(t, resp["version"])
 }
 
 func TestCreateWantAPI(t *testing.T) {
