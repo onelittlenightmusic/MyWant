@@ -294,7 +294,7 @@ func New(config Config) *Server {
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},
-			&CanvasTileSizeHook{builder: globalBuilder},
+			&CanvasTileSizeHook{},
 			&CanvasCoordinateHook{},
 		},
 	}

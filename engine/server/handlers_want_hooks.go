@@ -152,22 +152,18 @@ const (
 	canvasLabelLength   = "mywant.io/canvas-length"
 )
 
-// categoryDefaultLength maps want-type category → default extra-cell count.
-// length=0 means 1×1, length=1 means 1×2, etc.
-var categoryDefaultLength = map[string]int{
-	"travel":    1,
-	"transit":   1,
-	"transport": 1,
-	"tunnel":    1,
-}
-
-// CanvasTileSizeHook sets default canvas-rotation (0) and canvas-length (category-dependent)
-// on wants that do not already have them.  Must run before CanvasCoordinateHook.
-type CanvasTileSizeHook struct {
-	builder interface {
-		GetWantTypeDefinition(typeName string) *mywant.WantTypeDefinition
-	}
-}
+// CanvasTileSizeHook sets default canvas-rotation (0) and canvas-length (0, a
+// single cell) on wants that do not already have them.  Must run before
+// CanvasCoordinateHook.
+//
+// Every want type starts as a 1×1 tile. Certain categories (travel, transport,
+// tunnel) used to default to length 1 — a tile two cells long — but a tile's
+// size is a layout choice the user makes by stretching it on the canvas, not a
+// property of what the want is, and having some types arrive pre-stretched only
+// made the canvas harder to arrange. Length stays freely settable per want; it
+// just is no longer decided by category.
+// No builder dependency: the default no longer depends on the want type at all.
+type CanvasTileSizeHook struct{}
 
 func (h *CanvasTileSizeHook) Name() string { return "canvas-tile-size" }
 
@@ -176,14 +172,7 @@ func (h *CanvasTileSizeHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywan
 		want.SetLabel(canvasLabelRotation, "0")
 	}
 	if want.GetLabel(canvasLabelLength) == "" {
-		defaultLen := 0
-		typeDef := h.builder.GetWantTypeDefinition(want.Metadata.Type)
-		if typeDef != nil {
-			if dl, ok := categoryDefaultLength[typeDef.Metadata.Category]; ok {
-				defaultLen = dl
-			}
-		}
-		want.SetLabel(canvasLabelLength, strconv.Itoa(defaultLen))
+		want.SetLabel(canvasLabelLength, "0")
 	}
 	return nil
 }
