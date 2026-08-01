@@ -291,6 +291,14 @@ func RegisterWant(want *Want) {
 					paramKey: entry.AsGlobalParam,
 				}
 				want.GetSubscriptionSystem().Subscribe(EventTypeStateChange, handler)
+				// Publish what the field holds right now. The handler only fires
+				// on the NEXT change, so a field that already has its value —
+				// which is the normal case when an expose is added to a running
+				// want — would leave the global parameter missing, and anything
+				// referencing it via {fromGlobalParam} unresolved.
+				if v, ok := want.getState(entry.CurrentState); ok && v != nil && v != "" {
+					SetGlobalParameter(entry.AsGlobalParam, v) //nolint:errcheck
+				}
 			} else if entry.AsGoal != "" {
 				// Bottom-up: push local current state to parent's Goal-labeled state via SetGoal.
 				// Top-level wants have no parent and are not supported for asGoal.

@@ -133,7 +133,31 @@ func SetGlobalParameter(key string, value any) error {
 		ParamValue: value,
 	}
 	GetGlobalSubscriptionSystem().Emit(context.Background(), event)
+
+	// Ask for a reconcile when some want's parameters reference this key. Their
+	// effective values have just changed, which reconcile compares — that is
+	// what restarts them. Reconcile is event-driven with no periodic sweep, so
+	// without this the change would sit unnoticed until something else happened.
+	triggerReconcileForParamRef(key)
 	return nil
+}
+
+// triggerReconcileForParamRef nudges the reconcile loop if any configured want
+// references the given global parameter. Global parameters change often (timers
+// among them); reconciling on every write regardless of who cares would be
+// noise.
+func triggerReconcileForParamRef(key string) {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return
+	}
+	if !cb.hasParamRef(key) {
+		return
+	}
+	select {
+	case cb.reconcileTrigger <- &TriggerCommand{Type: "reconcile"}:
+	default: // a reconcile is already pending — it will see this too
+	}
 }
 
 // GetGlobalParamTypes returns a snapshot copy of the cached type classification.
