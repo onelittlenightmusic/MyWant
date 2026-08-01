@@ -163,7 +163,7 @@ func sourceTriggerClause(s RiffSource) string {
 		return "あなたが動き出したら"
 	case "spotify":
 		return "曲が変わったら"
-	case "transit", "transit_search":
+	case "transit_search":
 		return "電車が遅れたら"
 	default:
 		return "「" + s.Name + "」が変わったら"

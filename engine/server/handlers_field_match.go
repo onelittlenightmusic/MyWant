@@ -79,30 +79,72 @@ type ParamChange struct {
 func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source_id")
 	targetID := r.URL.Query().Get("target_id")
-	if sourceID == "" || targetID == "" {
-		s.JSONError(w, r, http.StatusBadRequest, "source_id and target_id are required", "")
+	targetType := r.URL.Query().Get("target_type")
+	if targetID == "" && targetType == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "target_id or target_type is required", "")
 		return
 	}
 
 	exposedLabels := parseExposedLabels(r.URL.Query().Get("exposed_labels"))
 
-	sourceWant, _, sourceFound := s.globalBuilder.FindWantByID(sourceID)
-	targetWant, _, targetFound := s.globalBuilder.FindWantByID(targetID)
-	if !sourceFound {
-		s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", sourceID), "")
-		return
-	}
-	if !targetFound {
-		s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("target want %s not found", targetID), "")
-		return
+	// The target may not exist yet — the Add Want form asks what a want of this
+	// type could be filled with before anything is deployed. Scoring only reads
+	// the target's type definition and its imports, so a want carrying just the
+	// type answers the same question a deployed one would.
+	var targetWant *mywant.Want
+	if targetID != "" {
+		tw, _, found := s.globalBuilder.FindWantByID(targetID)
+		if !found {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("target want %s not found", targetID), "")
+			return
+		}
+		targetWant = tw
+	} else {
+		if s.globalBuilder.GetWantTypeDefinition(targetType) == nil {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("want type %s not found", targetType), "")
+			return
+		}
+		targetWant = &mywant.Want{Metadata: mywant.Metadata{Type: targetType, Name: targetType}}
 	}
 
-	recs := computeExposeImportRecommendations(s, sourceWant, targetWant, exposedLabels)
+	// With no source named, every deployed want is a candidate provider — that is
+	// the whole question the form is asking ("what out there could fill this?").
+	var sources []*mywant.Want
+	if sourceID != "" {
+		sw, _, found := s.globalBuilder.FindWantByID(sourceID)
+		if !found {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", sourceID), "")
+			return
+		}
+		sources = []*mywant.Want{sw}
+	} else if sourceType := r.URL.Query().Get("source_type"); sourceType != "" {
+		sw := s.resolveSourceByType(sourceType)
+		if sw == nil {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("no deployed want of type %s", sourceType), "")
+			return
+		}
+		sources = []*mywant.Want{sw}
+	} else {
+		for _, cw := range s.globalBuilder.GetWants() {
+			if targetID != "" && cw.Metadata.ID == targetID {
+				continue // a want cannot feed itself
+			}
+			sources = append(sources, cw)
+		}
+	}
+
+	var recs []FieldMatchRecommendation
+	for _, src := range sources {
+		recs = append(recs, computeExposeImportRecommendations(s, src, targetWant, exposedLabels)...)
+	}
+	// Remembered values stand alongside live want fields as candidates.
+	recs = append(recs, computeMemoRecommendations(s, targetWant)...)
 	sort.Slice(recs, func(i, j int) bool { return recs[i].Score > recs[j].Score })
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"source_id":       sourceID,
 		"target_id":       targetID,
+		"target_type":     targetType,
 		"exposed_labels":  exposedLabelsToStrings(exposedLabels),
 		"recommendations": recs,
 	})
@@ -146,6 +188,23 @@ func exposedLabelsToStrings(set map[mywant.StateLabel]bool) []string {
 	return out
 }
 
+// resolveSourceByType picks the deployed want that should provide a field when
+// the caller names a provider by type rather than by id. Only a deployed want
+// holds a live value, so a type resolves to an instance here; the most recently
+// updated one wins, which is the one whose value is current.
+func (s *Server) resolveSourceByType(wantType string) *mywant.Want {
+	var best *mywant.Want
+	for _, cw := range s.globalBuilder.GetWants() {
+		if cw.Metadata.Type != wantType {
+			continue
+		}
+		if best == nil || cw.Metadata.UpdatedAt > best.Metadata.UpdatedAt {
+			best = cw
+		}
+	}
+	return best
+}
+
 // POST /api/v1/wants/field-match-recommendations/apply
 // Supports two modes:
 //  1. Param-change (legacy): set a param on target, auto-expose source field.
@@ -157,6 +216,7 @@ func exposedLabelsToStrings(set map[mywant.StateLabel]bool) []string {
 func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SourceID     string        `json:"source_id"`
+		SourceType   string        `json:"source_type"`
 		TargetID     string        `json:"target_id"`
 		ParamChange  *ParamChange  `json:"param_change,omitempty"`
 		ExposeAction *ExposeAction `json:"expose_action,omitempty"`
@@ -166,8 +226,19 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
-	if req.SourceID == "" || req.TargetID == "" {
-		s.JSONError(w, r, http.StatusBadRequest, "source_id and target_id are required", "")
+	// target_id may be empty: the Add Want form applies a recommendation to a
+	// want that does not exist yet. The source-side expose still has to happen
+	// here (the provider is real and must publish the field), while the param
+	// and the import ride back in the response for the form to put into the want
+	// it is about to deploy.
+	targetPending := req.TargetID == ""
+	if req.SourceID == "" && req.SourceType != "" {
+		if sw := s.resolveSourceByType(req.SourceType); sw != nil {
+			req.SourceID = sw.Metadata.ID
+		}
+	}
+	if req.SourceID == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "source_id or source_type is required", "")
 		return
 	}
 	if req.ParamChange == nil && req.ExposeAction == nil && req.ImportAction == nil {
@@ -187,7 +258,13 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 	}
 
 	// ── Mode 1: Param-change (legacy) ──────────────────────────────────────
-	if pc := req.ParamChange; pc != nil && pc.WantID != "" && pc.ParamName != "" {
+	if pc := req.ParamChange; pc != nil && targetPending && pc.ParamName != "" {
+		// Nothing to write to yet — hand the change back for the form to apply.
+		result["pending_param_change"] = map[string]any{
+			"param_name": pc.ParamName,
+			"value":      pc.Value,
+		}
+	} else if pc := req.ParamChange; pc != nil && pc.WantID != "" && pc.ParamName != "" {
 		if pc.WantID != req.TargetID {
 			s.JSONError(w, r, http.StatusBadRequest, "param_change.want_id must match target_id", "")
 			return
@@ -244,7 +321,14 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 	}
 
 	// ── Mode 2b: Explicit import action ───────────────────────────────────
-	if ia := req.ImportAction; ia != nil && ia.WantID != "" && ia.GlobalKey != "" && ia.LocalKey != "" {
+	if ia := req.ImportAction; ia != nil && targetPending && ia.GlobalKey != "" && ia.LocalKey != "" {
+		// Same as the param above: the want that would import this does not
+		// exist yet, so the entry goes back for the form to carry into it.
+		result["pending_import"] = map[string]any{
+			"global_key": ia.GlobalKey,
+			"local_key":  ia.LocalKey,
+		}
+	} else if ia := req.ImportAction; ia != nil && ia.WantID != "" && ia.GlobalKey != "" && ia.LocalKey != "" {
 		if targetWant, _, ok := s.globalBuilder.FindWantByID(ia.WantID); ok {
 			if _, exists := targetWant.Spec.Imports[ia.GlobalKey]; !exists {
 				newImports := make(map[string]string, len(targetWant.Spec.Imports)+1)
@@ -465,6 +549,65 @@ func wordIntersection(a, b []string) []string {
 // computeExposeImportRecommendations suggests connecting source → target via the
 // expose/import mechanism (Spec.Exposes + Spec.Imports) rather than a param change.
 // This is the preferred approach for the generic data-flow linkage between any two wants.
+// memoRecommendationLimit caps how many remembered values one parameter offers.
+const memoRecommendationLimit = 3
+
+// computeMemoRecommendations offers values the user has already used for a
+// parameter's subtype.
+//
+// This is the only source that can fill a parameter no deployed want provides:
+// a transit's `from` wants a station, and nothing in the system holds a station
+// in its state — but every station the user has ever typed is in the memo. A
+// memo value is a literal, so unlike a want-to-want match it needs no expose or
+// import; applying one is just a param write.
+//
+// Scored below a live semantic match: a value that some want is holding right
+// now beats one merely remembered, and among remembered ones the most recent
+// wins (MemoStore.Suggestions returns them newest first).
+func computeMemoRecommendations(s *Server, target *mywant.Want) []FieldMatchRecommendation {
+	if s.memoStore == nil {
+		return nil
+	}
+	def := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type)
+	if def == nil {
+		return nil
+	}
+	var recs []FieldMatchRecommendation
+	for _, p := range def.Parameters {
+		if p.SubType == "" {
+			continue
+		}
+		// Already filled by the caller — do not suggest over an existing value.
+		if v, ok := target.Spec.Params[p.Name]; ok && v != nil && v != "" {
+			continue
+		}
+		for i, v := range s.memoStore.Suggestions(p.SubType, memoRecommendationLimit) {
+			recs = append(recs, FieldMatchRecommendation{
+				Score:       0.7 - float64(i)*0.05,
+				Description: fmt.Sprintf("Use remembered %s %q for %s", p.SubType, v, p.Name),
+				Source: FieldRef{
+					WantName:  "memo",
+					FieldName: p.SubType,
+					FieldType: "string",
+					DataType:  p.SubType,
+					Label:     "memo",
+				},
+				Target: ParamRef{
+					WantID:    target.Metadata.ID,
+					WantName:  target.Metadata.Name,
+					ParamName: p.Name,
+				},
+				ParamChange: ParamChange{
+					WantID:    target.Metadata.ID,
+					ParamName: p.Name,
+					Value:     v,
+				},
+			})
+		}
+	}
+	return recs
+}
+
 func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, allowedLabels map[mywant.StateLabel]bool) []FieldMatchRecommendation {
 	sourceFields := collectSourceFields(s, source, allowedLabels)
 	if len(sourceFields) == 0 {
