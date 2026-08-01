@@ -169,6 +169,52 @@ func (cb *ChainBuilder) buildStateAccessIndex() {
 		}
 	}
 
+	// Section F: Global-parameter links.
+	// A want publishes one of its state fields to a named global parameter with
+	// `exposes: [{currentState: X, asGlobalParam: K}]`, and another want reads it
+	// back with `params: {p: {fromGlobalParam: K}}` or `when: [{fromGlobalParam: K}]`.
+	// That is a real data path between the two wants — the same shape as the
+	// expose/imports paths above, only carried by a global parameter instead of
+	// global state — but it was invisible here, so two wants chained through one
+	// (a transit search starting where a previous one arrived, say) reported no
+	// relationship at all.
+	globalParamToProviders := make(map[string]map[string]struct{}) // param key → set of provider want IDs
+	for _, rw := range cb.wants {
+		w := rw.want
+		wID := w.Metadata.ID
+		if wID == "" {
+			continue
+		}
+		for _, exp := range w.Spec.Exposes {
+			if exp.AsGlobalParam == "" {
+				continue
+			}
+			// A set rather than a single provider: nothing stops two wants from
+			// publishing the same parameter, and a reader is fed by whichever
+			// wrote last, so it is genuinely coupled to all of them.
+			if globalParamToProviders[exp.AsGlobalParam] == nil {
+				globalParamToProviders[exp.AsGlobalParam] = make(map[string]struct{})
+			}
+			globalParamToProviders[exp.AsGlobalParam][wID] = struct{}{}
+		}
+	}
+	if len(globalParamToProviders) > 0 {
+		for _, rw := range cb.wants {
+			w := rw.want
+			wID := w.Metadata.ID
+			if wID == "" {
+				continue
+			}
+			for _, key := range globalParamRefsOf(w) {
+				for providerID := range globalParamToProviders[key] {
+					if providerID != wID {
+						register(providerID, "param/"+key, wID)
+					}
+				}
+			}
+		}
+	}
+
 	// Post-processing: remove duplicates if any (e.g. multiple capabilities accessing same field)
 	for key, accessors := range cb.stateAccessIndex {
 		unique := make(map[string]struct{})
@@ -288,7 +334,7 @@ func (cb *ChainBuilder) correlationPhase() {
 	}
 }
 
-// resolveCorrelationDataType returns the data type of the first expose field
+// resolveCorrelationDataType returns the data type of the first exposed field
 // in the correlation labels by looking up the provider's want type definition.
 // dirty is the want whose correlation entry we're building; peer is the other side.
 //
@@ -296,11 +342,18 @@ func (cb *ChainBuilder) correlationPhase() {
 //
 //	"stateAccess/consumer:expose/X" → peer is the CONSUMER, dirty is the PROVIDER
 //	"stateAccess/provider:expose/X" → peer is the PROVIDER, dirty is the CONSUMER
+//
+// "param/X" appears in place of "expose/X" when the field reaches the other want
+// through a global parameter (exposes.asGlobalParam → params.fromGlobalParam)
+// rather than through global state. Either way the type comes from the field the
+// provider publishes, so both resolve the same way — only the entry of
+// Spec.Exposes that names the key differs.
 func resolveCorrelationDataType(labels []string, dirty *Want, peer *runtimeWant, typeDefs map[string]*WantTypeDefinition) string {
 	for _, l := range labels {
 		var providerType string
 		var globalKey string
 		var providerWant *Want
+		viaParam := false
 		switch {
 		case strings.HasPrefix(l, "stateAccess/consumer:expose/"):
 			// dirty is the PROVIDER; X is the global expose key (Spec.Exposes[*].As)
@@ -314,6 +367,18 @@ func resolveCorrelationDataType(labels []string, dirty *Want, peer *runtimeWant,
 				providerType = peer.want.Metadata.Type
 				providerWant = peer.want
 			}
+		case strings.HasPrefix(l, "stateAccess/consumer:param/"):
+			globalKey = strings.TrimPrefix(l, "stateAccess/consumer:param/")
+			providerType = dirty.Metadata.Type
+			providerWant = dirty
+			viaParam = true
+		case strings.HasPrefix(l, "stateAccess/provider:param/"):
+			globalKey = strings.TrimPrefix(l, "stateAccess/provider:param/")
+			if peer != nil {
+				providerType = peer.want.Metadata.Type
+				providerWant = peer.want
+			}
+			viaParam = true
 		}
 		if globalKey == "" || providerType == "" || providerWant == nil {
 			continue
@@ -321,7 +386,7 @@ func resolveCorrelationDataType(labels []string, dirty *Want, peer *runtimeWant,
 		// Resolve global key → currentState field name via Spec.Exposes
 		fieldName := ""
 		for _, e := range providerWant.Spec.Exposes {
-			if e.As == globalKey {
+			if (viaParam && e.AsGlobalParam == globalKey) || (!viaParam && e.As == globalKey) {
 				fieldName = e.CurrentState
 				break
 			}
@@ -362,6 +427,41 @@ func correlationRate(labels []string) int {
 		rate += 2
 	}
 	return rate
+}
+
+// globalParamRefsOf returns every global parameter name the want reads: the
+// {fromGlobalParam: K} entries in spec.params, plus fromGlobalParam in spec.when.
+func globalParamRefsOf(w *Want) []string {
+	var keys []string
+	for _, v := range w.Spec.Params {
+		if key := globalParamRefKey(v); key != "" {
+			keys = append(keys, key)
+		}
+	}
+	for _, when := range w.Spec.When {
+		// ResolveFromGlobalParams fills in at/every but deliberately keeps
+		// FromGlobalParam set, so the origin is still readable here.
+		if when.FromGlobalParam != "" {
+			keys = append(keys, when.FromGlobalParam)
+		}
+	}
+	return keys
+}
+
+// globalParamRefKey extracts K from a {fromGlobalParam: K} spec.params value.
+// The reference form survives in Spec.Params rather than being replaced by the
+// resolved value (see Want.resolvedParams for why), which is what makes the link
+// visible at this point.
+func globalParamRefKey(v any) string {
+	switch ref := v.(type) {
+	case map[string]any:
+		if key, ok := ref["fromGlobalParam"].(string); ok {
+			return key
+		}
+	case map[string]string:
+		return ref["fromGlobalParam"]
+	}
+	return ""
 }
 
 // isCorrelationImportParam returns true if the param name looks like a field-import selector.
