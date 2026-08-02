@@ -2,6 +2,11 @@
 
 INSTALL_DIR ?= $(HOME)/.local/bin
 
+# Build version reported by `mywant --version` and GET /health. Release builds
+# get this from goreleaser (see .goreleaser.yaml); locally it comes from the git
+# tag, e.g. v0.3.16, v0.3.16-4-g6e3180f, or v0.3.16-dirty with uncommitted work.
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
 # Code quality targets
 fmt:
 	@echo "🔧 Formatting Go code..."
@@ -37,7 +42,7 @@ check: fmt vet test
 build-cli:
 	@echo "🔨 Building mywant backend..."
 	@mkdir -p bin
-	go build -C client -o ../bin/mywant ./cmd/mywant
+	go build -C client -ldflags "-X main.version=$(VERSION)" -o ../bin/mywant ./cmd/mywant
 
 build-mywant-gui:
 	@$(MAKE) -C ../mywant-gui build

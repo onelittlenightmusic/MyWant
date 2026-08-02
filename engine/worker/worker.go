@@ -12,6 +12,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
+	"mywant/engine/server"
 	_ "mywant/engine/types" // ensures init() queues run; RunDeferredRegistrations executes them
 
 	"github.com/gorilla/mux"
@@ -280,11 +281,16 @@ func (w *Worker) handleAgentServiceMonitorExecute(rw http.ResponseWriter, r *htt
 
 // handleHealth returns health status
 func (w *Worker) handleHealth(rw http.ResponseWriter, r *http.Request) {
+	version, commit := server.BuildInfo()
 	response := map[string]interface{}{
 		"status":       "healthy",
 		"mode":         "worker",
+		"version":      version,
 		"agents_count": len(w.agentRegistry.GetAllAgents()),
 		"capabilities": len(w.agentRegistry.GetAllCapabilities()),
+	}
+	if commit != "" {
+		response["commit"] = commit
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
