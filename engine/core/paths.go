@@ -83,6 +83,7 @@ const (
 	DataTypesDir    = bundledRoot + "/data"
 	SpecDir         = bundledRoot + "/spec"
 	AchievementsDir = bundledRoot + "/achievements"
+	KataDir         = bundledRoot + "/kata"
 	PoliciesDir     = bundledRoot + "/policies"
 	SystemWantsFile = bundledRoot + "/system_wants.yaml"
 

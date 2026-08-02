@@ -1,0 +1,75 @@
+# 青帯 — 2nd kyu — Bundling
+#
+# Overlap the overlaps. From here a kata contains other kata.
+# 常 is hidden: it is not listed in advance, and only appears once 傘 is held
+# across three different destinations.
+levels:
+  - id: level-4
+    name: 青帯
+    grade: 2nd kyu
+    order: 4
+    theme: Bundling
+    subtitle: Overlap what is already overlapping
+    color: "#3b82f6"
+    accent: "#1d4ed8"
+    unlocked: false         # opens once the green belt is promoted
+    kata: [kata-yado, kata-jou, kata-hi]
+    promotion:
+      requiredKata: 2       # 2 of 3 to be promoted
+
+kata:
+  # No join — neither hotel nor budget has a place parameter.
+  - id: kata-yado
+    name: 宿
+    reading: yado
+    level: level-4
+    order: 1
+    intent: Overlap a hotel and a budget
+    yields: What is left in the budget narrows down where you can stay
+    contains: [kata-kate]
+    waza:
+      - { kind: want_type, type: hotel }
+      - { kind: want_type, type: budget }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The room rate joins the total"] }
+      kaiden: { shortcuts: ["The budget narrows the hotel suggestions", "Only what you can still afford is left to read"] }
+
+  - id: kata-jou
+    name: 常
+    reading: jou
+    level: level-4
+    order: 2
+    intent: Hold the same kata across several destinations
+    yields: Last time's record rides along with this one — cost and duration, side by side
+    hidden: true            # not listed in advance; it only shows itself once held
+    contains: [kata-kasa]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: repeat, kata: kata-kasa, minCount: 3 }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Last time's record is attached automatically"] }
+      kaiden: { autonomy: ["It suggests when you are about due to go again"], vocabulary: ["The difference from last time is shown"] }
+
+  - id: kata-hi
+    name: 日
+    reading: hi
+    level: level-4
+    order: 3
+    intent: Lay all three green-belt kata over one destination
+    yields: Umbrella, departure time and total cost on a single sheet
+    contains: [kata-kasa, kata-koku, kata-zeni]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: memo, subtype: city }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: weather, join: weather_city }
+      - { kind: want_type, type: reminder }
+      - { kind: want_type, type: budget }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The day at that destination comes together on one sheet"] }
+      kaiden: { shortcuts: ["One word for the destination raises all of it", "Only the summary is left to read"] }

@@ -248,6 +248,8 @@ func (s *Server) setupRoutes() {
 	memo.HandleFunc("", s.putMemo).Methods("PUT", "OPTIONS")
 	memo.HandleFunc("/subtypes", s.getMemoSubtypes).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/events", s.getMemoEvents).Methods("GET", "OPTIONS")
+	// Which live wants are naming which remembered values — derived on read.
+	memo.HandleFunc("/usage", s.getMemoUsage).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/stats", s.getMemoStats).Methods("GET", "OPTIONS")
 	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
 	// Per-memo-value labels (general facility; groups ride on group/* keys)
@@ -255,12 +257,16 @@ func (s *Server) setupRoutes() {
 	memo.HandleFunc("/labels", s.setMemoLabel).Methods("POST")
 	memo.HandleFunc("/labels/remove", s.removeMemoLabel).Methods("POST", "OPTIONS")
 
-	// Groups API (label-backed facade: group/<name> labels on memo values / wants)
-	groups := api.PathPrefix("/groups").Subrouter()
-	groups.HandleFunc("", s.getGroups).Methods("GET", "OPTIONS")
-	groups.HandleFunc("", s.createGroup).Methods("POST", "OPTIONS")
-	groups.HandleFunc("/{name}", s.updateGroup).Methods("PUT", "OPTIONS")
-	groups.HandleFunc("/{name}", s.deleteGroup).Methods("DELETE", "OPTIONS")
+	// Constellations API (label-backed facade: constellation/<name> labels on
+	// memo values / wants). /groups stays registered as the pre-rename alias so
+	// an older client keeps working.
+	for _, prefix := range []string{"/constellations", "/groups"} {
+		sub := api.PathPrefix(prefix).Subrouter()
+		sub.HandleFunc("", s.getConstellations).Methods("GET", "OPTIONS")
+		sub.HandleFunc("", s.createConstellation).Methods("POST", "OPTIONS")
+		sub.HandleFunc("/{name}", s.updateConstellation).Methods("PUT", "OPTIONS")
+		sub.HandleFunc("/{name}", s.deleteConstellation).Methods("DELETE", "OPTIONS")
+	}
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")
@@ -306,6 +312,12 @@ func (s *Server) setupRoutes() {
 	achievements.HandleFunc("/{id}", s.deleteAchievement).Methods("DELETE", "OPTIONS")
 	achievements.HandleFunc("/{id}/unlock", s.unlockAchievement).Methods("PATCH", "OPTIONS")
 	achievements.HandleFunc("/{id}/lock", s.lockAchievement).Methods("PATCH", "OPTIONS")
+
+	// Kata (型) — read-only: progress is derived from live wants, memo and records.
+	kata := api.PathPrefix("/kata").Subrouter()
+	kata.HandleFunc("", s.listKata).Methods("GET", "OPTIONS")
+	kata.HandleFunc("/records", s.listKataRecords).Methods("GET", "OPTIONS")
+	kata.HandleFunc("/{id}", s.getKata).Methods("GET", "OPTIONS")
 
 	// Characters CRUD
 	characters := api.PathPrefix("/characters").Subrouter()

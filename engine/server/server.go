@@ -135,6 +135,18 @@ func New(config Config) *Server {
 		}
 	}
 
+	// Load kata definitions: filesystem if present, otherwise embedded FS.
+	// Definitions are always read fresh from YAML; only practice records persist.
+	if _, err := os.Stat(mywant.KataDir); os.IsNotExist(err) {
+		if err := mywant.LoadKataConfigsFromFS(bundled.BuiltinFS, "kata"); err != nil {
+			log.Printf("[WARN] Failed to load embedded kata configs: %v", err)
+		}
+	} else {
+		if err := mywant.LoadKataConfigs(mywant.KataDir); err != nil {
+			log.Printf("[WARN] Failed to load kata configs: %v", err)
+		}
+	}
+
 	// Load data type definitions: filesystem if present, otherwise embedded FS
 	dataTypeLoader := mywant.NewDataTypeLoader()
 	if _, err := os.Stat(mywant.DataTypesDir); os.IsNotExist(err) {
