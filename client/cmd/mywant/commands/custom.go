@@ -65,6 +65,8 @@ Examples:
   mywant custom install transit-plugin
   mywant --context fly custom install onelittlenightmusic/mywant-transit-plugin
   mywant custom install ./my-skin --kind design --name neon
+  mywant custom update
+  mywant --context fly custom update mywant-transit-plugin
   mywant --context local custom list
   mywant custom uninstall mywant-transit-plugin`,
 }
@@ -114,6 +116,31 @@ var customInstallCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := installCustomOnTarget(args[0]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error installing custom: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
+var customUpdateCmd = &cobra.Command{
+	Use:   "update [name...]",
+	Short: "Pull the newest version of installed customs",
+	Long: `Re-fetch installed customs from the source they were installed from.
+
+With no names, every tracked custom is updated. Customs installed from a local
+directory are skipped, since nothing guarantees that directory still holds what
+it did — reinstall those explicitly with "custom install ./dir --force".
+
+Like every other custom command this follows the active context, so it updates
+whichever machine runs the server you are pointed at.
+
+Examples:
+  mywant custom update
+  mywant custom update mywant-transit-plugin
+  mywant --context fly custom update`,
+	ValidArgsFunction: completeCustomNames,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := updateCustomsOnTarget(args); err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating customs: %v\n", err)
 			os.Exit(1)
 		}
 	},
@@ -230,6 +257,122 @@ func installCustomOnTarget(source string) error {
 	}
 	reloadLocalWantTypes(len(rec.Agents) > 0)
 	return nil
+}
+
+// updateCustomsOnTarget re-fetches customs from the source recorded for them.
+//
+// Deliberately built on the existing install path rather than a new server
+// endpoint: InstallCustom already pulls when the store is a git checkout of the
+// same source, so "update" needs no backend change and therefore works against
+// servers that are already deployed.
+func updateCustomsOnTarget(names []string) error {
+	customs, _, err := listCustoms()
+	if err != nil {
+		return err
+	}
+
+	selected, err := selectCustomsToUpdate(customs, names)
+	if err != nil {
+		return err
+	}
+	if len(selected) == 0 {
+		fmt.Printf("No customs to update on %s.\n", customTargetLabel())
+		return nil
+	}
+
+	fmt.Printf("Updating %d custom(s) on %s\n\n", len(selected), customTargetLabel())
+
+	var failed []string
+	for _, rec := range selected {
+		fmt.Printf("%s\n", rec.Name)
+		newCommit, err := updateOneCustom(rec)
+		if err != nil {
+			fmt.Printf("  failed:     %v\n\n", err)
+			failed = append(failed, rec.Name)
+			continue
+		}
+		switch {
+		case rec.Commit == "" || newCommit == "":
+			fmt.Printf("  updated\n")
+		case rec.Commit == newCommit:
+			fmt.Printf("  already up to date (%s)\n", rec.Commit)
+		default:
+			fmt.Printf("  updated:    %s -> %s\n", rec.Commit, newCommit)
+		}
+		fmt.Println()
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("%d of %d failed: %s", len(failed), len(selected), strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// selectCustomsToUpdate resolves the names given on the command line, or picks
+// every updatable custom when none were.
+func selectCustomsToUpdate(customs []mywant.CustomRecord, names []string) ([]mywant.CustomRecord, error) {
+	byName := make(map[string]mywant.CustomRecord, len(customs))
+	for _, c := range customs {
+		byName[c.Name] = c
+	}
+
+	if len(names) > 0 {
+		selected := make([]mywant.CustomRecord, 0, len(names))
+		for _, name := range names {
+			rec, ok := byName[name]
+			if !ok {
+				return nil, fmt.Errorf("custom %q is not tracked on %s; 'mywant custom list' shows what is", name, customTargetLabel())
+			}
+			if rec.Origin == "local" {
+				// Named explicitly, so say why rather than silently skipping.
+				return nil, fmt.Errorf("custom %q was installed from a local directory; reinstall it with 'mywant custom install <dir> --force'", name)
+			}
+			selected = append(selected, rec)
+		}
+		return selected, nil
+	}
+
+	var selected []mywant.CustomRecord
+	var skipped []string
+	for _, c := range customs {
+		if c.Origin == "local" {
+			skipped = append(skipped, c.Name)
+			continue
+		}
+		selected = append(selected, c)
+	}
+	if len(skipped) > 0 {
+		fmt.Printf("Skipping %d custom(s) installed from a local directory: %s\n\n", len(skipped), strings.Join(skipped, ", "))
+	}
+	return selected, nil
+}
+
+// updateOneCustom reinstalls a single record from its own source, keeping the
+// name and component kinds it was installed with, and returns its new commit.
+func updateOneCustom(rec mywant.CustomRecord) (string, error) {
+	kind := strings.Join(rec.Kinds(), ",")
+
+	if target := remoteServer(); target != "" {
+		result, err := client.NewClient(viper.GetString("server")).InstallCustom(rec.Source, rec.Name, kind, false)
+		if err != nil {
+			return "", err
+		}
+		reportReload(result)
+		if custom, ok := result["custom"].(map[string]any); ok {
+			commit, _ := custom["commit"].(string)
+			return commit, nil
+		}
+		return "", nil
+	}
+
+	updated, err := mywant.InstallCustom(rec.Source, rec.Name, kind, false)
+	if err != nil {
+		return "", err
+	}
+	if !customNoReload {
+		reloadLocalWantTypes(len(updated.Agents) > 0)
+	}
+	return updated.Commit, nil
 }
 
 func uninstallCustomOnTarget(name string) error {
@@ -417,10 +560,12 @@ func init() {
 	customInstallCmd.Flags().StringVar(&customKindFlag, "kind", "", "component kinds to install, comma separated ("+kinds+"); default: auto-detect")
 	customInstallCmd.Flags().BoolVar(&customForce, "force", false, "replace an existing custom or conflicting destination")
 	customInstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
+	customUpdateCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
 	customUninstallCmd.Flags().BoolVar(&customForce, "force", false, "remove files that were not created by the custom")
 	customUninstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
 
 	CustomCmd.AddCommand(customListCmd)
 	CustomCmd.AddCommand(customInstallCmd)
+	CustomCmd.AddCommand(customUpdateCmd)
 	CustomCmd.AddCommand(customUninstallCmd)
 }
