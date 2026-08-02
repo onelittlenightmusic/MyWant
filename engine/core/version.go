@@ -1,15 +1,16 @@
-package server
+package mywant
 
 import (
 	"runtime/debug"
 	"sync"
 )
 
-// injectedVersion is the build version reported by /health. This package is a
-// library, so it can never know its own version: the value has to come from
-// the binary that embeds it, which is why SetVersion exists. The release build
-// stamps the git tag into the CLI's main.version (-X, see .goreleaser.yaml and
-// the Makefile's build-cli target) and main hands it over from there.
+// injectedVersion is the build version reported by /health and carried by the
+// want types bundled into the binary. This package is a library, so it can
+// never know its own version: the value has to come from the binary that
+// embeds it, which is why SetVersion exists. The release build stamps the git
+// tag into the CLI's main.version (-X, see .goreleaser.yaml and the Makefile's
+// build-cli target) and main hands it over from there.
 var injectedVersion = "dev"
 
 // SetVersion records the version of the binary embedding this package. Call it
@@ -21,7 +22,7 @@ func SetVersion(v string) {
 	}
 }
 
-// BuildInfo reports the running server's version and source commit. It is
+// BuildInfo reports the running binary's version and source commit. It is
 // resolved once, lazily, so SetVersion still lands if it runs after init.
 var BuildInfo = sync.OnceValues(buildInfo)
 

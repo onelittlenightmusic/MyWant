@@ -93,9 +93,13 @@ type CustomComponent struct {
 
 // CustomRecord is one entry of ~/.mywant/customs.yaml.
 type CustomRecord struct {
-	Name        string            `yaml:"name" json:"name"`
-	Source      string            `yaml:"source" json:"source"`
-	Origin      string            `yaml:"origin" json:"origin"` // git | local
+	Name   string `yaml:"name" json:"name"`
+	Source string `yaml:"source" json:"source"`
+	Origin string `yaml:"origin" json:"origin"` // git | local
+	// Version is what the custom's own repository calls this checkout: its git
+	// tag, via describe. Empty for a source with no tags (or no git at all),
+	// in which case Commit is all there is to go on.
+	Version     string            `yaml:"version,omitempty" json:"version,omitempty"`
 	Commit      string            `yaml:"commit,omitempty" json:"commit,omitempty"`
 	InstalledAt string            `yaml:"installed_at,omitempty" json:"installed_at,omitempty"`
 	UpdatedAt   string            `yaml:"updated_at,omitempty" json:"updated_at,omitempty"`
@@ -268,6 +272,11 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 		if err := runGit(store, "pull", "--ff-only"); err != nil {
 			return CustomRecord{}, err
 		}
+		// Tags are what name the version, and pull only brings along the ones
+		// reachable from the branch it fetched, so ask for them explicitly.
+		if err := runGit(store, "fetch", "--tags", "--force"); err != nil {
+			fmt.Printf("  warning: could not fetch tags: %v\n", err)
+		}
 	case statErr == nil:
 		if err := os.RemoveAll(store); err != nil {
 			return CustomRecord{}, err
@@ -305,11 +314,13 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 	}
 
 	now := time.Now().Format(time.RFC3339)
+	version, _, commit, _ := gitVersion(store)
 	rec := CustomRecord{
 		Name:        name,
 		Source:      resolved,
 		Origin:      origin,
-		Commit:      gitCommit(store),
+		Version:     version,
+		Commit:      commit,
 		InstalledAt: now,
 		UpdatedAt:   now,
 		Components:  components,
