@@ -225,6 +225,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(runtimeWants)))
 	s.notifyWantCreated(runtimeWants)
 	go broadcastSSE("want_changed", wantIDs)
+	s.ScheduleKataAnnounce()
 
 	s.JSONResponse(w, http.StatusCreated, map[string]any{
 		"id":       executionID,
@@ -568,6 +569,7 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	s.JSONResponse(w, http.StatusOK, updatedWant)
 	go broadcastSSE("want_changed", []string{wantID})
+	s.ScheduleKataAnnounce()
 }
 
 func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
@@ -583,6 +585,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 			want.SetStatus(mywant.WantStatusDeleting)
 			s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
 			go broadcastSSE("want_changed", []string{wantID})
+			s.ScheduleKataAnnounce()
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -603,6 +606,7 @@ func (s *Server) deleteWants(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		go broadcastSSE("want_changed", wantIDs)
+		s.ScheduleKataAnnounce()
 		s.JSONResponse(w, http.StatusAccepted, map[string]any{
 			"message": "Batch deletion queued",
 			"ids":     wantIDs,

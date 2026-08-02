@@ -18,7 +18,7 @@ import (
 // Memo is the catalog of remembered input values, grouped by subtype
 // (destination, hotel, command, ...). Wants record what the user typed, the
 // server keeps provenance (events) and usage counts (stats), and values can be
-// labelled - groups being a facade over a "group/<name>" label.
+// labelled - constellations being a facade over a "constellation/<name>" label.
 //
 // Global state, which this command used to manage, now lives under
 // "mywant state global".
@@ -37,7 +37,7 @@ Examples:
   mywant memo events --catalog destination --value Kyoto
   mywant memo stats
   mywant memo label cities::Kyoto favourite true
-  mywant memo groups list`,
+  mywant memo constellations list`,
 }
 
 // ─── catalog ───────────────────────────────────────────────────────────────
@@ -312,66 +312,66 @@ var memoLabelCmd = &cobra.Command{
 	},
 }
 
-// ─── groups ────────────────────────────────────────────────────────────────
+// ─── constellations ────────────────────────────────────────────────────────────────
 
-var memoGroupsCmd = &cobra.Command{
-	Use:   "groups",
-	Short: "Manage groups of memo values or wants",
-	Long: `Groups are named sets stored as "group/<name>" labels on memo values or wants.
+var memoConstellationsCmd = &cobra.Command{
+	Use:   "constellations",
+	Short: "Manage constellations of memo values or wants",
+	Long: `Constellations are named sets stored as "constellation/<name>" labels on memo values or wants.
 
 Examples:
-  mywant memo groups list
-  mywant memo groups create favourites --kind memo --member cities::Kyoto
-  mywant memo groups delete favourites --kind memo`,
+  mywant memo constellations list
+  mywant memo constellations create favourites --kind memo --member cities::Kyoto
+  mywant memo constellations delete favourites --kind memo`,
 }
 
-var memoGroupsListCmd = &cobra.Command{
+var memoConstellationsListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"l"},
-	Short:   "List groups",
+	Short:   "List constellations",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		kind, _ := cmd.Flags().GetString("kind")
-		groups, err := memoClient().GetGroups(kind)
+		constellations, err := memoClient().GetConstellations(kind)
 		if err != nil {
-			exitErr("listing groups", err)
+			exitErr("listing constellations", err)
 		}
 
 		if jsonOut(cmd) {
-			printJSON(groups)
+			printJSON(constellations)
 			return
 		}
-		if len(groups) == 0 {
-			fmt.Println("No groups defined.")
+		if len(constellations) == 0 {
+			fmt.Println("No constellations defined.")
 			return
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "NAME\tKIND\tMEMBERS")
-		for _, g := range groups {
+		for _, g := range constellations {
 			fmt.Fprintf(w, "%s\t%s\t%s\n", g.Name, g.Kind, truncateList(g.Members, 5))
 		}
 		w.Flush()
 	},
 }
 
-var memoGroupsCreateCmd = &cobra.Command{
+var memoConstellationsCreateCmd = &cobra.Command{
 	Use:   "create <name>",
-	Short: "Create a group",
+	Short: "Create a constellation",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		kind, _ := cmd.Flags().GetString("kind")
 		members, _ := cmd.Flags().GetStringArray("member")
-		if err := memoClient().CreateGroup(args[0], kind, members); err != nil {
-			exitErr("creating group", err)
+		if err := memoClient().CreateConstellation(args[0], kind, members); err != nil {
+			exitErr("creating constellation", err)
 		}
-		fmt.Printf("Created %s group %s with %d member(s).\n", kind, args[0], len(members))
+		fmt.Printf("Created %s constellation %s with %d member(s).\n", kind, args[0], len(members))
 	},
 }
 
-var memoGroupsUpdateCmd = &cobra.Command{
+var memoConstellationsUpdateCmd = &cobra.Command{
 	Use:   "update <name>",
-	Short: "Rename a group or replace its members",
+	Short: "Rename a constellation or replace its members",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		kind, _ := cmd.Flags().GetString("kind")
@@ -389,24 +389,24 @@ var memoGroupsUpdateCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, "Error: pass --name and/or --member")
 			os.Exit(1)
 		}
-		if err := memoClient().UpdateGroup(args[0], kind, newName, members); err != nil {
-			exitErr("updating group", err)
+		if err := memoClient().UpdateConstellation(args[0], kind, newName, members); err != nil {
+			exitErr("updating constellation", err)
 		}
-		fmt.Printf("Updated group %s.\n", args[0])
+		fmt.Printf("Updated constellation %s.\n", args[0])
 	},
 }
 
-var memoGroupsDeleteCmd = &cobra.Command{
+var memoConstellationsDeleteCmd = &cobra.Command{
 	Use:     "delete <name>",
 	Aliases: []string{"rm", "remove"},
-	Short:   "Delete a group (its members are kept)",
+	Short:   "Delete a constellation (its members are kept)",
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		kind, _ := cmd.Flags().GetString("kind")
-		if err := memoClient().DeleteGroup(args[0], kind); err != nil {
-			exitErr("deleting group", err)
+		if err := memoClient().DeleteConstellation(args[0], kind); err != nil {
+			exitErr("deleting constellation", err)
 		}
-		fmt.Printf("Deleted %s group %s.\n", kind, args[0])
+		fmt.Printf("Deleted %s constellation %s.\n", kind, args[0])
 	},
 }
 
@@ -494,19 +494,19 @@ func init() {
 	memoStatsCmd.Flags().Bool("json", false, "Output as JSON")
 	memoLabelsCmd.Flags().Bool("json", false, "Output as JSON")
 
-	memoGroupsListCmd.Flags().Bool("json", false, "Output as JSON")
-	memoGroupsListCmd.Flags().String("kind", "", "Only memo or want groups")
-	memoGroupsCreateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
-	memoGroupsCreateCmd.Flags().StringArray("member", nil, "Member id, repeatable")
-	memoGroupsUpdateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
-	memoGroupsUpdateCmd.Flags().String("name", "", "New group name")
-	memoGroupsUpdateCmd.Flags().StringArray("member", nil, "Replacement member id, repeatable")
-	memoGroupsDeleteCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsListCmd.Flags().Bool("json", false, "Output as JSON")
+	memoConstellationsListCmd.Flags().String("kind", "", "Only memo or want groups")
+	memoConstellationsCreateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsCreateCmd.Flags().StringArray("member", nil, "Member id, repeatable")
+	memoConstellationsUpdateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsUpdateCmd.Flags().String("name", "", "New group name")
+	memoConstellationsUpdateCmd.Flags().StringArray("member", nil, "Replacement member id, repeatable")
+	memoConstellationsDeleteCmd.Flags().String("kind", "memo", "Group kind: memo or want")
 
-	memoGroupsCmd.AddCommand(memoGroupsListCmd)
-	memoGroupsCmd.AddCommand(memoGroupsCreateCmd)
-	memoGroupsCmd.AddCommand(memoGroupsUpdateCmd)
-	memoGroupsCmd.AddCommand(memoGroupsDeleteCmd)
+	memoConstellationsCmd.AddCommand(memoConstellationsListCmd)
+	memoConstellationsCmd.AddCommand(memoConstellationsCreateCmd)
+	memoConstellationsCmd.AddCommand(memoConstellationsUpdateCmd)
+	memoConstellationsCmd.AddCommand(memoConstellationsDeleteCmd)
 
 	MemoCmd.AddCommand(memoListCmd)
 	MemoCmd.AddCommand(memoGetCmd)
@@ -516,5 +516,5 @@ func init() {
 	MemoCmd.AddCommand(memoStatsCmd)
 	MemoCmd.AddCommand(memoLabelsCmd)
 	MemoCmd.AddCommand(memoLabelCmd)
-	MemoCmd.AddCommand(memoGroupsCmd)
+	MemoCmd.AddCommand(memoConstellationsCmd)
 }

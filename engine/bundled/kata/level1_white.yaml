@@ -1,0 +1,85 @@
+# 白帯 — 5th kyu — Naming
+#
+# Every higher kata rests on wants pointing at the same destination, and what
+# holds them together is a memo value plus the group that ties values to one
+# another. So the first thing to learn is not placing a want at all: it is
+# giving something a name.
+#
+# No kata on this belt needs a want. The waza are memo values only.
+levels:
+  - id: level-1
+    name: 白帯
+    grade: 5th kyu
+    order: 1
+    theme: Naming
+    subtitle: Name a station, a city, a point on the map
+    color: "#d4d4d8"       # the belt's own colour
+    accent: "#0f766e"      # ink for marks — a white belt's colour is too pale to use
+    unlocked: true          # the first belt is always open
+    kata: [kata-eki, kata-shi, kata-shirube, kata-kin]
+    promotion:
+      requiredKata: 3       # 3 of 4 to be promoted
+
+kata:
+  - id: kata-eki
+    name: 駅
+    reading: eki
+    level: level-1
+    order: 1
+    intent: Give a station a name
+    yields: That station appears as a destination suggestion
+    waza:
+      - { kind: memo, subtype: station }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Pick a destination instead of typing it"] }
+      kaiden: { shortcuts: ["Your usual stations come first"], vocabulary: ["Your own route map opens in the record book"] }
+
+  - id: kata-shi
+    name: 市
+    reading: shi
+    level: level-1
+    order: 2
+    intent: Give a city a name
+    yields: That city appears as a forecast target suggestion
+    waza:
+      - { kind: memo, subtype: city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Pick a city instead of typing it"] }
+      kaiden: { shortcuts: ["The city you looked up last comes first"] }
+
+  - id: kata-shirube
+    name: 標
+    reading: shirube
+    level: level-1
+    order: 3
+    intent: Give a point on the map a name
+    yields: A coordinate becomes something you can call "home" or "the office"
+    waza:
+      - { kind: memo, subtype: place }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Places can be referred to by name"] }
+      kaiden: { vocabulary: ["Your own map takes shape"] }
+
+  # The belt's capstone — the kata that builds the join itself. It does not say
+  # the two values share a name; it says they stand near enough to count as one
+  # place, which is a judgement only the user can make.
+  # Without it, not one of the higher kata can hold.
+  - id: kata-kin
+    name: 近
+    reading: kin
+    level: level-1
+    order: 4
+    intent: Put a station and a city that stand near each other into one memo group
+    yields: Wants naming either of them are taken to be about the same area
+    contains: [kata-eki, kata-shi]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: memo, subtype: city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The two values count as one area"] }
+      kaiden: { shortcuts: ["New values are filed into the group for you"], vocabulary: ["A record book opens per place"] }

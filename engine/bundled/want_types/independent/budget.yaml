@@ -8,6 +8,7 @@ wantType:
     pattern: independent
     labels:
       child-role: thinker
+      type-icon: Wallet
   finalResultField: budget_summary
   parameters:
   - name: budget

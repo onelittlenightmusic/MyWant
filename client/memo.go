@@ -8,7 +8,7 @@ import (
 // Memo is the user's catalog of remembered input values, keyed by subtype
 // (destination, hotel, command, ...). The server records where each value came
 // from (events) and how often it is used (stats), and lets values be labelled -
-// groups are a facade over labels with a "group/<name>" key.
+// constellations are a facade over labels with a "constellation/<name>" key.
 
 // MemoEvent is one provenance entry: a value was recorded or used.
 type MemoEvent struct {
@@ -31,8 +31,8 @@ type MemoStat struct {
 	LastUsed string `json:"lastUsed"`
 }
 
-// MemoGroup is a named set of memo values or wants, stored as labels.
-type MemoGroup struct {
+// Constellation is a named set of memo values or wants, stored as labels.
+type Constellation struct {
 	Name    string   `json:"name"`
 	Kind    string   `json:"kind"` // memo | want
 	Members []string `json:"members"`
@@ -127,29 +127,29 @@ func (c *Client) RemoveMemoLabel(valueID, key string) error {
 	return c.Request("POST", "/api/v1/memo/labels/remove", body, nil)
 }
 
-// GetGroups lists groups. kind is "memo", "want", or "" for both.
-func (c *Client) GetGroups(kind string) ([]MemoGroup, error) {
-	path := "/api/v1/groups"
+// GetConstellations lists constellations. kind is "memo", "want", or "" for both.
+func (c *Client) GetConstellations(kind string) ([]Constellation, error) {
+	path := "/api/v1/constellations"
 	if kind != "" {
 		path += "?kind=" + url.QueryEscape(kind)
 	}
 	var result struct {
-		Groups []MemoGroup `json:"groups"`
+		Constellations []Constellation `json:"groups"`
 	}
 	if err := c.Request("GET", path, nil, &result); err != nil {
 		return nil, err
 	}
-	return result.Groups, nil
+	return result.Constellations, nil
 }
 
-// CreateGroup creates a group of memo values or wants.
-func (c *Client) CreateGroup(name, kind string, members []string) error {
+// CreateConstellation creates a constellation of memo values or wants.
+func (c *Client) CreateConstellation(name, kind string, members []string) error {
 	body := map[string]any{"name": name, "kind": kind, "members": members}
-	return c.Request("POST", "/api/v1/groups", body, nil)
+	return c.Request("POST", "/api/v1/constellations", body, nil)
 }
 
-// UpdateGroup renames a group and/or replaces its members.
-func (c *Client) UpdateGroup(name, kind string, newName *string, members *[]string) error {
+// UpdateConstellation renames a constellation and/or replaces its members.
+func (c *Client) UpdateConstellation(name, kind string, newName *string, members *[]string) error {
 	body := map[string]any{"kind": kind}
 	if newName != nil {
 		body["name"] = *newName
@@ -157,12 +157,12 @@ func (c *Client) UpdateGroup(name, kind string, newName *string, members *[]stri
 	if members != nil {
 		body["members"] = *members
 	}
-	return c.Request("PUT", "/api/v1/groups/"+url.PathEscape(name), body, nil)
+	return c.Request("PUT", "/api/v1/constellations/"+url.PathEscape(name), body, nil)
 }
 
-// DeleteGroup removes a group, leaving its members in place.
-func (c *Client) DeleteGroup(name, kind string) error {
-	path := "/api/v1/groups/" + url.PathEscape(name)
+// DeleteConstellation removes a constellation, leaving its members in place.
+func (c *Client) DeleteConstellation(name, kind string) error {
+	path := "/api/v1/constellations/" + url.PathEscape(name)
 	if kind != "" {
 		path += "?kind=" + url.QueryEscape(kind)
 	}

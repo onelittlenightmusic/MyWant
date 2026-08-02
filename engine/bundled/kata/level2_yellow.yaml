@@ -1,0 +1,70 @@
+# 黄帯 — 4th kyu — Pointing
+#
+# Put the names from the white belt to work. Two waza each: one memo value and
+# one want. What is learned here is a single move — feed a remembered value into
+# a want's parameter — and every higher kata is that move, two or more times.
+levels:
+  - id: level-2
+    name: 黄帯
+    grade: 4th kyu
+    order: 2
+    theme: Pointing
+    subtitle: One want pointing at a place that has a name
+    color: "#facc15"
+    accent: "#a16207"
+    unlocked: false         # opens once the white belt is promoted
+    kata: [kata-ate, kata-sora, kata-chaku]
+    promotion:
+      requiredKata: 2       # 2 of 3 to be promoted
+
+kata:
+  - id: kata-ate
+    name: 宛
+    reading: ate
+    level: level-2
+    order: 1
+    intent: Feed a remembered name into a route's destination
+    yields: Pick the destination instead of typing it, and the route is kept against that place
+    contains: [kata-eki]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: want_type, type: transit_search, join: to }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Choosing a destination is enough to pull a route"] }
+      kaiden: { shortcuts: ["One word for the destination raises the route"] }
+
+  - id: kata-sora
+    name: 空
+    reading: sora
+    level: level-2
+    order: 2
+    intent: Feed a remembered name into a forecast's target
+    yields: Choosing a city by name is enough to pull its weather
+    contains: [kata-shi]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: city }
+      - { kind: want_type, type: weather, join: weather_city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Choosing a city is enough to pull the weather"] }
+      kaiden: { shortcuts: ["One word for the city raises the forecast"] }
+
+  - id: kata-chaku
+    name: 着
+    reading: chaku
+    level: level-2
+    order: 3
+    intent: Feed a remembered name into the place being watched
+    yields: Watch a place by name — arriving there becomes something the system knows
+    contains: [kata-shirube]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: place }
+      - { kind: want_type, type: place_arrival, status: any, join: place }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Arrivals and departures are recorded"] }
+      kaiden: { autonomy: ["Arriving closes the wants that were waiting on it"] }

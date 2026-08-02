@@ -9,6 +9,9 @@ wantType:
     labels:
       child-role: doer
       type-tone-color: "#a05240"
+      # Without this it falls back to the travel category's plane, which is
+      # indistinguishable from every other travel type at a glance.
+      type-icon: UtensilsCrossed
   finalResultField: reservation_name
   parameters:
   - name: restaurant_type

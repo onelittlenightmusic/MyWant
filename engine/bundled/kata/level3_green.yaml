@@ -1,0 +1,112 @@
+# 緑帯 — 3rd kyu — Overlapping
+#
+# Put two of the yellow belt's "pointing" moves side by side. Two wants aimed at
+# the same memo group answer together something neither answers alone — that is
+# what a kata is.
+#
+# 糧 carries no join: neither restaurant nor budget has a place parameter, so
+# "the same destination" cannot be established mechanically. The combination is
+# worth just as much, so it stays a kata; it is simply not measured per group.
+levels:
+  - id: level-3
+    name: 緑帯
+    grade: 3rd kyu
+    order: 3
+    theme: Overlapping
+    subtitle: One destination, seen through two wants
+    color: "#22c55e"
+    accent: "#15803d"
+    unlocked: false         # opens once the yellow belt is promoted
+    kata: [kata-kasa, kata-koku, kata-zeni, kata-machi, kata-kate]
+    promotion:
+      requiredKata: 3       # 3 of 5 to be promoted
+
+kata:
+  - id: kata-kasa
+    name: 傘
+    reading: kasa
+    level: level-3
+    order: 1
+    intent: Overlap a route and a forecast on the same destination
+    yields: Rain laid over the walking legs — whether an umbrella is needed
+    contains: [kata-kin, kata-ate, kata-sora]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: memo, subtype: city }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: weather, join: weather_city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The pair earns a name"] }
+      kaiden: { shortcuts: ["Placing the route brings the forecast with it", "Only the umbrella answer is left to read"] }
+
+  - id: kata-koku
+    name: 刻
+    reading: koku
+    level: level-3
+    order: 2
+    intent: Overlap a route and a reminder on the same destination
+    yields: A departure time worked backwards from when you want to arrive
+    contains: [kata-ate]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: reminder }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The pair earns a name"] }
+      kaiden: { shortcuts: ["Placing the route brings the departure alert with it", "Only the departure time is left to read"] }
+
+  - id: kata-zeni
+    name: 銭
+    reading: zeni
+    level: level-3
+    order: 3
+    intent: Overlap a route and a budget on the same destination
+    yields: The fare lands in the budget, and the round trip has a total
+    contains: [kata-ate]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: station }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: budget }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The pair earns a name"] }
+      kaiden: { shortcuts: ["Placing the route puts the fare on the budget", "Only the total is left to read"] }
+
+  - id: kata-machi
+    name: 待
+    reading: machi
+    level: level-3
+    order: 4
+    intent: Overlap a route and an arrival watch on the same destination
+    yields: Arriving closes the route; falling behind redraws it
+    contains: [kata-ate, kata-chaku]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: place }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: place_arrival, status: any, join: place }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Arrivals are kept in the record"] }
+      kaiden: { autonomy: ["A delay is rebuilt into a new route without asking"] }
+
+  # No join — neither restaurant nor budget has a place parameter.
+  - id: kata-kate
+    name: 糧
+    reading: kate
+    level: level-3
+    order: 5
+    intent: Overlap a restaurant and a budget
+    yields: The likely bill for the booking lands in the budget
+    waza:
+      - { kind: want_type, type: restaurant }
+      - { kind: want_type, type: budget }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The restaurant's cost joins the total"] }
+      kaiden: { shortcuts: ["Choosing a restaurant puts its estimate on the budget", "The budget narrows the restaurant suggestions"] }
