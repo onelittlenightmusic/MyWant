@@ -27,6 +27,7 @@ import (
 var (
 	customNameFlag string
 	customKindFlag string
+	customToRef    string
 	customForce    bool
 	customNoReload bool
 )
@@ -58,11 +59,13 @@ Sources accepted by "install":
   ./path/to/dir                      local directory (copied; local target only)
   https://github.com/owner/repo.git  git URL (cloned)
   owner/repo                         GitHub shorthand
+  owner/repo@v1.2.0                  pinned to a tag (or branch, or commit)
   transit-plugin                     bare name -> https://github.com/` + mywant.DefaultCustomOwner + `/mywant-transit-plugin.git
 
 Examples:
   mywant custom list
   mywant custom install transit-plugin
+  mywant custom install transit-plugin@v1.2.0
   mywant --context fly custom install onelittlenightmusic/mywant-transit-plugin
   mywant custom install ./my-skin --kind design --name neon
   mywant custom update
@@ -88,10 +91,11 @@ var customListCmd = &cobra.Command{
 			fmt.Println("No customs installed. Use 'mywant custom install <source>'.")
 		} else {
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			fmt.Fprintln(w, "NAME\tKINDS\tSOURCE\tPROVIDES\tSTATUS")
+			fmt.Fprintln(w, "NAME\tVERSION\tKINDS\tSOURCE\tPROVIDES\tSTATUS")
 			for _, c := range customs {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					c.Name, joinOrDash(c.Kinds()), shortPath(c.Source), joinOrDash(c.Provides()), c.Status)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					c.Name, dashIfEmpty(customVersionLabel(c)), joinOrDash(c.Kinds()), shortPath(c.Source),
+					joinOrDash(c.Provides()), c.Status)
 			}
 			w.Flush()
 		}
@@ -130,12 +134,18 @@ With no names, every tracked custom is updated. Customs installed from a local
 directory are skipped, since nothing guarantees that directory still holds what
 it did — reinstall those explicitly with "custom install ./dir --force".
 
+Versions come from the tags of the custom's own repository, so an update reads
+as "v1.1.0 -> v1.2.0" for a tagged custom and as a commit hash for one with no
+tags yet. A custom pinned to a tag (installed as "owner/repo@v1.2.0") stays on
+it; pass --to to move the pin to another tag.
+
 Like every other custom command this follows the active context, so it updates
 whichever machine runs the server you are pointed at.
 
 Examples:
   mywant custom update
   mywant custom update mywant-transit-plugin
+  mywant custom update mywant-transit-plugin --to v1.3.0
   mywant --context fly custom update`,
 	ValidArgsFunction: completeCustomNames,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -285,19 +295,27 @@ func updateCustomsOnTarget(names []string) error {
 	var failed []string
 	for _, rec := range selected {
 		fmt.Printf("%s\n", rec.Name)
-		newCommit, err := updateOneCustom(rec)
+		newVersion, newCommit, err := updateOneCustom(rec)
 		if err != nil {
 			fmt.Printf("  failed:     %v\n\n", err)
 			failed = append(failed, rec.Name)
 			continue
 		}
+		// Prefer the version: a tagged custom moving v1.1.0 -> v1.2.0 says more
+		// than two commit hashes do.
+		was, now := rec.Version, newVersion
+		if was == "" || now == "" {
+			was, now = rec.Commit, newCommit
+		}
 		switch {
-		case rec.Commit == "" || newCommit == "":
+		case was == "" || now == "":
 			fmt.Printf("  updated\n")
-		case rec.Commit == newCommit:
-			fmt.Printf("  already up to date (%s)\n", rec.Commit)
+		case was == now && rec.Ref != "" && customToRef == "":
+			fmt.Printf("  pinned at %s\n", was)
+		case was == now:
+			fmt.Printf("  already up to date (%s)\n", was)
 		default:
-			fmt.Printf("  updated:    %s -> %s\n", rec.Commit, newCommit)
+			fmt.Printf("  updated:    %s -> %s\n", was, now)
 		}
 		fmt.Println()
 	}
@@ -348,31 +366,40 @@ func selectCustomsToUpdate(customs []mywant.CustomRecord, names []string) ([]myw
 }
 
 // updateOneCustom reinstalls a single record from its own source, keeping the
-// name and component kinds it was installed with, and returns its new commit.
-func updateOneCustom(rec mywant.CustomRecord) (string, error) {
+// name and component kinds it was installed with, and returns its new version
+// and commit.
+func updateOneCustom(rec mywant.CustomRecord) (version, commit string, err error) {
 	kind := strings.Join(rec.Kinds(), ",")
 
+	// Without --to the source carries no ref and the install keeps whatever pin
+	// the record already had; with it, the explicit ref moves the pin.
+	source := rec.Source
+	if customToRef != "" {
+		source += "@" + customToRef
+	}
+
 	if target := remoteServer(); target != "" {
-		result, err := client.NewClient(viper.GetString("server")).InstallCustom(rec.Source, rec.Name, kind, false)
+		result, err := client.NewClient(viper.GetString("server")).InstallCustom(source, rec.Name, kind, false)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		reportReload(result)
 		if custom, ok := result["custom"].(map[string]any); ok {
+			version, _ := custom["version"].(string)
 			commit, _ := custom["commit"].(string)
-			return commit, nil
+			return version, commit, nil
 		}
-		return "", nil
+		return "", "", nil
 	}
 
-	updated, err := mywant.InstallCustom(rec.Source, rec.Name, kind, false)
+	updated, err := mywant.InstallCustom(source, rec.Name, kind, false)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !customNoReload {
 		reloadLocalWantTypes(len(updated.Agents) > 0)
 	}
-	return updated.Commit, nil
+	return updated.Version, updated.Commit, nil
 }
 
 func uninstallCustomOnTarget(name string) error {
@@ -528,6 +555,15 @@ func shortPath(p string) string {
 	return "~" + strings.TrimPrefix(p, home)
 }
 
+// customVersionLabel is what a custom calls itself: its git tag when the source
+// repository publishes one, otherwise the commit it was installed at.
+func customVersionLabel(c mywant.CustomRecord) string {
+	if c.Version != "" {
+		return c.Version
+	}
+	return c.Commit
+}
+
 func joinOrDash(items []string) string {
 	if len(items) == 0 {
 		return "-"
@@ -560,6 +596,7 @@ func init() {
 	customInstallCmd.Flags().StringVar(&customKindFlag, "kind", "", "component kinds to install, comma separated ("+kinds+"); default: auto-detect")
 	customInstallCmd.Flags().BoolVar(&customForce, "force", false, "replace an existing custom or conflicting destination")
 	customInstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
+	customUpdateCmd.Flags().StringVar(&customToRef, "to", "", "move pinned customs to this tag, branch or commit")
 	customUpdateCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
 	customUninstallCmd.Flags().BoolVar(&customForce, "force", false, "remove files that were not created by the custom")
 	customUninstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")

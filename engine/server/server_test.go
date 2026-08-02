@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	mywant "mywant/engine/core"
 	_ "mywant/engine/types"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestHealthCheck(t *testing.T) {
 	assert.Equal(t, "mywant", resp["server"])
 
 	// The version must come from the build, never a hardcoded literal.
-	wantVersion, _ := BuildInfo()
+	wantVersion, _ := mywant.BuildInfo()
 	assert.Equal(t, wantVersion, resp["version"])
 	assert.NotEmpty(t, resp["version"])
 }

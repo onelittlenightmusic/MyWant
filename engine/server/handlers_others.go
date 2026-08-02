@@ -306,7 +306,7 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 	wantsCount := len(s.wants)
 	s.wantsMu.RUnlock()
 
-	version, commit := BuildInfo()
+	version, commit := mywant.BuildInfo()
 	health := map[string]any{
 		"status":  "healthy",
 		"wants":   wantsCount,
@@ -884,24 +884,49 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		res[i] = map[string]any{
-			"name":          d.Metadata.Name,
-			"title":         d.Metadata.Title,
-			"category":      d.Metadata.Category,
-			"pattern":       d.Metadata.Pattern,
+			"name":     d.Metadata.Name,
+			"title":    d.Metadata.Title,
+			"category": d.Metadata.Category,
+			"pattern":  d.Metadata.Pattern,
+			// "version" is the author's hand-written metadata.version and is
+			// kept for compatibility; "source" carries the version derived from
+			// the artifact itself, which is the one that cannot go stale.
 			"version":       d.Metadata.Version,
 			"system_type":   d.Metadata.SystemType,
 			"labels":        d.Metadata.Labels,
 			"paramSubtypes": paramSubtypes,
 		}
+		if origin := s.wantTypeLoader.GetOrigin(d.Metadata.Name); origin != nil {
+			res[i]["source"] = origin
+		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"wantTypes": res, "count": len(res)})
+}
+
+// withSource returns the definition with its provenance added under "source".
+// The field is injected into the definition's own JSON object rather than
+// wrapping it, so clients that already read this response keep working.
+func withSource(def *mywant.WantTypeDefinition, origin *mywant.WantTypeOrigin) any {
+	if origin == nil {
+		return def
+	}
+	raw, err := json.Marshal(def)
+	if err != nil {
+		return def
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return def
+	}
+	out["source"] = origin
+	return out
 }
 
 func (s *Server) getWantType(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(r.URL.Path, "/")
 	name := parts[len(parts)-1]
 	if def := s.wantTypeLoader.GetDefinition(name); def != nil {
-		s.JSONResponse(w, http.StatusOK, def)
+		s.JSONResponse(w, http.StatusOK, withSource(def, s.wantTypeLoader.GetOrigin(name)))
 		return
 	}
 	s.JSONError(w, r, http.StatusNotFound, "Not found", "")

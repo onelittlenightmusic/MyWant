@@ -73,8 +73,9 @@ type WantTypeLoader struct {
 	validPatterns   []string
 	validCategories map[string]bool
 	loadWarnings    []string
-	predefinedState []StateDef      // Common state fields merged into every want type
-	userCustomNames map[string]bool // types loaded from ~/.mywant/custom-types/ (user-deletable)
+	predefinedState []StateDef                // Common state fields merged into every want type
+	userCustomNames map[string]bool           // types loaded from ~/.mywant/custom-types/ (user-deletable)
+	origins         map[string]WantTypeOrigin // provenance by type name, see want_type_origin.go
 }
 
 // PredefinedStateFile is the special YAML file containing common state fields
@@ -98,6 +99,7 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		validPatterns:   []string{"generator", "processor", "sink", "independent", "coordinator"},
 		validCategories: make(map[string]bool),
 		userCustomNames: make(map[string]bool),
+		origins:         make(map[string]WantTypeOrigin),
 	}
 }
 
@@ -239,6 +241,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 
 		// Register definition
 		w.definitions[def.Metadata.Name] = def
+		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
 		w.indexGlobalParams(def)
 
 		// Index by category
@@ -324,6 +327,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 		}
 		w.mergePredefinedState(def)
 		w.definitions[def.Metadata.Name] = def
+		w.origins[def.Metadata.Name] = bundledOrigin(path)
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
@@ -351,6 +355,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		return
 	}
 
+	resolver := newOriginResolver()
 	_ = WalkFollowingSymlinks(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -396,6 +401,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		}
 		w.mergePredefinedState(def)
 		w.definitions[def.Metadata.Name] = def
+		w.origins[def.Metadata.Name] = resolver.forCustomFile(dir, path, data)
 		w.userCustomNames[def.Metadata.Name] = true
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
@@ -537,6 +543,7 @@ func (w *WantTypeLoader) ReloadUserCustomTypes() (loaded int, warnings []string)
 	// Remove previously loaded user custom types (tracked by userCustomNames).
 	for name := range w.userCustomNames {
 		delete(w.definitions, name)
+		delete(w.origins, name)
 		for cat, defs := range w.byCategory {
 			filtered := defs[:0]
 			for _, d := range defs {
@@ -572,6 +579,7 @@ func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.definitions[def.Metadata.Name] = def
+	w.origins[def.Metadata.Name] = WantTypeOrigin{Kind: WantTypeOriginAPI, Version: def.Metadata.Version}
 	w.indexGlobalParams(def)
 }
 
@@ -607,6 +615,7 @@ func (w *WantTypeLoader) UnregisterDefinition(name string) error {
 	}
 	delete(w.definitions, name)
 	delete(w.userCustomNames, name)
+	delete(w.origins, name)
 	w.rebuildGlobalParamIndex()
 	return nil
 }
@@ -616,6 +625,20 @@ func (w *WantTypeLoader) GetDefinition(name string) *WantTypeDefinition {
 	defer w.mu.RUnlock()
 
 	return w.definitions[name]
+}
+
+// GetOrigin returns where a want type came from and which build of it is
+// loaded. Nil when the type is registered by Go code rather than loaded from a
+// definition file.
+func (w *WantTypeLoader) GetOrigin(name string) *WantTypeOrigin {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	origin, ok := w.origins[name]
+	if !ok {
+		return nil
+	}
+	return &origin
 }
 
 // GetLoadWarnings returns warning messages collected during the last LoadAllWantTypes call.
