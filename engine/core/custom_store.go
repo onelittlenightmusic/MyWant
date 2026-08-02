@@ -96,6 +96,9 @@ type CustomRecord struct {
 	Name   string `yaml:"name" json:"name"`
 	Source string `yaml:"source" json:"source"`
 	Origin string `yaml:"origin" json:"origin"` // git | local
+	// Ref is the tag (or branch, or commit) this custom is pinned to, from an
+	// "owner/repo@v1.2.0" source. Empty means it follows its default branch.
+	Ref string `yaml:"ref,omitempty" json:"ref,omitempty"`
 	// Version is what the custom's own repository calls this checkout: its git
 	// tag, via describe. Empty for a source with no tags (or no git at all),
 	// in which case Commit is all there is to go on.
@@ -242,7 +245,7 @@ func readCustomManifest(storePath string) *customManifest {
 // ---------------------------------------------------------------------------
 
 func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomRecord, error) {
-	resolved, origin, derivedName := ResolveCustomSource(source)
+	resolved, origin, derivedName, ref := ResolveCustomSource(source)
 	name := overrideName
 	if name == "" {
 		name = derivedName
@@ -256,6 +259,13 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 		return CustomRecord{}, err
 	}
 	previous := reg.Find(name)
+	// A pin survives an update: "custom update" re-installs from the recorded
+	// source, which carries no ref, and a pinned custom must not drift off its
+	// tag just because it was updated. Re-installing with an explicit @ref
+	// moves the pin; @<branch> gives it up.
+	if ref == "" && previous != nil {
+		ref = previous.Ref
+	}
 
 	store := CustomStorePath(name)
 	if err := os.MkdirAll(CustomStoreDir(), 0755); err != nil {
@@ -269,12 +279,31 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 			store, filepath.Base(CustomsFilePath()))
 	case statErr == nil && origin == "git" && isGitRepo(store) && !force:
 		fmt.Printf("%s already installed, updating...\n", name)
+		if ref != "" {
+			// Pinned: fetch, then put the checkout back on the ref. Pulling
+			// would fail anyway, since a pinned checkout is detached.
+			if err := fetchGitTags(store); err != nil {
+				return CustomRecord{}, err
+			}
+			pinned, err := checkoutRef(store, ref)
+			if err != nil {
+				return CustomRecord{}, err
+			}
+			if !pinned {
+				// Moved onto a branch, so there is no pin left to keep.
+				ref = ""
+				if err := runGit(store, "pull", "--ff-only"); err != nil {
+					return CustomRecord{}, err
+				}
+			}
+			break
+		}
 		if err := runGit(store, "pull", "--ff-only"); err != nil {
 			return CustomRecord{}, err
 		}
 		// Tags are what name the version, and pull only brings along the ones
 		// reachable from the branch it fetched, so ask for them explicitly.
-		if err := runGit(store, "fetch", "--tags", "--force"); err != nil {
+		if err := fetchGitTags(store); err != nil {
 			fmt.Printf("  warning: could not fetch tags: %v\n", err)
 		}
 	case statErr == nil:
@@ -289,6 +318,15 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 			}
 		} else if err := runGit("", "clone", resolved, store); err != nil {
 			return CustomRecord{}, err
+		}
+		if ref != "" {
+			pinned, err := checkoutRef(store, ref)
+			if err != nil {
+				return CustomRecord{}, err
+			}
+			if !pinned {
+				ref = ""
+			}
 		}
 	}
 
@@ -319,6 +357,7 @@ func InstallCustom(source, overrideName, kindFilter string, force bool) (CustomR
 		Name:        name,
 		Source:      resolved,
 		Origin:      origin,
+		Ref:         ref,
 		Version:     version,
 		Commit:      commit,
 		InstalledAt: now,
@@ -775,15 +814,16 @@ func findPluginEntry(path string) string {
 
 // ResolveCustomSource turns a user-supplied source into a local directory path or
 // a git URL, together with the default install name.
-func ResolveCustomSource(source string) (resolved, origin, name string) {
+func ResolveCustomSource(source string) (resolved, origin, name, ref string) {
 	if isLocalDir(source) {
 		abs, err := filepath.Abs(source)
 		if err != nil {
 			abs = source
 		}
-		return abs, "local", filepath.Base(abs)
+		return abs, "local", filepath.Base(abs), ""
 	}
 
+	source, ref = splitSourceRef(source)
 	url := source
 	switch {
 	case strings.Contains(source, "://") || strings.HasPrefix(source, "git@"):
@@ -799,7 +839,19 @@ func ResolveCustomSource(source string) (resolved, origin, name string) {
 	}
 
 	name = strings.TrimSuffix(filepath.Base(strings.TrimSuffix(url, "/")), ".git")
-	return url, "git", name
+	return url, "git", name, ref
+}
+
+// splitSourceRef pulls the "@v1.2.0" off a source. Only an "@" after the last
+// "/" counts, which is what keeps "git@github.com:owner/repo.git" — where the
+// "@" belongs to the host, not to a ref — from being read as a pin.
+func splitSourceRef(source string) (rest, ref string) {
+	lastSlash := strings.LastIndex(source, "/")
+	at := strings.LastIndex(source, "@")
+	if at <= lastSlash || at == len(source)-1 {
+		return source, ""
+	}
+	return source[:at], source[at+1:]
 }
 
 func validateCustomName(name string) error {
@@ -854,6 +906,36 @@ func gitCommit(dir string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// fetchGitTags brings in tags the remote has published since the clone. Plain
+// "git pull" only carries tags reachable from the branch it fetched, so a
+// release tagged on another branch would otherwise stay invisible.
+func fetchGitTags(dir string) error {
+	return runGit(dir, "fetch", "--tags", "--force")
+}
+
+// checkoutRef moves a checkout onto a ref and reports whether that ref is a pin.
+//
+// A tag or commit is a pin: the custom sits there, detached, until someone
+// installs a different one. A branch is not — it is a thing to follow, so the
+// checkout stays attached to it and later updates fast-forward as usual. That
+// is what makes "@main" the way to give up a pin.
+func checkoutRef(dir, ref string) (pinned bool, err error) {
+	if branchExists(dir, ref) {
+		if err := runGit(dir, "checkout", "-B", ref, "origin/"+ref); err != nil {
+			return false, fmt.Errorf("cannot check out branch %q: %w", ref, err)
+		}
+		return false, nil
+	}
+	if err := runGit(dir, "-c", "advice.detachedHead=false", "checkout", "--detach", ref); err != nil {
+		return false, fmt.Errorf("cannot check out %q: %w", ref, err)
+	}
+	return true, nil
+}
+
+func branchExists(dir, ref string) bool {
+	return runGit(dir, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+ref) == nil
 }
 
 func runGit(dir string, args ...string) error {

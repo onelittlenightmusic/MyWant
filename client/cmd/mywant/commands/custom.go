@@ -27,6 +27,7 @@ import (
 var (
 	customNameFlag string
 	customKindFlag string
+	customToRef    string
 	customForce    bool
 	customNoReload bool
 )
@@ -58,11 +59,13 @@ Sources accepted by "install":
   ./path/to/dir                      local directory (copied; local target only)
   https://github.com/owner/repo.git  git URL (cloned)
   owner/repo                         GitHub shorthand
+  owner/repo@v1.2.0                  pinned to a tag (or branch, or commit)
   transit-plugin                     bare name -> https://github.com/` + mywant.DefaultCustomOwner + `/mywant-transit-plugin.git
 
 Examples:
   mywant custom list
   mywant custom install transit-plugin
+  mywant custom install transit-plugin@v1.2.0
   mywant --context fly custom install onelittlenightmusic/mywant-transit-plugin
   mywant custom install ./my-skin --kind design --name neon
   mywant custom update
@@ -131,12 +134,18 @@ With no names, every tracked custom is updated. Customs installed from a local
 directory are skipped, since nothing guarantees that directory still holds what
 it did — reinstall those explicitly with "custom install ./dir --force".
 
+Versions come from the tags of the custom's own repository, so an update reads
+as "v1.1.0 -> v1.2.0" for a tagged custom and as a commit hash for one with no
+tags yet. A custom pinned to a tag (installed as "owner/repo@v1.2.0") stays on
+it; pass --to to move the pin to another tag.
+
 Like every other custom command this follows the active context, so it updates
 whichever machine runs the server you are pointed at.
 
 Examples:
   mywant custom update
   mywant custom update mywant-transit-plugin
+  mywant custom update mywant-transit-plugin --to v1.3.0
   mywant --context fly custom update`,
 	ValidArgsFunction: completeCustomNames,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -301,6 +310,8 @@ func updateCustomsOnTarget(names []string) error {
 		switch {
 		case was == "" || now == "":
 			fmt.Printf("  updated\n")
+		case was == now && rec.Ref != "" && customToRef == "":
+			fmt.Printf("  pinned at %s\n", was)
 		case was == now:
 			fmt.Printf("  already up to date (%s)\n", was)
 		default:
@@ -360,8 +371,15 @@ func selectCustomsToUpdate(customs []mywant.CustomRecord, names []string) ([]myw
 func updateOneCustom(rec mywant.CustomRecord) (version, commit string, err error) {
 	kind := strings.Join(rec.Kinds(), ",")
 
+	// Without --to the source carries no ref and the install keeps whatever pin
+	// the record already had; with it, the explicit ref moves the pin.
+	source := rec.Source
+	if customToRef != "" {
+		source += "@" + customToRef
+	}
+
 	if target := remoteServer(); target != "" {
-		result, err := client.NewClient(viper.GetString("server")).InstallCustom(rec.Source, rec.Name, kind, false)
+		result, err := client.NewClient(viper.GetString("server")).InstallCustom(source, rec.Name, kind, false)
 		if err != nil {
 			return "", "", err
 		}
@@ -374,7 +392,7 @@ func updateOneCustom(rec mywant.CustomRecord) (version, commit string, err error
 		return "", "", nil
 	}
 
-	updated, err := mywant.InstallCustom(rec.Source, rec.Name, kind, false)
+	updated, err := mywant.InstallCustom(source, rec.Name, kind, false)
 	if err != nil {
 		return "", "", err
 	}
@@ -578,6 +596,7 @@ func init() {
 	customInstallCmd.Flags().StringVar(&customKindFlag, "kind", "", "component kinds to install, comma separated ("+kinds+"); default: auto-detect")
 	customInstallCmd.Flags().BoolVar(&customForce, "force", false, "replace an existing custom or conflicting destination")
 	customInstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
+	customUpdateCmd.Flags().StringVar(&customToRef, "to", "", "move pinned customs to this tag, branch or commit")
 	customUpdateCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
 	customUninstallCmd.Flags().BoolVar(&customForce, "force", false, "remove files that were not created by the custom")
 	customUninstallCmd.Flags().BoolVar(&customNoReload, "no-reload", false, "do not ask a local server to reload want types")
