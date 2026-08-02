@@ -157,3 +157,21 @@ func (c *Client) UninstallCustom(name string, force bool) (map[string]any, error
 	}
 	return result, nil
 }
+
+// HealthInfo is what GET /health reports about the server answering it.
+type HealthInfo struct {
+	Status  string `json:"status"`
+	Server  string `json:"server"`
+	Version string `json:"version"`
+	Commit  string `json:"commit,omitempty"`
+	Wants   int    `json:"wants"`
+}
+
+// Health retrieves the server's health, including the build it is running.
+func (c *Client) Health() (*HealthInfo, error) {
+	var result HealthInfo
+	if err := c.Request("GET", "/health", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
