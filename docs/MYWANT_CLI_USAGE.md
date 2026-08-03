@@ -593,11 +593,14 @@ API キーを受け取る口はここ（例: `TICKETMASTER_API_KEY`, `GOOGLE_MAP
 # 一覧（値はマスクされる。--show で全文表示）
 ./bin/mywant config env list
 
-# 設定・更新
-./bin/mywant config env set TICKETMASTER_API_KEY <key>
+# 設定・更新（値を省くと非表示のプロンプトで訊かれる。Enter で確定）
+./bin/mywant config env set TICKETMASTER_API_KEY
 
-# シェル履歴に残したくないときは標準入力から
+# ファイルやパイプから渡す
 ./bin/mywant config env set TICKETMASTER_API_KEY --stdin < key.txt
+
+# 値を引数で直接渡すこともできるが、シェル履歴に残る
+./bin/mywant config env set MYWANT_SERVER http://localhost:8080
 
 # 削除
 ./bin/mywant config env unset TICKETMASTER_API_KEY
