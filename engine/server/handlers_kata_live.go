@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -16,19 +17,17 @@ import (
 // This is deliberately not folded into GET /api/v1/wants. Drawing a
 // constellation needs the EDGES, and a per-want label cannot say who to join to
 // without the client re-deriving the whole evaluation. The wants do carry a
-// `kata/<id>` label for filtering (see annotateKataLabels); the shape lives here.
+// `kata/<id>` label for filtering (see kataLabelsByWant); the shape lives here.
 
 // kataEdge joins two members of a live constellation.
+//
+// Only memo↔memo and memo↔want edges are ever drawn. A constellation is not a
+// graph of everything that touches: the remembered values are what the form is
+// ABOUT, so they are its hubs, and joining two wants directly would say they
+// have something to do with each other when all they share is the place.
 type kataEdge struct {
 	From string `json:"from"`
 	To   string `json:"to"`
-	// Kind is "relation" when a value actually flows between the two — the road
-	// already drawn on the ground — and "waza" when they are merely part of the
-	// same form. The client can then light an existing road rather than laying a
-	// second line beside it.
-	Kind string `json:"kind"`
-	// Field names the exposed state a "relation" edge carries.
-	Field string `json:"field,omitempty"`
 }
 
 // kataConstellationDTO is one live kata, ready to draw.
@@ -120,60 +119,89 @@ func orEmpty(v []string) []string {
 	return v
 }
 
-// kataEdges joins the members of one live kata.
+// kataEdges joins the members of one live kata: the memo values chain to each
+// other, and every want hangs off the memo value it names.
 //
-// Where a relation already exists between two member wants, that relation is the
-// edge — the form rides on the road that is already there instead of drawing a
-// second line beside it. Whatever is left over is chained memo-first, one link
-// per neighbour: a complete graph turns four stars into a blot, which is why the
-// memo constellations on the canvas are chained too.
+// Chained rather than fully connected — a complete graph turns four stars into a
+// blot, which is why the memo constellations on the canvas are chained too — and
+// spoked from the memo side because a remembered value is what a form is about.
+// Two wants are never joined to each other: they share a place, not a thread.
 func (s *Server) kataEdges(memoIDs, wantIDs []string) []kataEdge {
-	members := append(append([]string{}, memoIDs...), wantIDs...)
-	if len(members) < 2 {
+	if len(memoIDs)+len(wantIDs) < 2 {
 		return nil
 	}
 
-	inKata := map[string]bool{}
-	for _, id := range wantIDs {
-		inKata[id] = true
+	edges := make([]kataEdge, 0, len(memoIDs)+len(wantIDs))
+
+	for i := 1; i < len(memoIDs); i++ {
+		edges = append(edges, kataEdge{From: memoIDs[i-1], To: memoIDs[i]})
 	}
 
-	edges := make([]kataEdge, 0, len(members))
-	joined := map[string]bool{} // unordered pair key → already has an edge
-	pairKey := func(a, b string) string {
-		if a > b {
-			a, b = b, a
+	// A kata with no memo 所作 (糧: a restaurant and a budget, joined by nothing
+	// the system can check) has no hub to hang from. Chaining its wants is the
+	// only way it reads as one form rather than as unrelated lights.
+	if len(memoIDs) == 0 {
+		for i := 1; i < len(wantIDs); i++ {
+			edges = append(edges, kataEdge{From: wantIDs[i-1], To: wantIDs[i]})
 		}
-		return a + "\x00" + b
+		return edges
 	}
 
-	for _, rel := range s.buildRelations(func(providerID, consumerID string) bool {
-		return inKata[providerID] && inKata[consumerID]
-	}) {
-		key := pairKey(rel.ProviderID, rel.ConsumerID)
-		if joined[key] {
-			continue
+	memoByValue := map[string]string{}
+	for _, id := range memoIDs {
+		if _, value, ok := strings.Cut(id, "::"); ok {
+			memoByValue[value] = id
 		}
-		joined[key] = true
-		edges = append(edges, kataEdge{
-			From:  rel.ProviderID,
-			To:    rel.ConsumerID,
-			Kind:  "relation",
-			Field: rel.FieldName,
-		})
 	}
 
-	for i := 1; i < len(members); i++ {
-		a, b := members[i-1], members[i]
-		key := pairKey(a, b)
-		if joined[key] {
-			continue
+	for _, wantID := range wantIDs {
+		hubs := s.memoValuesNamedBy(wantID, memoByValue)
+		if len(hubs) == 0 {
+			// It satisfied the form inside this constellation, so it belongs to
+			// it even when the naming is indirect (a venue resolved at runtime,
+			// say). Hang it off the first value rather than leaving it adrift.
+			hubs = []string{memoIDs[0]}
 		}
-		joined[key] = true
-		edges = append(edges, kataEdge{From: a, To: b, Kind: "waza"})
+		for _, hub := range hubs {
+			edges = append(edges, kataEdge{From: hub, To: wantID})
+		}
 	}
 
 	return edges
+}
+
+// memoValuesNamedBy returns the memo member ids this want names in its
+// parameters — the values it is pointed at, which is what makes it part of the
+// form rather than merely present.
+func (s *Server) memoValuesNamedBy(wantID string, memoByValue map[string]string) []string {
+	if s.globalBuilder == nil {
+		return nil
+	}
+	var want *mywant.Want
+	for _, w := range s.globalBuilder.GetAllWantStates() {
+		if w.Metadata.ID == wantID {
+			want = w
+			break
+		}
+	}
+	if want == nil || want.Spec.Params == nil {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range want.Spec.Params {
+		value := strings.TrimSpace(fmt.Sprintf("%v", v))
+		if value == "" {
+			continue
+		}
+		if id, ok := memoByValue[value]; ok && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // kataLabelPrefix marks a label as derived from a live kata rather than set by
