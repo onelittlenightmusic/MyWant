@@ -1,0 +1,128 @@
+# 茶帯 — 1st kyu — Occasion
+#
+# Every belt below points at a place. A place is always there; nothing about it
+# has to be caught. An occasion is different: it opens and it closes, and the
+# hour it opens is not one you chose. That is the whole belt — the first wants
+# whose timing belongs to the world rather than to you.
+#
+# The belt does not re-teach naming and pointing; those were the white and
+# yellow belts, and by now they are one move. 催 names the thing, and from 券
+# onward every kata is already an overlap.
+#
+# 券 finishes only when you say you got the ticket. The watch can see a sale
+# open; it cannot see your hands. So the belt turns on an answer only you can
+# give, and everything above 券 rests on that answer being honest.
+levels:
+  - id: level-5
+    name: 茶帯
+    grade: 1st kyu
+    order: 5
+    theme: Occasion
+    subtitle: A thing that opens and closes, on the world's clock
+    color: "#92400e"
+    accent: "#451a03"
+    unlocked: false         # opens once the blue belt is promoted
+    kata: [kata-moyoshi, kata-ken, kata-mode, kata-matsuri, kata-tsu]
+    promotion:
+      requiredKata: 3       # 3 of 5 to be promoted
+
+kata:
+  - id: kata-moyoshi
+    name: 催
+    reading: moyoshi
+    level: level-5
+    order: 1
+    intent: Give an occasion a name
+    yields: A date on the calendar becomes something wants can be aimed at
+    waza:
+      - { kind: memo, subtype: event }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Pick an occasion instead of typing it"] }
+      kaiden: { vocabulary: ["The occasions you go to take shape as a list"] }
+
+  # The belt's hinge. A sale is the first thing in the system that opens on
+  # someone else's schedule, so watching it is worth something — and the watch
+  # stops at the door: it can say the sale is open, never that you are holding a
+  # ticket.
+  - id: kata-ken
+    name: 券
+    reading: ken
+    level: level-5
+    order: 2
+    intent: Set a watch on a named occasion's ticket sale
+    yields: The moment the sale opens arrives in your hands; the buying stays yours
+    contains: [kata-moyoshi]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: want_type, type: event_ticket, join: event }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The stages of a sale are kept in the record"] }
+      kaiden:
+        shortcuts: ["Naming the occasion is enough to raise the watch"]
+        autonomy: ["The sale page is put in front of you the moment it opens"]
+
+  # The venue is a station too. Put both into one group — the same judgement the
+  # white belt's 近 asks for — and the route knows which occasion it serves.
+  - id: kata-mode
+    name: 詣
+    reading: mode
+    level: level-5
+    order: 3
+    intent: Overlap a secured ticket and a route on the same occasion
+    yields: A departure time worked backwards from the curtain
+    contains: [kata-ate, kata-ken]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: memo, subtype: station }
+      - { kind: want_type, type: event_ticket, join: event }
+      - { kind: want_type, type: transit_search, join: to }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The occasion and the way there count as one thing"] }
+      kaiden: { shortcuts: ["Securing the ticket brings the route with it", "Only the departure time is left to read"] }
+
+  - id: kata-matsuri
+    name: 祭
+    reading: matsuri
+    level: level-5
+    order: 4
+    intent: Lay the forecast over the occasion you are already travelling to
+    yields: Umbrella, departure and doors on a single sheet
+    contains: [kata-mode, kata-kasa]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: memo, subtype: station }
+      - { kind: memo, subtype: city }
+      - { kind: want_type, type: event_ticket, join: event }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: weather, join: weather_city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The day at that occasion comes together on one sheet"] }
+      kaiden: { shortcuts: ["One word for the occasion raises all of it", "Only the summary is left to read"] }
+
+  # A 口伝, like 常 on the blue belt: it is the difference between having gone
+  # and going every year, and it can only be noticed after the fact.
+  - id: kata-tsu
+    name: 通
+    reading: tsuu
+    level: level-5
+    order: 5
+    intent: Hold 券 for three different occasions
+    yields: What you paid and how it went last time rides along with the next one
+    hidden: true            # not listed in advance; it only shows itself once held
+    contains: [kata-ken]
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: repeat, kata: kata-ken, minCount: 3 }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Last time's ticket is attached automatically"] }
+      kaiden:
+        autonomy: ["The next time it comes round, the watch is already set"]
+        vocabulary: ["The difference from last time is shown"]

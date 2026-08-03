@@ -27,6 +27,9 @@ city:     { key: cities,    icon: Building2,    color: "#2563eb", base_type: str
 station:  { key: stations,  icon: Train,        color: "#059669", base_type: string }
 location: { key: locations, icon: MapPin,       color: "#7c3aed", base_type: string }
 place:    { key: places,    icon: MapPin,       color: "#db2777", base_type: string }
+# An event is a place and a time bundled into one named thing, which is why a
+# memo group can hold it alongside the station it happens at.
+event:    { key: events,    icon: Ticket,       color: "#7c3aed", base_type: string }
 country:  { key: countries, icon: Flag,         color: "#64748b", base_type: string }
 airport:  { key: airports,  icon: Plane,        color: "#0284c7", base_type: string }
 landmark: { key: landmarks, icon: Landmark,     color: "#ea580c", base_type: string }
