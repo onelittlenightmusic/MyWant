@@ -79,6 +79,21 @@ func (c *Client) ReloadWantTypes() (map[string]any, error) {
 	return result, nil
 }
 
+// ReloadConfigEnv calls POST /api/v1/config/reload-env so a running server picks
+// up the `environments:` block that was just written, without a restart.
+// The response carries key names only — never the values.
+func (c *Client) ReloadConfigEnv() (map[string]any, error) {
+	raw, err := c.RawRequest("POST", "/api/v1/config/reload-env", nil, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var result map[string]any
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	return result, nil
+}
+
 // GetWantTypeExamples retrieves examples for a specific want type
 func (c *Client) GetWantTypeExamples(name string) (*map[string]any, error) {
 	var result map[string]any

@@ -10,7 +10,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"mywant/client"
+
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
@@ -183,7 +186,7 @@ That is the way to enter a secret: an argument lands in the shell history.
 			verb = "Updated"
 		}
 		fmt.Printf("✅ %s %s = %s\n", verb, key, maskSecret(value))
-		fmt.Println("   Restart the server to apply it: mywant stop && mywant start -D")
+		reloadServerEnv()
 	},
 }
 
@@ -214,8 +217,26 @@ var configEnvUnsetCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✅ Removed %s\n", key)
-		fmt.Println("   Restart the server to apply it: mywant stop && mywant start -D")
+		reloadServerEnv()
 	},
+}
+
+// reloadServerEnv hands the change to a running server, the way `custom
+// install` hands over a newly installed type. Writing the file is only half the
+// job: the point of `config env set` is to change what the server runs with.
+//
+// A server that is not running needs nothing done — it reads the file at
+// startup — so an unreachable one is a note, not an error.
+func reloadServerEnv() {
+	result, err := client.NewClient(viper.GetString("server")).ReloadConfigEnv()
+	if err != nil {
+		fmt.Println("   No running server reached — it will be picked up at the next start.")
+		return
+	}
+	if msg, ok := result["message"].(string); ok {
+		fmt.Printf("   Server reloaded: %s\n", msg)
+	}
+	fmt.Println("   Agents pick it up on their next run.")
 }
 
 func init() {

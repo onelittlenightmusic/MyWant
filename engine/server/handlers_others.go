@@ -139,6 +139,27 @@ func (s *Server) patchConfig(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, s.config)
 }
 
+// reloadConfigEnv re-reads the `environments:` block of config.yaml into this
+// process, so `mywant config env set` reaches the running server instead of
+// waiting for a restart. Skills are spawned with cmd.Env = os.Environ(), so the
+// next skill run picks the new value up.
+//
+// Only names are returned. The values are API keys.
+func (s *Server) reloadConfigEnv(w http.ResponseWriter, r *http.Request) {
+	names, err := mywant.ApplyConfigEnvironments()
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to reload environments", err.Error())
+		return
+	}
+
+	s.globalBuilder.LogAPIOperation("POST", "/config/reload-env", "", "reloaded", len(names), "", "")
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"keys":    names,
+		"loaded":  len(names),
+		"message": fmt.Sprintf("applied %d environment variable(s)", len(names)),
+	})
+}
+
 // Canvas Background Image
 
 const canvasBgFilename = "canvas_bg"

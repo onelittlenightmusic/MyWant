@@ -218,6 +218,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/config", s.updateConfig).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/config", s.patchConfig).Methods("PATCH", "OPTIONS")
 	// Canvas background image upload/serve/delete
+	// Registered before /config/{...} style routes so it is not shadowed.
+	api.HandleFunc("/config/reload-env", s.reloadConfigEnv).Methods("POST", "OPTIONS")
+
 	api.HandleFunc("/config/canvas-bg", s.serveCanvasBg).Methods("GET")
 	api.HandleFunc("/config/canvas-bg", s.uploadCanvasBg).Methods("POST", "OPTIONS")
 	api.HandleFunc("/config/canvas-bg", s.deleteCanvasBg).Methods("DELETE", "OPTIONS")
