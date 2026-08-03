@@ -32,6 +32,9 @@
 # Backend contexts (kubectl-style): switch destination by editing config.yaml
 ./bin/mywant config set-context fly --server https://x.fly.dev --username mywant --password-env MYWANT_AUTH_PASSWORD
 ./bin/mywant config get-contexts / use-context <name> / current-context / delete-context <name>
+
+# Env vars applied to the server at startup (custom-type API keys live here)
+./bin/mywant config env list [--show] / set NAME <value> [--stdin] / unset NAME
 ```
 
 **Quick Start:**
