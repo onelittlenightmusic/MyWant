@@ -46,11 +46,26 @@ type KataProgress struct {
 	// Group is the memo group this standing was measured against — the shared
 	// thing the 所作 are all about. Empty for kata that declare no join.
 	Group string `json:"group,omitempty"`
+	// Constellation is Group under the name the rest of the system uses for it.
+	Constellation string `json:"constellation,omitempty"`
 
 	Waza      []WazaProgress `json:"waza"`
 	Satisfied int            `json:"satisfied"`
 	Total     int            `json:"total"`
 	Complete  bool           `json:"complete"`
+
+	// Live: the kata stands right now, on evidence that is still on the board.
+	// Not the same as Complete — a 口伝 built from `repeat` is satisfied out of
+	// the record book, so it completes with nothing currently deployed and must
+	// not be drawn as a burning constellation.
+	Live bool `json:"live"`
+	// Recorded: it has been 極まった at least once before. Live and Recorded are
+	// independent — either can hold without the other.
+	Recorded bool `json:"recorded"`
+	// The live evidence itself: want ids, and memo values as "catalogKey::value"
+	// so they match the member ids constellations are made of.
+	LiveWantIDs []string `json:"liveWantIDs,omitempty"`
+	LiveMemo    []string `json:"liveMemo,omitempty"`
 	// AlmostThere marks あと一所作 — the only moment a kata is allowed to speak up.
 	AlmostThere bool `json:"almostThere"`
 
@@ -224,6 +239,11 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.Intent = ""
 			p.Yields = ""
 			p.Group = ""
+			p.Constellation = ""
+			// The witnesses would draw the form on the canvas as plainly as the
+			// 所作 list would spell it out.
+			p.LiveWantIDs = nil
+			p.LiveMemo = nil
 			p.Unlocks = nil
 			// The name and its reading name the form as surely as its 所作 do,
 			// so they are withheld too — only the ID and the count of 所作 ship.
@@ -300,6 +320,7 @@ func (s *Server) evaluateOneKata(
 			}
 			total := len(henka.Waza)
 			complete := total > 0 && satisfied == total
+			liveWants, liveMemo := liveEvidence(wazaProgress)
 			best = KataProgress{
 				KataID:      k.ID,
 				Name:        k.Name,
@@ -308,13 +329,17 @@ func (s *Server) evaluateOneKata(
 				Intent:      k.Intent,
 				Yields:      k.Yields,
 				Contains:    k.Contains,
-				Variation:   henka.ID,
-				Group:       groupName,
-				Waza:        wazaProgress,
-				Satisfied:   satisfied,
-				Total:       total,
-				Complete:    complete,
-				AlmostThere: total > 1 && satisfied == total-1,
+				Variation:     henka.ID,
+				Group:         groupName,
+				Constellation: groupName,
+				Waza:          wazaProgress,
+				Satisfied:     satisfied,
+				Total:         total,
+				Complete:      complete,
+				Live:          complete && len(liveWants)+len(liveMemo) > 0,
+				LiveWantIDs:   liveWants,
+				LiveMemo:      liveMemo,
+				AlmostThere:   total > 1 && satisfied == total-1,
 				Thresholds:  k.Mastery,
 				Unlocks:     k.Unlocks,
 				Hidden:      k.Hidden,
@@ -343,7 +368,56 @@ func (s *Server) evaluateOneKata(
 	best.Mastery = mywant.KataMasteryCount(k.ID)
 	best.MasteryRank = k.RankFor(best.Mastery)
 	best.Earned = earnedUnlocks(k, best.Mastery)
+	best.Recorded = best.Mastery > 0
 	return best, credited
+}
+
+// liveEvidence splits what satisfied a standing into the two kinds of thing that
+// can be drawn: wants on the board, and memo values.
+//
+// `repeat` 所作 contribute nothing — they are satisfied out of the record book,
+// and a record has no position to draw at.
+//
+// Memo values come back as "catalogKey::value" so they match the member ids used
+// by constellations and by the memo tiles on the canvas.
+func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
+	seenWant := map[string]bool{}
+	seenMemo := map[string]bool{}
+	for _, wp := range waza {
+		if !wp.Satisfied {
+			continue
+		}
+		switch wp.Waza.Kind {
+		case "want_type":
+			for _, id := range wp.MatchedIDs {
+				if !seenWant[id] {
+					seenWant[id] = true
+					wantIDs = append(wantIDs, id)
+				}
+			}
+		case "memo":
+			key := memoCatalogKey(wp.Waza.Subtype)
+			for _, v := range wp.MatchedIDs {
+				id := key + "::" + v
+				if !seenMemo[id] {
+					seenMemo[id] = true
+					memoIDs = append(memoIDs, id)
+				}
+			}
+		}
+	}
+	sort.Strings(wantIDs)
+	sort.Strings(memoIDs)
+	return wantIDs, memoIDs
+}
+
+// memoCatalogKey maps a data type name to the memo.yaml section it is stored
+// under ("station" → "stations"), falling back to the naive plural.
+func memoCatalogKey(subtype string) string {
+	if info, ok := dataTypeDefs[subtype]; ok && info.Key != "" {
+		return info.Key
+	}
+	return subtype + "s"
 }
 
 // wantMatchesStatus applies a waza's status filter.
