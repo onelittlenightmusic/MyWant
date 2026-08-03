@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	mywant "mywant/engine/core"
+
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -70,13 +72,17 @@ type MyWantConfig struct {
 	WebInspectorExternalHost string `yaml:"web_inspector_external_host"`
 }
 
-// ApplyEnvironments sets entries from the environments section as environment variables.
-// Existing env vars (e.g. set in shell) always take precedence.
+// ApplyEnvironments sets entries from the environments section as environment
+// variables. Existing env vars (e.g. set in shell) always take precedence.
+//
+// The work lives in engine/core so that the server can redo it on demand —
+// `mywant config env set` writes this block while the server is running, and
+// POST /api/v1/config/reload-env re-applies it. Going through the same function
+// is what lets the reload know which keys are the file's to overwrite.
 func (c *MyWantConfig) ApplyEnvironments() {
-	for k, v := range c.Environments {
-		if v != "" && os.Getenv(k) == "" {
-			os.Setenv(k, v)
-		}
+	mywant.SetConfigEnvPath(getConfigPath())
+	if _, err := mywant.ApplyConfigEnvironments(); err != nil {
+		fmt.Printf("Warning: failed to apply environments from config: %v\n", err)
 	}
 }
 

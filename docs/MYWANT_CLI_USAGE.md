@@ -607,7 +607,16 @@ API キーを受け取る口はここ（例: `TICKETMASTER_API_KEY`, `GOOGLE_MAP
 ```
 
 キー名は環境変数として使える形（英大文字・数字・`_`、先頭は数字以外）に限られる。
-値を反映するにはサーバの再起動が要る（`mywant stop && mywant start -D`）。
+
+**反映は即時。** `set` / `unset` は書き込んだあと動いているサーバに
+`POST /api/v1/config/reload-env` を投げ、サーバプロセスの環境変数を更新する
+（`custom install` が want type をホットリロードするのと同じ流儀）。
+スキルは起動のたびに `os.Environ()` を読むので、次のエージェント実行から効く。
+サーバが動いていなければ次の起動時に読まれるだけなので、何もしなくてよい。
+
+ただし**シェルから export された環境変数の方が強い**。config.yaml の値は
+「そのキーがまだ無いとき」と「以前 config から入れたとき」だけ適用される。
+サーバを起動したシェルで `export FOO=bar` していたら、config の `FOO` は効かない。
 
 `config set` の方は固定キー（`agent_mode` / `server_port` など）専用で、
 `environments` は扱わない。
