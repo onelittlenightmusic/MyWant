@@ -17,9 +17,9 @@ levels:
     color: "#22c55e"
     accent: "#15803d"
     unlocked: false         # opens once the yellow belt is promoted
-    kata: [kata-kasa, kata-koku, kata-zeni, kata-machi, kata-kate]
+    kata: [kata-kasa, kata-koku, kata-zeni, kata-machi, kata-mode, kata-kate]
     promotion:
-      requiredKata: 3       # 3 of 5 to be promoted
+      requiredKata: 3       # 3 of 6 to be promoted
 
 kata:
   - id: kata-kasa
@@ -95,12 +95,35 @@ kata:
       shoden: { vocabulary: ["Arrivals are kept in the record"] }
       kaiden: { autonomy: ["A delay is rebuilt into a new route without asking"] }
 
+  # The venue is a station too. Put the occasion and that station into one group
+  # — the same judgement 近 asks for — and the route knows which occasion it
+  # serves. 券 has to be held first, so what this overlaps is a ticket you have,
+  # not one you are hoping for.
+  - id: kata-mode
+    name: 詣
+    reading: mode
+    level: level-3
+    order: 5
+    intent: Overlap a ticket and a route on the same occasion
+    yields: A departure time worked backwards from the curtain
+    contains: [kata-ate, kata-ken]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: memo, subtype: station }
+      - { kind: want_type, type: event_ticket, join: event }
+      - { kind: want_type, type: transit_search, join: to }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The occasion and the way there count as one thing"] }
+      kaiden: { shortcuts: ["Securing the ticket brings the route with it", "Only the departure time is left to read"] }
+
   # No join — neither restaurant nor budget has a place parameter.
   - id: kata-kate
     name: 糧
     reading: kate
     level: level-3
-    order: 5
+    order: 6
     intent: Overlap a restaurant and a budget
     yields: The likely bill for the booking lands in the budget
     waza:

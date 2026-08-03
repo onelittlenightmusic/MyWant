@@ -13,9 +13,9 @@ levels:
     color: "#facc15"
     accent: "#a16207"
     unlocked: false         # opens once the white belt is promoted
-    kata: [kata-ate, kata-sora, kata-chaku]
+    kata: [kata-ate, kata-sora, kata-chaku, kata-ken]
     promotion:
-      requiredKata: 2       # 2 of 3 to be promoted
+      requiredKata: 2       # 2 of 4 to be promoted
 
 kata:
   - id: kata-ate
@@ -68,3 +68,27 @@ kata:
     unlocks:
       shoden: { vocabulary: ["Arrivals and departures are recorded"] }
       kaiden: { autonomy: ["Arriving closes the wants that were waiting on it"] }
+
+  # Same single move as the other three, aimed at an occasion instead of a place.
+  # What it points at, though, opens on someone else's clock — so this is the
+  # first want that is worth watching rather than reading, and the only one on
+  # the belt that ends with an answer the system cannot see: whether you got a
+  # ticket is yours to say.
+  - id: kata-ken
+    name: 券
+    reading: ken
+    level: level-2
+    order: 4
+    intent: Feed a remembered occasion into a ticket watch
+    yields: The moment the sale opens arrives in your hands; the buying stays yours
+    contains: [kata-moyoshi]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: want_type, type: event_ticket, join: event }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The stages of a sale are kept in the record"] }
+      kaiden:
+        shortcuts: ["Naming the occasion is enough to raise the watch"]
+        autonomy: ["The sale page is put in front of you the moment it opens"]
