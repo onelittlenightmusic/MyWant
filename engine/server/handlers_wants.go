@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -268,8 +269,21 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Derived kata labels are opt-in: working them out means evaluating every
+	// kata against every constellation, which the canvas wants and a plain list
+	// does not need to pay for.
+	var kataLabels map[string]map[string]string
+	if strings.ToLower(r.URL.Query().Get("kata")) == "true" {
+		kataLabels = s.kataLabelsByWant()
+	}
+
 	// Compute collection ETag before building full responses
 	rawHashes := make([]string, 0, len(wantsByID))
+	if fp := kataLabelFingerprint(kataLabels); fp != "" {
+		// A kata catching fire changes no want, so without this the client would
+		// keep serving the unlit board from its cache.
+		rawHashes = append(rawHashes, fp)
+	}
 	for _, want := range wantsByID {
 		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
@@ -302,7 +316,15 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		if !want.MatchesFilters(filters) {
 			continue
 		}
-		allWants = append(allWants, s.buildWantAPIResponse(want, false))
+		resp := s.buildWantAPIResponse(want, false)
+		if extra := kataLabels[want.Metadata.ID]; len(extra) > 0 {
+			// Copy: the map on the response still points at the live want's own.
+			labels := make(map[string]string, len(resp.Metadata.Labels)+len(extra))
+			maps.Copy(labels, resp.Metadata.Labels)
+			maps.Copy(labels, extra)
+			resp.Metadata.Labels = labels
+		}
+		allWants = append(allWants, resp)
 	}
 
 	sort.Slice(allWants, func(i, j int) bool {

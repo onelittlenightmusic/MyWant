@@ -320,6 +320,8 @@ func (s *Server) setupRoutes() {
 	kata := api.PathPrefix("/kata").Subrouter()
 	kata.HandleFunc("", s.listKata).Methods("GET", "OPTIONS")
 	kata.HandleFunc("/records", s.listKataRecords).Methods("GET", "OPTIONS")
+	// Before /{id}, or "live" is read as a kata id.
+	kata.HandleFunc("/live", s.listLiveKata).Methods("GET", "OPTIONS")
 	kata.HandleFunc("/{id}", s.getKata).Methods("GET", "OPTIONS")
 
 	// Characters CRUD
