@@ -125,6 +125,22 @@ func ActiveContextName(config *MyWantConfig) string {
 	return config.CurrentContext
 }
 
+// IsContextName reports whether name is a context in the config file at the
+// *default* path, ignoring any --config override. It exists so that a
+// `--config fly` mix-up can be answered with "did you mean --context fly?".
+func IsContextName(name string) bool {
+	saved := configFilePath
+	configFilePath = ""
+	defer func() { configFilePath = saved }()
+
+	config, err := LoadConfig()
+	if err != nil || config == nil {
+		return false
+	}
+	_, ok := config.Contexts[name]
+	return ok
+}
+
 func contextNames(config *MyWantConfig) []string {
 	names := make([]string, 0, len(config.Contexts))
 	for name := range config.Contexts {

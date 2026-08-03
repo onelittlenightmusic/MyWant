@@ -147,6 +147,7 @@ func preRunConfig(cmd *cobra.Command, args []string) {
 // when the user actually changed it.
 func applyServerContext() {
 	if cfgFile != "" {
+		requireConfigFile(cfgFile)
 		commands.SetConfigPath(cfgFile)
 	}
 	commands.SetContextOverride(contextName)
@@ -165,6 +166,23 @@ func applyServerContext() {
 
 	viper.SetDefault("server", url)
 	client.SetDefaultAuth(auth)
+}
+
+// requireConfigFile refuses to run when an explicit --config path is missing.
+//
+// Silently falling back to the defaults here means talking to localhost while
+// believing you are pointed somewhere else — the same mistake that makes
+// `--config fly` (a context name, not a file) look like it worked.
+func requireConfigFile(path string) {
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Error: config file %q not found\n", path)
+	if commands.IsContextName(path) {
+		fmt.Fprintf(os.Stderr, "--config takes a config file path. Did you mean: mywant --context %s ...\n", path)
+	}
+	os.Exit(1)
 }
 
 func initConfig() {
