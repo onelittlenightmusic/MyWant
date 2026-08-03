@@ -175,6 +175,11 @@ func (c *MyWantConfig) Save() error {
 	if len(c.Contexts) == 0 {
 		delete(merged, "contexts")
 	}
+	// Same for the last `config env unset`: an empty map marshals to `{}`, which
+	// would sit in the file looking like a setting rather than the absence of one.
+	if len(c.Environments) == 0 {
+		delete(merged, "environments")
+	}
 
 	out, err := yaml.Marshal(merged)
 	if err != nil {

@@ -584,6 +584,31 @@ Bearer トークン認証の場合は `--token-env` / `token_env:` を使う（B
 なお `start` / `stop` / `ps` はローカルプロセスを管理するコマンドなので、
 コンテキストではなく `server_host` / `server_port` を見る。
 
+### 環境変数（`environments:`）
+
+`mywant start` が起動時にサーバのプロセスへ撒く環境変数。カスタム want type が
+API キーを受け取る口はここ（例: `TICKETMASTER_API_KEY`, `GOOGLE_MAPS_API_KEY`）。
+
+```bash
+# 一覧（値はマスクされる。--show で全文表示）
+./bin/mywant config env list
+
+# 設定・更新
+./bin/mywant config env set TICKETMASTER_API_KEY <key>
+
+# シェル履歴に残したくないときは標準入力から
+./bin/mywant config env set TICKETMASTER_API_KEY --stdin < key.txt
+
+# 削除
+./bin/mywant config env unset TICKETMASTER_API_KEY
+```
+
+キー名は環境変数として使える形（英大文字・数字・`_`、先頭は数字以外）に限られる。
+値を反映するにはサーバの再起動が要る（`mywant stop && mywant start -D`）。
+
+`config set` の方は固定キー（`agent_mode` / `server_port` など）専用で、
+`environments` は扱わない。
+
 ## Global Flags
 
 - `--server`: Specify MyWant server URL (overrides the active context)
