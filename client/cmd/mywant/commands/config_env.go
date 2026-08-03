@@ -11,6 +11,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // The `environments:` block holds arbitrary env vars that `mywant start` exports
@@ -23,6 +24,19 @@ import (
 // looser (a lowercase name, a dash, a stray `=`) survives the YAML write but
 // fails to export, so it is rejected here rather than at startup.
 var envKeyPattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
+
+// promptSecret asks for a value at the terminal without echoing it. The value
+// is usually an API key, and it would otherwise sit in the scrollback of a
+// shared screen long after the command finished.
+func promptSecret(key string) (string, error) {
+	fmt.Printf("Value for %s (hidden): ", key)
+	entered, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(entered)), nil
+}
 
 func validateEnvKey(key string) error {
 	if key == "" {
@@ -44,7 +58,7 @@ These are exported into the server's process by 'mywant start', which is how
 custom types reach their API keys (e.g. TICKETMASTER_API_KEY).
 
   mywant config env list
-  mywant config env set TICKETMASTER_API_KEY <key>
+  mywant config env set TICKETMASTER_API_KEY          # asks for the value, hidden
   mywant config env set TICKETMASTER_API_KEY --stdin < key.txt
   mywant config env unset TICKETMASTER_API_KEY`,
 }
@@ -93,10 +107,12 @@ var configEnvSetCmd = &cobra.Command{
 	Short: "Set an environment variable applied at server startup",
 	Long: `Set one entry of the environments: block.
 
-The value can be given as an argument or read from stdin with --stdin, which
-keeps a secret out of the shell history:
+Leave the value off and it is asked for, hidden, at the prompt — Enter ends it.
+That is the way to enter a secret: an argument lands in the shell history.
 
-  mywant config env set TICKETMASTER_API_KEY --stdin < key.txt`,
+  mywant config env set TICKETMASTER_API_KEY            # prompts
+  mywant config env set TICKETMASTER_API_KEY --stdin < key.txt
+  mywant config env set MYWANT_SERVER http://localhost:8080`,
 	Args: cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
@@ -106,13 +122,25 @@ keeps a secret out of the shell history:
 		}
 
 		fromStdin, _ := cmd.Flags().GetBool("stdin")
+		if fromStdin && len(args) == 2 {
+			fmt.Println("❌ Give the value as an argument or on stdin, not both")
+			os.Exit(1)
+		}
 
 		var value string
 		switch {
-		case fromStdin && len(args) == 2:
-			fmt.Println("❌ Give the value as an argument or with --stdin, not both")
-			os.Exit(1)
-		case fromStdin:
+		case len(args) == 2:
+			value = args[1]
+		case term.IsTerminal(int(os.Stdin.Fd())):
+			// At a terminal there is no EOF to wait for — the user presses Enter.
+			// Reading to EOF here is what makes a paste look like a hang.
+			var err error
+			value, err = promptSecret(key)
+			if err != nil {
+				fmt.Printf("❌ Failed to read the value: %v\n", err)
+				os.Exit(1)
+			}
+		default:
 			data, err := io.ReadAll(bufio.NewReader(os.Stdin))
 			if err != nil {
 				fmt.Printf("❌ Failed to read the value from stdin: %v\n", err)
@@ -121,11 +149,11 @@ keeps a secret out of the shell history:
 			// A key piped from a file or `echo` arrives with a trailing newline
 			// that would be exported verbatim and break the header it lands in.
 			value = strings.TrimRight(string(data), "\r\n")
-		case len(args) == 2:
-			value = args[1]
-		default:
-			fmt.Println("❌ No value given. Pass it as an argument or use --stdin")
-			os.Exit(1)
+			if value == "" {
+				fmt.Println("❌ Nothing arrived on stdin. Redirect a file into it, " +
+					"or run the command at a terminal to be prompted")
+				os.Exit(1)
+			}
 		}
 
 		if value == "" {
@@ -192,7 +220,7 @@ var configEnvUnsetCmd = &cobra.Command{
 
 func init() {
 	configEnvListCmd.Flags().Bool("show", false, "Print values in full instead of masking them")
-	configEnvSetCmd.Flags().Bool("stdin", false, "Read the value from stdin instead of an argument")
+	configEnvSetCmd.Flags().Bool("stdin", false, "Read the value from a pipe or file on stdin (at a terminal you are prompted anyway)")
 
 	configEnvCmd.AddCommand(configEnvListCmd)
 	configEnvCmd.AddCommand(configEnvSetCmd)
