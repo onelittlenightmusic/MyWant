@@ -13,9 +13,9 @@ levels:
     color: "#3b82f6"
     accent: "#1d4ed8"
     unlocked: false         # opens once the green belt is promoted
-    kata: [kata-yado, kata-jou, kata-hi]
+    kata: [kata-yado, kata-jou, kata-tsuu, kata-hi, kata-matsuri]
     promotion:
-      requiredKata: 2       # 2 of 3 to be promoted
+      requiredKata: 2       # 2 of 5 to be promoted (two of them are 口伝)
 
 kata:
   # No join — neither hotel nor budget has a place parameter.
@@ -53,11 +53,33 @@ kata:
       shoden: { vocabulary: ["Last time's record is attached automatically"] }
       kaiden: { autonomy: ["It suggests when you are about due to go again"], vocabulary: ["The difference from last time is shown"] }
 
+  # 常's twin on the occasion side: 常 is the same route travelled again, 通 is
+  # the same occasion come round again. Also hidden — being a regular is not a
+  # thing you set out to do, it is a thing you notice you have become.
+  - id: kata-tsuu
+    name: 通
+    reading: tsuu
+    level: level-4
+    order: 3
+    intent: Hold 券 for three different occasions
+    yields: What you paid and how it went last time rides along with the next one
+    hidden: true            # not listed in advance; it only shows itself once held
+    contains: [kata-ken]
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: repeat, kata: kata-ken, minCount: 3 }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["Last time's ticket is attached automatically"] }
+      kaiden:
+        autonomy: ["The next time it comes round, the watch is already set"]
+        vocabulary: ["The difference from last time is shown"]
+
   - id: kata-hi
     name: 日
     reading: hi
     level: level-4
-    order: 3
+    order: 4
     intent: Lay all three green-belt kata over one destination
     yields: Umbrella, departure time and total cost on a single sheet
     contains: [kata-kasa, kata-koku, kata-zeni]
@@ -73,3 +95,27 @@ kata:
     unlocks:
       shoden: { vocabulary: ["The day at that destination comes together on one sheet"] }
       kaiden: { shortcuts: ["One word for the destination raises all of it", "Only the summary is left to read"] }
+
+  # 日's twin: the same bundling move, but over an occasion. It is 詣 with the
+  # sky added, which is exactly 傘 laid on top — so the belt's rule holds, a
+  # kata containing kata.
+  - id: kata-matsuri
+    name: 祭
+    reading: matsuri
+    level: level-4
+    order: 5
+    intent: Lay a forecast over the occasion you are already travelling to
+    yields: Umbrella, departure and doors on a single sheet
+    contains: [kata-mode, kata-kasa]
+    join: { kind: memo_group }
+    waza:
+      - { kind: memo, subtype: event }
+      - { kind: memo, subtype: station }
+      - { kind: memo, subtype: city }
+      - { kind: want_type, type: event_ticket, join: event }
+      - { kind: want_type, type: transit_search, join: to }
+      - { kind: want_type, type: weather, join: weather_city }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { vocabulary: ["The day at that occasion comes together on one sheet"] }
+      kaiden: { shortcuts: ["One word for the occasion raises all of it", "Only the summary is left to read"] }

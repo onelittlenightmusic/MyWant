@@ -16,7 +16,7 @@ levels:
     color: "#d4d4d8"       # the belt's own colour
     accent: "#0f766e"      # ink for marks — a white belt's colour is too pale to use
     unlocked: true          # the first belt is always open
-    kata: [kata-eki, kata-shi, kata-shirube, kata-kin]
+    kata: [kata-eki, kata-shi, kata-shirube, kata-moyoshi, kata-kin]
     promotion:
       requiredKata: 3       # 3 of 4 to be promoted
 
@@ -63,6 +63,23 @@ kata:
       shoden: { vocabulary: ["Places can be referred to by name"] }
       kaiden: { vocabulary: ["Your own map takes shape"] }
 
+  # An occasion is a place and a time bundled into one named thing, so naming it
+  # is the same move as naming a station — which is why it belongs on this belt
+  # and not on one of its own.
+  - id: kata-moyoshi
+    name: 催
+    reading: moyoshi
+    level: level-1
+    order: 4
+    intent: Give an occasion a name
+    yields: A date on the calendar becomes something a want can be aimed at
+    waza:
+      - { kind: memo, subtype: event }
+    mastery: { shoden: 1, kaiden: 3 }
+    unlocks:
+      shoden: { shortcuts: ["Pick an occasion instead of typing it"] }
+      kaiden: { vocabulary: ["The occasions you go to take shape as a list"] }
+
   # The belt's capstone — the kata that builds the join itself. It does not say
   # the two values share a name; it says they stand near enough to count as one
   # place, which is a judgement only the user can make.
@@ -71,7 +88,7 @@ kata:
     name: 近
     reading: kin
     level: level-1
-    order: 4
+    order: 5
     intent: Put a station and a city that stand near each other into one memo group
     yields: Wants naming either of them are taken to be about the same area
     contains: [kata-eki, kata-shi]
