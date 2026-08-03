@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"testing"
 
 	mywant "mywant/engine/core"
@@ -67,27 +68,42 @@ func TestMemoCatalogKey(t *testing.T) {
 	}
 }
 
-// The chain is what keeps four stars from turning into a blot: one link per
-// neighbour, memo values first, never a complete graph.
-func TestKataEdgesChainsMembers(t *testing.T) {
+// A constellation hangs off its memo values: they chain to each other, and each
+// want spokes off the value it names. Two wants are never joined — they share a
+// place, not a thread.
+func TestKataEdgesSpokesFromMemo(t *testing.T) {
 	s := &Server{}
 	edges := s.kataEdges([]string{"cities::Kokubunji", "stations::国分寺"}, []string{"want-a", "want-b"})
 
+	// No want is named by a param here (there is no builder), so both fall back
+	// to the first memo value: one memo↔memo link plus one spoke per want.
 	if len(edges) != 3 {
-		t.Fatalf("edges = %d, want 3 for four members", len(edges))
+		t.Fatalf("edges = %d, want 3", len(edges))
 	}
-	expect := [][2]string{
-		{"cities::Kokubunji", "stations::国分寺"},
-		{"stations::国分寺", "want-a"},
-		{"want-a", "want-b"},
+	if edges[0].From != "cities::Kokubunji" || edges[0].To != "stations::国分寺" {
+		t.Errorf("first edge = %s→%s, want the memo chain", edges[0].From, edges[0].To)
 	}
-	for i, e := range edges {
-		if e.From != expect[i][0] || e.To != expect[i][1] {
-			t.Errorf("edge %d = %s→%s, want %s→%s", i, e.From, e.To, expect[i][0], expect[i][1])
+	for _, e := range edges[1:] {
+		if e.From != "cities::Kokubunji" {
+			t.Errorf("spoke starts at %s, want the memo hub", e.From)
 		}
-		if e.Kind != "waza" {
-			t.Errorf("edge %d kind = %q, want waza (no relation exists between these)", i, e.Kind)
+	}
+	for _, e := range edges {
+		if strings.HasPrefix(e.From, "want-") && strings.HasPrefix(e.To, "want-") {
+			t.Errorf("want↔want edge %s→%s: wants share a place, not a thread", e.From, e.To)
 		}
+	}
+}
+
+// 糧 (a restaurant and a budget) declares no memo 所作, so there is no hub to
+// hang from — without a fallback its wants would light separately and read as
+// unrelated.
+func TestKataEdgesChainsWantsWithoutMemo(t *testing.T) {
+	s := &Server{}
+	edges := s.kataEdges(nil, []string{"want-a", "want-b"})
+
+	if len(edges) != 1 || edges[0].From != "want-a" || edges[0].To != "want-b" {
+		t.Errorf("edges = %+v, want the two wants chained", edges)
 	}
 }
 
