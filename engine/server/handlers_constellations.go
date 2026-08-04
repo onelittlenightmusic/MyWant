@@ -11,7 +11,7 @@ import (
 // constellationLabelPrefix is the reserved label-key prefix that expresses
 // constellation membership. A constellation named "近い" is the label
 // "constellation/近い"="true" carried by each member — a memo value (via
-// MemoLabelStore) or a want (via metadata.labels). There is no separate
+// ThingLabelStore) or a want (via metadata.labels). There is no separate
 // constellation ledger; a constellation exists exactly as long as some member
 // still carries its label.
 const constellationLabelPrefix = "constellation/"
@@ -49,17 +49,17 @@ type constellationDTO struct {
 	Members []string `json:"members"`
 }
 
-// collectMemoConstellations aggregates constellation/* labels across all memo values.
-func (s *Server) collectMemoConstellations() []constellationDTO {
+// collectThingConstellations aggregates constellation/* labels across all memo values.
+func (s *Server) collectThingConstellations() []constellationDTO {
 	byName := map[string][]string{}
-	for valueID, labels := range s.memoLabels.All() {
+	for valueID, labels := range s.thingLabels.All() {
 		for key := range labels {
 			if name := constellationNameFromKey(key); name != "" {
 				byName[name] = append(byName[name], valueID)
 			}
 		}
 	}
-	return constellationsFromMap(byName, "memo")
+	return constellationsFromMap(byName, "thing")
 }
 
 // collectWantConstellations aggregates constellation/* labels across all live wants.
@@ -103,26 +103,34 @@ func (s *Server) setConstellationMembership(kind, name, member string, add bool)
 		}
 		return
 	}
-	// memo
+	// thing
 	if add {
-		_ = s.memoLabels.Set(member, key, "true")
+		_ = s.thingLabels.Set(member, key, "true")
 	} else {
-		_ = s.memoLabels.Remove(member, key)
-		_ = s.memoLabels.Remove(member, legacyConstellationKey(name))
+		_ = s.thingLabels.Remove(member, key)
+		_ = s.thingLabels.Remove(member, legacyConstellationKey(name))
 	}
 }
 
-// GET /api/v1/constellations?kind=memo|want
+// normalizeConstellationKind accepts the pre-rename name for the thing side.
+func normalizeConstellationKind(kind string) string {
+	if kind == "memo" {
+		return "thing"
+	}
+	return kind
+}
+
+// GET /api/v1/constellations?kind=thing|want ("memo" still accepted for thing)
 func (s *Server) getConstellations(w http.ResponseWriter, r *http.Request) {
-	kind := r.URL.Query().Get("kind")
+	kind := normalizeConstellationKind(r.URL.Query().Get("kind"))
 	var groups []constellationDTO
 	switch kind {
 	case "want":
 		groups = s.collectWantConstellations()
-	case "memo":
-		groups = s.collectMemoConstellations()
+	case "thing":
+		groups = s.collectThingConstellations()
 	default:
-		groups = append(s.collectMemoConstellations(), s.collectWantConstellations()...)
+		groups = append(s.collectThingConstellations(), s.collectWantConstellations()...)
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"groups": groups})
 }
@@ -142,8 +150,9 @@ func (s *Server) createConstellation(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
 		return
 	}
-	if body.Kind != "memo" && body.Kind != "want" {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be memo or want")
+	body.Kind = normalizeConstellationKind(body.Kind)
+	if body.Kind != "thing" && body.Kind != "want" {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing or want")
 		return
 	}
 	for _, m := range body.Members {
@@ -165,8 +174,9 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
-	if body.Kind != "memo" && body.Kind != "want" {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be memo or want")
+	body.Kind = normalizeConstellationKind(body.Kind)
+	if body.Kind != "thing" && body.Kind != "want" {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing or want")
 		return
 	}
 	newName := oldName
@@ -217,7 +227,8 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteConstellation(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	kind := r.URL.Query().Get("kind")
-	if kind != "memo" && kind != "want" {
+	kind = normalizeConstellationKind(kind)
+	if kind != "thing" && kind != "want" {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind query param must be memo or want")
 		return
 	}
@@ -247,7 +258,7 @@ func (s *Server) membersOfConstellation(kind, name string) []string {
 	}
 	seen := map[string]bool{}
 	var out []string
-	for _, v := range append(s.memoLabels.ValuesWithLabel(key), s.memoLabels.ValuesWithLabel(legacy)...) {
+	for _, v := range append(s.thingLabels.ValuesWithLabel(key), s.thingLabels.ValuesWithLabel(legacy)...) {
 		if !seen[v] {
 			seen[v] = true
 			out = append(out, v)
@@ -280,12 +291,12 @@ func (e errConstellationName) Error() string { return string(e) }
 // ── Raw memo-label endpoints (general facility; groups ride on top) ──────────
 
 // GET /api/v1/memo/labels
-func (s *Server) getMemoLabels(w http.ResponseWriter, _ *http.Request) {
-	s.JSONResponse(w, http.StatusOK, map[string]any{"labels": s.memoLabels.All()})
+func (s *Server) getThingLabels(w http.ResponseWriter, _ *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{"labels": s.thingLabels.All()})
 }
 
 // POST /api/v1/memo/labels   body: {value_id, key, value}
-func (s *Server) setMemoLabel(w http.ResponseWriter, r *http.Request) {
+func (s *Server) setThingLabel(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ValueID string `json:"value_id"`
 		Key     string `json:"key"`
@@ -295,7 +306,7 @@ func (s *Server) setMemoLabel(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
-	if err := s.memoLabels.Set(body.ValueID, body.Key, body.Value); err != nil {
+	if err := s.thingLabels.Set(body.ValueID, body.Key, body.Value); err != nil {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to set memo label", err.Error())
 		return
 	}
@@ -303,7 +314,7 @@ func (s *Server) setMemoLabel(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/memo/labels/remove   body: {value_id, key}
-func (s *Server) removeMemoLabel(w http.ResponseWriter, r *http.Request) {
+func (s *Server) removeThingLabel(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		ValueID string `json:"value_id"`
 		Key     string `json:"key"`
@@ -312,7 +323,7 @@ func (s *Server) removeMemoLabel(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
-	if err := s.memoLabels.Remove(body.ValueID, body.Key); err != nil {
+	if err := s.thingLabels.Remove(body.ValueID, body.Key); err != nil {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to remove memo label", err.Error())
 		return
 	}

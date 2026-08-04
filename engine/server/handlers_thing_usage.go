@@ -9,7 +9,7 @@ import (
 // The memo↔want relation.
 //
 // It is derived, not stored: a want names a memo value exactly when one of its
-// parameters carries a subType and holds that value — the same rule MemoHook
+// parameters carries a subType and holds that value — the same rule ThingHook
 // uses to decide the value was worth remembering in the first place. Deriving it
 // on read means the relation can never drift from the wants that are actually
 // live, and deleting a want removes its edges for free.
@@ -28,16 +28,16 @@ type memoUsage struct {
 	WantIDs []string `json:"wantIDs"`
 }
 
-// getMemoUsage handles GET /api/v1/memo/usage
+// getThingUsage handles GET /api/v1/memo/usage
 //
 // Returns only values that are both remembered and currently named by a live
 // want, so a caller can show the memo alongside the wants using it.
-func (s *Server) getMemoUsage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
 	// Everything the memo actually holds, so a parameter value that was never
 	// recorded (recordMemo: false, or typed before the hook existed) does not
 	// masquerade as a memo.
 	remembered := map[string]bool{}
-	for catalog, values := range s.memoStore.All() {
+	for catalog, values := range s.thingStore.All() {
 		for _, v := range values {
 			remembered[catalog+"::"+v] = true
 		}
@@ -56,7 +56,7 @@ func (s *Server) getMemoUsage(w http.ResponseWriter, r *http.Request) {
 				if pd.SubType == "" {
 					continue
 				}
-				if pd.RecordMemo != nil && !*pd.RecordMemo {
+				if !pd.ShouldRecordThing() {
 					continue
 				}
 				str, ok := want.Spec.Params[pd.Name].(string)

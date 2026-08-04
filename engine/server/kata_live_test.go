@@ -1,6 +1,7 @@
 package server
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -15,17 +16,17 @@ func wazaWant(satisfied bool, ids ...string) WazaProgress {
 	}
 }
 
-func wazaMemo(subtype string, values ...string) WazaProgress {
+func wazaThing(subtype string, values ...string) WazaProgress {
 	return WazaProgress{
-		Waza:       mywant.Waza{Kind: "memo", Subtype: subtype},
+		Waza:       mywant.Waza{Kind: "thing", Subtype: subtype},
 		Satisfied:  true,
 		MatchedIDs: values,
 	}
 }
 
-func TestLiveEvidenceSplitsWantsFromMemo(t *testing.T) {
+func TestLiveEvidenceSplitsWantsFromThings(t *testing.T) {
 	wants, memo := liveEvidence([]WazaProgress{
-		wazaMemo("station", "国分寺"),
+		wazaThing("station", "国分寺"),
 		wazaWant(true, "want-b", "want-a"),
 	})
 
@@ -57,13 +58,13 @@ func TestLiveEvidenceIgnoresUnsatisfiedAndRepeat(t *testing.T) {
 }
 
 func TestMemoCatalogKey(t *testing.T) {
-	if got := memoCatalogKey("station"); got != "stations" {
+	if got := thingCatalogKey("station"); got != "stations" {
 		t.Errorf("station → %q, want stations", got)
 	}
-	if got := memoCatalogKey("city"); got != "cities" {
+	if got := thingCatalogKey("city"); got != "cities" {
 		t.Errorf("city → %q, want cities (the catalog key, not a naive plural)", got)
 	}
-	if got := memoCatalogKey("madeup"); got != "madeups" {
+	if got := thingCatalogKey("madeup"); got != "madeups" {
 		t.Errorf("unknown type → %q, want the naive plural", got)
 	}
 }
@@ -135,5 +136,56 @@ func TestKataLabelFingerprintStable(t *testing.T) {
 	c := map[string]map[string]string{"want-a": {"kata/kata-kasa": "中野"}}
 	if kataLabelFingerprint(a) == kataLabelFingerprint(c) {
 		t.Error("a different constellation must change the fingerprint")
+	}
+}
+
+// A value in no constellation stands as its own scope, so a form that points one
+// want at one remembered value holds without anyone building a group of one.
+// A value already in a constellation does NOT also stand alone — it would be
+// measured twice and bank two practices for a single piece of evidence.
+func TestCollectKataGroupsGivesLoneValuesTheirOwnScope(t *testing.T) {
+	dir := t.TempDir()
+	store := &ThingStore{path: filepath.Join(dir, "memo.yaml")}
+	labels := &ThingLabelStore{path: filepath.Join(dir, "memo-labels.yaml")}
+
+	for _, v := range []string{"国分寺", "新宿"} {
+		if err := store.Record("station", v); err != nil {
+			t.Fatalf("record: %v", err)
+		}
+	}
+	if err := store.Record("city", "Kokubunji"); err != nil {
+		t.Fatalf("record: %v", err)
+	}
+	// 国分寺 and Kokubunji are declared one place; 新宿 is left alone.
+	for _, m := range []string{"stations::国分寺", "cities::Kokubunji"} {
+		if err := labels.Set(m, "constellation/国分寺", "true"); err != nil {
+			t.Fatalf("label: %v", err)
+		}
+	}
+
+	s := &Server{thingStore: store, thingLabels: labels}
+	byName := map[string]thingScope{}
+	for _, g := range s.collectKataGroups() {
+		byName[g.Name] = g
+	}
+
+	joined, ok := byName["国分寺"]
+	if !ok || joined.Lone {
+		t.Fatalf("the constellation should be a scope in its own right, got %+v", joined)
+	}
+	if !joined.has("station") || !joined.has("city") {
+		t.Errorf("the constellation should hold both kinds: %+v", joined.BySubtype)
+	}
+
+	lone, ok := byName["新宿"]
+	if !ok {
+		t.Fatal("an ungrouped value should stand as its own scope")
+	}
+	if !lone.Lone || !lone.has("station") || lone.has("city") {
+		t.Errorf("a lone scope holds exactly its one value: %+v", lone)
+	}
+
+	if _, duplicated := byName["Kokubunji"]; duplicated {
+		t.Error("a value inside a constellation must not also stand alone")
 	}
 }

@@ -245,20 +245,24 @@ func (s *Server) setupRoutes() {
 	states.HandleFunc("/{id}/{key}", s.deleteWantStateKey).Methods("DELETE")
 	states.HandleFunc("/{id}/{key}", s.handleOptions).Methods("OPTIONS")
 
-	// Memo API (user input history per subtype)
-	memo := api.PathPrefix("/memo").Subrouter()
-	memo.HandleFunc("", s.getMemo).Methods("GET", "OPTIONS")
-	memo.HandleFunc("", s.putMemo).Methods("PUT", "OPTIONS")
-	memo.HandleFunc("/subtypes", s.getMemoSubtypes).Methods("GET", "OPTIONS")
-	memo.HandleFunc("/events", s.getMemoEvents).Methods("GET", "OPTIONS")
-	// Which live wants are naming which remembered values — derived on read.
-	memo.HandleFunc("/usage", s.getMemoUsage).Methods("GET", "OPTIONS")
-	memo.HandleFunc("/stats", s.getMemoStats).Methods("GET", "OPTIONS")
-	memo.HandleFunc("/suggestions/{subtype}", s.getMemoSuggestions).Methods("GET", "OPTIONS")
-	// Per-memo-value labels (general facility; groups ride on group/* keys)
-	memo.HandleFunc("/labels", s.getMemoLabels).Methods("GET", "OPTIONS")
-	memo.HandleFunc("/labels", s.setMemoLabel).Methods("POST")
-	memo.HandleFunc("/labels/remove", s.removeMemoLabel).Methods("POST", "OPTIONS")
+	// Things API (the values a user has named, per subtype). /memo stays
+	// registered as the pre-rename alias so an older client keeps working.
+	for _, prefix := range []string{"/things", "/memo"} {
+		things := api.PathPrefix(prefix).Subrouter()
+		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")
+		things.HandleFunc("", s.putThings).Methods("PUT", "OPTIONS")
+		things.HandleFunc("/subtypes", s.getThingSubtypes).Methods("GET", "OPTIONS")
+		things.HandleFunc("/events", s.getThingEvents).Methods("GET", "OPTIONS")
+		// Which live wants are naming which things — derived on read.
+		things.HandleFunc("/usage", s.getThingUsage).Methods("GET", "OPTIONS")
+		things.HandleFunc("/stats", s.getThingStats).Methods("GET", "OPTIONS")
+		things.HandleFunc("/suggestions/{subtype}", s.getThingSuggestions).Methods("GET", "OPTIONS")
+		// Per-thing labels (general facility; constellations ride on
+		// constellation/* keys)
+		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
+		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
+		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
+	}
 
 	// Constellations API (label-backed facade: constellation/<name> labels on
 	// memo values / wants). /groups stays registered as the pre-rename alias so

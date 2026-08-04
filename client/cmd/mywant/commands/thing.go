@@ -23,32 +23,37 @@ import (
 // Global state, which this command used to manage, now lives under
 // "mywant state global".
 
-var MemoCmd = &cobra.Command{
-	Use:     "memo",
-	Aliases: []string{"m"},
-	Short:   "Manage the memo catalog (remembered input values)",
-	Long: `Manage memo: the catalog of values the user has entered, keyed by subtype.
+var ThingCmd = &cobra.Command{
+	Use: "thing",
+	// "memo" is what this was called; it keeps working so a habit or a script
+	// does not break on a rename.
+	Aliases: []string{"things", "t", "memo", "m"},
+	Short:   "Manage things (the values you have named)",
+	Long: `Manage things: the values you have named, keyed by subtype.
+
+A thing is not a note about something — it is the something: a station, a
+city, an occasion. Wants point at them, and kata are about them.
 
 Examples:
-  mywant memo list
-  mywant memo get destination
-  mywant memo add destination Kyoto Osaka
-  mywant memo remove destination Osaka
-  mywant memo events --catalog destination --value Kyoto
-  mywant memo stats
-  mywant memo label cities::Kyoto favourite true
-  mywant memo constellations list`,
+  mywant thing list
+  mywant thing get destination
+  mywant thing add destination Kyoto Osaka
+  mywant thing remove destination Osaka
+  mywant thing events --catalog destination --value Kyoto
+  mywant thing stats
+  mywant thing label cities::Kyoto favourite true
+  mywant thing constellations list`,
 }
 
 // ─── catalog ───────────────────────────────────────────────────────────────
 
-var memoListCmd = &cobra.Command{
+var thingListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"l"},
 	Short:   "List every subtype and its recorded values",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		memo, err := memoClient().GetMemo()
+		memo, err := memoClient().GetThings()
 		if err != nil {
 			exitErr("listing memo", err)
 		}
@@ -72,7 +77,7 @@ var memoListCmd = &cobra.Command{
 	},
 }
 
-var memoGetCmd = &cobra.Command{
+var thingGetCmd = &cobra.Command{
 	Use:               "get <catalog|subtype>",
 	Aliases:           []string{"g", "show"},
 	Short:             "Show the values recorded under one catalog key, newest first",
@@ -99,7 +104,7 @@ var memoGetCmd = &cobra.Command{
 	},
 }
 
-var memoAddCmd = &cobra.Command{
+var thingAddCmd = &cobra.Command{
 	Use:               "add <subtype> <value>...",
 	Short:             "Add values to a subtype",
 	Args:              cobra.MinimumNArgs(2),
@@ -108,7 +113,7 @@ var memoAddCmd = &cobra.Command{
 		subtype, values := args[0], args[1:]
 		c := memoClient()
 
-		memo, err := c.GetMemo()
+		memo, err := c.GetThings()
 		if err != nil {
 			exitErr("reading memo", err)
 		}
@@ -128,14 +133,14 @@ var memoAddCmd = &cobra.Command{
 			fmt.Println("Nothing to add; all values are already recorded.")
 			return
 		}
-		if err := c.PutMemo(memo); err != nil {
+		if err := c.PutThings(memo); err != nil {
 			exitErr("saving memo", err)
 		}
 		fmt.Printf("Added %d value(s) to %s.\n", added, subtype)
 	},
 }
 
-var memoRemoveCmd = &cobra.Command{
+var thingRemoveCmd = &cobra.Command{
 	Use:               "remove <subtype> [value]...",
 	Aliases:           []string{"rm", "delete"},
 	Short:             "Remove values from a subtype, or the whole subtype",
@@ -145,7 +150,7 @@ var memoRemoveCmd = &cobra.Command{
 		subtype, values := args[0], args[1:]
 		c := memoClient()
 
-		memo, err := c.GetMemo()
+		memo, err := c.GetThings()
 		if err != nil {
 			exitErr("reading memo", err)
 		}
@@ -156,7 +161,7 @@ var memoRemoveCmd = &cobra.Command{
 
 		if len(values) == 0 {
 			delete(memo, subtype)
-			if err := c.PutMemo(memo); err != nil {
+			if err := c.PutThings(memo); err != nil {
 				exitErr("saving memo", err)
 			}
 			fmt.Printf("Removed subtype %s.\n", subtype)
@@ -177,7 +182,7 @@ var memoRemoveCmd = &cobra.Command{
 			return
 		}
 		memo[subtype] = kept
-		if err := c.PutMemo(memo); err != nil {
+		if err := c.PutThings(memo); err != nil {
 			exitErr("saving memo", err)
 		}
 		fmt.Printf("Removed %d value(s) from %s.\n", removed, subtype)
@@ -186,7 +191,7 @@ var memoRemoveCmd = &cobra.Command{
 
 // ─── provenance ────────────────────────────────────────────────────────────
 
-var memoEventsCmd = &cobra.Command{
+var thingEventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Show where memo values came from, newest first",
 	Args:  cobra.NoArgs,
@@ -195,7 +200,7 @@ var memoEventsCmd = &cobra.Command{
 		catalog, _ := cmd.Flags().GetString("catalog")
 		value, _ := cmd.Flags().GetString("value")
 
-		events, err := memoClient().GetMemoEvents(catalog, value, limit)
+		events, err := memoClient().GetThingEvents(catalog, value, limit)
 		if err != nil {
 			exitErr("reading memo events", err)
 		}
@@ -222,12 +227,12 @@ var memoEventsCmd = &cobra.Command{
 	},
 }
 
-var memoStatsCmd = &cobra.Command{
+var thingStatsCmd = &cobra.Command{
 	Use:   "stats",
 	Short: "Show how often each memo value is used",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		stats, err := memoClient().GetMemoStats()
+		stats, err := memoClient().GetThingStats()
 		if err != nil {
 			exitErr("reading memo stats", err)
 		}
@@ -257,13 +262,13 @@ var memoStatsCmd = &cobra.Command{
 
 // ─── labels ────────────────────────────────────────────────────────────────
 
-var memoLabelsCmd = &cobra.Command{
+var thingLabelsCmd = &cobra.Command{
 	Use:     "labels",
 	Short:   "List labels attached to memo values",
 	Args:    cobra.NoArgs,
 	Aliases: []string{"label-list"},
 	Run: func(cmd *cobra.Command, args []string) {
-		labels, err := memoClient().GetMemoLabels()
+		labels, err := memoClient().GetThingLabels()
 		if err != nil {
 			exitErr("reading memo labels", err)
 		}
@@ -290,7 +295,7 @@ var memoLabelsCmd = &cobra.Command{
 	},
 }
 
-var memoLabelCmd = &cobra.Command{
+var thingLabelCmd = &cobra.Command{
 	Use:   "label <catalog::value> <key> [value]",
 	Short: "Attach a label to a memo value (omit the label value to remove it)",
 	Args:  cobra.RangeArgs(2, 3),
@@ -299,13 +304,13 @@ var memoLabelCmd = &cobra.Command{
 		c := memoClient()
 
 		if len(args) == 2 {
-			if err := c.RemoveMemoLabel(valueID, key); err != nil {
+			if err := c.RemoveThingLabel(valueID, key); err != nil {
 				exitErr("removing memo label", err)
 			}
 			fmt.Printf("Removed label %s from %s.\n", key, valueID)
 			return
 		}
-		if err := c.SetMemoLabel(valueID, key, args[2]); err != nil {
+		if err := c.SetThingLabel(valueID, key, args[2]); err != nil {
 			exitErr("setting memo label", err)
 		}
 		fmt.Printf("Set %s=%s on %s.\n", key, args[2], valueID)
@@ -314,15 +319,15 @@ var memoLabelCmd = &cobra.Command{
 
 // ─── constellations ────────────────────────────────────────────────────────────────
 
-var memoConstellationsCmd = &cobra.Command{
+var thingConstellationsCmd = &cobra.Command{
 	Use:   "constellations",
 	Short: "Manage constellations of memo values or wants",
 	Long: `Constellations are named sets stored as "constellation/<name>" labels on memo values or wants.
 
 Examples:
-  mywant memo constellations list
-  mywant memo constellations create favourites --kind memo --member cities::Kyoto
-  mywant memo constellations delete favourites --kind memo`,
+  mywant thing constellations list
+  mywant thing constellations create favourites --kind memo --member cities::Kyoto
+  mywant thing constellations delete favourites --kind memo`,
 }
 
 var memoConstellationsListCmd = &cobra.Command{
@@ -415,13 +420,13 @@ var memoConstellationsDeleteCmd = &cobra.Command{
 // memoValues reads one catalog. "memo list" prints catalog keys (stations),
 // while the suggestions API is keyed by data subtype (station), so accept both.
 func memoValues(name string, limit int) ([]string, error) {
-	memo, err := memoClient().GetMemo()
+	memo, err := memoClient().GetThings()
 	if err != nil {
 		return nil, err
 	}
 	values, ok := memo[name]
 	if !ok {
-		return memoClient().GetMemoSuggestions(name, limit)
+		return memoClient().GetThingSuggestions(name, limit)
 	}
 	if limit > 0 && len(values) > limit {
 		values = values[:limit]
@@ -437,7 +442,7 @@ func completeMemoSubtypes(cmd *cobra.Command, args []string, toComplete string) 
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	memo, err := memoClient().GetMemo()
+	memo, err := memoClient().GetThings()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -484,15 +489,15 @@ func dashIfEmpty(s string) string {
 }
 
 func init() {
-	memoListCmd.Flags().Bool("json", false, "Output as JSON")
-	memoGetCmd.Flags().Bool("json", false, "Output as JSON")
-	memoGetCmd.Flags().Int("limit", 20, "Maximum number of values")
-	memoEventsCmd.Flags().Bool("json", false, "Output as JSON")
-	memoEventsCmd.Flags().Int("limit", 200, "Maximum number of events")
-	memoEventsCmd.Flags().String("catalog", "", "Filter to one subtype (requires --value)")
-	memoEventsCmd.Flags().String("value", "", "Filter to one value (requires --catalog)")
-	memoStatsCmd.Flags().Bool("json", false, "Output as JSON")
-	memoLabelsCmd.Flags().Bool("json", false, "Output as JSON")
+	thingListCmd.Flags().Bool("json", false, "Output as JSON")
+	thingGetCmd.Flags().Bool("json", false, "Output as JSON")
+	thingGetCmd.Flags().Int("limit", 20, "Maximum number of values")
+	thingEventsCmd.Flags().Bool("json", false, "Output as JSON")
+	thingEventsCmd.Flags().Int("limit", 200, "Maximum number of events")
+	thingEventsCmd.Flags().String("catalog", "", "Filter to one subtype (requires --value)")
+	thingEventsCmd.Flags().String("value", "", "Filter to one value (requires --catalog)")
+	thingStatsCmd.Flags().Bool("json", false, "Output as JSON")
+	thingLabelsCmd.Flags().Bool("json", false, "Output as JSON")
 
 	memoConstellationsListCmd.Flags().Bool("json", false, "Output as JSON")
 	memoConstellationsListCmd.Flags().String("kind", "", "Only memo or want groups")
@@ -503,18 +508,18 @@ func init() {
 	memoConstellationsUpdateCmd.Flags().StringArray("member", nil, "Replacement member id, repeatable")
 	memoConstellationsDeleteCmd.Flags().String("kind", "memo", "Group kind: memo or want")
 
-	memoConstellationsCmd.AddCommand(memoConstellationsListCmd)
-	memoConstellationsCmd.AddCommand(memoConstellationsCreateCmd)
-	memoConstellationsCmd.AddCommand(memoConstellationsUpdateCmd)
-	memoConstellationsCmd.AddCommand(memoConstellationsDeleteCmd)
+	thingConstellationsCmd.AddCommand(memoConstellationsListCmd)
+	thingConstellationsCmd.AddCommand(memoConstellationsCreateCmd)
+	thingConstellationsCmd.AddCommand(memoConstellationsUpdateCmd)
+	thingConstellationsCmd.AddCommand(memoConstellationsDeleteCmd)
 
-	MemoCmd.AddCommand(memoListCmd)
-	MemoCmd.AddCommand(memoGetCmd)
-	MemoCmd.AddCommand(memoAddCmd)
-	MemoCmd.AddCommand(memoRemoveCmd)
-	MemoCmd.AddCommand(memoEventsCmd)
-	MemoCmd.AddCommand(memoStatsCmd)
-	MemoCmd.AddCommand(memoLabelsCmd)
-	MemoCmd.AddCommand(memoLabelCmd)
-	MemoCmd.AddCommand(memoConstellationsCmd)
+	ThingCmd.AddCommand(thingListCmd)
+	ThingCmd.AddCommand(thingGetCmd)
+	ThingCmd.AddCommand(thingAddCmd)
+	ThingCmd.AddCommand(thingRemoveCmd)
+	ThingCmd.AddCommand(thingEventsCmd)
+	ThingCmd.AddCommand(thingStatsCmd)
+	ThingCmd.AddCommand(thingLabelsCmd)
+	ThingCmd.AddCommand(thingLabelCmd)
+	ThingCmd.AddCommand(thingConstellationsCmd)
 }

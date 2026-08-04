@@ -175,23 +175,23 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 	// record that name in the memo under its kind, so every name you give shows
 	// up as a reusable suggestion alongside the ones wants record automatically.
 	if !target.IsBinding() && req.Value != nil && req.Value != "" {
-		if err := s.memoStore.Record(target.Kind, target.Name); err != nil {
+		if err := s.thingStore.Record(target.Kind, target.Name); err != nil {
 			mywant.WarnLog("[aura] failed to record memo %s=%q: %v", target.Kind, target.Name, err)
 		}
-		s.recordMemoEvent(target.Kind, target.Name, MemoSourceAuraDefinition, req.WantID, c)
+		s.recordThingEvent(target.Kind, target.Name, ThingSourceAuraDefinition, req.WantID, c)
 	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
-// recordMemoEvent appends a memo provenance event for a value named via an aura
+// recordThingEvent appends a memo provenance event for a value named via an aura
 // (a catalog definition or a card X-name). subtype is the catalog kind; wantID,
 // when present, is resolved to its want name/type. A nil event store is a no-op.
-func (s *Server) recordMemoEvent(subtype, value, source, wantID string, c *mywant.Character) {
-	if s.memoEvents == nil || value == "" {
+func (s *Server) recordThingEvent(subtype, value, source, wantID string, c *mywant.Character) {
+	if s.thingEvents == nil || value == "" {
 		return
 	}
-	ev := MemoEvent{
+	ev := ThingEvent{
 		Catalog: subtypeToKey(subtype),
 		Subtype: subtype,
 		Value:   value,
@@ -207,7 +207,7 @@ func (s *Server) recordMemoEvent(subtype, value, source, wantID string, c *mywan
 			ev.WantType = want.Metadata.Type
 		}
 	}
-	_ = s.memoEvents.Record(ev)
+	_ = s.thingEvents.Record(ev)
 }
 
 // setCharacterAuraCardWant sets (or, with an empty wantId, clears) the want a
@@ -302,10 +302,10 @@ func (s *Server) cardAuraName(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
-	if err := s.memoStore.Record(kind, name); err != nil {
+	if err := s.thingStore.Record(kind, name); err != nil {
 		mywant.WarnLog("[aura] failed to record memo %s=%q: %v", kind, name, err)
 	}
-	s.recordMemoEvent(kind, name, MemoSourceCardName, req.WantID, c)
+	s.recordThingEvent(kind, name, MemoSourceCardName, req.WantID, c)
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"character": c, "kind": kind, "name": name})
 }

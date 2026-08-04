@@ -21,24 +21,23 @@ func init() {
 	_ = yaml.Unmarshal(datatypesYAML, &dataTypeDefs)
 }
 
-// MemoStore persists user-entered values to ~/.mywant/memo.yaml, grouped by subtype.
+// ThingStore persists user-entered values to ~/.mywant/memo.yaml, grouped by subtype.
 // Thread-safe; reads and writes are serialised via a mutex.
-type MemoStore struct {
+type ThingStore struct {
 	path string
 	mu   sync.Mutex
 }
 
-// memoData is the on-disk YAML schema.
+// thingData is the on-disk YAML schema.
 // Each subtype key maps to a deduplicated list of recorded values.
-type memoData map[string][]string
+type thingData map[string][]string
 
-func newMemoStore() *MemoStore {
-	home, _ := os.UserHomeDir()
-	return &MemoStore{path: filepath.Join(home, ".mywant", "memo.yaml")}
+func newThingStore() *ThingStore {
+	return &ThingStore{path: thingPath("thing.yaml")}
 }
 
-func (m *MemoStore) load() (memoData, error) {
-	data := make(memoData)
+func (m *ThingStore) load() (thingData, error) {
+	data := make(thingData)
 	bytes, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
 		return data, nil
@@ -50,7 +49,7 @@ func (m *MemoStore) load() (memoData, error) {
 	return data, nil
 }
 
-func (m *MemoStore) save(data memoData) error {
+func (m *ThingStore) save(data thingData) error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
 		return err
 	}
@@ -62,7 +61,7 @@ func (m *MemoStore) save(data memoData) error {
 }
 
 // Record adds value to the list for subtype, deduplicating and capping at 100 entries.
-func (m *MemoStore) Record(subtype, value string) error {
+func (m *ThingStore) Record(subtype, value string) error {
 	if subtype == "" || value == "" {
 		return nil
 	}
@@ -92,7 +91,7 @@ func (m *MemoStore) Record(subtype, value string) error {
 }
 
 // Suggestions returns up to limit recorded values for subtype, most-recent first.
-func (m *MemoStore) Suggestions(subtype string, limit int) []string {
+func (m *ThingStore) Suggestions(subtype string, limit int) []string {
 	if subtype == "" {
 		return nil
 	}
@@ -111,7 +110,7 @@ func (m *MemoStore) Suggestions(subtype string, limit int) []string {
 }
 
 // Replace overwrites the entire memo with the provided data.
-func (m *MemoStore) Replace(data memoData) error {
+func (m *ThingStore) Replace(data thingData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.save(data)
@@ -119,7 +118,7 @@ func (m *MemoStore) Replace(data memoData) error {
 
 // GetCategory returns all values stored under the given category key directly
 // (no subtype mapping applied). Implements core.MemoReader.
-func (m *MemoStore) GetCategory(key string) []string {
+func (m *ThingStore) GetCategory(key string) []string {
 	if key == "" {
 		return nil
 	}
@@ -136,7 +135,7 @@ func (m *MemoStore) GetCategory(key string) []string {
 }
 
 // All returns the full memo data as-is from disk.
-func (m *MemoStore) All() memoData {
+func (m *ThingStore) All() thingData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, _ := m.load()
@@ -144,7 +143,7 @@ func (m *MemoStore) All() memoData {
 }
 
 // AllSubtypes returns all known subtype keys sorted alphabetically.
-func (m *MemoStore) AllSubtypes() []string {
+func (m *ThingStore) AllSubtypes() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, _ := m.load()

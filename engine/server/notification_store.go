@@ -36,7 +36,7 @@ type NotificationEntry struct {
 }
 
 // NotificationStore appends notices to ~/.mywant/notifications.yaml.
-// Mirrors MemoEventStore: load-modify-save under a mutex, newest last on disk,
+// Mirrors ThingEventStore: load-modify-save under a mutex, newest last on disk,
 // readers reverse for most-recent-first. Thread-safe.
 type NotificationStore struct {
 	path string

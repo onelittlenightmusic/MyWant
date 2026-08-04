@@ -67,10 +67,10 @@ make release                                        # Build CLI only
 ./bin/mywant --context fly custom install owner/repo   # installs on the remote server (API)
 ./bin/mywant --context local custom list               # act on this machine
 
-# Memo (remembered input values) / worlds / global state
-./bin/mywant memo list|get|add|remove|events|stats|labels|label|groups
+# Things (the values you have named) / worlds / global state
+./bin/mywant thing list|get|add|remove|events|stats|labels|label|groups
 ./bin/mywant world list|open|save|export|import        # named snapshots of all wants
-./bin/mywant state global get|set|delete|clear         # moved here from `memo`
+./bin/mywant state global get|set|delete|clear         # moved here from `thing`
 
 # System
 ./bin/mywant types/agents/capabilities list

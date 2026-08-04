@@ -36,7 +36,7 @@ wantType:
       description: OpenWeatherMap API key. Falls back to OPENWEATHERMAP_API_KEY env var. If absent, uses wttr.in.
       type: string
       subType: secret
-      recordMemo: false
+      recordThing: false
       required: false
       default: ""
 
@@ -53,7 +53,7 @@ wantType:
       description: OpenWeatherMap API key (copied from param)
       type: string
       subType: secret
-      recordMemo: false
+      recordThing: false
       persistent: false
       label: current
       initialValue: ''

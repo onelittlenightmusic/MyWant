@@ -67,7 +67,7 @@ func main() {
 
 	rootCmd.AddCommand(commands.ConfigCmd)
 
-	rootCmd.AddCommand(commands.MemoCmd)
+	rootCmd.AddCommand(commands.ThingCmd)
 
 	rootCmd.AddCommand(commands.ParamsCmd)
 
