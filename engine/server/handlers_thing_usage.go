@@ -56,7 +56,7 @@ func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
 				if pd.SubType == "" {
 					continue
 				}
-				if pd.RecordMemo != nil && !*pd.RecordMemo {
+				if !pd.ShouldRecordThing() {
 					continue
 				}
 				str, ok := want.Spec.Params[pd.Name].(string)

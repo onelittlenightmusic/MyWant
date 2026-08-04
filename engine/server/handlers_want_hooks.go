@@ -115,7 +115,7 @@ func (h *ThingHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) e
 			continue
 		}
 		// Skip if recordMemo is explicitly false.
-		if pd.RecordMemo != nil && !*pd.RecordMemo {
+		if !pd.ShouldRecordThing() {
 			continue
 		}
 		val, ok := want.Spec.Params[pd.Name]

@@ -1371,7 +1371,7 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 			if def.SubType == "" {
 				continue
 			}
-			if def.RecordMemo != nil && !*def.RecordMemo {
+			if !def.ShouldRecordThing() {
 				continue
 			}
 			val, ok := body.Parameters[def.Name]
