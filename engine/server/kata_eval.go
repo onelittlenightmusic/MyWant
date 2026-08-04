@@ -10,12 +10,12 @@ import (
 
 // Kata evaluation.
 //
-// Progress is computed on demand from live data — deployed wants, the memo store
+// Progress is computed on demand from live data — deployed wants, the thing store
 // and past practice records — so "どこが足りないか" is always current without a
 // background loop. The only thing written back is a practice record, the moment a
 // kata is found 極まった for a set of witnesses it has not been credited for yet.
 //
-// A kata that declares a join is evaluated once per memo group: its 所作 must all
+// A kata that declares a join is evaluated once per scope: its 所作 must all
 // resolve inside the SAME group, which is how two wants are known to be about the
 // same place. Nothing here looks at time or order — a kata is a set of wants that
 // belong together, never a schedule.
@@ -26,7 +26,7 @@ type WazaProgress struct {
 	Satisfied bool        `json:"satisfied"`
 	Have      int         `json:"have"`
 	Need      int         `json:"need"`
-	// MatchedIDs are the want IDs (or memo values) that satisfied this waza.
+	// MatchedIDs are the want IDs (or things) that satisfied this waza.
 	MatchedIDs []string `json:"matchedIDs,omitempty"`
 	// Hint is what the user would have to do to satisfy it, in one short phrase.
 	Hint string `json:"hint,omitempty"`
@@ -43,8 +43,9 @@ type KataProgress struct {
 	Yields    string   `json:"yields,omitempty"`
 	Contains  []string `json:"contains,omitempty"`
 	Variation string   `json:"variation,omitempty"`
-	// Group is the memo group this standing was measured against — the shared
-	// thing the 所作 are all about. Empty for kata that declare no join.
+	// Group is the scope this standing was measured against — the shared thing
+	// the 所作 are all about, whether a constellation or a single value standing
+	// on its own. Empty for kata that declare no join.
 	Group string `json:"group,omitempty"`
 	// Constellation is Group under the name the rest of the system uses for it.
 	Constellation string `json:"constellation,omitempty"`
@@ -62,10 +63,10 @@ type KataProgress struct {
 	// Recorded: it has been 極まった at least once before. Live and Recorded are
 	// independent — either can hold without the other.
 	Recorded bool `json:"recorded"`
-	// The live evidence itself: want ids, and memo values as "catalogKey::value"
+	// The live evidence itself: want ids, and things as "catalogKey::value"
 	// so they match the member ids constellations are made of.
 	LiveWantIDs []string `json:"liveWantIDs,omitempty"`
-	LiveMemo    []string `json:"liveMemo,omitempty"`
+	LiveThings    []string `json:"liveThings,omitempty"`
 	// AlmostThere marks あと一所作 — the only moment a kata is allowed to speak up.
 	AlmostThere bool `json:"almostThere"`
 
@@ -110,7 +111,7 @@ type thingScope struct {
 // has reports whether the group holds a value of this subtype.
 func (g *thingScope) has(subtype string) bool { return len(g.BySubtype[subtype]) > 0 }
 
-// collectKataGroups builds every scope a joined kata can be measured in.
+// collectKataScopes builds every scope a joined kata can be measured in.
 //
 // A constellation is one scope: the values the user has declared to be one
 // thing. But grouping is only ever needed to tie DIFFERENT values together —
@@ -125,7 +126,7 @@ func (g *thingScope) has(subtype string) bool { return len(g.BySubtype[subtype])
 //
 // Members arrive as "catalogKey::value" (e.g. "stations::<name>"), so the catalog
 // key is mapped back to its data type name.
-func (s *Server) collectKataGroups() []thingScope {
+func (s *Server) collectKataScopes() []thingScope {
 	keyToSubtype := make(map[string]string, len(dataTypeDefs))
 	for name, info := range dataTypeDefs {
 		// First declaration wins: several subtypes share a key (int/integer),
@@ -224,7 +225,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			wantsByType[w.Metadata.Type] = append(wantsByType[w.Metadata.Type], w)
 		}
 	}
-	groups := s.collectKataGroups()
+	groups := s.collectKataScopes()
 
 	// ── Belts first, from the records already on disk ─────────────────────────
 	// Which belts are open has to be settled before anything is evaluated:
@@ -285,7 +286,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			// The witnesses would draw the form on the canvas as plainly as the
 			// 所作 list would spell it out.
 			p.LiveWantIDs = nil
-			p.LiveMemo = nil
+			p.LiveThings = nil
 			p.Unlocks = nil
 			// The name and its reading name the form as surely as its 所作 do,
 			// so they are withheld too — only the ID and the count of 所作 ship.
@@ -310,7 +311,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 	return levelProgress, out, recorded
 }
 
-// evaluateOneKata scores every variation, against every memo group when the kata
+// evaluateOneKata scores every variation, against every scope when the kata
 // declares a join, and returns the closest standing.
 // Practice is only credited when the kata's belt is open.
 func (s *Server) evaluateOneKata(
@@ -362,7 +363,7 @@ func (s *Server) evaluateOneKata(
 			}
 			total := len(henka.Waza)
 			complete := total > 0 && satisfied == total
-			liveWants, liveMemo := liveEvidence(wazaProgress)
+			liveWants, liveThings := liveEvidence(wazaProgress)
 			best = KataProgress{
 				KataID:      k.ID,
 				Name:        k.Name,
@@ -378,9 +379,9 @@ func (s *Server) evaluateOneKata(
 				Satisfied:     satisfied,
 				Total:         total,
 				Complete:      complete,
-				Live:          complete && len(liveWants)+len(liveMemo) > 0,
+				Live:          complete && len(liveWants)+len(liveThings) > 0,
 				LiveWantIDs:   liveWants,
-				LiveMemo:      liveMemo,
+				LiveThings:      liveThings,
 				AlmostThere:   total > 1 && satisfied == total-1,
 				Thresholds:  k.Mastery,
 				Unlocks:     k.Unlocks,
@@ -415,13 +416,13 @@ func (s *Server) evaluateOneKata(
 }
 
 // liveEvidence splits what satisfied a standing into the two kinds of thing that
-// can be drawn: wants on the board, and memo values.
+// can be drawn: wants on the board, and things.
 //
 // `repeat` 所作 contribute nothing — they are satisfied out of the record book,
 // and a record has no position to draw at.
 //
-// Memo values come back as "catalogKey::value" so they match the member ids used
-// by constellations and by the memo tiles on the canvas.
+// Things come back as "catalogKey::value" so they match the member ids used
+// by constellations and by the thing tiles on the canvas.
 func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
 	seenWant := map[string]bool{}
 	seenMemo := map[string]bool{}
@@ -453,7 +454,7 @@ func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
 	return wantIDs, memoIDs
 }
 
-// thingCatalogKey maps a data type name to the memo.yaml section it is stored
+// thingCatalogKey maps a data type name to the thing.yaml section it is stored
 // under ("station" → "stations"), falling back to the naive plural.
 func thingCatalogKey(subtype string) string {
 	if info, ok := dataTypeDefs[subtype]; ok && info.Key != "" {
@@ -488,7 +489,7 @@ func paramString(w *mywant.Want, name string) string {
 }
 
 // evaluateWaza scores a single 所作. When scope is non-nil the waza is being
-// measured inside one memo group, and anything joined must resolve there.
+// measured inside one scope, and anything joined must resolve there.
 func (s *Server) evaluateWaza(
 	wz mywant.Waza,
 	wantsByType map[string][]*mywant.Want,
@@ -525,7 +526,7 @@ func (s *Server) evaluateWaza(
 
 	case "thing":
 		if scope != nil {
-			// Inside a join, a memo 所作 asks whether the group holds a value of
+			// Inside a join, a thing 所作 asks whether the group holds a value of
 			// this subtype — that is what makes the group name one thing.
 			for v := range scope.BySubtype[wz.Subtype] {
 				wp.MatchedIDs = append(wp.MatchedIDs, v)
@@ -546,7 +547,7 @@ func (s *Server) evaluateWaza(
 			}
 			break
 		}
-		// Ungrouped: a plain count over the whole memo store. Witnesses are the
+		// Ungrouped: a plain count over the whole thing store. Witnesses are the
 		// values themselves, so naming one more counts as a fresh practice.
 		values := s.thingStore.GetCategory(subtypeToKey(wz.Subtype))
 		wp.Have = len(values)
