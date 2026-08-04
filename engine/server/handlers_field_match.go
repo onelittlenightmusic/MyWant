@@ -51,21 +51,21 @@ type ImportAction struct {
 
 // FieldRef describes the source field.
 type FieldRef struct {
-	WantID      string `json:"want_id"`
-	WantName    string `json:"want_name"`
+	WantID   string `json:"want_id"`
+	WantName string `json:"want_name"`
 	// WantType lets a caller draw the provider's icon: with several wants
 	// offering the same field name, the name alone does not say which is which.
-	WantType    string `json:"want_type,omitempty"`
+	WantType string `json:"want_type,omitempty"`
 	// CurrentValue is what the field holds right now. A recommendation carries
 	// the field NAME as its param value (that is how the expose wiring reads),
 	// which tells a person nothing — this is what to show them.
 	CurrentValue any    `json:"current_value,omitempty"`
-	FieldName   string `json:"field_name"`
-	FieldType   string `json:"field_type"`          // runtime type: "array", "string", "number", "bool", "object"
-	DataType    string `json:"data_type,omitempty"` // semantic type from want type def: "weather", "date", "url", etc.
-	Label       string `json:"label"`               // "current", "plan", "goal", or "" (unlabeled)
-	IsFinal     bool   `json:"is_final"`            // true if this is the want type's finalResultField
-	IsExposable bool   `json:"is_exposable"`        // true if the want type declares exposable: true for this field
+	FieldName    string `json:"field_name"`
+	FieldType    string `json:"field_type"`          // runtime type: "array", "string", "number", "bool", "object"
+	DataType     string `json:"data_type,omitempty"` // semantic type from want type def: "weather", "date", "url", etc.
+	Label        string `json:"label"`               // "current", "plan", "goal", or "" (unlabeled)
+	IsFinal      bool   `json:"is_final"`            // true if this is the want type's finalResultField
+	IsExposable  bool   `json:"is_exposable"`        // true if the want type declares exposable: true for this field
 }
 
 // ParamRef describes the target parameter to be written.
@@ -118,6 +118,28 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 			return
 		}
 		targetWant = &mywant.Want{Metadata: mywant.Metadata{Type: targetType, Name: targetType}}
+	}
+
+	// A named remembered value asks a different question from a want: not "what
+	// could flow from there to here", but "does this want have somewhere to put
+	// this". A thing is a literal — it exposes nothing and imports nothing — so
+	// none of the provider machinery below applies, and the answer is complete
+	// on its own.
+	if thingID := r.URL.Query().Get("source_thing"); thingID != "" {
+		catalog, value, ok := strings.Cut(thingID, "::")
+		if !ok || catalog == "" || value == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "source_thing must be catalog::value", thingID)
+			return
+		}
+		recs := computeThingValueRecommendations(s, targetWant, catalog, value)
+		sort.Slice(recs, func(i, j int) bool { return recs[i].Score > recs[j].Score })
+		s.JSONResponse(w, http.StatusOK, map[string]any{
+			"source_thing":    thingID,
+			"target_id":       targetID,
+			"target_type":     targetType,
+			"recommendations": recs,
+		})
+		return
 	}
 
 	// With no source named, every deployed want is a candidate provider — that is
@@ -229,8 +251,11 @@ func (s *Server) resolveSourceByType(wantType string) *mywant.Want {
 // Both modes can be combined in one request.
 func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		SourceID     string        `json:"source_id"`
-		SourceType   string        `json:"source_type"`
+		SourceID   string `json:"source_id"`
+		SourceType string `json:"source_type"`
+		// SourceThing names a remembered value (catalog::value) instead of a
+		// want. A literal has nothing to expose, so it only ever writes a param.
+		SourceThing string `json:"source_thing"`
 		// SourceField names the field to connect from. Its presence is what
 		// asks for a connection rather than a plain value write.
 		SourceField  string        `json:"source_field"`
@@ -254,8 +279,11 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 			req.SourceID = sw.Metadata.ID
 		}
 	}
-	if req.SourceID == "" {
-		s.JSONError(w, r, http.StatusBadRequest, "source_id or source_type is required", "")
+	// A remembered value is a literal: there is no provider to publish a field,
+	// so the write to the target is the whole of the action.
+	fromThing := req.SourceThing != ""
+	if req.SourceID == "" && !fromThing {
+		s.JSONError(w, r, http.StatusBadRequest, "source_id, source_type or source_thing is required", "")
 		return
 	}
 	if req.ParamChange == nil && req.ExposeAction == nil && req.ImportAction == nil {
@@ -263,9 +291,11 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		return
 	}
 	// Validate that source want exists.
-	if _, _, ok := s.globalBuilder.FindWantByID(req.SourceID); !ok {
-		s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", req.SourceID), "")
-		return
+	if !fromThing {
+		if _, _, ok := s.globalBuilder.FindWantByID(req.SourceID); !ok {
+			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", req.SourceID), "")
+			return
+		}
 	}
 
 	result := map[string]any{
@@ -514,11 +544,11 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 			WantType:     want.Metadata.Type,
 			CurrentValue: v,
 			FieldName:    k,
-			FieldType:   fieldType,
-			DataType:    fieldDataTypes[k],
-			Label:       stateLabelString(effective),
-			IsFinal:     k == finalField,
-			IsExposable: exposableFields[k],
+			FieldType:    fieldType,
+			DataType:     fieldDataTypes[k],
+			Label:        stateLabelString(effective),
+			IsFinal:      k == finalField,
+			IsExposable:  exposableFields[k],
 		})
 	}
 
@@ -681,6 +711,70 @@ func computeStateParamRecommendations(s *Server, source, target *mywant.Want, al
 				},
 			})
 		}
+	}
+	return recs
+}
+
+// computeThingValueRecommendations answers for one remembered value what the
+// parameters of one want could do with it.
+//
+// The board asks this when a thing is set down beside a want. Where
+// computeMemoRecommendations offers a parameter its best few candidates, this
+// starts from the value and looks for somewhere to put it — the same match
+// (a parameter's subtype against the catalogue the value lives in), read from
+// the other end.
+//
+// A parameter that already holds a value is still offered, scored below an
+// empty one. Setting a thing down next to a want is a deliberate act, and
+// "replace what is in `from` with this station" is exactly what it usually
+// means; refusing to say so would make the gesture silently do nothing.
+func computeThingValueRecommendations(s *Server, target *mywant.Want, catalog, value string) []FieldMatchRecommendation {
+	if target == nil {
+		return nil
+	}
+	def := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type)
+	if def == nil {
+		return nil
+	}
+	var recs []FieldMatchRecommendation
+	for _, p := range def.Parameters {
+		// The parameter names a subtype; the value lives in that subtype's
+		// catalogue or in another one, and only the first is a match.
+		if p.SubType == "" || subtypeToKey(p.SubType) != catalog {
+			continue
+		}
+		current, has := target.Spec.Params[p.Name]
+		if has && current == value {
+			continue // already exactly this — nothing to offer
+		}
+		filled := has && current != nil && current != ""
+		score := 0.95
+		description := fmt.Sprintf("Use %s %q for %s", p.SubType, value, p.Name)
+		if filled {
+			score = 0.6
+			description = fmt.Sprintf("Replace %s with %s %q", p.Name, p.SubType, value)
+		}
+		recs = append(recs, FieldMatchRecommendation{
+			Score:       score,
+			Description: description,
+			Source: FieldRef{
+				WantName:  "thing",
+				FieldName: p.SubType,
+				FieldType: "string",
+				DataType:  p.SubType,
+				Label:     "thing",
+			},
+			Target: ParamRef{
+				WantID:    target.Metadata.ID,
+				WantName:  target.Metadata.Name,
+				ParamName: p.Name,
+			},
+			ParamChange: ParamChange{
+				WantID:    target.Metadata.ID,
+				ParamName: p.Name,
+				Value:     value,
+			},
+		})
 	}
 	return recs
 }
