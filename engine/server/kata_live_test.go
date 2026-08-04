@@ -69,7 +69,7 @@ func TestMemoCatalogKey(t *testing.T) {
 	}
 }
 
-// A constellation hangs off its memo values: they chain to each other, and each
+// A constellation hangs off its things: they chain to each other, and each
 // want spokes off the value it names. Two wants are never joined — they share a
 // place, not a thread.
 func TestKataEdgesSpokesFromMemo(t *testing.T) {
@@ -77,7 +77,7 @@ func TestKataEdgesSpokesFromMemo(t *testing.T) {
 	edges := s.kataEdges([]string{"cities::Kokubunji", "stations::国分寺"}, []string{"want-a", "want-b"})
 
 	// No want is named by a param here (there is no builder), so both fall back
-	// to the first memo value: one memo↔memo link plus one spoke per want.
+	// to the first thing: one thing↔thing link plus one spoke per want.
 	if len(edges) != 3 {
 		t.Fatalf("edges = %d, want 3", len(edges))
 	}
@@ -96,7 +96,7 @@ func TestKataEdgesSpokesFromMemo(t *testing.T) {
 	}
 }
 
-// 糧 (a restaurant and a budget) declares no memo 所作, so there is no hub to
+// 糧 (a restaurant and a budget) declares no thing 所作, so there is no hub to
 // hang from — without a fallback its wants would light separately and read as
 // unrelated.
 func TestKataEdgesChainsWantsWithoutMemo(t *testing.T) {
@@ -143,7 +143,7 @@ func TestKataLabelFingerprintStable(t *testing.T) {
 // want at one remembered value holds without anyone building a group of one.
 // A value already in a constellation does NOT also stand alone — it would be
 // measured twice and bank two practices for a single piece of evidence.
-func TestCollectKataGroupsGivesLoneValuesTheirOwnScope(t *testing.T) {
+func TestCollectKataScopesGivesLoneValuesTheirOwnScope(t *testing.T) {
 	dir := t.TempDir()
 	store := &ThingStore{path: filepath.Join(dir, "memo.yaml")}
 	labels := &ThingLabelStore{path: filepath.Join(dir, "memo-labels.yaml")}
@@ -165,7 +165,7 @@ func TestCollectKataGroupsGivesLoneValuesTheirOwnScope(t *testing.T) {
 
 	s := &Server{thingStore: store, thingLabels: labels}
 	byName := map[string]thingScope{}
-	for _, g := range s.collectKataGroups() {
+	for _, g := range s.collectKataScopes() {
 		byName[g.Name] = g
 	}
 
