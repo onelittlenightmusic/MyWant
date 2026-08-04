@@ -8,27 +8,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// MemoLabelStore gives memo values the metadata (labels) that memo.yaml itself
+// ThingLabelStore gives memo values the metadata (labels) that memo.yaml itself
 // can't hold — memo.yaml is just catalogKey → []value, with no per-value slot.
 // Labels are keyed by a memo value id ("catalogKey::value") and are a plain
 // key→value string map, mirroring a want's metadata.labels. Groups ride on top
 // of this via the reserved "group/<name>"="true" convention (see the /groups
 // facade in handlers_groups.go). Thread-safe; persisted to ~/.mywant/memo-labels.yaml.
-type MemoLabelStore struct {
+type ThingLabelStore struct {
 	path string
 	mu   sync.Mutex
 }
 
-// memoLabelData is the on-disk YAML schema: value id → labels.
-type memoLabelData map[string]map[string]string
+// thingLabelData is the on-disk YAML schema: value id → labels.
+type thingLabelData map[string]map[string]string
 
-func newMemoLabelStore() *MemoLabelStore {
-	home, _ := os.UserHomeDir()
-	return &MemoLabelStore{path: filepath.Join(home, ".mywant", "memo-labels.yaml")}
+func newThingLabelStore() *ThingLabelStore {
+	return &ThingLabelStore{path: thingPath("thing-labels.yaml")}
 }
 
-func (m *MemoLabelStore) load() (memoLabelData, error) {
-	data := make(memoLabelData)
+func (m *ThingLabelStore) load() (thingLabelData, error) {
+	data := make(thingLabelData)
 	bytes, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
 		return data, nil
@@ -38,12 +37,12 @@ func (m *MemoLabelStore) load() (memoLabelData, error) {
 	}
 	_ = yaml.Unmarshal(bytes, &data)
 	if data == nil {
-		data = make(memoLabelData)
+		data = make(thingLabelData)
 	}
 	return data, nil
 }
 
-func (m *MemoLabelStore) save(data memoLabelData) error {
+func (m *ThingLabelStore) save(data thingLabelData) error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
 		return err
 	}
@@ -55,7 +54,7 @@ func (m *MemoLabelStore) save(data memoLabelData) error {
 }
 
 // All returns a deep copy of every value's labels.
-func (m *MemoLabelStore) All() map[string]map[string]string {
+func (m *ThingLabelStore) All() map[string]map[string]string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, _ := m.load()
@@ -71,7 +70,7 @@ func (m *MemoLabelStore) All() map[string]map[string]string {
 }
 
 // Get returns a value's labels (copy), or an empty map.
-func (m *MemoLabelStore) Get(valueID string) map[string]string {
+func (m *ThingLabelStore) Get(valueID string) map[string]string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, _ := m.load()
@@ -83,7 +82,7 @@ func (m *MemoLabelStore) Get(valueID string) map[string]string {
 }
 
 // Set adds/updates one label on a value.
-func (m *MemoLabelStore) Set(valueID, key, value string) error {
+func (m *ThingLabelStore) Set(valueID, key, value string) error {
 	if valueID == "" || key == "" {
 		return nil
 	}
@@ -101,7 +100,7 @@ func (m *MemoLabelStore) Set(valueID, key, value string) error {
 }
 
 // Remove deletes one label from a value, pruning the value entry when empty.
-func (m *MemoLabelStore) Remove(valueID, key string) error {
+func (m *ThingLabelStore) Remove(valueID, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, err := m.load()
@@ -118,7 +117,7 @@ func (m *MemoLabelStore) Remove(valueID, key string) error {
 }
 
 // ValuesWithLabel returns the value ids carrying the given label key.
-func (m *MemoLabelStore) ValuesWithLabel(key string) []string {
+func (m *ThingLabelStore) ValuesWithLabel(key string) []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	data, _ := m.load()

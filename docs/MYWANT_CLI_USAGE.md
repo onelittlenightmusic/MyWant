@@ -61,7 +61,7 @@ Most commands have short versions for convenience.
 | | `deploy` | `d` | Deploy recommendation |
 | | `end` | `e` | End session |
 | | `shell` | `sh` | Interactive shell |
-| `memo` | - | `m` | Manage the memo catalog |
+| `thing` | `things` | `t`, `memo`, `m` | Manage things (the values you have named) |
 | | `list` | `l` | List catalogs and their values |
 | | `get` | `g` | Show values of one catalog |
 | | `add` / `remove` | `rm` | Add or remove values |
@@ -355,7 +355,7 @@ Explore available types and agents.
 ./bin/mywant l
 ```
 
-### Memo (remembered input values)
+### Things (the values you have named)
 
 Memo is the catalog of values the user has entered, keyed by catalog (`stations`,
 `cities`, ...). Wants record what was typed; the server keeps provenance
@@ -363,32 +363,32 @@ Memo is the catalog of values the user has entered, keyed by catalog (`stations`
 
 ```bash
 # カタログ一覧と値
-./bin/mywant memo list
-./bin/mywant memo get stations --limit 5
+./bin/mywant thing list
+./bin/mywant thing get stations --limit 5
 
-# 値の追加・削除（PUT /api/v1/memo の read-modify-write）
-./bin/mywant memo add stations 渋谷 新宿
-./bin/mywant memo remove stations 新宿      # 値を削除
-./bin/mywant memo remove stations           # カタログごと削除
+# 値の追加・削除（PUT /api/v1/things の read-modify-write）
+./bin/mywant thing add stations 渋谷 新宿
+./bin/mywant thing remove stations 新宿      # 値を削除
+./bin/mywant thing remove stations           # カタログごと削除
 
 # どこから来た値か / どれだけ使われたか
-./bin/mywant memo events --limit 20
-./bin/mywant memo events --catalog cities --value Kokubunji
-./bin/mywant memo stats
+./bin/mywant thing events --limit 20
+./bin/mywant thing events --catalog cities --value Kokubunji
+./bin/mywant thing stats
 
 # 値ラベル（値の識別子は <catalog>::<value>）
-./bin/mywant memo labels
-./bin/mywant memo label cities::Kyoto favourite true
-./bin/mywant memo label cities::Kyoto favourite      # 値を省略すると削除
+./bin/mywant thing labels
+./bin/mywant thing label cities::Kyoto favourite true
+./bin/mywant thing label cities::Kyoto favourite      # 値を省略すると削除
 
-# グループ（"group/<name>" ラベルのファサード。memo 値と want の両方に使える）
-./bin/mywant memo groups list
-./bin/mywant memo groups create favourites --kind memo --member cities::Kyoto
-./bin/mywant memo groups update favourites --kind memo --name faves
-./bin/mywant memo groups delete faves --kind memo
+# グループ（"group/<name>" ラベルのファサード。thing と want の両方に使える）
+./bin/mywant thing groups list
+./bin/mywant thing groups create favourites --kind thing --member cities::Kyoto
+./bin/mywant thing groups update favourites --kind thing --name faves
+./bin/mywant thing groups delete faves --kind thing
 ```
 
-> **Note:** 以前の `mywant memo get` / `memo clear` は**グローバル状態**を操作していました。
+> **Note:** 以前の `mywant memo get` / `memo clear`（現 `thing`）は**グローバル状態**を操作していました。
 > グローバル状態は `mywant state global` に移動し、`memo` は memo API を扱うようになりました。
 
 ### Global State

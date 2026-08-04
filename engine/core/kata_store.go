@@ -38,7 +38,7 @@ const (
 //
 // Kind determines which fields matter:
 //   - want_type: Type (+ Status, Count) — that many wants of this type reached Status
-//   - memo:      Subtype (+ MinCount)   — remembered values of this subtype
+//   - thing:     Subtype (+ MinCount)   — remembered things of this subtype
 //   - repeat:    Kata (+ MinCount)      — another kata was 極まった that many times
 type Waza struct {
 	Kind string `yaml:"kind" json:"kind"`
@@ -48,7 +48,7 @@ type Waza struct {
 	Status string `yaml:"status,omitempty" json:"status,omitempty"`
 	Count  int    `yaml:"count,omitempty"  json:"count,omitempty"`
 
-	// memo
+	// thing
 	Subtype string `yaml:"subtype,omitempty" json:"subtype,omitempty"`
 
 	// repeat
@@ -280,11 +280,31 @@ func (m *kataManager) saveRecords() {
 
 // ── Definitions ───────────────────────────────────────────────────────────────
 
+// normalizeWazaKinds accepts the pre-rename name for a 所作 that asks for a
+// remembered value. A kata file written by hand — or one that predates Things
+// being called Things — still says `kind: memo`, and it means the same form.
+func normalizeWazaKinds(kata []Kata) {
+	fix := func(waza []Waza) {
+		for i := range waza {
+			if waza[i].Kind == "memo" {
+				waza[i].Kind = "thing"
+			}
+		}
+	}
+	for i := range kata {
+		fix(kata[i].Waza)
+		for j := range kata[i].Henka {
+			fix(kata[i].Henka[j].Waza)
+		}
+	}
+}
+
 // addDefinitions merges one parsed seed file, replacing same-ID entries so an
 // edited YAML always wins over what a previous file declared.
 func (m *kataManager) addDefinitions(cfg kataConfigFile) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	normalizeWazaKinds(cfg.Kata)
 	n := 0
 	for _, lv := range cfg.Levels {
 		replaced := false

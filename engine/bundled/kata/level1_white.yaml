@@ -29,7 +29,7 @@ kata:
     intent: Give a station a name
     yields: That station appears as a destination suggestion
     waza:
-      - { kind: memo, subtype: station }
+      - { kind: thing, subtype: station }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a destination instead of typing it"] }
@@ -43,7 +43,7 @@ kata:
     intent: Give a city a name
     yields: That city appears as a forecast target suggestion
     waza:
-      - { kind: memo, subtype: city }
+      - { kind: thing, subtype: city }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a city instead of typing it"] }
@@ -57,7 +57,7 @@ kata:
     intent: Give a point on the map a name
     yields: A coordinate becomes something you can call "home" or "the office"
     waza:
-      - { kind: memo, subtype: place }
+      - { kind: thing, subtype: place }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Places can be referred to by name"] }
@@ -74,7 +74,7 @@ kata:
     intent: Give an occasion a name
     yields: A date on the calendar becomes something a want can be aimed at
     waza:
-      - { kind: memo, subtype: event }
+      - { kind: thing, subtype: event }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick an occasion instead of typing it"] }
@@ -92,10 +92,10 @@ kata:
     intent: Put a station and a city that stand near each other into one memo group
     yields: Wants naming either of them are taken to be about the same area
     contains: [kata-eki, kata-shi]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: station }
-      - { kind: memo, subtype: city }
+      - { kind: thing, subtype: station }
+      - { kind: thing, subtype: city }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The two values count as one area"] }

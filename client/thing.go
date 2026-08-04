@@ -10,8 +10,8 @@ import (
 // from (events) and how often it is used (stats), and lets values be labelled -
 // constellations are a facade over labels with a "constellation/<name>" key.
 
-// MemoEvent is one provenance entry: a value was recorded or used.
-type MemoEvent struct {
+// ThingEvent is one provenance entry: a value was recorded or used.
+type ThingEvent struct {
 	At      string `json:"at"` // RFC3339
 	Catalog string `json:"catalog"`
 	Subtype string `json:"subtype"`
@@ -38,23 +38,23 @@ type Constellation struct {
 	Members []string `json:"members"`
 }
 
-// GetMemo returns every subtype and its recorded values.
-func (c *Client) GetMemo() (map[string][]string, error) {
+// GetThings returns every subtype and its recorded values.
+func (c *Client) GetThings() (map[string][]string, error) {
 	var result map[string][]string
-	if err := c.Request("GET", "/api/v1/memo", nil, &result); err != nil {
+	if err := c.Request("GET", "/api/v1/things", nil, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-// PutMemo replaces the whole memo catalog.
-func (c *Client) PutMemo(memo map[string][]string) error {
-	return c.Request("PUT", "/api/v1/memo", memo, nil)
+// PutThings replaces the whole memo catalog.
+func (c *Client) PutThings(memo map[string][]string) error {
+	return c.Request("PUT", "/api/v1/things", memo, nil)
 }
 
-// GetMemoSuggestions returns the values recorded for one subtype, newest first.
-func (c *Client) GetMemoSuggestions(subtype string, limit int) ([]string, error) {
-	path := fmt.Sprintf("/api/v1/memo/suggestions/%s", url.PathEscape(subtype))
+// GetThingSuggestions returns the values recorded for one subtype, newest first.
+func (c *Client) GetThingSuggestions(subtype string, limit int) ([]string, error) {
+	path := fmt.Sprintf("/api/v1/things/suggestions/%s", url.PathEscape(subtype))
 	if limit > 0 {
 		path += fmt.Sprintf("?limit=%d", limit)
 	}
@@ -68,9 +68,9 @@ func (c *Client) GetMemoSuggestions(subtype string, limit int) ([]string, error)
 	return result.Suggestions, nil
 }
 
-// GetMemoEvents returns memo provenance events, newest first. When catalog and
+// GetThingEvents returns memo provenance events, newest first. When catalog and
 // value are both set the log is narrowed to that one value.
-func (c *Client) GetMemoEvents(catalog, value string, limit int) ([]MemoEvent, error) {
+func (c *Client) GetThingEvents(catalog, value string, limit int) ([]ThingEvent, error) {
 	query := url.Values{}
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
@@ -79,13 +79,13 @@ func (c *Client) GetMemoEvents(catalog, value string, limit int) ([]MemoEvent, e
 		query.Set("catalog", catalog)
 		query.Set("value", value)
 	}
-	path := "/api/v1/memo/events"
+	path := "/api/v1/things/events"
 	if encoded := query.Encode(); encoded != "" {
 		path += "?" + encoded
 	}
 
 	var result struct {
-		Events []MemoEvent `json:"events"`
+		Events []ThingEvent `json:"events"`
 	}
 	if err := c.Request("GET", path, nil, &result); err != nil {
 		return nil, err
@@ -93,38 +93,38 @@ func (c *Client) GetMemoEvents(catalog, value string, limit int) ([]MemoEvent, e
 	return result.Events, nil
 }
 
-// GetMemoStats returns per-value usage counts keyed by catalog, then value.
-func (c *Client) GetMemoStats() (map[string]map[string]MemoStat, error) {
+// GetThingStats returns per-value usage counts keyed by catalog, then value.
+func (c *Client) GetThingStats() (map[string]map[string]MemoStat, error) {
 	var result struct {
 		Stats map[string]map[string]MemoStat `json:"stats"`
 	}
-	if err := c.Request("GET", "/api/v1/memo/stats", nil, &result); err != nil {
+	if err := c.Request("GET", "/api/v1/things/stats", nil, &result); err != nil {
 		return nil, err
 	}
 	return result.Stats, nil
 }
 
-// GetMemoLabels returns every label attached to memo values, keyed by value id.
-func (c *Client) GetMemoLabels() (map[string]map[string]string, error) {
+// GetThingLabels returns every label attached to memo values, keyed by value id.
+func (c *Client) GetThingLabels() (map[string]map[string]string, error) {
 	var result struct {
 		Labels map[string]map[string]string `json:"labels"`
 	}
-	if err := c.Request("GET", "/api/v1/memo/labels", nil, &result); err != nil {
+	if err := c.Request("GET", "/api/v1/things/labels", nil, &result); err != nil {
 		return nil, err
 	}
 	return result.Labels, nil
 }
 
-// SetMemoLabel attaches key=value to a memo value, identified as "<catalog>::<value>".
-func (c *Client) SetMemoLabel(valueID, key, value string) error {
+// SetThingLabel attaches key=value to a memo value, identified as "<catalog>::<value>".
+func (c *Client) SetThingLabel(valueID, key, value string) error {
 	body := map[string]string{"value_id": valueID, "key": key, "value": value}
-	return c.Request("POST", "/api/v1/memo/labels", body, nil)
+	return c.Request("POST", "/api/v1/things/labels", body, nil)
 }
 
-// RemoveMemoLabel detaches a label key from a memo value.
-func (c *Client) RemoveMemoLabel(valueID, key string) error {
+// RemoveThingLabel detaches a label key from a memo value.
+func (c *Client) RemoveThingLabel(valueID, key string) error {
 	body := map[string]string{"value_id": valueID, "key": key}
-	return c.Request("POST", "/api/v1/memo/labels/remove", body, nil)
+	return c.Request("POST", "/api/v1/things/labels/remove", body, nil)
 }
 
 // GetConstellations lists constellations. kind is "memo", "want", or "" for both.

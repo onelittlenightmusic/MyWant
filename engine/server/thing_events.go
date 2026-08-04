@@ -12,17 +12,17 @@ import (
 
 // Memo event sources — how a value came to be recorded in the memo.
 const (
-	MemoSourceWantParam      = "want-param"      // a want parameter with a subType (MemoHook)
-	MemoSourceAuraDefinition = "aura-definition" // a catalog definition named via aura-defaults
+	MemoSourceWantParam      = "want-param"      // a want parameter with a subType (ThingHook)
+	ThingSourceAuraDefinition = "aura-definition" // a catalog definition named via aura-defaults
 	MemoSourceCardName       = "card-name"       // pressing X on a card to name its final result
 )
 
 // maxMemoEvents caps the on-disk event log. Oldest events are dropped first.
 const maxMemoEvents = 2000
 
-// MemoEvent is one provenance record: a named value entering (or re-entering)
+// ThingEvent is one provenance record: a named value entering (or re-entering)
 // the memo, with when it happened and which want / character produced it.
-type MemoEvent struct {
+type ThingEvent struct {
 	At      string `json:"at"      yaml:"at"`      // RFC3339 timestamp
 	Catalog string `json:"catalog" yaml:"catalog"` // memo.yaml section key, e.g. "places"
 	Subtype string `json:"subtype" yaml:"subtype"` // data subtype/kind, e.g. "place"
@@ -36,30 +36,29 @@ type MemoEvent struct {
 	CharacterName string `json:"characterName,omitempty" yaml:"characterName,omitempty"`
 }
 
-// MemoEventStore appends provenance events to ~/.mywant/memo-events.yaml.
+// ThingEventStore appends provenance events to ~/.mywant/memo-events.yaml.
 // The memo itself (memo.yaml) only keeps the deduplicated value list; this store
 // keeps the timeline of when/where each value was named. Thread-safe.
-type MemoEventStore struct {
+type ThingEventStore struct {
 	path string
 	mu   sync.Mutex
 }
 
-func newMemoEventStore() *MemoEventStore {
-	home, _ := os.UserHomeDir()
-	return &MemoEventStore{path: filepath.Join(home, ".mywant", "memo-events.yaml")}
+func newThingEventStore() *ThingEventStore {
+	return &ThingEventStore{path: thingPath("thing-events.yaml")}
 }
 
-func (m *MemoEventStore) load() []MemoEvent {
+func (m *ThingEventStore) load() []ThingEvent {
 	bytes, err := os.ReadFile(m.path)
 	if err != nil {
 		return nil
 	}
-	var events []MemoEvent
+	var events []ThingEvent
 	_ = yaml.Unmarshal(bytes, &events)
 	return events
 }
 
-func (m *MemoEventStore) save(events []MemoEvent) error {
+func (m *ThingEventStore) save(events []ThingEvent) error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
 		return err
 	}
@@ -72,7 +71,7 @@ func (m *MemoEventStore) save(events []MemoEvent) error {
 
 // Record appends one event, stamping the time if unset. Newest events are stored
 // last on disk; readers reverse for most-recent-first.
-func (m *MemoEventStore) Record(ev MemoEvent) error {
+func (m *ThingEventStore) Record(ev ThingEvent) error {
 	if ev.Value == "" || ev.Catalog == "" {
 		return nil
 	}
@@ -91,7 +90,7 @@ func (m *MemoEventStore) Record(ev MemoEvent) error {
 }
 
 // All returns every event, most-recent first, capped at limit (0 = no cap).
-func (m *MemoEventStore) All(limit int) []MemoEvent {
+func (m *ThingEventStore) All(limit int) []ThingEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return reverseCap(m.load(), limit)
@@ -99,11 +98,11 @@ func (m *MemoEventStore) All(limit int) []MemoEvent {
 
 // ForValue returns events for one (catalog, value) pair, most-recent first,
 // capped at limit (0 = no cap).
-func (m *MemoEventStore) ForValue(catalog, value string, limit int) []MemoEvent {
+func (m *ThingEventStore) ForValue(catalog, value string, limit int) []ThingEvent {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	all := m.load()
-	filtered := make([]MemoEvent, 0)
+	filtered := make([]ThingEvent, 0)
 	for _, ev := range all {
 		if ev.Catalog == catalog && ev.Value == value {
 			filtered = append(filtered, ev)
@@ -128,7 +127,7 @@ type MemoStat struct {
 // Stats aggregates the event log into per-(catalog,value) usage counts, last use
 // time, and the top want types the value was used with. RFC3339 timestamps (same
 // local zone) sort lexicographically, so a string max gives the most recent.
-func (m *MemoEventStore) Stats() map[string]map[string]MemoStat {
+func (m *ThingEventStore) Stats() map[string]map[string]MemoStat {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -190,8 +189,8 @@ func topWantTypes(byType map[string]int, n int) []WantTypeCount {
 }
 
 // reverseCap returns src reversed (newest first) and truncated to limit.
-func reverseCap(src []MemoEvent, limit int) []MemoEvent {
-	out := make([]MemoEvent, 0, len(src))
+func reverseCap(src []ThingEvent, limit int) []ThingEvent {
+	out := make([]ThingEvent, 0, len(src))
 	for i := len(src) - 1; i >= 0; i-- {
 		out = append(out, src[i])
 		if limit > 0 && len(out) >= limit {

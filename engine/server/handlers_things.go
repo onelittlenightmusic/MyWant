@@ -10,7 +10,7 @@ import (
 // GET /api/v1/memo/suggestions/{subtype}
 // Returns recorded values for a subtype, most-recent first.
 // Query param: limit (default 20)
-func (s *Server) getMemoSuggestions(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getThingSuggestions(w http.ResponseWriter, r *http.Request) {
 	subtype := mux.Vars(r)["subtype"]
 	limit := 20
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -18,7 +18,7 @@ func (s *Server) getMemoSuggestions(w http.ResponseWriter, r *http.Request) {
 			limit = v
 		}
 	}
-	suggestions := s.memoStore.Suggestions(subtype, limit)
+	suggestions := s.thingStore.Suggestions(subtype, limit)
 	if suggestions == nil {
 		suggestions = []string{}
 	}
@@ -30,8 +30,8 @@ func (s *Server) getMemoSuggestions(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/memo
 // Returns all subtypes and their recorded values.
-func (s *Server) getMemo(w http.ResponseWriter, r *http.Request) {
-	data := s.memoStore.All()
+func (s *Server) getThings(w http.ResponseWriter, r *http.Request) {
+	data := s.thingStore.All()
 	result := make(map[string][]string, len(data))
 	for k, v := range data {
 		if v == nil {
@@ -45,7 +45,7 @@ func (s *Server) getMemo(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/memo/subtypes
 // Backward-compat alias — redirects callers to /api/v1/datatypes response shape.
-func (s *Server) getMemoSubtypes(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getThingSubtypes(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"subtypes": DataTypeDefinitions(),
 	})
@@ -54,7 +54,7 @@ func (s *Server) getMemoSubtypes(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/memo/events
 // Returns memo provenance events, most-recent first.
 // Query params: limit (default 200); catalog + value to filter to one named value.
-func (s *Server) getMemoEvents(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getThingEvents(w http.ResponseWriter, r *http.Request) {
 	limit := 200
 	if l := r.URL.Query().Get("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
@@ -64,14 +64,14 @@ func (s *Server) getMemoEvents(w http.ResponseWriter, r *http.Request) {
 	catalog := r.URL.Query().Get("catalog")
 	value := r.URL.Query().Get("value")
 
-	var events []MemoEvent
+	var events []ThingEvent
 	if catalog != "" && value != "" {
-		events = s.memoEvents.ForValue(catalog, value, limit)
+		events = s.thingEvents.ForValue(catalog, value, limit)
 	} else {
-		events = s.memoEvents.All(limit)
+		events = s.thingEvents.All(limit)
 	}
 	if events == nil {
-		events = []MemoEvent{}
+		events = []ThingEvent{}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"events": events})
 }
@@ -79,19 +79,19 @@ func (s *Server) getMemoEvents(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/memo/stats
 // Per-value usage stats (count + lastUsed), derived from the event log, keyed
 // by catalog then value.
-func (s *Server) getMemoStats(w http.ResponseWriter, r *http.Request) {
-	s.JSONResponse(w, http.StatusOK, map[string]any{"stats": s.memoEvents.Stats()})
+func (s *Server) getThingStats(w http.ResponseWriter, r *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{"stats": s.thingEvents.Stats()})
 }
 
 // PUT /api/v1/memo
 // Replaces the entire memo with the provided map[string][]string.
-func (s *Server) putMemo(w http.ResponseWriter, r *http.Request) {
+func (s *Server) putThings(w http.ResponseWriter, r *http.Request) {
 	var data map[string][]string
 	if err := DecodeRequest(r, &data); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
-	if err := s.memoStore.Replace(data); err != nil {
+	if err := s.thingStore.Replace(data); err != nil {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to save memo", err.Error())
 		return
 	}

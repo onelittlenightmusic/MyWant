@@ -52,7 +52,7 @@ func TestKataSeedsLoad(t *testing.T) {
 					t.Errorf("kata %s joins on %q but declares no join", k.ID, wz.Join)
 				}
 				switch wz.Kind {
-				case "want_type", "memo":
+				case "want_type", "thing":
 				case "repeat":
 					if !known[wz.Kata] {
 						t.Errorf("kata %s repeats unknown kata %q", k.ID, wz.Kata)

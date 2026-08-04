@@ -40,10 +40,10 @@ type Server struct {
 	httpServer           *http.Server                    // HTTP server instance
 	otelShutdown         func(context.Context) error     // OpenTelemetry shutdown hook
 	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
-	memoStore            *MemoStore                      // Persists user-entered values to ~/.mywant/memo.yaml
-	memoEvents           *MemoEventStore                 // Provenance timeline for named values (~/.mywant/memo-events.yaml)
+	thingStore            *ThingStore                      // Persists user-entered values to ~/.mywant/memo.yaml
+	thingEvents           *ThingEventStore                 // Provenance timeline for named values (~/.mywant/memo-events.yaml)
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
-	memoLabels           *MemoLabelStore                 // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
+	thingLabels           *ThingLabelStore                 // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 }
 
@@ -298,10 +298,10 @@ func New(config Config) *Server {
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
-		memoStore:            newMemoStore(),
-		memoEvents:           newMemoEventStore(),
+		thingStore:            newThingStore(),
+		thingEvents:           newThingEventStore(),
 		notifications:        newNotificationStore(),
-		memoLabels:           newMemoLabelStore(),
+		thingLabels:           newThingLabelStore(),
 		exposableFieldsCache: exposableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
@@ -314,12 +314,12 @@ func New(config Config) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
-	mywant.SetGlobalMemoReader(s.memoStore)
+	mywant.SetGlobalMemoReader(s.thingStore)
 
-	// Register MemoHook here (after New) so it can reference s.memoStore and s.globalBuilder.
-	s.wantCreationHooks = append(s.wantCreationHooks, &MemoHook{
-		memo:    s.memoStore,
-		events:  s.memoEvents,
+	// Register ThingHook here (after New) so it can reference s.thingStore and s.globalBuilder.
+	s.wantCreationHooks = append(s.wantCreationHooks, &ThingHook{
+		memo:    s.thingStore,
+		events:  s.thingEvents,
 		builder: s.globalBuilder,
 	})
 	s.setupRoutes()

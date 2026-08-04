@@ -30,10 +30,10 @@ kata:
     intent: Overlap a route and a forecast on the same destination
     yields: Rain laid over the walking legs — whether an umbrella is needed
     contains: [kata-kin, kata-ate, kata-sora]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: station }
-      - { kind: memo, subtype: city }
+      - { kind: thing, subtype: station }
+      - { kind: thing, subtype: city }
       - { kind: want_type, type: transit_search, join: to }
       - { kind: want_type, type: weather, join: weather_city }
     mastery: { shoden: 1, kaiden: 3 }
@@ -49,9 +49,9 @@ kata:
     intent: Overlap a route and a reminder on the same destination
     yields: A departure time worked backwards from when you want to arrive
     contains: [kata-ate]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: station }
+      - { kind: thing, subtype: station }
       - { kind: want_type, type: transit_search, join: to }
       - { kind: want_type, type: reminder }
     mastery: { shoden: 1, kaiden: 3 }
@@ -67,9 +67,9 @@ kata:
     intent: Overlap a route and a budget on the same destination
     yields: The fare lands in the budget, and the round trip has a total
     contains: [kata-ate]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: station }
+      - { kind: thing, subtype: station }
       - { kind: want_type, type: transit_search, join: to }
       - { kind: want_type, type: budget }
     mastery: { shoden: 1, kaiden: 3 }
@@ -85,9 +85,9 @@ kata:
     intent: Overlap a route and an arrival watch on the same destination
     yields: Arriving closes the route; falling behind redraws it
     contains: [kata-ate, kata-chaku]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: place }
+      - { kind: thing, subtype: place }
       - { kind: want_type, type: transit_search, join: to }
       - { kind: want_type, type: place_arrival, status: any, join: place }
     mastery: { shoden: 1, kaiden: 3 }
@@ -107,10 +107,10 @@ kata:
     intent: Overlap a ticket and a route on the same occasion
     yields: A departure time worked backwards from the curtain
     contains: [kata-ate, kata-ken]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: event }
-      - { kind: memo, subtype: station }
+      - { kind: thing, subtype: event }
+      - { kind: thing, subtype: station }
       - { kind: want_type, type: event_ticket, join: event }
       - { kind: want_type, type: transit_search, join: to }
     mastery: { shoden: 1, kaiden: 3 }

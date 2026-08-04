@@ -93,9 +93,9 @@ type LevelProgress struct {
 	KataIDs  []string `json:"kataIDs"`
 }
 
-// memoGroup is one scope a joined kata is measured in: a set of values taken to
+// thingScope is one scope a joined kata is measured in: a set of values taken to
 // be one thing.
-type memoGroup struct {
+type thingScope struct {
 	Name string
 	// Values that belong to the group, keyed by subtype.
 	BySubtype map[string]map[string]bool
@@ -108,7 +108,7 @@ type memoGroup struct {
 }
 
 // has reports whether the group holds a value of this subtype.
-func (g *memoGroup) has(subtype string) bool { return len(g.BySubtype[subtype]) > 0 }
+func (g *thingScope) has(subtype string) bool { return len(g.BySubtype[subtype]) > 0 }
 
 // collectKataGroups builds every scope a joined kata can be measured in.
 //
@@ -125,7 +125,7 @@ func (g *memoGroup) has(subtype string) bool { return len(g.BySubtype[subtype]) 
 //
 // Members arrive as "catalogKey::value" (e.g. "stations::<name>"), so the catalog
 // key is mapped back to its data type name.
-func (s *Server) collectKataGroups() []memoGroup {
+func (s *Server) collectKataGroups() []thingScope {
 	keyToSubtype := make(map[string]string, len(dataTypeDefs))
 	for name, info := range dataTypeDefs {
 		// First declaration wins: several subtypes share a key (int/integer),
@@ -141,11 +141,11 @@ func (s *Server) collectKataGroups() []memoGroup {
 		return strings.TrimSuffix(key, "s")
 	}
 
-	var out []memoGroup
+	var out []thingScope
 	grouped := map[string]bool{} // "catalogKey::value" already in a constellation
 
-	for _, g := range s.collectMemoConstellations() {
-		mg := memoGroup{
+	for _, g := range s.collectThingConstellations() {
+		mg := thingScope{
 			Name:      g.Name,
 			BySubtype: map[string]map[string]bool{},
 			AllValues: map[string]bool{},
@@ -169,13 +169,13 @@ func (s *Server) collectKataGroups() []memoGroup {
 	// Everything not spoken for stands alone. A value already inside a
 	// constellation is left out: it would otherwise be measured twice and bank
 	// two practices for one piece of evidence.
-	for key, values := range s.memoStore.All() {
+	for key, values := range s.thingStore.All() {
 		subtype := subtypeOf(key)
 		for _, value := range values {
 			if value == "" || grouped[key+"::"+value] {
 				continue
 			}
-			out = append(out, memoGroup{
+			out = append(out, thingScope{
 				Name:      value,
 				BySubtype: map[string]map[string]bool{subtype: {value: true}},
 				AllValues: map[string]bool{value: true},
@@ -316,7 +316,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 func (s *Server) evaluateOneKata(
 	k mywant.Kata,
 	wantsByType map[string][]*mywant.Want,
-	groups []memoGroup,
+	groups []thingScope,
 	beltOpen bool,
 ) (KataProgress, bool) {
 	var best KataProgress
@@ -324,7 +324,7 @@ func (s *Server) evaluateOneKata(
 	credited := false
 
 	// A joined kata is measured once per group; an unjoined one once, globally.
-	scopes := []*memoGroup{nil}
+	scopes := []*thingScope{nil}
 	if k.Join.Kind == "memo_group" {
 		scopes = nil
 		for i := range groups {
@@ -332,7 +332,7 @@ func (s *Server) evaluateOneKata(
 		}
 		if len(scopes) == 0 {
 			// No groups yet: still report standing so the card can say so.
-			scopes = []*memoGroup{{Name: "", BySubtype: map[string]map[string]bool{}, AllValues: map[string]bool{}}}
+			scopes = []*thingScope{{Name: "", BySubtype: map[string]map[string]bool{}, AllValues: map[string]bool{}}}
 		}
 	}
 
@@ -437,8 +437,8 @@ func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
 					wantIDs = append(wantIDs, id)
 				}
 			}
-		case "memo":
-			key := memoCatalogKey(wp.Waza.Subtype)
+		case "thing":
+			key := thingCatalogKey(wp.Waza.Subtype)
 			for _, v := range wp.MatchedIDs {
 				id := key + "::" + v
 				if !seenMemo[id] {
@@ -453,9 +453,9 @@ func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
 	return wantIDs, memoIDs
 }
 
-// memoCatalogKey maps a data type name to the memo.yaml section it is stored
+// thingCatalogKey maps a data type name to the memo.yaml section it is stored
 // under ("station" → "stations"), falling back to the naive plural.
-func memoCatalogKey(subtype string) string {
+func thingCatalogKey(subtype string) string {
 	if info, ok := dataTypeDefs[subtype]; ok && info.Key != "" {
 		return info.Key
 	}
@@ -492,7 +492,7 @@ func paramString(w *mywant.Want, name string) string {
 func (s *Server) evaluateWaza(
 	wz mywant.Waza,
 	wantsByType map[string][]*mywant.Want,
-	scope *memoGroup,
+	scope *thingScope,
 ) WazaProgress {
 	need := wz.Need()
 	wp := WazaProgress{Waza: wz, Need: need}
@@ -523,7 +523,7 @@ func (s *Server) evaluateWaza(
 			}
 		}
 
-	case "memo":
+	case "thing":
 		if scope != nil {
 			// Inside a join, a memo 所作 asks whether the group holds a value of
 			// this subtype — that is what makes the group name one thing.
@@ -548,7 +548,7 @@ func (s *Server) evaluateWaza(
 		}
 		// Ungrouped: a plain count over the whole memo store. Witnesses are the
 		// values themselves, so naming one more counts as a fresh practice.
-		values := s.memoStore.GetCategory(subtypeToKey(wz.Subtype))
+		values := s.thingStore.GetCategory(subtypeToKey(wz.Subtype))
 		wp.Have = len(values)
 		wp.MatchedIDs = append(wp.MatchedIDs, values...)
 		sort.Strings(wp.MatchedIDs)

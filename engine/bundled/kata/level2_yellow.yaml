@@ -26,9 +26,9 @@ kata:
     intent: Feed a remembered name into a route's destination
     yields: Pick the destination instead of typing it, and the route is kept against that place
     contains: [kata-eki]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: station }
+      - { kind: thing, subtype: station }
       - { kind: want_type, type: transit_search, join: to }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
@@ -43,9 +43,9 @@ kata:
     intent: Feed a remembered name into a forecast's target
     yields: Choosing a city by name is enough to pull its weather
     contains: [kata-shi]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: city }
+      - { kind: thing, subtype: city }
       - { kind: want_type, type: weather, join: weather_city }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
@@ -60,9 +60,9 @@ kata:
     intent: Feed a remembered name into the place being watched
     yields: Watch a place by name — arriving there becomes something the system knows
     contains: [kata-shirube]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: place }
+      - { kind: thing, subtype: place }
       - { kind: want_type, type: place_arrival, status: any, join: place }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
@@ -82,9 +82,9 @@ kata:
     intent: Feed a remembered occasion into a ticket watch
     yields: The moment the sale opens arrives in your hands; the buying stays yours
     contains: [kata-moyoshi]
-    join: { kind: memo_group }
+    join: { kind: thing_group }
     waza:
-      - { kind: memo, subtype: event }
+      - { kind: thing, subtype: event }
       - { kind: want_type, type: event_ticket, join: event }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:

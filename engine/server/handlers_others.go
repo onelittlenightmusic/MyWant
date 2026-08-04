@@ -1366,7 +1366,7 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	// Record memo entries for global params that have a SubType defined.
-	if s.memoStore != nil {
+	if s.thingStore != nil {
 		for _, def := range body.Definitions {
 			if def.SubType == "" {
 				continue
@@ -1382,7 +1382,7 @@ func (s *Server) updateGlobalParameters(w http.ResponseWriter, r *http.Request) 
 			if !ok || str == "" {
 				continue
 			}
-			if err := s.memoStore.Record(def.SubType, str); err != nil {
+			if err := s.thingStore.Record(def.SubType, str); err != nil {
 				mywant.WarnLog("[GlobalParams] failed to record memo %s=%q: %v", def.SubType, str, err)
 			}
 		}

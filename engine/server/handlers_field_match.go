@@ -685,8 +685,8 @@ func computeStateParamRecommendations(s *Server, source, target *mywant.Want, al
 	return recs
 }
 
-// memoRecommendationLimit caps how many remembered values one parameter offers.
-const memoRecommendationLimit = 3
+// thingRecommendationLimit caps how many remembered values one parameter offers.
+const thingRecommendationLimit = 3
 
 // computeMemoRecommendations offers values the user has already used for a
 // parameter's subtype.
@@ -699,9 +699,9 @@ const memoRecommendationLimit = 3
 //
 // Scored below a live semantic match: a value that some want is holding right
 // now beats one merely remembered, and among remembered ones the most recent
-// wins (MemoStore.Suggestions returns them newest first).
+// wins (ThingStore.Suggestions returns them newest first).
 func computeMemoRecommendations(s *Server, target *mywant.Want) []FieldMatchRecommendation {
-	if s.memoStore == nil {
+	if s.thingStore == nil {
 		return nil
 	}
 	def := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type)
@@ -717,16 +717,16 @@ func computeMemoRecommendations(s *Server, target *mywant.Want) []FieldMatchReco
 		if v, ok := target.Spec.Params[p.Name]; ok && v != nil && v != "" {
 			continue
 		}
-		for i, v := range s.memoStore.Suggestions(p.SubType, memoRecommendationLimit) {
+		for i, v := range s.thingStore.Suggestions(p.SubType, thingRecommendationLimit) {
 			recs = append(recs, FieldMatchRecommendation{
 				Score:       0.7 - float64(i)*0.05,
 				Description: fmt.Sprintf("Use remembered %s %q for %s", p.SubType, v, p.Name),
 				Source: FieldRef{
-					WantName:  "memo",
+					WantName:  "thing",
 					FieldName: p.SubType,
 					FieldType: "string",
 					DataType:  p.SubType,
-					Label:     "memo",
+					Label:     "thing",
 				},
 				Target: ParamRef{
 					WantID:    target.Metadata.ID,

@@ -93,19 +93,19 @@ func (h *WantTypeDefaultsHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*myw
 
 // ── Built-in hook: memo recording ────────────────────────────────────────────
 
-// MemoHook records parameter values into the MemoStore when the parameter's
+// ThingHook records parameter values into the ThingStore when the parameter's
 // WantTypeDefinition declares a non-empty SubType.
-type MemoHook struct {
-	memo    *MemoStore
-	events  *MemoEventStore
+type ThingHook struct {
+	memo    *ThingStore
+	events  *ThingEventStore
 	builder interface {
 		GetWantTypeDefinition(typeName string) *mywant.WantTypeDefinition
 	}
 }
 
-func (h *MemoHook) Name() string { return "memo" }
+func (h *ThingHook) Name() string { return "memo" }
 
-func (h *MemoHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) error {
+func (h *ThingHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) error {
 	typeDef := h.builder.GetWantTypeDefinition(want.Metadata.Type)
 	if typeDef == nil {
 		return nil
@@ -127,10 +127,10 @@ func (h *MemoHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) er
 			continue
 		}
 		if err := h.memo.Record(pd.SubType, str); err != nil {
-			mywant.WarnLog("[MemoHook] failed to record %s=%q: %v", pd.SubType, str, err)
+			mywant.WarnLog("[ThingHook] failed to record %s=%q: %v", pd.SubType, str, err)
 		}
 		if h.events != nil {
-			_ = h.events.Record(MemoEvent{
+			_ = h.events.Record(ThingEvent{
 				Catalog:  subtypeToKey(pd.SubType),
 				Subtype:  pd.SubType,
 				Value:    str,

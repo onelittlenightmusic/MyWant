@@ -16,17 +16,17 @@ func wazaWant(satisfied bool, ids ...string) WazaProgress {
 	}
 }
 
-func wazaMemo(subtype string, values ...string) WazaProgress {
+func wazaThing(subtype string, values ...string) WazaProgress {
 	return WazaProgress{
-		Waza:       mywant.Waza{Kind: "memo", Subtype: subtype},
+		Waza:       mywant.Waza{Kind: "thing", Subtype: subtype},
 		Satisfied:  true,
 		MatchedIDs: values,
 	}
 }
 
-func TestLiveEvidenceSplitsWantsFromMemo(t *testing.T) {
+func TestLiveEvidenceSplitsWantsFromThings(t *testing.T) {
 	wants, memo := liveEvidence([]WazaProgress{
-		wazaMemo("station", "国分寺"),
+		wazaThing("station", "国分寺"),
 		wazaWant(true, "want-b", "want-a"),
 	})
 
@@ -58,13 +58,13 @@ func TestLiveEvidenceIgnoresUnsatisfiedAndRepeat(t *testing.T) {
 }
 
 func TestMemoCatalogKey(t *testing.T) {
-	if got := memoCatalogKey("station"); got != "stations" {
+	if got := thingCatalogKey("station"); got != "stations" {
 		t.Errorf("station → %q, want stations", got)
 	}
-	if got := memoCatalogKey("city"); got != "cities" {
+	if got := thingCatalogKey("city"); got != "cities" {
 		t.Errorf("city → %q, want cities (the catalog key, not a naive plural)", got)
 	}
-	if got := memoCatalogKey("madeup"); got != "madeups" {
+	if got := thingCatalogKey("madeup"); got != "madeups" {
 		t.Errorf("unknown type → %q, want the naive plural", got)
 	}
 }
@@ -145,8 +145,8 @@ func TestKataLabelFingerprintStable(t *testing.T) {
 // measured twice and bank two practices for a single piece of evidence.
 func TestCollectKataGroupsGivesLoneValuesTheirOwnScope(t *testing.T) {
 	dir := t.TempDir()
-	store := &MemoStore{path: filepath.Join(dir, "memo.yaml")}
-	labels := &MemoLabelStore{path: filepath.Join(dir, "memo-labels.yaml")}
+	store := &ThingStore{path: filepath.Join(dir, "memo.yaml")}
+	labels := &ThingLabelStore{path: filepath.Join(dir, "memo-labels.yaml")}
 
 	for _, v := range []string{"国分寺", "新宿"} {
 		if err := store.Record("station", v); err != nil {
@@ -163,8 +163,8 @@ func TestCollectKataGroupsGivesLoneValuesTheirOwnScope(t *testing.T) {
 		}
 	}
 
-	s := &Server{memoStore: store, memoLabels: labels}
-	byName := map[string]memoGroup{}
+	s := &Server{thingStore: store, thingLabels: labels}
+	byName := map[string]thingScope{}
 	for _, g := range s.collectKataGroups() {
 		byName[g.Name] = g
 	}
