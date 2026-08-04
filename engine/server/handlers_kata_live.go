@@ -9,10 +9,10 @@ import (
 	mywant "mywant/engine/core"
 )
 
-// A live kata is a constellation that is currently burning: the wants and memo
-// values satisfying it are all on the board at this moment. The canvas and the
+// A live kata is a constellation that is currently burning: the wants and things
+// satisfying it are all on the board at this moment. The canvas and the
 // minimap both draw from this one payload — the canvas uses all of it, the
-// minimap keeps the want half, since it has no memo layer to place stars on.
+// minimap keeps the want half, since it has no thing layer to place stars on.
 //
 // This is deliberately not folded into GET /api/v1/wants. Drawing a
 // constellation needs the EDGES, and a per-want label cannot say who to join to
@@ -21,7 +21,7 @@ import (
 
 // kataEdge joins two members of a live constellation.
 //
-// Only memo↔memo and memo↔want edges are ever drawn. A constellation is not a
+// Only thing↔thing and thing↔want edges are ever drawn. A constellation is not a
 // graph of everything that touches: the remembered values are what the form is
 // ABOUT, so they are its hubs, and joining two wants directly would say they
 // have something to do with each other when all they share is the place.
@@ -51,7 +51,7 @@ type kataConstellationDTO struct {
 	Mastery   int  `json:"mastery"`
 
 	WantIDs []string   `json:"wantIDs"`
-	MemoIDs []string   `json:"memoIDs"`
+	ThingIDs []string   `json:"thingIDs"`
 	Edges   []kataEdge `json:"edges"`
 }
 
@@ -70,7 +70,7 @@ func (s *Server) listLiveKata(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		// A form with no want in it is not burning on the board — it is a set of
-		// names, which the memo constellation already draws in its own pale
+		// names, which the thing constellation already draws in its own pale
 		// white. Lighting it again in the belt's colour would say that naming
 		// three stations is the same event as a kata coming together.
 		if len(k.LiveWantIDs) == 0 {
@@ -93,8 +93,8 @@ func (s *Server) listLiveKata(w http.ResponseWriter, r *http.Request) {
 			Recorded:      k.Recorded,
 			Mastery:       k.Mastery,
 			WantIDs:       orEmpty(k.LiveWantIDs),
-			MemoIDs:       orEmpty(k.LiveMemo),
-			Edges:         s.kataEdges(k.LiveMemo, k.LiveWantIDs),
+			ThingIDs:       orEmpty(k.LiveThings),
+			Edges:         s.kataEdges(k.LiveThings, k.LiveWantIDs),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -119,48 +119,48 @@ func orEmpty(v []string) []string {
 	return v
 }
 
-// kataEdges joins the members of one live kata: the memo values chain to each
-// other, and every want hangs off the memo value it names.
+// kataEdges joins the members of one live kata: the things chain to each
+// other, and every want hangs off the thing it names.
 //
 // Chained rather than fully connected — a complete graph turns four stars into a
-// blot, which is why the memo constellations on the canvas are chained too — and
-// spoked from the memo side because a remembered value is what a form is about.
+// blot, which is why the thing constellations on the canvas are chained too — and
+// spoked from the thing side because a remembered thing is what a form is about.
 // Two wants are never joined to each other: they share a place, not a thread.
-func (s *Server) kataEdges(memoIDs, wantIDs []string) []kataEdge {
-	if len(memoIDs)+len(wantIDs) < 2 {
+func (s *Server) kataEdges(thingIDs, wantIDs []string) []kataEdge {
+	if len(thingIDs)+len(wantIDs) < 2 {
 		return nil
 	}
 
-	edges := make([]kataEdge, 0, len(memoIDs)+len(wantIDs))
+	edges := make([]kataEdge, 0, len(thingIDs)+len(wantIDs))
 
-	for i := 1; i < len(memoIDs); i++ {
-		edges = append(edges, kataEdge{From: memoIDs[i-1], To: memoIDs[i]})
+	for i := 1; i < len(thingIDs); i++ {
+		edges = append(edges, kataEdge{From: thingIDs[i-1], To: thingIDs[i]})
 	}
 
-	// A kata with no memo 所作 (糧: a restaurant and a budget, joined by nothing
+	// A kata with no thing 所作 (糧: a restaurant and a budget, joined by nothing
 	// the system can check) has no hub to hang from. Chaining its wants is the
 	// only way it reads as one form rather than as unrelated lights.
-	if len(memoIDs) == 0 {
+	if len(thingIDs) == 0 {
 		for i := 1; i < len(wantIDs); i++ {
 			edges = append(edges, kataEdge{From: wantIDs[i-1], To: wantIDs[i]})
 		}
 		return edges
 	}
 
-	memoByValue := map[string]string{}
-	for _, id := range memoIDs {
+	thingByValue := map[string]string{}
+	for _, id := range thingIDs {
 		if _, value, ok := strings.Cut(id, "::"); ok {
-			memoByValue[value] = id
+			thingByValue[value] = id
 		}
 	}
 
 	for _, wantID := range wantIDs {
-		hubs := s.memoValuesNamedBy(wantID, memoByValue)
+		hubs := s.thingsNamedBy(wantID, thingByValue)
 		if len(hubs) == 0 {
 			// It satisfied the form inside this constellation, so it belongs to
 			// it even when the naming is indirect (a venue resolved at runtime,
 			// say). Hang it off the first value rather than leaving it adrift.
-			hubs = []string{memoIDs[0]}
+			hubs = []string{thingIDs[0]}
 		}
 		for _, hub := range hubs {
 			edges = append(edges, kataEdge{From: hub, To: wantID})
@@ -170,10 +170,10 @@ func (s *Server) kataEdges(memoIDs, wantIDs []string) []kataEdge {
 	return edges
 }
 
-// memoValuesNamedBy returns the memo member ids this want names in its
+// thingsNamedBy returns the member ids of the things this want names in its
 // parameters — the values it is pointed at, which is what makes it part of the
 // form rather than merely present.
-func (s *Server) memoValuesNamedBy(wantID string, memoByValue map[string]string) []string {
+func (s *Server) thingsNamedBy(wantID string, thingByValue map[string]string) []string {
 	if s.globalBuilder == nil {
 		return nil
 	}
@@ -195,7 +195,7 @@ func (s *Server) memoValuesNamedBy(wantID string, memoByValue map[string]string)
 		if value == "" {
 			continue
 		}
-		if id, ok := memoByValue[value]; ok && !seen[id] {
+		if id, ok := thingByValue[value]; ok && !seen[id] {
 			seen[id] = true
 			out = append(out, id)
 		}
