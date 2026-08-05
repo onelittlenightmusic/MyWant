@@ -21,7 +21,8 @@ func (w *WeatherWant) GetLocals() *WeatherLocals {
 }
 
 func (w *WeatherWant) Initialize() {
-	city := w.GetStringParam("weather_city", "Tokyo")
+	// The parameter is `at` — the want is a probe, and `at` is where it reads.
+	city := w.GetStringParam("at", "Tokyo")
 	apiKey := w.GetStringParam("openweathermap_api_key", "")
 	w.SetCurrent("weather_city", city)
 	w.SetCurrent("openweathermap_api_key", apiKey)

@@ -10,6 +10,8 @@ wantType:
     category: weather
     pattern: independent
     labels:
+      # Drawn on the canvas as a probe: a reach out to the place it reads.
+      form-type: probe
       riffable: source
       user-control: 'true'
       full-screen-display: 'true'
@@ -25,8 +27,8 @@ wantType:
     value: "$today"
 
   parameters:
-    - name: weather_city
-      description: City name to fetch weather for (e.g. Tokyo)
+    - name: at
+      description: Where to read the weather — a city, place or station
       type: string
       subType: city
       required: false
@@ -85,7 +87,7 @@ wantType:
 
   onInitialize:
     params:
-      weather_city: weather_city
+      weather_city: at
       openweathermap_api_key: openweathermap_api_key
     current:
       weather_date: ''
