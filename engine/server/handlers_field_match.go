@@ -315,7 +315,7 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 			s.JSONError(w, r, http.StatusNotFound, fmt.Sprintf("source want %s not found", req.SourceID), "")
 			return
 		}
-		paramKey := slugifyWantKey(sourceWant.Metadata.Name) + "_" + req.SourceField
+		paramKey := globalKeyFor(sourceWant.Metadata.Name, req.SourceField)
 		if !hasExposeAsGlobalParam(sourceWant, paramKey) {
 			srcUpdated := &mywant.Want{Metadata: sourceWant.Metadata, Spec: sourceWant.Spec}
 			srcUpdated.Spec.Exposes = append(append([]mywant.ExposeEntry{}, sourceWant.Spec.Exposes...), mywant.ExposeEntry{
@@ -872,7 +872,7 @@ func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, 
 		// field has not yet been exposed at all.
 		globalKey := fieldToExistingAs[sf.FieldName]
 		if globalKey == "" {
-			globalKey = slugifyWantKey(source.Metadata.Name) + "_" + sf.FieldName
+			globalKey = globalKeyFor(source.Metadata.Name, sf.FieldName)
 		}
 
 		// Bug fix 2: Find the best local key in the TARGET want's state definition.
@@ -1070,6 +1070,21 @@ func bestLocalKey(s *Server, target *mywant.Want, sf FieldRef) string {
 
 // slugifyWantKey converts a want name to a safe global-key prefix.
 // e.g. "My Want" → "my_want", "smartgolf" → "smartgolf".
+// globalKeyFor names the global slot a want's field is published into.
+//
+// The two halves are joined with a dot, not an underscore. Both halves already
+// contain underscores of their own — spotify_instance and album_art_url — so an
+// underscore between them left nothing to read the boundary by, and the key
+// came out as one long word whose middle was a guess. A dot says where the want
+// ends and the field begins.
+//
+// Keys made before this are unaffected: an expose and the import that reads it
+// match on the exact string, and neither is rewritten. Only new connections are
+// named this way.
+func globalKeyFor(wantName, field string) string {
+	return slugifyWantKey(wantName) + "." + field
+}
+
 func slugifyWantKey(s string) string {
 	s = strings.ToLower(s)
 	var b strings.Builder
