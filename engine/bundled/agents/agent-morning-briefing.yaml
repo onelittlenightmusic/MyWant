@@ -11,7 +11,7 @@ agents:
       - transit_api_agency
     role: action
     configuration:
-      weather_city: Tokyo
+      at: Tokyo
       language: ja
     actions:
       - name: run_briefing

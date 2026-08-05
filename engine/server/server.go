@@ -40,10 +40,10 @@ type Server struct {
 	httpServer           *http.Server                    // HTTP server instance
 	otelShutdown         func(context.Context) error     // OpenTelemetry shutdown hook
 	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
-	thingStore            *ThingStore                      // Persists user-entered values to ~/.mywant/memo.yaml
-	thingEvents           *ThingEventStore                 // Provenance timeline for named values (~/.mywant/memo-events.yaml)
+	thingStore           *ThingStore                     // Persists user-entered values to ~/.mywant/memo.yaml
+	thingEvents          *ThingEventStore                // Provenance timeline for named values (~/.mywant/memo-events.yaml)
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
-	thingLabels           *ThingLabelStore                 // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
+	thingLabels          *ThingLabelStore                // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 }
 
@@ -217,6 +217,11 @@ func New(config Config) *Server {
 	}
 	initialWants = filtered
 
+	// Rename any server-generated global key still joined with an underscore
+	// before anything reads the specs. Both sides move together, so an expose
+	// and the import that reads it never disagree about the key.
+	migrateGlobalKeysAndState(initialWants, globalBuilder)
+
 	globalBuilder.SetConfigInternal(initialWants)
 	globalBuilder.SetServerMode(true)
 	globalBuilder.SetAgentRegistry(agentRegistry)
@@ -298,10 +303,10 @@ func New(config Config) *Server {
 		reactionQueueManager: reactionQueueManager,
 		interactionManager:   interactionManager,
 		otelShutdown:         otelShutdown,
-		thingStore:            newThingStore(),
-		thingEvents:           newThingEventStore(),
+		thingStore:           newThingStore(),
+		thingEvents:          newThingEventStore(),
 		notifications:        newNotificationStore(),
-		thingLabels:           newThingLabelStore(),
+		thingLabels:          newThingLabelStore(),
 		exposableFieldsCache: exposableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},

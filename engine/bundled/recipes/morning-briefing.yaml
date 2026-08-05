@@ -33,7 +33,7 @@ recipe:
             {
               "fetch_weather": {
                 "type": "weather",
-                "params": {"weather_city": "Tokyo"}
+                "params": {"at": "Tokyo"}
               },
               "fetch_transit": {
                 "type": "transit",
