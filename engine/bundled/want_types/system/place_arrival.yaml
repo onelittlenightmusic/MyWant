@@ -10,6 +10,8 @@ wantType:
     category: trigger
     pattern: independent
     labels:
+      # A flag planted on the place, with a ring for how near counts as there.
+      form-type: flag
       type-icon: MapPin
       category-icon: MapPin
       category-bg-light: "linear-gradient(160deg, #bbf7d0 0%, #bfdbfe 100%)"

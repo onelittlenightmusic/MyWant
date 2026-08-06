@@ -22,6 +22,9 @@ wantType:
     category: game
     pattern: independent
     labels:
+      # Drawn as a door, not a card: the leaf swings on `locked`.
+      form-style: door
+      type-tone-color: "#8a5a3b"
       type-icon: "DoorClosed"
       list-visible: "false"
 

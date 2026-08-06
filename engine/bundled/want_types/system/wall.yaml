@@ -13,6 +13,8 @@ wantType:
     category: game
     pattern: independent
     labels:
+      # The tile is not a card with a brick icon on it — it is bricks.
+      form-style: brick
       type-icon: "BrickWall"
       category-icon: "BrickWall"
       list-visible: "false"
