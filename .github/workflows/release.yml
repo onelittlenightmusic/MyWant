@@ -14,20 +14,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: 'stable'
           cache: true
 
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
-          version: latest
+          # Pinned to the v2 line to match `version: 2` in .goreleaser.yaml.
+          # `latest` would silently follow a future GoReleaser v3 and break the
+          # config; the action already warns that it locks `latest` to `~> v2`.
+          version: '~> v2'
           install-only: true
 
       - name: Run GoReleaser
