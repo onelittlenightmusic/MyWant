@@ -53,25 +53,40 @@ var thingListCmd = &cobra.Command{
 	Short:   "List every subtype and its recorded values",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		memo, err := memoClient().GetThings()
+		things, err := memoClient().GetThings()
 		if err != nil {
 			exitErr("listing memo", err)
 		}
 
+		// --json gets the whole thing — names, stats, naming wants and all —
+		// since that is what the one GET now returns and what a script would
+		// otherwise have to make four more calls to reassemble.
 		if jsonOut(cmd) {
-			printJSON(memo)
+			printJSON(things)
 			return
 		}
-		if len(memo) == 0 {
+		if len(things) == 0 {
 			fmt.Println("Memo is empty.")
 			return
 		}
 
+		byCatalog := map[string][]string{}
+		named := map[string]int{}
+		used := map[string]int{}
+		for _, t := range things {
+			byCatalog[t.Catalog] = append(byCatalog[t.Catalog], t.Value)
+			if len(t.Definitions) > 0 {
+				named[t.Catalog]++
+			}
+			used[t.Catalog] += len(t.WantIDs)
+		}
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "SUBTYPE\tCOUNT\tVALUES")
-		for _, subtype := range sortedKeys(memo) {
-			values := memo[subtype]
-			fmt.Fprintf(w, "%s\t%d\t%s\n", subtype, len(values), truncateList(values, 5))
+		fmt.Fprintln(w, "SUBTYPE\tCOUNT\tNAMED\tIN USE\tVALUES")
+		for _, catalog := range sortedKeys(byCatalog) {
+			values := byCatalog[catalog]
+			fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\n",
+				catalog, len(values), named[catalog], used[catalog], truncateList(values, 5))
 		}
 		w.Flush()
 	},
@@ -113,7 +128,7 @@ var thingAddCmd = &cobra.Command{
 		subtype, values := args[0], args[1:]
 		c := memoClient()
 
-		memo, err := c.GetThings()
+		memo, err := c.GetThingsByCatalog()
 		if err != nil {
 			exitErr("reading memo", err)
 		}
@@ -150,7 +165,7 @@ var thingRemoveCmd = &cobra.Command{
 		subtype, values := args[0], args[1:]
 		c := memoClient()
 
-		memo, err := c.GetThings()
+		memo, err := c.GetThingsByCatalog()
 		if err != nil {
 			exitErr("reading memo", err)
 		}
@@ -420,7 +435,7 @@ var memoConstellationsDeleteCmd = &cobra.Command{
 // memoValues reads one catalog. "memo list" prints catalog keys (stations),
 // while the suggestions API is keyed by data subtype (station), so accept both.
 func memoValues(name string, limit int) ([]string, error) {
-	memo, err := memoClient().GetThings()
+	memo, err := memoClient().GetThingsByCatalog()
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +457,7 @@ func completeMemoSubtypes(cmd *cobra.Command, args []string, toComplete string) 
 	if len(args) > 0 {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
-	memo, err := memoClient().GetThings()
+	memo, err := memoClient().GetThingsByCatalog()
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}

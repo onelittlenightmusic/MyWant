@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -182,4 +183,26 @@ func subtypeToKey(subtype string) string {
 	}
 	// Default: append "s"
 	return subtype + "s"
+}
+
+// keyToSubtype is subtypeToKey read backwards: thing.yaml is keyed by catalog
+// ("artists") while the data type catalog is keyed by type name ("artist"), so
+// anything holding a catalog needs this to name the type again. A real subtype
+// wins over a primitive sharing the same key, matching the frontend's
+// buildKeyToType.
+func keyToSubtype(key string) string {
+	best := ""
+	for name, info := range dataTypeDefs {
+		if info.Key != key {
+			continue
+		}
+		if best == "" || (dataTypeDefs[best].BaseType == "" && info.BaseType != "") {
+			best = name
+		}
+	}
+	if best != "" {
+		return best
+	}
+	// Default: undo the "s" subtypeToKey appends.
+	return strings.TrimSuffix(key, "s")
 }

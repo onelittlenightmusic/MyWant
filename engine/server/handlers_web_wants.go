@@ -694,6 +694,36 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// openInBrowser handles POST /api/v1/web-wants/open with body {"url": "..."}.
+//
+// The bare form of launchWebWant above: it queues the same nav-launch claim, but
+// with no elements and no field values, so the extension opens the tab and
+// injects nothing. It exists so that a want which only needs a URL opened —
+// gmail_memo's "show mail" — does not have to be backed by a web want type with
+// an elements.json, and does not deploy a second want just to open a link.
+func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	// http(s) only: this hands a URL straight to chrome.tabs.create, and the
+	// javascript:/data: schemes are code execution rather than navigation.
+	if !strings.HasPrefix(body.URL, "http://") && !strings.HasPrefix(body.URL, "https://") {
+		s.JSONError(w, r, http.StatusBadRequest, "url must be http(s)", body.URL)
+		return
+	}
+	enqueueNavLaunch(navLaunchClaim{TargetURL: body.URL})
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"url":     body.URL,
+		"mode":    "open",
+		"message": "queued for the Chrome extension",
+	})
+}
+
 // navLaunchClaim is a pending "Inspect" request (POST /web-wants/{name}/launch
 // with no navigate_only/field_values) waiting for the Chrome extension to
 // open a tab for and inject the read-only nav-highlight overlay into —

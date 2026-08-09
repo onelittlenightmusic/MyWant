@@ -2,9 +2,12 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/gorilla/mux"
+
+	mywant "mywant/engine/core"
 )
 
 // GET /api/v1/memo/suggestions/{subtype}
@@ -28,19 +31,93 @@ func (s *Server) getThingSuggestions(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/v1/memo
-// Returns all subtypes and their recorded values.
-func (s *Server) getThings(w http.ResponseWriter, r *http.Request) {
-	data := s.thingStore.All()
-	result := make(map[string][]string, len(data))
-	for k, v := range data {
-		if v == nil {
-			result[k] = []string{}
-		} else {
-			result[k] = v
+// ThingFull is everything about one remembered value, in one place.
+//
+// The catalogs on disk hold only names, so for a long time a client wanting to
+// draw a thing had to fetch the names, then the data types for its icon and
+// colour, then the labels for where it sits, then the usage for which wants
+// name it, then the stats — five round trips and a catalog→type reverse lookup
+// that ended up reimplemented in three different files. All of that is derived
+// from state this server already holds, so it belongs in the one GET.
+type ThingFull struct {
+	// ID is "<catalog>::<value>" — the id used everywhere a thing is referred to.
+	ID      string `json:"id"`
+	Catalog string `json:"catalog"`
+	Subtype string `json:"subtype"`
+	Value   string `json:"value"`
+
+	Icon  string `json:"icon"`
+	Color string `json:"color"`
+
+	// Definitions are the names given to this value, by every character — the
+	// ledger's word, not any one character's copy.
+	Definitions []ThingDefinition `json:"definitions,omitempty"`
+	Stats       *MemoStat         `json:"stats,omitempty"`
+	// WantIDs are the live wants naming this value right now.
+	WantIDs []string          `json:"wantIDs,omitempty"`
+	Labels  map[string]string `json:"labels,omitempty"`
+}
+
+// GET /api/v1/things
+// Every remembered value, whole: name, type, who named it, where it sits, and
+// which wants are naming it.
+func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
+	types := DataTypeDefinitions()
+
+	usageByID := map[string][]string{}
+	for _, u := range s.deriveThingUsage() {
+		usageByID[u.ID] = u.WantIDs
+	}
+
+	// Definitions are keyed by the name they gave, which is the catalog entry
+	// itself: naming a value is what puts it in the catalog.
+	defsByID := map[string][]ThingDefinition{}
+	for _, d := range s.deriveThingDefinitions() {
+		id := d.Catalog + "::" + d.Name
+		defsByID[id] = append(defsByID[id], d)
+	}
+
+	stats := map[string]map[string]MemoStat{}
+	if s.thingEvents != nil {
+		stats = s.thingEvents.Stats()
+	}
+	labels := s.thingLabels.All()
+
+	out := []ThingFull{}
+	for catalog, values := range s.thingStore.All() {
+		subtype := keyToSubtype(catalog)
+		info := types[subtype]
+		for _, v := range values {
+			if v == "" {
+				continue
+			}
+			id := catalog + "::" + v
+			t := ThingFull{
+				ID:          id,
+				Catalog:     catalog,
+				Subtype:     subtype,
+				Value:       v,
+				Icon:        info.Icon,
+				Color:       info.Color,
+				Definitions: defsByID[id],
+				WantIDs:     usageByID[id],
+				Labels:      labels[id],
+			}
+			if t.Icon == "" {
+				t.Icon = "Type"
+			}
+			if t.Color == "" {
+				t.Color = "#64748b"
+			}
+			if st, ok := stats[catalog][v]; ok {
+				t.Stats = &st
+			}
+			out = append(out, t)
 		}
 	}
-	s.JSONResponse(w, http.StatusOK, result)
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+
+	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
 }
 
 // GET /api/v1/memo/subtypes
@@ -74,6 +151,73 @@ func (s *Server) getThingEvents(w http.ResponseWriter, r *http.Request) {
 		events = []ThingEvent{}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"events": events})
+}
+
+// getThingDefinitions handles GET /api/v1/things/definitions
+//
+// Every name in force, from every character — the ledger read back. This is
+// what the frontend should ask for rather than walking each character's
+// auraDefaults: a name belongs to the thing it names, not to the character
+// who happened to give it.
+//
+// Marks made before the ledger carried NamedValue are folded in from
+// characters.yaml, so nothing that was already named goes missing while both
+// stores are in use. The ledger wins wherever they overlap.
+func (s *Server) getThingDefinitions(w http.ResponseWriter, _ *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{"definitions": s.deriveThingDefinitions()})
+}
+
+// deriveThingDefinitions is the derivation itself, shared with getThings so a
+// caller never has to ask twice for the same answer.
+func (s *Server) deriveThingDefinitions() []ThingDefinition {
+	defs := []ThingDefinition{}
+	if s.thingEvents != nil {
+		defs = s.thingEvents.Definitions()
+	}
+
+	at := make(map[string]int, len(defs))
+	for i, d := range defs {
+		at[d.CharacterID+"\x00"+d.Subtype+"\x00"+d.Name] = i
+	}
+	for _, c := range mywant.ListCharacters() {
+		for _, mark := range c.AuraDefaults {
+			if mark.Target.IsBinding() || mark.Target.Name == "" {
+				continue
+			}
+			k := c.ID + "\x00" + mark.Target.Kind + "\x00" + mark.Target.Name
+			if i, ok := at[k]; ok {
+				// The ledger knows this name but was written before it carried
+				// the value — fill it in rather than skipping, or a name that
+				// predates NamedValue would read as pointing at nothing.
+				if defs[i].Value == nil {
+					defs[i].Value = mark.Value
+				}
+				continue
+			}
+			defs = append(defs, ThingDefinition{
+				Catalog:       subtypeToKey(mark.Target.Kind),
+				Subtype:       mark.Target.Kind,
+				Name:          mark.Target.Name,
+				Value:         mark.Value,
+				CharacterID:   c.ID,
+				CharacterName: c.Name,
+			})
+		}
+	}
+
+	// A name with nothing behind it is not a definition. These are names given
+	// before the ledger recorded values and since taken back, so neither store
+	// has the value any more — they would show up as a name pointing at
+	// nothing. Dropped from what is in force, NOT from the ledger: the lines
+	// recording that they were once named stay where they are.
+	inForce := make([]ThingDefinition, 0, len(defs))
+	for _, d := range defs {
+		if d.Value == nil {
+			continue
+		}
+		inForce = append(inForce, d)
+	}
+	return inForce
 }
 
 // GET /api/v1/memo/stats

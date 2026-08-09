@@ -165,37 +165,56 @@ func (s *Server) setCharacterAuraDefault(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// A definition is written to the ledger only — the thing is the record, and
+	// a second copy on the character is what made the two drift apart. An empty
+	// value still goes through SetCharacterAuraDefault so that definitions
+	// written before this change are cleared from the character as they are
+	// un-named. Bindings are the character's own and stay where they are.
 	mark := mywant.AuraMark{Target: target, Value: req.Value, Mode: req.Mode}
+	if !target.IsBinding() {
+		mark.Value = nil
+	}
 	c, ok := mywant.SetCharacterAuraDefault(id, mark)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
-	// A definition mark (a catalog kind, not a want-type binding) names a value:
-	// record that name in the memo under its kind, so every name you give shows
-	// up as a reusable suggestion alongside the ones wants record automatically.
-	if !target.IsBinding() && req.Value != nil && req.Value != "" {
-		if err := s.thingStore.Record(target.Kind, target.Name); err != nil {
-			mywant.WarnLog("[aura] failed to record memo %s=%q: %v", target.Kind, target.Name, err)
+	// A definition mark (a catalog kind, not a want-type binding) names a value.
+	// Both giving and taking back a name are written to the ledger: it is the
+	// record of what has been named, so it has to hear about both, and an empty
+	// value is how this endpoint spells "un-name it".
+	if !target.IsBinding() {
+		if req.Value != nil && req.Value != "" {
+			if err := s.thingStore.Record(target.Kind, target.Name); err != nil {
+				mywant.WarnLog("[aura] failed to record memo %s=%q: %v", target.Kind, target.Name, err)
+			}
+			s.recordThingEvent(target.Kind, target.Name, ThingSourceAuraDefinition, req.WantID, c, req.Value)
+		} else {
+			s.recordThingEvent(target.Kind, target.Name, ThingSourceAuraDefinitionRemoved, req.WantID, c, nil)
 		}
-		s.recordThingEvent(target.Kind, target.Name, ThingSourceAuraDefinition, req.WantID, c)
 	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
-// recordThingEvent appends a memo provenance event for a value named via an aura
-// (a catalog definition or a card X-name). subtype is the catalog kind; wantID,
-// when present, is resolved to its want name/type. A nil event store is a no-op.
-func (s *Server) recordThingEvent(subtype, value, source, wantID string, c *mywant.Character) {
+// recordThingEvent appends one line to the thing ledger.
+//
+// The ledger is append-only and every character's marks land in it, so reading
+// it back gives the whole story of what has been named, by whom, when and out
+// of which want — rather than the current state of one character's marks.
+// subtype is the catalog kind; value is the NAME; namedValue is what that name
+// was given to; wantID, when present, is resolved to its want name and type.
+// A nil event store is a no-op.
+func (s *Server) recordThingEvent(subtype, value, source, wantID string, c *mywant.Character, namedValue any) {
 	if s.thingEvents == nil || value == "" {
 		return
 	}
 	ev := ThingEvent{
-		Catalog: subtypeToKey(subtype),
-		Subtype: subtype,
-		Value:   value,
-		Source:  source,
+		Catalog:    subtypeToKey(subtype),
+		Subtype:    subtype,
+		Value:      value,
+		Source:     source,
+		NamedValue: namedValue,
 	}
 	if c != nil {
 		ev.CharacterID = c.ID
@@ -305,7 +324,7 @@ func (s *Server) cardAuraName(w http.ResponseWriter, r *http.Request) {
 	if err := s.thingStore.Record(kind, name); err != nil {
 		mywant.WarnLog("[aura] failed to record memo %s=%q: %v", kind, name, err)
 	}
-	s.recordThingEvent(kind, name, MemoSourceCardName, req.WantID, c)
+	s.recordThingEvent(kind, name, MemoSourceCardName, req.WantID, c, value)
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"character": c, "kind": kind, "name": name})
 }
