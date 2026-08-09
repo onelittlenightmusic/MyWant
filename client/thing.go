@@ -38,13 +38,63 @@ type Constellation struct {
 	Members []string `json:"members"`
 }
 
-// GetThings returns every subtype and its recorded values.
-func (c *Client) GetThings() (map[string][]string, error) {
-	var result map[string][]string
+// ThingDefinition is a name given to a value, and who gave it.
+type ThingDefinition struct {
+	Catalog string `json:"catalog"`
+	Subtype string `json:"subtype"`
+	Name    string `json:"name"`
+	Value   any    `json:"value,omitempty"`
+	At      string `json:"at"`
+
+	CharacterID   string `json:"characterId,omitempty"`
+	CharacterName string `json:"characterName,omitempty"`
+
+	WantID   string `json:"wantId,omitempty"`
+	WantType string `json:"wantType,omitempty"`
+}
+
+// Thing is one remembered value, whole: what it is, who named it, how often it
+// is used, which wants name it now, and where it sits on the board. The server
+// assembles all of it, so a client never has to fetch the pieces separately.
+type Thing struct {
+	ID      string `json:"id"` // "<catalog>::<value>"
+	Catalog string `json:"catalog"`
+	Subtype string `json:"subtype"`
+	Value   string `json:"value"`
+
+	Icon  string `json:"icon"`
+	Color string `json:"color"`
+
+	Definitions []ThingDefinition `json:"definitions,omitempty"`
+	Stats       *MemoStat         `json:"stats,omitempty"`
+	WantIDs     []string          `json:"wantIDs,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+}
+
+// GetThings returns every remembered value, whole.
+func (c *Client) GetThings() ([]Thing, error) {
+	var result struct {
+		Things []Thing `json:"things"`
+	}
 	if err := c.Request("GET", "/api/v1/things", nil, &result); err != nil {
 		return nil, err
 	}
-	return result, nil
+	return result.Things, nil
+}
+
+// GetThingsByCatalog folds the list back into catalog → values, which is both
+// the shape PutThings takes and the shape a caller wants when it only cares
+// which values exist.
+func (c *Client) GetThingsByCatalog() (map[string][]string, error) {
+	things, err := c.GetThings()
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]string{}
+	for _, t := range things {
+		out[t.Catalog] = append(out[t.Catalog], t.Value)
+	}
+	return out, nil
 }
 
 // PutThings replaces the whole memo catalog.

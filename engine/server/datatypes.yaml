@@ -21,6 +21,9 @@ image:     { key: images,     icon: Image,        color: "#a855f7", base_type: s
 image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string }
 url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string, catalog: webpage }
 webpage:   { key: webpages,   icon: Globe,        color: "#8b5cf6", base_type: string }
+# A port number is kept as a string, like the times and dates above it: it is an
+# address a service listens at, never a quantity to do arithmetic on.
+port:      { key: ports,      icon: Plug,         color: "#0891b2", base_type: string }
 date:     { key: dates,     icon: Calendar,     color: "#f59e0b", base_type: string }
 time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string }
 city:     { key: cities,    icon: Building2,    color: "#2563eb", base_type: string }
@@ -44,11 +47,24 @@ secret:   { key: secrets,   icon: EyeOff,       color: "#64748b", base_type: str
 hotel:    { key: hotels,    icon: Landmark,     color: "#dc2626", base_type: string }
 shop:     { key: shops,     icon: ShoppingCart, color: "#64748b", base_type: string }
 product:  { key: products,  icon: Package,      color: "#64748b", base_type: string }
+# One purchase, not the thing purchased: what an order-history want lists, and
+# what X files away when you want to remember a particular one.
+order:    { key: orders,    icon: Receipt,      color: "#0d9488", base_type: string }
 price:    { key: prices,    icon: DollarSign,   color: "#3b82f6", base_type: string }
 amount:   { key: amounts,   icon: DollarSign,   color: "#3b82f6", base_type: string }
 job:      { key: jobs,      icon: Briefcase,    color: "#64748b", base_type: string }
 book:     { key: books,     icon: BookOpen,     color: "#64748b", base_type: string }
 music:    { key: musics,    icon: Music,        color: "#64748b", base_type: string }
+# Who made the music, kept apart from `person` because an artist is named by a
+# performing name — a band is one artist and not one person.
+artist:   { key: artists,   icon: Mic2,         color: "#e11d48", base_type: string }
+# A song is one named track, as opposed to `music` (a genre, an artist, a
+# playlist — anything musical). It is what a player want's current track names
+# itself into, so pressing X on "now playing" files it under songs.
+song:     { key: songs,     icon: Music2,       color: "#ec4899", base_type: string }
+# The record a song came off, named by its title — not the artwork, which is an
+# `image` and files itself away under a different roof.
+album:    { key: albums,    icon: DiscAlbum,    color: "#c026d3", base_type: string }
 movie:    { key: movies,    icon: Film,         color: "#64748b", base_type: string }
 favorite: { key: favorites, icon: Heart,        color: "#f97316", base_type: string }
 rating:      { key: ratings,      icon: Star,          color: "#f59e0b", base_type: string }

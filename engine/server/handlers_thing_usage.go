@@ -17,6 +17,13 @@ import (
 // memo-events.yaml keeps the historical side (who named what, when); this is the
 // present tense.
 
+// ThingRefSubType marks a parameter whose value is a list of thing ids
+// ("<catalog>::<value>") rather than a value to be remembered under one
+// catalog. It is a reserved subType name and not a data type: nothing is ever
+// filed under it, and a want type declares it to say "these are the things this
+// want is about".
+const ThingRefSubType = "thing_ref"
+
 // memoUsage is one remembered value together with the live wants naming it.
 type memoUsage struct {
 	// ID is the memo record id, "<catalog>::<value>" — the same id the memo
@@ -32,7 +39,18 @@ type memoUsage struct {
 //
 // Returns only values that are both remembered and currently named by a live
 // want, so a caller can show the memo alongside the wants using it.
-func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getThingUsage(w http.ResponseWriter, _ *http.Request) {
+	out := s.deriveThingUsage()
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"usage": out,
+		"count": len(out),
+	})
+}
+
+// deriveThingUsage is the derivation itself, split out so the one GET that
+// returns a whole thing can reuse it instead of the caller making a second
+// round trip for the same answer.
+func (s *Server) deriveThingUsage() []memoUsage {
 	// Everything the memo actually holds, so a parameter value that was never
 	// recorded (recordMemo: false, or typed before the hook existed) does not
 	// masquerade as a memo.
@@ -53,6 +71,41 @@ func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			for _, pd := range typeDef.Parameters {
+				// A parameter that points AT things rather than being one: its
+				// value is a list of ids already in "<catalog>::<value>" form.
+				// Handled ahead of the single-value rule below because the ids
+				// carry their own catalogs — a list spanning an artist and an
+				// event has no one subType that could stand for all of it, and
+				// running these through subtypeToKey would only double the
+				// catalog up ("things::artists::Dream Theater").
+				if pd.SubType == ThingRefSubType {
+					list, _ := want.Spec.Params[pd.Name].([]any)
+					for _, el := range list {
+						id, ok := el.(string)
+						if !ok {
+							continue
+						}
+						id = strings.TrimSpace(id)
+						catalog, value, found := strings.Cut(id, "::")
+						if !found || value == "" || !remembered[id] {
+							continue
+						}
+						if byID[id] == nil {
+							byID[id] = &memoUsage{
+								ID:      id,
+								Catalog: catalog,
+								Subtype: keyToSubtype(catalog),
+								Value:   value,
+							}
+							seen[id] = map[string]bool{}
+						}
+						if wid := want.Metadata.ID; wid != "" && !seen[id][wid] {
+							seen[id][wid] = true
+							byID[id].WantIDs = append(byID[id].WantIDs, wid)
+						}
+					}
+					continue
+				}
 				if pd.SubType == "" {
 					continue
 				}
@@ -87,6 +140,7 @@ func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+
 	}
 
 	out := make([]memoUsage, 0, len(byID))
@@ -95,9 +149,5 @@ func (s *Server) getThingUsage(w http.ResponseWriter, r *http.Request) {
 		out = append(out, *u)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-
-	s.JSONResponse(w, http.StatusOK, map[string]any{
-		"usage": out,
-		"count": len(out),
-	})
+	return out
 }

@@ -393,6 +393,11 @@ func (s *Server) Start() error {
 		return want.Metadata.Type, true
 	})
 
+	// Then move the definition marks off the characters entirely: the ledger is
+	// where a named value belongs. Runs after the re-addressing above so the
+	// marks it moves are already in their final shape. No-op once migrated.
+	s.migrateAuraDefinitionsToLedger()
+
 	// Register push callback for want_achieved lifecycle webhooks
 	s.RegisterAchievementCallback()
 

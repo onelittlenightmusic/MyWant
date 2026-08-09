@@ -4,6 +4,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+
+	mywant "mywant/engine/core"
 )
 
 // What the app calls a remembered value is a Thing. It was called a Memo, and
@@ -49,4 +52,67 @@ func thingPath(name string) string {
 	}
 	log.Printf("[SERVER] renamed %s to %s", former, name)
 	return current
+}
+
+// ── Definitions move out of characters.yaml and into the ledger ──────────────
+//
+// A name given to a value used to live in two places: the catalog kept the
+// name, and the character who signed it kept the name→value pair. That made the
+// character file the only place a thing's value existed, which is backwards —
+// the thing is the record. The ledger now carries name, value, author, want and
+// time on one line, so the copy on the character is redundant.
+//
+// This moves each definition mark into the ledger (if it is not already there)
+// and then clears it from the character, leaving characters.yaml holding only
+// want-type bindings, which really are the character's own.
+func (s *Server) migrateAuraDefinitionsToLedger() {
+	if s.thingEvents == nil {
+		return
+	}
+
+	// What the ledger already knows — and knows the VALUE of. An entry recorded
+	// before the ledger carried NamedValue holds only a name, so the character's
+	// copy is still the only place that value exists: it has to be written
+	// across before the character is cleared, or clearing loses it. Treating
+	// those as "already known" is exactly the mistake that dropped five values
+	// the first time this ran.
+	known := map[string]bool{}
+	for _, d := range s.thingEvents.Definitions() {
+		if d.Value == nil {
+			continue
+		}
+		known[d.CharacterID+"\x00"+d.Subtype+"\x00"+d.Name] = true
+	}
+
+	moved, dropped := 0, 0
+	for _, c := range mywant.ListCharacters() {
+		for _, mark := range c.AuraDefaults {
+			if mark.Target.IsBinding() || mark.Target.Name == "" {
+				continue
+			}
+			// A URL is not a name. These come from naming a field whose value
+			// was already a URL and accepting the suggested name unchanged, so
+			// the "name" repeats the value and points at nothing a person would
+			// look up. Dropped rather than carried forward.
+			if strings.HasPrefix(mark.Target.Name, "http://") || strings.HasPrefix(mark.Target.Name, "https://") {
+				clearAuraDefinition(c.ID, mark.Target)
+				dropped++
+				continue
+			}
+			if !known[c.ID+"\x00"+mark.Target.Kind+"\x00"+mark.Target.Name] {
+				s.recordThingEvent(mark.Target.Kind, mark.Target.Name, ThingSourceAuraDefinition, "", &c, mark.Value)
+			}
+			clearAuraDefinition(c.ID, mark.Target)
+			moved++
+		}
+	}
+	if moved > 0 || dropped > 0 {
+		log.Printf("[thing] moved %d aura definitions into the ledger, dropped %d URL-named ones\n", moved, dropped)
+	}
+}
+
+// clearAuraDefinition removes one mark from a character: an empty value is how
+// SetCharacterAuraDefault spells deletion.
+func clearAuraDefinition(characterID string, target mywant.AuraTarget) {
+	mywant.SetCharacterAuraDefault(characterID, mywant.AuraMark{Target: target})
 }

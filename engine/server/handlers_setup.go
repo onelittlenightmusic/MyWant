@@ -253,6 +253,8 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("", s.putThings).Methods("PUT", "OPTIONS")
 		things.HandleFunc("/subtypes", s.getThingSubtypes).Methods("GET", "OPTIONS")
 		things.HandleFunc("/events", s.getThingEvents).Methods("GET", "OPTIONS")
+		// Every name in force, from every character — derived from the ledger.
+		things.HandleFunc("/definitions", s.getThingDefinitions).Methods("GET", "OPTIONS")
 		// Which live wants are naming which things — derived on read.
 		things.HandleFunc("/usage", s.getThingUsage).Methods("GET", "OPTIONS")
 		things.HandleFunc("/stats", s.getThingStats).Methods("GET", "OPTIONS")
@@ -350,6 +352,8 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/suggest-name", s.suggestElementName).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/active-inspection", s.activeInspection).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/pending-action", s.pendingBrowserAction).Methods("GET", "OPTIONS")
+	// Open a URL in a new tab via the extension, with no web want behind it.
+	webWants.HandleFunc("/open", s.openInBrowser).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run", s.browserRun).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run-result", s.browserRunResultHandler).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/ca-cert", s.serveCACert).Methods("GET", "OPTIONS")
