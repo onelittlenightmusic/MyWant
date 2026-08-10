@@ -332,6 +332,11 @@ func New(config Config) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Before anything reads a thing: give every one of them a stable id and
+	// move the labels that refer to them onto it. Once, on the way up, so no
+	// request can observe the two files disagreeing.
+	migrateThingStore(s.thingStore, s.thingLabels)
+
 	mywant.SetGlobalMemoReader(s.thingStore)
 
 	// Register ThingHook here (after New) so it can reference s.thingStore and s.globalBuilder.
@@ -545,6 +550,9 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.SystemFontSize != "" {
 		fullConfig["system_font_size"] = s.config.SystemFontSize
+	}
+	if s.config.GeocodeCountry != "" {
+		fullConfig["geocode_country"] = s.config.GeocodeCountry
 	}
 	if s.config.CanvasBgURL != "" {
 		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL

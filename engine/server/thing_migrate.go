@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	mywant "mywant/engine/core"
 )
 
@@ -115,4 +117,63 @@ func (s *Server) migrateAuraDefinitionsToLedger() {
 // SetCharacterAuraDefault spells deletion.
 func clearAuraDefinition(characterID string, target mywant.AuraTarget) {
 	mywant.SetCharacterAuraDefault(characterID, mywant.AuraMark{Target: target})
+}
+
+// ── identity migration (schema 1 → 2) ────────────────────────────────────────
+
+// migrateThingStore gives every thing a UUID and moves the references onto it.
+//
+// Until now a thing WAS its catalog and its value: the id was the two joined,
+// and the labels that say where a thing sits on the board and which group it
+// belongs to were keyed by that. So changing a thing's category did not edit
+// it — it destroyed one thing and created another, and left every reference
+// pointing at an id nothing answered to. On the board the tile just vanished.
+//
+// Both halves have to happen together. A store rewritten without the labels
+// remapped is exactly the failure this exists to prevent, so the labels are
+// moved first: a label under an id whose thing has not been written yet is
+// harmless, while a thing whose labels never followed is the bug.
+func migrateThingStore(store *ThingStore, labels *ThingLabelStore) {
+	if store == nil {
+		return
+	}
+	raw, err := os.ReadFile(store.path)
+	if os.IsNotExist(err) {
+		return // nothing stored yet; the first write uses the new schema
+	}
+	if err != nil {
+		log.Printf("[SERVER] thing store not readable (%v) — leaving it alone", err)
+		return
+	}
+	var probe thingFile
+	if err := yaml.Unmarshal(raw, &probe); err == nil && probe.Version >= thingSchemaVersion {
+		return // already migrated
+	}
+
+	var legacy thingData
+	if err := yaml.Unmarshal(raw, &legacy); err != nil {
+		log.Printf("[SERVER] thing store unreadable as either schema (%v) — leaving it alone", err)
+		return
+	}
+	if len(legacy) == 0 {
+		return
+	}
+
+	entries := entriesFromCatalogs(legacy)
+	mapping := make(map[string]string, len(entries))
+	for _, e := range entries {
+		mapping[e.Catalog+"::"+e.Value] = e.ID
+	}
+
+	if labels != nil {
+		if err := labels.Rekey(mapping); err != nil {
+			log.Printf("[SERVER] thing labels could not be re-keyed (%v) — thing store left on the old schema", err)
+			return // do NOT rewrite the store; the two must move together
+		}
+	}
+	if err := store.saveEntries(entries); err != nil {
+		log.Printf("[SERVER] thing store could not be rewritten (%v)", err)
+		return
+	}
+	log.Printf("[SERVER] thing store migrated to schema %d — %d things given stable ids", thingSchemaVersion, len(entries))
 }

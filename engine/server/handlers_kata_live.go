@@ -50,9 +50,9 @@ type kataConstellationDTO struct {
 	Recorded  bool `json:"recorded"`
 	Mastery   int  `json:"mastery"`
 
-	WantIDs []string   `json:"wantIDs"`
+	WantIDs  []string   `json:"wantIDs"`
 	ThingIDs []string   `json:"thingIDs"`
-	Edges   []kataEdge `json:"edges"`
+	Edges    []kataEdge `json:"edges"`
 }
 
 // listLiveKata returns every kata standing right now, as constellations.
@@ -93,7 +93,7 @@ func (s *Server) listLiveKata(w http.ResponseWriter, r *http.Request) {
 			Recorded:      k.Recorded,
 			Mastery:       k.Mastery,
 			WantIDs:       orEmpty(k.LiveWantIDs),
-			ThingIDs:       orEmpty(k.LiveThings),
+			ThingIDs:      orEmpty(k.LiveThings),
 			Edges:         s.kataEdges(k.LiveThings, k.LiveWantIDs),
 		})
 	}
@@ -147,9 +147,16 @@ func (s *Server) kataEdges(thingIDs, wantIDs []string) []kataEdge {
 		return edges
 	}
 
+	// Which value each of these things is called, so a want naming that value
+	// can be hung off it. Read from the store rather than split out of the id:
+	// a thing's id is a UUID now and says nothing about what it is called.
+	valueOf := map[string]string{}
+	for _, e := range s.thingStore.Entries() {
+		valueOf[e.ID] = e.Value
+	}
 	thingByValue := map[string]string{}
 	for _, id := range thingIDs {
-		if _, value, ok := strings.Cut(id, "::"); ok {
+		if value := valueOf[id]; value != "" {
 			thingByValue[value] = id
 		}
 	}

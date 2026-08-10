@@ -2,6 +2,8 @@ package server
 
 import (
 	_ "embed"
+
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,35 +24,121 @@ func init() {
 	_ = yaml.Unmarshal(datatypesYAML, &dataTypeDefs)
 }
 
-// ThingStore persists user-entered values to ~/.mywant/memo.yaml, grouped by subtype.
+// ThingStore persists user-entered values to ~/.mywant/thing.yaml.
 // Thread-safe; reads and writes are serialised via a mutex.
 type ThingStore struct {
 	path string
 	mu   sync.Mutex
 }
 
-// thingData is the on-disk YAML schema.
-// Each subtype key maps to a deduplicated list of recorded values.
+// thingData is the catalog VIEW of the store: catalog key → values, most
+// recent first. It is what most callers want — suggestions for a subtype, the
+// values a kata evaluates, the catalogs usage is derived against — and none of
+// those questions are about identity, so they are still answered this way.
 type thingData map[string][]string
+
+// ThingEntry is a thing as stored: an identity, and what is currently true
+// about it.
+//
+// The id used to be the catalog and the value joined, which made identity a
+// consequence of two things that can both change. Everything that referred to
+// a thing — where it sits on the board, which group it is in — hung off that
+// id, so changing a thing's category silently destroyed one thing and created
+// another, and every reference was left pointing at something that no longer
+// existed. A tile simply vanished from the canvas and nothing said why.
+//
+// The id is now a UUID and means nothing at all, which is the point: nothing
+// about a thing can change in a way that changes what it IS.
+type ThingEntry struct {
+	ID      string `yaml:"id"      json:"id"`
+	Catalog string `yaml:"catalog" json:"catalog"`
+	Value   string `yaml:"value"   json:"value"`
+}
+
+// thingFile is the on-disk YAML schema. Version 1 was the bare catalog map and
+// is migrated on first read — see migrateThingFile.
+type thingFile struct {
+	Version int          `yaml:"version"`
+	Things  []ThingEntry `yaml:"things"`
+}
+
+const thingSchemaVersion = 2
 
 func newThingStore() *ThingStore {
 	return &ThingStore{path: thingPath("thing.yaml")}
 }
 
-func (m *ThingStore) load() (thingData, error) {
-	data := make(thingData)
+// loadEntries reads the store as it is stored: a list of identified things.
+func (m *ThingStore) loadEntries() ([]ThingEntry, error) {
 	bytes, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
-		return data, nil
+		return nil, nil
 	}
 	if err != nil {
-		return data, err
+		return nil, err
 	}
-	_ = yaml.Unmarshal(bytes, &data)
-	return data, nil
+	var file thingFile
+	if err := yaml.Unmarshal(bytes, &file); err == nil && file.Version >= thingSchemaVersion {
+		return file.Things, nil
+	}
+	// Version 1: the bare catalog map. Read it as such and mint identities.
+	// Not written back here — migrateThingStore does that once, at startup,
+	// together with the label remap that has to happen in the same breath.
+	var legacy thingData
+	if err := yaml.Unmarshal(bytes, &legacy); err != nil {
+		return nil, err
+	}
+	return entriesFromCatalogs(legacy), nil
 }
 
+// load returns the catalog view, most-recent-first within each catalog, which
+// is the order the list form preserves.
+func (m *ThingStore) load() (thingData, error) {
+	entries, err := m.loadEntries()
+	if err != nil {
+		return make(thingData), err
+	}
+	return catalogsFromEntries(entries), nil
+}
+
+func (m *ThingStore) saveEntries(entries []ThingEntry) error {
+	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
+		return err
+	}
+	bytes, err := yaml.Marshal(thingFile{Version: thingSchemaVersion, Things: entries})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(m.path, bytes, 0o644)
+}
+
+// save takes the catalog view and writes it back, keeping the id of anything
+// already stored under the same catalog and value. Callers that work in the
+// catalog view are saying what exists, not who it is, so identity is preserved
+// here rather than being quietly reissued.
 func (m *ThingStore) save(data thingData) error {
+	existing, _ := m.loadEntries()
+	byPair := make(map[string]string, len(existing))
+	for _, e := range existing {
+		byPair[e.Catalog+"\x00"+e.Value] = e.ID
+	}
+	var out []ThingEntry
+	for _, catalog := range sortedKeys(data) {
+		for _, v := range data[catalog] {
+			if v == "" {
+				continue
+			}
+			id := byPair[catalog+"\x00"+v]
+			if id == "" {
+				id = newThingID()
+			}
+			out = append(out, ThingEntry{ID: id, Catalog: catalog, Value: v})
+		}
+	}
+	return m.saveEntries(out)
+}
+
+func (m *ThingStore) saveLegacy(data thingData) error {
 	if err := os.MkdirAll(filepath.Dir(m.path), 0o755); err != nil {
 		return err
 	}
@@ -59,6 +147,132 @@ func (m *ThingStore) save(data thingData) error {
 		return err
 	}
 	return os.WriteFile(m.path, bytes, 0o644)
+}
+
+// ── entries ↔ catalogs ───────────────────────────────────────────────────────
+
+func newThingID() string {
+	return "thg-" + uuid.NewString()
+}
+
+func sortedKeys(data thingData) []string {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// entriesFromCatalogs mints an identity for every value in the catalog map,
+// preserving the order within each catalog (which is most-recent-first).
+func entriesFromCatalogs(data thingData) []ThingEntry {
+	var out []ThingEntry
+	for _, catalog := range sortedKeys(data) {
+		for _, v := range data[catalog] {
+			if v == "" {
+				continue
+			}
+			out = append(out, ThingEntry{ID: newThingID(), Catalog: catalog, Value: v})
+		}
+	}
+	return out
+}
+
+func catalogsFromEntries(entries []ThingEntry) thingData {
+	data := make(thingData)
+	for _, e := range entries {
+		if e.Value == "" {
+			continue
+		}
+		data[e.Catalog] = append(data[e.Catalog], e.Value)
+	}
+	return data
+}
+
+// Entries returns every thing as stored, identity included.
+func (m *ThingStore) Entries() []ThingEntry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries, _ := m.loadEntries()
+	out := make([]ThingEntry, len(entries))
+	copy(out, entries)
+	return out
+}
+
+// Update changes a thing's catalog and/or value, keeping its identity — the
+// whole point of the identity being a UUID. Empty fields mean "leave alone".
+// Returns the entry as it now stands.
+func (m *ThingStore) Update(id, catalog, value string) (ThingEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	entries, err := m.loadEntries()
+	if err != nil {
+		return ThingEntry{}, err
+	}
+	var updated ThingEntry
+	found := false
+	for i, e := range entries {
+		if e.ID != id {
+			continue
+		}
+		if catalog != "" {
+			entries[i].Catalog = catalog
+		}
+		if value != "" {
+			entries[i].Value = value
+		}
+		updated, found = entries[i], true
+		break
+	}
+	if !found {
+		return ThingEntry{}, os.ErrNotExist
+	}
+	// A move onto a pair that already exists would leave two things claiming to
+	// be the same value in the same catalog, which every catalog-view caller
+	// would then see twice.
+	for _, e := range entries {
+		if e.ID != updated.ID && e.Catalog == updated.Catalog && e.Value == updated.Value {
+			return ThingEntry{}, os.ErrExist
+		}
+	}
+	return updated, m.saveEntries(entries)
+}
+
+// Delete removes one thing by identity.
+func (m *ThingStore) Delete(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries, err := m.loadEntries()
+	if err != nil {
+		return err
+	}
+	out := entries[:0]
+	for _, e := range entries {
+		if e.ID != id {
+			out = append(out, e)
+		}
+	}
+	return m.saveEntries(out)
+}
+
+// Add remembers a value under a catalog and returns its identity, reusing the
+// existing one when the pair is already stored.
+func (m *ThingStore) Add(catalog, value string) (ThingEntry, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries, err := m.loadEntries()
+	if err != nil {
+		return ThingEntry{}, err
+	}
+	for _, e := range entries {
+		if e.Catalog == catalog && e.Value == value {
+			return e, nil
+		}
+	}
+	entry := ThingEntry{ID: newThingID(), Catalog: catalog, Value: value}
+	return entry, m.saveEntries(append(entries, entry))
 }
 
 // Record adds value to the list for subtype, deduplicating and capping at 100 entries.

@@ -44,6 +44,7 @@ type MyWantConfig struct {
 	// to config.yaml by the server, so they must be read back here too —
 	// otherwise they survive on disk but not across a server restart.
 	IconFont             string              `yaml:"icon_font"`              // lucide, lucide-thin, heroicons-outline, heroicons-solid
+	GeocodeCountry       string              `yaml:"geocode_country"`        // ISO 3166-1 alpha-2 ("jp"); restricts place-name lookups. "" = worldwide
 	CanvasBgURL          string              `yaml:"canvas_bg_url"`          // canvas background image URL
 	CanvasBgColor        string              `yaml:"canvas_bg_color"`        // canvas background colour (hex)
 	CanvasDPad           *bool               `yaml:"canvas_dpad"`            // software D-Pad overlay

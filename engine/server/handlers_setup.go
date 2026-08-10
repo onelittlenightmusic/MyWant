@@ -251,6 +251,9 @@ func (s *Server) setupRoutes() {
 		things := api.PathPrefix(prefix).Subrouter()
 		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")
 		things.HandleFunc("", s.putThings).Methods("PUT", "OPTIONS")
+		// Identity-bearing operations. A thing's id survives its catalog and
+		// its name changing, which is the whole reason it has one.
+		things.HandleFunc("", s.createThing).Methods("POST", "OPTIONS")
 		things.HandleFunc("/subtypes", s.getThingSubtypes).Methods("GET", "OPTIONS")
 		things.HandleFunc("/events", s.getThingEvents).Methods("GET", "OPTIONS")
 		// Every name in force, from every character — derived from the ledger.
@@ -264,6 +267,10 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
 		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
 		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
+		// Registered last: "{id}" would otherwise swallow "/labels", "/events"
+		// and the rest, which are literal paths and not thing ids.
+		things.HandleFunc("/{id}", s.patchThing).Methods("PATCH", "OPTIONS")
+		things.HandleFunc("/{id}", s.deleteThing).Methods("DELETE", "OPTIONS")
 	}
 
 	// Constellations API (label-backed facade: constellation/<name> labels on

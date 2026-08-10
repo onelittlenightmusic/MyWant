@@ -66,7 +66,7 @@ type KataProgress struct {
 	// The live evidence itself: want ids, and things as "catalogKey::value"
 	// so they match the member ids constellations are made of.
 	LiveWantIDs []string `json:"liveWantIDs,omitempty"`
-	LiveThings    []string `json:"liveThings,omitempty"`
+	LiveThings  []string `json:"liveThings,omitempty"`
 	// AlmostThere marks あと一所作 — the only moment a kata is allowed to speak up.
 	AlmostThere bool `json:"almostThere"`
 
@@ -145,6 +145,10 @@ func (s *Server) collectKataScopes() []thingScope {
 	var out []thingScope
 	grouped := map[string]bool{} // "catalogKey::value" already in a constellation
 
+	byID := map[string]ThingEntry{}
+	for _, e := range s.thingStore.Entries() {
+		byID[e.ID] = e
+	}
 	for _, g := range s.collectThingConstellations() {
 		mg := thingScope{
 			Name:      g.Name,
@@ -152,11 +156,15 @@ func (s *Server) collectKataScopes() []thingScope {
 			AllValues: map[string]bool{},
 		}
 		for _, member := range g.Members {
-			key, value, ok := strings.Cut(member, "::")
+			// Members are thing ids, and an id is a UUID that says nothing about
+			// what it is or what it is called — so ask the store rather than
+			// taking the name apart, which is what this used to do.
+			entry, ok := byID[member]
 			if !ok {
 				continue
 			}
-			grouped[member] = true
+			key, value := entry.Catalog, entry.Value
+			grouped[key+"::"+value] = true
 			subtype := subtypeOf(key)
 			if mg.BySubtype[subtype] == nil {
 				mg.BySubtype[subtype] = map[string]bool{}
@@ -365,13 +373,13 @@ func (s *Server) evaluateOneKata(
 			complete := total > 0 && satisfied == total
 			liveWants, liveThings := liveEvidence(wazaProgress)
 			best = KataProgress{
-				KataID:      k.ID,
-				Name:        k.Name,
-				Reading:     k.Reading,
-				Level:       k.Level,
-				Intent:      k.Intent,
-				Yields:      k.Yields,
-				Contains:    k.Contains,
+				KataID:        k.ID,
+				Name:          k.Name,
+				Reading:       k.Reading,
+				Level:         k.Level,
+				Intent:        k.Intent,
+				Yields:        k.Yields,
+				Contains:      k.Contains,
 				Variation:     henka.ID,
 				Group:         groupName,
 				Constellation: groupName,
@@ -381,11 +389,11 @@ func (s *Server) evaluateOneKata(
 				Complete:      complete,
 				Live:          complete && len(liveWants)+len(liveThings) > 0,
 				LiveWantIDs:   liveWants,
-				LiveThings:      liveThings,
+				LiveThings:    liveThings,
 				AlmostThere:   total > 1 && satisfied == total-1,
-				Thresholds:  k.Mastery,
-				Unlocks:     k.Unlocks,
-				Hidden:      k.Hidden,
+				Thresholds:    k.Mastery,
+				Unlocks:       k.Unlocks,
+				Hidden:        k.Hidden,
 			}
 
 			// Credit the practice the first time this exact set of witnesses

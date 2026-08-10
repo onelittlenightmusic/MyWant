@@ -126,9 +126,22 @@ func (s *Server) getFieldMatchRecommendations(w http.ResponseWriter, r *http.Req
 	// none of the provider machinery below applies, and the answer is complete
 	// on its own.
 	if thingID := r.URL.Query().Get("source_thing"); thingID != "" {
-		catalog, value, ok := strings.Cut(thingID, "::")
-		if !ok || catalog == "" || value == "" {
-			s.JSONError(w, r, http.StatusBadRequest, "source_thing must be catalog::value", thingID)
+		// A thing id is its own opaque thing now; what it is filed under and
+		// what it is called are looked up, not parsed out of it. The old
+		// "catalog::value" form is still accepted so a caller holding one — a
+		// script, an older client — is not turned away.
+		var catalog, value string
+		for _, e := range s.thingStore.Entries() {
+			if e.ID == thingID {
+				catalog, value = e.Catalog, e.Value
+				break
+			}
+		}
+		if catalog == "" {
+			catalog, value, _ = strings.Cut(thingID, "::")
+		}
+		if catalog == "" || value == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "source_thing must be a thing id", thingID)
 			return
 		}
 		recs := computeThingValueRecommendations(s, targetWant, catalog, value)

@@ -54,6 +54,47 @@ func (m *ThingLabelStore) save(data thingLabelData) error {
 }
 
 // All returns a deep copy of every value's labels.
+// Rekey moves every label from one id to another, in one write.
+//
+// Used by the identity migration: labels used to hang off "catalog::value" and
+// now hang off the thing's own id, and doing that a label at a time through
+// Set/Remove would leave the file half-moved if anything failed in between.
+func (m *ThingLabelStore) Rekey(mapping map[string]string) error {
+	if len(mapping) == 0 {
+		return nil
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data, err := m.load()
+	if err != nil {
+		return err
+	}
+	changed := false
+	for from, to := range mapping {
+		labels, ok := data[from]
+		if !ok || from == to {
+			continue
+		}
+		// Merge rather than overwrite: whatever is already under the new id was
+		// put there deliberately and outranks a carried-over copy.
+		if existing, ok := data[to]; ok {
+			for k, v := range labels {
+				if _, taken := existing[k]; !taken {
+					existing[k] = v
+				}
+			}
+		} else {
+			data[to] = labels
+		}
+		delete(data, from)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	return m.save(data)
+}
+
 func (m *ThingLabelStore) All() map[string]map[string]string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 
@@ -84,38 +86,44 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 	labels := s.thingLabels.All()
 
 	out := []ThingFull{}
-	for catalog, values := range s.thingStore.All() {
-		subtype := keyToSubtype(catalog)
-		info := types[subtype]
-		for _, v := range values {
-			if v == "" {
-				continue
-			}
-			id := catalog + "::" + v
-			t := ThingFull{
-				ID:          id,
-				Catalog:     catalog,
-				Subtype:     subtype,
-				Value:       v,
-				Icon:        info.Icon,
-				Color:       info.Color,
-				Definitions: defsByID[id],
-				WantIDs:     usageByID[id],
-				Labels:      labels[id],
-			}
-			if t.Icon == "" {
-				t.Icon = "Type"
-			}
-			if t.Color == "" {
-				t.Color = "#64748b"
-			}
-			if st, ok := stats[catalog][v]; ok {
-				t.Stats = &st
-			}
-			out = append(out, t)
+	for _, e := range s.thingStore.Entries() {
+		if e.Value == "" {
+			continue
 		}
+		subtype := keyToSubtype(e.Catalog)
+		info := types[subtype]
+		// Labels and usage hang off the thing's own id; definitions, stats and
+		// usage are derived from what a want NAMED, which is a catalog and a
+		// value, so those are still looked up by the pair.
+		pair := e.Catalog + "::" + e.Value
+		t := ThingFull{
+			ID:          e.ID,
+			Catalog:     e.Catalog,
+			Subtype:     subtype,
+			Value:       e.Value,
+			Icon:        info.Icon,
+			Color:       info.Color,
+			Definitions: defsByID[pair],
+			WantIDs:     usageByID[pair],
+			Labels:      labels[e.ID],
+		}
+		if t.Icon == "" {
+			t.Icon = "Type"
+		}
+		if t.Color == "" {
+			t.Color = "#64748b"
+		}
+		if st, ok := stats[e.Catalog][e.Value]; ok {
+			t.Stats = &st
+		}
+		out = append(out, t)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Catalog != out[j].Catalog {
+			return out[i].Catalog < out[j].Catalog
+		}
+		return out[i].Value < out[j].Value
+	})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
 }
@@ -227,8 +235,90 @@ func (s *Server) getThingStats(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"stats": s.thingEvents.Stats()})
 }
 
+// POST /api/v1/things   body: {catalog, value}
+// Remembers one value. Returns the thing, identity included.
+func (s *Server) createThing(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Catalog string `json:"catalog"`
+		Value   string `json:"value"`
+	}
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	if body.Catalog == "" || body.Value == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "catalog and value are required", "")
+		return
+	}
+	catalog := body.Catalog
+	if _, isSubtype := DataTypeDefinitions()[catalog]; isSubtype {
+		catalog = subtypeToKey(catalog)
+	}
+	entry, err := s.thingStore.Add(catalog, body.Value)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to save thing", err.Error())
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, entry)
+}
+
+// PATCH /api/v1/things/{id}   body: {catalog?, value?}
+//
+// The operation the old whole-catalog PUT could not express: change what a
+// thing is filed under, or what it is called, WITHOUT changing which thing it
+// is. Everything pointing at it — where it sits on the board, which group it
+// joined — is keyed by the id and so simply keeps pointing.
+func (s *Server) patchThing(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var body struct {
+		Catalog string `json:"catalog"`
+		Value   string `json:"value"`
+	}
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	// Callers say either the catalog key ("landmarks", what the GUI has in
+	// hand) or the subtype name ("landmark", what a person types). Normalise,
+	// or the same move made from two places files the thing under two
+	// different catalogs.
+	catalog := body.Catalog
+	if _, isSubtype := DataTypeDefinitions()[catalog]; isSubtype {
+		catalog = subtypeToKey(catalog)
+	}
+	entry, err := s.thingStore.Update(id, catalog, body.Value)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		s.JSONError(w, r, http.StatusNotFound, "thing not found", id)
+		return
+	case errors.Is(err, os.ErrExist):
+		s.JSONError(w, r, http.StatusConflict, "that catalog already holds that value", id)
+		return
+	case err != nil:
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to update thing", err.Error())
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, entry)
+}
+
+// DELETE /api/v1/things/{id}
+func (s *Server) deleteThing(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if err := s.thingStore.Delete(id); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to delete thing", err.Error())
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "thing deleted", "id": id})
+}
+
 // PUT /api/v1/memo
 // Replaces the entire memo with the provided map[string][]string.
+//
+// Kept for callers that still speak in whole catalogs. It cannot express
+// identity — a value that moves between catalogs across two of these looks
+// like a delete and an unrelated create — so the store preserves the id of any
+// catalog/value pair that survives the write, and anything genuinely new gets
+// a fresh one. Prefer POST/PATCH/DELETE above.
 func (s *Server) putThings(w http.ResponseWriter, r *http.Request) {
 	var data map[string][]string
 	if err := DecodeRequest(r, &data); err != nil {

@@ -67,6 +67,9 @@ func (s *Server) applyFrontendConfig(newConfig Config) {
 	if newConfig.SystemFontSize != "" {
 		s.config.SystemFontSize = newConfig.SystemFontSize
 	}
+	if newConfig.GeocodeCountry != "" {
+		s.config.GeocodeCountry = newConfig.GeocodeCountry
+	}
 	s.config.CanvasBgColor = newConfig.CanvasBgColor
 	s.config.CanvasDPad = newConfig.CanvasDPad
 	s.config.CanvasWeatherEffect = newConfig.CanvasWeatherEffect

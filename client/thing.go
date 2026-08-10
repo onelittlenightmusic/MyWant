@@ -57,7 +57,7 @@ type ThingDefinition struct {
 // is used, which wants name it now, and where it sits on the board. The server
 // assembles all of it, so a client never has to fetch the pieces separately.
 type Thing struct {
-	ID      string `json:"id"` // "<catalog>::<value>"
+	ID      string `json:"id"` // the thing's own UUID — survives its catalog and name changing
 	Catalog string `json:"catalog"`
 	Subtype string `json:"subtype"`
 	Value   string `json:"value"`
@@ -98,8 +98,52 @@ func (c *Client) GetThingsByCatalog() (map[string][]string, error) {
 }
 
 // PutThings replaces the whole memo catalog.
+//
+// Identity-blind: a value that moves between catalogs across two of these
+// looks like a delete and an unrelated create. Prefer the three below when the
+// thing being changed is one you already have in hand.
 func (c *Client) PutThings(memo map[string][]string) error {
 	return c.Request("PUT", "/api/v1/things", memo, nil)
+}
+
+// ThingEntry is a thing as stored: an identity, and what is true about it.
+type ThingEntry struct {
+	ID      string `json:"id"`
+	Catalog string `json:"catalog"`
+	Value   string `json:"value"`
+}
+
+// CreateThing remembers one value and returns it, identity included.
+func (c *Client) CreateThing(catalog, value string) (ThingEntry, error) {
+	var out ThingEntry
+	body := map[string]string{"catalog": catalog, "value": value}
+	if err := c.Request("POST", "/api/v1/things", body, &out); err != nil {
+		return ThingEntry{}, err
+	}
+	return out, nil
+}
+
+// PatchThing changes what a thing is filed under, or what it is called,
+// without changing which thing it is. Empty fields are left alone.
+func (c *Client) PatchThing(id, catalog, value string) (ThingEntry, error) {
+	body := map[string]string{}
+	if catalog != "" {
+		body["catalog"] = catalog
+	}
+	if value != "" {
+		body["value"] = value
+	}
+	var out ThingEntry
+	path := fmt.Sprintf("/api/v1/things/%s", url.PathEscape(id))
+	if err := c.Request("PATCH", path, body, &out); err != nil {
+		return ThingEntry{}, err
+	}
+	return out, nil
+}
+
+// DeleteThing forgets one thing by identity.
+func (c *Client) DeleteThing(id string) error {
+	return c.Request("DELETE", fmt.Sprintf("/api/v1/things/%s", url.PathEscape(id)), nil, nil)
 }
 
 // GetThingSuggestions returns the values recorded for one subtype, newest first.

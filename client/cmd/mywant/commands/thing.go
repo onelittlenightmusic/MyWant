@@ -136,20 +136,22 @@ var thingAddCmd = &cobra.Command{
 			memo = map[string][]string{}
 		}
 
+		// One request each, so the server mints an identity per value. Writing
+		// the whole catalog back would work, but it cannot say which of the
+		// values in it is new, and a thing's id is the server's to give.
 		added := 0
 		for _, v := range values {
 			if slices.Contains(memo[subtype], v) {
 				continue
 			}
-			memo[subtype] = append(memo[subtype], v)
+			if _, err := c.CreateThing(subtype, v); err != nil {
+				exitErr("saving thing", err)
+			}
 			added++
 		}
 		if added == 0 {
 			fmt.Println("Nothing to add; all values are already recorded.")
 			return
-		}
-		if err := c.PutThings(memo); err != nil {
-			exitErr("saving memo", err)
 		}
 		fmt.Printf("Added %d value(s) to %s.\n", added, subtype)
 	},
@@ -201,6 +203,65 @@ var thingRemoveCmd = &cobra.Command{
 			exitErr("saving memo", err)
 		}
 		fmt.Printf("Removed %d value(s) from %s.\n", removed, subtype)
+	},
+}
+
+var thingMoveCmd = &cobra.Command{
+	Use:   "move <value> <new-subtype>",
+	Short: "Change what category a thing is filed under, keeping the thing",
+	Long: `Change a thing's category without changing which thing it is.
+
+A thing's id survives the move, so everything pointing at it — where it sits on
+the canvas, which constellations it belongs to — keeps pointing. That is the
+difference between this and removing the value and adding it back, which would
+give you a different thing wearing the same name.
+
+The value may be given on its own when it is unambiguous, or as
+"catalog::value" when the same name is filed in more than one place.`,
+	Args:              cobra.ExactArgs(2),
+	ValidArgsFunction: completeMemoSubtypes,
+	Run: func(cmd *cobra.Command, args []string) {
+		wanted, target := args[0], args[1]
+		c := memoClient()
+
+		things, err := c.GetThings()
+		if err != nil {
+			exitErr("reading things", err)
+		}
+		catalog, value, qualified := strings.Cut(wanted, "::")
+		if !qualified {
+			value = wanted
+		}
+
+		var matches []client.Thing
+		for _, t := range things {
+			if t.Value != value {
+				continue
+			}
+			if qualified && t.Catalog != catalog {
+				continue
+			}
+			matches = append(matches, t)
+		}
+		switch len(matches) {
+		case 0:
+			fmt.Fprintf(os.Stderr, "No thing called %q.\n", value)
+			os.Exit(1)
+		case 1:
+		default:
+			fmt.Fprintf(os.Stderr, "%q is filed in more than one place — say which:\n", value)
+			for _, m := range matches {
+				fmt.Fprintf(os.Stderr, "  %s::%s\n", m.Catalog, m.Value)
+			}
+			os.Exit(1)
+		}
+
+		moved, err := c.PatchThing(matches[0].ID, target, "")
+		if err != nil {
+			exitErr("moving thing", err)
+		}
+		fmt.Printf("Moved %s from %s to %s (id %s, unchanged).\n",
+			moved.Value, matches[0].Catalog, moved.Catalog, moved.ID)
 	},
 }
 
@@ -531,6 +592,7 @@ func init() {
 	ThingCmd.AddCommand(thingListCmd)
 	ThingCmd.AddCommand(thingGetCmd)
 	ThingCmd.AddCommand(thingAddCmd)
+	ThingCmd.AddCommand(thingMoveCmd)
 	ThingCmd.AddCommand(thingRemoveCmd)
 	ThingCmd.AddCommand(thingEventsCmd)
 	ThingCmd.AddCommand(thingStatsCmd)

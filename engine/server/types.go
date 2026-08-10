@@ -24,7 +24,7 @@ type Config struct {
 	// SystemFontSize scales card-face names and the hamburger menu together:
 	// "small" | "medium" | "large" (absent = "large", the current sizes).
 	SystemFontSize string `json:"system_font_size,omitempty" yaml:"system_font_size,omitempty"`
-	CanvasBgURL  string   `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
+	CanvasBgURL    string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
 	// TunnelURL is the public URL captured from a managed_launch want (e.g.
 	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.
 	TunnelURL           string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
@@ -39,7 +39,15 @@ type Config struct {
 	// CurrentWorld is the name of the currently-open world snapshot
 	// (~/.mywant/worlds/<name>.yaml) — see handlers_worlds.go. Empty means no
 	// world has been opened yet (ad-hoc wants, not yet snapshotted).
-	CurrentWorld         string `json:"current_world,omitempty" yaml:"current_world,omitempty"`
+	CurrentWorld string `json:"current_world,omitempty" yaml:"current_world,omitempty"`
+	// GeocodeCountry restricts place-name lookups to one country, as an
+	// ISO 3166-1 alpha-2 code ("jp"). Cards that turn a name into coordinates
+	// pass it to the geocoder. Worth having because a bare name is ambiguous
+	// across the whole planet: "新宿駅" resolved to a city in Anhui, China, and
+	// the router then refused a 900 km walk it had been asked for by accident.
+	// Empty = no restriction, which is the right default for anyone whose
+	// places are not all in one country.
+	GeocodeCountry       string `json:"geocode_country,omitempty" yaml:"geocode_country,omitempty"`
 	ActiveLocationDevice string `json:"active_location_device,omitempty" yaml:"active_location_device,omitempty"`
 	LocationWantId       string `json:"location_want_id,omitempty" yaml:"location_want_id,omitempty"`
 	// WebInspectorLANHost is the mywant server's LAN-reachable address (host
