@@ -922,6 +922,28 @@ func computeExposeImportRecommendations(s *Server, source, target *mywant.Want, 
 			}
 		}
 
+		// The target said outright that it wants this filled. That is a stronger
+		// statement than any of the guesses above, which read names, labels and
+		// types and infer intent from them — here the want type declared it. So
+		// an importable slot outranks everything, and an importable slot whose
+		// subType also matches is the top of the list: the pairing both sides
+		// asked for. Without this a location want offered its lat, its lng and
+		// its coordinate with nothing to separate them, and the one the target
+		// could actually use was buried among the ones it could not.
+		if targetDef := s.globalBuilder.GetWantTypeDefinition(target.Metadata.Type); targetDef != nil {
+			for _, st := range targetDef.State {
+				if st.Name != localKey || !st.Importable {
+					continue
+				}
+				if semanticMatch {
+					score = 1.0
+				} else if score < 0.9 {
+					score = 0.9
+				}
+				break
+			}
+		}
+
 		// ExposeAction only when the source has not yet exposed this global key.
 		var exposeAction *ExposeAction
 		if _, exposed := alreadyExposedAs[globalKey]; !exposed {

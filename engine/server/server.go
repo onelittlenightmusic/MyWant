@@ -45,6 +45,10 @@ type Server struct {
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
 	thingLabels          *ThingLabelStore                // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
+	// The mirror: slots a want type is asking to have filled. Built the same
+	// way and in the same pass, so the two can never describe different sets of
+	// want types.
+	importableFieldsCache map[string][]ImportableFieldInfo
 }
 
 // WantExecutionTyped overrides the one in types.go to use proper mywant types if possible
@@ -248,18 +252,26 @@ func New(config Config) *Server {
 	// This must happen in New() (not just Start()) so tests that call setupRoutes()
 	// directly also have StateLabels populated before ExecuteWithMode runs.
 	exposableFieldsCache := make(map[string][]ExposableFieldInfo)
+	importableFieldsCache := make(map[string][]ImportableFieldInfo)
 	if wantTypeLoader != nil {
 		allDefs := wantTypeLoader.GetAll()
 		for _, def := range allDefs {
 			globalBuilder.StoreWantTypeDefinition(def)
 			var fields []ExposableFieldInfo
+			var wanted []ImportableFieldInfo
 			for _, sd := range def.State {
 				if sd.Exposable {
 					fields = append(fields, ExposableFieldInfo{Name: sd.Name, Type: sd.Type, SubType: sd.SubType})
 				}
+				if sd.Importable {
+					wanted = append(wanted, ImportableFieldInfo{Name: sd.Name, Type: sd.Type, SubType: sd.SubType})
+				}
 			}
 			if len(fields) > 0 {
 				exposableFieldsCache[def.Metadata.Name] = fields
+			}
+			if len(wanted) > 0 {
+				importableFieldsCache[def.Metadata.Name] = wanted
 			}
 		}
 	}
@@ -291,23 +303,24 @@ func New(config Config) *Server {
 	mywant.DebugLoggingEnabled = config.Debug
 
 	return &Server{
-		config:               config,
-		wants:                make(map[string]*WantExecution),
-		globalBuilder:        globalBuilder,
-		agentRegistry:        agentRegistry,
-		recipeRegistry:       recipeRegistry,
-		wantTypeLoader:       wantTypeLoader,
-		errorHistory:         make([]ErrorHistoryEntry, 0),
-		robotLog:             make([]RobotLogEntry, 0),
-		router:               mux.NewRouter(),
-		reactionQueueManager: reactionQueueManager,
-		interactionManager:   interactionManager,
-		otelShutdown:         otelShutdown,
-		thingStore:           newThingStore(),
-		thingEvents:          newThingEventStore(),
-		notifications:        newNotificationStore(),
-		thingLabels:          newThingLabelStore(),
-		exposableFieldsCache: exposableFieldsCache,
+		config:                config,
+		wants:                 make(map[string]*WantExecution),
+		globalBuilder:         globalBuilder,
+		agentRegistry:         agentRegistry,
+		recipeRegistry:        recipeRegistry,
+		wantTypeLoader:        wantTypeLoader,
+		errorHistory:          make([]ErrorHistoryEntry, 0),
+		robotLog:              make([]RobotLogEntry, 0),
+		router:                mux.NewRouter(),
+		reactionQueueManager:  reactionQueueManager,
+		interactionManager:    interactionManager,
+		otelShutdown:          otelShutdown,
+		thingStore:            newThingStore(),
+		thingEvents:           newThingEventStore(),
+		notifications:         newNotificationStore(),
+		thingLabels:           newThingLabelStore(),
+		exposableFieldsCache:  exposableFieldsCache,
+		importableFieldsCache: importableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},

@@ -365,6 +365,11 @@ type ExposableFieldInfo struct {
 	SubType string `json:"subType,omitempty"`
 }
 
+// ImportableFieldInfo describes a state field the want type has declared as a
+// slot it wants filled from elsewhere — the mirror of ExposableFieldInfo. Same
+// shape on purpose: a reader that can draw one can draw the other.
+type ImportableFieldInfo = ExposableFieldInfo
+
 // enrichedCorrelationEntry mirrors want_spec.CorrelationEntry with an added RelationID.
 type enrichedCorrelationEntry struct {
 	RelationID string   `json:"relationID,omitempty"`
@@ -393,6 +398,7 @@ type wantAPIResponse struct {
 	ConnectivityMetadata mywant.ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
 	Hash                 string                      `json:"hash,omitempty"`
 	ExposableFields      []ExposableFieldInfo        `json:"exposable_fields,omitempty"`
+	ImportableFields     []ImportableFieldInfo       `json:"importable_fields,omitempty"`
 }
 
 // buildWantAPIResponse constructs a wantAPIResponse from a live Want, grouping state fields
@@ -429,6 +435,7 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 	}
 
 	exposableFields := s.exposableFieldsCache[want.Metadata.Type]
+	importableFields := s.importableFieldsCache[want.Metadata.Type]
 
 	// Build enriched correlation entries with RelationIDs.
 	enrichedCorr := make([]enrichedCorrelationEntry, 0, len(want.Metadata.Correlation))
@@ -459,15 +466,16 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 	meta := apiMetadata{Metadata: want.Metadata, Correlation: enrichedCorr}
 
 	resp := wantAPIResponse{
-		Metadata:        meta,
-		Spec:            *want.GetSpec(),
-		Status:          want.GetStatus(),
-		State:           hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
-		StateTimestamps: want.GetStateTimestamps(),
-		HiddenState:     want.GetHiddenState(),
-		History:         want.BuildHistory(),
-		Hash:            mywant.CalculateWantHash(want),
-		ExposableFields: exposableFields,
+		Metadata:         meta,
+		Spec:             *want.GetSpec(),
+		Status:           want.GetStatus(),
+		State:            hierarchicalState{FinalResult: finalResult, Current: current, Goal: goal, Plan: plan, Internal: internal},
+		StateTimestamps:  want.GetStateTimestamps(),
+		HiddenState:      want.GetHiddenState(),
+		History:          want.BuildHistory(),
+		Hash:             mywant.CalculateWantHash(want),
+		ExposableFields:  exposableFields,
+		ImportableFields: importableFields,
 	}
 	if includeConnectivity {
 		resp.ConnectivityMetadata = want.ConnectivityMetadata
