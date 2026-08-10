@@ -698,7 +698,11 @@ func computeStateParamRecommendations(s *Server, source, target *mywant.Want, al
 			continue
 		}
 		for _, sf := range fields {
-			if sf.DataType != p.SubType {
+			// Interchangeable, not identical: a field carrying a place can fill
+			// a parameter asking for a station. An exact agreement still scores
+			// higher below, so widening what is offered does not reorder what
+			// was already the best answer.
+			if !subtypesInterchangeable(sf.DataType, p.SubType) {
 				continue
 			}
 			// Says only what could fill what. HOW the two get connected — as a
@@ -751,9 +755,16 @@ func computeThingValueRecommendations(s *Server, target *mywant.Want, catalog, v
 	}
 	var recs []FieldMatchRecommendation
 	for _, p := range def.Parameters {
-		// The parameter names a subtype; the value lives in that subtype's
-		// catalogue or in another one, and only the first is a match.
-		if p.SubType == "" || subtypeToKey(p.SubType) != catalog {
+		// The parameter names a subtype and the value lives in some catalog.
+		// An exact agreement is the best case; a catalog whose subtype is
+		// interchangeable with it is still worth offering, one rank down —
+		// a place you have already named is a perfectly good place to leave
+		// from, even where the field says "station".
+		if p.SubType == "" {
+			continue
+		}
+		exact := subtypeToKey(p.SubType) == catalog
+		if !exact && !subtypesInterchangeable(p.SubType, keyToSubtype(catalog)) {
 			continue
 		}
 		current, has := target.Spec.Params[p.Name]
@@ -762,19 +773,27 @@ func computeThingValueRecommendations(s *Server, target *mywant.Want, catalog, v
 		}
 		filled := has && current != nil && current != ""
 		score := 0.95
-		description := fmt.Sprintf("Use %s %q for %s", p.SubType, value, p.Name)
+		named := p.SubType
+		if !exact {
+			// Say what it actually is. Calling a place a station because the
+			// field is spelled that way would be describing the field, not the
+			// thing being offered.
+			named = keyToSubtype(catalog)
+			score = 0.8
+		}
+		description := fmt.Sprintf("Use %s %q for %s", named, value, p.Name)
 		if filled {
-			score = 0.6
-			description = fmt.Sprintf("Replace %s with %s %q", p.Name, p.SubType, value)
+			score -= 0.35
+			description = fmt.Sprintf("Replace %s with %s %q", p.Name, named, value)
 		}
 		recs = append(recs, FieldMatchRecommendation{
 			Score:       score,
 			Description: description,
 			Source: FieldRef{
 				WantName:  "thing",
-				FieldName: p.SubType,
+				FieldName: named,
 				FieldType: "string",
-				DataType:  p.SubType,
+				DataType:  named,
 				Label:     "thing",
 			},
 			Target: ParamRef{
@@ -824,15 +843,40 @@ func computeMemoRecommendations(s *Server, target *mywant.Want) []FieldMatchReco
 		if v, ok := target.Spec.Params[p.Name]; ok && v != nil && v != "" {
 			continue
 		}
-		for i, v := range s.thingStore.Suggestions(p.SubType, thingRecommendationLimit) {
+		// The declared subtype first, then the ones interchangeable with it —
+		// a field asking for a station will happily take a place you have
+		// already named. Ordered so the exact subtype's values still come out
+		// on top, and each following subtype starts a rank lower.
+		type suggestion struct {
+			value   string
+			subtype string
+			rank    int
+		}
+		var pool []suggestion
+		rank := 0
+		for _, sub := range orderedInterchangeable(p.SubType) {
+			for _, v := range s.thingStore.Suggestions(sub, thingRecommendationLimit) {
+				pool = append(pool, suggestion{value: v, subtype: sub, rank: rank})
+				rank++
+			}
+			if len(pool) >= thingRecommendationLimit {
+				break
+			}
+		}
+		if len(pool) > thingRecommendationLimit {
+			pool = pool[:thingRecommendationLimit]
+		}
+		for _, sg := range pool {
+			i := sg.rank
+			v := sg.value
 			recs = append(recs, FieldMatchRecommendation{
 				Score:       0.7 - float64(i)*0.05,
-				Description: fmt.Sprintf("Use remembered %s %q for %s", p.SubType, v, p.Name),
+				Description: fmt.Sprintf("Use remembered %s %q for %s", sg.subtype, v, p.Name),
 				Source: FieldRef{
 					WantName:  "thing",
-					FieldName: p.SubType,
+					FieldName: sg.subtype,
 					FieldType: "string",
-					DataType:  p.SubType,
+					DataType:  sg.subtype,
 					Label:     "thing",
 				},
 				Target: ParamRef{

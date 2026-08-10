@@ -391,6 +391,67 @@ func DataTypeDefinitions() map[string]DataTypeInfo {
 	return out
 }
 
+// baseTypeOf is what a subtype ultimately IS — "station" and "location" are
+// both strings, "percentage" is a number. Primitives are their own base.
+func baseTypeOf(subtype string) string {
+	info, ok := dataTypeDefs[subtype]
+	if !ok {
+		return ""
+	}
+	if info.BaseType == "" {
+		return subtype // a primitive
+	}
+	return info.BaseType
+}
+
+// subtypesInterchangeable reports whether a value of one subtype may be offered
+// for a field declaring the other.
+//
+// A route's `from` is declared as a station, but a place, a landmark or a city
+// is just as good a thing to leave from — they are all strings, and the field
+// only ever wanted a string with a meaning attached. Requiring the exact
+// subtype meant a thing you had already named was invisible to a field that
+// could plainly use it.
+//
+// Deliberately permissive: an exact match still ranks above this wherever the
+// two are ordered, so widening what is ACCEPTED does not change what is
+// SUGGESTED FIRST.
+func subtypesInterchangeable(a, b string) bool {
+	if a == b {
+		return true
+	}
+	if a == "" || b == "" {
+		return false
+	}
+	base := baseTypeOf(a)
+	return base != "" && base == baseTypeOf(b)
+}
+
+// orderedInterchangeable lists the subtypes a field declaring `subtype` will
+// take: itself first, then the others sharing its base type, alphabetically so
+// the order is the same from one call to the next.
+func orderedInterchangeable(subtype string) []string {
+	if subtype == "" {
+		return nil
+	}
+	base := baseTypeOf(subtype)
+	if base == "" {
+		return []string{subtype}
+	}
+	out := []string{subtype}
+	var rest []string
+	for name, info := range dataTypeDefs {
+		if name == subtype || info.BaseType == "" {
+			continue // itself, or a primitive: a bare "string" names nothing
+		}
+		if info.BaseType == base {
+			rest = append(rest, name)
+		}
+	}
+	sort.Strings(rest)
+	return append(out, rest...)
+}
+
 func subtypeToKey(subtype string) string {
 	if info, ok := dataTypeDefs[subtype]; ok {
 		return info.Key

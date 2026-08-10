@@ -55,9 +55,15 @@ func (s *Server) deriveThingUsage() []memoUsage {
 	// recorded (recordMemo: false, or typed before the hook existed) does not
 	// masquerade as a memo.
 	remembered := map[string]bool{}
+	// Also: which catalogs a value of this name is remembered in, so a field
+	// can be matched against a thing filed under a different but
+	// interchangeable subtype — a `from` declared as a station finding the
+	// place you already named. See subtypesInterchangeable.
+	catalogsByValue := map[string][]string{}
 	for catalog, values := range s.thingStore.All() {
 		for _, v := range values {
 			remembered[catalog+"::"+v] = true
+			catalogsByValue[v] = append(catalogsByValue[v], catalog)
 		}
 	}
 
@@ -121,15 +127,27 @@ func (s *Server) deriveThingUsage() []memoUsage {
 					continue
 				}
 				catalog := subtypeToKey(pd.SubType)
-				id := catalog + "::" + str
-				if !remembered[id] {
-					continue
+				// The declared subtype first; failing that, any catalog holding
+				// this value whose subtype is interchangeable with it. The
+				// field asked for a string with a meaning, and these all are.
+				if !remembered[catalog+"::"+str] {
+					catalog = ""
+					for _, c := range catalogsByValue[str] {
+						if subtypesInterchangeable(pd.SubType, keyToSubtype(c)) {
+							catalog = c
+							break
+						}
+					}
+					if catalog == "" {
+						continue
+					}
 				}
+				id := catalog + "::" + str
 				if byID[id] == nil {
 					byID[id] = &memoUsage{
 						ID:      id,
 						Catalog: catalog,
-						Subtype: pd.SubType,
+						Subtype: keyToSubtype(catalog),
 						Value:   str,
 					}
 					seen[id] = map[string]bool{}
