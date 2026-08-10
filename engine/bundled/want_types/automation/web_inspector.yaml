@@ -4,7 +4,7 @@ wantType:
     title: Web Inspector
     description: |
       Opens the target URL with an interactive overlay via the MyWant Web
-      Inspector Chrome extension (mcp/playwright-app/chrome-extension/) — its
+      Inspector browser extension (built from the mywant-gui repo, webext/) — its
       background service worker polls for this want and opens/injects the tab
       itself, no CDP-debuggable Chrome required. Use arrow keys or a gamepad
       to navigate between interactive elements (inputs, buttons, links).

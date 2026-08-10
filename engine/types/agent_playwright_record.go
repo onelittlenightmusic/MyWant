@@ -181,7 +181,7 @@ func startPlaywrightRecording(ctx context.Context, want *mywant.Want) error {
 
 	serverPath := resolvePlaywrightServerPath()
 	if serverPath == "" {
-		return fmt.Errorf("[PLAYWRIGHT-RECORD] playwright-app server not found; build mcp/playwright-app first")
+		return fmt.Errorf("[PLAYWRIGHT-RECORD] playwright-app server not found; run `make install-playwright-app` (or set MYWANT_PLAYWRIGHT_SERVER)")
 	}
 
 	mgr := GetNativeMCPManager(ctx)
@@ -262,7 +262,7 @@ func startDebugRecording(ctx context.Context, want *mywant.Want) error {
 
 	serverPath := resolvePlaywrightServerPath()
 	if serverPath == "" {
-		return fmt.Errorf("[PLAYWRIGHT-RECORD] playwright-app server not found; build mcp/playwright-app first")
+		return fmt.Errorf("[PLAYWRIGHT-RECORD] playwright-app server not found; run `make install-playwright-app` (or set MYWANT_PLAYWRIGHT_SERVER)")
 	}
 
 	mgr := GetNativeMCPManager(ctx)
@@ -515,7 +515,29 @@ func moveReplayScreenshot(srcPath, wantID string) (string, error) {
 }
 
 // resolvePlaywrightServerPath returns the absolute path to the playwright-app server.js.
+//
+// Search order, first hit wins:
+//  1. $MYWANT_PLAYWRIGHT_SERVER — explicit override
+//  2. ~/.mywant/playwright-app/dist/server.js — populated by the opt-in
+//     `make install-playwright-app`, so an installed binary works without a
+//     source checkout next to it
+//  3. mcp/playwright-app/dist/server.js under the cwd — running from a checkout
+//  4. the same path under the compile-time source root — `go run` / `go test`
 func resolvePlaywrightServerPath() string {
+	if override := os.Getenv("MYWANT_PLAYWRIGHT_SERVER"); override != "" {
+		if _, err := os.Stat(override); err == nil {
+			abs, _ := filepath.Abs(override)
+			return abs
+		}
+	}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		p := filepath.Join(home, ".mywant", "playwright-app", "dist", "server.js")
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+
 	candidates := []string{
 		"mcp/playwright-app/dist/server.js",
 		"mcp/playwright-app/server.js",

@@ -1,6 +1,7 @@
-.PHONY: clean build build-cli build-mywant-gui build-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
+.PHONY: clean build build-cli build-mywant-gui build-playwright-app install-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
 
 INSTALL_DIR ?= $(HOME)/.local/bin
+PLAYWRIGHT_APP_DIR ?= $(HOME)/.mywant/playwright-app
 
 # Build version reported by `mywant --version` and GET /health. Release builds
 # get this from goreleaser (see .goreleaser.yaml); locally it comes from the git
@@ -177,8 +178,9 @@ help:
 	@echo "  test-build                - Quick build test"
 	@echo "  build-mock                - Build mock flight server (bin/flight-server)"
 	@echo "  build-mock-plugin         - Build mock CLI plugin (bin/mywant-mock)"
-	@echo "  build-playwright-app      - Build Playwright MCP App Server (Node.js)"
-	@echo "  install-playwright-browsers - Install Chromium for Playwright (first-time setup)"
+	@echo "  build-playwright-app      - Build Playwright MCP App Server (Node.js, used by the 'replay' want type)"
+	@echo "  install-playwright-app    - Build + install it to ~/.mywant/playwright-app (opt-in; NOT part of 'make install')"
+	@echo "  install-playwright-browsers - Install Chromium for Playwright (needed after install-playwright-app)"
 	@echo ""
 	@echo "🏃 Run Examples:"
 	@echo "  run-qnet              - Queue network example"
@@ -235,16 +237,33 @@ fix-mcp:
 reload-want-type:
 	@./bin/mywant types reload
 
-install: release build-playwright-app
+install: release
 	@echo "📦 Installing mywant to $(INSTALL_DIR)..."
 	@mkdir -p $(INSTALL_DIR)
 	@cp bin/mywant $(INSTALL_DIR)/mywant
 	@codesign --sign - --force $(INSTALL_DIR)/mywant 2>/dev/null || true
 	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
 
+# Opt-in: only the `replay` want type needs this, and it costs a Node toolchain
+# plus ~42MB of dependencies. It shells out to the Node server, so the server has
+# to live outside the source tree for an installed binary to find it
+# (see resolvePlaywrightServerPath). Browsers are a further opt-in step:
+# make install-playwright-browsers
+install-playwright-app: build-playwright-app
+	@echo "🎭 Installing playwright-app to $(PLAYWRIGHT_APP_DIR)..."
+	@rm -rf $(PLAYWRIGHT_APP_DIR)
+	@mkdir -p $(PLAYWRIGHT_APP_DIR)
+	@cp -R mcp/playwright-app/dist $(PLAYWRIGHT_APP_DIR)/dist
+	@cp mcp/playwright-app/package.json mcp/playwright-app/package-lock.json $(PLAYWRIGHT_APP_DIR)/
+	@# npm ci against the copied lockfile, so the installed Playwright is the exact
+	@# version the browsers in ~/Library/Caches/ms-playwright were installed for.
+	@cd $(PLAYWRIGHT_APP_DIR) && npm ci --omit=dev --silent
+	@echo "✅ Installed: $(PLAYWRIGHT_APP_DIR)/dist/server.js"
+
 uninstall:
 	@echo "🗑️  Uninstalling mywant from $(INSTALL_DIR)..."
 	@rm -f $(INSTALL_DIR)/mywant
+	@rm -rf $(PLAYWRIGHT_APP_DIR)
 	@echo "✅ Uninstalled: mywant"
 
 # Default target
