@@ -171,6 +171,16 @@ func (s *Server) saveWorld(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusInternalServerError, "Failed to save world", err.Error())
 		return
 	}
+	// Saving under another name copies the things too, or the copy would be the
+	// same board with nothing on it. The open world keeps its own — this
+	// snapshots, it does not move house.
+	if dir, err := s.worldsDir(); err == nil {
+		from := s.config.CurrentWorld
+		if from == "" {
+			from = defaultWorldName
+		}
+		copyWorldThings(dir, from, name)
+	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"name": name})
 }
 
@@ -395,6 +405,15 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 
 	s.config.CurrentWorld = name
 	s.saveFrontendConfig()
+
+	// The world's things, by pointing the stores at them. No load step and no
+	// save step: the world being left has been written all along, and the one
+	// being entered is read on the next request that asks. See world_things.go.
+	s.useWorldThings(name)
+	// Said out loud because a client that already has the old world's things in
+	// hand has no other way to learn they are no longer the truth — nothing
+	// about a thing changed, the question changed.
+	go broadcastSSE("thing_changed", name)
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"name":       name,

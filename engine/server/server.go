@@ -427,6 +427,20 @@ func (s *Server) Start() error {
 	// the world you are actually in rather than an empty one.
 	s.ensureDefaultWorld()
 
+	// Things belong to the world they were entered in. Adopt whatever was
+	// collected before that was true into the world open right now — after
+	// ensureDefaultWorld, so on a fresh install there is a world to adopt them
+	// into — and then read and write them there from here on. See
+	// world_things.go.
+	{
+		world := s.config.CurrentWorld
+		if world == "" {
+			world = defaultWorldName
+		}
+		s.adoptLegacyThingsInto(world)
+		s.useWorldThings(world)
+	}
+
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	s.httpServer = &http.Server{

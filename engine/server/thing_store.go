@@ -68,6 +68,16 @@ func newThingStore() *ThingStore {
 	return &ThingStore{path: thingPath("thing.yaml")}
 }
 
+// SetPath moves the store to another file. Every read and write goes through
+// `path` at the moment it happens, so this is the whole of "things belong to a
+// world": point it at the open world's file and the saves the store already
+// performs are saves into that world. See world_things.go.
+func (m *ThingStore) SetPath(p string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.path = p
+}
+
 // loadEntries reads the store as it is stored: a list of identified things.
 func (m *ThingStore) loadEntries() ([]ThingEntry, error) {
 	bytes, err := os.ReadFile(m.path)

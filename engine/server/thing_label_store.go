@@ -26,6 +26,14 @@ func newThingLabelStore() *ThingLabelStore {
 	return &ThingLabelStore{path: thingPath("thing-labels.yaml")}
 }
 
+// SetPath moves the store to another file — see ThingStore.SetPath, and
+// world_things.go for why labels travel with the things they describe.
+func (m *ThingLabelStore) SetPath(p string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.path = p
+}
+
 func (m *ThingLabelStore) load() (thingLabelData, error) {
 	data := make(thingLabelData)
 	bytes, err := os.ReadFile(m.path)
