@@ -26,9 +26,14 @@ import (
 // enumerates worlds by scanning *.yaml in the worlds directory, and a sibling
 // file would list itself as a world.
 
+// worldThingsDir returns <worldsDir>/things, where every world's things live.
+func worldThingsDir(dir string) string {
+	return filepath.Join(dir, "things")
+}
+
 // worldThingsPath returns <worldsDir>/things/<name>.yaml — the world's things.
 func worldThingsPath(dir, name string) string {
-	return filepath.Join(dir, "things", name+".yaml")
+	return filepath.Join(worldThingsDir(dir), name+".yaml")
 }
 
 // worldThingLabelsPath returns <worldsDir>/things/<name>-labels.yaml — where
@@ -38,7 +43,7 @@ func worldThingsPath(dir, name string) string {
 // in two files: a thing restored without its labels arrives with no position
 // and no group, which on the canvas is indistinguishable from not arriving.
 func worldThingLabelsPath(dir, name string) string {
-	return filepath.Join(dir, "things", name+"-labels.yaml")
+	return filepath.Join(worldThingsDir(dir), name+"-labels.yaml")
 }
 
 // useWorldThings points both thing stores at the given world's files, so every
@@ -53,7 +58,7 @@ func (s *Server) useWorldThings(name string) {
 		log.Printf("[WARN] worlds: cannot access worlds directory for things: %v", err)
 		return
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "things"), 0o755); err != nil {
+	if err := os.MkdirAll(worldThingsDir(dir), 0o755); err != nil {
 		log.Printf("[WARN] worlds: cannot create things directory: %v", err)
 		return
 	}
@@ -109,7 +114,7 @@ func copyWorldThings(dir, from, to string) {
 	if from == to {
 		return
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "things"), 0o755); err != nil {
+	if err := os.MkdirAll(worldThingsDir(dir), 0o755); err != nil {
 		log.Printf("[WARN] worlds: cannot create things directory: %v", err)
 		return
 	}

@@ -184,9 +184,11 @@ func (s *Server) saveWorld(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"name": name})
 }
 
-// exportWorld handles GET /api/v1/worlds/{name}/export — downloads a world's
-// snapshot as YAML. The currently-open world is snapshotted first so the
-// download reflects the live wants rather than the last switch.
+// exportWorld handles GET /api/v1/worlds/{name}/export — downloads a world as
+// one YAML document: its wants, its things, and where those things sit. The
+// currently-open world is snapshotted first so the download reflects the live
+// wants rather than the last switch; its things need no such step, having been
+// written as they changed.
 func (s *Server) exportWorld(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	if !safeWorldName(name) {
@@ -207,13 +209,21 @@ func (s *Server) exportWorld(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := os.ReadFile(worldFilePath(dir, name))
+	// One document, wants and things together — a world that travels has to
+	// arrive whole, and several files is not something a person can hand to
+	// someone else. See world_bundle.go.
+	bundle, err := readWorldBundle(dir, name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			s.JSONError(w, r, http.StatusNotFound, "World not found", name)
 			return
 		}
 		s.JSONError(w, r, http.StatusInternalServerError, "Failed to read world", err.Error())
+		return
+	}
+	data, err := yaml.Marshal(bundle)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "Failed to encode world", err.Error())
 		return
 	}
 
@@ -223,8 +233,8 @@ func (s *Server) exportWorld(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// importWorld handles POST /api/v1/worlds/{name}/import — stores an uploaded
-// wants YAML as <name>.yaml, creating a new world without opening it. Refuses
+// importWorld handles POST /api/v1/worlds/{name}/import — unfolds an uploaded
+// world into the files it is made of, creating it without opening it. Refuses
 // to clobber an existing world unless ?overwrite=true is passed.
 func (s *Server) importWorld(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
@@ -240,12 +250,14 @@ func (s *Server) importWorld(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate before writing so a malformed upload can't create a broken world.
-	var wants []*mywant.Want
-	if err := yaml.Unmarshal(data, &wants); err != nil {
-		s.JSONError(w, r, http.StatusBadRequest, "Invalid wants YAML", err.Error())
+	// Either shape is accepted: a bundle from export, or a bare list of wants —
+	// the older export's shape, and what hand-written world files look like.
+	bundle, bundled, err := parseWorldUpload(data)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid world YAML", err.Error())
 		return
 	}
-	for _, want := range wants {
+	for _, want := range bundle.Wants {
 		if want == nil || want.Metadata.ID == "" {
 			s.JSONError(w, r, http.StatusBadRequest, "Imported wants must have IDs", "")
 			return
@@ -267,14 +279,15 @@ func (s *Server) importWorld(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := writeWorldBundle(dir, name, bundle, bundled); err != nil {
 		s.JSONError(w, r, http.StatusInternalServerError, "Failed to write world", err.Error())
 		return
 	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
-		"name":       name,
-		"want_count": len(wants),
+		"name":        name,
+		"want_count":  len(bundle.Wants),
+		"thing_count": len(bundle.Things),
 	})
 }
 
