@@ -63,6 +63,7 @@ func (w *RobotWant) Initialize() {
 	}
 
 	w.SetGoal("provider", locals.Provider)
+	w.SetGoal("model", w.GetStringParam("model", ""))
 	w.SetGoal("session_id", locals.SessionID)
 	w.SetGoal("auto_request", "")
 	w.SetGoal("max_requests", 0) // robot chat is unlimited — it never completes
@@ -74,7 +75,7 @@ func (w *RobotWant) Initialize() {
 	w.SetGoal("trigger_on", "webhook")
 	w.SetGoal("watch_pattern", "")
 
-	w.SetCurrent("phase", CCPhaseMonitoring)
+	SetCCPhase(&w.Want, CCPhaseMonitoring)
 	w.SetCurrent("request_count", locals.ReqCount)
 	w.SetCurrent("timeout_seconds", locals.TimeoutSec)
 	w.SetCurrent("interactive", true)
@@ -220,29 +221,29 @@ func (w *RobotWant) Progress() {
 	switch phase {
 	case CCPhaseMonitoring:
 		if nextAction == "send_request" {
-			w.SetCurrent("phase", CCPhaseTriggerReady)
+			SetCCPhase(&w.Want, CCPhaseTriggerReady)
 		}
 
 	case CCPhaseTriggerReady:
 		// Allow DoAgent to re-run for each new message (chat mode).
 		// DoAgent itself clears webhook_auto_request after reading it.
 		w.FinishAgentRun(ccDoAgentName, false)
-		w.SetCurrent("phase", CCPhaseRequesting)
+		SetCCPhase(&w.Want, CCPhaseRequesting)
 		if err := w.ExecuteAgents(); err != nil {
 			w.StoreLog("ERROR: DoAgent execution failed: %v", err)
-			w.SetCurrent("phase", CCPhaseError)
+			SetCCPhase(&w.Want, CCPhaseError)
 			w.SetCurrent("last_error", err.Error())
 			return
 		}
-		w.SetCurrent("phase", CCPhaseAwaitingResponse)
+		SetCCPhase(&w.Want, CCPhaseAwaitingResponse)
 		w.SetPlan("next_action", "")
 
 	case CCPhaseAwaitingResponse:
 		if nextAction == "process_response" {
-			w.SetCurrent("phase", CCPhaseResponseReceived)
+			SetCCPhase(&w.Want, CCPhaseResponseReceived)
 		} else if nextAction == "handle_timeout" {
 			w.StoreLog("[ROBOT] Response timeout, resuming monitoring")
-			w.SetCurrent("phase", CCPhaseMonitoring)
+			SetCCPhase(&w.Want, CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
 
@@ -250,12 +251,12 @@ func (w *RobotWant) Progress() {
 		locals.ReqCount++
 		w.SetCurrent("request_count", locals.ReqCount)
 		w.StoreLog("[ROBOT] Request %d completed", locals.ReqCount)
-		w.SetCurrent("phase", CCPhaseMonitoring)
+		SetCCPhase(&w.Want, CCPhaseMonitoring)
 		w.SetPlan("next_action", "")
 
 	case CCPhaseError:
 		if nextAction == "retry" {
-			w.SetCurrent("phase", CCPhaseMonitoring)
+			SetCCPhase(&w.Want, CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
 
@@ -265,7 +266,7 @@ func (w *RobotWant) Progress() {
 		// previous request was interrupted mid-flight (e.g. a server
 		// restart during ExecuteAgents()). Recover via the error/retry path.
 		w.StoreLog("[ROBOT] Found stale 'requesting' phase (likely interrupted by a server restart) — recovering")
-		w.SetCurrent("phase", CCPhaseError)
+		SetCCPhase(&w.Want, CCPhaseError)
 		w.SetCurrent("last_error", "request was interrupted (e.g. server restart) before completing")
 	}
 }

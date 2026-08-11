@@ -1,0 +1,147 @@
+wantType:
+  metadata:
+    name: model_list
+    title: Model List
+    description: |
+      Discovers which models the installed provider CLI actually recognizes and
+      publishes them as a global parameter.
+
+      Discovery goes through the CLI, not the provider's HTTP API: the CLI is
+      what runs a coding want's request, so what it recognizes is the only
+      answer that matters — and it needs no separate credentials.
+
+      For claude_code the check is free and offline. Running
+      `claude --print --model <name> ""` fails on the empty prompt before any
+      request is made, and the model check happens first, so the two outcomes
+      are distinguishable without spending a token:
+
+        recognized   -> "Error: Input must be provided ..."
+        unrecognized -> "<name>" is not a model this version of Claude Code
+                        recognizes, ...
+
+      For gemini the CLI offers no equivalent cheap check, so candidates are
+      only filtered on whether the `gemini` binary exists (see below).
+
+      Feed the result to a coding want by referencing the published parameter:
+
+        spec:
+          params:
+            model: {fromGlobalParam: available_models}
+
+      Or read the list and name one model directly on the coding want's `model`
+      parameter.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      type-icon: "Bot"
+
+  parameters:
+    - name: provider
+      description: |
+        Which CLI to interrogate.
+        - claude_code: probes each candidate against `claude` (free, offline)
+        - gemini:      checks the `gemini` binary exists; candidates are not
+                       individually verified
+      type: string
+      required: false
+      default: "claude_code"
+      validation:
+        enum:
+          - claude_code
+          - gemini
+
+    - name: candidates
+      description: |
+        Model names to probe, comma- or space-separated. Leave empty to probe a
+        built-in list of current aliases and ids. Naming a model that does not
+        exist costs nothing — the probe simply drops it.
+      type: string
+      subType: models
+      required: false
+      default: ""
+
+    - name: global_param
+      description: |
+        Global parameter the recognized list is published to. Set empty to keep
+        the result in this want's own state only.
+      type: string
+      required: false
+      default: "available_models"
+
+    - name: refresh_interval_seconds
+      description: |
+        How often to re-probe. The recognized set only changes when the CLI is
+        upgraded, so this can be generous.
+      type: int
+      required: false
+      default: 3600
+
+  state:
+    - name: provider
+      description: CLI being interrogated
+      type: string
+      persistent: true
+      initialValue: "claude_code"
+      label: goal
+
+    - name: global_param
+      description: Global parameter the list is published to
+      type: string
+      persistent: true
+      initialValue: "available_models"
+      label: goal
+
+    - name: models
+      description: Recognized models, comma-separated
+      type: string
+      subType: models
+      persistent: true
+      initialValue: ""
+      label: current
+
+    - name: model_count
+      description: How many candidates were recognized
+      type: int
+      persistent: true
+      initialValue: 0
+      label: current
+
+    - name: checked_at
+      description: RFC3339 timestamp of the last probe run
+      type: string
+      persistent: true
+      initialValue: ""
+      label: current
+
+    - name: last_error
+      description: Why the last probe run failed, empty when it succeeded
+      type: string
+      persistent: false
+      initialValue: ""
+      label: current
+
+  examples:
+    - title: Publish the models Claude Code recognizes
+      description: |
+        Probes the built-in candidate list hourly and publishes the recognized
+        names to the "available_models" global parameter.
+      want:
+        metadata:
+          name: model-list
+          type: model_list
+        spec:
+          params:
+            provider: claude_code
+
+    - title: Probe a narrowed set
+      description: Only check the three aliases this project is willing to run on.
+      want:
+        metadata:
+          name: model-list-narrow
+          type: model_list
+        spec:
+          params:
+            provider: claude_code
+            candidates: "opus, sonnet, haiku"
+            global_param: coding_models

@@ -56,6 +56,7 @@ func (w *CodingWant) Initialize() {
 	}
 
 	w.SetGoal("provider", locals.Provider)
+	w.SetGoal("model", w.GetStringParam("model", ""))
 	w.SetGoal("session_id", locals.SessionID)
 	w.SetGoal("auto_request", w.GetStringParam("auto_request", ""))
 	w.SetGoal("max_requests", locals.MaxReqs)
@@ -67,7 +68,7 @@ func (w *CodingWant) Initialize() {
 	w.SetGoal("trigger_on", "webhook")
 	w.SetGoal("watch_pattern", "")
 
-	w.SetCurrent("phase", CCPhaseMonitoring)
+	SetCCPhase(&w.Want, CCPhaseMonitoring)
 	w.SetCurrent("request_count", locals.ReqCount)
 	w.SetCurrent("timeout_seconds", locals.TimeoutSec)
 	w.SetCurrent("interactive", true)
@@ -90,29 +91,29 @@ func (w *CodingWant) Progress() {
 	switch phase {
 	case CCPhaseMonitoring:
 		if nextAction == "send_request" {
-			w.SetCurrent("phase", CCPhaseTriggerReady)
+			SetCCPhase(&w.Want, CCPhaseTriggerReady)
 		}
 
 	case CCPhaseTriggerReady:
 		// Allow DoAgent to re-run for each new message (chat mode).
 		// DoAgent itself clears webhook_auto_request after reading it.
 		w.FinishAgentRun(ccDoAgentName, false)
-		w.SetCurrent("phase", CCPhaseRequesting)
+		SetCCPhase(&w.Want, CCPhaseRequesting)
 		if err := w.ExecuteAgents(); err != nil {
 			w.StoreLog("ERROR: DoAgent execution failed: %v", err)
-			w.SetCurrent("phase", CCPhaseError)
+			SetCCPhase(&w.Want, CCPhaseError)
 			w.SetCurrent("last_error", err.Error())
 			return
 		}
-		w.SetCurrent("phase", CCPhaseAwaitingResponse)
+		SetCCPhase(&w.Want, CCPhaseAwaitingResponse)
 		w.SetPlan("next_action", "")
 
 	case CCPhaseAwaitingResponse:
 		if nextAction == "process_response" {
-			w.SetCurrent("phase", CCPhaseResponseReceived)
+			SetCCPhase(&w.Want, CCPhaseResponseReceived)
 		} else if nextAction == "handle_timeout" {
 			w.StoreLog("[CODING] Response timeout, resuming monitoring")
-			w.SetCurrent("phase", CCPhaseMonitoring)
+			SetCCPhase(&w.Want, CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
 
@@ -123,15 +124,15 @@ func (w *CodingWant) Progress() {
 
 		// max_requests == 0 means unlimited
 		if locals.MaxReqs > 0 && locals.ReqCount >= locals.MaxReqs {
-			w.SetCurrent("phase", CCPhaseAchieved)
+			SetCCPhase(&w.Want, CCPhaseAchieved)
 		} else {
-			w.SetCurrent("phase", CCPhaseMonitoring)
+			SetCCPhase(&w.Want, CCPhaseMonitoring)
 		}
 		w.SetPlan("next_action", "")
 
 	case CCPhaseError:
 		if nextAction == "retry" {
-			w.SetCurrent("phase", CCPhaseMonitoring)
+			SetCCPhase(&w.Want, CCPhaseMonitoring)
 			w.SetPlan("next_action", "")
 		}
 
@@ -146,7 +147,7 @@ func (w *CodingWant) Progress() {
 		// stuck in "requesting" forever, silently ignoring all future
 		// trigger messages. Recover via the existing error/retry path.
 		w.StoreLog("[CODING] Found stale 'requesting' phase (likely interrupted by a server restart) — recovering")
-		w.SetCurrent("phase", CCPhaseError)
+		SetCCPhase(&w.Want, CCPhaseError)
 		w.SetCurrent("last_error", "request was interrupted (e.g. server restart) before completing")
 	}
 }

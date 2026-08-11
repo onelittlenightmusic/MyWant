@@ -36,6 +36,20 @@ wantType:
       - claude_code
       - gemini
 
+  - name: model
+    description: |
+      Model to run the request on. Passed straight through to the provider CLI
+      (`claude --model <value>` / `gemini --model <value>`), so it accepts
+      whatever that CLI accepts — an alias like "opus" or "sonnet", or a full
+      id like "claude-opus-5". Leave empty to use the CLI's own default.
+
+      Deploy a `model_list` want to fill the "models" suggestion catalog with
+      the models the installed CLI actually recognizes.
+    type: string
+    subType: models
+    required: false
+    default: ""
+
   - name: session_id
     description: Session ID to resume (optional — omit to auto-create on first message)
     type: string
@@ -115,6 +129,14 @@ wantType:
     type: string
     persistent: true
     initialValue: "claude_code"
+    label: goal
+
+  - name: model
+    description: Model passed to the provider CLI (empty = the CLI's own default)
+    type: string
+    subType: models
+    persistent: true
+    initialValue: ""
     label: goal
 
   - name: session_id
@@ -324,6 +346,18 @@ wantType:
 
   - name: cc_responses
     description: FIFO buffer of last 20 AI responses (paired with cc_messages)
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
+  - name: cc_activity
+    description: |
+      FIFO buffer (last 100) of what the agent did between question and answer —
+      tool calls, its narration between them, phase transitions and errors.
+      Each entry is {kind, text, timestamp, detail?}; kind is note/tool/phase/error.
+      detail holds the full call behind a summary (the command a Bash line ran).
+      The chat tab merges these into the conversation by timestamp.
     type: object
     persistent: false
     initialValue: []

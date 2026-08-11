@@ -102,6 +102,12 @@ func geminiRequester(ctx context.Context, want *Want) error {
 
 	args := []string{"-p", autoRequest, "--output-format", "json"}
 
+	// Same `model` goal the claude_code provider reads — the coding want names
+	// the model once and each provider spells the flag its own way.
+	if model := GetGoal(want, "model", ""); model != "" {
+		args = append(args, "--model", model)
+	}
+
 	if sessionID != "" {
 		// Find session index to resume by UUID
 		if idx, err := findGeminiSessionIndex(sessionID, GetGoal(want, "working_dir", "")); err == nil && idx > 0 {
