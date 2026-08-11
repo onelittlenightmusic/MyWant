@@ -1,7 +1,9 @@
 package server
 
 import (
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -88,6 +90,54 @@ var (
 	cursorsMu sync.RWMutex
 	cursors   = map[string]cursorEntry{} // characterId → entry
 )
+
+// Per-character canvas position, as written into gui_state by the canvas Call
+// action and by `mywant-gui i take`. Read by character_want_bridge.go.
+const (
+	cursorStateXPrefix = "canvas_cursor_x_"
+	cursorStateYPrefix = "canvas_cursor_y_"
+)
+
+// trimCursorKeyPrefix returns the character id a canvas_cursor_{x,y}_<id> key
+// names. The unsuffixed keys (the CursorMan robot cursor) yield no id.
+func trimCursorKeyPrefix(key, prefix string) (string, bool) {
+	if !strings.HasPrefix(key, prefix) {
+		return "", false
+	}
+	id := strings.TrimPrefix(key, prefix)
+	return id, id != ""
+}
+
+// cursorCoord coerces a gui_state value to a coordinate. JSON round-trips make
+// these float64, but a want's state can also hold them as int after a YAML load.
+func cursorCoord(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case float32:
+		return float64(n), true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	}
+	return 0, false
+}
+
+// formatCanvasCoord renders a coordinate the way a canvas label holds it: a
+// whole cell, as a string. Matches what the GUI writes when a tile is dragged.
+func formatCanvasCoord(v float64) string {
+	return strconv.Itoa(int(math.Round(v)))
+}
+
+// hasLiveCursor reports whether someone is currently publishing for a character.
+func hasLiveCursor(characterID string) bool {
+	cutoff := time.Now().Add(-cursorTTL).UnixMilli()
+	cursorsMu.RLock()
+	e, ok := cursors[characterID]
+	cursorsMu.RUnlock()
+	return ok && e.LastSeen >= cutoff
+}
 
 // cursorResponse is returned by GET /api/v1/cursors.
 type cursorResponse struct {
