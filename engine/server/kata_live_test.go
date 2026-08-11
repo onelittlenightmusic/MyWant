@@ -73,11 +73,16 @@ func TestMemoCatalogKey(t *testing.T) {
 // want spokes off the value it names. Two wants are never joined — they share a
 // place, not a thread.
 func TestKataEdgesSpokesFromMemo(t *testing.T) {
-	s := &Server{}
+	// An empty store, not no store: kataEdges asks it what each thing is
+	// called, because a thing's id is a UUID and no longer says. A real server
+	// always has one (server.go), so a bare &Server{} is a shape only a test
+	// can produce — and it panicked here rather than testing anything.
+	s := &Server{thingStore: &ThingStore{path: filepath.Join(t.TempDir(), "memo.yaml")}}
 	edges := s.kataEdges([]string{"cities::Kokubunji", "stations::国分寺"}, []string{"want-a", "want-b"})
 
-	// No want is named by a param here (there is no builder), so both fall back
-	// to the first thing: one thing↔thing link plus one spoke per want.
+	// Nothing is recorded, so no want is named by a value here (nor by a param
+	// — there is no builder), and both fall back to the first thing: one
+	// thing↔thing link plus one spoke per want.
 	if len(edges) != 3 {
 		t.Fatalf("edges = %d, want 3", len(edges))
 	}
@@ -157,8 +162,22 @@ func TestCollectKataScopesGivesLoneValuesTheirOwnScope(t *testing.T) {
 		t.Fatalf("record: %v", err)
 	}
 	// 国分寺 and Kokubunji are declared one place; 新宿 is left alone.
+	//
+	// Labelled by the ids the store actually assigned. A thing's identity is a
+	// UUID that says nothing about what it is called, so labelling the
+	// "stations::国分寺" it used to be named by would hang the constellation off
+	// nothing: collectKataScopes looks its members up in the store and skips
+	// the ones it cannot find, and the group would come back empty.
+	idOf := map[string]string{}
+	for _, e := range store.Entries() {
+		idOf[e.Catalog+"::"+e.Value] = e.ID
+	}
 	for _, m := range []string{"stations::国分寺", "cities::Kokubunji"} {
-		if err := labels.Set(m, "constellation/国分寺", "true"); err != nil {
+		id := idOf[m]
+		if id == "" {
+			t.Fatalf("nothing recorded for %s — the store holds %v", m, idOf)
+		}
+		if err := labels.Set(id, "constellation/国分寺", "true"); err != nil {
 			t.Fatalf("label: %v", err)
 		}
 	}
