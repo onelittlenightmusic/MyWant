@@ -44,6 +44,10 @@ person:   { key: people,    icon: User,         color: "#64748b", base_type: str
 tag:      { key: tags,      icon: Tag,          color: "#64748b", base_type: string }
 keyword:  { key: keywords,  icon: Search,       color: "#64748b", base_type: string }
 secret:   { key: secrets,   icon: EyeOff,       color: "#64748b", base_type: string }
+# The name an AI model answers to on a provider CLI — an alias ("opus") or a
+# full id ("claude-opus-5"). Named `models` (plural, against the singular
+# convention above) because the subType is spelled that way at every call site.
+models:   { key: models,    icon: Bot,          color: "#8b5cf6", base_type: string }
 hotel:    { key: hotels,    icon: Landmark,     color: "#dc2626", base_type: string }
 shop:     { key: shops,     icon: ShoppingCart, color: "#64748b", base_type: string }
 product:  { key: products,  icon: Package,      color: "#64748b", base_type: string }

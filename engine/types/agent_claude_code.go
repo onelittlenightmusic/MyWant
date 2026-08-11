@@ -298,6 +298,9 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 	if sessionID != "" {
 		args = append(args, "--resume", sessionID)
 	}
+	if model := GetGoal(want, "model", ""); model != "" {
+		args = append(args, "--model", model)
+	}
 	if permMode := GetGoal(want, "permission_mode", ""); permMode != "" && permMode != "default" {
 		args = append(args, "--permission-mode", permMode)
 	}
@@ -369,10 +372,13 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 				case "text":
 					if text, ok := cm["text"].(string); ok && text != "" {
 						want.SetCurrent("cc_streaming_text", text)
+						RecordCCActivity(want, CCActivityNote, text)
 					}
 				case "tool_use":
 					name, _ := cm["name"].(string)
 					want.SetCurrent("cc_streaming_text", fmt.Sprintf("🔧 %s", name))
+					input, _ := cm["input"].(map[string]any)
+					RecordCCActivityDetail(want, CCActivityTool, name, toolInputDetail(input))
 				}
 			}
 
@@ -393,6 +399,7 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		}
 		want.StoreLog("[CC_DO] ERROR: %s", errMsg)
 		want.SetCurrent("last_error", errMsg)
+		RecordCCActivity(want, CCActivityError, errMsg)
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -417,6 +424,10 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		}
 		want.SetCurrent("cc_responses", responses)
 		want.SetCurrent("last_response_raw", finalResult)
+		// The closing text arrives twice — once as an assistant event (recorded
+		// as a note above) and again as the result. Drop the note so the chat
+		// does not show the answer immediately before itself.
+		dropTrailingActivityNote(want, finalResult)
 	}
 
 	// Mark sent in idempotency log.
@@ -426,6 +437,136 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 
 	want.StoreLog("[CC_DO] Request completed (result len=%d)", len(finalResult))
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Activity log
+// ---------------------------------------------------------------------------
+
+// ccActivityCap bounds the activity ring buffer. Long enough to cover a whole
+// exchange's worth of tool calls, short enough that the state field stays
+// cheap to ship on every poll.
+const ccActivityCap = 100
+
+// Activity kinds. The chat tab styles each one differently, so they are a small
+// closed set rather than free text.
+const (
+	CCActivityNote  = "note"  // the agent narrating between tool calls
+	CCActivityTool  = "tool"  // a tool it reached for
+	CCActivityPhase = "phase" // a state transition of the want itself
+	CCActivityError = "error"
+)
+
+// RecordCCActivity appends one line to the running account of what the agent
+// did between the question and the answer.
+//
+// cc_streaming_text holds only the newest line — each tool call overwrites the
+// last, and the whole thing is cleared when the response lands — so without
+// this the intermediate work is visible for a moment and then gone. This keeps
+// it, so the chat can replay the work alongside the messages.
+//
+// AppendState (not SetCurrent) because the stream produces events faster than
+// the reconcile interval, and a single slot silently drops the ones in between.
+func RecordCCActivity(want *Want, kind, text string) {
+	RecordCCActivityDetail(want, kind, text, "")
+}
+
+// ccDetailCap bounds one entry's detail. Long enough for a real shell command
+// or a wall of tool arguments, short enough that a runaway input can't bloat
+// the state field the GUI polls.
+const ccDetailCap = 4000
+
+// RecordCCActivityDetail is RecordCCActivity plus the full text behind the
+// summary — the command a Bash call actually ran, the path a Read opened. The
+// summary is what the chat shows inline; the detail is what it reveals when
+// the line is expanded, so it can be long without making the log unreadable.
+func RecordCCActivityDetail(want *Want, kind, text, detail string) {
+	if text == "" {
+		return
+	}
+	if len(detail) > ccDetailCap {
+		detail = detail[:ccDetailCap] + "\n… (truncated)"
+	}
+	entry := map[string]any{
+		"kind":      kind,
+		"text":      text,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	if detail != "" {
+		entry["detail"] = detail
+	}
+	want.AppendState("cc_activity", entry)
+	// Trim from the front once over cap. Appends outnumber trims heavily, so
+	// paying the read-modify-write only when the buffer is actually full keeps
+	// the hot path to a single locked append.
+	if list := GetCurrent(want, "cc_activity", []any{}); len(list) > ccActivityCap {
+		want.SetCurrent("cc_activity", list[len(list)-ccActivityCap:])
+	}
+}
+
+// toolInputDetail renders a tool call's arguments as the text to show when the
+// log line is expanded.
+//
+// The salient argument comes first on its own line — for Bash that is the
+// command, which is the whole reason to expand a "Bash" line at all — followed
+// by the rest of the arguments. Nothing is dropped: a tool this doesn't know
+// still shows everything it was given.
+func toolInputDetail(input map[string]any) string {
+	if len(input) == 0 {
+		return ""
+	}
+	// Ordered by how much each identifies what the call did. The first one
+	// present wins; matching on argument names rather than tool names means a
+	// tool this has never seen still gets a useful headline.
+	var lead string
+	for _, k := range []string{"command", "file_path", "path", "pattern", "url", "query", "prompt"} {
+		if v, ok := input[k].(string); ok && v != "" {
+			lead = v
+			break
+		}
+	}
+
+	rest, err := json.MarshalIndent(input, "", "  ")
+	if err != nil {
+		return lead
+	}
+	if lead == "" {
+		return string(rest)
+	}
+	return lead + "\n\n" + string(rest)
+}
+
+// dropTrailingActivityNote removes the last activity entry when it is a note
+// holding exactly the given text — the duplicate the closing assistant event
+// leaves behind once the same text arrives as the result.
+func dropTrailingActivityNote(want *Want, text string) {
+	list := GetCurrent(want, "cc_activity", []any{})
+	if len(list) == 0 {
+		return
+	}
+	last, ok := list[len(list)-1].(map[string]any)
+	if !ok {
+		return
+	}
+	if last["kind"] != CCActivityNote {
+		return
+	}
+	if s, _ := last["text"].(string); s != text {
+		return
+	}
+	want.SetCurrent("cc_activity", list[:len(list)-1])
+}
+
+// SetCCPhase stores the want's phase and records the transition in the activity
+// log, so the chat shows how the want moved, not just where it ended up.
+// Re-setting the phase it is already in records nothing.
+func SetCCPhase(want *Want, phase string) {
+	if GetCurrent(want, "phase", "") == phase {
+		want.SetCurrent("phase", phase)
+		return
+	}
+	want.SetCurrent("phase", phase)
+	RecordCCActivity(want, CCActivityPhase, phase)
 }
 
 // ---------------------------------------------------------------------------
