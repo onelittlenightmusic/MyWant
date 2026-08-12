@@ -29,6 +29,10 @@ type worldBundle struct {
 	Wants       []*mywant.Want               `yaml:"wants"`
 	Things      []ThingEntry                 `yaml:"things,omitempty"`
 	ThingLabels map[string]map[string]string `yaml:"thing_labels,omitempty"`
+	// Where the characters were standing, and the rest of what the GUI keeps
+	// per board. Optional: a bundle written before this existed simply has
+	// none, and is still a whole world.
+	GUIState map[string]any `yaml:"gui_state,omitempty"`
 }
 
 // readWorldBundle gathers a world off disk into one document.
@@ -59,6 +63,7 @@ func readWorldBundle(dir, name string) (*worldBundle, error) {
 			bundle.ThingLabels = labels
 		}
 	}
+	bundle.GUIState = readWorldGUIState(dir, name)
 	return bundle, nil
 }
 
@@ -136,5 +141,22 @@ func writeWorldBundle(dir, name string, b *worldBundle, bundled bool) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(worldThingLabelsPath(dir, name), labelsData, 0o644)
+	if err := os.WriteFile(worldThingLabelsPath(dir, name), labelsData, 0o644); err != nil {
+		return err
+	}
+
+	// Unlike the things, an absent gui_state is left absent rather than
+	// written empty: a bundle carrying none is a world nobody has stood on
+	// yet, and clearing the file would be claiming the opposite.
+	if len(b.GUIState) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(worldGUIStateDir(dir), 0o755); err != nil {
+		return err
+	}
+	guiData, err := yaml.Marshal(b.GUIState)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(worldGUIStatePath(dir, name), guiData, 0o644)
 }
