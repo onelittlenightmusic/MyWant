@@ -26,6 +26,23 @@ wantType:
       type: string
       required: false
 
+  # A wall is a coordinate and a shape, both read off its labels by the canvas —
+  # there is nothing for a progression loop to do. Without an achievement
+  # condition IsAchieved() falls through to this very field, finds nothing, and
+  # answers false forever, so every wall kept a goroutine waking every 20ms for
+  # the life of the server. On a drawn world that was 152 of them, and the
+  # largest single source of idle CPU left after the agent work.
+  #
+  # Declaring it achieved from the start lets StartProgressionLoop run its one
+  # final cycle and return, ending the goroutine. The want stays in the graph
+  # and on the canvas; it simply stops asking whether anything has changed.
+  state:
+    - name: achieved
+      type: bool
+      label: current
+      persistent: true
+      initialValue: true
+
   examples:
     - title: Place a wall
       description: A single-cell wall blocking passage at a fixed canvas position.

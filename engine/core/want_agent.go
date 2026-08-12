@@ -80,6 +80,24 @@ func (n *Want) StartBackgroundAgents() error {
 }
 
 // ExecuteAgents finds and executes agents based on want requirements
+// resolveRequirement finds the agents that satisfy one entry of Spec.Requires,
+// either as a direct "gives" value or via the capability of that name.
+func (n *Want) resolveRequirement(requirement string) []Agent {
+	// First, try to find agents by the requirement directly (if it's a "gives" value)
+	agents := n.agentRegistry.FindAgentsByGives(requirement)
+	if len(agents) > 0 {
+		return agents
+	}
+
+	// If not found, check if requirement is a capability name, then get agents for its "gives" values
+	if cap, exists := n.agentRegistry.GetCapability(requirement); exists {
+		for _, givesValue := range cap.Gives {
+			agents = append(agents, n.agentRegistry.FindAgentsByGives(givesValue)...)
+		}
+	}
+	return agents
+}
+
 func (n *Want) ExecuteAgents() error {
 	if n.agentRegistry == nil {
 		return nil
@@ -89,22 +107,20 @@ func (n *Want) ExecuteAgents() error {
 		return nil
 	}
 
-	for _, requirement := range n.Spec.Requires {
-		var agents []Agent
-		// n.StoreLog("🔍 Resolving requirement: '%s'", requirement)
-
-		// First, try to find agents by the requirement directly (if it's a "gives" value)
-		agents = n.agentRegistry.FindAgentsByGives(requirement)
-
-		// If not found, check if requirement is a capability name, then get agents for its "gives" values
-		if len(agents) == 0 {
-			if cap, exists := n.agentRegistry.GetCapability(requirement); exists {
-				for _, givesValue := range cap.Gives {
-					foundAgents := n.agentRegistry.FindAgentsByGives(givesValue)
-					agents = append(agents, foundAgents...)
-				}
-			}
+	// The requirement → agents mapping only changes when the registry does, but
+	// this runs on every progression cycle. Resolve once per registry
+	// generation and reuse the answer in between.
+	generation := n.agentRegistry.Generation()
+	if n.resolvedAgents == nil || n.resolvedAgentsGen != generation {
+		n.resolvedAgents = make(map[string][]Agent, len(n.Spec.Requires))
+		n.resolvedAgentsGen = generation
+		for _, requirement := range n.Spec.Requires {
+			n.resolvedAgents[requirement] = n.resolveRequirement(requirement)
 		}
+	}
+
+	for _, requirement := range n.Spec.Requires {
+		agents := n.resolvedAgents[requirement]
 
 		if len(agents) == 0 {
 			n.StoreLog("⚠️ WARNING: No agents found providing requirement '%s'", requirement)

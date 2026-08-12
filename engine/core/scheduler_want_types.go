@@ -10,7 +10,18 @@ import (
 type SchedulerWant struct {
 	Want
 	builder *ChainBuilder // Reference to ChainBuilder for coordinating restarts
+	// Wall-clock second last written to the last_scan_time state field. The
+	// scheduler scans on every progression cycle, so writing the time each pass
+	// changed the field once a second — and because any real state change makes
+	// the stats writer rebuild and rewrite the entire memory file, a 4-byte
+	// liveness timestamp was costing a 275KB write every second, forever.
+	lastScanStored int64
 }
+
+// schedulerScanTimeResolution is how coarsely last_scan_time is recorded. It
+// exists to show the scheduler is alive, which a minute answers as well as a
+// second, and a minute costs 60× less persistence churn.
+const schedulerScanTimeResolution = 60
 
 // NewSchedulerWant creates a new Scheduler Want
 func NewSchedulerWant() *SchedulerWant {
@@ -105,9 +116,14 @@ func (s *SchedulerWant) Progress() {
 			want.Metadata.Name)
 	}
 
-	// Update scheduler statistics in state
+	// Update scheduler statistics in state. The count is idempotent — StoreState
+	// drops a write that changes nothing — but the scan time is not, so it is
+	// only refreshed once every schedulerScanTimeResolution seconds.
 	s.storeState("total_scheduled_wants", s.GetBackgroundAgentCount())
-	s.storeState("last_scan_time", time.Now().Unix())
+	if now := time.Now().Unix(); now-s.lastScanStored >= schedulerScanTimeResolution {
+		s.lastScanStored = now
+		s.storeState("last_scan_time", now)
+	}
 }
 
 // IsAchieved always returns false since the scheduler runs continuously

@@ -50,6 +50,15 @@ func (w *Want) SetConfigError(field string, message string) error {
 // The want continues running — governance rules are best-effort, not enforced hard stops.
 // Status transitions: reaching → reaching_with_warning, achieved → achieved_with_warning.
 func (w *Want) setGovernanceWarning(component string, message string) {
+	// A want that breaks the policy breaks it on every cycle, so this is reached
+	// ~50 times a second per offending want. Re-recording an identical warning
+	// tells nobody anything new while filling the log and the want's history,
+	// so say it once and stay quiet until it changes.
+	if GetCurrent(w, "governance_warning_component", "") == component &&
+		GetCurrent(w, "governance_warning_message", "") == message {
+		return
+	}
+
 	w.storeStateMulti(map[string]any{
 		"governance_warning_component": component,
 		"governance_warning_message":   message,

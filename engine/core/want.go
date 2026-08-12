@@ -289,6 +289,27 @@ type Want struct {
 	// Progressable function - concrete want implementation (e.g., RestaurantWant, QueueWant)
 	progressable Progressable `json:"-" yaml:"-"`
 
+	// Resolved GetLocals method for the current progressable, if it has one.
+	// Looking this up by name costs a linear scan of the method set with string
+	// comparisons, and the progression loop ran it every cycle — at 20ms per
+	// want that was thousands of lookups a second for an answer that only
+	// changes when progressable does. Invalidated by SetProgressable.
+	getLocalsFn       reflect.Value `json:"-" yaml:"-"`
+	getLocalsFor      Progressable  `json:"-" yaml:"-"`
+	getLocalsResolved bool          `json:"-" yaml:"-"`
+
+	// State defs carrying fetchFrom+onFetchData, filtered once instead of on
+	// every EndProgressCycle. Most want types (all the static scenery on a
+	// canvas) declare none, and they were walking their whole state list every
+	// 20ms to discover that.
+	fetchFromDefs     []StateDef `json:"-" yaml:"-"`
+	fetchFromResolved bool       `json:"-" yaml:"-"`
+
+	// Agents resolved from Spec.Requires, valid while the registry generation
+	// they were resolved at still holds.
+	resolvedAgents    map[string][]Agent `json:"-" yaml:"-"`
+	resolvedAgentsGen uint64             `json:"-" yaml:"-"`
+
 	// Goroutine execution tracking - Want owns this state for proper encapsulation
 	// ChainBuilder sets this via SetGoroutineActive() to inform Want when goroutine starts/stops
 	goroutineActive atomic.Bool `json:"-" yaml:"-"`
@@ -395,6 +416,9 @@ func (n *Want) UnmarshalYAML(value *yaml.Node) error {
 func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
+	if oldStatus != status {
+		bumpStateEpoch() // Status is persisted alongside state
+	}
 
 	// Emit StatusChange event (Group B - synchronous control)
 	if oldStatus != status {
@@ -568,7 +592,14 @@ func (n *Want) EndProgressCycle() {
 	if n.governanceViolationCount > 0 {
 		violations := n.governanceViolationCount
 		n.governanceViolationCount = 0
-		n.setGovernanceWarning("PolicyViolation", fmt.Sprintf("%d state access policy violation(s) in cycle %d — check [GOVERNANCE]/[WARN] logs", violations, n.execCycleCount))
+		// Deliberately without the cycle number: a want that violates the policy
+		// does so on every cycle, and embedding a counter made the warning a
+		// different string each time. StoreState then saw a real change 50 times
+		// a second, which bumped the state epoch, which made the stats writer
+		// rebuild and rewrite the whole 275KB memory file every second — for a
+		// message whose meaning had not changed at all. The cycle number is
+		// still in the [GOVERNANCE] log lines, where it costs nothing.
+		n.setGovernanceWarning("PolicyViolation", fmt.Sprintf("%d state access policy violation(s) — check [GOVERNANCE]/[WARN] logs", violations))
 	}
 	n.governanceViolationCount = 0
 
@@ -589,11 +620,8 @@ func (n *Want) EndProgressCycle() {
 	// up-to-date when FinalResultField reads them in the same cycle.
 	// (e.g. mrs_raw_output written by agent → fetchFrom populates smartgolf_all_available_times
 	//  → FinalResultField reads smartgolf_all_available_times for final_result)
-	if n.WantTypeDefinition != nil {
-		for _, sd := range n.WantTypeDefinition.State {
-			if sd.FetchFrom == "" || sd.OnFetchData == "" {
-				continue
-			}
+	if defs := n.fetchFromStateDefs(); len(defs) > 0 {
+		for _, sd := range defs {
 			// Read fetchFrom source from the flat state map (not label-gated) so that
 			// transiently written fields like mrs_raw_output (written via StoreState by
 			// plugin agents) are accessible even when not declared in the type definition.
@@ -657,9 +685,33 @@ func (n *Want) EndProgressCycle() {
 	n.inExecCycle = false
 }
 
+// fetchFromStateDefs returns the state defs that derive their value from
+// another field, resolving the list on first use.
+//
+// The want type definition does not change over a want's life, so this is
+// computed once. A nil definition or one with no such fields yields an empty
+// slice, which lets the caller skip the block entirely.
+func (n *Want) fetchFromStateDefs() []StateDef {
+	if n.fetchFromResolved {
+		return n.fetchFromDefs
+	}
+	if n.WantTypeDefinition != nil {
+		for _, sd := range n.WantTypeDefinition.State {
+			if sd.FetchFrom != "" && sd.OnFetchData != "" {
+				n.fetchFromDefs = append(n.fetchFromDefs, sd)
+			}
+		}
+	}
+	n.fetchFromResolved = true
+	return n.fetchFromDefs
+}
+
 // SetProgressable sets the concrete progressable implementation for this want
 func (n *Want) SetProgressable(progressable Progressable) {
 	n.progressable = progressable
+	n.getLocalsResolved = false // the cached GetLocals belongs to the old one
+	n.getLocalsFn = reflect.Value{}
+	n.getLocalsFor = nil
 }
 
 // GetProgressable returns the concrete progressable implementation for this want
@@ -1011,6 +1063,7 @@ func (n *Want) StoreState(key string, value any) {
 	n.State.Store(key, value)
 	n.stateTimestamps.Store(key, now)
 	n.getHistoryManager().AddStateEntry(key, value)
+	bumpStateEpoch() // this is the only path by which state actually changes
 
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
@@ -1667,6 +1720,8 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 	}
 	n.metadataMutex.Lock()
 	n.WantTypeDefinition = typeDef
+	n.fetchFromDefs = nil // the cached filter belongs to the previous definition
+	n.fetchFromResolved = false
 	n.metadataMutex.Unlock()
 
 	// Initialize labels from definition
@@ -1898,6 +1953,7 @@ func (n *Want) SetLabel(key, value string) {
 		n.Metadata.Labels = make(map[string]string)
 	}
 	n.Metadata.Labels[key] = value
+	bumpStateEpoch() // Labels are persisted with the want
 }
 
 // SetLabels merges the given labels in under the metadata write lock.
@@ -1911,6 +1967,7 @@ func (n *Want) SetLabels(labels map[string]string) {
 		n.Metadata.Labels = make(map[string]string, len(labels))
 	}
 	maps.Copy(n.Metadata.Labels, labels)
+	bumpStateEpoch() // Labels are persisted with the want
 }
 
 // DeleteLabel removes one label under the metadata write lock.
@@ -1918,6 +1975,7 @@ func (n *Want) DeleteLabel(key string) {
 	n.metadataMutex.Lock()
 	defer n.metadataMutex.Unlock()
 	delete(n.Metadata.Labels, key)
+	bumpStateEpoch() // Labels are persisted with the want
 }
 
 // ReplaceLabels swaps the whole label map under the metadata write lock. The
@@ -1928,6 +1986,7 @@ func (n *Want) ReplaceLabels(labels map[string]string) {
 	replacement := make(map[string]string, len(labels))
 	maps.Copy(replacement, labels)
 	n.Metadata.Labels = replacement
+	bumpStateEpoch() // Labels are persisted with the want
 }
 
 // GetLabel reads one label under the metadata read lock.

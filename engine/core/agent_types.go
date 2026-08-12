@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 )
 
 // AgentType defines the type of agent for execution strategies.
@@ -179,6 +180,20 @@ type AgentRegistry struct {
 	agentSpecs         map[string]*AgentSpec // NEW: agent specs for validation
 	pluginStateUpdates map[string][]StateDef // capName -> state defs declared by MRS plugin agents
 	mutex              sync.RWMutex
+
+	// generation increments whenever the agent/capability tables change, so a
+	// caller that resolved a requirement to a set of agents can tell whether
+	// that answer is still current without redoing the lookup. Wants resolve
+	// the same requirements on every progression cycle, which at 20ms each is
+	// a lot of repeated map walks for a table that changes at startup and
+	// almost never after.
+	generation atomic.Uint64
+}
+
+// Generation reports the current registry version. A change means any cached
+// requirement resolution must be recomputed.
+func (r *AgentRegistry) Generation() uint64 {
+	return r.generation.Load()
 }
 
 // NewAgentRegistry creates a new agent registry for managing agents and capabilities.
@@ -212,6 +227,7 @@ func (r *AgentRegistry) RegisterCapability(cap Capability) {
 	defer r.mutex.Unlock()
 
 	r.capabilities[cap.Name] = cap
+	r.generation.Add(1)
 	InfoLog("[REGISTRY] Registered capability: %s (gives: %v)", cap.Name, cap.Gives)
 
 	for _, gives := range cap.Gives {
@@ -226,6 +242,7 @@ func (r *AgentRegistry) RegisterAgent(agent Agent) {
 	defer r.mutex.Unlock()
 
 	r.agents[agent.GetName()] = agent
+	r.generation.Add(1)
 	InfoLog("[REGISTRY] Registered agent: %s (type: %s, capabilities: %v)", agent.GetName(), agent.GetType(), agent.GetCapabilities())
 
 	for _, capName := range agent.GetCapabilities() {

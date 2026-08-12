@@ -38,8 +38,22 @@ const (
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
 	GlobalReconcileInterval = 100 * time.Millisecond
-	// GlobalStatsInterval defines the frequency of stats writing to memory file (YAML serialization and file I/O)
-	GlobalStatsInterval = 1 * time.Second
+	// GlobalStatsInterval defines the frequency of stats writing to memory file (YAML serialization and file I/O).
+	//
+	// This is the only thing the constant drives: one ticker, one call to
+	// writeStatsToMemory. Nothing reads it to decide anything else.
+	//
+	// It caps how often the memory file can be rewritten, and that cap is worth
+	// having independently of the epoch guard in writeStatsToMemory. A single
+	// want storing a wall-clock heartbeat changes state every second, and every
+	// such change rewrites the whole file — so without a cap, one careless field
+	// anywhere sets the cost for all of them. Five seconds bounds that at a fifth
+	// of the price.
+	//
+	// The trade is durability: an unclean crash loses up to this much
+	// want-runtime state. API-driven changes are unaffected — they persist
+	// through TriggerSave/debouncedSaveLoop, which has its own 3s debounce.
+	GlobalStatsInterval = 5 * time.Second
 )
 
 // ChangeEvent represents a configuration change
@@ -99,6 +113,8 @@ type ChainBuilder struct {
 	lastConfigHash     string               // Hash of last config for change detection
 	lastConfigFileHash string               // Hash of config file for change detection (batch mode)
 	lastStatsHash      string               // Hash of last written stats for change detection
+	lastStatsEpoch     uint64               // State epoch at the last stats write (see state_epoch.go)
+	lastStatsWrite     time.Time            // When stats were last written, for the periodic safety write
 
 	// Path and channel management
 	pathMap map[string]Paths // Want path mapping

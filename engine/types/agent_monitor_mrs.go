@@ -1,12 +1,9 @@
 package types
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -182,7 +179,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	// Pass CLI args if skill_json_arg is configured (supports param-driven monitor tasks).
 	args := mrsBuildArgs(want)
 	DebugLog("[%s] [MRS-MONITOR] executing skill: %s args=%v (timeout: %ds)", want.Metadata.Name, scriptPath, args, timeoutSec)
-	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args, func(pct int, msg string) {
+	raw, err := runMRSSkillForWant(skillCtx, want, scriptPath, args, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
 		if msg != "" {
 			want.SetCurrent("summary", msg)
@@ -246,7 +243,7 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	defer cancel()
 
 	want.StoreLog("[MRS-DO] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
-	raw, err := runMRSSkillWithArgs(skillCtx, scriptPath, args, func(pct int, msg string) {
+	raw, err := runMRSSkillForWant(skillCtx, want, scriptPath, args, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
 		if msg != "" {
 			want.SetCurrent("summary", msg)
@@ -324,72 +321,23 @@ func expandTilde(p string) string {
 // (if non-nil) and are NOT included in the returned result. The last non-progress JSON
 // line is returned as the final result.
 func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string, onProgress func(int, string)) (map[string]any, error) {
-	cmdArgs := append([]string{scriptPath}, args...)
-	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
-	cmd.Env = os.Environ()
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("stdout pipe: %w", err)
-	}
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = &stderrBuf
-
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start: %w", err)
-	}
-
-	var finalResult map[string]any
-	decoder := json.NewDecoder(stdout)
-	for decoder.More() {
-		var obj map[string]any
-		if err := decoder.Decode(&obj); err != nil {
-			break // unrecoverable parse error; check stderr below
-		}
-		if pct, ok := obj["_progress"]; ok {
-			if onProgress != nil {
-				onProgress(int(toMRSFloat64(pct)), mrsString(obj["_message"]))
-			}
-		} else {
-			finalResult = obj
-		}
-	}
-
-	if err := cmd.Wait(); err != nil {
-		// Prefer structured error from the script's own JSON output
-		if finalResult != nil {
-			if msg, ok := finalResult["error"].(string); ok && msg != "" {
-				return nil, fmt.Errorf("%s", msg)
-			}
-		}
-		if stderr := strings.TrimSpace(stderrBuf.String()); stderr != "" {
-			return nil, fmt.Errorf("exit error: %w\nstderr: %s", err, stderr)
-		}
-		return nil, fmt.Errorf("exit error: %w", err)
-	}
-
-	if finalResult == nil {
-		return nil, fmt.Errorf("skill produced no JSON output")
-	}
-	return finalResult, nil
+	return RunMRSScript(ctx, scriptPath, MRSRunOptions{Args: args, OnProgress: onProgress})
 }
 
-func toMRSFloat64(v any) float64 {
-	switch n := v.(type) {
-	case float64:
-		return n
-	case int:
-		return float64(n)
-	case int64:
-		return float64(n)
-	}
-	return 0
-}
-
-func mrsString(v any) string {
-	if v == nil {
-		return ""
-	}
-	s, _ := v.(string)
-	return s
+// runMRSSkillForWant is runMRSSkillWithArgs plus the residency options a
+// skill_path-style want can ask for. agent.yaml plugins declare these under
+// `script:`; these wants carry them as state fields instead, so a want type
+// can opt into residency without being migrated to the newer plugin format.
+//
+//	skill_serve         bool — keep one interpreter alive (script must support it)
+//	skill_cache_ttl_ms  int  — reuse a result for a repeat call with equal args
+//	skill_max_procs     int  — resident processes for this script (0 → 1)
+func runMRSSkillForWant(ctx context.Context, want *Want, scriptPath string, args []string, onProgress func(int, string)) (map[string]any, error) {
+	return RunMRSScript(ctx, scriptPath, MRSRunOptions{
+		Args:       args,
+		OnProgress: onProgress,
+		Serve:      GetCurrent(want, "skill_serve", false),
+		CacheTTL:   time.Duration(GetCurrent(want, "skill_cache_ttl_ms", 0)) * time.Millisecond,
+		MaxProcs:   GetCurrent(want, "skill_max_procs", 0),
+	})
 }

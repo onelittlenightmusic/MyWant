@@ -171,14 +171,8 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 	case "delete":
 		// Delete wants
 		if len(op.IDs) > 0 {
-			deletedCount := 0
-			for _, wantID := range op.IDs {
-				if err := cb.DeleteWantByID(wantID); err != nil {
-					// Continue deleting others even if one fails
-				} else {
-					deletedCount++
-				}
-			}
+			// One persist for the whole batch, not one per want.
+			deletedCount := cb.DeleteWantsByIDs(op.IDs)
 			if deletedCount > 0 {
 				// Trigger reconciliation after deletion
 				cb.reconcileWants()

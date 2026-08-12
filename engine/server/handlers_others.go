@@ -991,7 +991,49 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 	// 1. Get all registered labels from the persistent registry in ChainBuilder
 	keys, rawValues := s.globalBuilder.GetRegisteredLabels()
 
-	// 2. Prepare the response structure with owner/user info
+	// 2. Index owners and users in ONE pass over the wants.
+	//
+	// This used to walk every want once per (key, value) pair, which on a canvas
+	// world meant GetAllWantStates() — a copy of the whole want map — 102 times
+	// and GetLabels() — a fresh map allocation — ~20,000 times per request, all
+	// to answer what a single walk answers. The label cardinality is driven by
+	// canvas-x/canvas-y tile coordinates, so the old cost grew with the size of
+	// the map being drawn.
+	type labelKV struct{ key, value string }
+	owners := map[labelKV]map[string]bool{}
+	users := map[labelKV]map[string]bool{}
+	add := func(index map[labelKV]map[string]bool, k, v, wantID string) {
+		kv := labelKV{k, v}
+		ids, ok := index[kv]
+		if !ok {
+			ids = map[string]bool{}
+			index[kv] = ids
+		}
+		ids[wantID] = true
+	}
+
+	for _, want := range s.globalBuilder.GetAllWantStates() {
+		wantID := want.Metadata.ID
+		for k, v := range want.GetLabels() {
+			add(owners, k, v, wantID)
+		}
+		for _, u := range want.Spec.Using {
+			for k, v := range u.Labels {
+				add(users, k, v, wantID)
+			}
+		}
+	}
+
+	sortedIDs := func(index map[labelKV]map[string]bool, kv labelKV) []string {
+		out := make([]string, 0, len(index[kv]))
+		for id := range index[kv] {
+			out = append(out, id)
+		}
+		sort.Strings(out)
+		return out
+	}
+
+	// 3. Prepare the response structure with owner/user info
 	values := make(map[string][]map[string]any)
 
 	for _, k := range keys {
@@ -999,52 +1041,11 @@ func (s *Server) getLabels(w http.ResponseWriter, r *http.Request) {
 		vList := make([]map[string]any, 0, len(vStrings))
 
 		for _, v := range vStrings {
-			// Find current owners and users for this specific label value in the active graph
-			ownerMap := make(map[string]bool)
-			userMap := make(map[string]bool)
-
-			findOwnersUsers := func(builder *mywant.ChainBuilder) {
-				if builder == nil {
-					return
-				}
-				// Check active wants in this builder
-				states := builder.GetAllWantStates()
-				for _, want := range states {
-					// Check if want PROVIDES this label
-					labels := want.GetLabels()
-					if val, ok := labels[k]; ok && val == v {
-						ownerMap[want.Metadata.ID] = true
-					}
-					// Check if want USES this label (via 'using' in spec)
-					for _, u := range want.Spec.Using {
-						if uv, ok := u.Labels[k]; ok && uv == v {
-							userMap[want.Metadata.ID] = true
-						}
-					}
-				}
-			}
-
-			if s.globalBuilder != nil {
-				findOwnersUsers(s.globalBuilder)
-			}
-
-			// Convert deduplicated maps to sorted slices
-			owners := make([]string, 0, len(ownerMap))
-			for id := range ownerMap {
-				owners = append(owners, id)
-			}
-			sort.Strings(owners)
-
-			users := make([]string, 0, len(userMap))
-			for id := range userMap {
-				users = append(users, id)
-			}
-			sort.Strings(users)
-
+			kv := labelKV{k, v}
 			vList = append(vList, map[string]any{
 				"value":  v,
-				"owners": owners,
-				"users":  users,
+				"owners": sortedIDs(owners, kv),
+				"users":  sortedIDs(users, kv),
 			})
 		}
 		values[k] = vList

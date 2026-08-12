@@ -204,6 +204,36 @@ func (cb *ChainBuilder) TriggerReconcile() error {
 
 // DeleteWantByID removes a want from runtime by its ID If the want has children (based on ownerReferences), they will be deleted first (cascade deletion)
 func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
+	return cb.deleteWantTree(wantID, true)
+}
+
+// DeleteWantsByIDs removes several wants and writes the memory file ONCE, at the
+// end. Returns how many were deleted; failures are skipped, not fatal.
+//
+// Deleting one at a time re-marshals the entire config and rewrites the memory
+// file per want. Swapping a world of ~200 wants therefore serialised ~240KB
+// two hundred times — tens of megabytes of YAML for a single operation, and the
+// visible CPU spike whenever a world was opened.
+func (cb *ChainBuilder) DeleteWantsByIDs(wantIDs []string) int {
+	deleted := 0
+	for _, wantID := range wantIDs {
+		if err := cb.deleteWantTree(wantID, false); err == nil {
+			deleted++
+		}
+	}
+	if deleted > 0 {
+		cb.reconcileMutex.Lock()
+		if err := cb.copyConfigToMemory(); err != nil {
+			fmt.Printf("[ERROR] Failed to persist config after deleting %d wants: %v\n", deleted, err)
+		}
+		cb.reconcileMutex.Unlock()
+	}
+	return deleted
+}
+
+// deleteWantTree removes a want and its descendants. persist=false leaves the
+// memory file alone so a bulk caller can write it once afterwards.
+func (cb *ChainBuilder) deleteWantTree(wantID string, persist bool) error {
 	// Phase 1: Identify if parent want exists (O(1) lookup)
 	cb.reconcileMutex.RLock()
 	_, found := cb.wants[wantID]
@@ -241,9 +271,11 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	}
 	cb.reconcileMutex.RUnlock()
 
-	// Phase 3: Delete children recursively (handles grandchildren and deeper via DeleteWantByID)
+	// Phase 3: Delete children recursively (handles grandchildren and deeper).
+	// Children never persist on their own — the root of the tree does it once,
+	// or the bulk caller does it after the last tree.
 	for _, childID := range childrenIDsToDelete {
-		cb.DeleteWantByID(childID) //nolint:errcheck
+		cb.deleteWantTree(childID, false) //nolint:errcheck
 	}
 
 	// Phase 4: Delete the parent want (with write lock)
@@ -261,9 +293,11 @@ func (cb *ChainBuilder) DeleteWantByID(wantID string) error {
 	cb.config = newWants
 
 	// Persist configuration change to memory file
-	if err := cb.copyConfigToMemory(); err != nil {
-		// Log error but don't fail the deletion operation itself as in-memory state is correct
-		fmt.Printf("[ERROR] Failed to persist config after deleting want %s: %v\n", wantID, err)
+	if persist {
+		if err := cb.copyConfigToMemory(); err != nil {
+			// Log error but don't fail the deletion operation itself as in-memory state is correct
+			fmt.Printf("[ERROR] Failed to persist config after deleting want %s: %v\n", wantID, err)
+		}
 	}
 
 	cb.reconcileMutex.Unlock()

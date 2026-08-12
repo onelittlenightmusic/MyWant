@@ -2,13 +2,11 @@ package mywant
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,6 +33,18 @@ type MRSAgentMetadata struct {
 type MRSScriptDef struct {
 	Path           string `yaml:"path"`            // absolute or ~/ path to the script
 	TimeoutSeconds int    `yaml:"timeout_seconds"` // 0 → default 120s
+	// Serve keeps one interpreter alive and sends it jobs, instead of starting
+	// a new one per call. Only set it on scripts that implement the resident
+	// loop (MYWANT_MRS_SERVE=1); the runner falls back to spawning if not.
+	Serve bool `yaml:"serve"`
+	// CacheTTLMs reuses the previous result for a repeat call with identical
+	// args. Useful for argument-less monitors shared by many wants; useless
+	// for skills whose result varies per want.
+	CacheTTLMs int `yaml:"cache_ttl_ms"`
+	// MaxProcs bounds how many resident interpreters may run for this script.
+	// 0 → 1, which serialises calls. Raise it for skills slow enough that
+	// queueing behind one another matters.
+	MaxProcs int `yaml:"max_procs"`
 }
 
 // MRSStateUpdate declares a state field that the plugin agent writes, along with
@@ -355,6 +365,11 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		r.RegisterPluginStateUpdates(capName, stateDefs)
 	}
 	stateUpdates := def.StateUpdates
+	runOpts := MRSRunOptions{
+		Serve:    def.Script.Serve,
+		CacheTTL: time.Duration(def.Script.CacheTTLMs) * time.Millisecond,
+		MaxProcs: def.Script.MaxProcs,
+	}
 	switch strings.ToLower(def.Metadata.Type) {
 	case "do":
 		finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
@@ -366,7 +381,9 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
 				want.StoreLog("[MRS-DO:%s] executing %s args=%v", finalName, finalPath, args)
-				raw, err := mrsRunScript(skillCtx, finalPath, args)
+				opt := runOpts
+				opt.Args = args
+				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
 					want.StoreLog("[MRS-DO:%s] failed: %v", finalName, err)
 					return nil
@@ -384,7 +401,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
 				want.StoreLog("[MRS-MONITOR:%s] executing %s", finalName, finalPath)
-				raw, err := mrsRunScript(skillCtx, finalPath, nil)
+				raw, err := RunMRSScript(skillCtx, finalPath, runOpts)
 				if err != nil {
 					want.StoreLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
 					return false, nil
@@ -462,43 +479,6 @@ func mrsExpandTilde(p string) string {
 		return p
 	}
 	return filepath.Join(home, p[2:])
-}
-
-// mrsRunScript executes a Python3 script and returns parsed JSON output.
-// Progress lines ({"_progress": ...}) are consumed and discarded; the last
-// non-progress JSON object is returned as the result.
-func mrsRunScript(ctx context.Context, scriptPath string, args []string) (map[string]any, error) {
-	cmdArgs := append([]string{scriptPath}, args...)
-	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
-	cmd.Env = os.Environ()
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("stdout pipe: %w", err)
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start: %w", err)
-	}
-
-	var finalResult map[string]any
-	decoder := json.NewDecoder(stdout)
-	for decoder.More() {
-		var obj map[string]any
-		if err := decoder.Decode(&obj); err != nil {
-			break
-		}
-		if _, ok := obj["_progress"]; !ok {
-			finalResult = obj
-		}
-	}
-
-	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("exit error: %w", err)
-	}
-	if finalResult == nil {
-		return nil, fmt.Errorf("skill produced no JSON output")
-	}
-	return finalResult, nil
 }
 
 // LoadCapabilitiesFromFS loads capability YAML files from an embedded fs.FS.

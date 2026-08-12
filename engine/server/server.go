@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -20,6 +22,33 @@ import (
 )
 
 var GlobalDebugEnabled bool
+
+// pprofListenAddr decides where (if anywhere) the pprof server should listen.
+// Debug mode enables it on the default port; MYWANT_PPROF enables it without
+// debug mode ("1"/"true" for the default port, or an explicit port number).
+func pprofListenAddr(debug bool) string {
+	const defaultPort = 6060
+	env := os.Getenv("MYWANT_PPROF")
+	switch env {
+	case "":
+		if debug {
+			return fmt.Sprintf("localhost:%d", defaultPort)
+		}
+		return ""
+	case "0", "false":
+		return ""
+	case "1", "true":
+		return fmt.Sprintf("localhost:%d", defaultPort)
+	}
+	if port, err := strconv.Atoi(env); err == nil && port > 0 && port < 65536 {
+		return fmt.Sprintf("localhost:%d", port)
+	}
+	log.Printf("⚠️  ignoring invalid MYWANT_PPROF=%q\n", env)
+	if debug {
+		return fmt.Sprintf("localhost:%d", defaultPort)
+	}
+	return ""
+}
 
 // Server represents the MyWant server
 type Server struct {
@@ -375,12 +404,19 @@ func (s *Server) Start() error {
 		return nil
 	})
 
-	// Start pprof profiling server only in debug mode
-	if s.config.Debug {
+	// Start pprof profiling server in debug mode, or whenever MYWANT_PPROF is set
+	// (MYWANT_PPROF=1 for the default port, or MYWANT_PPROF=<port>).
+	if pprofAddr := pprofListenAddr(s.config.Debug); pprofAddr != "" {
 		go func() {
-			pprofAddr := "localhost:6060"
 			log.Printf("📊 pprof profiling server starting on http://%s/debug/pprof/\n", pprofAddr)
-			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+			// Dedicated mux: net/http/pprof registers on DefaultServeMux via init().
+			mux := http.NewServeMux()
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			if err := http.ListenAndServe(pprofAddr, mux); err != nil {
 				log.Printf("⚠️  pprof server error: %v\n", err)
 			}
 		}()
@@ -483,14 +519,18 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.globalBuilder.Shutdown()
 	}
 
-	// 2. Flush and shut down OpenTelemetry exporters
+	// 2. Kill resident MRS interpreters. They are children of this process, so
+	// leaving them behind would strand a python3 per serve-enabled skill.
+	mywant.StopAllMRSResidents()
+
+	// 3. Flush and shut down OpenTelemetry exporters
 	if s.otelShutdown != nil {
 		if err := s.otelShutdown(ctx); err != nil {
 			log.Printf("[SERVER] Warning: OTEL shutdown error: %v\n", err)
 		}
 	}
 
-	// 3. Shutdown HTTP server
+	// 4. Shutdown HTTP server
 	if s.httpServer != nil {
 		return s.httpServer.Shutdown(ctx)
 	}

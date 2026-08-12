@@ -69,9 +69,23 @@ func (cb *ChainBuilder) hasConfigFileChanged() bool {
 	return currentHash != cb.lastConfigFileHash
 }
 
+// statsForceWriteInterval bounds how long a change can go unwritten if some
+// mutation path forgets to bumpStateEpoch. The epoch guard below is an
+// optimisation, not a correctness mechanism, and this is its safety net.
+const statsForceWriteInterval = 30 * time.Second
+
 // writeStatsToMemory writes current stats to memory file
 func (cb *ChainBuilder) writeStatsToMemory() {
 	if cb.memoryPath == "" {
+		return
+	}
+
+	// Nothing has changed since the last write, so rebuilding every want and
+	// marshalling them to YAML would only produce bytes we already wrote. The
+	// md5 comparison further down catches this too, but only after paying the
+	// full cost — which on a mostly-static world is nearly every tick.
+	epoch := currentStateEpoch()
+	if epoch == cb.lastStatsEpoch && time.Since(cb.lastStatsWrite) < statsForceWriteInterval {
 		return
 	}
 
@@ -133,6 +147,11 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 	// Calculate hash of stats data for change detection
 	statsHash := fmt.Sprintf("%x", md5.Sum(data))
+
+	// Record the epoch on both paths — a change that produced identical bytes
+	// (a value written back to itself) must not make us rebuild next tick too.
+	cb.lastStatsEpoch = epoch
+	cb.lastStatsWrite = time.Now()
 
 	// Skip write if stats haven't changed
 	if statsHash == cb.lastStatsHash {

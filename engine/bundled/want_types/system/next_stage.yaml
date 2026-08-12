@@ -88,6 +88,16 @@ wantType:
       label: current
       persistent: false
       initialValue: ""
+    # Without this gate the monitor spawns a Python interpreter every tick just
+    # to have the script find pending_jump empty and print {} — 8 of these wants
+    # at 1s cost ~0.44 of a CPU core doing nothing. mrsCheckRequiredParams
+    # returns before the script is ever run, so an empty pending_jump now costs
+    # nothing at all and the jump still fires the tick after it is set.
+    - name: skill_required_params
+      type: string
+      label: current
+      persistent: true
+      initialValue: "pending_jump"
     - name: skill_timeout_seconds
       type: int
       label: goal
@@ -111,6 +121,7 @@ wantType:
       target_y: '${target_y}'
       skill_path: "~/.mywant/custom-types/mywant-next-stage-trigger/main.py"
       skill_json_arg_template: '{"pending_jump":"%{pending_jump}"}'
+      skill_required_params: "pending_jump"
     goal:
       skill_timeout_seconds: 5
       skill_poll_interval_ms: 1000

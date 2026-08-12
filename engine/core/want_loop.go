@@ -91,13 +91,10 @@ func (n *Want) runProgressWithRecovery() (exitLoop bool) {
 
 	// Declarative mapping: State → Locals
 	var locals any
-	if progressableVal := reflect.ValueOf(n.progressable); progressableVal.Kind() == reflect.Pointer {
-		method := progressableVal.MethodByName("GetLocals")
-		if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
-			results := method.Call(nil)
-			locals = results[0].Interface()
-			SyncLocalsState(n, locals, true)
-		}
+	if method, ok := n.localsMethod(); ok {
+		results := method.Call(nil)
+		locals = results[0].Interface()
+		SyncLocalsState(n, locals, true)
 	}
 
 	n.progressable.Progress()
@@ -107,6 +104,30 @@ func (n *Want) runProgressWithRecovery() (exitLoop bool) {
 		SyncLocalsState(n, locals, false)
 	}
 	return false
+}
+
+// localsMethod returns the progressable's GetLocals method, resolving it by
+// name at most once per progressable rather than on every cycle.
+//
+// Only pointer progressables are cached by identity: the interface then holds a
+// pointer, so comparing it is both cheap and safe (a value type could be
+// non-comparable and panic on ==).
+func (n *Want) localsMethod() (reflect.Value, bool) {
+	if n.getLocalsResolved && n.getLocalsFor == n.progressable {
+		return n.getLocalsFn, n.getLocalsFn.IsValid()
+	}
+
+	var resolved reflect.Value
+	if progressableVal := reflect.ValueOf(n.progressable); progressableVal.Kind() == reflect.Pointer {
+		method := progressableVal.MethodByName("GetLocals")
+		if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
+			resolved = method
+		}
+		n.getLocalsFn = resolved
+		n.getLocalsFor = n.progressable
+		n.getLocalsResolved = true
+	}
+	return resolved, resolved.IsValid()
 }
 
 // checkPostProgressStatus inspects want status and failable/achieved state after
