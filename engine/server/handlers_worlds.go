@@ -153,7 +153,12 @@ func (s *Server) saveWorldSnapshot(name string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(worldFilePath(dir, name), data, 0644)
+	if err := os.WriteFile(worldFilePath(dir, name), data, 0644); err != nil {
+		return err
+	}
+	// Where the characters were standing is part of the snapshot: a world
+	// reopened without it puts everyone back at the middle of the board.
+	return s.saveWorldGUIState(dir, name)
 }
 
 // saveWorld handles POST /api/v1/worlds/{name}/save — snapshots the currently
@@ -180,6 +185,7 @@ func (s *Server) saveWorld(w http.ResponseWriter, r *http.Request) {
 			from = defaultWorldName
 		}
 		copyWorldThings(dir, from, name)
+		copyWorldGUIState(dir, from, name)
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"name": name})
 }
@@ -428,9 +434,19 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 	// about a thing changed, the question changed.
 	go broadcastSSE("thing_changed", name)
 
+	// And where everyone was standing on this board. Merged rather than
+	// applied wholesale, so a world that never recorded a position leaves the
+	// characters where they are — see world_gui_state.go.
+	cursorRestored := s.applyGUIState(readWorldGUIState(dir, name))
+
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"name":       name,
 		"want_count": loadedCount,
+		// Whether this board already knows where to stand. A world want carries
+		// a spawn point for arriving somewhere sensible the first time; once
+		// the board remembers where you were, that memory is the better answer
+		// and the client should not teleport over it.
+		"cursor_restored": cursorRestored,
 	})
 }
 

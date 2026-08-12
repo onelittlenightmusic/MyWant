@@ -94,8 +94,10 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.Status = runtimeWant.want.Status
 			want.Metadata.OrderKey = runtimeWant.want.Metadata.OrderKey // Sync order key
 
-			// Correctly copy state using the thread-safe helper
-			stateCopy := runtimeWant.want.GetAllState()
+			// Deep copy: this snapshot is about to be marshalled, and a
+			// shallow one shares its nested maps with the live want — see
+			// GetAllStateDeep.
+			stateCopy := runtimeWant.want.GetAllStateDeep()
 			want.storeStateMulti(stateCopy)
 			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
 		}
@@ -108,8 +110,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
 
-			// Correctly copy state using the thread-safe helper
-			stateCopy := runtimeWant.want.GetAllState()
+			// Deep copy — same reason as above.
+			stateCopy := runtimeWant.want.GetAllStateDeep()
 
 			wantConfig := &Want{
 				Metadata: runtimeWant.GetMetadata(),

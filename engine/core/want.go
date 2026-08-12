@@ -1462,6 +1462,51 @@ func (n *Want) getRawState() map[string]any {
 	return state
 }
 
+// GetAllStateDeep is GetAllState with the nested containers copied too.
+//
+// GetAllState copies the top level only, so a state value that is itself a map
+// or a slice comes back shared with the live want. Reading one of those while
+// another goroutine replaces its contents is a data race, and when the reader
+// is a serializer it is a fatal one: `concurrent map iteration and map write`
+// takes the process down and cannot be recovered from. That is what it did —
+// the reconcile loop was marshalling wants to state.yaml while a webhook stored
+// a fresh payload map on one of them.
+//
+// Use this anywhere the copy outlives the call or gets serialized. Everywhere
+// else GetAllState is fine and cheaper: this walks the whole structure, so it
+// is worth paying only where the alternative is walking it anyway.
+func (n *Want) GetAllStateDeep() map[string]any {
+	return deepCopyValue(n.GetAllState()).(map[string]any)
+}
+
+// deepCopyValue copies the containers YAML/JSON state is actually made of.
+// Scalars are returned as they are — they are immutable, so sharing them is
+// safe, and copying them would cost without buying anything.
+func deepCopyValue(v any) any {
+	switch t := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			out[k] = deepCopyValue(val)
+		}
+		return out
+	case map[any]any: // YAML round-trips can produce these
+		out := make(map[any]any, len(t))
+		for k, val := range t {
+			out[k] = deepCopyValue(val)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = deepCopyValue(val)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
 func (n *Want) GetAllState() map[string]any {
 	state := n.getRawState()
 	// Overlay imported fields with live values so the API response always reflects
