@@ -381,6 +381,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/design-plugins", s.listDesignPlugins).Methods("GET", "OPTIONS")
 	api.HandleFunc("/design-plugins/{filename}", s.serveDesignPlugin).Methods("GET", "OPTIONS")
 
+	// Form designs (tile surfaces / form shapes / form styles) carried by a want
+	// type — compiled on-the-fly from ~/.mywant/custom-types/*/form-design/plugin.*
+	api.HandleFunc("/form-designs", s.listFormDesigns).Methods("GET", "OPTIONS")
+	api.HandleFunc("/form-designs/{filename}", s.serveFormDesign).Methods("GET", "OPTIONS")
+
 	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
