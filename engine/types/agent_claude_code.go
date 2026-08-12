@@ -167,10 +167,13 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		switch triggerOn {
 		case "pattern":
 			autonomousTriggered = GetCurrent(want, "pattern_matched", false)
-		case "waiting":
+		case "waiting", "complete":
+			// One event, two names. The transcript records that the assistant
+			// yielded the turn; whether that means "I have a question" or "I am
+			// done" is not something it states, and guessing it from punctuation
+			// is what used to make both of these wrong. Wants configured either
+			// way keep firing where they always meant to.
 			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "waiting_for_input"
-		case "complete":
-			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "task_complete"
 		case "idle":
 			autonomousTriggered = GetCurrent(want, "current_session_state", "") == "idle"
 		case "webhook":
@@ -578,6 +581,12 @@ type sessionEntry struct {
 	Role      string // "user" or "assistant"
 	Content   string // extracted text content
 	Timestamp string // ISO 8601 timestamp from the outer envelope
+	// StopReason is why the assistant stopped: "end_turn" (yielded to the user),
+	// "tool_use" (paused to run a tool, still working), "stop_sequence", or ""
+	// on user lines. This is how the transcript says whether a turn is over —
+	// the text alone cannot, and reading punctuation instead of this field is
+	// what made the session state wrong.
+	StopReason string
 }
 
 // rawSessionLine is the top-level JSONL structure in Claude Code session files.
@@ -590,8 +599,9 @@ type rawSessionLine struct {
 
 // rawMessage is the nested message inside a session line.
 type rawMessage struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"` // string or []contentBlock
+	Role       string `json:"role"`
+	Content    any    `json:"content"` // string or []contentBlock
+	StopReason string `json:"stop_reason"`
 }
 
 // contentBlock is one element in a Claude content array.
@@ -639,13 +649,25 @@ func readClaudeSessionEntries(sessionID string) ([]sessionEntry, error) {
 
 		text := extractMessageText(raw.Message)
 		entries = append(entries, sessionEntry{
-			Role:      raw.Type,
-			Content:   text,
-			Timestamp: raw.Timestamp,
+			Role:       raw.Type,
+			Content:    text,
+			Timestamp:  raw.Timestamp,
+			StopReason: extractStopReason(raw.Message),
 		})
 	}
 
 	return entries, scanner.Err()
+}
+
+// extractStopReason reads message.stop_reason, which is absent on user lines.
+func extractStopReason(msgRaw json.RawMessage) string {
+	var msg struct {
+		StopReason string `json:"stop_reason"`
+	}
+	if err := json.Unmarshal(msgRaw, &msg); err != nil {
+		return ""
+	}
+	return msg.StopReason
 }
 
 // extractMessageText extracts readable text from a Claude Code message.
@@ -711,6 +733,19 @@ func findSessionFile(claudeDir, sessionID string) (string, error) {
 }
 
 // classifyClaudeSessionState determines the current state of a Claude Code session.
+//
+// The rule is about whose turn it is, not about what was said. When the
+// assistant yields the turn the ball is with the user, and that is
+// waiting_for_input whether the last sentence was a question, a summary or a
+// diff. This used to be decided by whether the text ended in "?" — which meant
+// an ASCII question mark, so a Japanese session ending in "？" (or in a question
+// followed by a parenthetical) was read as "task complete" and never triggered
+// a trigger_on: waiting want.
+//
+// stop_reason is the transcript's own answer to the same question, and it also
+// distinguishes the case the punctuation rule could not see at all: an assistant
+// message that stopped to call a tool has not yielded anything, and reporting it
+// as finished said the task was done while the work was still running.
 func classifyClaudeSessionState(entries []sessionEntry) string {
 	if len(entries) == 0 {
 		return "idle"
@@ -721,11 +756,10 @@ func classifyClaudeSessionState(entries []sessionEntry) string {
 	case "user":
 		return "waiting_for_response"
 	case "assistant":
-		content := strings.ToLower(last.Content)
-		if strings.HasSuffix(strings.TrimSpace(content), "?") {
-			return "waiting_for_input"
+		if last.StopReason == "tool_use" {
+			return "waiting_for_response" // paused to run a tool; still working
 		}
-		return "task_complete"
+		return "waiting_for_input"
 	default:
 		return "unknown"
 	}

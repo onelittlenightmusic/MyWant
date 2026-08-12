@@ -136,7 +136,7 @@ wantType:
     label: goal
 
   - name: current_session_state
-    description: Observed session state from MonitorAgent (idle, waiting_for_input, waiting_for_response, task_complete)
+    description: Observed session state from MonitorAgent (idle, waiting_for_input, waiting_for_response). waiting_for_input means the assistant yielded the turn — the transcript does not say whether it asked something or finished, so task_complete is no longer reported
     type: string
     persistent: false
     initialValue: ""
