@@ -13,6 +13,12 @@ wantType:
     category: game
     pattern: independent
     labels:
+      # What this takes the shape of on the ground. Tiles that share it are one
+      # thing: the canvas runs the brickwork straight through the gaps between
+      # them, and projects the depth of the whole run rather than of each tile.
+      # A door declares the same form — it is not made of brick, but it is part
+      # of the wall, so the wall closes around it instead of stopping at it.
+      form-type: wall
       # The tile is not a card with a brick icon on it — it is bricks.
       form-style: brick
       type-icon: "BrickWall"

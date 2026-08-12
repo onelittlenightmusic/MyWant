@@ -22,6 +22,11 @@ wantType:
     category: game
     pattern: independent
     labels:
+      # A door is part of the wall it stands in, so it takes the wall's form:
+      # the canvas bricks over the gaps on either side of it and carries the
+      # wall's depth through the doorway, instead of leaving a hole around the
+      # door. A door on open ground has no wall to join and is drawn plain.
+      form-type: wall
       # Drawn as a door, not a card: the leaf swings on `locked`.
       form-style: door
       type-tone-color: "#8a5a3b"
