@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	mywant "mywant/engine/core"
@@ -220,6 +221,144 @@ func markWantOccupied(w *mywant.Want, occupied map[[2]int]bool) {
 	}
 }
 
+// tileGeometry reads a want's own rotation/length (set by CanvasTileSizeHook).
+func tileGeometry(w *mywant.Want) (rot, length int) {
+	if v, err := strconv.Atoi(w.GetLabel(canvasLabelRotation)); err == nil {
+		rot = v
+	}
+	if v, err := strconv.Atoi(w.GetLabel(canvasLabelLength)); err == nil {
+		length = v
+	}
+	return rot, length
+}
+
+// canvasOccupancy returns the cells already taken — by everything on the board
+// and by everything else arriving in the same batch — together with a test for
+// whether `want` fits at a given anchor, its full footprint included.
+//
+// Batch members matter as much as the board: three wants deployed together are
+// placed one at a time, and each has to see where the previous two landed or
+// all three claim the same cell.
+func canvasOccupancy(want *mywant.Want, allWants, newBatch []*mywant.Want) (map[[2]int]bool, func(x, y int) bool) {
+	occupied := make(map[[2]int]bool)
+	for _, w := range allWants {
+		markWantOccupied(w, occupied)
+	}
+	for _, bw := range newBatch {
+		if bw.Metadata.ID == want.Metadata.ID {
+			continue
+		}
+		markWantOccupied(bw, occupied)
+	}
+	rot, length := tileGeometry(want)
+	return occupied, func(x, y int) bool {
+		for _, c := range tileFootprint(x, y, rot, length) {
+			if occupied[c] {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// ── Built-in hook: "put this near someone" ───────────────────────────────────
+
+// canvasLabelNear names whoever a want wants to arrive beside: a character id,
+// or the sentinel below for the CursorMan.
+const canvasLabelNear = "mywant.io/canvas-near"
+
+// canvasNearCursor asks for the CursorMan — the robot cursor, whose position
+// lives in the unsuffixed gui_state keys. Spelled as a word because a deploy
+// file that says "near the cursor" should not have to know an id.
+const canvasNearCursor = "cursor"
+
+// CanvasNearHook turns "near so-and-so" into a coordinate.
+//
+// A deployment file is written before the game is played, so it cannot say
+// where to put anything: the one thing it knows is who the new want is FOR.
+// Coordinates are what the board wants, and only the server knows both — it is
+// holding every player's live position — so the translation belongs here rather
+// than in whatever wrote the YAML. The file states the intent; this resolves it
+// at the moment of deployment.
+//
+// Runs before CanvasCoordinateHook, which then does the real work: this only
+// seeds canvas-x/y, and the seeding is deliberately a full placement search so
+// the coordinate handed on is one that fits.
+type CanvasNearHook struct{}
+
+func (h *CanvasNearHook) Name() string { return "canvas-near" }
+
+func (h *CanvasNearHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {
+	target := want.GetLabel(canvasLabelNear)
+	if target == "" {
+		return nil
+	}
+	// An explicit position wins. Somebody said exactly where; "near someone" is
+	// the vaguer of the two answers and has no business overruling it.
+	if want.GetLabel(canvasLabelX) != "" && want.GetLabel(canvasLabelY) != "" {
+		return nil
+	}
+	cx, cy, ok := resolveCanvasNear(target, allWants)
+	if !ok {
+		// Nobody by that name, or they have never been anywhere. Not an error
+		// worth failing a deployment over — the want still gets placed, just by
+		// the ordinary scan, which is exactly where it would have gone before
+		// anyone thought to ask for this.
+		return nil
+	}
+
+	_, isFreeAt := canvasOccupancy(want, allWants, newBatch)
+	// From radius 1: beside them, not underneath them. See spiralFreeCell.
+	x, y, found := spiralFreeCell(cx, cy, 1, isFreeAt)
+	if !found {
+		return nil
+	}
+	want.SetLabel(canvasLabelX, strconv.Itoa(x))
+	want.SetLabel(canvasLabelY, strconv.Itoa(y))
+	return nil
+}
+
+// resolveCanvasNear finds the cell a canvas-near target is standing on.
+//
+// Three places to look, in order of how current they are: a live cursor is
+// someone with a tab open reporting where they are right now; the per-character
+// gui_state keys are where a character was left when nobody is playing them;
+// and the unsuffixed keys are the CursorMan. A character with a tab open and a
+// stale gui_state entry must resolve to the tab, which is why the live map is
+// asked first.
+func resolveCanvasNear(target string, allWants []*mywant.Want) (int, int, bool) {
+	if target != canvasNearCursor {
+		cursorsMu.RLock()
+		e, ok := cursors[target]
+		cursorsMu.RUnlock()
+		if ok && hasLiveCursor(target) {
+			return int(math.Round(e.X)), int(math.Round(e.Y)), true
+		}
+	}
+
+	var state map[string]any
+	for _, w := range allWants {
+		if w.Metadata.ID == guiStateWantID {
+			state = w.GetAllState()
+			break
+		}
+	}
+	if state == nil {
+		return 0, 0, false
+	}
+
+	xKey, yKey := "canvas_cursor_x", "canvas_cursor_y"
+	if target != canvasNearCursor {
+		xKey, yKey = cursorStateXPrefix+target, cursorStateYPrefix+target
+	}
+	x, okX := cursorCoord(state[xKey])
+	y, okY := cursorCoord(state[yKey])
+	if !okX || !okY {
+		return 0, 0, false
+	}
+	return int(math.Round(x)), int(math.Round(y)), true
+}
+
 // CanvasCoordinateHook assigns mywant.io/canvas-x and canvas-y labels to wants.
 // If a position is already set (e.g. from cursorman location), it verifies the
 // footprint is free; if occupied it spirals outward to find the nearest free cell.
@@ -235,41 +374,41 @@ func absInt(x int) int {
 	return x
 }
 
+// spiralFreeCell walks Chebyshev rings outward from (cx, cy) and returns the
+// first cell isFree accepts, or ok=false if the search gives up.
+//
+// minRadius is where the search starts: 0 means "(cx, cy) itself is a fine
+// answer", 1 means "beside it, not on it". The second is what "put this near
+// someone" wants — a want placed on the exact cell a player is standing on
+// appears underneath them, which reads as the board swallowing them rather than
+// as something arriving next to them.
+func spiralFreeCell(cx, cy, minRadius int, isFree func(x, y int) bool) (int, int, bool) {
+	if minRadius <= 0 && isFree(cx, cy) {
+		return cx, cy, true
+	}
+	for radius := max(minRadius, 1); radius <= 100; radius++ {
+		for dx := -radius; dx <= radius; dx++ {
+			for dy := -radius; dy <= radius; dy++ {
+				// Ring, not disc: the interior was covered by earlier radii.
+				if absInt(dx) != radius && absInt(dy) != radius {
+					continue
+				}
+				if isFree(cx+dx, cy+dy) {
+					return cx + dx, cy + dy, true
+				}
+			}
+		}
+	}
+	return 0, 0, false
+}
+
 func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {
 	if len(want.Metadata.OwnerReferences) > 0 {
 		return nil
 	}
 
-	// Read this want's own rotation/length (set by CanvasTileSizeHook).
-	myRot := 0
-	myLen := 0
-	if v, err := strconv.Atoi(want.GetLabel(canvasLabelRotation)); err == nil {
-		myRot = v
-	}
-	if v, err := strconv.Atoi(want.GetLabel(canvasLabelLength)); err == nil {
-		myLen = v
-	}
-
-	// Build occupied set, accounting for multi-cell spans of existing tiles.
-	occupied := make(map[[2]int]bool)
-	for _, w := range allWants {
-		markWantOccupied(w, occupied)
-	}
-	for _, bw := range newBatch {
-		if bw.Metadata.ID == want.Metadata.ID {
-			continue
-		}
-		markWantOccupied(bw, occupied)
-	}
-
-	isFreeAt := func(x, y int) bool {
-		for _, c := range tileFootprint(x, y, myRot, myLen) {
-			if occupied[c] {
-				return false
-			}
-		}
-		return true
-	}
+	myRot, myLen := tileGeometry(want)
+	occupied, isFreeAt := canvasOccupancy(want, allWants, newBatch)
 	placeAt := func(x, y int) {
 		want.SetLabel(canvasLabelX, strconv.Itoa(x))
 		want.SetLabel(canvasLabelY, strconv.Itoa(y))
@@ -284,22 +423,9 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 		reqX, errX := strconv.Atoi(want.GetLabel(canvasLabelX))
 		reqY, errY := strconv.Atoi(want.GetLabel(canvasLabelY))
 		if errX == nil && errY == nil {
-			if isFreeAt(reqX, reqY) {
-				placeAt(reqX, reqY)
+			if x, y, ok := spiralFreeCell(reqX, reqY, 0, isFreeAt); ok {
+				placeAt(x, y)
 				return nil
-			}
-			for radius := 1; radius <= 100; radius++ {
-				for dx := -radius; dx <= radius; dx++ {
-					for dy := -radius; dy <= radius; dy++ {
-						if absInt(dx) != radius && absInt(dy) != radius {
-							continue
-						}
-						if isFreeAt(reqX+dx, reqY+dy) {
-							placeAt(reqX+dx, reqY+dy)
-							return nil
-						}
-					}
-				}
 			}
 		}
 		// Clear labels so the fallback scan can reassign.
