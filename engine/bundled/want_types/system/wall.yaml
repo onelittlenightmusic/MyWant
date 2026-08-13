@@ -21,6 +21,11 @@ wantType:
       form-type: wall
       # The tile is not a card with a brick icon on it — it is bricks.
       form-style: brick
+      # Not worth a panel. Walking into a wall is walking into something, but a
+      # room has walls on every side and "you have bumped a wall" is not news —
+      # a board that opened a card for each of them would never be about
+      # anything else. Standing on one says nothing either.
+      highlightable: "false"
       type-icon: "BrickWall"
       category-icon: "BrickWall"
       list-visible: "false"
