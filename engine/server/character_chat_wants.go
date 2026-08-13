@@ -78,7 +78,7 @@ func (s *Server) ensureCharacterChatWant(characterID string) {
 			IsSystemWant: true,
 			Labels: map[string]string{
 				// Starts beside its character and moves onto them as soon as
-				// they are seen (placeChatWantAt). Asking for "near" rather than
+				// they are seen (moveCharacterWant). Asking for "near" rather than
 				// a coordinate because at creation the character's position is
 				// the server's to know, not this call's — see CanvasNearHook.
 				canvasLabelNear: characterID,
@@ -127,25 +127,4 @@ func (s *Server) removeCharacterChatWant(characterID string) {
 		return
 	}
 	log.Printf("[CharacterChat] removed %s", name)
-}
-
-// placeChatWantAt keeps a character's chat want on the cell the character is
-// standing on.
-//
-// The want is how you open their card — the same arrangement the robot has,
-// where walking onto it opens the chat it holds. That only works if it is
-// where they are: a card you reach by walking has to be somewhere you can walk
-// to, and the only somewhere that means anything for a person's chat window is
-// the person.
-//
-// Nothing draws it. The character is already drawn from their cursor, and a
-// second token on the same cell would be the same person twice; this only
-// occupies the cell so that arriving there finds something to open.
-func (s *Server) placeChatWantAt(characterID string, x, y float64) {
-	want := s.findWantByIDOrName(characterChatWantName(characterID))
-	if want == nil {
-		return
-	}
-	want.SetLabel(canvasLabelX, formatCanvasCoord(x))
-	want.SetLabel(canvasLabelY, formatCanvasCoord(y))
 }

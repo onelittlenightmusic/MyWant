@@ -31,6 +31,11 @@ import (
 // the two in step.
 var characterWantTypes = map[string]bool{
 	"robot": true,
+	// A character's chat want is bound to them the same way and follows them
+	// for the same reason: it is the card you open by finding them, so it has
+	// to be where they are. Same table, same mover — the robot's arrangement
+	// was never specific to the robot, only ever used by it.
+	"character_chat": true,
 }
 
 // applyCharacterCursorToWant turns "this character is now at (x, y)" into a
@@ -56,10 +61,16 @@ func (s *Server) applyCharacterCursorToWant(updates map[string]any) {
 		}
 		// Somebody is publishing a live cursor for this character: they are a
 		// player with a tab open, this write is that tab reporting where it
-		// already is, and there is no want standing in for them. Nothing to do.
+		// already is. Their browser owns where they are; leave it alone.
 		if hasLiveCursor(charID) {
 			continue
 		}
+		// Nobody is playing them, so this write IS where they now are — being
+		// called, taken, or moved by an agent. The board draws them from the
+		// durable roster, so that is what has to be told: without this, calling
+		// a character who has no browser wrote a position nothing was reading
+		// and they stayed exactly where they were.
+		rememberCharacterPosition(charID, x, y)
 		s.moveCharacterWant(charID, x, y)
 	}
 }

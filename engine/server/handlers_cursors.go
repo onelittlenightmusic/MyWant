@@ -378,9 +378,11 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	lastCursorPos[characterID] = cursors[characterID]
 	cursorsMu.Unlock()
 
-	// Their chat want walks with them, so the card is always reachable from
-	// where they are — see placeChatWantAt.
-	s.placeChatWantAt(characterID, body.X, body.Y)
+	// The want bound to this character follows them, so the card is reachable
+	// from where they are. The same mover the robot has always used — it is
+	// gated on the want being one that stands for a character, so a starred
+	// weather tile is not dragged around by its owner walking.
+	s.moveCharacterWant(characterID, body.X, body.Y)
 
 	// A new utterance joins the conversation record. Only the first PUT carrying
 	// a given messageAt — the later ones are the same words being carried along
@@ -456,5 +458,32 @@ func FireCharacterEffect(characterID, effectType string) {
 	cursors[characterID] = e
 	cursorsMu.Unlock()
 
+	go broadcastSSE("cursor", snapshotCursors())
+}
+
+// rememberCharacterPosition records where a character now is, for a character
+// nobody is playing.
+//
+// The durable roster is normally fed by the browser publishing a cursor. A
+// character without one is moved by other means — called across the board,
+// taken by `mywant-gui i take`, driven by an agent — and those write the
+// position into gui_state instead. This is how that reaches the roster the
+// board actually draws from.
+//
+// The identity fields come from the character store rather than from whatever
+// was last published, so somebody who has never had a browser open still
+// arrives with their own face and colour.
+func rememberCharacterPosition(characterID string, x, y float64) {
+	c, ok := mywant.GetCharacter(characterID)
+	if !ok {
+		return
+	}
+	cursorsMu.Lock()
+	prev := lastCursorPos[characterID]
+	prev.X, prev.Y = x, y
+	prev.Avatar, prev.Color, prev.Name = c.Avatar, c.Color, c.Name
+	lastCursorPos[characterID] = prev
+	cursorsMu.Unlock()
+	// Everyone watching sees them arrive, rather than on whoever's next poll.
 	go broadcastSSE("cursor", snapshotCursors())
 }
