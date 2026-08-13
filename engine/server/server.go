@@ -448,6 +448,10 @@ func (s *Server) Start() error {
 	// character's cursor, so they animate on every client via the cursor stream.
 	mywant.OnCharacterEffectFire = FireCharacterEffect
 
+	// ...and let a want record that a character said something, so the robot's
+	// answers join the same conversation as everybody else's words.
+	mywant.OnCharacterSpeak = recordSpeech
+
 	// Re-address any aura marks still keyed by want instance UUID (pre-target
 	// characters.yaml) to their want type, now that the restored wants are
 	// available to resolve those IDs against. No-op once migrated.

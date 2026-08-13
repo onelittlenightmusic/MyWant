@@ -1503,6 +1503,12 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	// nothing at all. See character_want_bridge.go.
 	s.applyCharacterCursorToWant(updates)
 
+	// `mywant gui robot say` writes the words here, alongside a fresh nonce that
+	// marks them as newly said rather than carried along by an unrelated update.
+	// The robot speaks into the same conversation as everybody else — see
+	// speech_log.go — so the record is taken on the way through.
+	recordRobotSayFromGUIState(want, updates)
+
 	for key, val := range updates {
 		if val == nil {
 			want.DeleteState(key) // null from client means "remove this field"

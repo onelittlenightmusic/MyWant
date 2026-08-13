@@ -115,3 +115,40 @@ func characterIDForChatWant(want *mywant.Want) string {
 	}
 	return ""
 }
+
+// recordRobotSayFromGUIState notices `mywant gui robot say` going past.
+//
+// The robot's words arrive as a gui_state write rather than as a cursor message
+// or a chat want, because the robot has no browser publishing a cursor and its
+// want is a coding agent rather than a mailbox. Three ways of speaking, then —
+// but one conversation, so this is where the third one joins it.
+//
+// Gated on the nonce actually changing. The dashboard rewrites the whole
+// gui_state block on every debounce, so the same message goes past again and
+// again; the nonce is what `say` bumps and a rewrite does not, and it is
+// already what tells the frontend a command is new.
+func recordRobotSayFromGUIState(want *mywant.Want, updates map[string]any) {
+	message, _ := updates["robot_message"].(string)
+	if message == "" {
+		return
+	}
+	nonce := toInt64(updates["robot_nonce"])
+	if nonce == 0 || nonce == toInt64(want.GetAllState()["robot_nonce"]) {
+		return
+	}
+	recordSpeech(robotCharacterID, message, "say")
+}
+
+// toInt64 coerces a JSON number, which arrives as float64 however it was
+// written, without caring which shape it took on the way.
+func toInt64(v any) int64 {
+	switch n := v.(type) {
+	case float64:
+		return int64(n)
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	}
+	return 0
+}
