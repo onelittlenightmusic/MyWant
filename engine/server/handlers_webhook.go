@@ -67,7 +67,9 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 			Timestamp: time.Now().Format(time.RFC3339),
 		}, ccStateCfg)
 		if want.Metadata.Type == "character_chat" {
-			recordSpeech(characterIDForChatWant(want), text, "chat")
+			speaker := characterIDForChatWant(want)
+			recordSpeech(speaker, text, "chat")
+			s.forwardToRobotIfAddressed(speaker, text)
 		}
 		log.Printf("[CC-WEBHOOK] Received request for want %s: %s\n", wantID, text)
 		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
