@@ -200,7 +200,7 @@ func snapshotCursors() []cursorResponse {
 		}
 		seen[charID] = true
 		result = append(result, cursorResponse{
-			Live: true,
+			Live:        true,
 			CharacterID: charID,
 			DeviceID:    e.DeviceID,
 			X:           e.X,
@@ -220,7 +220,7 @@ func snapshotCursors() []cursorResponse {
 	// lock so a character cannot appear twice by going live between the two
 	// halves.
 	for charID, e := range lastCursorPos {
-		if seen[charID] {
+		if seen[charID] || drawnFromOwnWant(charID) {
 			continue
 		}
 		result = append(result, cursorResponse{
@@ -475,7 +475,7 @@ func FireCharacterEffect(characterID, effectType string) {
 // arrives with their own face and colour.
 func rememberCharacterPosition(characterID string, x, y float64) {
 	c, ok := mywant.GetCharacter(characterID)
-	if !ok {
+	if !ok || drawnFromOwnWant(characterID) {
 		return
 	}
 	cursorsMu.Lock()
@@ -486,4 +486,29 @@ func rememberCharacterPosition(characterID string, x, y float64) {
 	cursorsMu.Unlock()
 	// Everyone watching sees them arrive, rather than on whoever's next poll.
 	go broadcastSSE("cursor", snapshotCursors())
+}
+
+// drawnFromOwnWant reports whether the board draws this character from a want
+// of their own rather than from their cursor — the robot, which has no browser
+// and so no cursor to be drawn from.
+//
+// Such a character must stay out of the roster entirely. Their want is where
+// they are, and a second copy in the roster can only ever disagree with it:
+// the want moves when they wander, the roster copy moves when they are called,
+// so the two drift apart and the board draws the same robot in two places. The
+// one you walked up to is then not the one that moves, which reads as the robot
+// flying off the moment you reach it.
+func drawnFromOwnWant(characterID string) bool {
+	c, ok := mywant.GetCharacter(characterID)
+	if !ok || c.AuraCardWantID == "" {
+		return false
+	}
+	want, _, found := mywant.GetGlobalChainBuilder().FindWantByID(c.AuraCardWantID)
+	if !found || want == nil {
+		return false
+	}
+	// The same table the mover uses, minus the chat wants: those stand on their
+	// character's cell and are drawn by nothing, so their character is still
+	// drawn from the cursor and still belongs in the roster.
+	return want.Metadata.Type == "robot"
 }

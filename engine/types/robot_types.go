@@ -2,6 +2,7 @@ package types
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	. "mywant/engine/core"
@@ -130,17 +131,25 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	dx := int(step%3) - 1
 	dy := int(step/3) - 1
 
-	// One cell, from wherever it happens to be.
+	// One cell, on a leash — but tied to where it was last put, not to the
+	// origin.
 	//
-	// This used to clamp into an absolute box (0..wander_bound), which was a
-	// fair leash while the robot only ever lived near the origin and is wrong
-	// now that it can be called: summoned to somebody standing outside that box
-	// — anywhere on a stage, say — the very next wander yanked it back inside,
-	// so being called looked like the robot flying off to a coordinate nobody
-	// asked for. Coming when called and then staying put is the whole of what
-	// was wanted; a leash to the origin was never part of it.
-	nx := x + dx
-	ny := y + dy
+	// Both extremes were wrong. Clamping into an absolute box (0..bound) yanked
+	// a robot that had been called to somebody standing outside it straight back
+	// inside, so being called looked like the robot flying off somewhere nobody
+	// asked for. Removing the leash entirely fixed that and introduced a slower
+	// version of the same complaint: with nothing to hold it, a one-cell drift
+	// every forty-five seconds walked the robot clean off the board — 448 steps
+	// took it from (7,-4) to (-16,-51), which is not wandering, it is leaving.
+	//
+	// So it wanders around wherever it was last placed. anchorFor works that out
+	// by noticing when the robot is somewhere wander did not leave it: only
+	// something else — a call, a take, an agent — moves it that way, and that is
+	// exactly the event that should re-tie the leash.
+	bound := w.GetIntParam("wander_bound", 6)
+	ax, ay := anchorFor(w.Metadata.ID, x, y)
+	nx := clampInt(x+dx, ax-bound, ax+bound)
+	ny := clampInt(y+dy, ay-bound, ay+bound)
 
 	// Same wall / locked-door boundaries a player's cursor can't cross (see
 	// WantCanvas.tsx's wallCells) — try the diagonal move, then slide along
@@ -161,6 +170,7 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	}
 
 	if nx != x {
+		rememberWanderLeftAt(w.Metadata.ID, nx, ny)
 		w.SetLabel("mywant.io/canvas-x", strconv.Itoa(nx))
 	}
 	if ny != y {
@@ -201,7 +211,6 @@ func isCanvasBlocked(x, y int, selfID string) bool {
 	}
 	return false
 }
-
 
 // Progress reads ThinkAgent's Plan decisions and executes state transitions.
 // Identical phase machine to CodingWant.Progress (see coding_types.go), plus
@@ -273,4 +282,51 @@ func (w *RobotWant) Progress() {
 // IsAchieved always returns false: the robot is a permanent system want.
 func (w *RobotWant) IsAchieved() bool {
 	return false
+}
+
+// ── Where the robot is tethered while it wanders ─────────────────────────────
+
+// Its leash is tied to wherever it was last put by something other than its own
+// wandering: called to somebody, taken, moved by an agent. Held in memory
+// rather than in state because a leash is not worth persisting — a restart
+// simply re-ties it wherever the robot is standing, which is the same answer
+// anybody would give.
+type wanderAnchor struct{ anchorX, anchorY, leftX, leftY int }
+
+var (
+	wanderAnchorsMu sync.Mutex
+	wanderAnchors   = map[string]wanderAnchor{}
+)
+
+// anchorFor returns the cell to wander around, re-tying to (x, y) when the
+// robot is not where wander left it — the mark of somebody else having moved it.
+func anchorFor(wantID string, x, y int) (int, int) {
+	wanderAnchorsMu.Lock()
+	defer wanderAnchorsMu.Unlock()
+	a, known := wanderAnchors[wantID]
+	if !known || a.leftX != x || a.leftY != y {
+		a = wanderAnchor{anchorX: x, anchorY: y, leftX: x, leftY: y}
+		wanderAnchors[wantID] = a
+	}
+	return a.anchorX, a.anchorY
+}
+
+// rememberWanderLeftAt records where this tick's wander put the robot, so the
+// next tick can tell its own move apart from anybody else's.
+func rememberWanderLeftAt(wantID string, x, y int) {
+	wanderAnchorsMu.Lock()
+	defer wanderAnchorsMu.Unlock()
+	a := wanderAnchors[wantID]
+	a.leftX, a.leftY = x, y
+	wanderAnchors[wantID] = a
+}
+
+func clampInt(v, min, max int) int {
+	if v < min {
+		return min
+	}
+	if v > max {
+		return max
+	}
+	return v
 }
