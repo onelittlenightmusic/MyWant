@@ -197,6 +197,16 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 		requestID := deriveClaudeRequestID(want)
 		if sessionID != "" && isClaudeRequestSent(sessionID, requestID) {
 			want.StoreLog("[CC_THINK] Request %s already sent, skipping", requestID)
+			// A message that has been delivered must not stay queued. Left in
+			// the slot it re-triggers this same check on every tick forever:
+			// the log fills with skips, the want looks busy, and — because the
+			// slot holds exactly one message — nothing anyone says afterwards
+			// is ever looked at. Now that the id is derived from the message
+			// itself, reaching here means this exact message really was sent,
+			// so dropping it loses nothing.
+			if GetCurrent(want, "webhook_auto_request", "") != "" {
+				want.SetCurrent("webhook_auto_request", "")
+			}
 			// Restore request_count from idempotency log
 			sentCount := countClaudeSentLogs(sessionID)
 			currentCount := GetCurrent(want, "request_count", 0)
@@ -882,13 +892,51 @@ func idempotencyLogPath(sessionID, requestID string) string {
 }
 
 // deriveClaudeRequestID generates a deterministic request ID from current state.
+// deriveClaudeRequestID names the request a trigger is asking for, so that the
+// same one is never sent twice.
+//
+// A message from a person is identified by the MESSAGE. It used to be
+// identified by a counter — session:auto_request:request_count:matched — which
+// contains nothing the person typed, so what the id actually said was "the Nth
+// request of this session", and two entirely different messages could hash the
+// same. Then the counter could not advance: it only moves when a send
+// completes, and the send was being skipped as a duplicate. A message that hit
+// that state was dropped in silence, permanently, and so was every message
+// after it — the only way out was deleting files by hand.
+//
+// What makes one message different from another is what it says, where it sits
+// in the conversation, and when it was said, so that is what is hashed. Two
+// different messages cannot collide. The same message after a server restart
+// still hashes the same and is still not sent twice, which is the one thing the
+// idempotency log is actually for.
+//
+// Autonomous triggers (pattern / waiting) keep the old derivation: there is no
+// message there, and what identifies those is the matched content and the
+// session's own state.
 func deriveClaudeRequestID(want *Want) string {
 	sessionID := GetGoal(want, "session_id", "")
+
+	if msg := GetCurrent(want, "webhook_auto_request", ""); msg != "" {
+		stamp := ""
+		if latest := GetCurrent(want, "cc_latest_message", map[string]any{}); len(latest) > 0 {
+			if ts, ok := latest["timestamp"].(string); ok {
+				stamp = ts
+			}
+		}
+		// The count distinguishes the same words said twice; the timestamp
+		// distinguishes them across a want that was recreated and started
+		// counting again.
+		count := GetCurrent(want, "cc_message_count", 0)
+		return hashClaudeRequestID(fmt.Sprintf("%s:webhook:%d:%s:%s", sessionID, count, stamp, msg))
+	}
+
 	autoRequest := GetGoal(want, "auto_request", "")
 	reqCount := GetCurrent(want, "request_count", 0)
 	matchedContent := GetCurrent(want, "matched_content", "")
+	return hashClaudeRequestID(fmt.Sprintf("%s:%s:%d:%s", sessionID, autoRequest, reqCount, matchedContent))
+}
 
-	input := fmt.Sprintf("%s:%s:%d:%s", sessionID, autoRequest, reqCount, matchedContent)
+func hashClaudeRequestID(input string) string {
 	hash := sha256.Sum256([]byte(input))
 	return fmt.Sprintf("%x", hash[:8])
 }
