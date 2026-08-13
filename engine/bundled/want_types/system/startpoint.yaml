@@ -4,11 +4,31 @@ wantType:
     title: Start Point
     description: |
       A canvas-grid marker for where CursorMan lands when entering this area
-      (typically the first room of a stage). Purely positional — other wants
-      (e.g. `next_stage`) reference a start point's coordinates as their
-      teleport target rather than looking it up at runtime, so moving a
-      start point does not retroactively repoint anything that already
-      references its old position.
+      (typically the first room of a stage). Other wants (e.g. `next_stage`)
+      reference a start point's coordinates as their teleport target rather
+      than looking it up at runtime, so moving a start point does not
+      retroactively repoint anything that already references its old position.
+
+      It is also the way back. Where `next_stage` sits in a stage's last room
+      and sends the game forward, a start point sits in its first room and
+      sends it back: pressing "前の階に戻る" on this want's card writes
+      rpg_prev_stage_id into "pending_jump", and a monitor_mrs_agent poll (~1s)
+      sends rpg-server the ordinary return action (POST /api/v1/control,
+      actor=you action=return), then clears the field (see
+      ~/.mywant/custom-types/rpg-stage-jump/main.py).
+
+      Walking back, not restarting: both stages are left exactly as they were,
+      alarms and doors and inventory included. Unlike advancing, returning has
+      no "cleared" requirement — you may leave a stage unfinished and come back
+      to it. rpg-server puts you where you were standing when you left, so the
+      canvas target and it agree about the door you came through.
+
+      The canvas CursorMan warp fires immediately on press and does not wait
+      for rpg-server, so the two are only loosely (~1s) synchronized — the same
+      bargain `next_stage` makes going the other way.
+
+      Leave rpg_prev_stage_id unset for the first stage, which has nowhere to
+      go back to: the card then shows the marker and no button.
 
       Purely a canvas-grid fixture: it is not shown in the want dashboard's
       card list (labels.list-visible: "false").
@@ -18,12 +38,88 @@ wantType:
     labels:
       type-icon: "Flag"
       list-visible: "false"
+      # The card carries a control the user presses, so the card can be
+      # operated: Enter/A drills into it and the button joins the tab ring.
+      user-control: "true"
 
   parameters:
     - name: label
       description: Optional human-readable name for this start point (e.g. "stage2 entrance")
       type: string
       required: false
+    - name: rpg_prev_stage_id
+      description: skills-rpg stage id to go back to (e.g. "stage1"). Unset on the first stage, which has no way back.
+      type: string
+      required: false
+    - name: target_x
+      description: Grid x-coordinate to place CursorMan at after going back (normally the previous stage's next_stage portal)
+      type: int
+      required: false
+      default: 0
+    - name: target_y
+      description: Grid y-coordinate to place CursorMan at after going back (normally the previous stage's next_stage portal)
+      type: int
+      required: false
+      default: 0
+
+  state:
+    - name: rpg_prev_stage_id
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: target_x
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: target_y
+      type: int
+      label: current
+      persistent: true
+      initialValue: 0
+    # Declared here, not only in the agent's state_updates: a state write to a
+    # key the want type never declared is refused by governance, and the field
+    # the card writes has to exist before the agent has ever run. The agent
+    # says how to fill them from the script's output; the type says they exist.
+    - name: pending_jump
+      description: Set by the card's button to the stage to travel to; cleared back to "" once the poll has sent the action. Empty = idle.
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: last_jump_result
+      description: ok, or why the game refused (e.g. current stage is not cleared yet).
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: summary
+      description: What the want is waiting for, while it waits.
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+    - name: skill_json_arg_template
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: skill_json_arg
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""
+
+  onInitialize:
+    current:
+      rpg_prev_stage_id: '${rpg_prev_stage_id}'
+      target_x: '${target_x}'
+      target_y: '${target_y}'
+      skill_json_arg_template: '{"pending_jump":"%{pending_jump}","direction":"return"}'
+
+  requires:
+    - rpg_stage_jump
 
   examples:
     - title: Stage entrance marker
@@ -38,3 +134,19 @@ wantType:
         spec:
           params:
             label: "stage2 entrance"
+
+    - title: Entrance that leads back
+      description: Marks stage2's entrance and sends the game back to stage1, landing on the portal it was entered through.
+      want:
+        metadata:
+          name: stage2-start
+          type: startpoint
+          labels:
+            mywant.io/canvas-x: "8"
+            mywant.io/canvas-y: "12"
+        spec:
+          params:
+            label: "stage2 entrance"
+            rpg_prev_stage_id: stage1
+            target_x: 4
+            target_y: 2

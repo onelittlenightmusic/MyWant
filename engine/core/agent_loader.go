@@ -45,6 +45,13 @@ type MRSScriptDef struct {
 	// 0 → 1, which serialises calls. Raise it for skills slow enough that
 	// queueing behind one another matters.
 	MaxProcs int `yaml:"max_procs"`
+	// RequiredParams names the want fields that must be non-empty before the
+	// script is run at all. A monitor whose work only makes sense once a field
+	// is filled in — a button writing what to do, say — otherwise starts an
+	// interpreter every tick to be told there is nothing to do. Declared here
+	// rather than carried in want state, which is what `skill_required_params`
+	// does for the older skill_path wants; both are honoured.
+	RequiredParams []string `yaml:"required_params"`
 }
 
 // MRSStateUpdate declares a state field that the plugin agent writes, along with
@@ -365,6 +372,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		r.RegisterPluginStateUpdates(capName, stateDefs)
 	}
 	stateUpdates := def.StateUpdates
+	requiredParams := def.Script.RequiredParams
 	runOpts := MRSRunOptions{
 		Serve:    def.Script.Serve,
 		CacheTTL: time.Duration(def.Script.CacheTTLMs) * time.Millisecond,
@@ -377,6 +385,10 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		r.RegisterAgent(&DoAgent{
 			BaseAgent: *NewBaseAgent(agentName, []string{capName}, DoAgentType),
 			Action: func(ctx context.Context, want *Want) error {
+				if MRSCheckRequiredParams(want, requiredParams...) {
+					return nil // not ready; the want stays as it is
+				}
+				MRSRebuildSkillArg(want)
 				args := mrsPluginBuildArgs(want)
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
@@ -398,10 +410,23 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		r.RegisterAgent(&MonitorAgent{
 			BaseAgent: *NewBaseAgent(agentName, []string{capName}, MonitorAgentType),
 			Monitor: func(ctx context.Context, want *Want) (bool, error) {
+				// The same three questions the generic agent asks, in the same
+				// order: is this want ready, what do the placeholders resolve
+				// to now, and what does the script get. A monitor used to ask
+				// none of them — it ran every tick and ran with no arguments,
+				// so a plugin skill that needed to be told anything could not
+				// be written as one.
+				if MRSCheckRequiredParams(want, requiredParams...) {
+					return false, nil // keep polling; retry when the fields arrive
+				}
+				MRSRebuildSkillArg(want)
+				args := mrsPluginBuildArgs(want)
 				skillCtx, cancel := context.WithTimeout(ctx, time.Duration(finalTimeout)*time.Second)
 				defer cancel()
-				want.StoreLog("[MRS-MONITOR:%s] executing %s", finalName, finalPath)
-				raw, err := RunMRSScript(skillCtx, finalPath, runOpts)
+				want.StoreLog("[MRS-MONITOR:%s] executing %s args=%v", finalName, finalPath, args)
+				opt := runOpts
+				opt.Args = args
+				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
 					want.StoreLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
 					return false, nil

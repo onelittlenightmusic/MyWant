@@ -29,117 +29,6 @@ func init() {
 	})
 }
 
-// mrsCheckRequiredParams checks whether all params listed in the "skill_required_params"
-// current state field (space-separated) are non-empty.
-//
-// Resolution order (first non-empty wins):
-//  1. Imported values — if the param name is an imported local key (Spec.Imports),
-//     the live value from the parent/global state is used via GetAllState().
-//  2. Spec.Params — the statically declared parameter value.
-//
-// Returns true if any required param is missing/empty, in which case the MRS agent
-// should skip this tick. Also updates "summary" with a waiting message.
-//
-// This enables the "wait for params" pattern: create a want with empty params,
-// and the agent will not execute until the user (or a thinker) populates them.
-func mrsCheckRequiredParams(want *Want) bool {
-	reqStr := GetCurrent(want, "skill_required_params", "")
-	if reqStr == "" {
-		return false // no guard configured
-	}
-	// Overlay imports so imported keys resolve through GetAllState.
-	allState := want.GetAllState()
-	var missing []string
-	for _, p := range strings.Fields(reqStr) {
-		// Priority 1: check imported / live state value
-		if stateVal, ok := allState[p]; ok && stateVal != nil && strings.TrimSpace(fmt.Sprintf("%v", stateVal)) != "" {
-			continue // provided via import or current state
-		}
-		// Priority 2: the parameter's effective value — GetParameter, not
-		// Spec.Params, so a {fromGlobalParam} reference reads as the value it
-		// resolves to rather than as the declaration.
-		val, exists := want.GetParameter(p)
-		if !exists || val == nil || strings.TrimSpace(fmt.Sprintf("%v", val)) == "" {
-			missing = append(missing, p)
-		}
-	}
-	if len(missing) > 0 {
-		want.StoreLog("[MRS] waiting for required params: %v", missing)
-		want.SetCurrent("summary", "パラメータ待機中: "+strings.Join(missing, ", "))
-		return true
-	}
-	return false
-}
-
-// mrsRebuildSkillArg rebuilds the "skill_json_arg" state from "skill_json_arg_template"
-// by substituting %{param} placeholders with current values.
-//
-// Resolution order for each placeholder %{key} (first non-empty wins):
-//  1. Imported / live state values from GetAllState() — covers keys declared in Spec.Imports.
-//     If the imported value is a map (e.g. a selected_slot object), its sub-keys are also
-//     available as %{key} so the template can reference nested fields directly.
-//  2. Spec.Params — the statically declared parameter value.
-//  3. The want's own identity: %{want_name} and %{want_id}. Scripts that call back
-//     into the API (OAuth state, state PUTs) need to name the want they belong to,
-//     which is otherwise invisible to them. Lowest priority, so a param or state
-//     field of the same name still wins.
-//
-// IMPORTANT: The placeholder syntax is %{key} (percent-brace), NOT ${key}.
-// The onInitialize interpolation engine uses ${key} and would pre-expand those
-// at want-creation time (replacing params with their init-time values, often "").
-// Using %{key} avoids this clash: the template is stored literally by onInitialize
-// and expanded here at each tick with the *current* values.
-//
-// This allows the want to pick up import changes (e.g. selected slot from a child choice
-// want) without requiring re-initialization.
-func mrsRebuildSkillArg(want *Want) {
-	tmpl := GetCurrent(want, "skill_json_arg_template", "")
-	if tmpl == "" {
-		return // no template; keep existing skill_json_arg unchanged
-	}
-
-	// Build a merged params map: want identity as base, then spec.params,
-	// overlaid by imported/live state values.
-	merged := make(map[string]any)
-	if want.Metadata.Name != "" {
-		merged["want_name"] = want.Metadata.Name
-	}
-	if want.Metadata.ID != "" {
-		merged["want_id"] = want.Metadata.ID
-	}
-	// GetParameter, not Spec.Params: a param declared as
-	// {fromGlobalParam: key} keeps that reference in Spec.Params by design, and
-	// its resolved value lives beside it. Reading the raw map put the reference
-	// object itself into the skill arguments.
-	for k := range want.Spec.Params {
-		if v, ok := want.GetParameter(k); ok {
-			merged[k] = v
-		}
-	}
-	// Overlay imported values (Priority 1): imported values take precedence over spec.params.
-	allState := want.GetAllState()
-	for k, v := range allState {
-		if v != nil && strings.TrimSpace(fmt.Sprintf("%v", v)) != "" {
-			merged[k] = v
-			// If the imported value is a map, also expose its sub-keys so templates
-			// can reference nested fields directly as %{subkey}.
-			if m, ok := v.(map[string]any); ok {
-				for subKey, subVal := range m {
-					if _, alreadySet := merged[subKey]; !alreadySet {
-						merged[subKey] = subVal
-					}
-				}
-			}
-		}
-	}
-
-	built := tmpl
-	for k, v := range merged {
-		built = strings.ReplaceAll(built, "%{"+k+"}", fmt.Sprintf("%v", v))
-	}
-	want.StoreState("skill_json_arg", built)
-}
-
 // monitorMRSAgentFn executes a Machine-Readable Skill script (no CLI args) and writes
 // raw JSON output to the "mrs_raw_output" state field. EndProgressCycle then expands
 // any state fields that declare fetchFrom+onFetchData automatically.
@@ -154,7 +43,7 @@ func mrsRebuildSkillArg(want *Want) {
 func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	// Wait for required params before executing (supports param-driven doers).
 	// Return false (shouldStop=false) so PollingAgent keeps polling until params arrive.
-	if mrsCheckRequiredParams(want) {
+	if MRSCheckRequiredParams(want) {
 		return false, nil // keep polling; retry on next tick
 	}
 	// Gate: check using.when conditions against live provider state.
@@ -163,7 +52,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 		return false, nil
 	}
 	// Rebuild skill_json_arg from template so param updates are picked up each tick.
-	mrsRebuildSkillArg(want)
+	MRSRebuildSkillArg(want)
 
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
@@ -223,11 +112,11 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 // Timeout: reads "skill_timeout_seconds" from goal state (default: 120s).
 func doMRSAgentFn(ctx context.Context, want *Want) error {
 	// Wait for required params before executing (supports param-driven doers).
-	if mrsCheckRequiredParams(want) {
+	if MRSCheckRequiredParams(want) {
 		return fmt.Errorf("waiting for required params") // triggers retry on next cycle (succeeded=false)
 	}
 	// Rebuild skill_json_arg from template so param updates are picked up.
-	mrsRebuildSkillArg(want)
+	MRSRebuildSkillArg(want)
 
 	scriptPath, err := mrsSkillPath(want)
 	if err != nil {
