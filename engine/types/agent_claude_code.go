@@ -437,6 +437,12 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		}
 		want.SetCurrent("cc_responses", responses)
 		want.SetCurrent("last_response_raw", finalResult)
+		// The robot answering is the robot speaking, and it goes in the same
+		// column as everybody else's words. Only the robot: a `coding` want is
+		// somebody's agent on the board, not a character, and has no mouth.
+		if want.Metadata.Type == "robot" {
+			CharacterSpeaks("robot", finalResult, "agent")
+		}
 		// The closing text arrives twice — once as an assistant event (recorded
 		// as a note above) and again as the result. Drop the note so the chat
 		// does not show the answer immediately before itself.

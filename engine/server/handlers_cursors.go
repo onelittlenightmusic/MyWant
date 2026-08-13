@@ -251,6 +251,17 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 
 	cursorsMu.Lock()
 	prev := cursors[characterID]
+	// Somebody who says something without stamping it said it now.
+	//
+	// The test below is "does this carry a messageAt we have not seen", which
+	// silently answered no for a client that sends none: `mywant gui i say`
+	// sends the words and no timestamp, so its utterances compared 0 against 0
+	// and were taken for a repeat of themselves — never recorded, never spoken.
+	// Stamping here is what makes them utterances; browsers already stamp their
+	// own, and are unaffected.
+	if body.Message != "" && body.MessageAt == 0 {
+		body.MessageAt = time.Now().UnixMilli()
+	}
 	// Only the FIRST PUT carrying a given messageAt is a real utterance — that's
 	// the one worth archiving. Later PUTs just carry it along.
 	isNewMessage := body.Message != "" && prev.MessageAt != body.MessageAt
@@ -297,6 +308,16 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 	lastCursorPos[characterID] = cursors[characterID]
 	cursorsMu.Unlock()
+
+	// A new utterance joins the conversation record. Only the first PUT carrying
+	// a given messageAt — the later ones are the same words being carried along
+	// by position updates, not somebody saying it again.
+	if isNewMessage {
+		recordSpeech(characterID, body.Message, "say")
+		// ...and if it was addressed to the robot, the robot hears it. Said in
+		// the room either way — see forwardToRobotIfAddressed.
+		s.forwardToRobotIfAddressed(characterID, body.Message)
+	}
 
 	go broadcastSSE("cursor", snapshotCursors())
 

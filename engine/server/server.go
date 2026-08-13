@@ -428,6 +428,15 @@ func (s *Server) Start() error {
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	go s.globalBuilder.ExecuteWithMode(true)
 
+	// Give every character a mouth. Deferred a moment because it deploys wants,
+	// and the builder above has to be running to take them; a character that
+	// predates this gets one on the next start, which is what makes it a
+	// migration as well as a default.
+	go func() {
+		time.Sleep(2 * time.Second)
+		s.ensureCharacterChatWants()
+	}()
+
 	// Start the drive engine: moves characters targeted by going/gear/direction
 	// wants once per second based on the currently deployed drive-category wants.
 	startDriveEngine()
@@ -438,6 +447,10 @@ func (s *Server) Start() error {
 	// Let server-side triggers (e.g. a place_arrival geofence) play effects on a
 	// character's cursor, so they animate on every client via the cursor stream.
 	mywant.OnCharacterEffectFire = FireCharacterEffect
+
+	// ...and let a want record that a character said something, so the robot's
+	// answers join the same conversation as everybody else's words.
+	mywant.OnCharacterSpeak = recordSpeech
 
 	// Re-address any aura marks still keyed by want instance UUID (pre-target
 	// characters.yaml) to their want type, now that the restored wants are
