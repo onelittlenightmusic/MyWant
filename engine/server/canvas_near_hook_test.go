@@ -59,8 +59,8 @@ func TestCanvasNearPlacesBesideNotUnder(t *testing.T) {
 	}
 }
 
-// A tab open beats a remembered position: the live cursor is the character
-// reporting where they are now, gui_state is where they were left.
+// A browser's own report beats gui_state: it is the character saying where it
+// is, gui_state is where something else last wrote it down.
 func TestCanvasNearPrefersLiveCursorOverGUIState(t *testing.T) {
 	setLiveCursor(t, "chr-hero", 25, 64)
 	all := []*mywant.Want{guiStateWant(map[string]any{
@@ -96,10 +96,12 @@ func TestCanvasNearFallsBackToGUIState(t *testing.T) {
 	}
 }
 
-// The sentinel reads the unsuffixed keys — the CursorMan, who has no id.
+// With nobody publishing a cursor, the sentinel falls back to the CursorMan's
+// own keys — but only while it is actually on the board.
 func TestCanvasNearCursorSentinel(t *testing.T) {
 	clearCursors(t)
 	all := []*mywant.Want{guiStateWant(map[string]any{
+		"cursor_visible":  true,
 		"canvas_cursor_x": 12,
 		"canvas_cursor_y": 4,
 	})}
@@ -191,18 +193,89 @@ func TestCanvasNearAvoidsOccupiedNeighbours(t *testing.T) {
 	}
 }
 
-func setLiveCursor(t *testing.T, id string, x, y float64) {
-	t.Helper()
+// The unsuffixed keys are plain gui_state entries that default to 0, so on a
+// board where the CursorMan was never summoned they read as a confident (0, 0)
+// — which put wants in the corner of the world and called it success.
+func TestCanvasNearCursorIgnoresAnAbsentCursorMan(t *testing.T) {
+	clearCursors(t)
+	all := []*mywant.Want{guiStateWant(map[string]any{
+		"cursor_visible":  false,
+		"canvas_cursor_x": 0,
+		"canvas_cursor_y": 0,
+	})}
+
+	w := nearWant(canvasNearCursor)
+	if err := (&CanvasNearHook{}).Run(w, all, []*mywant.Want{w}); err != nil {
+		t.Fatalf("hook returned %v", err)
+	}
+	if x, y := cellOf(t, w); x != "" || y != "" {
+		t.Errorf("placed at (%s,%s) beside a CursorMan that is not on the board", x, y)
+	}
+}
+
+// "Near the cursor" means whoever is at the controls. With two players, the one
+// who moved most recently is the one who just deployed this.
+func TestCanvasNearCursorPicksTheMostRecentPlayer(t *testing.T) {
+	clearCursors(t)
+	putCursor("chr-old", cursorEntry{X: 3, Y: 3, LastSeen: time.Now().Add(-20 * time.Second).UnixMilli()})
+	putCursor("chr-now", cursorEntry{X: 40, Y: 8, LastSeen: time.Now().UnixMilli()})
+	t.Cleanup(func() { clearCursors(t) })
+
+	w := nearWant(canvasNearCursor)
+	if err := (&CanvasNearHook{}).Run(w, nil, []*mywant.Want{w}); err != nil {
+		t.Fatalf("hook returned %v", err)
+	}
+	x, y := cellOf(t, w)
+	if !within(t, x, y, 40, 8, 1) {
+		t.Errorf("placed at (%s,%s); expected next to the player who moved last, at (40,8)", x, y)
+	}
+}
+
+// setLiveCursor publishes a position the way updateCursor does: into both the
+// presence map and the durable one.
+// The presence map is pruned to eight seconds, which is right for drawing
+// other people's cursors and wrong for asking where somebody is. A deploy that
+// landed in the gap between two publishes used to fall through to the corner of
+// the world — the bug this whole distinction exists for.
+func TestCanvasNearUsesAPositionOlderThanPresenceTTL(t *testing.T) {
+	clearCursors(t)
+	// Published a minute ago and since pruned from `cursors`, as a real GET
+	// /api/v1/cursors would have done.
 	cursorsMu.Lock()
-	cursors[id] = cursorEntry{X: x, Y: y, LastSeen: time.Now().UnixMilli()}
+	lastCursorPos["chr-hero"] = cursorEntry{X: 27, Y: 62, LastSeen: time.Now().Add(-time.Minute).UnixMilli()}
 	cursorsMu.Unlock()
 	t.Cleanup(func() { clearCursors(t) })
+
+	for _, target := range []string{"chr-hero", canvasNearCursor} {
+		w := nearWant(target)
+		if err := (&CanvasNearHook{}).Run(w, nil, []*mywant.Want{w}); err != nil {
+			t.Fatalf("%s: hook returned %v", target, err)
+		}
+		x, y := cellOf(t, w)
+		if x == "" || !within(t, x, y, 27, 62, 1) {
+			t.Errorf("near %q placed at (%s,%s); expected next to (27,62)", target, x, y)
+		}
+	}
+}
+
+func setLiveCursor(t *testing.T, id string, x, y float64) {
+	t.Helper()
+	putCursor(id, cursorEntry{X: x, Y: y, LastSeen: time.Now().UnixMilli()})
+	t.Cleanup(func() { clearCursors(t) })
+}
+
+func putCursor(id string, e cursorEntry) {
+	cursorsMu.Lock()
+	cursors[id] = e
+	lastCursorPos[id] = e
+	cursorsMu.Unlock()
 }
 
 func clearCursors(t *testing.T) {
 	t.Helper()
 	cursorsMu.Lock()
 	cursors = map[string]cursorEntry{}
+	lastCursorPos = map[string]cursorEntry{}
 	cursorsMu.Unlock()
 }
 
