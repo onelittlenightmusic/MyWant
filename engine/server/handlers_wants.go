@@ -25,6 +25,13 @@ import (
 // (gui_state/capability_manager/scheduler) that stay hidden from the UI.
 var alwaysVisibleSystemWantTypes = map[string]bool{
 	"robot": true,
+	// A character's chat want is infrastructure the way the robot's is, and
+	// visible for the same reason: it is the card you open by walking onto that
+	// character, and a card the board never receives cannot be opened. It stays
+	// out of the want LIST by its type's list-visible label, which is a
+	// different question — where it should not appear, rather than who should
+	// be told it exists.
+	"character_chat": true,
 }
 
 // shouldHideSystemWant centralizes the include-system-wants filter used by

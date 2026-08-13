@@ -166,19 +166,41 @@ type cursorResponse struct {
 	EffectNonce int64         `json:"effectNonce,omitempty"`
 	Message     string        `json:"message,omitempty"`
 	MessageAt   int64         `json:"messageAt,omitempty"`
+	// Whether somebody is publishing for this character right now. False means
+	// this is where they were left — they are still on the board, because a
+	// character does not stop existing when the browser showing them is closed.
+	Live bool `json:"live"`
 }
 
 // snapshotCursors returns all non-stale cursor entries as a response slice.
 // Shared by listCursors (HTTP GET) and the SSE broadcast after updateCursor.
+// Every character the board should draw: those being played right now, and
+// those merely standing where they were left.
+//
+// It used to be only the first kind. Presence expires after cursorTTL, so a
+// character whose browser closed — or whose tab simply went quiet for eight
+// seconds — vanished from the board mid-game, and a cast of characters was only
+// ever as visible as the number of browsers open at that moment. Existing and
+// being watched are different things, and only one of them should decide
+// whether somebody is on the board.
+//
+// The distinction is kept rather than erased: each entry says whether it is
+// live, so a client can draw a character who is present differently from one
+// who is only standing there. Everything else — the effects, the message, the
+// device — belongs to a live entry and is left empty on the others, which is
+// what they are: a position and a person, with nobody driving.
 func snapshotCursors() []cursorResponse {
 	cutoff := time.Now().Add(-cursorTTL).UnixMilli()
 	cursorsMu.RLock()
 	result := make([]cursorResponse, 0, len(cursors))
+	seen := make(map[string]bool, len(cursors))
 	for charID, e := range cursors {
 		if e.LastSeen < cutoff {
 			continue
 		}
+		seen[charID] = true
 		result = append(result, cursorResponse{
+			Live: true,
 			CharacterID: charID,
 			DeviceID:    e.DeviceID,
 			X:           e.X,
@@ -194,8 +216,55 @@ func snapshotCursors() []cursorResponse {
 			MessageAt:   e.MessageAt,
 		})
 	}
+	// ...and everybody else, where they were last seen. Read under the same
+	// lock so a character cannot appear twice by going live between the two
+	// halves.
+	for charID, e := range lastCursorPos {
+		if seen[charID] {
+			continue
+		}
+		result = append(result, cursorResponse{
+			CharacterID: charID,
+			X:           e.X,
+			Y:           e.Y,
+			Avatar:      e.Avatar,
+			Color:       e.Color,
+			Name:        e.Name,
+			LastSeen:    e.LastSeen,
+		})
+	}
 	cursorsMu.RUnlock()
 	return result
+}
+
+// seedLastKnownPositions fills the durable map from where the canvas last
+// recorded everybody, so characters are on the board from the moment the server
+// is up rather than from the moment somebody opens a browser and republishes.
+//
+// gui_state is the only thing that outlives a restart here: the presence map is
+// memory, and a character nobody is playing publishes nothing to refill it.
+func seedLastKnownPositions(state map[string]any) {
+	if state == nil {
+		return
+	}
+	cursorsMu.Lock()
+	defer cursorsMu.Unlock()
+	for _, c := range mywant.ListCharacters() {
+		if _, known := lastCursorPos[c.ID]; known {
+			continue
+		}
+		x, okX := cursorCoord(state[cursorStateXPrefix+c.ID])
+		y, okY := cursorCoord(state[cursorStateYPrefix+c.ID])
+		if !okX || !okY {
+			continue
+		}
+		lastCursorPos[c.ID] = cursorEntry{
+			X: x, Y: y, Avatar: c.Avatar, Color: c.Color, Name: c.Name,
+			// Long ago on purpose: this is a position, not a sighting, and
+			// nothing should read it as somebody having just been here.
+			LastSeen: 0,
+		}
+	}
 }
 
 // listCursors handles GET /api/v1/cursors
@@ -308,6 +377,10 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 	lastCursorPos[characterID] = cursors[characterID]
 	cursorsMu.Unlock()
+
+	// Their chat want walks with them, so the card is always reachable from
+	// where they are — see placeChatWantAt.
+	s.placeChatWantAt(characterID, body.X, body.Y)
 
 	// A new utterance joins the conversation record. Only the first PUT carrying
 	// a given messageAt — the later ones are the same words being carried along

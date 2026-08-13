@@ -26,9 +26,10 @@ wantType:
     labels:
       user-control: "true"
       type-icon: "MessageCircle"
-      # Not a thing to walk into. The want is the character's chat window, not a
-      # second body on the board — the character already has one, their cursor.
-      highlightable: "false"
+      # Walking onto a character opens their chat, the way it does for the
+      # robot. The want has no tile of its own — the character is already drawn
+      # from their cursor — it simply sits on their cell so that arriving there
+      # finds something to open.
       list-visible: "false"
 
   parameters:

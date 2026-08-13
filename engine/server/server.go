@@ -435,6 +435,12 @@ func (s *Server) Start() error {
 	go func() {
 		time.Sleep(2 * time.Second)
 		s.ensureCharacterChatWants()
+		// Put everybody back where they were left, so the board has its cast
+		// from the moment the server is up rather than from the moment somebody
+		// opens a browser. See seedLastKnownPositions.
+		if gs := s.findWantByIDInAll(guiStateWantID); gs != nil {
+			seedLastKnownPositions(gs.GetAllState())
+		}
 	}()
 
 	// Start the drive engine: moves characters targeted by going/gear/direction
