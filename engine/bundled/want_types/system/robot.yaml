@@ -98,12 +98,6 @@ wantType:
     required: false
     default: 45
 
-  - name: wander_bound
-    description: Max canvas x/y coordinate the robot will wander within
-    type: int
-    required: false
-    default: 20
-
   - name: spawn_x
     description: Initial canvas x coordinate (only used the very first time the want is created)
     type: int

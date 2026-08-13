@@ -130,9 +130,17 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	dx := int(step%3) - 1
 	dy := int(step/3) - 1
 
-	maxCoord := w.GetIntParam("wander_bound", 20)
-	nx := clampInt(x+dx, 0, maxCoord)
-	ny := clampInt(y+dy, 0, maxCoord)
+	// One cell, from wherever it happens to be.
+	//
+	// This used to clamp into an absolute box (0..wander_bound), which was a
+	// fair leash while the robot only ever lived near the origin and is wrong
+	// now that it can be called: summoned to somebody standing outside that box
+	// — anywhere on a stage, say — the very next wander yanked it back inside,
+	// so being called looked like the robot flying off to a coordinate nobody
+	// asked for. Coming when called and then staying put is the whole of what
+	// was wanted; a leash to the origin was never part of it.
+	nx := x + dx
+	ny := y + dy
 
 	// Same wall / locked-door boundaries a player's cursor can't cross (see
 	// WantCanvas.tsx's wallCells) — try the diagonal move, then slide along
@@ -194,15 +202,6 @@ func isCanvasBlocked(x, y int, selfID string) bool {
 	return false
 }
 
-func clampInt(v, min, max int) int {
-	if v < min {
-		return min
-	}
-	if v > max {
-		return max
-	}
-	return v
-}
 
 // Progress reads ThinkAgent's Plan decisions and executes state transitions.
 // Identical phase machine to CodingWant.Progress (see coding_types.go), plus
