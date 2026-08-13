@@ -298,6 +298,13 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	lastCursorPos[characterID] = cursors[characterID]
 	cursorsMu.Unlock()
 
+	// A new utterance joins the conversation record. Only the first PUT carrying
+	// a given messageAt — the later ones are the same words being carried along
+	// by position updates, not somebody saying it again.
+	if isNewMessage {
+		recordSpeech(characterID, body.Message, "say")
+	}
+
 	go broadcastSSE("cursor", snapshotCursors())
 
 	// Log to ~/.mywant/work.log.

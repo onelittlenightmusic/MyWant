@@ -428,6 +428,15 @@ func (s *Server) Start() error {
 	// Start global builder's reconcile loop for server mode (runs indefinitely)
 	go s.globalBuilder.ExecuteWithMode(true)
 
+	// Give every character a mouth. Deferred a moment because it deploys wants,
+	// and the builder above has to be running to take them; a character that
+	// predates this gets one on the next start, which is what makes it a
+	// migration as well as a default.
+	go func() {
+		time.Sleep(2 * time.Second)
+		s.ensureCharacterChatWants()
+	}()
+
 	// Start the drive engine: moves characters targeted by going/gear/direction
 	// wants once per second based on the currently deployed drive-category wants.
 	startDriveEngine()

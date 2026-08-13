@@ -47,6 +47,9 @@ func (s *Server) createCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	created := mywant.AddCharacter(c)
+	// A character arrives with a mouth. Made here rather than left for the next
+	// restart so somebody can be talked to the moment they exist.
+	s.ensureCharacterChatWant(created.ID)
 	go broadcastSSE("character_changed", created.ID)
 	s.JSONResponse(w, http.StatusCreated, created)
 }

@@ -53,8 +53,12 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Claude Code / coding / robot webhook: structured message handling
-	if want.Metadata.Type == "claude_code_thread" || want.Metadata.Type == "coding" || want.Metadata.Type == "robot" {
+	// Claude Code / coding / robot / character_chat webhook: structured message
+	// handling. character_chat is here for the same reason as the others — it
+	// keeps a conversation in the same state fields — and for no other: there is
+	// no agent behind it, so what arrives is simply stored and said.
+	if want.Metadata.Type == "claude_code_thread" || want.Metadata.Type == "coding" ||
+		want.Metadata.Type == "robot" || want.Metadata.Type == "character_chat" {
 		text, _ := payload["text"].(string)
 		sender, _ := payload["sender"].(string)
 		storeWebhookMessage(want, webhookMessage{
@@ -62,6 +66,9 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 			Text:      text,
 			Timestamp: time.Now().Format(time.RFC3339),
 		}, ccStateCfg)
+		if want.Metadata.Type == "character_chat" {
+			recordSpeech(characterIDForChatWant(want), text, "chat")
+		}
 		log.Printf("[CC-WEBHOOK] Received request for want %s: %s\n", wantID, text)
 		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
 		return

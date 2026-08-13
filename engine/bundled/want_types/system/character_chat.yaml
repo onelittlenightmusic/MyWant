@@ -1,0 +1,108 @@
+wantType:
+  metadata:
+    name: character_chat
+    title: Character Chat
+    description: |
+      A character's voice and mailbox: a chat window with nothing behind it.
+
+      The robot is the exception on this board, not the rule. It has a coding
+      agent inside it, which is why talking to it produces an answer — but a
+      character is a person, and a person's want has nobody to ask. So this is
+      the robot's arrangement with the agent taken out: the same webhook in, the
+      same message history, the same card, and no LLM, no session, no CLI, no
+      cost.
+
+      What arrives is what the character says. The board draws it over whoever
+      the want belongs to (its character's AuraCardWantID), in a bubble above
+      their cursor — or, when that character is nowhere in view, beside the
+      board instead. Nothing here decides any of that; this want only holds what
+      was said.
+
+      One is created automatically for every character, so a character always
+      has a mouth without anyone having to arrange it.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "MessageCircle"
+      # Not a thing to walk into. The want is the character's chat window, not a
+      # second body on the board — the character already has one, their cursor.
+      highlightable: "false"
+      list-visible: "false"
+
+  parameters:
+  - name: character_id
+    description: The character this chat belongs to. Set when the want is created alongside the character.
+    type: string
+    required: false
+    default: ""
+
+  - name: webhook_secret
+    description: HMAC secret for webhook signature verification (optional)
+    type: string
+    subType: secret
+    required: false
+    default: ""
+
+  - name: channel_filter
+    description: Only accept messages whose channel_id matches (empty = accept all)
+    type: string
+    required: false
+    default: ""
+
+  state:
+  - name: character_id
+    description: The character whose voice this is
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: cc_messages
+    description: Recent messages, oldest first. Named for the field the chat card already reads.
+    type: array
+    persistent: true
+    initialValue: []
+    label: current
+
+  - name: cc_latest_message
+    description: The most recent message — what the character is currently saying
+    type: object
+    persistent: true
+    label: current
+
+  - name: cc_message_count
+    description: How many messages have arrived
+    type: int
+    persistent: true
+    initialValue: 0
+    label: current
+
+  - name: cc_webhook_status
+    description: Whether the mailbox is accepting messages
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: webhook_url
+    description: Where to POST a message for this character to say
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
+  - name: interactive
+    description: Marks this want as one the user talks to (drives the chat card)
+    type: bool
+    persistent: false
+    initialValue: true
+    label: current
+
+  - name: achieving_percentage
+    description: Progress indicator — a chat is never finished
+    type: int
+    persistent: false
+    initialValue: 50
+    label: current

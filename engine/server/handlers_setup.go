@@ -398,6 +398,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/riff/deploy", s.deployRiff).Methods("POST", "OPTIONS")
 
 	// Multi-cursor: per-character canvas cursor positions (in-memory, TTL-based, no locking)
+	// The recent conversation, in the order it happened — see speech_log.go.
+	api.HandleFunc("/speech", s.listSpeech).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")
