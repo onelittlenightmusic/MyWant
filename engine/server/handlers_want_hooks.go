@@ -267,9 +267,10 @@ func canvasOccupancy(want *mywant.Want, allWants, newBatch []*mywant.Want) (map[
 // or the sentinel below for the CursorMan.
 const canvasLabelNear = "mywant.io/canvas-near"
 
-// canvasNearCursor asks for the CursorMan — the robot cursor, whose position
-// lives in the unsuffixed gui_state keys. Spelled as a word because a deploy
-// file that says "near the cursor" should not have to know an id.
+// canvasNearCursor asks for whoever is at the controls: the live cursor that
+// moved most recently, or the CursorMan if it is on the board and nobody else
+// is. Spelled as a word because a deploy file that says "near the cursor"
+// should not have to know an id.
 const canvasNearCursor = "cursor"
 
 // CanvasNearHook turns "near so-and-so" into a coordinate.
@@ -327,15 +328,6 @@ func (h *CanvasNearHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatc
 // stale gui_state entry must resolve to the tab, which is why the live map is
 // asked first.
 func resolveCanvasNear(target string, allWants []*mywant.Want) (int, int, bool) {
-	if target != canvasNearCursor {
-		cursorsMu.RLock()
-		e, ok := cursors[target]
-		cursorsMu.RUnlock()
-		if ok && hasLiveCursor(target) {
-			return int(math.Round(e.X)), int(math.Round(e.Y)), true
-		}
-	}
-
 	var state map[string]any
 	for _, w := range allWants {
 		if w.Metadata.ID == guiStateWantID {
@@ -343,16 +335,65 @@ func resolveCanvasNear(target string, allWants []*mywant.Want) (int, int, bool) 
 			break
 		}
 	}
+
+	if target == canvasNearCursor {
+		return resolveCursorSentinel(state)
+	}
+
+	cursorsMu.RLock()
+	e, ok := lastCursorPos[target]
+	cursorsMu.RUnlock()
+	if ok {
+		return int(math.Round(e.X)), int(math.Round(e.Y)), true
+	}
 	if state == nil {
 		return 0, 0, false
 	}
-
-	xKey, yKey := "canvas_cursor_x", "canvas_cursor_y"
-	if target != canvasNearCursor {
-		xKey, yKey = cursorStateXPrefix+target, cursorStateYPrefix+target
+	x, okX := cursorCoord(state[cursorStateXPrefix+target])
+	y, okY := cursorCoord(state[cursorStateYPrefix+target])
+	if !okX || !okY {
+		return 0, 0, false
 	}
-	x, okX := cursorCoord(state[xKey])
-	y, okY := cursorCoord(state[yKey])
+	return int(math.Round(x)), int(math.Round(y)), true
+}
+
+// resolveCursorSentinel answers "near the cursor" — meaning whoever is at the
+// controls, not any particular character.
+//
+// The characters a browser has ever published for are asked first, most
+// recently seen winning: somebody whose browser reports a position IS a person
+// driving, and with two players the one who moved last is the one who just
+// deployed this. Last-seen, not currently-live — see lastCursorPos. Presence
+// times out in eight seconds and a deploy can easily land in the gap.
+//
+// The CursorMan's own keys (the unsuffixed canvas_cursor_x/y) come second, and
+// only while it is on the board. They are plain gui_state keys that default to
+// 0, so on a board where the CursorMan has never been summoned they read as a
+// perfectly confident (0, 0) — which is how the first version of this put wants
+// in the top-left corner of the world and reported success. An unset key is not
+// a position, and cursor_visible is what tells the two apart.
+func resolveCursorSentinel(state map[string]any) (int, int, bool) {
+	var newest cursorEntry
+	found := false
+	cursorsMu.RLock()
+	for _, e := range lastCursorPos {
+		if !found || e.LastSeen > newest.LastSeen {
+			newest, found = e, true
+		}
+	}
+	cursorsMu.RUnlock()
+	if found {
+		return int(math.Round(newest.X)), int(math.Round(newest.Y)), true
+	}
+
+	if state == nil {
+		return 0, 0, false
+	}
+	if visible, _ := state["cursor_visible"].(bool); !visible {
+		return 0, 0, false
+	}
+	x, okX := cursorCoord(state["canvas_cursor_x"])
+	y, okY := cursorCoord(state["canvas_cursor_y"])
 	if !okX || !okY {
 		return 0, 0, false
 	}

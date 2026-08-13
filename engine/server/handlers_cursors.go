@@ -89,6 +89,18 @@ type cursorEntry struct {
 var (
 	cursorsMu sync.RWMutex
 	cursors   = map[string]cursorEntry{} // characterId → entry
+
+	// Where each character was last seen, kept regardless of how long ago that
+	// was. `cursors` answers "who is here now" and is pruned to cursorTTL (8s),
+	// which is right for drawing other people's cursors — a cursor that stops
+	// reporting should vanish rather than hang there as a ghost.
+	//
+	// It is wrong for "where is so-and-so". A tab that went quiet for ten
+	// seconds has not moved its character to nowhere; the character is exactly
+	// where it was left. Placement (canvas-near) asks that second question, and
+	// asking it of the pruned map put wants in the corner of the world whenever
+	// the browser's last publish had just aged out.
+	lastCursorPos = map[string]cursorEntry{} // characterId → last known position
 )
 
 // Per-character canvas position, as written into gui_state by the canvas Call
@@ -141,12 +153,12 @@ func hasLiveCursor(characterID string) bool {
 
 // cursorResponse is returned by GET /api/v1/cursors.
 type cursorResponse struct {
-	CharacterID string  `json:"characterId"`
-	DeviceID    string  `json:"deviceId,omitempty"`
-	X           float64 `json:"x"`
-	Y           float64 `json:"y"`
-	Avatar      string  `json:"avatar,omitempty"`
-	Color       string  `json:"color,omitempty"`
+	CharacterID string        `json:"characterId"`
+	DeviceID    string        `json:"deviceId,omitempty"`
+	X           float64       `json:"x"`
+	Y           float64       `json:"y"`
+	Avatar      string        `json:"avatar,omitempty"`
+	Color       string        `json:"color,omitempty"`
 	Name        string        `json:"name,omitempty"`
 	LastSeen    int64         `json:"lastSeen"`
 	Effects     []effectEvent `json:"effects,omitempty"`
@@ -283,6 +295,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		Message:     message,
 		MessageAt:   messageAt,
 	}
+	lastCursorPos[characterID] = cursors[characterID]
 	cursorsMu.Unlock()
 
 	go broadcastSSE("cursor", snapshotCursors())
