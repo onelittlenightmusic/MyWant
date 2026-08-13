@@ -21,11 +21,11 @@ func TestMRSRebuildSkillArg_WantIdentityPlaceholders(t *testing.T) {
 	}
 
 	want.BeginProgressCycle()
-	want.SetCurrent("skill_json_arg_template",`{"name":"%{want_name}","id":"%{want_id}"}`)
+	want.SetCurrent("skill_json_arg_template", `{"name":"%{want_name}","id":"%{want_id}"}`)
 	want.EndProgressCycle()
 
 	want.BeginProgressCycle()
-	mrsRebuildSkillArg(want)
+	MRSRebuildSkillArg(want)
 	want.EndProgressCycle()
 
 	assert.Equal(t, `{"name":"spotify-instance","id":"want-abc123"}`,
@@ -45,11 +45,11 @@ func TestMRSRebuildSkillArg_ParamOverridesWantName(t *testing.T) {
 	}
 
 	want.BeginProgressCycle()
-	want.SetCurrent("skill_json_arg_template",`{"name":"%{want_name}"}`)
+	want.SetCurrent("skill_json_arg_template", `{"name":"%{want_name}"}`)
 	want.EndProgressCycle()
 
 	want.BeginProgressCycle()
-	mrsRebuildSkillArg(want)
+	MRSRebuildSkillArg(want)
 	want.EndProgressCycle()
 
 	assert.Equal(t, `{"name":"explicit-override"}`, GetCurrent(want, "skill_json_arg", ""))

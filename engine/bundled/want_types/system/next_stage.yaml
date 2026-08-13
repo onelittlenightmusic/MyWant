@@ -8,14 +8,25 @@ wantType:
       target_x/target_y (normally a `startpoint` want's position in that next
       stage) on this same mywant canvas.
 
-      Pressing the "Next Stage" button (on this want's canvas card) writes
-      rpg_next_stage_id into the "pending_jump" state field; a
-      monitor_mrs_agent poll (~1s) notices it, calls rpg-server's
-      POST /api/v1/debug/jump, and clears pending_jump back to "" once done
-      (see ~/.mywant/custom-types/mywant-next-stage-trigger/main.py). The
-      canvas-side CursorMan warp fires immediately on click — it does not
-      wait for rpg-server's jump to actually complete, so the two are only
-      loosely (~1s) synchronized.
+      Pressing "進む" on this want's card writes rpg_next_stage_id into the
+      "pending_jump" state field; a monitor_mrs_agent poll (~1s) notices it and
+      sends rpg-server the game's ORDINARY advance action (POST /api/v1/control,
+      actor=you action=advance), then clears pending_jump back to "" (see
+      ~/.mywant/custom-types/rpg-stage-jump/main.py, shared with `startpoint`,
+      which sends "return" through the same field to go the other way).
+
+      Not the debug jump. That endpoint restores the stage it lands on from its
+      pristine YAML and empties inventory and achievements — a testing restart,
+      which as a way to travel meant leaving a stage and coming back re-armed
+      every alarm. Advancing normally also means the stage has to be cleared
+      first: a refusal comes back in last_jump_result for the card to show.
+
+      The canvas-side CursorMan warp fires immediately on press — it does not
+      wait for rpg-server, so the two are only loosely (~1s) synchronized.
+
+      The pair: this want sits in a stage's last room and sends the game
+      forward to the next stage's start point; that start point sends it back
+      here.
 
       Purely a canvas-grid fixture: it is not shown in the want dashboard's
       card list (labels.list-visible: "false").
@@ -25,6 +36,9 @@ wantType:
     labels:
       type-icon: "LogIn"
       list-visible: "false"
+      # The card carries a control the user presses, so the card can be
+      # operated: Enter/A drills into it and the button joins the tab ring.
+      user-control: "true"
 
   parameters:
     - name: rpg_next_stage_id
@@ -58,25 +72,27 @@ wantType:
       label: current
       persistent: true
       initialValue: 0
+    # Declared here, not only in the agent's state_updates: a state write to a
+    # key the want type never declared is refused by governance, and the field
+    # the card writes has to exist before the agent has ever run. The agent
+    # says how to fill them from the script's output; the type says they exist.
     - name: pending_jump
-      description: Set (to rpg_next_stage_id) by the canvas "Next Stage" button; cleared back to "" once the poll has called rpg-server's debug/jump. Empty = idle.
+      description: Set by the card's button to the stage to travel to; cleared back to "" once the poll has sent the action. Empty = idle.
       type: string
       label: current
       persistent: true
       initialValue: ""
-      fetchFrom: mrs_raw_output
-      onFetchData: "pending_jump"
     - name: last_jump_result
+      description: ok, or why the game refused (e.g. current stage is not cleared yet).
       type: string
       label: current
       persistent: true
       initialValue: ""
-      fetchFrom: mrs_raw_output
-      onFetchData: "last_jump_result"
-    - name: skill_path
+    - name: summary
+      description: What the want is waiting for, while it waits.
       type: string
       label: current
-      persistent: true
+      persistent: false
       initialValue: ""
     - name: skill_json_arg_template
       type: string
@@ -88,46 +104,16 @@ wantType:
       label: current
       persistent: false
       initialValue: ""
-    # Without this gate the monitor spawns a Python interpreter every tick just
-    # to have the script find pending_jump empty and print {} — 8 of these wants
-    # at 1s cost ~0.44 of a CPU core doing nothing. mrsCheckRequiredParams
-    # returns before the script is ever run, so an empty pending_jump now costs
-    # nothing at all and the jump still fires the tick after it is set.
-    - name: skill_required_params
-      type: string
-      label: current
-      persistent: true
-      initialValue: "pending_jump"
-    - name: skill_timeout_seconds
-      type: int
-      label: goal
-      persistent: true
-      initialValue: 5
-    - name: skill_poll_interval_ms
-      type: int
-      label: goal
-      persistent: true
-      initialValue: 1000
-    - name: mrs_raw_output
-      type: object
-      label: current
-      persistent: false
-      initialValue: null
 
   onInitialize:
     current:
       rpg_next_stage_id: '${rpg_next_stage_id}'
       target_x: '${target_x}'
       target_y: '${target_y}'
-      skill_path: "~/.mywant/custom-types/mywant-next-stage-trigger/main.py"
-      skill_json_arg_template: '{"pending_jump":"%{pending_jump}"}'
-      skill_required_params: "pending_jump"
-    goal:
-      skill_timeout_seconds: 5
-      skill_poll_interval_ms: 1000
+      skill_json_arg_template: '{"pending_jump":"%{pending_jump}","direction":"advance"}'
 
   requires:
-    - monitor_mrs_agent
+    - rpg_stage_jump
 
   examples:
     - title: Portal to stage2, landing at its start point
