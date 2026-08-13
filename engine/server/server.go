@@ -354,6 +354,9 @@ func New(config Config) *Server {
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},
 			&CanvasTileSizeHook{},
+			// Before the coordinate hook: this one only seeds canvas-x/y from
+			// "near so-and-so", and the coordinate hook is what honours a seed.
+			&CanvasNearHook{},
 			&CanvasCoordinateHook{},
 		},
 	}
