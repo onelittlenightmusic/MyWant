@@ -41,6 +41,51 @@ type Character struct {
 	// Empty = inherit the canvas-level design (config.canvas_design).
 	TileDesign string `yaml:"tileDesign,omitempty" json:"tile_design,omitempty"`
 	AuraDesign string `yaml:"auraDesign,omitempty" json:"aura_design,omitempty"`
+	// MoveSpeed multiplies how fast this character's movement is ANIMATED on the
+	// canvas — the step glide, the hop onto a tile, the walk cycle and the
+	// free-drag speed. 0 or 1 is the normal pace; 2 and 3 are the same motion
+	// played at double and treble speed. It changes nothing about what a step
+	// does or where it lands, so two people walking side by side at different
+	// speeds still agree about the board.
+	MoveSpeed int `yaml:"moveSpeed,omitempty" json:"move_speed,omitempty"`
+	// Display is how this character likes the app to look and sound: the
+	// settings that used to live in the global config and are now chosen per
+	// person, because a character IS a person here and two of them share a
+	// server. Everything in it is optional — an empty field means "the built-in
+	// default", so a character created before any of this looks exactly as it
+	// always did.
+	Display CharacterDisplay `yaml:"display,omitempty" json:"display,omitempty"`
+}
+
+// CharacterDisplay carries one person's look-and-feel choices.
+//
+// Deliberately a struct of named fields rather than a free map: each one has a
+// small set of legal values that the UI offers as pills, and a typo in a map
+// key is a setting that silently does nothing. Pointers where the zero value is
+// a real choice — false is a real answer for sound, and 0 a real opacity — so
+// "unset" stays distinguishable from "set to the zero value".
+type CharacterDisplay struct {
+	// Where the app's header sits: "top" (default) or "bottom".
+	HeaderPosition string `yaml:"headerPosition,omitempty" json:"header_position,omitempty"`
+	// "light", "dark" or "system" (default).
+	ColorMode string `yaml:"colorMode,omitempty" json:"color_mode,omitempty"`
+	// Card grid row height: "sm", "md" or "lg".
+	CardHeight string `yaml:"cardHeight,omitempty" json:"card_height,omitempty"`
+	// Card-face name and menu scale: "small", "medium" or "large".
+	SystemFontSize string `yaml:"systemFontSize,omitempty" json:"system_font_size,omitempty"`
+	// Whether this person hears the interface.
+	SoundEnabled *bool `yaml:"soundEnabled,omitempty" json:"sound_enabled,omitempty"`
+	// How opaque a card's painted surface is, 0.0–1.0.
+	CardOpacity *float64 `yaml:"cardOpacity,omitempty" json:"card_opacity,omitempty"`
+	// Icon family for category/type icons ("lucide", "heroicons-solid", …).
+	IconFont string `yaml:"iconFont,omitempty" json:"icon_font,omitempty"`
+	// Canvas skin id ("cubic", "forest", …) — the whole board's look, as
+	// opposed to TileDesign/AuraDesign, which are this character's own tiles.
+	CanvasDesign string `yaml:"canvasDesign,omitempty" json:"canvas_design,omitempty"`
+	// Solid canvas ground colour, and the background image URL. Both are what
+	// THIS person sees; the board underneath is the same board.
+	CanvasBgColor string `yaml:"canvasBgColor,omitempty" json:"canvas_bg_color,omitempty"`
+	CanvasBgURL   string `yaml:"canvasBgUrl,omitempty" json:"canvas_bg_url,omitempty"`
 }
 
 // AuraTarget addresses what an aura mark is about. Scope (Kind+Name) names
@@ -473,9 +518,10 @@ func (m *characterManager) ensureDefaultCharacters() {
 	log.Printf("[CharacterStore] Seeded default 'robot' character")
 }
 
-// SetDesign sets the tile/aura design-plugin ids for a character (empty string
-// = inherit the canvas-level design).
-func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
+// SetDesign sets the canvas preferences a character owns: the tile/aura
+// design-plugin ids (empty string = inherit the canvas-level design) and how
+// fast their movement is animated (see Character.MoveSpeed).
+func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string, moveSpeed int) (*Character, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, c := range m.store.Characters {
@@ -484,6 +530,27 @@ func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string)
 		}
 		m.store.Characters[i].TileDesign = tileDesign
 		m.store.Characters[i].AuraDesign = auraDesign
+		m.store.Characters[i].MoveSpeed = moveSpeed
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
+// SetDisplay replaces this character's look-and-feel choices wholesale.
+//
+// Replace rather than merge: the editor sends the complete set it is showing,
+// and a merge would make "clear this back to the default" impossible to express
+// — an omitted field would mean "leave it" rather than "unset it".
+func (m *characterManager) SetDisplay(characterID string, d CharacterDisplay) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].Display = d
 		m.save()
 		cp := m.store.Characters[i]
 		return &cp, true
@@ -598,6 +665,9 @@ func MigrateCharacterAuraDefaults(resolveWantType func(wantID string) (string, b
 func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
 	return GetCharacterManager().SetAuraCardWant(characterID, wantID)
 }
-func SetCharacterDesign(characterID, tileDesign, auraDesign string) (*Character, bool) {
-	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign)
+func SetCharacterDesign(characterID, tileDesign, auraDesign string, moveSpeed int) (*Character, bool) {
+	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign, moveSpeed)
+}
+func SetCharacterDisplay(characterID string, d CharacterDisplay) (*Character, bool) {
+	return GetCharacterManager().SetDisplay(characterID, d)
 }

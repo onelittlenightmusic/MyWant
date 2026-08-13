@@ -405,19 +405,43 @@ func metersBetween(a, b *latLng) float64 {
 	return R * 2 * math.Atan2(math.Sqrt(s), math.Sqrt(1-s))
 }
 
-// setCharacterDesign sets the tile/aura design-plugin ids for a character.
-// Body: { "tile_design": "forest", "aura_design": "forest" } (either may be "" = inherit).
+// setCharacterDesign sets the canvas preferences a character owns.
+// Body: { "tile_design": "forest", "aura_design": "forest", "move_speed": 2 }
+// — either design may be "" (inherit the canvas design), and move_speed 0 or 1
+// is the normal pace.
 func (s *Server) setCharacterDesign(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var req struct {
 		TileDesign string `json:"tile_design"`
 		AuraDesign string `json:"aura_design"`
+		MoveSpeed  int    `json:"move_speed"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
-	c, ok := mywant.SetCharacterDesign(id, req.TileDesign, req.AuraDesign)
+	c, ok := mywant.SetCharacterDesign(id, req.TileDesign, req.AuraDesign, req.MoveSpeed)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// setCharacterDisplay replaces a character's look-and-feel choices — the
+// settings that used to be global and are now one person's own.
+//
+// Body is the whole CharacterDisplay; an omitted field means "the built-in
+// default", not "leave whatever was there" (see SetDisplay).
+func (s *Server) setCharacterDisplay(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req mywant.CharacterDisplay
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	c, ok := mywant.SetCharacterDisplay(id, req)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
