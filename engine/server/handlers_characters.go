@@ -80,6 +80,10 @@ func (s *Server) deleteCharacter(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	// Their mouth goes with them. It is a protected system want, so nothing else
+	// would ever remove it — a deleted character would leave a chat want behind
+	// that no character claims and no API call can clear.
+	s.removeCharacterChatWant(id)
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "deleted", "id": id})
 }

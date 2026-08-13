@@ -48,6 +48,10 @@ func (s *Server) ensureCharacterChatWants() {
 func (s *Server) ensureCharacterChatWant(characterID string) {
 	name := characterChatWantName(characterID)
 	if existing := s.findWantByIDOrName(name); existing != nil {
+		// Re-assert the mark as well as the binding. A want that predates this
+		// being a system want is still on disk without it, and would be swept
+		// away by the next world switch exactly as before.
+		existing.Metadata.IsSystemWant = true
 		bindCharacterToChatWant(characterID, existing.Metadata.ID)
 		return
 	}
@@ -57,6 +61,21 @@ func (s *Server) ensureCharacterChatWant(characterID string) {
 			ID:   name,
 			Name: name,
 			Type: characterChatWantType,
+			// A character's mouth belongs to the person, not to the board.
+			//
+			// Switching worlds tears down every want that is not a system want
+			// (see clearNonSystemWants), which is right for the things a world
+			// is made of and wrong for this: the person is the same person in
+			// every world, and without the mark their chat want was swept away
+			// the first time anybody travelled — after which they could not say
+			// anything, with nothing on screen to explain why.
+			//
+			// The same reasoning the robot's own want is held under, and it
+			// survives startup for a different reason: the startup filter only
+			// reconsiders types listed in system_wants.yaml, and these are not
+			// there. They cannot be — there is one per character, and who the
+			// characters are is not known until the store is read.
+			IsSystemWant: true,
 			Labels: map[string]string{
 				// Off the board. The character is already on it as a cursor;
 				// this want is the window you talk to them through, and drawing
@@ -87,4 +106,24 @@ func bindCharacterToChatWant(characterID, wantID string) {
 		return
 	}
 	mywant.SetCharacterAuraCardWant(characterID, wantID)
+}
+
+// removeCharacterChatWant tears down the chat want of a character who no longer
+// exists.
+//
+// Deleted through the builder rather than the API path, which refuses on
+// purpose: these are protected system wants so that nobody loses their voice by
+// accident, and "the person is gone" is the one case where removing it is
+// right.
+func (s *Server) removeCharacterChatWant(characterID string) {
+	name := characterChatWantName(characterID)
+	want := s.findWantByIDOrName(name)
+	if want == nil {
+		return
+	}
+	if err := s.globalBuilder.QueueWantDelete([]string{want.Metadata.ID}); err != nil {
+		log.Printf("[CharacterChat] could not remove %s: %v", name, err)
+		return
+	}
+	log.Printf("[CharacterChat] removed %s", name)
 }
