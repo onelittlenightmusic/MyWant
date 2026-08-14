@@ -341,7 +341,15 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 	// Only the FIRST PUT carrying a given messageAt is a real utterance — that's
 	// the one worth archiving. Later PUTs just carry it along.
-	isNewMessage := body.Message != "" && prev.MessageAt != body.MessageAt
+	// Newly said means said LATER, not merely said differently.
+	//
+	// A tab republishes what its character is saying on every keepalive, from a
+	// copy it adopted earlier. If that copy has fallen behind — the character
+	// has said two more things since — the republish carries an old message
+	// with an old timestamp, and "different from the current one" counted that
+	// as a fresh utterance: an old remark reappeared at the end of the
+	// conversation, after the newer ones it had already been replaced by.
+	isNewMessage := body.Message != "" && body.MessageAt > prev.MessageAt
 
 	// A live speech bubble survives position updates that say nothing about it.
 	// Without this, a message set by one writer is wiped by the next position
