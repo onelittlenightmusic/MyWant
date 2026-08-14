@@ -381,11 +381,6 @@ func (s *Server) Start() error {
 
 	// Register config.yaml field updaters so built-in want types can update and
 	// persist server config without an HTTP round-trip to their own server.
-	mywant.RegisterConfigFieldUpdater("canvas_bg_url", func(url string) error {
-		s.config.CanvasBgURL = url
-		s.saveFrontendConfig()
-		return nil
-	})
 	// tunnel_url: captured public URL from a managed_launch want running
 	// cloudflared/ngrok (result_field: tunnel_url).
 	mywant.RegisterConfigFieldUpdater("tunnel_url", func(url string) error {
@@ -611,6 +606,11 @@ func (s *Server) saveFrontendConfig() {
 		fullConfig = make(map[string]any)
 	}
 
+	// A background is a character's own now (see SetCharacterCanvasBg). The key
+	// is dropped rather than left alone, because a value nothing reads is worse
+	// than no value: it stays in the file looking like a setting.
+	delete(fullConfig, "canvas_bg_url")
+
 	// 2. Update only the frontend sections
 	fullConfig["header_position"] = s.config.HeaderPosition
 	fullConfig["color_mode"] = s.config.ColorMode
@@ -629,9 +629,6 @@ func (s *Server) saveFrontendConfig() {
 	}
 	if s.config.GeocodeCountry != "" {
 		fullConfig["geocode_country"] = s.config.GeocodeCountry
-	}
-	if s.config.CanvasBgURL != "" {
-		fullConfig["canvas_bg_url"] = s.config.CanvasBgURL
 	}
 	if s.config.TunnelURL != "" {
 		fullConfig["tunnel_url"] = s.config.TunnelURL

@@ -20,12 +20,11 @@ wantType:
   parameters:
     - name: character_id
       description: |
-        Whose canvas this dresses. Named, the picture becomes that character's
-        own background — the board is shared but what somebody looks at need
-        not be. Left empty it sets the server-wide background, which is what
-        this want type has always done.
-      type: string
-      required: false
+        Whose canvas this dresses. The board is shared; what somebody looks at
+        need not be. Required — there is no server-wide background to fall
+        back on, so a picture with nobody to belong to has nowhere to go.
+      type: character
+      required: true
       default: ""
 
   finalResultField: current_image_url

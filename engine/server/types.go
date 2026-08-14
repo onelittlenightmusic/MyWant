@@ -24,7 +24,6 @@ type Config struct {
 	// SystemFontSize scales card-face names and the hamburger menu together:
 	// "small" | "medium" | "large" (absent = "large", the current sizes).
 	SystemFontSize string `json:"system_font_size,omitempty" yaml:"system_font_size,omitempty"`
-	CanvasBgURL    string `json:"canvas_bg_url,omitempty" yaml:"canvas_bg_url,omitempty"`
 	// TunnelURL is the public URL captured from a managed_launch want (e.g.
 	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.
 	TunnelURL           string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`

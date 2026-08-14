@@ -156,7 +156,6 @@ var StartCmd = &cobra.Command{
 			SoundEnabled:             config.SoundEnabled,
 			IconFont:                 config.IconFont,
 			GeocodeCountry:           config.GeocodeCountry,
-			CanvasBgURL:              config.CanvasBgURL,
 			CanvasBgColor:            config.CanvasBgColor,
 			CanvasDPad:               config.CanvasDPad,
 			CanvasWeatherEffect:      config.CanvasWeatherEffect,

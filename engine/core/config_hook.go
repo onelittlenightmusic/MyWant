@@ -24,8 +24,6 @@ func SetConfigField(field, value string) error {
 	return fn(value)
 }
 
-// SetCanvasBgURL applies a new background image URL through the server-registered updater.
-func SetCanvasBgURL(url string) error { return SetConfigField("canvas_bg_url", url) }
 
 // SetTunnelURL applies a newly-captured tunnel URL (e.g. from cloudflared/ngrok)
 // through the server-registered updater.

@@ -221,9 +221,6 @@ func (s *Server) setupRoutes() {
 	// Registered before /config/{...} style routes so it is not shadowed.
 	api.HandleFunc("/config/reload-env", s.reloadConfigEnv).Methods("POST", "OPTIONS")
 
-	api.HandleFunc("/config/canvas-bg", s.serveCanvasBg).Methods("GET")
-	api.HandleFunc("/config/canvas-bg", s.uploadCanvasBg).Methods("POST", "OPTIONS")
-	api.HandleFunc("/config/canvas-bg", s.deleteCanvasBg).Methods("DELETE", "OPTIONS")
 
 	// Global State endpoint
 	api.HandleFunc("/global-state", s.getGlobalState).Methods("GET", "OPTIONS")
