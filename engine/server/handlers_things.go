@@ -177,6 +177,20 @@ func (s *Server) getThingDefinitions(w http.ResponseWriter, _ *http.Request) {
 
 // deriveThingDefinitions is the derivation itself, shared with getThings so a
 // caller never has to ask twice for the same answer.
+// oldestThingEventAt is the earliest moment the ledger still remembers, used to
+// date a definition it never recorded. Empty when the ledger is empty, where
+// there is nothing to be older than.
+func (s *Server) oldestThingEventAt() string {
+	if s.thingEvents == nil {
+		return ""
+	}
+	events := s.thingEvents.All(0) // newest first
+	if len(events) == 0 {
+		return ""
+	}
+	return events[len(events)-1].At
+}
+
 func (s *Server) deriveThingDefinitions() []ThingDefinition {
 	defs := []ThingDefinition{}
 	if s.thingEvents != nil {
@@ -202,11 +216,20 @@ func (s *Server) deriveThingDefinitions() []ThingDefinition {
 				}
 				continue
 			}
+			// A name the ledger has never heard of: one given before the ledger
+			// existed, or one whose lines have since scrolled off the end of it
+			// (see maxMemoEvents). The mark itself carries no time — a mark is a
+			// standing fact, not an event — so the only honest answer to "when"
+			// is the oldest moment still on record. That keeps it BEHIND
+			// everything the ledger can date, which is the right way round: a
+			// name of unknown age must not win a tie against one that can prove
+			// when it was given.
 			defs = append(defs, ThingDefinition{
 				Catalog:       subtypeToKey(mark.Target.Kind),
 				Subtype:       mark.Target.Kind,
 				Name:          mark.Target.Name,
 				Value:         mark.Value,
+				At:            s.oldestThingEventAt(),
 				CharacterID:   c.ID,
 				CharacterName: c.Name,
 			})

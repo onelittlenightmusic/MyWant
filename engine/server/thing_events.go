@@ -21,6 +21,16 @@ const (
 	ThingSourceAuraDefinitionRemoved = "aura-definition-removed"
 )
 
+// definitionSources are the ways a name gets given. Both of them: naming a
+// field and naming a card's result are one act reached from two places (X on a
+// card goes through cardAuraName, a field through setCharacterAuraDefault), and
+// the ledger has to recognise both or the one it does not know about has no
+// history — no author, no want, and no time it happened.
+var definitionSources = map[string]bool{
+	ThingSourceAuraDefinition: true,
+	MemoSourceCardName:        true,
+}
+
 // maxMemoEvents caps the on-disk event log. Oldest events are dropped first.
 const maxMemoEvents = 2000
 
@@ -252,7 +262,7 @@ func (m *ThingEventStore) Definitions() []ThingDefinition {
 	order := []key{}
 
 	for _, ev := range m.load() {
-		if ev.Source != ThingSourceAuraDefinition && ev.Source != ThingSourceAuraDefinitionRemoved {
+		if !definitionSources[ev.Source] && ev.Source != ThingSourceAuraDefinitionRemoved {
 			continue
 		}
 		k := key{ev.CharacterID, ev.Subtype, ev.Value}
