@@ -107,12 +107,26 @@ func (s *Server) moveCharacterTo(characterID string, x, y float64) {
 	go broadcastSSE("gui_state", resp)
 }
 
-// liveDeviceOf returns a device of this character that a browser is currently
-// answering on, or "" when nobody is at the controls.
+// liveDeviceOf returns the device somebody is playing this character on, or ""
+// when nobody is at the controls.
 //
-// Liveness is read from the same device list the GUI reads, so "present" means
-// the same thing on both sides of the invitation.
+// Asked of the cursor registry first, because that is what being played
+// actually is: a browser publishing where this character is, from a device it
+// names as it does so. The assignment list is a different fact — which devices
+// a character has been GIVEN — and it is routinely empty for a character
+// somebody is playing right now, which made every call to a present player
+// skip the invitation and simply move them. Whoever is driving is the one to
+// ask, and the driver says which device they are driving from.
 func (s *Server) liveDeviceOf(c *mywant.Character) string {
+	cursorsMu.RLock()
+	e, ok := cursors[c.ID]
+	cursorsMu.RUnlock()
+	if ok && hasLiveCursor(c.ID) && e.DeviceID != "" {
+		return e.DeviceID
+	}
+
+	// Nobody is publishing, but a device may still be assigned and listening —
+	// a tab that has gone quiet without closing.
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil || len(c.AssignedDeviceIDs) == 0 {
 		return ""
