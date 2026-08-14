@@ -329,7 +329,15 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// Stamping here is what makes them utterances; browsers already stamp their
 	// own, and are unaffected.
 	if body.Message != "" && body.MessageAt == 0 {
-		body.MessageAt = time.Now().UnixMilli()
+		if body.Message == prev.Message {
+			// The same words, carried along by an ordinary position update —
+			// a keepalive, a step, an echo. Keep the moment they were first
+			// said, or every republish would count as saying it again and the
+			// conversation would fill with copies of one remark.
+			body.MessageAt = prev.MessageAt
+		} else {
+			body.MessageAt = time.Now().UnixMilli()
+		}
 	}
 	// Only the FIRST PUT carrying a given messageAt is a real utterance — that's
 	// the one worth archiving. Later PUTs just carry it along.
