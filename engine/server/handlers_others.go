@@ -793,15 +793,20 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 	defs := s.wantTypeLoader.GetAll()
 	res := make([]map[string]any, len(defs))
 	for i, d := range defs {
-		// Distinct non-empty parameter subtypes — lets the client filter want
-		// types by the subtype of a memo value (memo-seeded Add Want) without
-		// fetching every full definition.
+		// Distinct parameter subtypes — lets the client filter want types by the
+		// subtype of a thing (thing-seeded Add Want) without fetching every full
+		// definition. Everything each parameter ACCEPTS, not only what it
+		// records as: a route takes a named place in a field that records
+		// stations, and a list built from subType alone would have hidden it
+		// from a place being dropped on the board.
 		paramSubtypes := []string{}
 		seen := map[string]bool{}
 		for _, p := range d.Parameters {
-			if p.SubType != "" && !seen[p.SubType] {
-				seen[p.SubType] = true
-				paramSubtypes = append(paramSubtypes, p.SubType)
+			for _, st := range p.AcceptedSubTypes() {
+				if !seen[st] {
+					seen[st] = true
+					paramSubtypes = append(paramSubtypes, st)
+				}
 			}
 		}
 		res[i] = map[string]any{
