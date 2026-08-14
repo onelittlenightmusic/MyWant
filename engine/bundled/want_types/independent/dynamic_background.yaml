@@ -4,8 +4,8 @@ wantType:
     title: Dynamic Background
     description: |
       Monitors a want's state field for an image URL (via spec.imports) and applies it
-      as a canvas background — one character's, if character_id names one, and
-      the server-wide background otherwise.
+      as the canvas background of the character named by character_id. There is no
+      server-wide background: a picture belongs to whoever chose to look at it.
 
       Usage:
         spec:
