@@ -71,7 +71,12 @@ func (s *Server) summonCharacter(w http.ResponseWriter, r *http.Request) {
 	//
 	// It is also the more honest reading of the two words: call asks, take
 	// takes. Anyone who wants the old behaviour asks for it by not inviting.
-	if req.Invite {
+	// An agent has no consent to give. The robot is a program with a character's
+	// face — there is no one behind it to be interrupted, no camera to yank, and
+	// nobody who will ever open a tab to answer, so an invitation addressed to it
+	// would sit in the queue forever while the thing it asked for never happened.
+	// Calling it is simply moving it, which is what calling a program means.
+	if req.Invite && !isAgentCharacter(id) {
 		from, _ := mywant.GetCharacter(req.From)
 		fromName := ""
 		if from != nil {
@@ -270,4 +275,21 @@ func (s *Server) recordSummonAnswer(invite map[string]any, answer string) {
 			"url":               stringField(invite, "url"),
 		},
 	})
+}
+
+// isAgentCharacter reports whether this character is run by a program rather
+// than played by a person.
+//
+// Asked of the want bound to them: the robot's is its coding agent, which is
+// the whole of the difference — a chat want is a mailbox and its character is
+// still somebody. Kept next to the summon rather than shared with the drawing
+// rule it resembles, because they answer different questions and will not
+// always agree: one is about who can consent, the other about what to draw.
+func isAgentCharacter(characterID string) bool {
+	c, ok := mywant.GetCharacter(characterID)
+	if !ok || c.AuraCardWantID == "" {
+		return false
+	}
+	want, _, found := mywant.GetGlobalChainBuilder().FindWantByID(c.AuraCardWantID)
+	return found && want != nil && want.Metadata.Type == "robot"
 }
