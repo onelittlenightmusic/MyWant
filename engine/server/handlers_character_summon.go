@@ -177,3 +177,117 @@ func (s *Server) appendCallInvite(deviceID, fromID, fromName string, x, y float6
 	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: s.guiStateWithConfig(want)}
 	go broadcastSSE("gui_state", resp)
 }
+
+// ── Answering an invitation ──────────────────────────────────────────────────
+
+// respondRequest is the body of POST /api/v1/characters/{id}/summon/respond.
+type respondRequest struct {
+	InviteID string `json:"inviteId"`
+	Accept   bool   `json:"accept"`
+}
+
+type respondResponse struct {
+	Outcome string  `json:"outcome"` // "moved", "declined", or "open-url"
+	X       float64 `json:"x,omitempty"`
+	Y       float64 `json:"y,omitempty"`
+	URL     string  `json:"url,omitempty"`
+}
+
+// respondToSummon answers an invitation, in the one place that knows what
+// answering means.
+//
+// Accepting used to be a thing a browser did to itself: it moved its own cursor
+// and forgot the invitation. So the server, having asked, never learned the
+// answer — accepted, declined and ignored looked identical from here — the move
+// skipped the path every other move takes, and nothing without a browser could
+// answer at all. Half of summoning had been unified and this was the other half,
+// still living in a client.
+//
+// A URL invitation is the one part that cannot move here: opening a page is
+// something only the browser can do. The answer is still recorded here, and the
+// address is handed back for the client to open.
+func (s *Server) respondToSummon(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if _, ok := mywant.GetCharacter(id); !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	var req respondRequest
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+
+	invite := s.takePendingAction(req.InviteID)
+	if invite == nil {
+		s.JSONError(w, r, http.StatusNotFound, "No such invitation", req.InviteID)
+		return
+	}
+
+	x, _ := invite["x"].(float64)
+	y, _ := invite["y"].(float64)
+	url := stringField(invite, "url")
+
+	if !req.Accept {
+		s.recordSummonAnswer(invite, "declined")
+		s.JSONResponse(w, http.StatusOK, respondResponse{Outcome: "declined"})
+		return
+	}
+
+	if url != "" {
+		s.recordSummonAnswer(invite, "accepted")
+		s.JSONResponse(w, http.StatusOK, respondResponse{Outcome: "open-url", URL: url})
+		return
+	}
+
+	// The same move a summons without an invitation makes — one path, so
+	// arriving because you agreed to and arriving because you were pulled leave
+	// the board in the same state.
+	s.moveCharacterTo(id, x, y)
+	s.recordSummonAnswer(invite, "accepted")
+	s.JSONResponse(w, http.StatusOK, respondResponse{Outcome: "moved", X: x, Y: y})
+}
+
+// takePendingAction removes an action by id and returns it, so an invitation
+// cannot be answered twice.
+func (s *Server) takePendingAction(id string) map[string]any {
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil || id == "" {
+		return nil
+	}
+	existing, _ := want.GetAllState()["pendingDeviceActions"].([]any)
+	var found map[string]any
+	remaining := make([]any, 0, len(existing))
+	for _, a := range existing {
+		m, ok := a.(map[string]any)
+		if ok && stringField(m, "id") == id {
+			found = m
+			continue
+		}
+		remaining = append(remaining, a)
+	}
+	if found == nil {
+		return nil
+	}
+	want.StoreState("pendingDeviceActions", remaining)
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: s.guiStateWithConfig(want)}
+	go broadcastSSE("gui_state", resp)
+	return found
+}
+
+// recordSummonAnswer keeps the answer, so the person who asked can find out
+// what became of it — the whole point of asking rather than pulling.
+func (s *Server) recordSummonAnswer(invite map[string]any, answer string) {
+	mywant.AppendWorkLog(mywant.WorkLogEntry{
+		Type:      "call",
+		Important: true,
+		Data: map[string]any{
+			"answer":            answer,
+			"from_character_id": stringField(invite, "from_character_id"),
+			"to_device_id":      stringField(invite, "device_id"),
+			"x":                 invite["x"],
+			"y":                 invite["y"],
+			"url":               stringField(invite, "url"),
+		},
+	})
+}
