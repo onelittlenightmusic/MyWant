@@ -48,8 +48,7 @@ type summonResponse struct {
 
 func (s *Server) summonCharacter(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	target, ok := mywant.GetCharacter(id)
-	if !ok {
+	if _, ok := mywant.GetCharacter(id); !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
@@ -60,17 +59,27 @@ func (s *Server) summonCharacter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Asking is asking, whether or not anybody is there to hear it yet.
+	//
+	// This used to look for a live device first and move the character when it
+	// found none, which made consent depend on being caught at the right
+	// moment: a character nobody had a tab open for was simply dragged. An
+	// invitation can wait — it sits in the queue until whoever picks that
+	// character up answers it, on whatever device they turn up with, which may
+	// not have existed when it was sent. Presence has no business deciding
+	// whether permission is asked for.
+	//
+	// It is also the more honest reading of the two words: call asks, take
+	// takes. Anyone who wants the old behaviour asks for it by not inviting.
 	if req.Invite {
-		if deviceID := s.liveDeviceOf(target); deviceID != "" {
-			from, _ := mywant.GetCharacter(req.From)
-			fromName := ""
-			if from != nil {
-				fromName = from.Name
-			}
-			s.appendCallInvite(deviceID, req.From, fromName, req.X, req.Y, req.URL)
-			s.JSONResponse(w, http.StatusOK, summonResponse{Outcome: "invited", X: req.X, Y: req.Y})
-			return
+		from, _ := mywant.GetCharacter(req.From)
+		fromName := ""
+		if from != nil {
+			fromName = from.Name
 		}
+		s.appendCallInvite(id, req.From, fromName, req.X, req.Y, req.URL)
+		s.JSONResponse(w, http.StatusOK, summonResponse{Outcome: "invited", X: req.X, Y: req.Y})
+		return
 	}
 
 	s.moveCharacterTo(id, req.X, req.Y)
@@ -107,64 +116,21 @@ func (s *Server) moveCharacterTo(characterID string, x, y float64) {
 	go broadcastSSE("gui_state", resp)
 }
 
-// liveDeviceOf returns the device somebody is playing this character on, or ""
-// when nobody is at the controls.
-//
-// Asked of the cursor registry first, because that is what being played
-// actually is: a browser publishing where this character is, from a device it
-// names as it does so. The assignment list is a different fact — which devices
-// a character has been GIVEN — and it is routinely empty for a character
-// somebody is playing right now, which made every call to a present player
-// skip the invitation and simply move them. Whoever is driving is the one to
-// ask, and the driver says which device they are driving from.
-func (s *Server) liveDeviceOf(c *mywant.Character) string {
-	cursorsMu.RLock()
-	e, ok := cursors[c.ID]
-	cursorsMu.RUnlock()
-	if ok && hasLiveCursor(c.ID) && e.DeviceID != "" {
-		return e.DeviceID
-	}
-
-	// Nobody is publishing, but a device may still be assigned and listening —
-	// a tab that has gone quiet without closing.
-	want := s.findWantByIDInAll(guiStateWantID)
-	if want == nil || len(c.AssignedDeviceIDs) == 0 {
-		return ""
-	}
-	raw, ok := want.GetAllState()["devices"].([]any)
-	if !ok {
-		return ""
-	}
-	cutoff := time.Now().UnixMilli() - deviceLiveMs
-	for _, id := range c.AssignedDeviceIDs {
-		for _, d := range raw {
-			m, ok := d.(map[string]any)
-			if !ok || stringField(m, "id") != id {
-				continue
-			}
-			if seen, ok := m["lastSeen"].(float64); ok && int64(seen) >= cutoff {
-				return id
-			}
-		}
-	}
-	return ""
-}
-
-// How recently a device must have checked in to count as somebody being there.
-// Matches the GUI's own DEVICE_LIVE_MS, so the two agree about who is present.
-const deviceLiveMs = 60_000
-
 // appendCallInvite asks a browser whether its character will come.
-func (s *Server) appendCallInvite(deviceID, fromID, fromName string, x, y float64, url string) {
+func (s *Server) appendCallInvite(toCharacterID, fromID, fromName string, x, y float64, url string) {
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil {
 		return
 	}
 	now := time.Now().UnixMilli()
 	action := map[string]any{
-		"id":                  fmt.Sprintf("call-%d-%s", now, deviceID),
-		"type":                "call-invite",
-		"device_id":           deviceID,
+		"id":   fmt.Sprintf("call-%d-%s", now, toCharacterID),
+		"type": "call-invite",
+		// Addressed to the person, not to a screen. Which device answers is
+		// whichever one is playing them when they get to it, and that one need
+		// not exist yet — see the queue this lands in (pendingDeviceActions),
+		// which is read by every client and outlives any of them.
+		"to_character_id":     toCharacterID,
 		"from_character_id":   fromID,
 		"from_character_name": fromName,
 		"x":                   x,
@@ -182,7 +148,7 @@ func (s *Server) appendCallInvite(deviceID, fromID, fromName string, x, y float6
 		Important: true,
 		Data: map[string]any{
 			"from_character_id": fromID,
-			"to_device_id":      deviceID,
+			"to_character_id":   toCharacterID,
 			"x":                 x,
 			"y":                 y,
 			"url":               url,
@@ -298,7 +264,7 @@ func (s *Server) recordSummonAnswer(invite map[string]any, answer string) {
 		Data: map[string]any{
 			"answer":            answer,
 			"from_character_id": stringField(invite, "from_character_id"),
-			"to_device_id":      stringField(invite, "device_id"),
+			"to_character_id":   stringField(invite, "to_character_id"),
 			"x":                 invite["x"],
 			"y":                 invite["y"],
 			"url":               stringField(invite, "url"),
