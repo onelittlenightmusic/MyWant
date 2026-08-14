@@ -69,11 +69,17 @@ func (lw *LocationWant) Progress() {
 			lw.SetCurrent("updated_at", ts)
 		}
 
-		// Reverse-geocode if position moved significantly (>~100m) OR if city is not yet set
+		// Ask about the place — its name and its height — when the position has
+		// moved far enough to be somewhere else (>~100m), or when an answer is
+		// missing. Both are properties of the coordinates rather than of the
+		// reading, so both are looked up on the same occasions and neither is
+		// re-asked while standing still.
 		lastLat, _ := lw.GetStateFloat64("last_geocoded_lat", 0)
 		lastLng, _ := lw.GetStateFloat64("last_geocoded_lng", 0)
 		currentCity := GetCurrent[string](&lw.Want, "city", "")
-		if currentCity == "" || haversineKm(lat, lng, lastLat, lastLng) > 0.1 {
+		currentElevation := GetCurrent[float64](&lw.Want, "elevation", 0)
+		moved := haversineKm(lat, lng, lastLat, lastLng) > 0.1
+		if currentCity == "" || moved {
 			if city, prefecture, address, err := reverseGeocode(lat, lng); err == nil {
 				lw.SetCurrent("city", city)
 				lw.SetCurrent("prefecture", prefecture)
@@ -81,6 +87,22 @@ func (lw *LocationWant) Progress() {
 				lw.StoreState("last_geocoded_lat", lat)
 				lw.StoreState("last_geocoded_lng", lng)
 			}
+		}
+		// Only when asked for: the height comes from a third party, and a
+		// position sensor should not be calling one on every move for something
+		// nobody wanted. See the fetch_elevation parameter.
+		if lw.GetBoolParam("fetch_elevation", false) {
+			if currentElevation == 0 || moved {
+				if metres, source, err := lookupElevation(lat, lng); err == nil {
+					lw.SetCurrent("elevation", metres)
+					lw.StoreLog("[LOCATION] elevation %.1fm (%s)", metres, source)
+				}
+			}
+		} else if currentElevation != 0 {
+			// Switched off, so nothing is keeping this up to date — and a height
+			// left over from where the sensor used to be would follow the device
+			// around telling everyone it was still true.
+			lw.SetCurrent("elevation", float64(0))
 		}
 
 		return true
@@ -175,6 +197,91 @@ func reverseGeocode(lat, lng float64) (city, prefecture, address string, err err
 	}
 	address = nr.DisplayName
 	return
+}
+
+// lookupElevation returns the ground height above sea level at a position, in
+// metres, from the best source that covers it.
+//
+// Not from the browser. The geolocation API does carry an altitude, and it is
+// what `altitude` holds — but it is the DEVICE's height as the positioning
+// hardware measured it, which is null on anything positioned by wi-fi and
+// noisy by tens of metres even on GPS. "How high is the ground here" is a
+// question about the place, so it is answered from the place's coordinates,
+// the same way its city and address are.
+//
+// Japan first, because that is where the sharpest data is: the GSI publishes a
+// 1m laser-scanned model, against the ~90m global model behind the fallback.
+// Outside its coverage it answers "-----" rather than a number, which is the
+// signal to ask the one that covers everywhere.
+func lookupElevation(lat, lng float64) (metres float64, source string, err error) {
+	if m, gsiErr := gsiElevation(lat, lng); gsiErr == nil {
+		return m, "gsi", nil
+	}
+	m, err := openMeteoElevation(lat, lng)
+	return m, "open-meteo", err
+}
+
+func gsiElevation(lat, lng float64) (float64, error) {
+	url := fmt.Sprintf(
+		"https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php?lon=%f&lat=%f&outtype=JSON",
+		lng, lat,
+	)
+	body, err := getWithTimeout(url)
+	if err != nil {
+		return 0, err
+	}
+	// Outside coverage the field is the string "-----", so it is decoded loosely
+	// and rejected unless it is a number.
+	var r struct {
+		Elevation any `json:"elevation"`
+	}
+	if err := json.Unmarshal(body, &r); err != nil {
+		return 0, err
+	}
+	m, ok := r.Elevation.(float64)
+	if !ok {
+		return 0, fmt.Errorf("no elevation data for %f,%f", lat, lng)
+	}
+	return m, nil
+}
+
+func openMeteoElevation(lat, lng float64) (float64, error) {
+	url := fmt.Sprintf("https://api.open-meteo.com/v1/elevation?latitude=%f&longitude=%f", lat, lng)
+	body, err := getWithTimeout(url)
+	if err != nil {
+		return 0, err
+	}
+	var r struct {
+		Elevation []float64 `json:"elevation"`
+	}
+	if err := json.Unmarshal(body, &r); err != nil {
+		return 0, err
+	}
+	if len(r.Elevation) == 0 {
+		return 0, fmt.Errorf("no elevation data for %f,%f", lat, lng)
+	}
+	return r.Elevation[0], nil
+}
+
+// getWithTimeout fetches a small JSON body, giving up rather than holding the
+// want's progress cycle open on a slow third party.
+func getWithTimeout(url string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "mywant-location-want/1.0")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: %s", url, resp.Status)
+	}
+	return io.ReadAll(resp.Body)
 }
 
 // haversineKm returns approximate distance in km between two lat/lng points.

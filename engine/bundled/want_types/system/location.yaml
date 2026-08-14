@@ -20,6 +20,15 @@ wantType:
       type: string
       default: "My Location"
       required: false
+    - name: fetch_elevation
+      description: |
+        Look up the ground height at this position and keep it in `elevation`.
+        Off by default: it is a call to a third party on every move, and a
+        position sensor should not reach outside for something nobody asked
+        for. Turn it on where the height matters.
+      type: bool
+      default: false
+      required: false
 
   state:
     - name: lat
@@ -51,7 +60,20 @@ wantType:
       initialValue: 0
       exposable: true
     - name: altitude
-      description: Altitude in metres (null if unavailable)
+      description: |
+        Height of the DEVICE as the positioning hardware measured it, in metres.
+        0 on anything positioned by wi-fi — for the height of the ground here,
+        see elevation.
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+      exposable: true
+    - name: elevation
+      description: |
+        Ground height above sea level at this position, in metres, looked up
+        from the coordinates the way the address is (GSI's 1m model in Japan,
+        Open-Meteo's global model elsewhere) rather than read off the device.
       type: float64
       label: current
       persistent: true
