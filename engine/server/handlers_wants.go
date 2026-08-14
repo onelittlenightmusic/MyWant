@@ -441,6 +441,12 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 		}
 	}
 
+	// What this want's named parameters stand for, answered on the way out —
+	// see resolveThingValues.
+	for k, v := range s.resolveThingValues(want) {
+		current[k] = v
+	}
+
 	exposableFields := s.exposableFieldsCache[want.Metadata.Type]
 	importableFields := s.importableFieldsCache[want.Metadata.Type]
 

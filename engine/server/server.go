@@ -331,7 +331,7 @@ func New(config Config) *Server {
 	GlobalDebugEnabled = config.Debug
 	mywant.DebugLoggingEnabled = config.Debug
 
-	return &Server{
+	srv := &Server{
 		config:                config,
 		wants:                 make(map[string]*WantExecution),
 		globalBuilder:         globalBuilder,
@@ -360,6 +360,7 @@ func New(config Config) *Server {
 			&CanvasCoordinateHook{},
 		},
 	}
+	return srv
 }
 
 // Start starts the HTTP server
