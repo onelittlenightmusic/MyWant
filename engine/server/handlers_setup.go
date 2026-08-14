@@ -345,6 +345,10 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}", s.getCharacter).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}", s.updateCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
+	// Move a character to a cell — optionally asking first. The one place that
+	// answers "somebody should be over there", for the GUI's Call and the CLI's
+	// take alike. See handlers_character_summon.go.
+	characters.HandleFunc("/{id}/summon", s.summonCharacter).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/aura-defaults", s.setCharacterAuraDefault).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/aura-card", s.setCharacterAuraCardWant).Methods("PUT", "OPTIONS")
