@@ -58,7 +58,21 @@ func dynamicBackgroundMonitorFn(_ context.Context, want *Want) (bool, error) {
 		return false, nil
 	}
 
-	if err := SetCanvasBgURL(newURL); err != nil {
+	// Whose board this dresses.
+	//
+	// Named, it belongs to that person: the background is something a character
+	// chose to look at, and two people sharing a server need not share a
+	// picture. Unnamed, it stays what it was — the server-wide background,
+	// which is what every existing want of this type means and must go on
+	// meaning.
+	if characterID := want.GetStringParam("character_id", ""); characterID != "" {
+		if !SetCharacterCanvasBg(characterID, newURL) {
+			msg := "no such character: " + characterID
+			want.SetCurrent("last_error", msg)
+			want.SetCurrent("status", "error: "+msg)
+			return false, nil
+		}
+	} else if err := SetCanvasBgURL(newURL); err != nil {
 		want.SetCurrent("last_error", err.Error())
 		want.SetCurrent("status", "error: "+err.Error())
 		return false, nil

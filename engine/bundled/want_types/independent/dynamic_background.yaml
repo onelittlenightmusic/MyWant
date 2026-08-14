@@ -4,7 +4,8 @@ wantType:
     title: Dynamic Background
     description: |
       Monitors a want's state field for an image URL (via spec.imports) and applies it
-      as the canvas and dashboard background (canvas_bg_url in server config).
+      as a canvas background — one character's, if character_id names one, and
+      the server-wide background otherwise.
 
       Usage:
         spec:
@@ -15,6 +16,17 @@ wantType:
     pattern: independent
     labels:
       type-icon: "Image"
+
+  parameters:
+    - name: character_id
+      description: |
+        Whose canvas this dresses. Named, the picture becomes that character's
+        own background — the board is shared but what somebody looks at need
+        not be. Left empty it sets the server-wide background, which is what
+        this want type has always done.
+      type: string
+      required: false
+      default: ""
 
   finalResultField: current_image_url
 

@@ -668,6 +668,28 @@ func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
 func SetCharacterDesign(characterID, tileDesign, auraDesign string, moveSpeed int) (*Character, bool) {
 	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign, moveSpeed)
 }
+// SetCharacterCanvasBg gives one character a canvas background picture,
+// leaving the rest of how they like the app untouched.
+//
+// SetDisplay replaces the whole block, which is right for a settings sheet
+// sending everything it knows and wrong for a want that knows one field: a
+// dynamic_background applying an album cover would otherwise reset that
+// character's theme, card height and sound along with it.
+func SetCharacterCanvasBg(characterID, url string) bool {
+	m := GetCharacterManager()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].Display.CanvasBgURL = url
+		m.save()
+		return true
+	}
+	return false
+}
+
 func SetCharacterDisplay(characterID string, d CharacterDisplay) (*Character, bool) {
 	return GetCharacterManager().SetDisplay(characterID, d)
 }
