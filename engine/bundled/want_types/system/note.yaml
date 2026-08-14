@@ -1,0 +1,40 @@
+wantType:
+  metadata:
+    name: note
+    title: Sticky Note
+    description: A sticky note to jot down anything. Mark as Done to achieve and record.
+    version: '1.0'
+    category: utility
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: StickyNote
+  parameters:
+  - name: content
+    description: Note text content
+    type: string
+    required: false
+    default: ''
+  state:
+  - name: content
+    description: Note text content
+    type: string
+    label: current
+    persistent: true
+    initialValue: ''
+  examples:
+  - title: Empty note
+    description: A blank sticky note to type into on the dashboard
+    want:
+      metadata:
+        name: my-note
+        type: note
+  - title: Note with text
+    description: A note that starts with something already written on it
+    want:
+      metadata:
+        name: shopping
+        type: note
+      spec:
+        params:
+          content: "milk, bread, coffee"
