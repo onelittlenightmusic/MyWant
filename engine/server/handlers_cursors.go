@@ -389,6 +389,9 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// by position updates, not somebody saying it again.
 	if isNewMessage {
 		recordSpeech(characterID, body.Message, "say")
+		// ...and into their own chat window, which is the same conversation
+		// seen from their card rather than from the board.
+		s.appendToCharacterChat(characterID, body.Message)
 		// ...and if it was addressed to the robot, the robot hears it. Said in
 		// the room either way — see forwardToRobotIfAddressed.
 		s.forwardToRobotIfAddressed(characterID, body.Message)

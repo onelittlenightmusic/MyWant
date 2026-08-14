@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -127,4 +128,28 @@ func (s *Server) removeCharacterChatWant(characterID string) {
 		return
 	}
 	log.Printf("[CharacterChat] removed %s", name)
+}
+
+// appendToCharacterChat puts what a character said into their own chat want, so
+// their card and its chat tab show the conversation.
+//
+// Saying something and having it appear in your chat window are the same event
+// seen twice, and only one of them used to happen: the header bubble and
+// `mywant gui i say` published speech, which the board drew and the speech
+// record kept, while the want that IS the character's chat window heard
+// nothing. Anybody opening their card found it empty however much they had
+// said.
+//
+// Not called for a message that arrived through the chat want itself — that one
+// is already in there, and adding it again would show it twice.
+func (s *Server) appendToCharacterChat(characterID, text string) {
+	want := s.findWantByIDOrName(characterChatWantName(characterID))
+	if want == nil {
+		return
+	}
+	storeWebhookMessage(want, webhookMessage{
+		Sender:    characterID,
+		Text:      text,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}, ccStateCfg)
 }
