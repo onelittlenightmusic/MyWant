@@ -151,6 +151,26 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	nx := clampInt(x+dx, ax-bound, ax+bound)
 	ny := clampInt(y+dy, ay-bound, ay+bound)
 
+	// And inside the board, whatever the leash says.
+	//
+	// The leash is relative — it holds the robot near wherever it was last put —
+	// so it has nothing to say about where the board IS. That was enough while
+	// the leash held, and when it slipped (see rememberWanderLeftAt below) the
+	// robot walked to (201, -166) with every other want between (-4,-4) and
+	// (14,14). Nothing was broken by it standing there; what broke was
+	// everything that asks how big the board is. The canvas sizes itself to hold
+	// every want, so one wanderer 160 cells out stretched a 19×19 board to
+	// 207×181 — the minimap drew that whole empty expanse, and the opening
+	// camera framed its middle, which is nowhere near anything.
+	//
+	// So the robot is not allowed to be the want that defines the board. It
+	// wanders within what the others already span; if it is the only thing
+	// placed there is no board to leave, and the leash alone decides.
+	if minX, minY, maxX, maxY, ok := canvasBounds(w.Metadata.ID); ok {
+		nx = clampInt(nx, minX, maxX)
+		ny = clampInt(ny, minY, maxY)
+	}
+
 	// Same wall / locked-door boundaries a player's cursor can't cross (see
 	// WantCanvas.tsx's wallCells) — try the diagonal move, then slide along
 	// one axis at a time (matching the player's own slide-along-wall
@@ -169,13 +189,65 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 		nx, ny = x, y
 	}
 
-	if nx != x {
+	// Record the move before writing it, and for a move on either axis.
+	//
+	// This used to sit inside the `nx != x` branch, so a step that only changed
+	// y was never remembered. anchorFor then compared the robot's new y against
+	// a leftY that had not moved, decided somebody else must have put it there,
+	// and re-tied the leash to where the robot had just walked itself. A leash
+	// that follows is not a leash: every vertical step re-anchored, the anchor
+	// crept along behind the robot, and the drift the bound was meant to stop
+	// resumed at full speed in both axes.
+	if nx != x || ny != y {
 		rememberWanderLeftAt(w.Metadata.ID, nx, ny)
+	}
+	if nx != x {
 		w.SetLabel("mywant.io/canvas-x", strconv.Itoa(nx))
 	}
 	if ny != y {
 		w.SetLabel("mywant.io/canvas-y", strconv.Itoa(ny))
 	}
+}
+
+// canvasBounds is the rectangle the OTHER placed wants span, in grid cells.
+//
+// This is the board as far as anything that draws it is concerned: the canvas
+// and the minimap both size themselves to hold every want, so this is exactly
+// the region the robot must stay inside to avoid resizing them. Reports ok =
+// false when nothing else carries a position, which is a board with no extent
+// rather than an empty one.
+func canvasBounds(selfID string) (minX, minY, maxX, maxY int, ok bool) {
+	cb := GetGlobalChainBuilder()
+	if cb == nil {
+		return 0, 0, 0, 0, false
+	}
+	for _, sib := range cb.GetWants() {
+		if sib.Metadata.ID == selfID {
+			continue
+		}
+		x, errX := strconv.Atoi(sib.GetLabel("mywant.io/canvas-x"))
+		y, errY := strconv.Atoi(sib.GetLabel("mywant.io/canvas-y"))
+		if errX != nil || errY != nil {
+			continue
+		}
+		if !ok {
+			minX, maxX, minY, maxY, ok = x, x, y, y, true
+			continue
+		}
+		if x < minX {
+			minX = x
+		}
+		if x > maxX {
+			maxX = x
+		}
+		if y < minY {
+			minY = y
+		}
+		if y > maxY {
+			maxY = y
+		}
+	}
+	return minX, minY, maxX, maxY, ok
 }
 
 // isCanvasBlocked reports whether (x,y) is occupied by a wall or a locked
