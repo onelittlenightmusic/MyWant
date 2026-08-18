@@ -310,6 +310,9 @@ func (s *Server) setThingLabel(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to set memo label", err.Error())
 		return
 	}
+	// A label is how a value gets pinned to the canvas, which is a change to
+	// what the city knows about it — the same kind of news as being named.
+	go broadcastSSE("thing_changed", body.ValueID)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label set"})
 }
 
