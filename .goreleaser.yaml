@@ -57,5 +57,10 @@ brews:
     license: "MIT"
     install: |
       bin.install "mywant"
+    service: |
+      run [opt_bin/"mywant", "start"]
+      keep_alive true
+      log_path var/"log/mywant.log"
+      error_log_path var/"log/mywant.log"
     test: |
       system "#{bin}/mywant", "--version"
