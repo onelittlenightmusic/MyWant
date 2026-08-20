@@ -441,7 +441,7 @@ func (s *Server) Start() error {
 
 	// Start the drive engine: moves characters targeted by going/gear/direction
 	// wants once per second based on the currently deployed drive-category wants.
-	startDriveEngine()
+	startDriveEngine(s)
 
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()

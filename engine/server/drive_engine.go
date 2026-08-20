@@ -25,12 +25,14 @@ var driveHeadings = map[string]float64{}
 
 // startDriveEngine launches the background goroutine that moves characters
 // targeted by "going"/"gear"/"direction" wants once per driveEngineTick.
-func startDriveEngine() {
+// Takes the Server so a moved character's new cell can be checked against
+// form-type:button wants (see syncButtonOccupancy in button_occupancy.go).
+func startDriveEngine(s *Server) {
 	go func() {
 		ticker := time.NewTicker(driveEngineTick)
 		defer ticker.Stop()
 		for range ticker.C {
-			driveEngineTickOnce()
+			driveEngineTickOnce(s)
 		}
 	}()
 }
@@ -47,7 +49,7 @@ type driveTarget struct {
 // driveEngineTickOnce enumerates all going/gear/direction wants, resolves the
 // combined motion for every targeted character, and pushes updated positions
 // into the shared cursor store.
-func driveEngineTickOnce() {
+func driveEngineTickOnce(s *Server) {
 	builder := mywant.GetGlobalChainBuilder()
 	if builder == nil {
 		return
@@ -129,12 +131,16 @@ func driveEngineTickOnce() {
 			continue
 		}
 
-		distance := t.gearMultiplier * baseSpeedCellsPerSec * driveEngineTick.Seconds()
+		speed := baseSpeedCellsPerSec
+		if character, ok := mywant.GetCharacter(charID); ok && character.Speed > 0 {
+			speed = character.Speed
+		}
+		distance := t.gearMultiplier * speed * driveEngineTick.Seconds()
 		rad := heading * math.Pi / 180
 		dx := distance * math.Cos(rad)
 		dy := distance * math.Sin(rad)
 
-		moveDrivenCharacter(charID, dx, dy)
+		moveDrivenCharacter(s, charID, dx, dy)
 	}
 }
 
@@ -179,8 +185,10 @@ func characterIDsOf(want *mywant.Want) []string {
 // moveDrivenCharacter applies a relative (dx, dy) movement (in grid-cell
 // units) to a character's position in the shared ephemeral cursor store,
 // enriching the entry with the character's display fields, and broadcasts
-// the updated snapshot over SSE.
-func moveDrivenCharacter(characterID string, dx, dy float64) {
+// the updated snapshot over SSE. Also re-checks which form-type:button want
+// (if any) the character now stands on, since a "going" push is exactly the
+// kind of move that can walk them onto or off of one.
+func moveDrivenCharacter(s *Server, characterID string, dx, dy float64) {
 	character, ok := mywant.GetCharacter(characterID)
 	if !ok {
 		log.Printf("[DriveEngine] unknown character %q referenced by a drive want; skipping", characterID)
@@ -196,7 +204,10 @@ func moveDrivenCharacter(characterID string, dx, dy float64) {
 	entry.Name = character.Name
 	entry.LastSeen = time.Now().UnixMilli()
 	cursors[characterID] = entry
+	newX, newY := entry.X, entry.Y
 	cursorsMu.Unlock()
+
+	s.syncButtonOccupancy(characterID, newX, newY)
 
 	go broadcastSSE("cursor", snapshotCursors())
 }

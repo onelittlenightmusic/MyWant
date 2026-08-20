@@ -413,21 +413,23 @@ func metersBetween(a, b *latLng) float64 {
 }
 
 // setCharacterDesign sets the canvas preferences a character owns.
-// Body: { "tile_design": "forest", "aura_design": "forest", "move_speed": 2 }
-// — either design may be "" (inherit the canvas design), and move_speed 0 or 1
-// is the normal pace.
+// Body: { "tile_design": "forest", "aura_design": "forest", "move_speed": 2, "speed": 1.5 }
+// — either design may be "" (inherit the canvas design), move_speed 0 or 1 is
+// the normal animation pace, and speed 0 falls back to the engine's default
+// real movement rate (baseSpeedCellsPerSec).
 func (s *Server) setCharacterDesign(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var req struct {
-		TileDesign string `json:"tile_design"`
-		AuraDesign string `json:"aura_design"`
-		MoveSpeed  int    `json:"move_speed"`
+		TileDesign string  `json:"tile_design"`
+		AuraDesign string  `json:"aura_design"`
+		MoveSpeed  int     `json:"move_speed"`
+		Speed      float64 `json:"speed"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
 		return
 	}
-	c, ok := mywant.SetCharacterDesign(id, req.TileDesign, req.AuraDesign, req.MoveSpeed)
+	c, ok := mywant.SetCharacterDesign(id, req.TileDesign, req.AuraDesign, req.MoveSpeed, req.Speed)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return

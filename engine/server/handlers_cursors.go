@@ -400,6 +400,10 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// weather tile is not dragged around by its owner walking.
 	s.moveCharacterWant(characterID, body.X, body.Y)
 
+	// Add/remove this character from any form-type:button want's `characters`
+	// list depending on whether they just stepped onto or off of its tile.
+	s.syncButtonOccupancy(characterID, body.X, body.Y)
+
 	// A new utterance joins the conversation record. Only the first PUT carrying
 	// a given messageAt — the later ones are the same words being carried along
 	// by position updates, not somebody saying it again.

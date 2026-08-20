@@ -48,6 +48,14 @@ type Character struct {
 	// does or where it lands, so two people walking side by side at different
 	// speeds still agree about the board.
 	MoveSpeed int `yaml:"moveSpeed,omitempty" json:"move_speed,omitempty"`
+	// Speed is how fast this character ACTUALLY moves when driven (e.g. by a
+	// "going" button they're standing on), in canvas grid cells per second.
+	// Unlike MoveSpeed, this changes where a step lands and how far a tick of
+	// automatic movement carries them — it's a real physical rate, not an
+	// animation multiplier. 0 (unset) falls back to the engine's default pace
+	// (baseSpeedCellsPerSec), so an existing character with no opinion here
+	// moves exactly as it always did.
+	Speed float64 `yaml:"speed,omitempty" json:"speed,omitempty"`
 	// Display is how this character likes the app to look and sound: the
 	// settings that used to live in the global config and are now chosen per
 	// person, because a character IS a person here and two of them share a
@@ -521,7 +529,7 @@ func (m *characterManager) ensureDefaultCharacters() {
 // SetDesign sets the canvas preferences a character owns: the tile/aura
 // design-plugin ids (empty string = inherit the canvas-level design) and how
 // fast their movement is animated (see Character.MoveSpeed).
-func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string, moveSpeed int) (*Character, bool) {
+func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string, moveSpeed int, speed float64) (*Character, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for i, c := range m.store.Characters {
@@ -531,6 +539,7 @@ func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string,
 		m.store.Characters[i].TileDesign = tileDesign
 		m.store.Characters[i].AuraDesign = auraDesign
 		m.store.Characters[i].MoveSpeed = moveSpeed
+		m.store.Characters[i].Speed = speed
 		m.save()
 		cp := m.store.Characters[i]
 		return &cp, true
@@ -665,8 +674,8 @@ func MigrateCharacterAuraDefaults(resolveWantType func(wantID string) (string, b
 func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
 	return GetCharacterManager().SetAuraCardWant(characterID, wantID)
 }
-func SetCharacterDesign(characterID, tileDesign, auraDesign string, moveSpeed int) (*Character, bool) {
-	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign, moveSpeed)
+func SetCharacterDesign(characterID, tileDesign, auraDesign string, moveSpeed int, speed float64) (*Character, bool) {
+	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign, moveSpeed, speed)
 }
 // SetCharacterCanvasBg gives one character a canvas background picture,
 // leaving the rest of how they like the app untouched.

@@ -8,6 +8,7 @@ wantType:
     pattern: independent
     labels:
       user-control: "true"
+      form-type: button
       type-icon: "Gauge"
       category-icon: "Car"
       category-bg-light: "linear-gradient(160deg, #a7f3d0 0%, #93c5fd 100%)"
