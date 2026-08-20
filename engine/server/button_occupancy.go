@@ -79,8 +79,30 @@ func applyButtonOccupancy(characterID string, newX, newY float64, allWants []*my
 	}
 	if newWant != nil {
 		addCharacterToWant(newWant, characterID)
+		toggleGoingOnStep(newWant)
 	}
 	characterOnButton[characterID] = newWantID
+}
+
+// toggleGoingOnStep flips a "going" want's own going/stopped state the
+// instant a footstep lands on it — a pressure plate, not a switch someone
+// else has to reach into the sidebar and throw. A want that only recorded
+// who was standing there and left its toggle untouched never actually
+// started anyone: the card said STOPPED, and stayed that way, until someone
+// separately flipped it by hand.
+//
+// Flips rather than always setting true so a second footstep stops what the
+// first one started — the same "step on it again to turn it off" a real
+// pressure plate or switch reads as. Stepping *off* does not touch it either
+// way: see drive_engine.go's driveGoingOwner for why leaving a going tile
+// must never read as landing on a stopped one.
+func toggleGoingOnStep(want *mywant.Want) {
+	if want.Metadata.Type != "going" {
+		return
+	}
+	current, _ := want.GetCurrent("going")
+	wasGoing, _ := current.(bool)
+	want.SetCurrent("going", !wasGoing)
 }
 
 // findButtonWantAtCell returns the form-type:button want sitting at (x, y)
