@@ -90,6 +90,19 @@ var (
 	cursorsMu sync.RWMutex
 	cursors   = map[string]cursorEntry{} // characterId → entry
 
+	// cursorSeq is the highest client-assigned sequence number applied so
+	// far for each character — see updateCursor's own seq handling. A
+	// client's own rapid-fire position PUTs can arrive at the server out of
+	// the order they were sent (ordinary network jitter across concurrent
+	// requests); without this, whichever one is *processed* last wins,
+	// which is not necessarily the one the client *sent* last, and the
+	// character's position visibly regresses to an already-superseded cell.
+	// Comparing seq (not arrival order) rejects exactly the stale one.
+	// Absent entirely (seq==0, the zero value) for a character nothing has
+	// ever sent a seq for — every caller that doesn't send one (drive-tick
+	// updates, older clients, the CLI) is untouched by this check.
+	cursorSeq = map[string]int64{}
+
 	// Where each character was last seen, kept regardless of how long ago that
 	// was. `cursors` answers "who is here now" and is pruned to cursorTTL (8s),
 	// which is right for drawing other people's cursors — a cursor that stops
@@ -312,6 +325,11 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		EffectNonce int64   `json:"effectNonce,omitempty"`
 		Message     string  `json:"message,omitempty"`
 		MessageAt   int64   `json:"messageAt,omitempty"`
+		// Seq, if the client sends one, orders that client's own PUTs for
+		// this character — see cursorSeq's own comment. Zero (the default
+		// for a caller that omits it) means "no ordering information",
+		// never treated as stale.
+		Seq int64 `json:"seq,omitempty"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -319,6 +337,18 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cursorsMu.Lock()
+	if body.Seq > 0 && body.Seq <= cursorSeq[characterID] {
+		// A later PUT from the same client already landed and applied —
+		// this one represents a position the client itself has already
+		// moved past. Nothing in it (position or metadata) is more current
+		// than what's already there; apply none of it.
+		cursorsMu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if body.Seq > 0 {
+		cursorSeq[characterID] = body.Seq
+	}
 	prev := cursors[characterID]
 	// Somebody who says something without stamping it said it now.
 	//
