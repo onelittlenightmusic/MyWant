@@ -431,6 +431,9 @@ func (s *Server) Start() error {
 	go func() {
 		time.Sleep(2 * time.Second)
 		s.ensureCharacterChatWants()
+		// Give every character legs, too: the want that actually moves them
+		// (see character_motion_wants.go / CharacterMotionTick below).
+		s.ensureCharacterMotionWants()
 		// Put everybody back where they were left, so the board has its cast
 		// from the moment the server is up rather than from the moment somebody
 		// opens a browser. See seedLastKnownPositions.
@@ -439,9 +442,14 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	// Start the drive engine: moves characters targeted by going/gear/direction
-	// wants once per second based on the currently deployed drive-category wants.
-	startDriveEngine(s)
+	// Wire the drive engine's per-character mover into core so each
+	// character's own "character_motion" want can call it from its own
+	// Progress() (see engine/types/character_motion_types.go) — no more
+	// single shared ticker driving every character; see drive_engine.go's
+	// driveOneCharacterTick for the actual resolve-and-apply logic.
+	mywant.CharacterMotionTick = func(characterID string, motionWant *mywant.Want) (float64, float64, bool) {
+		return driveOneCharacterTick(s, characterID, motionWant)
+	}
 
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()

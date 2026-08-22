@@ -32,6 +32,14 @@ var alwaysVisibleSystemWantTypes = map[string]bool{
 	// different question — where it should not appear, rather than who should
 	// be told it exists.
 	"character_chat": true,
+	// A going-toggle tile is one shared want, but going itself is each
+	// character's own state now (see character_motion_types.go's "going"
+	// field) — the client colors that tile from the *viewer's own*
+	// character, which means it has to be able to look their own
+	// character_motion want up at all. Stays out of the want LIST the same
+	// way character_chat does, by its type's own list-visible label; this is
+	// only about whether the API tells anyone it exists.
+	"character_motion": true,
 }
 
 // shouldHideSystemWant centralizes the include-system-wants filter used by

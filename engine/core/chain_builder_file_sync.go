@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -91,22 +92,56 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 	updatedWants := make([]*Want, 0)
 
+	// Snapshotted rather than ranged over live: cb.wants is a plain map, mutated
+	// under wantsMu by want creation/deletion elsewhere while this runs on its
+	// own ticker with no lock of its own — reading it directly here (both the
+	// lookup below and the second loop's range) is exactly the shape of
+	// "concurrent map read and map write". Held only long enough to copy the
+	// map header out; none of the heavier calls below (GetSpec, BuildHistory,
+	// GetAllStateDeep) run while it's held, so there's no reentrancy risk with
+	// whatever locking those already do internally.
+	cb.wantsMu.RLock()
+	wantsSnapshot := make(map[string]*runtimeWant, len(cb.wants))
+	maps.Copy(wantsSnapshot, cb.wants)
+	cb.wantsMu.RUnlock()
+
+	// Same reasoning, for cb.config: UpdateWant replaces a slot (cb.config[i]
+	// = wantConfig) under reconcileMutex.Lock() while this reads the slice on
+	// its own ticker with no lock — ranging cb.config directly races that
+	// replacement. reconcileMutex, not a narrower lock: every other cb.config
+	// writer already serializes through it, so this is the one that actually
+	// excludes them.
+	//
+	// Held only long enough to copy the slice header — deliberately not
+	// wrapping the loop below, which calls GetAllStateDeep → getParentWant →
+	// FindWantByID, and FindWantByID takes reconcileMutex.RLock() itself. Two
+	// RLocks on the same goroutine are safe by themselves, but not once a
+	// Lock() is queued in between (see sync.RWMutex's own docs, and the
+	// warning on FindWantByID above) — held any longer than this copy, that's
+	// a deadlock waiting to happen rather than a race.
+	cb.reconcileMutex.RLock()
+	configSnapshot := append([]*Want(nil), cb.config...)
+	cb.reconcileMutex.RUnlock()
+
 	// First, add all wants from config and update with current stats
 	// Deduplicate by ID to prevent state.yaml bloat from accumulated duplicates
 	seenIDs := make(map[string]bool)
 	configWantMap := make(map[string]bool)
-	for _, want := range cb.config {
+	for _, want := range configSnapshot {
 		if seenIDs[want.Metadata.ID] {
 			continue // Skip duplicate entries
 		}
 		seenIDs[want.Metadata.ID] = true
 		configWantMap[want.Metadata.Name] = true
-		if runtimeWant, exists := cb.wants[want.Metadata.ID]; exists {
+		if runtimeWant, exists := wantsSnapshot[want.Metadata.ID]; exists {
 			// Update with runtime data including spec using
 			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
 			want.Status = runtimeWant.want.Status
-			want.Metadata.OrderKey = runtimeWant.want.Metadata.OrderKey // Sync order key
+			// GetMetadata(), not a raw field read: UpdateWant replaces the whole
+			// Metadata struct under metadataMutex, and an unlocked read racing
+			// that write is the same class of bug GetSpec() above already avoids.
+			want.Metadata.OrderKey = runtimeWant.want.GetMetadata().OrderKey // Sync order key
 
 			// Deep copy: this snapshot is about to be marshalled, and a
 			// shallow one shares its nested maps with the live want — see
@@ -119,8 +154,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	}
 
 	// Then, add any runtime wants that might not be in config (e.g., dynamically created and completed)
-	for _, runtimeWant := range cb.wants {
-		wantName := runtimeWant.want.Metadata.Name
+	for _, runtimeWant := range wantsSnapshot {
+		wantName := runtimeWant.want.GetMetadata().Name // see the OrderKey comment above
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
 

@@ -1192,9 +1192,10 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 
 	wantFunction, err := cb.createWantFunction(wantConfig)
 	if err != nil {
+		// Cloned — see the comment on the wantPtr == nil branch below.
 		wantPtr = &Want{
-			Metadata: wantConfig.Metadata,
-			Spec:     wantConfig.Spec,
+			Metadata: cloneMetadata(wantConfig.Metadata),
+			Spec:     cloneSpec(wantConfig.Spec),
 			Status:   WantStatusFailed,
 			History:  wantConfig.History,
 		}
@@ -1234,18 +1235,28 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 			historyField.ParameterHistory = append(historyField.ParameterHistory, entry)
 		}
 
+		// Cloned, not assigned by value: same reasoning as UpdateWant's own
+		// clone of wantConfig — wantConfig IS (or shares reference fields
+		// with) an entry writeStatsToMemory reads straight off cb.config with
+		// no lock. wantPtr isn't published anywhere yet at this point, so no
+		// lock is needed for the clone itself, only for what it protects
+		// later.
 		wantPtr = &Want{
-			Metadata: wantConfig.Metadata,
-			Spec:     wantConfig.Spec,
+			Metadata: cloneMetadata(wantConfig.Metadata),
+			Spec:     cloneSpec(wantConfig.Spec),
 			Status:   WantStatusIdle,
 			History:  historyField,
 		}
 	} else {
 		// Update the extracted Want with metadata and config info
 		// Preserve any labels added by CreateTargetFunc (e.g. recipe-based) that are not in wantConfig
+		//
+		// Cloned (see the comment on the other branch above) and both fields
+		// under the one lock, Spec included — it used to sit outside the
+		// critical section entirely, assigned by value same as Metadata was.
 		wantPtr.metadataMutex.Lock()
 		preservedLabels := wantPtr.Metadata.Labels
-		wantPtr.Metadata = wantConfig.Metadata
+		wantPtr.Metadata = cloneMetadata(wantConfig.Metadata)
 		if len(preservedLabels) > 0 {
 			// Direct map access on purpose: metadataMutex is already held by
 			// this function (see the Lock above). The Set/GetLabel helpers take
@@ -1259,8 +1270,8 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 				}
 			}
 		}
+		wantPtr.Spec = cloneSpec(wantConfig.Spec)
 		wantPtr.metadataMutex.Unlock()
-		wantPtr.Spec = wantConfig.Spec
 		wantPtr.SetStatus(WantStatusIdle)
 
 		// Update history
@@ -1467,11 +1478,26 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 	// immediately in writeStatsToMemory (which reads runtimeWant.want.GetSpec()).
 	// Without updating Spec here, writeStatsToMemory would overwrite the newly saved
 	// config want's Spec with the stale runtime spec, losing fields like Imports.
+	//
+	// Cloned (cloneMetadata/cloneSpec — the same helpers GetMetadata/GetSpec use)
+	// rather than assigned by value: wantConfig IS cb.config[i] as of the slice
+	// write above, so `rw.want.Metadata = wantConfig.Metadata` would only copy
+	// the struct header — Labels, OwnerReferences, Correlation, Params, Imports,
+	// and every other slice/map field either struct carries are reference types,
+	// and the copy would still point at the exact map/slice cb.config[i] holds.
+	// rw.want's own metadataMutex then protects a later SetLabel/param write
+	// against nothing at all: writeStatsToMemory reads cb.config[i]'s fields
+	// straight off the slice, by design (see its own comment), taking no lock —
+	// a raw yaml.Marshal reflecting over that same live, aliased map or slice
+	// while SetLabel/UpdateWant writes it is exactly a concurrent read/write,
+	// and is what actually crashed the server. Giving rw.want its own copies
+	// here is cheaper than making every reader of cb.config defensively
+	// re-lock storage it has no reason to think is shared.
 	cb.wantsMu.RLock()
 	if rw, exists := cb.wants[wantConfig.Metadata.ID]; exists {
 		rw.want.metadataMutex.Lock()
-		rw.want.Metadata = wantConfig.Metadata
-		rw.want.Spec = wantConfig.Spec
+		rw.want.Metadata = cloneMetadata(wantConfig.Metadata)
+		rw.want.Spec = cloneSpec(wantConfig.Spec)
 		rw.want.metadataMutex.Unlock()
 
 		// Recompute GUI-authored derived fields synchronously so a saved definition's

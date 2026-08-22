@@ -480,6 +480,17 @@ func (n *Want) prepareForRestart() {
 	// Goal-labeled fields are excluded: they represent configuration set by Initialize()
 	// from params, and must survive want restarts so that Initialize() can read them as
 	// fallbacks (e.g. session_id for coding want).
+	//
+	// Persistent fields are excluded too, for the same reason — a type author
+	// marking a state field `persistent: true` is declaring exactly this: that
+	// it holds a value which outlives a restart (going/direction/gear's own
+	// dx/dy/going/value/characters all do — a webhook is the only thing that's
+	// ever supposed to change them). The schema has carried this flag for a
+	// while; nothing here was reading it, so every current-labeled field reset
+	// to its initialValue on every restart regardless — silently discarding
+	// whatever a player had last set, which is what actually crashed nothing
+	// but quietly undid a going want's toggle and a direction want's heading
+	// on every server restart.
 	if n.Spec.ResetOnRestart == nil || *n.Spec.ResetOnRestart {
 		cb := GetGlobalChainBuilder()
 		if cb != nil {
@@ -489,6 +500,9 @@ func (n *Want) prepareForRestart() {
 				for _, sd := range typeDef.State {
 					if label, exists := n.StateLabels[sd.Name]; exists && label == LabelGoal {
 						continue // goal state is re-set by Initialize(); don't wipe it here
+					}
+					if sd.Persistent {
+						continue // declared to survive a restart — leave whatever was loaded
 					}
 					resetState[sd.Name] = sd.InitialValue
 				}
@@ -1566,8 +1580,21 @@ func (n *Want) GetAllState() map[string]any {
 	// the current value without requiring a want restart.
 	//   - child wants  → read from parent's current state
 	//   - top-level    → read from global state store
+	//
+	// Imports is read under metadataMutex and copied out before the loop below
+	// runs: Spec (Imports included) is replaced wholesale under this same lock
+	// by UpdateWant, and ranging the live map here while that write lands is a
+	// concurrent map read/write — this is one of the paths that crashed the
+	// server (see chain_builder.go's UpdateWant comment). Copying out first
+	// also means parent.getState()/GetGlobalState() below never run while the
+	// lock is held.
+	n.metadataMutex.RLock()
+	imports := make(map[string]string, len(n.Spec.Imports))
+	maps.Copy(imports, n.Spec.Imports)
+	n.metadataMutex.RUnlock()
+
 	parent := n.getParentWant()
-	for globalKey, localKey := range n.Spec.Imports {
+	for globalKey, localKey := range imports {
 		if parent != nil {
 			if val, ok := parent.getState(globalKey); ok {
 				state[localKey] = val
@@ -1880,28 +1907,80 @@ func (n *Want) IncrementIntState(key string) int {
 	return newValue
 }
 
-// GetSpec returns a deep copy of the want's Spec, with Params and Imports maps
-// snapshotted under metadataMutex to prevent concurrent-map-read/write panics
-// when UpdateParameter is called from a concurrent goroutine.
+// cloneSpec returns s with every reference-type field — Params, Imports,
+// and every slice field WantSpec carries — given its own backing array/map,
+// so the copy shares nothing mutable with wherever s came from. One level
+// deep: each field is assigned wholesale (by a param update, an expose/
+// import edit, UpdateWant, …), never mutated element-by-element after
+// creation, so a shallow copy is enough to stop two holders of "the same"
+// WantSpec from reading and writing the same backing storage.
+//
+// This used to clone only Params and Imports, the two fields that happen to
+// get read on a hot path (GetAllState's Imports overlay). The rest — Exposes,
+// Using, Requires, When, StateSubscriptions, NotificationFilters,
+// UnknownFields — were just as shared and just as reassignable, and one of
+// them (a slice, not caught until `go test -race` on the fix for the others)
+// was still enough to crash writeStatsToMemory's marshal against a
+// concurrent UpdateWant. Cloning all of them here is the difference between
+// "safe until the next field is added" and actually safe.
+func cloneSpec(s WantSpec) WantSpec {
+	if s.Params != nil {
+		s.Params = maps.Clone(s.Params)
+	}
+	if s.Imports != nil {
+		s.Imports = maps.Clone(s.Imports)
+	}
+	if s.Exposes != nil {
+		s.Exposes = append([]ExposeEntry(nil), s.Exposes...)
+	}
+	if s.Using != nil {
+		s.Using = append([]want_spec.UsingEntry(nil), s.Using...)
+	}
+	if s.StateSubscriptions != nil {
+		s.StateSubscriptions = append([]StateSubscription(nil), s.StateSubscriptions...)
+	}
+	if s.NotificationFilters != nil {
+		s.NotificationFilters = append([]NotificationFilter(nil), s.NotificationFilters...)
+	}
+	if s.Requires != nil {
+		s.Requires = append([]string(nil), s.Requires...)
+	}
+	if s.When != nil {
+		s.When = append([]WhenSpec(nil), s.When...)
+	}
+	if s.UnknownFields != nil {
+		s.UnknownFields = append([]string(nil), s.UnknownFields...)
+	}
+	return s
+}
+
+// cloneMetadata is cloneSpec's counterpart for Metadata: Labels,
+// OwnerReferences and Correlation are its only reference-type fields, given
+// their own backing storage for the same reason.
+func cloneMetadata(m Metadata) Metadata {
+	if m.Labels != nil {
+		m.Labels = maps.Clone(m.Labels)
+	}
+	if m.OwnerReferences != nil {
+		m.OwnerReferences = append([]OwnerReference(nil), m.OwnerReferences...)
+	}
+	if m.Correlation != nil {
+		m.Correlation = append([]CorrelationEntry(nil), m.Correlation...)
+	}
+	return m
+}
+
+// GetSpec returns a deep copy of the want's Spec, snapshotted under
+// metadataMutex to prevent concurrent-map/slice-read-write panics when the
+// spec is being replaced (UpdateWant, UpdateParameter, …) from a concurrent
+// goroutine.
 func (w *Want) GetSpec() *WantSpec {
 	if w == nil {
 		return nil
 	}
 	w.metadataMutex.RLock()
 	defer w.metadataMutex.RUnlock()
-	spec := w.Spec
-	if w.Spec.Params != nil {
-		spec.Params = make(map[string]any, len(w.Spec.Params))
-		for k, v := range w.Spec.Params {
-			spec.Params[k] = v
-		}
-	}
-	if w.Spec.Imports != nil {
-		spec.Imports = make(map[string]string, len(w.Spec.Imports))
-		for k, v := range w.Spec.Imports {
-			spec.Imports[k] = v
-		}
-	}
+	spec := cloneSpec(w.Spec)
 	return &spec
 }
 func (w *Want) GetMetadata() Metadata {
@@ -1910,18 +1989,7 @@ func (w *Want) GetMetadata() Metadata {
 	}
 	w.metadataMutex.RLock()
 	defer w.metadataMutex.RUnlock()
-
-	// Deep copy metadata to ensure thread safety
-	meta := w.Metadata
-	if w.Metadata.Labels != nil {
-		meta.Labels = make(map[string]string, len(w.Metadata.Labels))
-		maps.Copy(meta.Labels, w.Metadata.Labels)
-	}
-	if w.Metadata.OwnerReferences != nil {
-		meta.OwnerReferences = make([]OwnerReference, len(w.Metadata.OwnerReferences))
-		copy(meta.OwnerReferences, w.Metadata.OwnerReferences)
-	}
-	return meta
+	return cloneMetadata(w.Metadata)
 }
 
 // GetLabels returns a copy of the want's labels map in a thread-safe way

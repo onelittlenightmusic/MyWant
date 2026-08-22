@@ -23,18 +23,30 @@ func buttonWantAt(id string, x, y int) *mywant.Want {
 
 // goingWantAt builds an actual "going" want — unlike buttonWantAt, whose
 // Type is deliberately something else so tests can supply their own
-// isButton predicate — because startGoingOnStep checks Metadata.Type
-// directly, not through that predicate.
-func goingWantAt(id string, x, y int, startingGoing bool) *mywant.Want {
+// isButton predicate — because toggleGoingOnStep checks Metadata.Type
+// directly, not through that predicate. Carries no "going" state of its
+// own any more — going lives on each targeted character's own
+// "character_motion" want (see motionWantFor) — this is purely the trigger.
+func goingWantAt(id string, x, y int) *mywant.Want {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: id, Type: "going"}}
-	w.StateLabels = map[string]mywant.StateLabel{
-		"characters": mywant.LabelCurrent,
-		"going":      mywant.LabelCurrent,
-	}
-	w.SetCurrent("going", startingGoing)
+	w.StateLabels = map[string]mywant.StateLabel{"characters": mywant.LabelCurrent}
 	w.SetLabel(canvasLabelX, strconv.Itoa(x))
 	w.SetLabel(canvasLabelY, strconv.Itoa(y))
 	return w
+}
+
+// motionWantFor builds a character's own "character_motion" want, named the
+// way ensureCharacterMotionWant names it — the thing toggleGoingOnStep
+// actually writes "going" to. startingGoing seeds its initial flag.
+func motionWantFor(characterID string, startingGoing bool) *mywant.Want {
+	w := &mywant.Want{Metadata: mywant.Metadata{ID: characterMotionWantName(characterID), Type: "character_motion"}}
+	w.StateLabels = map[string]mywant.StateLabel{"going": mywant.LabelCurrent}
+	w.SetCurrent("going", startingGoing)
+	return w
+}
+
+func goingOf(w *mywant.Want) bool {
+	return mywant.GetCurrent(w, "going", false)
 }
 
 func isGoingButtonType(typeName string) bool { return typeName == "going" }
@@ -144,33 +156,34 @@ func TestApplyButtonOccupancyStandingStillDoesNothing(t *testing.T) {
 // going want's own going/stopped toggle only ever moved via its card's
 // webhook, so the card kept reading STOPPED — and the drive engine kept
 // reading no vote at all for it — until someone opened the sidebar and
-// flipped it by hand.
+// flipped it by hand. Now it's the *stepping character's own*
+// "character_motion" want that gets set — see motionWantFor.
 func TestApplyButtonOccupancyStepOntoGoingWantStartsIt(t *testing.T) {
 	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5, false)
-	all := []*mywant.Want{going}
+	going := goingWantAt("going-1", 5, 5)
+	motion := motionWantFor("chr-hero", false)
+	all := []*mywant.Want{going, motion}
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType)
 
-	current, _ := going.GetCurrent("going")
-	if b, ok := current.(bool); !ok || !b {
-		t.Fatalf("expected stepping onto the want to set going=true, got %v", current)
+	if !goingOf(motion) {
+		t.Fatalf("expected stepping onto the want to set chr-hero's own going=true, got %v", goingOf(motion))
 	}
 }
 
-// Leaving must not undo it — see driveGoingOwner in drive_engine.go for why
-// walking off a going tile must not read as walking onto a stopped one.
+// Leaving must not undo it — going, once set, stays set regardless of where
+// the character wanders next; it lives on their own want, not on the tile.
 func TestApplyButtonOccupancyStepOffGoingWantDoesNotStopIt(t *testing.T) {
 	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5, false)
-	all := []*mywant.Want{going}
+	going := goingWantAt("going-1", 5, 5)
+	motion := motionWantFor("chr-hero", false)
+	all := []*mywant.Want{going, motion}
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on: starts it
 	applyButtonOccupancy("chr-hero", 9, 9, all, isGoingButtonType) // step off: nothing there
 
-	current, _ := going.GetCurrent("going")
-	if b, ok := current.(bool); !ok || !b {
-		t.Fatalf("expected going to remain true after stepping off, got %v", current)
+	if !goingOf(motion) {
+		t.Fatalf("expected going to remain true after stepping off, got %v", goingOf(motion))
 	}
 }
 
@@ -180,14 +193,37 @@ func TestApplyButtonOccupancyStepOffGoingWantDoesNotStopIt(t *testing.T) {
 // reads as.
 func TestApplyButtonOccupancyStepOntoAlreadyGoingWantStopsIt(t *testing.T) {
 	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5, true)
-	all := []*mywant.Want{going}
+	going := goingWantAt("going-1", 5, 5)
+	motion := motionWantFor("chr-hero", true)
+	all := []*mywant.Want{going, motion}
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType)
 
-	current, _ := going.GetCurrent("going")
-	if b, ok := current.(bool); !ok || b {
-		t.Fatalf("expected a second footstep to toggle going to false, got %v", current)
+	if goingOf(motion) {
+		t.Fatalf("expected a second footstep to toggle going to false, got %v", goingOf(motion))
+	}
+}
+
+// This is the reported bug, now fixed at its root rather than patched
+// around: going lives on each character's own "character_motion" want, so
+// one character's footstep on a shared going want can only ever flip their
+// own flag. A second, unrelated character's flag — even one who is
+// currently, physically also standing on the very same tile — must be
+// completely untouched.
+func TestApplyButtonOccupancyStepOntoGoingWantOnlyAffectsTheStepper(t *testing.T) {
+	resetButtonOccupancy()
+	going := goingWantAt("going-1", 5, 5)
+	stepper := motionWantFor("chr-new", false)
+	bystander := motionWantFor("chr-bystander", true) // already going, from something else entirely
+	all := []*mywant.Want{going, stepper, bystander}
+
+	applyButtonOccupancy("chr-new", 5, 5, all, isGoingButtonType)
+
+	if !goingOf(stepper) {
+		t.Fatalf("expected chr-new's own going to be set true, got %v", goingOf(stepper))
+	}
+	if !goingOf(bystander) {
+		t.Fatalf("expected chr-bystander's going to be completely untouched, got %v", goingOf(bystander))
 	}
 }
 
@@ -198,30 +234,31 @@ func TestApplyButtonOccupancyStepOntoAlreadyGoingWantStopsIt(t *testing.T) {
 // off and back on, or off onto a neighbouring button and back.
 func TestApplyButtonOccupancyTwoFootstepsToggleOnThenOff(t *testing.T) {
 	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5, false)
-	all := []*mywant.Want{going}
+	going := goingWantAt("going-1", 5, 5)
+	motion := motionWantFor("chr-hero", false)
+	all := []*mywant.Want{going, motion}
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on: false -> true
 	applyButtonOccupancy("chr-hero", 9, 9, all, isGoingButtonType) // step off elsewhere
 	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on again: true -> false
 
-	current, _ := going.GetCurrent("going")
-	if b, ok := current.(bool); !ok || b {
-		t.Fatalf("expected the second distinct footstep to toggle going back to false, got %v", current)
+	if goingOf(motion) {
+		t.Fatalf("expected the second distinct footstep to toggle going back to false, got %v", goingOf(motion))
 	}
 }
 
 // Stepping onto a *different* form-type:button want (direction, gear — or
-// anything else that isn't itself a going want) must not start any going
-// want, including one the character previously claimed.
+// anything else that isn't itself a going want) must not touch anyone's
+// going flag at all.
 func TestApplyButtonOccupancyStepOntoNonGoingButtonDoesNotStartGoing(t *testing.T) {
 	resetButtonOccupancy()
 	dir := buttonWantAt("dir-1", 5, 5) // Type: "direction", not "going"
-	all := []*mywant.Want{dir}
+	motion := motionWantFor("chr-hero", false)
+	all := []*mywant.Want{dir, motion}
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isButtonType)
 
-	if _, has := dir.GetCurrent("going"); has {
-		t.Fatalf("a direction want should never gain a going current-state entry")
+	if goingOf(motion) {
+		t.Fatalf("a direction want should never start anyone's going")
 	}
 }

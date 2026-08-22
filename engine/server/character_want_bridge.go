@@ -89,15 +89,21 @@ func (s *Server) moveCharacterWant(characterID string, x, y float64) {
 	if !found || want == nil || !characterWantTypes[want.Metadata.Type] {
 		return
 	}
-	if want.Metadata.Labels == nil {
-		want.Metadata.Labels = map[string]string{}
-	}
 	nx, ny := formatCanvasCoord(x), formatCanvasCoord(y)
-	if want.Metadata.Labels[canvasLabelX] == nx && want.Metadata.Labels[canvasLabelY] == ny {
+	if want.GetLabel(canvasLabelX) == nx && want.GetLabel(canvasLabelY) == ny {
 		return // already there; don't churn a save and a broadcast
 	}
-	want.Metadata.Labels[canvasLabelX] = nx
-	want.Metadata.Labels[canvasLabelY] = ny
+	// Through SetLabels, not a direct map write: this used to write
+	// want.Metadata.Labels[...] straight through, which is safe only as long
+	// as nothing else ever touches this want's Labels map at the same
+	// moment. That stopped being true once movement became continuous (a
+	// character with going=true now calls this roughly every 250ms) instead
+	// of occasional — any other goroutine reading this want's Labels at the
+	// same instant (its own EndProgressCycle evaluating derived fields, for
+	// one) now hits a real "concurrent map read and map write" crash rather
+	// than a theoretical one. SetLabels takes the same metadataMutex every
+	// label reader already respects.
+	want.SetLabels(map[string]string{canvasLabelX: nx, canvasLabelY: ny})
 	s.globalBuilder.UpdateWant(want)
 	s.globalBuilder.TriggerSave()
 	go broadcastSSE("want_changed", []string{want.Metadata.ID})

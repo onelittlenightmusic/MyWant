@@ -1,0 +1,79 @@
+wantType:
+  metadata:
+    name: character_motion
+    title: Character Motion
+    description: |
+      What actually moves a character.
+
+      "going" is this character's own going/stopped flag — set by a footstep
+      on any "going" want (or its card's sidebar toggle), and by nothing
+      else, so one character stepping on a going want can never start or
+      stop a different character who also happens to be near it. The
+      gear/direction votes cast by whatever wants this character is
+      currently standing on or steering are, by contrast, read fresh every
+      tick, not stored here.
+
+      All of it is resolved once every ~250ms, and the result is written to
+      the character's own position in the shared cursor store — x/y here are
+      only a mirror of that, kept purely so this want's own card can show at
+      a glance where its character last resolved to.
+
+      One is created automatically for every character, so a character always
+      has legs without anyone having to arrange it — the same reasoning
+      character_chat gives every character a mouth. Driven by the engine's
+      normal reconcile loop like every other want, self-paced against its own
+      clock rather than a separate ticker goroutine outside it.
+    version: '1.0'
+    category: system
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "Footprints"
+      # No tile of its own — the character is already drawn from their
+      # cursor. It sits beside the board rather than opening anything when
+      # walked onto.
+      list-visible: "false"
+
+  parameters:
+  - name: character_id
+    description: The character this motion belongs to. Set when the want is created alongside the character.
+    type: string
+    required: false
+    default: ""
+
+  state:
+  - name: character_id
+    description: The character this resolves motion for
+    type: string
+    persistent: true
+    initialValue: ""
+    label: goal
+
+  - name: going
+    description: This character's own going/stopped flag, toggled by a footstep on any "going" want or its sidebar toggle — never shared with any other character.
+    type: boolean
+    persistent: true
+    exposable: true
+    initialValue: false
+    label: current
+
+  - name: x
+    description: Mirror of the character's last resolved x position, for observability only
+    type: float
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: y
+    description: Mirror of the character's last resolved y position, for observability only
+    type: float
+    persistent: false
+    initialValue: 0
+    label: current
+
+  - name: achieving_percentage
+    description: Progress indicator — a character is never finished being able to move
+    type: int
+    persistent: false
+    initialValue: 50
+    label: current

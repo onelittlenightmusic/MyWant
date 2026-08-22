@@ -8,11 +8,19 @@ import (
 // want_parent.go — parent/child want relationship, role, dispatch, and suggestion helpers
 
 func (n *Want) getParentWant() *Want {
-	if len(n.Metadata.OwnerReferences) == 0 {
+	// Snapshotted under metadataMutex: UpdateWant replaces the whole Metadata
+	// struct (OwnerReferences included) under this lock, and ranging the live
+	// slice here unlocked raced it under -race — the same class of bug as
+	// GetMetadata()'s own OwnerReferences copy, which this mirrors.
+	n.metadataMutex.RLock()
+	ownerRefs := append([]OwnerReference(nil), n.Metadata.OwnerReferences...)
+	n.metadataMutex.RUnlock()
+
+	if len(ownerRefs) == 0 {
 		return nil
 	}
 	var parentID string
-	for _, ref := range n.Metadata.OwnerReferences {
+	for _, ref := range ownerRefs {
 		if ref.Controller && ref.Kind == "Want" {
 			parentID = ref.ID
 			break

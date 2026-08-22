@@ -35,9 +35,17 @@ func (d *DirectionWant) GetLocals() *DirectionLocals {
 }
 
 func (d *DirectionWant) Initialize() {
-	dx, dy := clampDirectionVector(d.GetFloatParam("dx", 1), d.GetFloatParam("dy", 0))
-	d.SetCurrent("dx", dx)
-	d.SetCurrent("dy", dy)
+	// Only on first init, not on every restart: dx/dy is live-controlled by
+	// its webhook (see Progress) the same way a button's pressed_count or an
+	// aura's cells are — see those types' own Initialize for the same guard.
+	// Applying the param default unconditionally here overwrote whatever a
+	// player had last set the vector to every time the server restarted,
+	// silently discarding it back to whatever the want was deployed with.
+	if _, ok := d.GetCurrent("dx"); !ok {
+		dx, dy := clampDirectionVector(d.GetFloatParam("dx", 1), d.GetFloatParam("dy", 0))
+		d.SetCurrent("dx", dx)
+		d.SetCurrent("dy", dy)
+	}
 	if chars := d.GetStringSliceParam("characters"); len(chars) > 0 {
 		d.SetCurrent("characters", chars)
 	}

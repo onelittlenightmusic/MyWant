@@ -6,176 +6,82 @@ import (
 	mywant "mywant/engine/core"
 )
 
-func goingWant(id string, going bool) *mywant.Want {
-	w := &mywant.Want{Metadata: mywant.Metadata{ID: id, Type: "going"}}
-	w.StateLabels = map[string]mywant.StateLabel{
-		"characters": mywant.LabelCurrent,
-		"going":      mywant.LabelCurrent,
-	}
-	w.SetCurrent("going", going)
-	return w
-}
-
-func TestCarryForwardGoingTargetsReadsOwnerLiveState(t *testing.T) {
-	owner := map[string]string{"chr-1": "want-a"}
-	goingWants := map[string]*mywant.Want{"want-a": goingWant("want-a", true)}
-	targets := map[string]*driveTarget{}
-
-	carryForwardGoingTargets(targets, owner, goingWants)
-
-	got, ok := targets["chr-1"]
-	if !ok {
-		t.Fatalf("expected a carried-forward target for chr-1")
-	}
-	if !resolveGoing(got.goingVotes) {
-		t.Fatalf("expected the carried-forward vote to reflect the owner's current going=true")
+func TestResolveMotionRequiresGoing(t *testing.T) {
+	dx, dy, moved := resolveMotion(false, 0, true, 1, 2)
+	if moved || dx != 0 || dy != 0 {
+		t.Fatalf("expected a stopped character to produce no motion, got (%v, %v, %v)", dx, dy, moved)
 	}
 }
 
-// This is the second half of the reported behaviour: toggling the SAME
-// going want's own card — not by anyone standing on it — must keep
-// controlling a character it once claimed, even after that character has
-// walked away.
-func TestCarryForwardGoingTargetsReflectsOwnerToggledToStopped(t *testing.T) {
-	owner := map[string]string{"chr-1": "want-a"}
-	goingWants := map[string]*mywant.Want{"want-a": goingWant("want-a", false)}
-	targets := map[string]*driveTarget{}
-
-	carryForwardGoingTargets(targets, owner, goingWants)
-
-	if resolveGoing(targets["chr-1"].goingVotes) {
-		t.Fatalf("expected the carried-forward vote to reflect the owner's current going=false")
+// The actual bug this guards: stepping onto a bare "going" want with no
+// direction want anywhere in the mix used to move the character anyway,
+// heading east — not because anything said "go east", but because an unset
+// heading float64 defaults to 0 and 0 degrees happens to mean east. From the
+// player's side that read as the plate itself shoving them off it the
+// instant they stepped on, no input involved.
+func TestResolveMotionGoingWithNoHeadingEverStandsStill(t *testing.T) {
+	dx, dy, moved := resolveMotion(true, 0, false, 1, 2)
+	if moved || dx != 0 || dy != 0 {
+		t.Fatalf("expected a going character with no heading ever set to stand still, got (%v, %v, %v)", dx, dy, moved)
 	}
 }
 
-func TestCarryForwardGoingTargetsSkipsCharacterAlreadyVotingThisTick(t *testing.T) {
-	owner := map[string]string{"chr-1": "want-a"}
-	// want-a says stopped, but chr-1 is standing on a *different* going want
-	// this tick (want-b, already in targets) which says going. The stale
-	// owner must not override the live vote.
-	goingWants := map[string]*mywant.Want{"want-a": goingWant("want-a", false)}
-	targets := map[string]*driveTarget{
-		"chr-1": {gearMultiplier: 1, goingVotes: []bool{true}},
+func TestResolveMotionUsesCharacterSpeedAndGear(t *testing.T) {
+	dx, dy, moved := resolveMotion(true, 0, true, 3, 5) // heading 0 = east
+	if !moved {
+		t.Fatalf("expected motion")
 	}
-
-	carryForwardGoingTargets(targets, owner, goingWants)
-
-	if !resolveGoing(targets["chr-1"].goingVotes) {
-		t.Fatalf("expected the live vote from the want currently stood on to win")
-	}
-	if len(targets["chr-1"].goingVotes) != 1 {
-		t.Fatalf("expected no extra vote appended, got %v", targets["chr-1"].goingVotes)
+	dist := dx*dx + dy*dy // heading 0 -> dy=0, so this is just dx^2
+	want := 15.0 * 15.0   // gearMultiplier(3) * speed(5) = 15 cells east
+	if dist < want-0.01 || dist > want+0.01 {
+		t.Fatalf("expected distance from gear*speed (15), got squared distance %v", dist)
 	}
 }
 
-func TestCarryForwardGoingTargetsForgetsOwnerWhoseWantIsGone(t *testing.T) {
-	owner := map[string]string{"chr-1": "want-deleted"}
-	targets := map[string]*driveTarget{}
-
-	carryForwardGoingTargets(targets, owner, map[string]*mywant.Want{})
-
-	if _, ok := targets["chr-1"]; ok {
-		t.Fatalf("expected no target for a character whose owning want no longer exists")
-	}
-	if _, ok := owner["chr-1"]; ok {
-		t.Fatalf("expected the dangling owner entry to be forgotten")
+func TestResolveMotionIsNotScaledByTickDuration(t *testing.T) {
+	// Deliberately no tickSeconds parameter at all — distance is always
+	// speed*gearMultiplier whole cells per call, regardless of how often the
+	// caller happens to invoke this. See resolveMotion's own doc for why: a
+	// cells-per-second version was tried and rejected for producing sub-cell
+	// fractional movement at fast tick rates.
+	dx, _, moved := resolveMotion(true, 0, true, 1, 4)
+	if !moved || dx != 4 {
+		t.Fatalf("expected exactly 4 whole cells east (speed*gear, no scaling), got dx=%v moved=%v", dx, moved)
 	}
 }
 
-// This is the reported regression: standing on a direction want (or gear —
-// anything that isn't itself a going want) still creates a targets entry,
-// for its own dx/dy vote, with no goingVotes of its own. Treating "has a
-// targets entry at all" as "already voting on going" skipped the carried-
-// forward vote and left that entry's goingVotes empty for the tick — which
-// resolveGoing then reads as stopped. A character that was going must keep
-// going while it's merely steering, not stop the moment it touches the
-// wheel.
-func TestCarryForwardGoingTargetsDoesNotStopACharacterOnlyVotingDirection(t *testing.T) {
-	owner := map[string]string{"chr-1": "want-a"}
-	goingWants := map[string]*mywant.Want{"want-a": goingWant("want-a", true)}
-	// What the direction branch of the want-collection loop in
-	// driveEngineTickOnce leaves behind: a target with a direction vote and
-	// no going vote at all.
-	targets := map[string]*driveTarget{
-		"chr-1": {gearMultiplier: 1, dirVectorX: 1, dirVectorY: 0, hasDirection: true},
-	}
+// The actual bug: a direction/gear want's dx/dy/value survives a restart by
+// loading back from state.yaml (see want_restart_test.go), but YAML's own
+// decoder hands an integer-looking scalar back as a Go int, not a float64 —
+// unlike a value SetCurrent wrote fresh this tick, which really is a
+// float64. A raw `.(float64)` type assertion on GetCurrent's result silently
+// fails for exactly that reloaded-from-disk case, producing a zero vector
+// even though hasDirection is (correctly) still true — which is what made a
+// character already moving along one heading keep moving along it forever,
+// since driveOneCharacterTick's `dirVectorX != 0 || dirVectorY != 0` guard
+// falls straight through to the previously persisted heading on a silent
+// zero.
+func TestDirectionVectorOfCoercesIntPersistedFromYAML(t *testing.T) {
+	w := &mywant.Want{Metadata: mywant.Metadata{ID: "dir-1", Type: "direction"}}
+	w.StateLabels = map[string]mywant.StateLabel{"dx": mywant.LabelCurrent, "dy": mywant.LabelCurrent}
+	w.SetCurrent("dx", int(-1))
+	w.SetCurrent("dy", int(0))
 
-	carryForwardGoingTargets(targets, owner, goingWants)
+	dx, dy := directionVectorOf(w)
 
-	if !resolveGoing(targets["chr-1"].goingVotes) {
-		t.Fatalf("expected the owner's going=true to be carried forward despite the existing direction vote")
-	}
-	if !targets["chr-1"].hasDirection || targets["chr-1"].dirVectorX != 1 {
-		t.Fatalf("expected the existing direction vote to survive, got %+v", targets["chr-1"])
+	if dx != -1 || dy != 0 {
+		t.Fatalf("expected (-1, 0) coerced from int, got (%v, %v)", dx, dy)
 	}
 }
 
-// This is the first half of the reported behaviour: a character that steps
-// onto a going want's tile and starts moving keeps moving at the same speed
-// after it walks off the tile, as long as nothing has since told it to stop.
-func TestResolveDriveTickKeepsMovingAfterLeavingTheGoingTile(t *testing.T) {
-	headings := map[string]float64{}
-	owner := map[string]string{}
-	goingWants := map[string]*mywant.Want{"want-a": goingWant("want-a", true)}
+func TestGearValueOfCoercesIntPersistedFromYAML(t *testing.T) {
+	w := &mywant.Want{Metadata: mywant.Metadata{ID: "gear-1", Type: "gear"}}
+	w.StateLabels = map[string]mywant.StateLabel{"value": mywant.LabelCurrent}
+	w.SetCurrent("value", int(2))
 
-	// Tick 1: standing on going want "want-a" (going=true), facing east.
-	targets := map[string]*driveTarget{
-		"chr-1": {
-			gearMultiplier: 1,
-			goingVotes:     []bool{true},
-			dirVectorX:     1,
-			dirVectorY:     0,
-			hasDirection:   true,
-		},
-	}
-	owner["chr-1"] = "want-a" // set by the want loop in driveEngineTickOnce
-	moves := resolveDriveTick(targets, headings, 1, func(string) float64 { return 2 }, 1)
-	first, ok := moves["chr-1"]
-	if !ok || first.dx <= 0 {
-		t.Fatalf("expected eastward motion on the tick it steps onto the going tile, got %v ok=%v", first, ok)
-	}
+	got := gearValueOf(w)
 
-	// Tick 2: walked off every drive-category button — no target at all this
-	// tick, exactly as the want-collection loop would leave it. Go through
-	// carryForwardGoingTargets, as the real tick does, since that's what's
-	// supposed to keep chr-1 in play.
-	targets2 := map[string]*driveTarget{}
-	carryForwardGoingTargets(targets2, owner, goingWants)
-	moves2 := resolveDriveTick(targets2, headings, 1, func(string) float64 { return 2 }, 1)
-
-	second, ok := moves2["chr-1"]
-	if !ok {
-		t.Fatalf("expected chr-1 to keep moving after walking off the going tile")
-	}
-	if second.dx != first.dx || second.dy != first.dy {
-		t.Fatalf("expected the same motion as before leaving the tile, got %v want %v", second, first)
-	}
-}
-
-func TestResolveDriveTickUsesCharacterSpeedOverBase(t *testing.T) {
-	headings := map[string]float64{}
-	targets := map[string]*driveTarget{
-		"chr-1": {gearMultiplier: 1, goingVotes: []bool{true}},
-	}
-
-	moves := resolveDriveTick(targets, headings, 1, func(string) float64 { return 5 }, 1)
-
-	m := moves["chr-1"]
-	dist := m.dx*m.dx + m.dy*m.dy // heading 0 → dy=0, so this is just dx^2
-	if dist < 24 || dist > 26 {   // expect distance ≈ 5 (speed) * 1 (gear) * 1s → dx=5, dist=25
-		t.Fatalf("expected the character's own speed (5) to be used, got squared distance %v", dist)
-	}
-}
-
-func TestResolveDriveTickStoppedProducesNoMotion(t *testing.T) {
-	headings := map[string]float64{}
-	targets := map[string]*driveTarget{
-		"chr-1": {gearMultiplier: 1, goingVotes: []bool{false}},
-	}
-
-	moves := resolveDriveTick(targets, headings, 1, func(string) float64 { return 2 }, 1)
-
-	if _, moved := moves["chr-1"]; moved {
-		t.Fatalf("expected no motion for a stopped character")
+	if got != 2 {
+		t.Fatalf("expected 2 coerced from int, got %v", got)
 	}
 }

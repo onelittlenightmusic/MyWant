@@ -30,10 +30,9 @@ var (
 	buttonOccupancyMu sync.Mutex
 	// characterOnButton remembers, for each character, the ID of the
 	// form-type:button want they were standing on as of the last position
-	// update — "" if none. Touched from both HTTP handler goroutines (ordinary
-	// movement) and the drive engine's ticker goroutine (driven movement), so
-	// it needs its own lock — unlike driveHeadings, which only the ticker ever
-	// touches.
+	// update — "" if none. Touched from both HTTP handler goroutines
+	// (ordinary movement) and each character's own "character_motion" want's
+	// goroutine (driven movement), so it needs its own lock.
 	characterOnButton = map[string]string{}
 )
 
@@ -79,30 +78,52 @@ func applyButtonOccupancy(characterID string, newX, newY float64, allWants []*my
 	}
 	if newWant != nil {
 		addCharacterToWant(newWant, characterID)
-		toggleGoingOnStep(newWant)
+		toggleGoingOnStep(newWant, characterID, allWants)
 	}
 	characterOnButton[characterID] = newWantID
 }
 
-// toggleGoingOnStep flips a "going" want's own going/stopped state the
-// instant a footstep lands on it — a pressure plate, not a switch someone
-// else has to reach into the sidebar and throw. A want that only recorded
-// who was standing there and left its toggle untouched never actually
-// started anyone: the card said STOPPED, and stayed that way, until someone
-// separately flipped it by hand.
+// toggleGoingOnStep flips the *stepping character's own* going/stopped flag
+// the instant a footstep lands on a "going" want — a pressure plate, not a
+// switch someone else has to reach into the sidebar and throw. A want that
+// only recorded who was standing there and left nobody's toggle touched
+// never actually started anyone: the card said STOPPED, and stayed that
+// way, until someone separately flipped it by hand.
+//
+// Going is the stepping character's own state (see
+// character_motion_types.go's "going" field), not this want's — this want
+// is only ever an instruction to flip it. Two different characters stepping
+// on the same going want each flip only their own flag; neither can start
+// or stop the other, which is the whole reason it lives with the character
+// and not on a want they might be sharing.
 //
 // Flips rather than always setting true so a second footstep stops what the
-// first one started — the same "step on it again to turn it off" a real
-// pressure plate or switch reads as. Stepping *off* does not touch it either
-// way: see drive_engine.go's driveGoingOwner for why leaving a going tile
-// must never read as landing on a stopped one.
-func toggleGoingOnStep(want *mywant.Want) {
+// first one started for *that character* — the same "step on it again to
+// turn it off" a real pressure plate or switch reads as. Stepping *off*
+// does not touch it either way: going, once set, stays set regardless of
+// where the character wanders next — there is no separate "keep moving
+// after leaving" mechanism to maintain any more, because there was never
+// anywhere else for it to have gone.
+func toggleGoingOnStep(want *mywant.Want, characterID string, allWants []*mywant.Want) {
 	if want.Metadata.Type != "going" {
 		return
 	}
-	current, _ := want.GetCurrent("going")
-	wasGoing, _ := current.(bool)
-	want.SetCurrent("going", !wasGoing)
+	motionWant := findWantByID(allWants, characterMotionWantName(characterID))
+	if motionWant == nil {
+		return
+	}
+	wasGoing := mywant.GetCurrent(motionWant, "going", false)
+	motionWant.SetCurrent("going", !wasGoing)
+}
+
+// findWantByID returns the want with the given ID from allWants, or nil.
+func findWantByID(allWants []*mywant.Want, id string) *mywant.Want {
+	for _, w := range allWants {
+		if w.Metadata.ID == id {
+			return w
+		}
+	}
+	return nil
 }
 
 // findButtonWantAtCell returns the form-type:button want sitting at (x, y)

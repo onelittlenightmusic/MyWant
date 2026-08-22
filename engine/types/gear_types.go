@@ -22,7 +22,14 @@ func (g *GearWant) GetLocals() *GearLocals {
 }
 
 func (g *GearWant) Initialize() {
-	g.SetCurrent("value", g.GetFloatParam("default", 1))
+	// Only on first init, not on every restart — see direction_types.go's own
+	// Initialize for the same guard and why. min/max/step are the slider's
+	// bounds, not something the webhook ever changes, so re-deriving them
+	// from params every time is harmless and keeps a spec edit to the range
+	// taking effect on restart; value is the one a player actually moves.
+	if _, ok := g.GetCurrent("value"); !ok {
+		g.SetCurrent("value", g.GetFloatParam("default", 1))
+	}
 	g.SetCurrent("min", g.GetFloatParam("min", 0))
 	g.SetCurrent("max", g.GetFloatParam("max", 5))
 	g.SetCurrent("step", g.GetFloatParam("step", 0.1))
