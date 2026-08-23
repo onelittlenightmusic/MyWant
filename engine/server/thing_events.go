@@ -67,19 +67,44 @@ type ThingEvent struct {
 type ThingEventStore struct {
 	path string
 	mu   sync.Mutex
+
+	// The parsed file, kept between reads. Every listing of things and every
+	// resolution of a thing's name asks this store a question, and each of
+	// those used to re-read and re-parse the whole timeline from disk — up to
+	// maxMemoEvents of it. On a busy board that parse was the single largest
+	// piece of the server's CPU, spent over and over on a file that changes
+	// only when somebody names something.
+	cached   []ThingEvent
+	cachedAt time.Time // mtime the cache was parsed from
+	cachedSz int64
 }
 
 func newThingEventStore() *ThingEventStore {
 	return &ThingEventStore{path: thingPath("thing-events.yaml")}
 }
 
+// load returns the timeline, parsing the file only when it has changed since
+// last time. The mtime and size are taken from a stat, which is cheap next to
+// the parse; the file is checked rather than assumed unchanged because this
+// process is not guaranteed to be the only writer.
 func (m *ThingEventStore) load() []ThingEvent {
+	st, err := os.Stat(m.path)
+	if err != nil {
+		m.cached, m.cachedAt, m.cachedSz = nil, time.Time{}, 0
+		return nil
+	}
+	if m.cached != nil && st.ModTime().Equal(m.cachedAt) && st.Size() == m.cachedSz {
+		return m.cached
+	}
+
 	bytes, err := os.ReadFile(m.path)
 	if err != nil {
 		return nil
 	}
 	var events []ThingEvent
 	_ = yaml.Unmarshal(bytes, &events)
+
+	m.cached, m.cachedAt, m.cachedSz = events, st.ModTime(), st.Size()
 	return events
 }
 
@@ -106,12 +131,22 @@ func (m *ThingEventStore) Record(ev ThingEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	events := m.load()
-	events = append(events, ev)
+	// A copy, not an append onto what load() handed back: that slice is the
+	// cache every reader is now being served from, and appending into spare
+	// capacity would edit it underneath them.
+	old := m.load()
+	events := make([]ThingEvent, 0, len(old)+1)
+	events = append(append(events, old...), ev)
 	if len(events) > maxMemoEvents {
 		events = events[len(events)-maxMemoEvents:]
 	}
-	return m.save(events)
+	if err := m.save(events); err != nil {
+		return err
+	}
+	// The file just moved; leave the cache to notice on the next stat rather
+	// than trusting an mtime we would have to read back anyway.
+	m.cached, m.cachedAt, m.cachedSz = nil, time.Time{}, 0
+	return nil
 }
 
 // All returns every event, most-recent first, capped at limit (0 = no cap).
