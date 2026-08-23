@@ -14,6 +14,8 @@ package mywant
 // what does the script get — so they live here, where both can ask them.
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -125,7 +127,35 @@ func MRSRebuildSkillArg(want *Want) {
 
 	built := tmpl
 	for k, v := range merged {
-		built = strings.ReplaceAll(built, "%{"+k+"}", fmt.Sprintf("%v", v))
+		built = strings.ReplaceAll(built, "%{"+k+"}", jsonEscapeValue(fmt.Sprintf("%v", v)))
 	}
 	want.StoreState("skill_json_arg", built)
+}
+
+// jsonEscapeValue renders a substituted value so that it cannot break the JSON
+// template it is being pasted into.
+//
+// Without this, a value carrying a double quote produced an argument the skill
+// could not parse — and a skill that cannot parse its argument answers with
+// nothing, so the state holding the quote was never replaced and every later
+// tick rebuilt the same unparseable argument. The want went silent for good,
+// and no restart could clear it because the offending value was persisted
+// state. It was reached the obvious way: a script reporting an error that
+// names something in quotes, into a template ending "last_error":"%{error}".
+//
+// Escaping is safe outside a string context too. A number or an id passes
+// through untouched, and the only values it changes are the ones that would
+// have produced invalid JSON either way.
+func jsonEscapeValue(s string) string {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // a value holding < or & is not markup here
+	if err := enc.Encode(s); err != nil {
+		return s
+	}
+	out := strings.TrimRight(buf.String(), "\n")
+	if len(out) < 2 {
+		return s
+	}
+	return out[1 : len(out)-1] // drop the quotes Encode wrapped it in
 }
