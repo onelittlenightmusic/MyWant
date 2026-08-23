@@ -4,6 +4,7 @@ import (
 	_ "embed"
 
 	"github.com/google/uuid"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,12 +17,62 @@ import (
 //go:embed datatypes.yaml
 var datatypesYAML []byte
 
-// dataTypeDefs is loaded once at init from the embedded datatypes.yaml.
+// dataTypeDefs is the data type catalog: the embedded datatypes.yaml, with the
+// user's own file laid over it.
 var dataTypeDefs map[string]DataTypeInfo
+
+// userDataTypesFile is where a deployment adds subtypes of its own.
+//
+// The embedded catalog is a deliberately short list of kinds that mean
+// something to everyone — a city, a person, a price. A want type shipped by
+// somebody else brings kinds that mean something only in its own world, and
+// until now had nowhere to say so: it could declare `subType: level` on a
+// parameter, and a value typed into that parameter WOULD be filed under
+// "levels", but the kind itself was unknown to the catalog — so it was missing
+// from every list built from it, including the one the Add Thing form offers.
+// A kind you can write and cannot choose is a kind that only half exists.
+//
+// Read at startup and never written: this is a deployment's declaration, not
+// state, and a registry that grows by itself at runtime is a registry nobody
+// ever prunes.
+const userDataTypesFile = "datatypes.yaml"
 
 func init() {
 	dataTypeDefs = make(map[string]DataTypeInfo)
 	_ = yaml.Unmarshal(datatypesYAML, &dataTypeDefs)
+	loadUserDataTypes()
+}
+
+// loadUserDataTypes merges ~/.mywant/datatypes.yaml over the embedded catalog.
+// Same shape, same keys; an entry naming a type that already exists replaces
+// it, which is how a deployment recolours a kind it disagrees with rather than
+// only adding new ones. A missing file is the ordinary case and says nothing.
+func loadUserDataTypes() {
+	path := thingPath(userDataTypesFile)
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	extra := map[string]DataTypeInfo{}
+	if err := yaml.Unmarshal(body, &extra); err != nil {
+		log.Printf("[WARN] %s: %v — ignored, using the built-in data types only", path, err)
+		return
+	}
+	for name, info := range extra {
+		if name == "" {
+			continue
+		}
+		// A subtype with no catalog key of its own is filed under its own name
+		// pluralised, which is what every built-in one does and what the write
+		// path already assumes.
+		if info.Key == "" {
+			info.Key = name + "s"
+		}
+		dataTypeDefs[name] = info
+	}
+	if len(extra) > 0 {
+		log.Printf("[thing] %d data type(s) added from %s", len(extra), path)
+	}
 }
 
 // ThingStore persists user-entered values to ~/.mywant/thing.yaml.

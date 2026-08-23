@@ -47,3 +47,19 @@ predefined:
       label: plan
       persistent: false
       initialValue: null
+    # A word over this want's tile on the canvas, shown for a few seconds
+    # whenever the value CHANGES (see useTileSpeech in the GUI). Predefined
+    # rather than declared per type, because being able to say what you just
+    # did is not a property of any one kind of want: an agent finishing, a
+    # reader coming alive, a script reporting — all of them have moments worth
+    # a sentence, and a board where only the characters can speak is a board
+    # where nothing else can tell you what happened.
+    #
+    # Not persistent: it is an utterance, not a fact about the want. Reloading
+    # a board should not make everything on it speak again.
+    - name: say
+      description: A sentence to show over this want's tile, briefly
+      type: string
+      label: current
+      persistent: false
+      initialValue: ""

@@ -106,6 +106,13 @@ func (c *Client) RestartWants(ids []string) error {
 // If nameOrID already matches a want's metadata.id, it is returned as-is.
 // Otherwise the wants list is searched for a want whose metadata.name matches.
 func (c *Client) ResolveWantID(nameOrID string) (string, error) {
+	// An id addresses its want directly. Listing first would fetch the whole
+	// board to find something the server could hand over on its own — and every
+	// command that takes a want comes through here now, so that is a board's
+	// worth of JSON per invocation. Only a name needs the search.
+	if w, err := c.GetWant(nameOrID, false); err == nil && w != nil && w.Metadata.ID != "" {
+		return w.Metadata.ID, nil
+	}
 	resp, err := c.ListWants("", nil, nil, false, false)
 	if err != nil {
 		return "", err

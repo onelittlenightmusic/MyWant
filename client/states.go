@@ -135,3 +135,13 @@ func (c *Client) SetGlobalStateKey(key string, value any) error {
 func (c *Client) DeleteGlobalStateKey(key string) error {
 	return c.Request("DELETE", fmt.Sprintf("/api/v1/global-state/%s", key), nil, nil)
 }
+
+// SetWantState writes state keys onto one want.
+//
+// The same door the GUI's card editors use (PUT /api/v1/states/{id}), and the
+// only way for anything outside a want's own agent to put a value into it. Keys
+// the want type does not declare are stored all the same — see the engine's
+// ProvidedStateFields — so a caller can say something a type never anticipated.
+func (c *Client) SetWantState(id string, updates map[string]any) error {
+	return c.Request("PUT", "/api/v1/states/"+id, updates, nil)
+}

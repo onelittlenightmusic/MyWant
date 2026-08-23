@@ -92,8 +92,37 @@ var listWantsCmd = &cobra.Command{
 	},
 }
 
+// resolveRef turns whatever the user typed into a want id.
+//
+// A want has both, and which one somebody has to hand depends on where they
+// read it: a name is what appears on a card, in a stage's instructions and in
+// anything a person wrote down, while the id is what the API deals in. Only
+// connect and disconnect accepted a name, so `mywant wants get head_tank` — the
+// form printed in skills-rpg's own hints — answered "Want not found" while the
+// want was sitting there on the board.
+//
+// Exact matches are tried first and by id, so a name that happens to look like
+// somebody else's id can never shadow it.
+func resolveRef(c *client.Client, ref string) string {
+	id, err := c.ResolveWantID(ref)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+	return id
+}
+
+// resolveRefs is the same for the commands that take a list.
+func resolveRefs(c *client.Client, refs []string) []string {
+	out := make([]string, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, resolveRef(c, r))
+	}
+	return out
+}
+
 var getWantCmd = &cobra.Command{
-	Use:               "get [id]",
+	Use:               "get [name-or-id]",
 	Aliases:           []string{"g"},
 	Short:             "Get want details",
 	Args:              cobra.ExactArgs(1),
@@ -101,7 +130,7 @@ var getWantCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
 		showHidden, _ := cmd.Flags().GetBool("hidden")
-		want, err := c.GetWant(args[0], showHidden)
+		want, err := c.GetWant(resolveRef(c, args[0]), showHidden)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 			os.Exit(1)
@@ -137,6 +166,47 @@ var getWantCmd = &cobra.Command{
 				fmt.Printf("  Description: %s\n", want.ConnectivityMetadata.Description)
 			}
 		}
+	},
+}
+
+// Speaking is a want's own act, not a decoration on the card.
+//
+// The canvas shows `say` over a tile for a few seconds whenever the value
+// changes (see useTileSpeech), so anything that can write a want's state can
+// make it talk — a script finishing, an agent noticing something, a person at a
+// prompt. Which is the point: a board where only the characters can say
+// anything is a board where nothing else can tell you what it just did.
+var sayWantCmd = &cobra.Command{
+	Use:               "say <name-or-id> <words...>",
+	Short:             "Make a want say something over its tile",
+	Args:              cobra.MinimumNArgs(2),
+	ValidArgsFunction: completeWantIDs,
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		id := resolveRef(c, args[0])
+		words := strings.Join(args[1:], " ")
+		if err := c.SetWantState(id, map[string]any{"say": words}); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s: %s\n", args[0], words)
+	},
+}
+
+// Saying the same thing twice needs the field cleared in between — the canvas
+// shows a change, not a value — so there is a way to clear it.
+var hushWantCmd = &cobra.Command{
+	Use:               "hush <name-or-id>",
+	Short:             "Clear what a want was saying",
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeWantIDs,
+	Run: func(cmd *cobra.Command, args []string) {
+		c := client.NewClient(viper.GetString("server"))
+		if err := c.SetWantState(resolveRef(c, args[0]), map[string]any{"say": ""}); err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%s: hushed\n", args[0])
 	},
 }
 
@@ -275,14 +345,14 @@ Modes:
 }
 
 var deleteWantCmd = &cobra.Command{
-	Use:               "delete [id]",
+	Use:               "delete [name-or-id]",
 	Aliases:           []string{"d"},
 	Short:             "Delete a want",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.NewClient(viper.GetString("server"))
-		err := c.DeleteWant(args[0])
+		err := c.DeleteWant(resolveRef(c, args[0]))
 		if err != nil {
 			fmt.Printf("Error deleting want: %v\n", err)
 			os.Exit(1)
@@ -294,6 +364,8 @@ var deleteWantCmd = &cobra.Command{
 func init() {
 	WantsCmd.AddCommand(listWantsCmd)
 	WantsCmd.AddCommand(getWantCmd)
+	WantsCmd.AddCommand(sayWantCmd)
+	WantsCmd.AddCommand(hushWantCmd)
 	WantsCmd.AddCommand(createWantCmd)
 	WantsCmd.AddCommand(deleteWantCmd)
 	WantsCmd.AddCommand(exportWantsCmd)
@@ -335,57 +407,57 @@ func runBatchOperation(args []string, opName string, opFunc func(*client.Client,
 }
 
 var suspendWantsCmd = &cobra.Command{
-	Use:               "suspend [id]...",
+	Use:               "suspend [name-or-id]...",
 	Aliases:           []string{"sus"},
 	Short:             "Suspend want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "suspend", (*client.Client).SuspendWants)
+		runBatchOperation(resolveRefs(client.NewClient(viper.GetString("server")), args), "suspend", (*client.Client).SuspendWants)
 	},
 }
 
 var resumeWantsCmd = &cobra.Command{
-	Use:               "resume [id]...",
+	Use:               "resume [name-or-id]...",
 	Aliases:           []string{"res"},
 	Short:             "Resume want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "resume", (*client.Client).ResumeWants)
+		runBatchOperation(resolveRefs(client.NewClient(viper.GetString("server")), args), "resume", (*client.Client).ResumeWants)
 	},
 }
 
 var stopWantsCmd = &cobra.Command{
-	Use:               "stop [id]...",
+	Use:               "stop [name-or-id]...",
 	Aliases:           []string{"st"},
 	Short:             "Stop want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "stop", (*client.Client).StopWants)
+		runBatchOperation(resolveRefs(client.NewClient(viper.GetString("server")), args), "stop", (*client.Client).StopWants)
 	},
 }
 
 var startWantsCmd = &cobra.Command{
-	Use:               "start [id]...",
+	Use:               "start [name-or-id]...",
 	Aliases:           []string{"sta"},
 	Short:             "Start want executions",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "start", (*client.Client).StartWants)
+		runBatchOperation(resolveRefs(client.NewClient(viper.GetString("server")), args), "start", (*client.Client).StartWants)
 	},
 }
 
 var restartWantsCmd = &cobra.Command{
-	Use:               "restart [id]...",
+	Use:               "restart [name-or-id]...",
 	Aliases:           []string{"rs"},
 	Short:             "Restart want executions (stop then start)",
 	Args:              cobra.MinimumNArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
-		runBatchOperation(args, "restart", (*client.Client).RestartWants)
+		runBatchOperation(resolveRefs(client.NewClient(viper.GetString("server")), args), "restart", (*client.Client).RestartWants)
 	},
 }
 
