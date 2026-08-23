@@ -10,7 +10,7 @@ wantType:
       user-control: "true"
       form-type: button
       form-style: toggle
-      type-icon: "PersonStanding"
+      type-icon: "Footprints"
       category-icon: "Car"
       category-bg-light: "linear-gradient(160deg, #a7f3d0 0%, #93c5fd 100%)"
       category-bg-dark: "linear-gradient(160deg, #065f46 0%, #1e3a8a 100%)"
