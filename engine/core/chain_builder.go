@@ -34,7 +34,20 @@ const (
 	// GlobalExecutionInterval defines the sleep interval between want progression loop cycles.
 	// This throttles how often Progress() is called per want goroutine.
 	// ThinkAgent/MonitorAgent/PollAgent have their own internal timers and are unaffected.
-	GlobalExecutionInterval = 20 * time.Millisecond
+	//
+	// It was 20ms, which is fifty cycles a second for every want that has not
+	// finished. A board of eighty live wants therefore ran four thousand
+	// progress cycles a second, and a CPU profile of an idle server spent
+	// roughly six samples in ten inside pthread_cond_wait, kevent and usleep —
+	// waking goroutines up and putting them back to sleep, rather than in any
+	// want's own work. At 100ms that traffic is a fifth of what it was.
+	//
+	// The wants this paces are not waiting on it for their own timing: an MRS
+	// monitor polls on skill_poll_interval_ms (seconds, typically), and
+	// ThinkAgent/MonitorAgent/PollAgent keep their own timers. What the loop
+	// does between those is bookkeeping, and it does not need to happen fifty
+	// times a second.
+	GlobalExecutionInterval = 100 * time.Millisecond
 
 	// GlobalReconcileInterval defines the frequency of reconcile loop operations (file change detection, config reloading, etc.)
 	GlobalReconcileInterval = 100 * time.Millisecond

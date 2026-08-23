@@ -238,6 +238,19 @@ type Want struct {
 	inExecCycle              bool
 	governanceViolationCount int // incremented on each state access policy violation (label mismatch or role/label governance denial)
 
+	// stateRevision counts the times this want's state actually changed —
+	// bumped by StoreState on the path where a write got past the equality
+	// check, so it moves when a value moves and not when one is merely
+	// rewritten. It is how a cycle can ask "is anything I derived from this
+	// still current?" without re-deriving it to find out.
+	stateRevision atomic.Uint64
+	// derivedAtRevision is the revision the fetchFrom fields were last expanded
+	// at. Equal revisions mean nothing has moved since, so the expansion — one
+	// JSON-path extraction and one comparison per declared field, of which a
+	// door type has eighteen — can be skipped whole.
+	derivedAtRevision uint64
+	derivedOnce       bool
+
 	// Agent system
 	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`
 	runningAgents   map[string]context.CancelFunc `json:"-" yaml:"-"`
@@ -634,7 +647,19 @@ func (n *Want) EndProgressCycle() {
 	// up-to-date when FinalResultField reads them in the same cycle.
 	// (e.g. mrs_raw_output written by agent → fetchFrom populates smartgolf_all_available_times
 	//  → FinalResultField reads smartgolf_all_available_times for final_result)
-	if defs := n.fetchFromStateDefs(); len(defs) > 0 {
+	// Nothing derived from this want's state can have moved unless the state
+	// moved, so the expansion below is skipped whole while the revision stands
+	// still. A monitor want re-reads its source and re-derives every declared
+	// field on every cycle, and in a settled system every one of those ends in
+	// "same as before" — the comparison inside StoreState was catching them one
+	// at a time, which is the right answer arrived at eighteen times over.
+	//
+	// The revision moves on ANY real change to this want, not just the source
+	// field, which is deliberately blunt: a value put in from outside — the GUI
+	// editing a derived field — bumps it too, and the next cycle re-derives and
+	// puts the field back, exactly as it did before this skip existed.
+	rev := n.stateRevision.Load()
+	if defs := n.fetchFromStateDefs(); len(defs) > 0 && (!n.derivedOnce || rev != n.derivedAtRevision) {
 		for _, sd := range defs {
 			// Read fetchFrom source from the flat state map (not label-gated) so that
 			// transiently written fields like mrs_raw_output (written via StoreState by
@@ -651,6 +676,10 @@ func (n *Want) EndProgressCycle() {
 				n.storeState(sd.Name, val)
 			}
 		}
+		// Read again rather than reusing rev: the expansion may itself have
+		// changed something, and that is a change already accounted for.
+		n.derivedAtRevision = n.stateRevision.Load()
+		n.derivedOnce = true
 	}
 
 	// User-defined computed fields (GUI-authored, stored in a label). Runs here,
@@ -989,7 +1018,52 @@ func (n *Want) valuesEqual(val1, val2 any) bool {
 		return false
 	}
 
-	// Try direct comparison first (works for strings, numbers, booleans)
+	// Same primitive type on both sides — a string, a number, a flag — which is
+	// nearly every state value there is. Comparing those directly avoids
+	// formatting both sides into two throwaway strings, which this did for
+	// every field of every want on every progress cycle and which showed up as
+	// one of the larger pieces of the server's CPU.
+	//
+	// Anything else still falls through to the printed form below, so a value
+	// that arrived as a float and a value that arrived as an int go on
+	// comparing equal the way they always have.
+	switch a := val1.(type) {
+	case string:
+		if b, ok := val2.(string); ok {
+			return a == b
+		}
+	case bool:
+		if b, ok := val2.(bool); ok {
+			return a == b
+		}
+	case int:
+		if b, ok := val2.(int); ok {
+			return a == b
+		}
+	case int64:
+		if b, ok := val2.(int64); ok {
+			return a == b
+		}
+	case float64:
+		if b, ok := val2.(float64); ok {
+			return a == b
+		}
+	}
+
+	// Composite values — a skill's raw output map, a list of checks — reach
+	// here, and printing those twice is the expensive case rather than the
+	// cheap one. Anything DeepEqual calls equal would print the same, so a
+	// match here is the same answer arrived at without building two strings,
+	// and in a settled system almost every comparison is a match: this runs
+	// because a want stored the value it already had.
+	//
+	// A mismatch still falls through, because DeepEqual is the stricter test —
+	// it separates an int from the float that prints identically, and that
+	// leniency is the behaviour the printed comparison was chosen for.
+	if reflect.DeepEqual(val1, val2) {
+		return true
+	}
+
 	return fmt.Sprintf("%v", val1) == fmt.Sprintf("%v", val2)
 }
 
@@ -1077,7 +1151,8 @@ func (n *Want) StoreState(key string, value any) {
 	n.State.Store(key, value)
 	n.stateTimestamps.Store(key, now)
 	n.getHistoryManager().AddStateEntry(key, value)
-	bumpStateEpoch() // this is the only path by which state actually changes
+	n.stateRevision.Add(1) // per want, for skipping work derived from this state
+	bumpStateEpoch()       // this is the only path by which state actually changes
 
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
