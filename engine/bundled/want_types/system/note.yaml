@@ -9,6 +9,8 @@ wantType:
     labels:
       user-control: "true"
       type-icon: StickyNote
+      form-type: button
+      form-style: book
   parameters:
   - name: content
     description: Note text content
@@ -22,6 +24,11 @@ wantType:
     label: current
     persistent: true
     initialValue: ''
+  - name: characters
+    description: Character IDs currently standing on this want's tile (kept in sync by footsteps — see button_occupancy.go)
+    type: array
+    label: current
+    persistent: true
   examples:
   - title: Empty note
     description: A blank sticky note to type into on the dashboard
