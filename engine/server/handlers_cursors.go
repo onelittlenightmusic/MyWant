@@ -336,6 +336,10 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Built before the lock — it walks every want — so the check and the write
+	// below stay atomic with respect to each other.
+	blocked := s.blockedCellSnapshot()
+
 	cursorsMu.Lock()
 	if body.Seq > 0 && body.Seq <= cursorSeq[characterID] {
 		// A later PUT from the same client already landed and applied —
@@ -350,6 +354,21 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		cursorSeq[characterID] = body.Seq
 	}
 	prev := cursors[characterID]
+
+	// Where they asked to be, verified. A PUT is an arrival, not a walk —
+	// the browser already refuses to *step* into a wall (WantCanvas keeps its
+	// own wall set so a keypress can be answered in the same frame), and a
+	// warp deliberately does not visit the cells it crosses. So the
+	// destination is what's checked here, not the path: landing inside a wall
+	// is impossible by any route, while a teleport over one still works.
+	//
+	// Blocked keeps them where they were rather than rejecting the request,
+	// because a position update is not all this carries: the same PUT may be
+	// delivering a message or an effect, and dropping those over a rejected
+	// step would lose somebody's words.
+	var moveStopped bool
+	body.X, body.Y, moveStopped = resolveMove(blocked, prev.X, prev.Y, body.X, body.Y, false)
+
 	// Somebody who says something without stamping it said it now.
 	//
 	// The test below is "does this carry a messageAt we have not seen", which
@@ -397,6 +416,17 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// the snapshot. effectType may be comma-separated (several effects fired by
 	// one press).
 	effects := appendNoop(prev.Effects)
+	// A step the server had to refuse. The browser plays its own knock for
+	// the walls it knows about, and declines to send the PUT at all in that
+	// case — so one arriving here means the client thought the cell was free
+	// and made no sound. Raising it keeps "blocked means a noise" true no
+	// matter which side caught it, without ever doubling up. See
+	// bumpEffectType.
+	if moveStopped {
+		effects = appendEffect(effects, effectEvent{
+			Type: bumpEffectType, Nonce: time.Now().UnixMilli(), X: body.X, Y: body.Y,
+		})
+	}
 	if body.EffectType != "" {
 		nonce := body.EffectNonce
 		if nonce == 0 {

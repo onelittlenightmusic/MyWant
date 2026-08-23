@@ -232,10 +232,29 @@ func moveDrivenCharacter(s *Server, characterID string, dx, dy float64) (newX, n
 		return 0, 0
 	}
 
+	// Built before the lock — it walks every want — so the check and the write
+	// below stay atomic with respect to each other.
+	blocked := s.blockedCellSnapshot()
+
 	cursorsMu.Lock()
 	entry := cursors[characterID]
-	entry.X += dx
-	entry.Y += dy
+	// This is walking, so the whole segment is verified, not just where it
+	// lands: a gear-multiplied push covers several cells in one tick and
+	// would otherwise step clean over a wall instead of into it. Being
+	// stopped is not an error — a character held against a wall simply does
+	// not advance this tick, and keeps trying on the next one.
+	var stopped bool
+	entry.X, entry.Y, stopped = resolveMove(blocked, entry.X, entry.Y, entry.X+dx, entry.Y+dy, true)
+	// Walking into something solid makes a noise, and this is the one path
+	// where the browser never gets the chance to make it itself — nothing
+	// here started in a keypress. See bumpEffectType.
+	if stopped {
+		entry.Effects = appendEffect(entry.Effects, effectEvent{
+			Type: bumpEffectType, Nonce: time.Now().UnixMilli(), X: entry.X, Y: entry.Y,
+		})
+	} else {
+		entry.Effects = appendNoop(entry.Effects)
+	}
 	entry.Avatar = character.Avatar
 	entry.Color = character.Color
 	entry.Name = character.Name
