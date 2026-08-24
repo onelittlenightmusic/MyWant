@@ -341,16 +341,19 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	blocked := s.blockedCellSnapshot()
 
 	cursorsMu.Lock()
-	if body.Seq > 0 && body.Seq <= cursorSeq[characterID] {
-		// A later PUT from the same client already landed and applied —
-		// this one represents a position the client itself has already
-		// moved past. Nothing in it (position or metadata) is more current
-		// than what's already there; apply none of it.
-		cursorsMu.Unlock()
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-	if body.Seq > 0 {
+	// A later PUT from the same client already landed — this one carries a
+	// position the client has moved past.
+	//
+	// Only the POSITION is stale, though. This used to answer 204 and apply
+	// none of the request, on the grounds that nothing in it could be more
+	// current than what was already there. That is true of the move PUTs the
+	// check was written for, each of which is a whole snapshot; it is not true
+	// of a message or an effect, which are events rather than state. Those have
+	// never been said before whatever their seq, and dropping them loses
+	// somebody's words for no better reason than that they spoke while walking
+	// — the same reason a refused step goes on to deliver its message below.
+	stalePos := body.Seq > 0 && body.Seq <= cursorSeq[characterID]
+	if body.Seq > 0 && !stalePos {
 		cursorSeq[characterID] = body.Seq
 	}
 	prev := cursors[characterID]
@@ -367,7 +370,13 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// delivering a message or an effect, and dropping those over a rejected
 	// step would lose somebody's words.
 	var moveStopped bool
-	body.X, body.Y, moveStopped = resolveMove(blocked, prev.X, prev.Y, body.X, body.Y, false)
+	if stalePos {
+		// Stay where the newer PUT put them, and carry on with what else this
+		// one brought.
+		body.X, body.Y = prev.X, prev.Y
+	} else {
+		body.X, body.Y, moveStopped = resolveMove(blocked, prev.X, prev.Y, body.X, body.Y, false)
+	}
 
 	// Somebody who says something without stamping it said it now.
 	//

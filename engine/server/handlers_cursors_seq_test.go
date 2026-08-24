@@ -94,3 +94,40 @@ func TestUpdateCursorIgnoresOrderingWithoutSeq(t *testing.T) {
 		t.Fatalf("expected the second no-seq PUT to apply normally, got x=%v", got.X)
 	}
 }
+
+// A PUT whose position lost the race still delivers what else it carries.
+//
+// The stale-seq check used to answer 204 and apply none of the request. That is
+// right for a position — a newer one has already landed — but a message is an
+// event, not state: it has never been said before, whatever seq it arrived
+// under. So speaking while walking could silently swallow the words, which is
+// the same loss the blocked-move path takes care to avoid.
+func TestStaleSeqStillDeliversItsMessage(t *testing.T) {
+	resetCursorState()
+	s := &Server{}
+
+	putCursorSeq(t, s, "chr", 5, 5, 10)
+
+	// Sent before that one, delivered after it, and carrying a remark.
+	body, _ := json.Marshal(map[string]any{
+		"x": 1, "y": 1, "seq": 9, "message": "wait for me", "messageAt": 1234,
+	})
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/cursors/chr", bytes.NewReader(body))
+	req = mux.SetURLVars(req, map[string]string{"characterId": "chr"})
+	w := httptest.NewRecorder()
+	s.updateCursor(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+
+	cursorsMu.RLock()
+	got := cursors["chr"]
+	cursorsMu.RUnlock()
+
+	if got.X != 5 || got.Y != 5 {
+		t.Errorf("position moved back to (%v,%v); the newer PUT's (5,5) should stand", got.X, got.Y)
+	}
+	if got.Message != "wait for me" {
+		t.Errorf("message = %q, want it delivered despite the stale position", got.Message)
+	}
+}

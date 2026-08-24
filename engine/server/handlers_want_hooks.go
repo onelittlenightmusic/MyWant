@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 
 	mywant "mywant/engine/core"
@@ -428,19 +429,65 @@ func spiralFreeCell(cx, cy, minRadius int, isFree func(x, y int) bool) (int, int
 		return cx, cy, true
 	}
 	for radius := max(minRadius, 1); radius <= 100; radius++ {
-		for dx := -radius; dx <= radius; dx++ {
-			for dy := -radius; dy <= radius; dy++ {
-				// Ring, not disc: the interior was covered by earlier radii.
-				if absInt(dx) != radius && absInt(dy) != radius {
-					continue
-				}
-				if isFree(cx+dx, cy+dy) {
-					return cx + dx, cy + dy, true
-				}
+		for _, d := range ringCells(radius) {
+			if isFree(cx+d.dx, cy+d.dy) {
+				return cx + d.dx, cy + d.dy, true
 			}
 		}
 	}
 	return 0, 0, false
+}
+
+type ringOffset struct{ dx, dy int }
+
+// ringCells is one Chebyshev ring, in the order a person would look.
+//
+// The ring used to be walked as two nested loops from -radius, which made the
+// first cell tried the top-left DIAGONAL every time. So a want asked for a cell
+// somebody was already standing on did not arrive beside them, it arrived up
+// and to the left — reliably, since the loop order never varied — and from the
+// board that read as the tile landing in the wrong place by (-1, -1) rather
+// than as a free cell being chosen.
+//
+// Two things decide the order instead. Orthogonal neighbours come before
+// diagonal ones, because "next to" means sharing an edge before it means
+// sharing a corner — that is Manhattan distance, which separates the two within
+// a ring the Chebyshev radius treats as equal. Then it goes clockwise from due
+// east, so the first answer is the cell to the right, where a reader of a
+// left-to-right board looks for the next thing.
+func ringCells(radius int) []ringOffset {
+	out := make([]ringOffset, 0, 8*radius)
+	for dx := -radius; dx <= radius; dx++ {
+		for dy := -radius; dy <= radius; dy++ {
+			// Ring, not disc: the interior was covered by earlier radii.
+			if absInt(dx) != radius && absInt(dy) != radius {
+				continue
+			}
+			out = append(out, ringOffset{dx, dy})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		mi := absInt(out[i].dx) + absInt(out[i].dy)
+		mj := absInt(out[j].dx) + absInt(out[j].dy)
+		if mi != mj {
+			return mi < mj
+		}
+		return ringAngle(out[i]) < ringAngle(out[j])
+	})
+	return out
+}
+
+// ringAngle is the compass bearing of an offset, clockwise from due east.
+//
+// Canvas rows count downward, so atan2 taken with y as-is already turns
+// clockwise on screen; shifting into [0, 2π) puts east at the start rather than
+// on the wrap.
+func ringAngle(d ringOffset) float64 {
+	a := math.Atan2(float64(d.dy), float64(d.dx))
+	if a < 0 {
+		a += 2 * math.Pi
+	}
+	return a
 }
 
 func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatch []*mywant.Want) error {

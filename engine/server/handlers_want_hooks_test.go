@@ -49,3 +49,41 @@ func hookRun(t *testing.T, w *mywant.Want) error {
 	t.Helper()
 	return (&CanvasTileSizeHook{}).Run(w, nil, nil)
 }
+
+// A want asked for an occupied cell should arrive BESIDE it, and "beside"
+// should mean the cell a person would look at first.
+//
+// The ring used to be walked from -radius in both axes, so the answer was
+// always the top-left diagonal: on the board a new tile appeared one cell up
+// and one cell left of the character every time, which read as a placement bug
+// rather than as a free cell being picked.
+func TestSpiralPrefersTheCellToTheRight(t *testing.T) {
+	// Only the centre is taken.
+	free := func(x, y int) bool { return !(x == 5 && y == 5) }
+
+	x, y, ok := spiralFreeCell(5, 5, 0, free)
+	if !ok {
+		t.Fatal("no free cell found")
+	}
+	if x != 6 || y != 5 {
+		t.Fatalf("crowded out of (5,5): got (%d,%d), want the cell to the right (6,5)", x, y)
+	}
+}
+
+// Every orthogonal neighbour comes before any diagonal one: sharing an edge is
+// nearer than sharing a corner, however the Chebyshev radius counts it.
+func TestRingCellsPutEdgesBeforeCorners(t *testing.T) {
+	ring := ringCells(1)
+	if len(ring) != 8 {
+		t.Fatalf("ring of radius 1 has %d cells, want 8", len(ring))
+	}
+	want := []ringOffset{
+		{1, 0}, {0, 1}, {-1, 0}, {0, -1}, // east, south, west, north
+		{1, 1}, {-1, 1}, {-1, -1}, {1, -1}, // then the corners, same turn
+	}
+	for i, w := range want {
+		if ring[i] != w {
+			t.Fatalf("ring[%d] = %v, want %v (full order %v)", i, ring[i], w, ring)
+		}
+	}
+}
