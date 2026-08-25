@@ -87,3 +87,33 @@ func TestRingCellsPutEdgesBeforeCorners(t *testing.T) {
 		}
 	}
 }
+
+// A want asked for the cell you are standing on should arrive there.
+//
+// Every character carries a hidden chat want that rides at their own cell. It
+// draws nothing, but it was counted as furniture, so the cell under your feet
+// was permanently taken and anything deployed there was bumped aside — which
+// read as a rule against placing a want on yourself. There is no such rule.
+func TestHiddenWantsDoNotOccupyTheirCell(t *testing.T) {
+	hidden := &mywant.Want{}
+	hidden.Metadata.ID = "chat-chr-1"
+	hidden.SetLabel(canvasLabelX, "4")
+	hidden.SetLabel(canvasLabelY, "7")
+	hidden.SetLabel(canvasLabelHidden, "true")
+
+	occupied := map[[2]int]bool{}
+	markWantOccupied(hidden, occupied)
+	if occupied[[2]int{4, 7}] {
+		t.Fatal("a hidden want claimed its cell; nothing is drawn there")
+	}
+
+	// And a visible one still does.
+	visible := &mywant.Want{}
+	visible.Metadata.ID = "gate"
+	visible.SetLabel(canvasLabelX, "4")
+	visible.SetLabel(canvasLabelY, "7")
+	markWantOccupied(visible, occupied)
+	if !occupied[[2]int{4, 7}] {
+		t.Fatal("a visible want failed to claim its cell")
+	}
+}

@@ -152,6 +152,8 @@ const (
 	canvasLabelY        = "mywant.io/canvas-y"
 	canvasLabelRotation = "mywant.io/canvas-rotation"
 	canvasLabelLength   = "mywant.io/canvas-length"
+	// canvasLabelHidden marks a want that has a cell but is not drawn in it.
+	canvasLabelHidden = "mywant.io/canvas-hidden"
 )
 
 // CanvasTileSizeHook sets default canvas-rotation (0) and canvas-length (0, a
@@ -204,6 +206,18 @@ func markWantOccupied(w *mywant.Want, occupied map[[2]int]bool) {
 	// One snapshot under the read lock: reading label-by-label would let a
 	// concurrent move land between the x and y reads.
 	labels := w.GetLabels()
+	// A cell is taken by something you can see standing in it. A hidden want
+	// has coordinates for its own bookkeeping and draws nothing, so treating it
+	// as furniture pushed real tiles out of the way for no visible reason.
+	//
+	// Every character carries one: a chat want, hidden, that rides along at
+	// whatever cell they are standing on. So the cell under your own feet was
+	// permanently occupied by an invisible tile, and a want deployed where you
+	// stand always arrived somewhere else — which looked like the board
+	// refusing to put anything under you, and was never a rule anybody wrote.
+	if labels[canvasLabelHidden] == "true" {
+		return
+	}
 	rx, errX := strconv.Atoi(labels[canvasLabelX])
 	ry, errY := strconv.Atoi(labels[canvasLabelY])
 	if errX != nil || errY != nil {
