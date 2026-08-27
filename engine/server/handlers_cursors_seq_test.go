@@ -30,7 +30,23 @@ func resetCursorState() {
 	cursorsMu.Lock()
 	cursors = map[string]cursorEntry{}
 	cursorSeq = map[string]int64{}
+	cursorHolder = map[string]string{}
+	deviceLastPos = map[string]map[string]struct{ X, Y float64 }{}
 	cursorsMu.Unlock()
+}
+
+// putCursorFrom is putCursorSeq with a device attached — for the rules about
+// which of a character's devices gets to say where it is.
+func putCursorFrom(t *testing.T, s *Server, characterID, deviceID string, x, y float64, seq int64) {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"x": x, "y": y, "seq": seq, "deviceId": deviceID})
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/cursors/"+characterID, bytes.NewReader(body))
+	req = mux.SetURLVars(req, map[string]string{"characterId": characterID})
+	w := httptest.NewRecorder()
+	s.updateCursor(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT %s seq=%d: expected 204, got %d: %s", deviceID, seq, w.Code, w.Body.String())
+	}
 }
 
 // This is the actual bug: a client's own rapid-fire position PUTs can reach

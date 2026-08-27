@@ -259,6 +259,12 @@ func moveDrivenCharacter(s *Server, characterID string, dx, dy float64) (newX, n
 	entry.Color = character.Color
 	entry.Name = character.Name
 	entry.LastSeen = time.Now().UnixMilli()
+	// Stamped as the server's own, so the browser whose character this is
+	// applies it. Its own-cursor sync drops any position carrying a seq it has
+	// already sent — which every client-authored position does — and this is
+	// the one kind of move that is genuinely news to the player: nobody
+	// pressed anything for it. See cursorEntry.Seq.
+	entry.Seq = serverAuthoredSeq(characterID)
 	cursors[characterID] = entry
 	newX, newY = entry.X, entry.Y
 	cursorsMu.Unlock()

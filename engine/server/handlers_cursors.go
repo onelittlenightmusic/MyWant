@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -68,7 +70,29 @@ func splitEffectTypes(s string) []string {
 }
 
 type cursorEntry struct {
-	DeviceID    string        `json:"deviceId,omitempty"`
+	DeviceID string `json:"deviceId,omitempty"`
+	// Seq is the sequence number of the write that put the character HERE,
+	// echoed back on every broadcast so a client can recognise its own work
+	// coming back to it.
+	//
+	// A cursor broadcast is not news to whoever caused it: it carries a
+	// position that client already has, or one it has since moved on from.
+	// Applying it anyway is what made a character pace between two cells on a
+	// slow link — every step the browser took was contradicted a moment later
+	// by the echo of the step before it, which was still in flight when the
+	// step was taken. Locally the echo comes back inside a frame and there is
+	// nothing to see; over a phone's network it is two or three steps behind.
+	//
+	// A client ignores a broadcast whose seq it has already sent (see
+	// useOwnCursorSync). That works across clients too, because cursorSeq is
+	// one high-water mark per character shared by every writer, not a counter
+	// per client — a seq this client has sent is by definition not news from
+	// anybody else either.
+	//
+	// A move the SERVER made (the drive engine, a summons) is stamped one past
+	// that mark, so it is news to every client including the one whose
+	// character it is — which is the whole reason the own-cursor sync exists.
+	Seq         int64         `json:"seq,omitempty"`
 	X           float64       `json:"x"`
 	Y           float64       `json:"y"`
 	Avatar      string        `json:"avatar,omitempty"`
@@ -114,7 +138,35 @@ var (
 	// asking it of the pruned map put wants in the corner of the world whenever
 	// the browser's last publish had just aged out.
 	lastCursorPos = map[string]cursorEntry{} // characterId → last known position
+
+	// Which device is currently driving each character, and where each device
+	// last said that character was.
+	//
+	// Two devices signed in as the same character both publish for it — a phone
+	// in a hand, and a laptop left open on the same board. Each sends a
+	// keepalive every few seconds carrying the position IT believes in, and
+	// each one's keepalive undoes the other's movement: the character paces
+	// between two cells, and neither person is doing anything wrong.
+	//
+	// So one device is preferred, and a device that is not it does not get to
+	// say where the character is. Moving the character is what makes a device
+	// the preferred one — pick up the phone and walk, and the phone holds it
+	// from that step on, while the laptop's keepalives go on proving it is
+	// alive and stop overruling where the character stands.
+	//
+	// Chosen by playing rather than by configuration, because that is the
+	// question actually being asked: not "which of my devices is the important
+	// one" but "which one is being used right now".
+	cursorHolder  = map[string]string{}                            // characterId → deviceId
+	deviceLastPos = map[string]map[string]struct{ X, Y float64 }{} // characterId → deviceId → last published
 )
+
+// serverAuthoredSeq stamps a position the server itself chose so every client
+// applies it — one past the high-water mark, without raising it, so the next
+// client PUT is still accepted. Callers must hold cursorsMu.
+func serverAuthoredSeq(characterID string) int64 {
+	return cursorSeq[characterID] + 1
+}
 
 // Per-character canvas position, as written into gui_state by the canvas Call
 // action and by `mywant-gui i take`. Read by character_want_bridge.go.
@@ -166,8 +218,12 @@ func hasLiveCursor(characterID string) bool {
 
 // cursorResponse is returned by GET /api/v1/cursors.
 type cursorResponse struct {
-	CharacterID string        `json:"characterId"`
-	DeviceID    string        `json:"deviceId,omitempty"`
+	CharacterID string `json:"characterId"`
+	DeviceID    string `json:"deviceId,omitempty"`
+	// Which write put them here — see cursorEntry.Seq. Carried out to the
+	// client because that is the whole point of recording it: a browser
+	// recognising its own echo and declining to be moved by it.
+	Seq         int64         `json:"seq,omitempty"`
 	X           float64       `json:"x"`
 	Y           float64       `json:"y"`
 	Avatar      string        `json:"avatar,omitempty"`
@@ -216,6 +272,7 @@ func snapshotCursors() []cursorResponse {
 			Live:        true,
 			CharacterID: charID,
 			DeviceID:    e.DeviceID,
+			Seq:         e.Seq,
 			X:           e.X,
 			Y:           e.Y,
 			Avatar:      e.Avatar,
@@ -238,12 +295,15 @@ func snapshotCursors() []cursorResponse {
 		}
 		result = append(result, cursorResponse{
 			CharacterID: charID,
-			X:           e.X,
-			Y:           e.Y,
-			Avatar:      e.Avatar,
-			Color:       e.Color,
-			Name:        e.Name,
-			LastSeen:    e.LastSeen,
+			// Carried here too: a remembered position this tab itself last
+			// published is no more news than a live one would be.
+			Seq:      e.Seq,
+			X:        e.X,
+			Y:        e.Y,
+			Avatar:   e.Avatar,
+			Color:    e.Color,
+			Name:     e.Name,
+			LastSeen: e.LastSeen,
 		})
 	}
 	cursorsMu.RUnlock()
@@ -358,6 +418,30 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	}
 	prev := cursors[characterID]
 
+	// A device that is not moving the character does not get to place it.
+	//
+	// This is what tells a step from a keepalive without the client having to
+	// label them: a step carries a position that device has not sent before, a
+	// keepalive carries the one it sent last. Only a step takes the wheel — see
+	// cursorHolder. A caller with no device id (the CLI, a test) is taken at
+	// its word, having no history to be judged against.
+	if body.DeviceID != "" && !stalePos {
+		byDevice := deviceLastPos[characterID]
+		if byDevice == nil {
+			byDevice = map[string]struct{ X, Y float64 }{}
+			deviceLastPos[characterID] = byDevice
+		}
+		was, seen := byDevice[body.DeviceID]
+		byDevice[body.DeviceID] = struct{ X, Y float64 }{body.X, body.Y}
+		if !seen || was.X != body.X || was.Y != body.Y {
+			cursorHolder[characterID] = body.DeviceID
+		} else if holder, held := cursorHolder[characterID]; held && holder != body.DeviceID {
+			// Somebody else is playing this character. Say you are alive, and
+			// let them say where you are.
+			stalePos = true
+		}
+	}
+
 	// Where they asked to be, verified. A PUT is an arrival, not a walk —
 	// the browser already refuses to *step* into a wall (WantCanvas keeps its
 	// own wall set so a keypress can be answered in the same frame), and a
@@ -446,8 +530,17 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The seq that owns the position: this PUT's when it placed the character,
+	// the previous one's when it did not (a stale or overruled PUT changes
+	// nothing about where they are, so it must not claim to).
+	posSeq := body.Seq
+	if stalePos {
+		posSeq = prev.Seq
+	}
+
 	cursors[characterID] = cursorEntry{
 		DeviceID:    body.DeviceID,
+		Seq:         posSeq,
 		X:           body.X,
 		Y:           body.Y,
 		Avatar:      body.Avatar,
@@ -520,8 +613,53 @@ func (s *Server) deleteCursor(w http.ResponseWriter, r *http.Request) {
 	characterID := mux.Vars(r)["characterId"]
 	cursorsMu.Lock()
 	delete(cursors, characterID)
+	delete(cursorHolder, characterID)
+	delete(deviceLastPos, characterID)
 	cursorsMu.Unlock()
+	// Nobody is riding somebody who has left the board.
+	s.dropRidersOf(characterID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// dropRidersOf ends every ride whose mount is this character.
+//
+// A ride is a link one character holds to another, and it is written by the
+// rider's browser. If the mount leaves — closes the tab, steps off the canvas
+// — nothing on the rider's side is told, so the link outlives the ride and sits
+// in gui_state indefinitely. It looks harmless while the mount is gone (the
+// follow finds nobody and holds position), and stops being harmless the moment
+// the mount comes back: the rider is silently yanked across the board to
+// somebody they stopped riding hours ago, and every step they take afterwards
+// is undone by the next place the mount moves to.
+//
+// So the ride ends where it actually ended: when the mount left.
+func (s *Server) dropRidersOf(mountCharacterID string) {
+	if mountCharacterID == "" {
+		return
+	}
+	want := s.findWantByIDInAll(guiStateWantID)
+	if want == nil {
+		return
+	}
+	var ended []string
+	for key, val := range want.GetAllState() {
+		if !strings.HasPrefix(key, ridingKeyPrefix) {
+			continue
+		}
+		if fmt.Sprint(val) != mountCharacterID {
+			continue
+		}
+		ended = append(ended, key)
+	}
+	if len(ended) == 0 {
+		return
+	}
+	for _, key := range ended {
+		want.DeleteState(key)
+	}
+	log.Printf("[Cursors] %s left the board; ended %d ride(s) on them", mountCharacterID, len(ended))
+	resp := guiStateResponse{Seq: nextGUIStateSeq(), State: s.guiStateWithConfig(want)}
+	go broadcastSSE("gui_state", resp)
 }
 
 // FireCharacterEffect plays an effect on a character's cursor by bumping its
