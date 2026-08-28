@@ -151,100 +151,99 @@ func TestApplyButtonOccupancyStandingStillDoesNothing(t *testing.T) {
 	}
 }
 
-// This is the reported behaviour: stepping onto a going want must actually
-// start it, not just record that someone is standing there. Before this, a
-// going want's own going/stopped toggle only ever moved via its card's
-// webhook, so the card kept reading STOPPED — and the drive engine kept
-// reading no vote at all for it — until someone opened the sidebar and
-// flipped it by hand. Now it's the *stepping character's own*
-// "character_motion" want that gets set — see motionWantFor.
-func TestApplyButtonOccupancyStepOntoGoingWantStartsIt(t *testing.T) {
-	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5)
-	motion := motionWantFor("chr-hero", false)
-	all := []*mywant.Want{going, motion}
+// A footstep on a going want queues the instruction that flips the stepping
+// character's own flag.
+//
+// The write itself is not here any more, and deliberately: a footstep and the
+// card's toggle are one instruction with two doors, and the interpreting —
+// which action, applied to whom — belongs to the going want (see
+// engine/types/going_types.go). What this package is responsible for is
+// noticing the footstep and saying whose it was, which is what these assert.
+func queuedGoingActions(t *testing.T, w *mywant.Want) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, entry := range w.DrainState("webhook_queue") {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			t.Fatalf("queue entry is not a map: %T", entry)
+		}
+		pm, ok := m["payload"].(map[string]any)
+		if !ok {
+			t.Fatalf("queue entry has no payload map: %v", m)
+		}
+		out = append(out, pm)
+	}
+	return out
+}
 
-	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType)
-
-	if !goingOf(motion) {
-		t.Fatalf("expected stepping onto the want to set chr-hero's own going=true, got %v", goingOf(motion))
+func assertOneToggleFor(t *testing.T, w *mywant.Want, characterID string) {
+	t.Helper()
+	got := queuedGoingActions(t, w)
+	if len(got) != 1 {
+		t.Fatalf("expected exactly one queued instruction, got %d: %v", len(got), got)
+	}
+	if got[0]["action"] != "toggle" || got[0]["character_id"] != characterID {
+		t.Fatalf("expected {toggle, %s}, got %v", characterID, got[0])
 	}
 }
 
-// Leaving must not undo it — going, once set, stays set regardless of where
-// the character wanders next; it lives on their own want, not on the tile.
-func TestApplyButtonOccupancyStepOffGoingWantDoesNotStopIt(t *testing.T) {
+func TestApplyButtonOccupancyStepOntoGoingWantQueuesAToggle(t *testing.T) {
 	resetButtonOccupancy()
 	going := goingWantAt("going-1", 5, 5)
-	motion := motionWantFor("chr-hero", false)
-	all := []*mywant.Want{going, motion}
+	all := []*mywant.Want{going}
 
-	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on: starts it
+	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType)
+
+	assertOneToggleFor(t, going, "chr-hero")
+}
+
+// Leaving asks for nothing. Going, once set, stays set regardless of where the
+// character wanders next — it lives on their own want, not on the tile — so
+// stepping off must not queue a second instruction that would undo it.
+func TestApplyButtonOccupancyStepOffGoingWantQueuesNothing(t *testing.T) {
+	resetButtonOccupancy()
+	going := goingWantAt("going-1", 5, 5)
+	all := []*mywant.Want{going}
+
+	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on
 	applyButtonOccupancy("chr-hero", 9, 9, all, isGoingButtonType) // step off: nothing there
 
-	if !goingOf(motion) {
-		t.Fatalf("expected going to remain true after stepping off, got %v", goingOf(motion))
+	assertOneToggleFor(t, going, "chr-hero")
+}
+
+// A going want is a toggle, not a one-way switch — which is why a footstep
+// queues "toggle" rather than "going". Two distinct footsteps are two
+// instructions; what they resolve to is the going want's business.
+func TestApplyButtonOccupancyTwoFootstepsQueueTwoToggles(t *testing.T) {
+	resetButtonOccupancy()
+	going := goingWantAt("going-1", 5, 5)
+	all := []*mywant.Want{going}
+
+	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // on
+	applyButtonOccupancy("chr-hero", 9, 9, all, isGoingButtonType) // off elsewhere
+	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // on again
+
+	got := queuedGoingActions(t, going)
+	if len(got) != 2 {
+		t.Fatalf("expected two queued instructions, got %d: %v", len(got), got)
+	}
+	for i, pm := range got {
+		if pm["action"] != "toggle" || pm["character_id"] != "chr-hero" {
+			t.Fatalf("instruction %d: expected {toggle, chr-hero}, got %v", i, pm)
+		}
 	}
 }
 
-// This is the second half of the reported behaviour: a going want is a
-// toggle, not a one-way switch — stepping onto one that's already going
-// stops it, the same "press it again to turn it off" a real pressure plate
-// reads as.
-func TestApplyButtonOccupancyStepOntoAlreadyGoingWantStopsIt(t *testing.T) {
+// One character's footstep can only ever ask about their own flag. A second
+// character standing on the very same tile must not appear in the instruction.
+func TestApplyButtonOccupancyStepOntoGoingWantNamesOnlyTheStepper(t *testing.T) {
 	resetButtonOccupancy()
 	going := goingWantAt("going-1", 5, 5)
-	motion := motionWantFor("chr-hero", true)
-	all := []*mywant.Want{going, motion}
-
-	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType)
-
-	if goingOf(motion) {
-		t.Fatalf("expected a second footstep to toggle going to false, got %v", goingOf(motion))
-	}
-}
-
-// This is the reported bug, now fixed at its root rather than patched
-// around: going lives on each character's own "character_motion" want, so
-// one character's footstep on a shared going want can only ever flip their
-// own flag. A second, unrelated character's flag — even one who is
-// currently, physically also standing on the very same tile — must be
-// completely untouched.
-func TestApplyButtonOccupancyStepOntoGoingWantOnlyAffectsTheStepper(t *testing.T) {
-	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5)
-	stepper := motionWantFor("chr-new", false)
-	bystander := motionWantFor("chr-bystander", true) // already going, from something else entirely
-	all := []*mywant.Want{going, stepper, bystander}
+	all := []*mywant.Want{going}
 
 	applyButtonOccupancy("chr-new", 5, 5, all, isGoingButtonType)
 
-	if !goingOf(stepper) {
-		t.Fatalf("expected chr-new's own going to be set true, got %v", goingOf(stepper))
-	}
-	if !goingOf(bystander) {
-		t.Fatalf("expected chr-bystander's going to be completely untouched, got %v", goingOf(bystander))
-	}
-}
-
-// Two separate footsteps toggle twice: on, then off. A single continuous
-// step (same cell reported again) is filtered out earlier, by the
-// newWantID == prevWantID guard, and never reaches the toggle at all — this
-// exercises the pair as two genuinely distinct step-on events, e.g. stepping
-// off and back on, or off onto a neighbouring button and back.
-func TestApplyButtonOccupancyTwoFootstepsToggleOnThenOff(t *testing.T) {
-	resetButtonOccupancy()
-	going := goingWantAt("going-1", 5, 5)
-	motion := motionWantFor("chr-hero", false)
-	all := []*mywant.Want{going, motion}
-
-	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on: false -> true
-	applyButtonOccupancy("chr-hero", 9, 9, all, isGoingButtonType) // step off elsewhere
-	applyButtonOccupancy("chr-hero", 5, 5, all, isGoingButtonType) // step on again: true -> false
-
-	if goingOf(motion) {
-		t.Fatalf("expected the second distinct footstep to toggle going back to false, got %v", goingOf(motion))
-	}
+	assertOneToggleFor(t, going, "chr-new")
 }
 
 // Stepping onto a *different* form-type:button want (direction, gear — or
@@ -258,7 +257,8 @@ func TestApplyButtonOccupancyStepOntoNonGoingButtonDoesNotStartGoing(t *testing.
 
 	applyButtonOccupancy("chr-hero", 5, 5, all, isButtonType)
 
-	if goingOf(motion) {
-		t.Fatalf("a direction want should never start anyone's going")
+	if got := queuedGoingActions(t, dir); len(got) != 0 {
+		t.Fatalf("a direction want should never ask about anyone's going, got %v", got)
 	}
+	_ = motion
 }
