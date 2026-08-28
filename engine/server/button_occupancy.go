@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"sync"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -83,47 +84,30 @@ func applyButtonOccupancy(characterID string, newX, newY float64, allWants []*my
 	characterOnButton[characterID] = newWantID
 }
 
-// toggleGoingOnStep flips the *stepping character's own* going/stopped flag
-// the instant a footstep lands on a "going" want — a pressure plate, not a
-// switch someone else has to reach into the sidebar and throw. A want that
-// only recorded who was standing there and left nobody's toggle touched
-// never actually started anyone: the card said STOPPED, and stayed that
-// way, until someone separately flipped it by hand.
+// toggleGoingOnStep asks a "going" want to flip the *stepping character's own*
+// going/stopped flag the instant a footstep lands on it — a pressure plate, not
+// a switch someone else has to reach into the sidebar and throw.
 //
-// Going is the stepping character's own state (see
-// character_motion_types.go's "going" field), not this want's — this want
-// is only ever an instruction to flip it. Two different characters stepping
-// on the same going want each flip only their own flag; neither can start
-// or stop the other, which is the whole reason it lives with the character
-// and not on a want they might be sharing.
+// Asks rather than does. It used to write the character's flag here, which made
+// two implementations of one instruction: this one knew who had stepped, and
+// the webhook one in engine/types knew how to interpret an action, and neither
+// knew the other's half — so the card's toggle applied to nobody. A footstep is
+// now the same instruction the card sends, queued on the same want and carried
+// out by the same Progress (see going_types.go), and this is only the door it
+// comes in by.
 //
-// Flips rather than always setting true so a second footstep stops what the
-// first one started for *that character* — the same "step on it again to
-// turn it off" a real pressure plate or switch reads as. Stepping *off*
-// does not touch it either way: going, once set, stays set regardless of
-// where the character wanders next — there is no separate "keep moving
-// after leaving" mechanism to maintain any more, because there was never
-// anywhere else for it to have gone.
+// "toggle" rather than "going" so a second footstep stops what the first one
+// started for *that character* — the "step on it again to turn it off" a real
+// pressure plate reads as. Stepping *off* does not touch it either way: going,
+// once set, stays set regardless of where the character wanders next.
 func toggleGoingOnStep(want *mywant.Want, characterID string, allWants []*mywant.Want) {
-	if want.Metadata.Type != "going" {
+	if want.Metadata.Type != "going" || characterID == "" {
 		return
 	}
-	motionWant := findWantByID(allWants, characterMotionWantName(characterID))
-	if motionWant == nil {
-		return
-	}
-	wasGoing := mywant.GetCurrent(motionWant, "going", false)
-	motionWant.SetCurrent("going", !wasGoing)
-}
-
-// findWantByID returns the want with the given ID from allWants, or nil.
-func findWantByID(allWants []*mywant.Want, id string) *mywant.Want {
-	for _, w := range allWants {
-		if w.Metadata.ID == id {
-			return w
-		}
-	}
-	return nil
+	want.AppendState("webhook_queue", map[string]any{
+		"payload":    map[string]any{"action": "toggle", "character_id": characterID},
+		"receivedAt": time.Now().Format(time.RFC3339Nano),
+	})
 }
 
 // findButtonWantAtCell returns the form-type:button want sitting at (x, y)

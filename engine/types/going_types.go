@@ -19,8 +19,20 @@ type GoingLocals struct{}
 // the whole reason going lives with the character and not on a want they
 // might be sharing.
 //
-// A toggle event is delivered via POST /api/v1/webhooks/{id} with
-// {"action":"going"} or {"action":"stopped"}.
+// Every way of asking arrives the same way: as a webhook payload on this
+// want, drained by Progress. A footstep is one too (see button_occupancy.go),
+// so there is exactly one place that decides what a going instruction means
+// and exactly one that writes the flag — the two used to be written twice, and
+// only one of the copies knew who had asked.
+//
+//	{"action": "going"}                          every character this want targets
+//	{"action": "stopped", "character_id": "..."}  that character alone
+//	{"action": "toggle",  "character_id": "..."}  flip that character's own flag
+//
+// Queue-based (AppendState/DrainState) rather than the single-slot
+// webhook_payload other user-control wants use: footsteps are driven by
+// movement and two characters can land in the same ~100ms reconcile tick, which
+// a single overwritable slot would silently drop.
 type GoingWant struct{ Want }
 
 func (gw *GoingWant) GetLocals() *GoingLocals {
@@ -42,33 +54,74 @@ func (gw *GoingWant) Initialize() {
 			applyGoingTo(id, defaultGoing, true)
 		}
 	}
-	gw.StoreState("last_action_at", "")
 }
 
 func (gw *GoingWant) IsAchieved() bool { return false }
 
-// Progress processes a going/stopped action delivered via webhook — the
-// sidebar's own toggle, not a footstep (see button_occupancy.go's
-// toggleGoingOnStep for that path). Applies to every character this want
-// currently targets (its live `characters` list — static config or
-// footstep occupancy), same as a footstep would for whoever's on it right
-// now.
+// Progress drains every going instruction accumulated since the last tick and
+// carries each one out, in the order it arrived.
 func (gw *GoingWant) Progress() {
-	ConsumeWebhookAction(&gw.Want, "last_action_at", func(action string, _ map[string]any) bool {
-		var goingVal bool
+	for _, entry := range gw.DrainState("webhook_queue") {
+		m, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		pm, ok := m["payload"].(map[string]any)
+		if !ok {
+			continue
+		}
+		action, _ := pm["action"].(string)
+		characterID, _ := pm["character_id"].(string)
+		gw.applyGoingAction(action, characterID)
+	}
+}
+
+// applyGoingAction carries out one going instruction.
+//
+// Who it applies to is the whole of what used to differ between the two paths:
+// a footstep and a card press are both made by somebody, and name them; a
+// webhook from a script or an agent names nobody, and then the want's own
+// targets are who it meant.
+//
+// "toggle" is the pressure-plate meaning — step on it again to turn it off —
+// and is per character, read from the flag that character actually has now.
+func (gw *GoingWant) applyGoingAction(action, characterID string) {
+	targets := []string{characterID}
+	if characterID == "" {
+		targets = GetCurrent(&gw.Want, "characters", []string(nil))
+	}
+	for _, id := range targets {
+		if id == "" {
+			continue
+		}
 		switch action {
 		case "going":
-			goingVal = true
+			applyGoingTo(id, true, false)
 		case "stopped":
-			goingVal = false
-		default:
-			return false
+			applyGoingTo(id, false, false)
+		case "toggle":
+			applyGoingTo(id, !goingOf(id), false)
 		}
-		for _, id := range GetCurrent(&gw.Want, "characters", []string(nil)) {
-			applyGoingTo(id, goingVal, false)
+	}
+}
+
+// goingOf reads a character's own going flag, for the toggle case. Same want
+// applyGoingTo writes to, looked up the same way — see its doc for why the flag
+// lives on the character rather than on whichever want asked about it.
+func goingOf(characterID string) bool {
+	builder := GetGlobalChainBuilder()
+	if builder == nil || characterID == "" {
+		return false
+	}
+	name := "motion-" + characterID
+	for _, w := range builder.GetWants() {
+		if w.Metadata.ID == name {
+			v, _ := w.GetCurrent("going")
+			b, _ := v.(bool)
+			return b
 		}
-		return true
-	})
+	}
+	return false
 }
 
 // applyGoingTo sets characterID's own going/stopped flag by writing straight
