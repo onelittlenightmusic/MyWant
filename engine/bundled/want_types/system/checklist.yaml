@@ -1,0 +1,49 @@
+wantType:
+  metadata:
+    name: checklist
+    title: Checklist
+    description: A checklist to work through a set of tasks. Tick items off; mark the whole thing Done to achieve and record.
+    version: '1.0'
+    category: utility
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: ListChecks
+      # Same flush pressure-plate tile as a note, but its cover is a notepad's:
+      # it flips UP off the top edge rather than swinging open to the right.
+      form-type: button
+      form-style: notepad
+  parameters:
+  - name: items
+    description: Initial checklist lines, plain strings — each becomes an unchecked item
+    type: array
+    required: false
+    default: []
+  state:
+  - name: items
+    description: 'Checklist items: [{ id, text, done }]'
+    type: array
+    label: current
+    persistent: true
+    initialValue: []
+  - name: characters
+    description: Character IDs currently standing on this want's tile (kept in sync by footsteps — see button_occupancy.go)
+    type: array
+    label: current
+    persistent: true
+  examples:
+  - title: Empty checklist
+    description: A blank checklist to add items to on the dashboard
+    want:
+      metadata:
+        name: my-checklist
+        type: checklist
+  - title: Checklist with items
+    description: A checklist that starts with a few tasks already on it
+    want:
+      metadata:
+        name: packing
+        type: checklist
+      spec:
+        params:
+          items: ["passport", "charger", "toothbrush"]
