@@ -264,6 +264,10 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
 		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
 		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
+		// A thing's neighbours: constellation co-members and the wants naming it.
+		// Registered before "/{id}" so the literal "/relations" segment is not
+		// mistaken for part of a thing id.
+		things.HandleFunc("/{id}/relations", s.listThingRelations).Methods("GET", "OPTIONS")
 		// Registered last: "{id}" would otherwise swallow "/labels", "/events"
 		// and the rest, which are literal paths and not thing ids.
 		things.HandleFunc("/{id}", s.patchThing).Methods("PATCH", "OPTIONS")

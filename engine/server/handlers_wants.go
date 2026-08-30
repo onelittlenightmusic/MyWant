@@ -385,10 +385,28 @@ type ExposableFieldInfo struct {
 // shape on purpose: a reader that can draw one can draw the other.
 type ImportableFieldInfo = ExposableFieldInfo
 
-// enrichedCorrelationEntry mirrors want_spec.CorrelationEntry with an added RelationID.
+// enrichedCorrelationEntry mirrors want_spec.CorrelationEntry with an added
+// RelationID and a Kind that distinguishes the three sorts of connection the
+// canvas draws between the thing under attention and its neighbours:
+//
+//	"relation"      — a want↔want data dependency (import/expose/state access);
+//	                  this is the only kind want_spec.CorrelationEntry carries,
+//	                  and the default when Kind is empty.
+//	"constellation" — the target shares a constellation/<name> label with this
+//	                  want; the target may be a want or a thing.
+//	"parameter"     — this want named a thing through one of its parameters
+//	                  (`at: 国分寺`), or, on a thing's own relations list, a want
+//	                  that named this thing.
+//
+// TargetKind ("want" by default, or "thing") and TargetID say what the other
+// end is. For a want target TargetID equals WantID; for a thing target WantID
+// is empty and TargetID is the thing id "<catalog>::<value>".
 type enrichedCorrelationEntry struct {
 	RelationID string   `json:"relationID,omitempty"`
+	Kind       string   `json:"kind,omitempty"`
 	WantID     string   `json:"wantID"`
+	TargetKind string   `json:"targetKind,omitempty"`
+	TargetID   string   `json:"targetID,omitempty"`
 	Labels     []string `json:"labels"`
 	Rate       int      `json:"rate"`
 	DataType   string   `json:"dataType,omitempty"`
@@ -478,12 +496,21 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 		}
 		enrichedCorr = append(enrichedCorr, enrichedCorrelationEntry{
 			RelationID: relationID,
+			Kind:       "relation",
 			WantID:     ce.WantID,
+			TargetKind: "want",
+			TargetID:   ce.WantID,
 			Labels:     ce.Labels,
 			Rate:       ce.Rate,
 			DataType:   ce.DataType,
 		})
 	}
+	// Constellation and parameter neighbours are not want↔want data
+	// dependencies, so correlationPhase never sees them; they are derived here
+	// from the label store and the live thing usage, and carried in the same
+	// list under their own Kind.
+	enrichedCorr = append(enrichedCorr, s.constellationCorrelationEntries(want)...)
+	enrichedCorr = append(enrichedCorr, s.parameterCorrelationEntries(want)...)
 	meta := apiMetadata{Metadata: want.Metadata, Correlation: enrichedCorr}
 
 	resp := wantAPIResponse{
