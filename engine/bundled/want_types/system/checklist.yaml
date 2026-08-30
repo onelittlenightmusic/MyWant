@@ -13,6 +13,8 @@ wantType:
       # it flips UP off the top edge rather than swinging open to the right.
       form-type: button
       form-style: notepad
+      # A navy notebook cover — the surface paints the closed cover in this tone.
+      type-tone-color: "#2b3a55"
   parameters:
   - name: items
     description: Initial checklist lines, plain strings — each becomes an unchecked item
