@@ -1,0 +1,199 @@
+wantType:
+  metadata:
+    name: backup to google
+    title: Backup to Google
+    description: |
+      Every 10 minutes, dumps the identity and current state of every deployed
+      want to a single JSON file on Google Drive, overwriting it in place.
+
+      Auth is the same OAuth flow the other Google types use: set
+      google_client_id / google_client_secret, then send the browser to
+      Google's consent screen with
+
+        redirect_uri = <host>/api/v1/oauth/callback
+        state        = <this want's name>
+        access_type  = offline
+        prompt       = consent
+        scope        = https://www.googleapis.com/auth/drive.file
+
+      The callback stores the code as `oauth_code`; the first run exchanges it
+      for a refresh token and keeps it in state, and every run after refreshes
+      an access token from it.
+    version: '1.0'
+    category: utility
+    pattern: independent
+    labels:
+      user-control: 'true'
+      type-icon: DatabaseBackup
+      # A reach out to the service it writes to.
+      form-type: probe
+
+  achievedWhen:
+    field: backup_status
+    operator: '=='
+    value: done
+
+  parameters:
+    - name: google_client_id
+      description: Google OAuth client id. Falls back to GOOGLE_CLIENT_ID env var.
+      type: string
+      subType: secret
+      recordThing: false
+      required: false
+      default: ''
+
+    - name: google_client_secret
+      description: Google OAuth client secret. Falls back to GOOGLE_CLIENT_SECRET env var.
+      type: string
+      subType: secret
+      recordThing: false
+      required: false
+      default: ''
+
+    - name: drive_file_name
+      description: Name to give the backup file on Drive
+      type: string
+      required: false
+      default: 'mywant-backup.json'
+
+    - name: drive_folder_id
+      description: Drive folder id to place the file in (optional; My Drive root by default)
+      type: string
+      required: false
+      default: ''
+
+  state:
+    - name: google_client_id
+      type: string
+      subType: secret
+      recordThing: false
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: google_client_secret
+      type: string
+      subType: secret
+      recordThing: false
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: drive_file_name
+      type: string
+      persistent: false
+      label: current
+      initialValue: 'mywant-backup.json'
+
+    - name: drive_folder_id
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    # Opt-in to the OAuth callback (see handlers_oauth.go). The callback stores
+    # every query param here and the code as oauth_code.
+    - name: webhook_payload
+      description: Raw query params from the OAuth callback
+      type: object
+      persistent: true
+      label: current
+
+    - name: oauth_code
+      description: Authorization code from the OAuth callback, consumed on the first run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: oauth_redirect_uri
+      description: Redirect URI used in the consent request; the token exchange must reuse it verbatim
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    # The refresh token itself is NOT kept in state — it lives in
+    # ~/.mywant/secrets/backup_google_tokens.json (chmod 600), the same place
+    # the Spotify plugin keeps its tokens, so it never lands in state.yaml or
+    # in the Drive snapshot. This flag just says whether one is on file.
+    - name: authorized
+      description: True once a Google refresh token is on file for this want
+      type: boolean
+      persistent: true
+      label: current
+      initialValue: false
+
+    # Legacy: earlier builds stored the token here. Kept declared so the
+    # migration in agent_backup_google.go can read and then blank it.
+    - name: google_refresh_token
+      description: (deprecated — migrated to ~/.mywant/secrets on first run)
+      type: string
+      subType: secret
+      recordThing: false
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: drive_file_id
+      description: Drive file id of the backup, set on the first successful run
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: last_backup_at
+      description: RFC3339 timestamp of the last successful backup
+      type: string
+      persistent: true
+      label: current
+      exposable: true
+      initialValue: ''
+
+    - name: backup_bytes
+      description: Size of the last backup in bytes
+      type: integer
+      persistent: true
+      label: current
+      initialValue: 0
+
+    - name: backup_status
+      description: waiting_auth | done | failed
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: error
+      description: Error from the last run, empty on success
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+  onInitialize:
+    params:
+      google_client_id: google_client_id
+      google_client_secret: google_client_secret
+      drive_file_name: drive_file_name
+      drive_folder_id: drive_folder_id
+    current:
+      backup_status: ''
+      error: ''
+
+  requires:
+    - backup_google_agency
+
+  examples:
+    - title: Back up every 10 minutes
+      description: Deploy once, authorize with Google, and it keeps one JSON snapshot fresh on Drive
+      want:
+        metadata:
+          name: state-backup
+          type: backup to google
+        spec:
+          when:
+            - every: 10m
+          params:
+            google_client_id: 'YOUR_CLIENT_ID.apps.googleusercontent.com'
+            google_client_secret: 'YOUR_CLIENT_SECRET'

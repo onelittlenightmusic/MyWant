@@ -67,6 +67,16 @@ func (s *Server) receiveOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[OAUTH-CALLBACK] Stored OAuth payload for want %q (type=%s) keys=%v\n",
 		want.Metadata.Name, want.Metadata.Type, mapKeys(payload))
 
+	// Kick the want so it acts on the code now rather than on its next poll or
+	// schedule tick — the person is sitting on the "authorized" page waiting
+	// for something to happen. Best-effort: a want with nothing to re-run just
+	// re-reaches harmlessly.
+	if s.globalBuilder != nil {
+		if err := s.globalBuilder.RestartWant(want.Metadata.ID); err != nil {
+			log.Printf("[OAUTH-CALLBACK] restart %q after callback: %v\n", want.Metadata.Name, err)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprintf(w, successPage, want.Metadata.Name)
 }

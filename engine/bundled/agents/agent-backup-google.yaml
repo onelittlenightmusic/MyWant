@@ -1,0 +1,48 @@
+agents:
+  - name: agent_backup_google
+    runtime: localGo
+    type: do
+    description: Writes every deployed want's state to a single JSON file on Google Drive, overwriting it each run
+    version: '1.0'
+    capabilities:
+      - backup_google_agency
+    role: action
+    actions:
+      - name: backup_state
+        description: Snapshots all want state and uploads it to Google Drive
+        parameters:
+          google_client_id:
+            type: string
+            description: Google OAuth client id. Falls back to GOOGLE_CLIENT_ID env var.
+            required: false
+          google_client_secret:
+            type: string
+            description: Google OAuth client secret. Falls back to GOOGLE_CLIENT_SECRET env var.
+            required: false
+          drive_file_name:
+            type: string
+            description: File name to give the backup on Drive
+            default: mywant-backup.json
+          drive_folder_id:
+            type: string
+            description: Drive folder id to create the file in (optional; defaults to My Drive root)
+            required: false
+        state_updates:
+          - name: google_refresh_token
+            type: string
+            description: Refresh token, stored after the first authorization
+          - name: drive_file_id
+            type: string
+            description: Drive file id of the backup
+          - name: last_backup_at
+            type: string
+            description: RFC3339 timestamp of the last successful backup
+          - name: backup_bytes
+            type: integer
+            description: Size of the last backup in bytes
+          - name: backup_status
+            type: string
+            description: waiting_auth | done | failed
+          - name: error
+            type: string
+            description: Error from the last run

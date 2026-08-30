@@ -1,0 +1,42 @@
+capabilities:
+  - name: backup_google_agency
+    gives:
+      - backup_google_agency
+    description: Dumps every deployed want's state to a single JSON file on Google Drive, overwriting it each run
+    stateAccess:
+      - name: authorized
+        type: boolean
+        description: True once a Google refresh token is on file (the token lives in ~/.mywant/secrets, not here)
+        accessType: readUpdate
+      - name: google_refresh_token
+        type: string
+        description: Deprecated — migrated to ~/.mywant/secrets on first run
+        accessType: readUpdate
+      - name: oauth_code
+        type: string
+        description: Authorization code captured by /api/v1/oauth/callback
+        accessType: readUpdate
+      - name: oauth_redirect_uri
+        type: string
+        description: Redirect URI the consent request used; reused verbatim for the token exchange
+        accessType: readUpdate
+      - name: drive_file_id
+        type: string
+        description: Drive file id of the backup, created on the first successful run
+        accessType: readUpdate
+      - name: last_backup_at
+        type: string
+        description: RFC3339 timestamp of the last successful backup
+        accessType: readUpdate
+      - name: backup_bytes
+        type: integer
+        description: Size of the last backup in bytes
+        accessType: readUpdate
+      - name: backup_status
+        type: string
+        description: waiting_auth | done | failed
+        accessType: readUpdate
+      - name: error
+        type: string
+        description: Error from the last run, empty on success
+        accessType: readUpdate
