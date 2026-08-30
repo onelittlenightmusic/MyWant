@@ -24,6 +24,10 @@ capabilities:
         type: string
         description: Drive file id of the backup, created on the first successful run
         accessType: readUpdate
+      - name: drive_file_name
+        type: string
+        description: Resolved backup file name (per-server default filled in on the first run)
+        accessType: readUpdate
       - name: last_backup_at
         type: string
         description: RFC3339 timestamp of the last successful backup

@@ -51,10 +51,13 @@ wantType:
       default: ''
 
     - name: drive_file_name
-      description: Name to give the backup file on Drive
+      description: >-
+        Name for the backup file on Drive. Left blank it defaults to
+        mywant-backup-<server>.json (MYWANT_SERVER_ID env, or the hostname),
+        so several servers backing up to one Drive do not collide.
       type: string
       required: false
-      default: 'mywant-backup.json'
+      default: ''
 
     - name: drive_folder_id
       description: Drive folder id to place the file in (optional; My Drive root by default)
@@ -80,10 +83,11 @@ wantType:
       initialValue: ''
 
     - name: drive_file_name
+      description: The resolved backup file name — blank until the first run fills in the per-server default
       type: string
-      persistent: false
+      persistent: true
       label: current
-      initialValue: 'mywant-backup.json'
+      initialValue: ''
 
     - name: drive_folder_id
       type: string

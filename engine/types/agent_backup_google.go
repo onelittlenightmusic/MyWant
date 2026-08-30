@@ -119,7 +119,11 @@ func executeBackupToGoogle(ctx context.Context, want *Want) error {
 	}
 
 	fileID := GetCurrent(want, "drive_file_id", "")
-	fileName := firstNonEmpty(GetCurrent(want, "drive_file_name", ""), "mywant-backup.json")
+	// Default the name per server, so several mywant servers backing up to the
+	// same Drive do not all land on "mywant-backup.json". An explicit
+	// drive_file_name param still wins outright.
+	prevName := GetCurrent(want, "drive_file_name", "")
+	fileName := firstNonEmpty(GetCurrent(want, "drive_file_name", ""), defaultBackupFileName())
 	folderID := GetCurrent(want, "drive_folder_id", "")
 
 	newID, err := driveUpsertJSON(ctx, accessToken, fileID, fileName, folderID, payload)
@@ -128,6 +132,17 @@ func executeBackupToGoogle(ctx context.Context, want *Want) error {
 	}
 	if newID != fileID {
 		want.SetCurrent("drive_file_id", newID)
+	}
+	// If an existing file was uploaded to by id, its name on Drive is whatever
+	// it was created as — rename it when the resolved name has changed (a fresh
+	// per-server default, or the user editing MYWANT_SERVER_ID).
+	if fileID != "" && newID == fileID && prevName != "" && prevName != fileName {
+		if e := driveRenameFile(ctx, accessToken, fileID, fileName); e != nil {
+			want.StoreLog("[BACKUP-GOOGLE] rename to %q: %v", fileName, e)
+		}
+	}
+	if prevName != fileName {
+		want.SetCurrent("drive_file_name", fileName)
 	}
 	want.SetCurrent("last_backup_at", time.Now().Format(time.RFC3339))
 	want.SetCurrent("backup_bytes", len(payload))
@@ -354,6 +369,20 @@ func driveUpsertJSON(ctx context.Context, accessToken, fileID, fileName, folderI
 	return driveDo(req, "")
 }
 
+// driveRenameFile changes just the name metadata on an existing Drive file.
+func driveRenameFile(ctx context.Context, accessToken, fileID, name string) error {
+	body, _ := json.Marshal(map[string]any{"name": name})
+	u := fmt.Sprintf("%s/%s?fields=id", driveFilesURL, url.PathEscape(fileID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, u, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	_, err = driveDo(req, fileID)
+	return err
+}
+
 func driveDo(req *http.Request, fallbackID string) (string, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -390,4 +419,37 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n] + "…"
+}
+
+// defaultBackupFileName is "mywant-backup-<server>.json", where <server> is
+// MYWANT_SERVER_ID if set (a Fly machine, say, can give itself a clean name)
+// and otherwise the sanitised hostname.
+func defaultBackupFileName() string {
+	id := strings.TrimSpace(os.Getenv("MYWANT_SERVER_ID"))
+	if id == "" {
+		if h, err := os.Hostname(); err == nil {
+			id = h
+		}
+	}
+	id = sanitiseFileToken(id)
+	if id == "" {
+		return "mywant-backup.json"
+	}
+	return "mywant-backup-" + id + ".json"
+}
+
+func sanitiseFileToken(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_' || r == '.':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	return strings.Trim(b.String(), "-.")
 }

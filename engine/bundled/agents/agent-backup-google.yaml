@@ -21,8 +21,8 @@ agents:
             required: false
           drive_file_name:
             type: string
-            description: File name to give the backup on Drive
-            default: mywant-backup.json
+            description: File name for the backup on Drive. Blank → mywant-backup-<server>.json (per-server, no collisions).
+            default: ''
           drive_folder_id:
             type: string
             description: Drive folder id to create the file in (optional; defaults to My Drive root)
