@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	mywant "mywant/engine/core"
@@ -71,49 +72,146 @@ func (s *Server) thingUUIDByPair() map[string]string {
 	return m
 }
 
-// constellationCorrelationEntries returns one entry per (want-or-thing) member
-// of every constellation this want belongs to.
-func (s *Server) constellationCorrelationEntries(want *mywant.Want) []enrichedCorrelationEntry {
-	if want == nil {
-		return nil
+// constellationMember is one member of a constellation, either kind.
+type constellationMember struct {
+	id   string
+	kind string // "want" | "thing"
+}
+
+// constellationMemberRank is the position a member carries inside a
+// constellation — the number in the value of its membership label (see the
+// GUI's utils/thingOrder). "true", a member with no place yet, returns
+// ok=false.
+func (s *Server) constellationMemberRank(kind, name, id string) (int, bool) {
+	key, legacy := constellationKey(name), legacyConstellationKey(name)
+	var raw string
+	if kind == "want" {
+		if s.globalBuilder != nil {
+			if wnt, _, found := s.globalBuilder.FindWantByID(id); found && wnt != nil {
+				if v, ok := wnt.Metadata.Labels[key]; ok {
+					raw = v
+				} else {
+					raw = wnt.Metadata.Labels[legacy]
+				}
+			}
+		}
+	} else {
+		lbls := s.thingLabels.Get(id)
+		if v, ok := lbls[key]; ok {
+			raw = v
+		} else {
+			raw = lbls[legacy]
+		}
 	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// constellationChainNeighbors returns only the members sitting immediately
+// before and after the subject in the constellation's order — the ±1 hop. A
+// jump is meant to step along the chain, not skip down it, so anything two or
+// more places away is dropped. Members with no place in the order fall off the
+// chain once the subject has one; when the subject itself has no place there is
+// no chain to walk, so every member stays a candidate.
+func (s *Server) constellationChainNeighbors(name, subjectKind, subjectID string) []constellationMember {
+	var all []constellationMember
+	for _, m := range s.membersOfConstellation("want", name) {
+		all = append(all, constellationMember{m, "want"})
+	}
+	for _, t := range s.membersOfConstellation("thing", name) {
+		all = append(all, constellationMember{t, "thing"})
+	}
+
+	type rankedMember struct {
+		constellationMember
+		rank int
+	}
+	var ranked []rankedMember
+	for _, m := range all {
+		if r, ok := s.constellationMemberRank(m.kind, name, m.id); ok {
+			ranked = append(ranked, rankedMember{m, r})
+		}
+	}
+	sort.Slice(ranked, func(i, j int) bool {
+		if ranked[i].rank != ranked[j].rank {
+			return ranked[i].rank < ranked[j].rank
+		}
+		if ranked[i].kind != ranked[j].kind {
+			return ranked[i].kind < ranked[j].kind
+		}
+		return ranked[i].id < ranked[j].id
+	})
+
+	si := -1
+	for i, m := range ranked {
+		if m.kind == subjectKind && m.id == subjectID {
+			si = i
+			break
+		}
+	}
+	if si < 0 {
+		out := make([]constellationMember, 0, len(all))
+		for _, m := range all {
+			if m.kind == subjectKind && m.id == subjectID {
+				continue
+			}
+			out = append(out, m)
+		}
+		return out
+	}
+
+	var out []constellationMember
+	if si-1 >= 0 {
+		out = append(out, ranked[si-1].constellationMember)
+	}
+	if si+1 < len(ranked) {
+		out = append(out, ranked[si+1].constellationMember)
+	}
+	return out
+}
+
+// constellationEntriesFor emits the ±1-hop constellation neighbours of a
+// subject (a want or a thing) as correlation entries, de-duplicated via seen.
+func (s *Server) constellationEntriesFor(subjectKind, subjectID string, labels map[string]string, seen map[string]bool) []enrichedCorrelationEntry {
 	var out []enrichedCorrelationEntry
-	seen := map[string]bool{}
-	for key := range want.Metadata.Labels {
+	for key := range labels {
 		name := constellationNameFromKey(key)
 		if name == "" {
 			continue
 		}
 		label := constellationLabelPrefix + name
-		for _, m := range s.membersOfConstellation("want", name) {
-			if m == want.Metadata.ID || seen["want\x00"+m] {
+		for _, m := range s.constellationChainNeighbors(name, subjectKind, subjectID) {
+			sk := m.kind + "\x00" + m.id
+			if seen[sk] {
 				continue
 			}
-			seen["want\x00"+m] = true
-			out = append(out, enrichedCorrelationEntry{
+			seen[sk] = true
+			e := enrichedCorrelationEntry{
 				Kind:       "constellation",
-				WantID:     m,
-				TargetKind: "want",
-				TargetID:   m,
+				TargetKind: m.kind,
+				TargetID:   m.id,
 				Labels:     []string{label},
 				Rate:       constellationRelationRate,
-			})
-		}
-		for _, t := range s.membersOfConstellation("thing", name) {
-			if seen["thing\x00"+t] {
-				continue
 			}
-			seen["thing\x00"+t] = true
-			out = append(out, enrichedCorrelationEntry{
-				Kind:       "constellation",
-				TargetKind: "thing",
-				TargetID:   t,
-				Labels:     []string{label},
-				Rate:       constellationRelationRate,
-			})
+			if m.kind == "want" {
+				e.WantID = m.id
+			}
+			out = append(out, e)
 		}
 	}
 	return out
+}
+
+// constellationCorrelationEntries returns the ±1-hop constellation neighbours
+// of a want across every constellation it belongs to.
+func (s *Server) constellationCorrelationEntries(want *mywant.Want) []enrichedCorrelationEntry {
+	if want == nil {
+		return nil
+	}
+	return s.constellationEntriesFor("want", want.Metadata.ID, want.Metadata.Labels, map[string]bool{})
 }
 
 // parameterCorrelationEntries returns one entry per thing this want currently
@@ -164,43 +262,8 @@ func (s *Server) listThingRelations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var out []enrichedCorrelationEntry
 	seen := map[string]bool{}
-
-	for key := range s.thingLabels.Get(id) {
-		name := constellationNameFromKey(key)
-		if name == "" {
-			continue
-		}
-		label := constellationLabelPrefix + name
-		for _, t := range s.membersOfConstellation("thing", name) {
-			if t == id || seen["thing\x00"+t] {
-				continue
-			}
-			seen["thing\x00"+t] = true
-			out = append(out, enrichedCorrelationEntry{
-				Kind:       "constellation",
-				TargetKind: "thing",
-				TargetID:   t,
-				Labels:     []string{label},
-				Rate:       constellationRelationRate,
-			})
-		}
-		for _, m := range s.membersOfConstellation("want", name) {
-			if seen["want\x00"+m] {
-				continue
-			}
-			seen["want\x00"+m] = true
-			out = append(out, enrichedCorrelationEntry{
-				Kind:       "constellation",
-				WantID:     m,
-				TargetKind: "want",
-				TargetID:   m,
-				Labels:     []string{label},
-				Rate:       constellationRelationRate,
-			})
-		}
-	}
+	out := s.constellationEntriesFor("thing", id, s.thingLabels.Get(id), seen)
 
 	// `id` is a thing UUID; deriveThingUsage keys by the "catalog::value" pair.
 	uuidByPair := s.thingUUIDByPair()
