@@ -1,7 +1,10 @@
 package server
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/gorilla/mux"
 	mywant "mywant/engine/core"
@@ -28,6 +31,45 @@ const (
 	constellationRelationRate = 2
 	parameterRelationRate     = 1
 )
+
+// thingRelationFingerprint is a hash of everything the derived
+// parameter/constellation correlations are computed from — which live wants
+// name which things, and the constellation/colour labels on things. Mixed into
+// the /wants collection ETag so that a thing becoming named (or a constellation
+// changing) busts the client's cache: correlationPhase never touched
+// want.Metadata.Correlation for these kinds, so CalculateWantHash cannot see
+// them change on its own.
+func (s *Server) thingRelationFingerprint() string {
+	h := sha256.New()
+	for _, u := range s.deriveThingUsage() {
+		fmt.Fprintf(h, "%s|%s|%v\n", u.ID, u.Subtype, u.WantIDs)
+	}
+	all := s.thingLabels.All()
+	keys := make([]string, 0, len(all))
+	for k := range all {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(h, "L:%s=%v\n", k, all[k])
+	}
+	return fmt.Sprintf("things:%x", h.Sum(nil)[:8])
+}
+
+// thingUUIDByPair maps "<catalog>::<value>" — the key deriveThingUsage /
+// deriveThingDefinitions work in — to the thing's real id, which is a UUID and
+// is what the canvas keys tiles, placements and jump targets by. A value a want
+// names but that was never persisted as a thing has no entry here.
+func (s *Server) thingUUIDByPair() map[string]string {
+	m := make(map[string]string)
+	for _, e := range s.thingStore.Entries() {
+		if e.Value == "" {
+			continue
+		}
+		m[e.Catalog+"::"+e.Value] = e.ID
+	}
+	return m
+}
 
 // constellationCorrelationEntries returns one entry per (want-or-thing) member
 // of every constellation this want belongs to.
@@ -82,16 +124,24 @@ func (s *Server) parameterCorrelationEntries(want *mywant.Want) []enrichedCorrel
 		return nil
 	}
 	wid := want.Metadata.ID
+	uuidByPair := s.thingUUIDByPair()
 	var out []enrichedCorrelationEntry
 	for _, u := range s.deriveThingUsage() {
 		for _, id := range u.WantIDs {
 			if id != wid {
 				continue
 			}
+			// The canvas needs the thing's UUID; u.ID is the "catalog::value"
+			// pair. Fall back to the pair for a named value with no thing
+			// record — the overlay can still show it, it just can't be jumped to.
+			target := uuidByPair[u.ID]
+			if target == "" {
+				target = u.ID
+			}
 			out = append(out, enrichedCorrelationEntry{
 				Kind:       "parameter",
 				TargetKind: "thing",
-				TargetID:   u.ID,
+				TargetID:   target,
 				Labels:     []string{"parameter/" + u.Subtype},
 				Rate:       parameterRelationRate,
 				DataType:   u.Subtype,
@@ -152,8 +202,10 @@ func (s *Server) listThingRelations(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// `id` is a thing UUID; deriveThingUsage keys by the "catalog::value" pair.
+	uuidByPair := s.thingUUIDByPair()
 	for _, u := range s.deriveThingUsage() {
-		if u.ID != id {
+		if uuidByPair[u.ID] != id {
 			continue
 		}
 		for _, wid := range u.WantIDs {

@@ -123,6 +123,10 @@ func (s *Server) listWantHashes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sort.Slice(entries, func(i, j int) bool { return entries[i].ID < entries[j].ID })
+	// The client polls this to decide whether to refetch /wants; a thing
+	// becoming named changes no want hash but does change the correlation the
+	// full response carries, so it has to move this collection hash too.
+	rawHashes = append(rawHashes, s.thingRelationFingerprint())
 	collectionHash := computeCollectionHash(rawHashes)
 
 	ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
@@ -299,6 +303,10 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		// keep serving the unlit board from its cache.
 		rawHashes = append(rawHashes, fp)
 	}
+	// A value becoming named (or a constellation changing) adds a
+	// parameter/constellation correlation entry that CalculateWantHash cannot
+	// see — those are folded in only at response time, not on the want itself.
+	rawHashes = append(rawHashes, s.thingRelationFingerprint())
 	for _, want := range wantsByID {
 		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
@@ -524,6 +532,13 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 		Hash:             mywant.CalculateWantHash(want),
 		ExposableFields:  exposableFields,
 		ImportableFields: importableFields,
+	}
+	// Fold the derived correlation into the per-want hash too, so a single-want
+	// GET's ETag busts when a parameter/constellation edge appears — same
+	// reason as the collection ETag in listWants.
+	if len(enrichedCorr) > 0 {
+		sum := sha256.Sum256([]byte(resp.Hash + fmt.Sprintf("%v", enrichedCorr)))
+		resp.Hash = fmt.Sprintf("%x", sum[:])
 	}
 	if includeConnectivity {
 		resp.ConnectivityMetadata = want.ConnectivityMetadata
