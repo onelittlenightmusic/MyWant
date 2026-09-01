@@ -34,6 +34,9 @@ func (s *Server) setupRoutes() {
 	// Static sub-paths must be registered before /{id} to avoid being swallowed as id values
 	wants.HandleFunc("/field-match-recommendations", s.getFieldMatchRecommendations).Methods("GET", "OPTIONS")
 	wants.HandleFunc("/field-match-recommendations/apply", s.applyFieldMatchRecommendation).Methods("POST", "OPTIONS")
+	// Home-screen manifest for one want (see handlers_want_homescreen.go).
+	// Before "/{id}" so the literal trailing segment isn't read as an id.
+	wants.HandleFunc("/{id}/manifest.webmanifest", s.handleWantManifest).Methods("GET")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
