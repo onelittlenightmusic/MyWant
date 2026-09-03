@@ -37,6 +37,10 @@ func (s *Server) setupRoutes() {
 	// Home-screen manifest for one want (see handlers_want_homescreen.go).
 	// Before "/{id}" so the literal trailing segment isn't read as an id.
 	wants.HandleFunc("/{id}/manifest.webmanifest", s.handleWantManifest).Methods("GET")
+	// Per-want alerts (see handlers_notifications.go).
+	wants.HandleFunc("/{id}/notify", s.notifyWant).Methods("POST", "OPTIONS")
+	wants.HandleFunc("/{id}/notifications", s.getWantNotifications).Methods("GET", "OPTIONS")
+	wants.HandleFunc("/{id}/notifications/read", s.markWantNotificationsRead).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
@@ -157,10 +161,17 @@ func (s *Server) setupRoutes() {
 	logs.HandleFunc("", s.handleOptions).Methods("OPTIONS")
 
 	notifications := api.PathPrefix("/notifications").Subrouter()
+	notifications.HandleFunc("/unread-counts", s.getUnreadWantCounts).Methods("GET", "OPTIONS")
 	notifications.HandleFunc("", s.recordNotification).Methods("POST")
 	notifications.HandleFunc("", s.getNotifications).Methods("GET")
 	notifications.HandleFunc("", s.clearNotifications).Methods("DELETE")
 	notifications.HandleFunc("", s.handleOptions).Methods("OPTIONS")
+
+	// Web Push for per-want alerts (see handlers_push.go).
+	push := api.PathPrefix("/push").Subrouter()
+	push.HandleFunc("/vapid-public-key", s.getVAPIDPublicKey).Methods("GET", "OPTIONS")
+	push.HandleFunc("/subscribe", s.pushSubscribe).Methods("POST", "OPTIONS")
+	push.HandleFunc("/unsubscribe", s.pushUnsubscribe).Methods("POST", "OPTIONS")
 
 	robotLogs := api.PathPrefix("/robot/logs").Subrouter()
 	robotLogs.HandleFunc("", s.getRobotLogs).Methods("GET")

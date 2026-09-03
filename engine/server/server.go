@@ -72,6 +72,8 @@ type Server struct {
 	thingStore           *ThingStore                     // Persists user-entered values to ~/.mywant/memo.yaml
 	thingEvents          *ThingEventStore                // Provenance timeline for named values (~/.mywant/memo-events.yaml)
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
+	pushStore            *PushStore                      // Web Push subscriptions for per-want alerts (~/.mywant/push-subscriptions.yaml)
+	vapid                vapidKeys                       // Web Push signing keypair (~/.mywant/vapid.json or MYWANT_VAPID_*)
 	thingLabels          *ThingLabelStore                // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 	// The mirror: slots a want type is asking to have filled. Built the same
@@ -347,6 +349,8 @@ func New(config Config) *Server {
 		thingStore:            newThingStore(),
 		thingEvents:           newThingEventStore(),
 		notifications:         newNotificationStore(),
+		pushStore:             newPushStore(),
+		vapid:                 loadVAPIDKeys(),
 		thingLabels:           newThingLabelStore(),
 		exposableFieldsCache:  exposableFieldsCache,
 		importableFieldsCache: importableFieldsCache,
@@ -480,6 +484,9 @@ func (s *Server) Start() error {
 
 	// Register push callback for want_achieved lifecycle webhooks
 	s.RegisterAchievementCallback()
+
+	// Watch spotify wants and raise a per-want alert when the track changes.
+	s.startSpotifyTrackWatcher()
 
 	// Seed "default" so a fresh install is never worldless. Until now a world
 	// file only appeared when you switched worlds (openWorld auto-saves the

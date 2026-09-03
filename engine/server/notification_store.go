@@ -33,6 +33,12 @@ type NotificationEntry struct {
 	// legible here: the SPA route it was raised on, and who was looking.
 	Route       string `json:"route,omitempty"       yaml:"route,omitempty"`
 	CharacterID string `json:"characterId,omitempty" yaml:"characterId,omitempty"`
+
+	// Kind separates a deliberate per-want alert ("alert") — one that raises a
+	// badge on the want's tile until the want is opened — from the transient
+	// robot-bubble log ("" / legacy). Read is only meaningful for "alert".
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Read bool   `json:"read,omitempty" yaml:"read,omitempty"`
 }
 
 // NotificationStore appends notices to ~/.mywant/notifications.yaml.
@@ -113,4 +119,61 @@ func (n *NotificationStore) Clear() error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	return n.save([]NotificationEntry{})
+}
+
+// ── per-want alerts ─────────────────────────────────────────────────────────
+
+// UnreadWantCounts returns, per want id, how many unread "alert" notices target
+// it — the number a tile / minimap badge shows.
+func (n *NotificationStore) UnreadWantCounts() map[string]int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	counts := map[string]int{}
+	for _, e := range n.load() {
+		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID != "" && !e.Read {
+			counts[e.TargetID]++
+		}
+	}
+	return counts
+}
+
+// ForWant returns the notices targeting one want, most-recent first (limit 0 =
+// all), plus how many of them are unread alerts.
+func (n *NotificationStore) ForWant(id string, limit int) (entries []NotificationEntry, unread int) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	all := n.load()
+	for i := len(all) - 1; i >= 0; i-- {
+		e := all[i]
+		if e.TargetType != "want" || e.TargetID != id {
+			continue
+		}
+		if e.Kind == "alert" && !e.Read {
+			unread++
+		}
+		if limit == 0 || len(entries) < limit {
+			entries = append(entries, e)
+		}
+	}
+	return entries, unread
+}
+
+// MarkWantRead flags every unread "alert" notice for one want as read and
+// returns how many changed.
+func (n *NotificationStore) MarkWantRead(id string) (int, error) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	entries := n.load()
+	changed := 0
+	for i := range entries {
+		e := &entries[i]
+		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID == id && !e.Read {
+			e.Read = true
+			changed++
+		}
+	}
+	if changed == 0 {
+		return 0, nil
+	}
+	return changed, n.save(entries)
 }

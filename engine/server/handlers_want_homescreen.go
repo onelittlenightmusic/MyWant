@@ -37,11 +37,16 @@ func (s *Server) handleWantManifest(w http.ResponseWriter, r *http.Request) {
 		short = string([]rune(short)[:14])
 	}
 
+	// id AND scope must be unique per want. With scope "/" and no id, Chrome
+	// treats every /w/<id> page as the same installable app — "Install" on any
+	// want reuses (or overwrites with) whichever one was installed first. A
+	// scope of "/w/<id>" makes each want-app own only its own URL.
 	manifest := map[string]any{
 		"name":             name,
 		"short_name":       short,
+		"id":               "/w/" + id,
 		"start_url":        "/w/" + id,
-		"scope":            "/",
+		"scope":            "/w/" + id,
 		"display":          "standalone",
 		"orientation":      "any",
 		"background_color": "#1e293b",
@@ -55,6 +60,6 @@ func (s *Server) handleWantManifest(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	w.Header().Set("Content-Type", "application/manifest+json")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-store, must-revalidate")
 	_ = json.NewEncoder(w).Encode(manifest)
 }

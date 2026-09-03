@@ -290,6 +290,20 @@ func (s *Server) RegisterAchievementCallback() {
 		payload := buildPayloadWithEvent("want_achieved", w)
 		log.Printf("[LIFECYCLE-WEBHOOK] want_achieved: %s (%s)", w.Metadata.Name, w.Metadata.ID)
 
+		// A per-want alert badges the want's tile until it is opened, and pushes
+		// to any subscribed home-screen app. Separate from the webhooks below,
+		// which push the event to external URLs.
+		if s.notifications != nil && w.Metadata.Name != "" {
+			msg := fmt.Sprintf("「%s」が達成されました", w.Metadata.Name)
+			_ = s.notifications.Record(NotificationEntry{
+				Message:    msg,
+				Kind:       "alert",
+				TargetType: "want",
+				TargetID:   w.Metadata.ID,
+			})
+			s.sendWantPush(w.Metadata.ID, w.Metadata.Name, msg, "/w/"+w.Metadata.ID)
+		}
+
 		// Unfiltered
 		for _, h := range hooks {
 			go postLifecycleEvent(h.URL, payload)
