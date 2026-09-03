@@ -72,8 +72,16 @@ func FilterWants(wants []*Want, filters WantFilters) []*Want {
 // State fields declared as volatile: true in the want type are excluded so that
 // high-frequency writes (e.g. progress_ms, last_state_poll_at) don't trigger
 // unnecessary frontend re-renders.
+//
+// Every field here is snapshotted through a thread-safe accessor, never read off
+// w directly: this runs on the /wants/hashes request path, which the GUI polls
+// continuously, and json.Marshal ranges each map it is handed. A raw w.Metadata
+// hands it the live Labels map, and an agent calling SetLabel mid-marshal is
+// "concurrent map iteration and map write" — a fatal error recover() cannot
+// catch, so it takes the whole server down. GetMetadata/GetSpec clone under
+// metadataMutex; GetAllStateDeep copies the nested state containers too.
 func CalculateWantHash(w *Want) string {
-	state := w.GetAllState()
+	state := w.GetAllStateDeep()
 	if w.WantTypeDefinition != nil {
 		for _, sd := range w.WantTypeDefinition.State {
 			if sd.Volatile {
@@ -88,9 +96,9 @@ func CalculateWantHash(w *Want) string {
 		Status   WantStatus     `json:"status"`
 		State    map[string]any `json:"state"`
 	}{
-		Metadata: w.Metadata,
+		Metadata: w.GetMetadata(),
 		Spec:     *w.GetSpec(),
-		Status:   w.Status,
+		Status:   w.GetStatus(),
 		State:    state,
 	}
 
