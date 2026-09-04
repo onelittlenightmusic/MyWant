@@ -102,3 +102,65 @@ func TestPrepareForRestartResetOnRestartFalseSkipsEverything(t *testing.T) {
 		t.Fatalf("expected resetOnRestart:false to skip the reset entirely, got %v", got)
 	}
 }
+
+// The other half of the same bug, one level up: prepareForRestart correctly
+// leaves a persistent field alone, but ScriptableWant.Initialize (called right
+// after it on every restart) used to copy Spec.Params back over state for any
+// param sharing a state field's name — persistent or not. A checklist's
+// `items` state is persistent:true, but its `items` param is just the initial
+// seed (defaulted to [] by Initialize's own fill-in when the deploy never set
+// one), so that copy silently deleted the persisted list on every restart —
+// the exact case reproduced here.
+func TestScriptableWantInitializeSkipsParamCopyForPersistentField(t *testing.T) {
+	def := &WantTypeDefinition{
+		Parameters: []ParameterDef{
+			{Name: "items", Default: []interface{}{}},
+		},
+		State: []StateDef{
+			{Name: "items", Label: "current", Persistent: true, InitialValue: []interface{}{}},
+		},
+	}
+
+	sw := &ScriptableWant{Want: Want{
+		Metadata:           Metadata{ID: "w1", Name: "w1", Type: "test-doc"},
+		StateLabels:        map[string]StateLabel{"items": LabelCurrent},
+		WantTypeDefinition: def,
+	}}
+	// As if reloaded from a persisted snapshot: state already holds what the
+	// user last saved, and the deploy never set an explicit `items` param.
+	sw.SetCurrent("items", []interface{}{"user-item"})
+
+	sw.Initialize()
+
+	got, _ := sw.GetCurrent("items")
+	gotSlice, ok := got.([]interface{})
+	if !ok || len(gotSlice) != 1 || gotSlice[0] != "user-item" {
+		t.Fatalf("expected the persistent items field to survive Initialize's param copy, got %#v", got)
+	}
+}
+
+// The param copy still has to run for a field that ISN'T persistent — this
+// guards that the new Persistent check doesn't turn the copy off altogether.
+func TestScriptableWantInitializeStillCopiesNonPersistentParam(t *testing.T) {
+	def := &WantTypeDefinition{
+		Parameters: []ParameterDef{
+			{Name: "label", Default: "fallback"},
+		},
+		State: []StateDef{
+			{Name: "label", Label: "current", Persistent: false, InitialValue: ""},
+		},
+	}
+
+	sw := &ScriptableWant{Want: Want{
+		Metadata:           Metadata{ID: "w1", Name: "w1", Type: "test-doc"},
+		StateLabels:        map[string]StateLabel{"label": LabelCurrent},
+		WantTypeDefinition: def,
+		Spec:               WantSpec{Params: map[string]any{"label": "from-param"}},
+	}}
+
+	sw.Initialize()
+
+	if got, _ := sw.GetCurrent("label"); got != "from-param" {
+		t.Fatalf("expected the non-persistent field to still be copied from its param, got %v", got)
+	}
+}

@@ -62,8 +62,10 @@ func (s *ScriptableWant) Initialize() {
 	skipParamCopy := s.Spec.ResetOnRestart != nil && !*s.Spec.ResetOnRestart
 	if !skipParamCopy {
 		labels := make(map[string]string, len(s.WantTypeDefinition.State))
+		persistent := make(map[string]bool, len(s.WantTypeDefinition.State))
 		for _, sd := range s.WantTypeDefinition.State {
 			labels[sd.Name] = string(sd.Label)
+			persistent[sd.Name] = sd.Persistent
 		}
 		for k := range s.Spec.Params {
 			// GetParameter, not the raw map: a param declared as
@@ -81,7 +83,17 @@ func (s *ScriptableWant) Initialize() {
 			case "plan":
 				s.SetPlan(k, v)
 			default:
-				if _, isStateDefined := labels[k]; isStateDefined {
+				// A persistent current field is declared to survive a restart
+				// — the same contract prepareForRestart's initialValue reset
+				// already honours (it skips persistent fields outright). This
+				// copy has to honour it too, or persistent:true is a lie: a
+				// checklist's `items` is persistent, but its `items` param —
+				// the initial seed, defaulted to [] by the fill-in above —
+				// still overwrote the live list on every restart, silently
+				// deleting whatever the user had checked off. A param is only
+				// ever meant to seed a persistent field once, at creation; a
+				// restart is not a creation.
+				if _, isStateDefined := labels[k]; isStateDefined && !persistent[k] {
 					s.SetCurrent(k, v)
 				}
 			}
