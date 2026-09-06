@@ -60,13 +60,32 @@ func constellationNameFromKey(key string) string {
 // never written.
 func legacyConstellationKey(name string) string { return legacyConstellationLabelPrefix + name }
 
-// constellationDTO is the API shape (id == name; kind namespaces memo vs want).
+// constellationDTO is the API shape (id == name).
+//
+// `kind` used to namespace the whole constellation: a thing one and a want one
+// were different constellations that merely shared a name. Nothing in the
+// STORAGE ever said so — membership is a `constellation/<name>` label, carried
+// by a want's metadata or by a thing's labels, and a name has always been able
+// to have both — so the split was an artefact of the two collectors and of an
+// API that made the caller declare which pile it meant.
+//
+// A constellation is a name someone gave to a handful of things on the board,
+// and the board has two kinds of things on it. So the kind moved onto the
+// MEMBER, where it was always a fact, and `kind` is now a summary of what is
+// in there: "thing", "want", or "mixed". Kept, rather than dropped, because
+// every existing caller reads it and because "what sort of constellation is
+// this" is still a fair question.
 type constellationDTO struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// "thing", "want", or "mixed" — derived from the members.
 	Kind    string   `json:"kind"`
 	Color   string   `json:"color,omitempty"`
 	Members []string `json:"members"`
+	// Which kind each member is, keyed by the same ids as Members. The list
+	// stays a list of ids so that every caller that only asks "is this id in
+	// here" keeps working unchanged.
+	MemberKinds map[string]string `json:"memberKinds,omitempty"`
 }
 
 // collectThingConstellations aggregates constellation/* labels across all memo values.
@@ -109,10 +128,82 @@ func constellationsFromMap(byName map[string][]string, colorByName map[string]st
 	out := make([]constellationDTO, 0, len(byName))
 	for name, members := range byName {
 		sort.Strings(members)
-		out = append(out, constellationDTO{ID: name, Name: name, Kind: kind, Color: colorByName[name], Members: members})
+		kinds := make(map[string]string, len(members))
+		for _, m := range members {
+			kinds[m] = kind
+		}
+		out = append(out, constellationDTO{
+			ID: name, Name: name, Kind: kind,
+			Color: colorByName[name], Members: members, MemberKinds: kinds,
+		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
+}
+
+// collectAllConstellations is the whole sky: one constellation per name,
+// holding whatever carries its label — wants, things, or both.
+//
+// The two collectors stay as they are and this folds their output together,
+// rather than a third walk over both stores. They each know how to read their
+// own side, and a name that appears in both is one constellation that happens
+// to have members of two kinds; there is nothing to reconcile beyond saying so.
+func (s *Server) collectAllConstellations() []constellationDTO {
+	byName := map[string]*constellationDTO{}
+	var order []string
+	for _, g := range append(s.collectThingConstellations(), s.collectWantConstellations()...) {
+		existing, ok := byName[g.Name]
+		if !ok {
+			copied := g
+			copied.MemberKinds = map[string]string{}
+			for k, v := range g.MemberKinds {
+				copied.MemberKinds[k] = v
+			}
+			copied.Members = append([]string{}, g.Members...)
+			byName[g.Name] = &copied
+			order = append(order, g.Name)
+			continue
+		}
+		existing.Members = append(existing.Members, g.Members...)
+		for k, v := range g.MemberKinds {
+			existing.MemberKinds[k] = v
+		}
+		// Both piles answered to this name, so it is neither one of them.
+		if existing.Kind != g.Kind {
+			existing.Kind = "mixed"
+		}
+		// A colour is recorded on every member, so either side's answer is the
+		// same answer — except when one side has none, which is what a
+		// constellation that only just gained a member of that kind looks like.
+		if existing.Color == "" {
+			existing.Color = g.Color
+		}
+	}
+	sort.Strings(order)
+	out := make([]constellationDTO, 0, len(order))
+	for _, name := range order {
+		g := byName[name]
+		sort.Strings(g.Members)
+		out = append(out, *g)
+	}
+	return out
+}
+
+// memberKindOf answers what an id names, by asking rather than by reading its
+// prefix: ids are shaped predictably today and a shape is not a guarantee.
+//
+// This is what lets the API stop making the caller declare a kind. A
+// constellation with a want and a thing in it cannot be described by one kind
+// at the door, and the server is the side that already knows which is which.
+func (s *Server) memberKindOf(id string) string {
+	if s.globalBuilder != nil {
+		for _, want := range s.globalBuilder.GetAllWantStates() {
+			if want.Metadata.ID == id {
+				return "want"
+			}
+		}
+	}
+	return "thing"
 }
 
 // setConstellationMembership applies (add=true) or clears (add=false) the group label on
@@ -216,7 +307,10 @@ func (s *Server) getConstellations(w http.ResponseWriter, r *http.Request) {
 	case "thing":
 		groups = s.collectThingConstellations()
 	default:
-		groups = append(s.collectThingConstellations(), s.collectWantConstellations()...)
+		// One constellation per name, whatever kinds are in it. The two
+		// filtered cases stay for callers that genuinely want one side (the
+		// Thing page's own list), but a name with both is one constellation.
+		groups = s.collectAllConstellations()
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"groups": groups})
 }
@@ -237,18 +331,29 @@ func (s *Server) createConstellation(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
 		return
 	}
+	// `kind` is no longer required, and no longer decides anything: each member
+	// is written to whichever store it lives in, so one call can name a want
+	// and a thing together. It is still accepted — every existing caller sends
+	// it — and still validated when present, so a typo is an error rather than
+	// silently ignored.
 	body.Kind = normalizeConstellationKind(body.Kind)
-	if body.Kind != "thing" && body.Kind != "want" {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing or want")
+	if body.Kind != "" && body.Kind != "thing" && body.Kind != "want" && body.Kind != "mixed" {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing, want or mixed")
 		return
 	}
+	kinds := make(map[string]string, len(body.Members))
 	for _, m := range body.Members {
-		s.setConstellationMembership(body.Kind, body.Name, m, true)
+		k := s.memberKindOf(m)
+		kinds[m] = k
+		s.setConstellationMembership(k, body.Name, m, true)
 	}
 	if body.Color != "" {
-		s.setConstellationColor(body.Kind, body.Name, body.Color)
+		s.setConstellationColorForMembers(body.Name, body.Color, kinds)
 	}
-	s.JSONResponse(w, http.StatusOK, constellationDTO{ID: body.Name, Name: body.Name, Kind: body.Kind, Color: body.Color, Members: body.Members})
+	s.JSONResponse(w, http.StatusOK, constellationDTO{
+		ID: body.Name, Name: body.Name, Kind: summariseKinds(kinds),
+		Color: body.Color, Members: body.Members, MemberKinds: kinds,
+	})
 }
 
 // PUT /api/v1/constellations/{name}   body: {name?, members?, kind, color?}
@@ -266,9 +371,11 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
+	// As on create, `kind` no longer decides anything — each member is written
+	// where it lives. Still validated when present so a typo is not silence.
 	body.Kind = normalizeConstellationKind(body.Kind)
-	if body.Kind != "thing" && body.Kind != "want" {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing or want")
+	if body.Kind != "" && body.Kind != "thing" && body.Kind != "want" && body.Kind != "mixed" {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing, want or mixed")
 		return
 	}
 	newName := oldName
@@ -282,10 +389,11 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 
 	// The colour, captured before any membership move so a rename can carry it
 	// over even when the client did not restate it.
-	carriedColor := s.constellationColor(body.Kind, oldName)
+	carriedColor := s.anyConstellationColor(oldName)
 
-	// Current members of the old group.
-	current := s.membersOfConstellation(body.Kind, oldName)
+	// Current members of the old group — of both kinds, or reconciling a mixed
+	// constellation would silently drop everything of the kind not named.
+	current := s.allMembersOfConstellation(oldName)
 
 	if body.Members != nil {
 		want := map[string]bool{}
@@ -295,14 +403,14 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		// Remove members no longer wanted (from the OLD name).
 		for _, m := range current {
 			if !want[m] {
-				s.setConstellationMembership(body.Kind, oldName, m, false)
+				s.setConstellationMembership(s.memberKindOf(m), oldName, m, false)
 			}
 		}
 		// Under a rename, everything moves to the new key below; otherwise add
 		// the newly-wanted members to the existing name here.
 		if newName == oldName {
 			for m := range want {
-				s.setConstellationMembership(body.Kind, oldName, m, true)
+				s.setConstellationMembership(s.memberKindOf(m), oldName, m, true)
 			}
 		}
 	}
@@ -311,17 +419,18 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	if newName != oldName {
 		final := *orDefaultMembers(body.Members, current)
 		for _, m := range final {
-			s.setConstellationMembership(body.Kind, oldName, m, false)
-			s.setConstellationMembership(body.Kind, newName, m, true)
+			k := s.memberKindOf(m)
+			s.setConstellationMembership(k, oldName, m, false)
+			s.setConstellationMembership(k, newName, m, true)
 		}
 	}
 
 	// Colour: an explicit value in the body wins (including "" to clear);
 	// otherwise a rename still keeps whatever colour the old name had.
 	if body.Color != nil {
-		s.setConstellationColor(body.Kind, newName, *body.Color)
+		s.setConstellationColorEverywhere(newName, *body.Color)
 	} else if newName != oldName && carriedColor != "" {
-		s.setConstellationColor(body.Kind, newName, carriedColor)
+		s.setConstellationColorEverywhere(newName, carriedColor)
 	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group updated", "name": newName})
@@ -330,16 +439,68 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/constellations/{name}?kind=memo|want
 func (s *Server) deleteConstellation(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	kind := r.URL.Query().Get("kind")
-	kind = normalizeConstellationKind(kind)
-	if kind != "thing" && kind != "want" {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind query param must be memo or want")
-		return
-	}
-	for _, m := range s.membersOfConstellation(kind, name) {
-		s.setConstellationMembership(kind, name, m, false)
+	// The ?kind= is accepted and ignored. Deleting a constellation means the
+	// name stops existing, and a name that had a want and a thing in it would
+	// otherwise half-survive whichever kind the caller happened to send.
+	for _, m := range s.allMembersOfConstellation(name) {
+		s.setConstellationMembership(s.memberKindOf(m), name, m, false)
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group deleted"})
+}
+
+// allMembersOfConstellation is every id carrying the name's label, whichever
+// store it lives in. What "the members of this constellation" means now that a
+// constellation is not partitioned by kind.
+func (s *Server) allMembersOfConstellation(name string) []string {
+	return append(s.membersOfConstellation("thing", name), s.membersOfConstellation("want", name)...)
+}
+
+// anyConstellationColor is the colour recorded for a name by any member of
+// either kind. The colour is written to every member, so any one of them
+// answers for the whole — this only widens which members get asked.
+func (s *Server) anyConstellationColor(name string) string {
+	if c := s.constellationColor("thing", name); c != "" {
+		return c
+	}
+	return s.constellationColor("want", name)
+}
+
+// setConstellationColorEverywhere paints every current member, of either kind.
+func (s *Server) setConstellationColorEverywhere(name, color string) {
+	s.setConstellationColor("thing", name, color)
+	s.setConstellationColor("want", name, color)
+}
+
+// setConstellationColorForMembers paints a specific set, each in its own store
+// — for a constellation being created, whose members are not yet findable by
+// their labels.
+func (s *Server) setConstellationColorForMembers(name, color string, kinds map[string]string) {
+	colorKey := constellationColorKey(name)
+	for m, k := range kinds {
+		if k == "want" {
+			if s.globalBuilder != nil {
+				_ = s.globalBuilder.QueueWantAddLabel(m, colorKey, color)
+			}
+			continue
+		}
+		_ = s.thingLabels.Set(m, colorKey, color)
+	}
+}
+
+// summariseKinds reduces what is in a constellation to the one word `kind`
+// still reports: "thing", "want", or "mixed" when it holds both.
+func summariseKinds(kinds map[string]string) string {
+	seen := ""
+	for _, k := range kinds {
+		if seen == "" {
+			seen = k
+			continue
+		}
+		if seen != k {
+			return "mixed"
+		}
+	}
+	return seen
 }
 
 // membersOfConstellation returns the current member ids of a group of the given kind.
