@@ -142,12 +142,17 @@ func (s *Server) thingMotionTick() {
 		// it and a driven thing holds its speed. Friction is for what is
 		// coasting on its own momentum, which is the only thing that should
 		// come to a stop by itself.
+		//
+		// `decay` is also what the NEXT step will be scaled by, which is what
+		// makes the velocity reported below a prediction rather than a guess —
+		// see thingMove.
+		decay := 1.0
 		if dx, dy, steered := steerThing(allWants, id, labels); steered {
 			st.vx, st.vy = dx, dy
 		} else {
-			f := math.Pow(dampingOf(labels), thingMotionInterval.Seconds())
-			st.vx *= f
-			st.vy *= f
+			decay = math.Pow(dampingOf(labels), thingMotionInterval.Seconds())
+			st.vx *= decay
+			st.vy *= decay
 		}
 
 		x, y, moved, _ := stepBody(blocked, body{x: st.x, y: st.y, dx: st.vx, dy: st.vy})
@@ -160,11 +165,20 @@ func (s *Server) thingMotionTick() {
 			landThing(id)
 			s.putThingDown(id, x, y)
 			rested = append(rested, id)
+			// A last frame, at rest. Without it a browser filling the gaps
+			// between frames would carry on past the true stopping point on the
+			// velocity it was last told about, and only be corrected by the
+			// next thing that happened to refetch. A zero velocity is the
+			// instruction to stop predicting.
+			moves = append(moves, thingMove{ID: id, X: x, Y: y})
 			continue
 		}
 
 		st.x, st.y = x, y
-		moves = append(moves, thingMove{ID: id, X: x, Y: y})
+		moves = append(moves, thingMove{
+			ID: id, X: x, Y: y,
+			VX: st.vx * decay, VY: st.vy * decay,
+		})
 
 		// Arriving somewhere can put it on a plate, exactly as a footstep can.
 		s.syncThingOccupancy(id, x, y)
@@ -262,10 +276,28 @@ func dampingOf(labels map[string]string) float64 {
 // Numbers rather than the cell strings the labels carry, because in flight
 // there is no cell — the whole point of keeping the position in memory is that
 // it is allowed to be between two of them.
+//
+// The velocity is here so the browser can fill in the gaps. Frames arrive four
+// times a second because that is how often the board is recalculated, and that
+// is not often enough to look like sliding; with a velocity the browser can
+// carry the thing along between them and draw as often as it likes.
+//
+// It is the velocity of the NEXT step, not the one just taken — st.vx has
+// already been damped for this tick, so damping it once more is exactly what
+// the next tick will do to it. That distinction is the whole difference
+// between a prediction that lands on the following frame and one that
+// overshoots it by a damping step and gets visibly yanked back. A steered
+// thing is not damped at all, so for it the two are the same number.
+//
+// Zero means stopped: the last frame of a flight carries no velocity, which is
+// how a browser is told to stop filling.
 type thingMove struct {
 	ID string  `json:"id"`
 	X  float64 `json:"x"`
 	Y  float64 `json:"y"`
+	// Cells per tick — the same units the speed labels use.
+	VX float64 `json:"vx"`
+	VY float64 `json:"vy"`
 }
 
 // liveThingPositions returns where the things currently in flight actually are,
