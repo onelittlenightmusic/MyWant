@@ -197,7 +197,19 @@ func (s *Server) collectAllConstellations() []constellationDTO {
 // at the door, and the server is the side that already knows which is which.
 func (s *Server) memberKindOf(id string) string {
 	if s.globalBuilder != nil {
+		// Both views of the want list, because they are not the same list.
+		// GetAllWantStates is what the constellation collectors read and
+		// GetWants is what the board reads, and a want present in one and not
+		// the other came back as a thing — which then wrote its membership
+		// into the thing store, where the want side would never find it again.
+		// Asking both is the only answer that cannot be wrong in one
+		// direction.
 		for _, want := range s.globalBuilder.GetAllWantStates() {
+			if want.Metadata.ID == id {
+				return "want"
+			}
+		}
+		for _, want := range s.globalBuilder.GetWants() {
 			if want.Metadata.ID == id {
 				return "want"
 			}
