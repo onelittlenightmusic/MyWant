@@ -244,7 +244,10 @@ func moveDrivenCharacter(s *Server, characterID string, dx, dy float64) (newX, n
 	// stopped is not an error — a character held against a wall simply does
 	// not advance this tick, and keeps trying on the next one.
 	var stopped bool
-	entry.X, entry.Y, stopped = resolveMove(blocked, entry.X, entry.Y, entry.X+dx, entry.Y+dy, true)
+	// Through the shared mover, which is the same one every moving thing on
+	// the board goes through — see body_motion.go. What is left here is only
+	// what is genuinely a character's: where the position is kept.
+	entry.X, entry.Y, _, stopped = stepBody(blocked, body{x: entry.X, y: entry.Y, dx: dx, dy: dy})
 	// Walking into something solid makes a noise, and this is the one path
 	// where the browser never gets the chance to make it itself — nothing
 	// here started in a keypress. See bumpEffectType.

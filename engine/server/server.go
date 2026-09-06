@@ -384,6 +384,12 @@ func (s *Server) Start() error {
 	})
 	s.setupRoutes()
 
+	// Things with a speed move themselves, on the same board and against the
+	// same walls as a character. One ticker for all of them rather than a want
+	// each: the blocked-cell snapshot is built once per tick and shared by
+	// everything moving through it. See thing_motion.go.
+	s.startThingMotion()
+
 	// Register config.yaml field updaters so built-in want types can update and
 	// persist server config without an HTTP round-trip to their own server.
 	// tunnel_url: captured public URL from a managed_launch want running
