@@ -61,9 +61,9 @@ func nonButtonWantAt(id string, x, y int) *mywant.Want {
 func isButtonType(typeName string) bool { return typeName == "direction" }
 
 func resetButtonOccupancy() {
-	buttonOccupancyMu.Lock()
-	characterOnButton = map[string]string{}
-	buttonOccupancyMu.Unlock()
+	intersectionMu.Lock()
+	intersectionOn = map[string][]string{}
+	intersectionMu.Unlock()
 }
 
 func TestApplyButtonOccupancyAddsOnStep(t *testing.T) {

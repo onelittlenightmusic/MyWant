@@ -72,7 +72,7 @@ func (s *Server) thingMotionTick() {
 	var allWants []*mywant.Want
 	built := false
 
-	changed := make([]string, 0, 4)
+	moves := make([]thingMove, 0, 4)
 	for id, labels := range all {
 		b, moving, ok := thingBodyOf(labels)
 		if !ok || !moving {
@@ -139,13 +139,30 @@ func (s *Server) thingMotionTick() {
 		if err := s.thingLabels.Set(id, "mywant.io/canvas-y", ny); err != nil {
 			continue
 		}
-		changed = append(changed, id)
+		moves = append(moves, thingMove{ID: id, X: nx, Y: ny})
 
 		// Arriving somewhere can put it on a plate, exactly as a footstep can.
 		s.syncThingOccupancy(id, x, y)
 	}
 
-	for _, id := range changed {
-		go broadcastSSE("thing_changed", id)
+	// One frame for the whole tick, carrying the positions themselves.
+	//
+	// This used to send "thing_changed", the event that means the set of things
+	// is different — a world was opened, something was added or thrown away —
+	// and which a browser answers by fetching the entire catalog back. That is
+	// the right answer to that question and the wrong one to this: a thing that
+	// moved one cell is the same thing, and asking for the catalog four times a
+	// second buries the move under work nobody asked for. A position is small
+	// enough to just say, so it is said here, the way a character's is.
+	if len(moves) > 0 {
+		go broadcastSSE("thing_moved", moves)
 	}
+}
+
+// thingMove is one thing's new cell, as the browser needs it: whole cells,
+// already formatted the way the labels carry them, so the two cannot disagree.
+type thingMove struct {
+	ID string `json:"id"`
+	X  string `json:"x"`
+	Y  string `json:"y"`
 }

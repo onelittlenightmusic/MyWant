@@ -20,6 +20,13 @@ wantType:
     type: array
     subType: character_ids
     required: false
+  - name: things
+    description: >-
+      Thing IDs this want targets. A plate does not care what stepped on it —
+      see the same parameter on direction. Filled by occupancy when something
+      is pushed onto this tile.
+    type: array
+    required: false
   - name: default
     description: Initial going state (true = going, false = stopped)
     type: boolean
@@ -28,6 +35,11 @@ wantType:
   state:
   - name: characters
     description: Character IDs this want targets
+    type: array
+    label: current
+    persistent: true
+  - name: things
+    description: Thing IDs this want targets — see the parameter of the same name
     type: array
     label: current
     persistent: true

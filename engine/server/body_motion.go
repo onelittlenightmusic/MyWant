@@ -29,6 +29,11 @@ const (
 	thingSpeedXLabel = "mywant.io/speed-x"
 	thingSpeedYLabel = "mywant.io/speed-y"
 	thingMovingLabel = "mywant.io/moving"
+	// The pin: whether a thing is on the board at all. Three states, and the
+	// absent one matters — no label means nobody has answered and the board's
+	// own rule decides. "false" is a thing taken off by hand, which is also
+	// what a thing's archive is (see intersection.go's trash rule).
+	thingCanvasPinLabel = "mywant.io/canvas"
 )
 
 // body is what the mover needs to know about anything it moves: where it is
