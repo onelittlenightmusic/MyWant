@@ -174,6 +174,7 @@ func applyIntersections(
 		for _, rule := range intersectionRules {
 			if rule.leave != nil && rule.applies(ctx, want, m) {
 				rule.leave(ctx, want, m)
+				announce(rule, want, m, "leave")
 			}
 		}
 	}
@@ -184,6 +185,7 @@ func applyIntersections(
 		for _, rule := range intersectionRules {
 			if rule.applies(ctx, want, m) {
 				rule.enter(ctx, want, m)
+				announce(rule, want, m, "enter")
 			}
 		}
 	}
@@ -197,6 +199,44 @@ func applyIntersections(
 		ids = append(ids, w.Metadata.ID)
 	}
 	intersectionOn[m.key()] = ids
+}
+
+// intersectionEvent is a rule having fired, told to whoever is watching.
+//
+// A rule does something to the board — a bin swallows a thing, a plate starts
+// it moving — and the board has a way of SHOWING that: the bin's lid opens and
+// something drops into it. Until now the only way in was the drag gesture, so
+// the browser knew because it had just done it. A thing that slid into a bin on
+// its own was archived in silence: the tile simply stopped existing, with the
+// lid shut.
+//
+// So the rules say what they did. Deliberately about the rule rather than about
+// the bin — "trash fired here, on this thing" — because that is the general
+// fact, and the next rule with something to show gets its animation without a
+// second event being invented for it.
+type intersectionEvent struct {
+	Rule  string `json:"rule"`
+	Phase string `json:"phase"` // "enter" | "leave"
+	// The want that reacted, and what arrived at it.
+	WantID    string `json:"wantId"`
+	WantType  string `json:"wantType"`
+	MoverKind string `json:"moverKind"` // "character" | "thing"
+	MoverID   string `json:"moverId"`
+}
+
+func announce(rule intersectionRule, want *mywant.Want, m mover, phase string) {
+	kind := "character"
+	if m.kind == moverThing {
+		kind = "thing"
+	}
+	go broadcastSSE("intersection", intersectionEvent{
+		Rule:      rule.name,
+		Phase:     phase,
+		WantID:    want.Metadata.ID,
+		WantType:  want.Metadata.Type,
+		MoverKind: kind,
+		MoverID:   m.id,
+	})
 }
 
 // forgetIntersections drops a mover's record without running any leave rules —
