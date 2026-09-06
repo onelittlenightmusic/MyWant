@@ -83,7 +83,8 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 	if s.thingEvents != nil {
 		stats = s.thingEvents.Stats()
 	}
-	labels := s.thingLabels.All()
+	// Where things in flight actually are, not where they last came to rest.
+	labels := overlayThingMotion(s.thingLabels.All())
 
 	out := []ThingFull{}
 	for _, e := range s.thingStore.Entries() {

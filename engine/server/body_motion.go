@@ -1,8 +1,8 @@
 package server
 
 import (
-	"math"
 	"strconv"
+	"strings"
 )
 
 // Motion, for anything on the board that has a position.
@@ -17,10 +17,11 @@ import (
 // for a thing.
 //
 // What stays with each caller is only what genuinely differs — where the
-// position is KEPT. A character's lives in the ephemeral cursor store (floats,
-// broadcast over SSE, owned by the server for the length of a push); a thing's
-// lives on its own labels, which is where a thing's position has always lived.
-// Neither of those is a fact about motion.
+// position is KEPT. A character's lives in the ephemeral cursor store; a
+// thing's rests on its own labels and, while it is actually in flight, in the
+// motion store (see thingMotionState) for the same reason a character's is
+// ephemeral: a live position is not something to write to disk four times a
+// second. Neither of those is a fact about motion.
 
 // Label keys a thing's own motion is kept under, alongside the canvas-x/y it
 // has always had. Prefixed like every other board label so a thing carries its
@@ -90,14 +91,25 @@ func thingBodyOf(labels map[string]string) (b body, moving bool, ok bool) {
 	return body{x: x, y: y, dx: dx, dy: dy}, moving, true
 }
 
-// cellLabel formats a resolved coordinate the way a canvas label has always
-// carried one: a whole cell.
+// posLabel formats a coordinate for a label.
 //
-// The position itself is a float while it is being resolved, because a
-// velocity smaller than a cell has to be able to accumulate — rounding every
-// tick would leave anything slower than one cell per tick permanently still.
-// See thingMotion, which keeps the unrounded position between ticks and only
-// rounds on the way out.
-func cellLabel(v float64) string {
-	return strconv.Itoa(int(math.Round(v)))
+// A canvas label used to carry a whole cell and nothing else. It does not have
+// to: a cell is where a thing RESTS, and every "which thing is on this square"
+// question rounds anyway, but nothing says a thing must come to rest on the
+// grid. Keeping the fraction is what lets something drift to a halt just past
+// a cell instead of snapping onto it.
+//
+// Three decimals, trailing zeros trimmed. Enough that a board this size cannot
+// tell the difference, short enough that a label stays readable, and rounded
+// rather than shortest-representation so a position never comes out as
+// "6.700000000000001".
+func posLabel(v float64) string {
+	s := strconv.FormatFloat(v, 'f', 3, 64)
+	s = strings.TrimRight(s, "0")
+	return strings.TrimSuffix(s, ".")
+}
+
+// parseFloatLabel reads a number off a label.
+func parseFloatLabel(raw string) (float64, error) {
+	return strconv.ParseFloat(strings.TrimSpace(raw), 64)
 }
