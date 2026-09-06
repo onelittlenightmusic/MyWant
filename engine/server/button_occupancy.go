@@ -140,13 +140,33 @@ func (s *Server) isButtonFormType(typeName string) bool {
 // addCharacterToWant adds characterID to a want's `characters` current state
 // if it isn't already there.
 func addCharacterToWant(want *mywant.Want, characterID string) {
-	current := characterIDsOf(want)
-	for _, id := range current {
-		if id == characterID {
+	addTargetToWant(want, targetsCharacters, characterID)
+}
+
+// addTargetToWant adds id to one of a want's target arrays, if not already in
+// it. The same act for a character and for a thing — only which array differs.
+func addTargetToWant(want *mywant.Want, field, id string) {
+	current := targetIDsOf(want, field)
+	for _, got := range current {
+		if got == id {
 			return
 		}
 	}
-	want.SetCurrent("characters", append(append([]string{}, current...), characterID))
+	want.SetCurrent(field, append(append([]string{}, current...), id))
+}
+
+// removeTargetFromWant removes id from one of a want's target arrays.
+func removeTargetFromWant(want *mywant.Want, field, id string) {
+	current := targetIDsOf(want, field)
+	out := make([]string, 0, len(current))
+	for _, got := range current {
+		if got != id {
+			out = append(out, got)
+		}
+	}
+	if len(out) != len(current) {
+		want.SetCurrent(field, out)
+	}
 }
 
 // removeCharacterFromWant removes characterID from a want's `characters`

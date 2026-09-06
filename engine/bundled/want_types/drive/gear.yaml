@@ -19,6 +19,15 @@ wantType:
     type: array
     subType: character_ids
     required: false
+  - name: things
+    description: >-
+      Thing IDs this want targets. The same act as `characters`, on the other
+      kind of object that has a position: a thing on the board is as steerable
+      as a person on it, and this want does not need to know which it is
+      pointed at. Filled from here, or by footstep occupancy when something is
+      pushed onto this tile.
+    type: array
+    required: false
   - name: default
     description: Initial speed multiplier
     type: float64
@@ -67,6 +76,11 @@ wantType:
     initialValue: 0.1
   - name: characters
     description: Character IDs this want targets
+    type: array
+    label: current
+    persistent: true
+  - name: things
+    description: Thing IDs this want targets — see the parameter of the same name
     type: array
     label: current
     persistent: true

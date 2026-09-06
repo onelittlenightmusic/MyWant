@@ -36,6 +36,14 @@ func (g *GearWant) Initialize() {
 	if chars := g.GetStringSliceParam("characters"); len(chars) > 0 {
 		g.SetCurrent("characters", chars)
 	}
+	// Things are targeted the same way characters are, and by the same want:
+	// this steers whatever is named, and a thing on the board is as steerable
+	// as a person on it. Footstep occupancy fills the same array for whatever
+	// walks or is pushed onto this tile (see thing_occupancy.go), so naming
+	// them here is only the YAML half of it.
+	if things := g.GetStringSliceParam("things"); len(things) > 0 {
+		g.SetCurrent("things", things)
+	}
 	g.StoreState("last_action_at", "")
 }
 

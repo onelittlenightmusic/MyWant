@@ -3,6 +3,8 @@ package server
 import (
 	"sync"
 	"time"
+
+	mywant "mywant/engine/core"
 )
 
 // Things that move.
@@ -56,7 +58,10 @@ const thingMotionInterval = 250 * time.Millisecond
 
 // thingMotionTick advances every moving thing by one tick.
 func (s *Server) thingMotionTick() {
-	if s.thingLabels == nil {
+	// Nothing to move things against before the board exists — and reading the
+	// want list through a nil builder is a panic in a goroutine nobody is
+	// watching.
+	if s.thingLabels == nil || s.globalBuilder == nil {
 		return
 	}
 	all := s.thingLabels.All()
@@ -64,23 +69,39 @@ func (s *Server) thingMotionTick() {
 	// Built once for the whole tick rather than per thing: it walks every want,
 	// and every thing on the board is being stopped by the same walls.
 	var blocked map[[2]int]bool
+	var allWants []*mywant.Want
 	built := false
 
 	changed := make([]string, 0, 4)
 	for id, labels := range all {
 		b, moving, ok := thingBodyOf(labels)
-		if !ok || !moving || (b.dx == 0 && b.dy == 0) {
-			// Not in motion. Forget any fraction it was carrying, so starting
-			// again begins from where its label actually says it is.
+		if !ok || !moving {
+			// Not in motion. Forget what it was carrying between ticks, so
+			// starting again begins from where its label says it is and from
+			// no heading rather than a stale one.
 			thingMotionMu.Lock()
 			delete(thingMotionPositions, id)
 			thingMotionMu.Unlock()
+			forgetThingMotion(id)
 			continue
 		}
 
 		if !built {
 			blocked = s.blockedCellSnapshot()
 			built = true
+			allWants = s.globalBuilder.GetWants()
+		}
+
+		// Steering first: a direction want naming this thing decides where it
+		// goes, and its own speed vector is only the magnitude then — two
+		// answers to "which way" would be one too many. With nothing steering
+		// it, the vector it was given is used whole, which is how a thing moves
+		// when nobody is pushing it.
+		if dx, dy, steered := steerThing(allWants, id, labels); steered {
+			b.dx, b.dy = dx, dy
+		}
+		if b.dx == 0 && b.dy == 0 {
+			continue
 		}
 
 		// Carry on from the unrounded position when there is one; otherwise
@@ -119,6 +140,9 @@ func (s *Server) thingMotionTick() {
 			continue
 		}
 		changed = append(changed, id)
+
+		// Arriving somewhere can put it on a plate, exactly as a footstep can.
+		s.syncThingOccupancy(id, x, y)
 	}
 
 	for _, id := range changed {

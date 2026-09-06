@@ -88,33 +88,7 @@ func driveOneCharacterTick(s *Server, characterID string, motionWant *mywant.Wan
 		return
 	}
 
-	target := &driveTarget{gearMultiplier: 1}
-
-	for _, want := range builder.GetWants() {
-		switch want.Metadata.Type {
-		case "gear":
-			if !containsCharacter(want, characterID) {
-				continue
-			}
-			gearVal := gearValueOf(want)
-			if !target.hasGear {
-				target.gearMultiplier = 1
-				target.hasGear = true
-			}
-			target.gearMultiplier *= gearVal
-		case "direction":
-			if !containsCharacter(want, characterID) {
-				continue
-			}
-			dxVal, dyVal := directionVectorOf(want)
-			// Raw (unnormalized) vector: a want's magnitude acts as its
-			// weight when combined with other direction wants targeting
-			// the same character.
-			target.dirVectorX += dxVal
-			target.dirVectorY += dyVal
-			target.hasDirection = true
-		}
-	}
+	target := collectDriveInputs(builder.GetWants(), targetsCharacters, characterID)
 
 	going := mywant.GetCurrent(motionWant, "going", false)
 
@@ -136,6 +110,47 @@ func driveOneCharacterTick(s *Server, characterID string, motionWant *mywant.Wan
 	}
 	x, y = moveDrivenCharacter(s, characterID, dx, dy)
 	return x, y, true
+}
+
+// collectDriveInputs gathers every direction and gear want currently pointed
+// at one target, whoever it is.
+//
+// Identical for a character and for a thing, because a direction want does not
+// know or care which it is steering — it names ids, and the only difference is
+// which array they are named in. Written once and passed the field, rather
+// than copied for things and left to drift out of step with this one the first
+// time the vote rules change.
+//
+// Still O(wants) per target per tick: there is no reverse index from a target
+// back to the wants naming it. Accepted at this size; see the design note where
+// the character version was introduced.
+func collectDriveInputs(allWants []*mywant.Want, field, id string) *driveTarget {
+	target := &driveTarget{gearMultiplier: 1}
+	for _, want := range allWants {
+		switch want.Metadata.Type {
+		case "gear":
+			if !wantTargets(want, field, id) {
+				continue
+			}
+			gearVal := gearValueOf(want)
+			if !target.hasGear {
+				target.gearMultiplier = 1
+				target.hasGear = true
+			}
+			target.gearMultiplier *= gearVal
+		case "direction":
+			if !wantTargets(want, field, id) {
+				continue
+			}
+			dxVal, dyVal := directionVectorOf(want)
+			// Raw (unnormalized) vector: a want's magnitude acts as its weight
+			// when combined with other direction wants naming the same target.
+			target.dirVectorX += dxVal
+			target.dirVectorY += dyVal
+			target.hasDirection = true
+		}
+	}
+	return target
 }
 
 // speedOfCharacter resolves a character's own configured speed, falling
@@ -184,11 +199,25 @@ func resolveMotion(going bool, heading float64, hasHeading bool, gearMultiplier,
 	return distance * math.Cos(rad), distance * math.Sin(rad), true
 }
 
+// A want says who it acts on with an array of ids in its current state, and
+// there are two of those now: "characters" and "things". They are read the
+// same way and mean the same thing — everything standing on me, or named by
+// me — so the field is a parameter rather than two copies of this code.
+const (
+	targetsCharacters = "characters"
+	targetsThings     = "things"
+)
+
 // containsCharacter reports whether characterID is in a want's `characters`
 // current-state array.
 func containsCharacter(want *mywant.Want, characterID string) bool {
-	for _, id := range characterIDsOf(want) {
-		if id == characterID {
+	return wantTargets(want, targetsCharacters, characterID)
+}
+
+// wantTargets reports whether id is in the want's `field` current-state array.
+func wantTargets(want *mywant.Want, field, id string) bool {
+	for _, got := range targetIDsOf(want, field) {
+		if got == id {
 			return true
 		}
 	}
@@ -199,7 +228,12 @@ func containsCharacter(want *mywant.Want, characterID string) bool {
 // there from the "characters" parameter at Initialize time, or from
 // footstep occupancy — see button_occupancy.go).
 func characterIDsOf(want *mywant.Want) []string {
-	raw, ok := want.GetCurrent("characters")
+	return targetIDsOf(want, targetsCharacters)
+}
+
+// targetIDsOf reads one of a want's target arrays.
+func targetIDsOf(want *mywant.Want, field string) []string {
+	raw, ok := want.GetCurrent(field)
 	if !ok {
 		return nil
 	}
