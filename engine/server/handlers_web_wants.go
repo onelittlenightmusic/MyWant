@@ -537,6 +537,10 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
     pattern: independent
     labels:
       category-icon: "Globe"
+      # A doorway you walk into, not a plate you press: a page somewhere else
+      # is a way OUT of the board, and the board already has a shape for that.
+      # The form opens when a character stands on it — see forms/types/web.tsx.
+      form-type: web
       category-bg-light: "linear-gradient(160deg, #bfdbfe 0%%, #ddd6fe 100%%)"
       category-bg-dark:  "linear-gradient(160deg, #1e3a5f 0%%, #2d1b69 100%%)"
       source-url: %q%s%s
