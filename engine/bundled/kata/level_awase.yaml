@@ -20,7 +20,7 @@
 # belt you can already put any two things together and see, which is the only
 # way a discovery belt can work.
 levels:
-  - id: level-craft
+  - id: level-awase
     name: 合帯
     grade: 合
     order: 90              # after the graded belts; it is beside them, not above
@@ -29,17 +29,37 @@ levels:
     color: "#f59e0b"
     accent: "#b45309"
     unlocked: true
-    kata: [craft-jikoku, craft-rosen, craft-bansen]
+    kata: [kata-moyori, kata-hatchaku, kata-sou]
 
 kata:
   # Each is two 所作 of kind `thing` under a join, which the evaluator reads as
   # "one constellation holds a thing of this subtype and a thing of that one".
-  # `mark` is what the form leaves on the line between them once it is found.
-  - id: craft-jikoku
-    name: 時刻表
-    reading: jikokuhyou
-    level: level-craft
+  #
+  # The name is the RELATION, never a product. A form makes nothing; what it
+  # gives is the word for a pair that turns out to go together, so the word has
+  # to be the name of how they go together. 路線 was a thing you could imagine
+  # holding — 最寄 is what a station IS to a city. `mark` carries the same word
+  # onto the line between them.
+  - id: kata-moyori
+    name: 最寄
+    reading: moyori
+    level: level-awase
     order: 1
+    veiled: true
+    intent: A station and the city it stands in
+    yields: Which station this place is reached by
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: station }
+      - { kind: thing, subtype: city }
+    mark: { label: 最寄, icon: Navigation }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-hatchaku
+    name: 発着
+    reading: hatchaku
+    level: level-awase
+    order: 2
     veiled: true
     intent: A station and a time, held together
     yields: A departure rather than a place and a number
@@ -47,35 +67,20 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: thing, subtype: time }
-    mark: { label: 時刻表, icon: CalendarClock }
+    mark: { label: 発着, icon: ArrowRightLeft }
     mastery: { shoden: 1, kaiden: 3 }
 
-  - id: craft-rosen
-    name: 路線
-    reading: rosen
-    level: level-craft
-    order: 2
-    veiled: true
-    intent: A station and the city it stands in
-    yields: The line between them, as one place rather than two
-    join: { kind: thing_group }
-    waza:
-      - { kind: thing, subtype: station }
-      - { kind: thing, subtype: city }
-    mark: { label: 路線, icon: TrainTrack }
-    mastery: { shoden: 1, kaiden: 3 }
-
-  - id: craft-bansen
-    name: 番組
-    reading: bangumi
-    level: level-craft
+  - id: kata-sou
+    name: 奏
+    reading: sou
+    level: level-awase
     order: 3
     veiled: true
     intent: A song and whoever made it
-    yields: A set rather than a pile of songs
+    yields: Whose hand this one is in
     join: { kind: thing_group }
     waza:
       - { kind: thing, subtype: song }
       - { kind: thing, subtype: artist }
-    mark: { label: 番組, icon: ListMusic }
+    mark: { label: 奏, icon: AudioLines }
     mastery: { shoden: 1, kaiden: 3 }
