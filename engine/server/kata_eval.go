@@ -41,6 +41,9 @@ type KataProgress struct {
 	Level     string   `json:"level"`
 	Intent    string   `json:"intent,omitempty"`
 	Yields    string   `json:"yields,omitempty"`
+	// Yield is the same answer drawn rather than described — withheld while
+	// veiled, which is what makes finding the combination worth anything.
+	Yield *mywant.KataYield `json:"yield,omitempty"`
 	Contains  []string `json:"contains,omitempty"`
 	Variation string   `json:"variation,omitempty"`
 	// Group is the scope this standing was measured against — the shared thing
@@ -82,6 +85,9 @@ type KataProgress struct {
 	// withheld server-side so it genuinely cannot be ground for.
 	Masked bool `json:"masked"`
 	Hidden bool `json:"hidden"`
+	// Veiled means the blanks are shown and their contents are not — see the
+	// masking below, and Kata.Veiled for why the two secrets differ.
+	Veiled bool `json:"veiled"`
 }
 
 // LevelProgress is one belt's standing.
@@ -289,6 +295,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.AlmostThere = false
 			p.Intent = ""
 			p.Yields = ""
+			p.Yield = nil
 			p.Group = ""
 			p.Constellation = ""
 			// The witnesses would draw the form on the canvas as plainly as the
@@ -300,6 +307,34 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			// so they are withheld too — only the ID and the count of 所作 ship.
 			p.Name = ""
 			p.Reading = ""
+		}
+
+		// 合: a recipe keeps its SHAPE and loses its contents.
+		//
+		// The opposite secret to the 口伝 above, and the reason both exist. A
+		// 口伝 hides that it is there; a recipe is on the shelf with the right
+		// number of blanks in it, because "two ingredients make something" is
+		// the invitation — hide the arity too and there is nothing to be
+		// curious about. So the waza survive as blanks, and only what goes in
+		// them, what comes out, and what it is called are withheld.
+		//
+		// Dropped the moment it is 極まった, once — a recipe you have made is a
+		// recipe you know, and mastery is not the gate here. Finding it is.
+		if p.Veiled && p.Mastery == 0 && !p.Complete {
+			p.Masked = true
+			for i := range p.Waza {
+				p.Waza[i] = WazaProgress{Waza: mywant.Waza{Kind: p.Waza[i].Waza.Kind}}
+			}
+			p.Satisfied = 0
+			p.AlmostThere = false
+			p.Intent = ""
+			p.Yields = ""
+			p.Yield = nil
+			p.Name = ""
+			p.Reading = ""
+			p.LiveWantIDs = nil
+			p.LiveThings = nil
+			p.Unlocks = nil
 		}
 		out = append(out, p)
 	}
@@ -334,7 +369,7 @@ func (s *Server) evaluateOneKata(
 
 	// A joined kata is measured once per group; an unjoined one once, globally.
 	scopes := []*thingScope{nil}
-	if k.Join.Kind == "memo_group" {
+	if joinsOneGroup(k.Join.Kind) {
 		scopes = nil
 		for i := range groups {
 			scopes = append(scopes, &groups[i])
@@ -394,6 +429,8 @@ func (s *Server) evaluateOneKata(
 				Thresholds:    k.Mastery,
 				Unlocks:       k.Unlocks,
 				Hidden:        k.Hidden,
+				Veiled:        k.Veiled,
+				Yield:         k.Yield,
 			}
 
 			// Credit the practice the first time this exact set of witnesses
@@ -460,6 +497,20 @@ func liveEvidence(waza []WazaProgress) (wantIDs, memoIDs []string) {
 	sort.Strings(wantIDs)
 	sort.Strings(memoIDs)
 	return wantIDs, memoIDs
+}
+
+// joinsOneGroup reports whether a kata's 所作 must all resolve inside ONE
+// constellation, rather than anywhere on the board.
+//
+// Two spellings, and the second one is why this function exists. The rename
+// that turned every "memo" into a "thing" reached the seeds and not this test,
+// so all thirteen joined kata declared `thing_group`, matched nothing, and
+// were quietly measured globally — a kata meant to say "these are about the
+// same place" was satisfied by any two things anywhere. Both names are
+// accepted now rather than the seeds being rewritten to the older one, because
+// the seeds have the current vocabulary and this was the straggler.
+func joinsOneGroup(kind string) bool {
+	return kind == "thing_group" || kind == "memo_group"
 }
 
 // thingCatalogKey maps a data type name to the thing.yaml section it is stored

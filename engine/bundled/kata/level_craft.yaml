@@ -1,0 +1,76 @@
+# 合帯 — Combining
+#
+# The other belts are about doing: place a want, point it somewhere, overlap
+# two of them. This one is about DISCOVERING — which two things, put in one
+# constellation, turn out to make a third.
+#
+# So every kata here is veiled. The board lists it with the right number of
+# blanks and nothing else: "two ingredients make something" is the invitation,
+# and which two is what you go and find out. Unveiling one is the reward, and
+# it is permanent — a recipe you have made once is a recipe you know.
+#
+# Always open. A recipe is not a rank: there is nothing to be promoted to and
+# nothing to earn the right to try. Standing on the first belt, you can already
+# put any two things in a constellation and see what happens, which is the only
+# way a discovery belt can work.
+levels:
+  - id: level-craft
+    name: 合帯
+    grade: 合
+    order: 90              # after the graded belts; it is beside them, not above
+    theme: Combining
+    subtitle: Two things in one constellation make a third
+    color: "#f59e0b"
+    accent: "#b45309"
+    unlocked: true
+
+kata:
+  # Each is two `thing` waza under a join, which the evaluator reads as "one
+  # constellation holds a thing of this subtype and a thing of that one".
+  # `yield.subtype` is the seat kept for the recipe rule: today it names what
+  # the pair would produce, and when things start being produced it is what
+  # gets made, with none of these having to be rewritten.
+  - id: craft-jikoku
+    name: 時刻表
+    reading: jikokuhyou
+    level: level-craft
+    order: 1
+    veiled: true
+    intent: A station and a time, held together
+    yields: When this line actually runs
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: station }
+      - { kind: thing, subtype: time }
+    yield: { label: 時刻表, icon: CalendarClock, subtype: timetable }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: craft-rosen
+    name: 路線
+    reading: rosen
+    level: level-craft
+    order: 2
+    veiled: true
+    intent: A station and the city it stands in
+    yields: The line between them, as a place rather than two places
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: station }
+      - { kind: thing, subtype: city }
+    yield: { label: 路線, icon: TrainTrack, subtype: route }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: craft-bansen
+    name: 番組
+    reading: bangumi
+    level: level-craft
+    order: 3
+    veiled: true
+    intent: A song and whoever made it
+    yields: A set list rather than a pile of songs
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: song }
+      - { kind: thing, subtype: artist }
+    yield: { label: 番組, icon: ListMusic, subtype: setlist }
+    mastery: { shoden: 1, kaiden: 3 }
