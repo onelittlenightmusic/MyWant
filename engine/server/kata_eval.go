@@ -47,6 +47,12 @@ type KataProgress struct {
 	Mark      *mywant.KataMark `json:"mark,omitempty"`
 	Contains  []string         `json:"contains,omitempty"`
 	Variation string           `json:"variation,omitempty"`
+	// Constellations is every group this form currently stands on, in the order
+	// they were measured. `Constellation` below is the one the card speaks for;
+	// this is the whole set, because a form is not held in one place only — two
+	// stations are a line on 中央線 AND on 丸の内線 — and the board has to mark
+	// every line it stands on, not the first one the loop happened to meet.
+	Constellations []string `json:"constellations,omitempty"`
 	// Group is the scope this standing was measured against — the shared thing
 	// the 所作 are all about, whether a constellation or a single value standing
 	// on its own. Empty for kata that declare no join.
@@ -303,6 +309,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			// 所作 list would spell it out.
 			p.LiveWantIDs = nil
 			p.LiveThings = nil
+			p.Constellations = nil
 			p.Unlocks = nil
 			// The name and its reading name the form as surely as its 所作 do,
 			// so they are withheld too — only the ID and the count of 所作 ship.
@@ -353,6 +360,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.Reading = ""
 			p.LiveWantIDs = nil
 			p.LiveThings = nil
+			p.Constellations = nil
 			p.Unlocks = nil
 		}
 		out = append(out, p)
@@ -385,6 +393,8 @@ func (s *Server) evaluateOneKata(
 	var best KataProgress
 	bestScore := -1
 	credited := false
+	// Every constellation this form stands on, not just the one it speaks for.
+	var standing []string
 
 	// A joined kata is measured once per group; an unjoined one once, globally.
 	scopes := []*thingScope{nil}
@@ -414,11 +424,6 @@ func (s *Server) evaluateOneKata(
 				wazaProgress = append(wazaProgress, wp)
 			}
 
-			if satisfied <= bestScore {
-				continue
-			}
-			bestScore = satisfied
-
 			groupName := ""
 			if scope != nil {
 				groupName = scope.Name
@@ -426,6 +431,44 @@ func (s *Server) evaluateOneKata(
 			total := len(henka.Waza)
 			complete := total > 0 && satisfied == total
 			liveWants, liveThings := liveEvidence(wazaProgress)
+
+			// Every place it stands, before anything is ranked.
+			//
+			// Crediting used to sit below the ranking test, which meant a
+			// second constellation holding the SAME form scored equal, hit the
+			// `continue`, and was never credited at all — so 練度, which is
+			// supposed to measure exactly that (the same form held in
+			// different places), could never pass one. It also meant the form
+			// named one constellation when it stood on three, and the board
+			// drew its mark on only the first.
+			if complete && groupName != "" {
+				standing = append(standing, groupName)
+			}
+
+			// Credit the practice the first time this exact set of witnesses
+			// completes it. The group joins the key, so the same combination
+			// held for two different places counts as two practices.
+			if complete && beltOpen {
+				key := append([]string{}, witnesses...)
+				if groupName != "" {
+					key = append(key, "group:"+groupName)
+				}
+				if mywant.RecordKataPractice(mywant.KataRecord{
+					KataID:     k.ID,
+					SessionKey: mywant.SessionKeyFor(key),
+					WantIDs:    witnesses,
+					Variation:  henka.ID,
+				}) {
+					credited = true
+				}
+			}
+
+			// Which one the card SPEAKS for: the furthest along, first found.
+			if satisfied <= bestScore {
+				continue
+			}
+			bestScore = satisfied
+
 			best = KataProgress{
 				KataID:        k.ID,
 				Name:          k.Name,
@@ -451,26 +494,9 @@ func (s *Server) evaluateOneKata(
 				Veiled:        k.Veiled,
 				Mark:          k.Mark,
 			}
-
-			// Credit the practice the first time this exact set of witnesses
-			// completes it. The group joins the key, so the same combination
-			// held for two different places counts as two practices.
-			if complete && beltOpen {
-				key := append([]string{}, witnesses...)
-				if groupName != "" {
-					key = append(key, "group:"+groupName)
-				}
-				if mywant.RecordKataPractice(mywant.KataRecord{
-					KataID:     k.ID,
-					SessionKey: mywant.SessionKeyFor(key),
-					WantIDs:    witnesses,
-					Variation:  henka.ID,
-				}) {
-					credited = true
-				}
-			}
 		}
 	}
+	best.Constellations = standing
 
 	best.Mastery = mywant.KataMasteryCount(k.ID)
 	best.MasteryRank = k.RankFor(best.Mastery)
