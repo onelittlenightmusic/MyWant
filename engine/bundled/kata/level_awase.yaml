@@ -52,7 +52,7 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: thing, subtype: city }
-    mark: { label: 最寄, icon: Navigation }
+    mark: { label: 最寄, icon: Footprints }
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-hatchaku
