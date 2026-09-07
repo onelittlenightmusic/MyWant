@@ -30,6 +30,8 @@ kata:
     yields: That station appears as a destination suggestion
     waza:
       - { kind: thing, subtype: station }
+    # What it leaves where it was held — the thing that comes to the name you just gave.
+    mark: { label: 駅, icon: TramFront }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a destination instead of typing it"] }
@@ -44,6 +46,8 @@ kata:
     yields: That city appears as a forecast target suggestion
     waza:
       - { kind: thing, subtype: city }
+    # What it leaves where it was held — a city named is a skyline you can point at.
+    mark: { label: 市, icon: Building2 }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a city instead of typing it"] }
@@ -58,6 +62,8 @@ kata:
     yields: A coordinate becomes something you can call "home" or "the office"
     waza:
       - { kind: thing, subtype: place }
+    # What it leaves where it was held — a coordinate with a name on it is a pin.
+    mark: { label: 標, icon: MapPin }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Places can be referred to by name"] }
@@ -75,6 +81,8 @@ kata:
     yields: A date on the calendar becomes something a want can be aimed at
     waza:
       - { kind: thing, subtype: event }
+    # What it leaves where it was held — an occasion is a square on the calendar.
+    mark: { label: 催, icon: CalendarDays }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick an occasion instead of typing it"] }

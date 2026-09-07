@@ -35,18 +35,18 @@ type WazaProgress struct {
 // KataProgress is a kata's standing: how far along, how deep, and whether it is
 // even visible yet.
 type KataProgress struct {
-	KataID    string   `json:"kataID"`
-	Name      string   `json:"name"`
-	Reading   string   `json:"reading,omitempty"`
-	Level     string   `json:"level"`
-	Intent    string   `json:"intent,omitempty"`
-	Yields    string   `json:"yields,omitempty"`
+	KataID  string `json:"kataID"`
+	Name    string `json:"name"`
+	Reading string `json:"reading,omitempty"`
+	Level   string `json:"level"`
+	Intent  string `json:"intent,omitempty"`
+	Yields  string `json:"yields,omitempty"`
 	// Mark is what the form leaves where it was 極まった, drawn rather than
-	// described — withheld while veiled, which is what makes finding it worth
-	// anything.
-	Mark *mywant.KataMark `json:"mark,omitempty"`
-	Contains  []string `json:"contains,omitempty"`
-	Variation string   `json:"variation,omitempty"`
+	// described. Behind a veil only its icon ships, without the word under it —
+	// enough to be curious about, not enough to be the answer.
+	Mark      *mywant.KataMark `json:"mark,omitempty"`
+	Contains  []string         `json:"contains,omitempty"`
+	Variation string           `json:"variation,omitempty"`
 	// Group is the scope this standing was measured against — the shared thing
 	// the 所作 are all about, whether a constellation or a single value standing
 	// on its own. Empty for kata that declare no join.
@@ -334,7 +334,14 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.AlmostThere = false
 			p.Intent = ""
 			p.Yields = ""
-			p.Mark = nil
+			// The mark keeps its PICTURE and loses its word — the same trade the
+			// 所作 make. A shape behind the veil is the invitation ("this one is
+			// about walking, and I have never walked anything"); the kanji under
+			// it would be the answer. A 口伝 above gets no such hint: hiding that
+			// the form is there at all is the whole of what it does.
+			if p.Mark != nil {
+				p.Mark = &mywant.KataMark{Icon: p.Mark.Icon}
+			}
 			p.Name = ""
 			p.Reading = ""
 			p.LiveWantIDs = nil
