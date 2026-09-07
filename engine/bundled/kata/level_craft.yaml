@@ -29,6 +29,7 @@ levels:
     color: "#f59e0b"
     accent: "#b45309"
     unlocked: true
+    kata: [craft-jikoku, craft-rosen, craft-bansen]
 
 kata:
   # Each is two 所作 of kind `thing` under a join, which the evaluator reads as
