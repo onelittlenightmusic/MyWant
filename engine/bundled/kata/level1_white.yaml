@@ -96,6 +96,9 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: thing, subtype: city }
+    # What this form leaves on the constellation it was held on — a station is
+    # what a city is WALKED to, so the line between them wears footprints.
+    mark: { label: 近, icon: Footprints }
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The two values count as one area"] }

@@ -29,7 +29,7 @@ levels:
     color: "#f59e0b"
     accent: "#b45309"
     unlocked: true
-    kata: [kata-moyori, kata-hatchaku, kata-sou]
+    kata: [kata-hatchaku, kata-sou]
 
 kata:
   # Each is two 所作 of kind `thing` under a join, which the evaluator reads as
@@ -37,24 +37,13 @@ kata:
   #
   # The name is the RELATION, never a product. A form makes nothing; what it
   # gives is the word for a pair that turns out to go together, so the word has
-  # to be the name of how they go together. 路線 was a thing you could imagine
-  # holding — 最寄 is what a station IS to a city. `mark` carries the same word
-  # onto the line between them.
-  - id: kata-moyori
-    name: 最寄
-    reading: moyori
-    level: level-awase
-    order: 1
-    veiled: true
-    intent: A station and the city it stands in
-    yields: Which station this place is reached by
-    join: { kind: thing_group }
-    waza:
-      - { kind: thing, subtype: station }
-      - { kind: thing, subtype: city }
-    mark: { label: 最寄, icon: Footprints }
-    mastery: { shoden: 1, kaiden: 3 }
-
+  # to be the name of how they go together — 発着 is what a time is AT a
+  # station. `mark` carries that word onto the line between them.
+  #
+  # Station + city is deliberately absent: 近 on the white belt already is that
+  # pair, and it was there first. A form invented here that duplicates one of
+  # the graded belts is not a second discovery, it is the same one with two
+  # names — so 近 wears the mark and this belt does not repeat it.
   - id: kata-hatchaku
     name: 発着
     reading: hatchaku
