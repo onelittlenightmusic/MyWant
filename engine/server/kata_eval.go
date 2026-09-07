@@ -328,7 +328,14 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 		if p.Veiled && p.Mastery == 0 && !p.Complete {
 			p.Masked = true
 			for i := range p.Waza {
-				p.Waza[i] = WazaProgress{Waza: mywant.Waza{Kind: p.Waza[i].Waza.Kind}}
+				// Kind and arity survive; what goes in the blank does not. A form
+				// asking for TWO of something is a different invitation from one
+				// asking for two different things, and the card can only draw the
+				// right number of blanks if the count comes with them.
+				p.Waza[i] = WazaProgress{
+					Waza: mywant.Waza{Kind: p.Waza[i].Waza.Kind},
+					Need: p.Waza[i].Need,
+				}
 			}
 			p.Satisfied = 0
 			p.AlmostThere = false

@@ -29,7 +29,8 @@ levels:
     color: "#f59e0b"
     accent: "#b45309"
     unlocked: true
-    kata: [kata-hatchaku, kata-sou]
+    kata: [kata-sen, kata-aida, kata-kei, kata-ren, kata-haba, kata-kumi,
+           kata-hatchaku, kata-sou, kata-kai, kata-yaku, kata-koro, kata-en]
 
 kata:
   # Each is two 所作 of kind `thing` under a join, which the evaluator reads as
@@ -44,11 +45,107 @@ kata:
   # pair, and it was there first. A form invented here that duplicates one of
   # the graded belts is not a second discovery, it is the same one with two
   # names — so 近 wears the mark and this belt does not repeat it.
+  # ── 同じもの二つ ──────────────────────────────────────────────────────────
+  #
+  # A pair does not have to be a pair of DIFFERENT things. Two stations in one
+  # constellation are a line; two times are a span. These are the plainest
+  # forms on the belt and the easiest to stumble into, which is why they open
+  # it — somebody who has named two stations has already half-found one.
+  #
+  # Written as ONE 所作 with `minCount: 2`, never as the same 所作 twice: a
+  # thing 所作 inside a join asks how many values of that subtype the
+  # constellation holds, so two copies of it would both be answered by the one
+  # station and the form would stand on half of itself.
+  - id: kata-sen
+    name: 線
+    reading: sen
+    level: level-awase
+    order: 1
+    veiled: true
+    intent: Two stations, held as one place
+    yields: The run between them, rather than two names
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: station, minCount: 2 }
+    mark: { label: 線, icon: TrainTrack }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-aida
+    name: 間
+    reading: aida
+    level: level-awase
+    order: 2
+    veiled: true
+    intent: Two cities, held together
+    yields: The stretch between them becomes a thing you can ask about
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: city, minCount: 2 }
+    mark: { label: 間, icon: ArrowLeftRight }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-kei
+    name: 径
+    reading: kei
+    level: level-awase
+    order: 3
+    veiled: true
+    intent: Two points on the map, held together
+    yields: A way from one to the other, not two pins
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: place, minCount: 2 }
+    mark: { label: 径, icon: Spline }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-ren
+    name: 連
+    reading: ren
+    level: level-awase
+    order: 4
+    veiled: true
+    intent: Two occasions, held together
+    yields: A series rather than two separate dates
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: event, minCount: 2 }
+    mark: { label: 連, icon: CalendarRange }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-haba
+    name: 幅
+    reading: haba
+    level: level-awase
+    order: 5
+    veiled: true
+    intent: Two times, held together
+    yields: A span rather than two readings of a clock
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: time, minCount: 2 }
+    mark: { label: 幅, icon: Hourglass }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-kumi
+    name: 組
+    reading: kumi
+    level: level-awase
+    order: 6
+    veiled: true
+    intent: Two songs, held together
+    yields: A set rather than two tracks
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: song, minCount: 2 }
+    mark: { label: 組, icon: ListMusic }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  # ── 違うもの二つ ──────────────────────────────────────────────────────────
   - id: kata-hatchaku
     name: 発着
     reading: hatchaku
     level: level-awase
-    order: 2
+    order: 7
     veiled: true
     intent: A station and a time, held together
     yields: A departure rather than a place and a number
@@ -63,7 +160,7 @@ kata:
     name: 奏
     reading: sou
     level: level-awase
-    order: 3
+    order: 8
     veiled: true
     intent: A song and whoever made it
     yields: Whose hand this one is in
@@ -72,4 +169,64 @@ kata:
       - { kind: thing, subtype: song }
       - { kind: thing, subtype: artist }
     mark: { label: 奏, icon: Guitar }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-kai
+    name: 会
+    reading: kai
+    level: level-awase
+    order: 9
+    veiled: true
+    intent: An occasion and the place it is held
+    yields: Somewhere to go, not just a date
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: event }
+      - { kind: thing, subtype: place }
+    mark: { label: 会, icon: MapPinned }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-yaku
+    name: 約
+    reading: yaku
+    level: level-awase
+    order: 10
+    veiled: true
+    intent: A place and a time
+    yields: An appointment, rather than a where and a when
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: place }
+      - { kind: thing, subtype: time }
+    mark: { label: 約, icon: CalendarCheck2 }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-koro
+    name: 頃
+    reading: koro
+    level: level-awase
+    order: 11
+    veiled: true
+    intent: A city and a time of day
+    yields: What hour it is over there
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: city }
+      - { kind: thing, subtype: time }
+    mark: { label: 頃, icon: Globe }
+    mastery: { shoden: 1, kaiden: 3 }
+
+  - id: kata-en
+    name: 演
+    reading: en
+    level: level-awase
+    order: 12
+    veiled: true
+    intent: Whoever plays, and the occasion they play at
+    yields: A performance with a date on it
+    join: { kind: thing_group }
+    waza:
+      - { kind: thing, subtype: artist }
+      - { kind: thing, subtype: event }
+    mark: { label: 演, icon: Mic2 }
     mastery: { shoden: 1, kaiden: 3 }
