@@ -67,7 +67,7 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: thing, subtype: time }
-    mark: { label: 発着, icon: ArrowRightLeft }
+    mark: { label: 発着, icon: CalendarClock }
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-sou
@@ -82,5 +82,5 @@ kata:
     waza:
       - { kind: thing, subtype: song }
       - { kind: thing, subtype: artist }
-    mark: { label: 奏, icon: AudioLines }
+    mark: { label: 奏, icon: Guitar }
     mastery: { shoden: 1, kaiden: 3 }
