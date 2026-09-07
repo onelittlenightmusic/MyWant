@@ -106,17 +106,15 @@ type KataUnlocks struct {
 	Vocabulary []string `yaml:"vocabulary,omitempty" json:"vocabulary,omitempty"` // 語彙
 }
 
-// KataYield is a combination's product, as something that can be drawn.
-type KataYield struct {
-	// What it is called — shown when there is room for a word.
+// KataMark is what a 極まった kata leaves where it was found, as something
+// that can be drawn.
+type KataMark struct {
+	// What the combination is called — the word you now have for it.
 	Label string `yaml:"label,omitempty" json:"label,omitempty"`
 	// A lucide icon name, drawn on the constellation line's own dot once the
-	// combination is known. The icon is the whole reward on the board: a line
-	// between two things that says what they make.
+	// form has been found. A line between two things that says what they turn
+	// out to be together.
 	Icon string `yaml:"icon,omitempty" json:"icon,omitempty"`
-	// The thing subtype this produces, for when a recipe stops being a fact
-	// about the board and starts putting an object on it.
-	Subtype string `yaml:"subtype,omitempty" json:"subtype,omitempty"`
 }
 
 // MasteryThresholds maps rank → number of times the kata must be 極まった.
@@ -140,31 +138,31 @@ type Kata struct {
 	// reach, never gates it.
 	Yields string `yaml:"yields,omitempty" json:"yields,omitempty"`
 
-	// Yield is the same answer as a THING rather than as a sentence — what a
-	// combination hands you, drawn rather than described.
+	// Mark is what this kata leaves on the board where it was 極まった —
+	// drawn, where `yields` is said.
 	//
-	// Alongside `yields` rather than replacing it: a kata whose reward is an
-	// insight ("you now know which trains are late") has nothing to draw, and
-	// a kata whose reward is an object has little to say in prose. Most have
-	// one or the other.
+	// It is not a product. Nothing is made by holding a form; what the mark
+	// records is that this combination WAS found here, on this constellation,
+	// which is why it is drawn on the line between the two 所作 that found it.
 	//
-	// `subtype` is the seat kept for the next step. Today it names what the
-	// combination WOULD produce; when the recipe rule lands it is what gets
-	// produced, and nothing about the recipes already written has to change.
-	Yield *KataYield `yaml:"yield,omitempty" json:"yield,omitempty"`
+	// Alongside `yields` rather than replacing it: a kata whose answer is an
+	// insight has nothing to draw, and one whose answer is a name has little
+	// to say in prose.
+	Mark *KataMark `yaml:"mark,omitempty" json:"mark,omitempty"`
 
-	// Veiled marks a recipe: the kata is LISTED, with the right number of
-	// blanks, and only what goes in them is withheld.
+	// Veiled: the kata is LISTED, with the right number of blanks, and only
+	// what goes in them is withheld — a form you are told exists and have to
+	// find the 所作 of.
 	//
 	// Not the same secret as Hidden, and the difference is the whole point of
 	// having both. A 口伝 hides that it exists at all — you cannot grind for
-	// what you have never heard of. A recipe is the opposite kind of mystery:
-	// "there is a two-ingredient combination here" is exactly what should be
-	// on the shelf, because that is the invitation to go and find out which
-	// two. Hiding the arity as well would leave nothing to be curious about.
+	// what you have never heard of. A veiled form is the opposite kind of
+	// mystery: "there is a form of two 所作 here" is exactly what should be on
+	// the shelf, because that is the invitation to go and find which two.
+	// Hiding the arity as well would leave nothing to be curious about.
 	//
-	// So a veiled kata sends its waza as blanks rather than not at all, and
-	// the board draws `? + ?`.
+	// So a veiled kata sends its 所作 as blanks rather than not at all, and the
+	// board draws `? + ?`.
 	Veiled bool `yaml:"veiled,omitempty" json:"veiled,omitempty"`
 
 	// Hidden marks a 口伝 — it is not listed in advance. It only reveals itself

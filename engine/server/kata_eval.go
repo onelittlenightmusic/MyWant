@@ -41,9 +41,10 @@ type KataProgress struct {
 	Level     string   `json:"level"`
 	Intent    string   `json:"intent,omitempty"`
 	Yields    string   `json:"yields,omitempty"`
-	// Yield is the same answer drawn rather than described — withheld while
-	// veiled, which is what makes finding the combination worth anything.
-	Yield *mywant.KataYield `json:"yield,omitempty"`
+	// Mark is what the form leaves where it was 極まった, drawn rather than
+	// described — withheld while veiled, which is what makes finding it worth
+	// anything.
+	Mark *mywant.KataMark `json:"mark,omitempty"`
 	Contains  []string `json:"contains,omitempty"`
 	Variation string   `json:"variation,omitempty"`
 	// Group is the scope this standing was measured against — the shared thing
@@ -295,7 +296,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.AlmostThere = false
 			p.Intent = ""
 			p.Yields = ""
-			p.Yield = nil
+			p.Mark = nil
 			p.Group = ""
 			p.Constellation = ""
 			// The witnesses would draw the form on the canvas as plainly as the
@@ -309,17 +310,21 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.Reading = ""
 		}
 
-		// 合: a recipe keeps its SHAPE and loses its contents.
+		// 合: a veiled form keeps its SHAPE and loses its contents.
 		//
 		// The opposite secret to the 口伝 above, and the reason both exist. A
-		// 口伝 hides that it is there; a recipe is on the shelf with the right
-		// number of blanks in it, because "two ingredients make something" is
-		// the invitation — hide the arity too and there is nothing to be
-		// curious about. So the waza survive as blanks, and only what goes in
-		// them, what comes out, and what it is called are withheld.
+		// 口伝 hides that it is there; a veiled form is on the shelf with the
+		// right number of blanks in it, because "two 所作 make a form" is the
+		// invitation — hide the arity too and there is nothing to be curious
+		// about. So the 所作 survive as blanks, and only what goes in them,
+		// what it leaves, and what it is called are withheld.
 		//
-		// Dropped the moment it is 極まった, once — a recipe you have made is a
-		// recipe you know, and mastery is not the gate here. Finding it is.
+		// Lifted the moment it is 極まった, once, and it stays lifted: a form
+		// you have held is one you know. 練度 is not the gate here — finding
+		// it is. What 練度 still measures is holding the same form on DIFFERENT
+		// constellations, which the credit key already distinguishes: knowing
+		// that stations and cities go together, and knowing it in three
+		// places, are not the same knowing.
 		if p.Veiled && p.Mastery == 0 && !p.Complete {
 			p.Masked = true
 			for i := range p.Waza {
@@ -329,7 +334,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.AlmostThere = false
 			p.Intent = ""
 			p.Yields = ""
-			p.Yield = nil
+			p.Mark = nil
 			p.Name = ""
 			p.Reading = ""
 			p.LiveWantIDs = nil
@@ -430,7 +435,7 @@ func (s *Server) evaluateOneKata(
 				Unlocks:       k.Unlocks,
 				Hidden:        k.Hidden,
 				Veiled:        k.Veiled,
-				Yield:         k.Yield,
+				Mark:          k.Mark,
 			}
 
 			// Credit the practice the first time this exact set of witnesses
