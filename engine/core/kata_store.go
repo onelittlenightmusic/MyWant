@@ -115,6 +115,15 @@ type KataMark struct {
 	// form has been found. A line between two things that says what they turn
 	// out to be together.
 	Icon string `yaml:"icon,omitempty" json:"icon,omitempty"`
+	// Form is how the constellation's own LINE is drawn once this form stands
+	// on it — a form-type id the GUI resolves in its plugin registry, the way a
+	// want type's `form-type` label is resolved.
+	//
+	// The icon says what a pair turned out to be; this says it in the line
+	// itself. Two stations are a railway, so the line between them stops being
+	// a plain segment and becomes track: 線 sets `form: rail`. Empty leaves the
+	// ordinary line, which is what every form that is not about a shape does.
+	Form string `yaml:"form,omitempty" json:"form,omitempty"`
 }
 
 // MasteryThresholds maps rank → number of times the kata must be 極まった.

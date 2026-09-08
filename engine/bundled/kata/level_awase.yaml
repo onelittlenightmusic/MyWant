@@ -67,7 +67,10 @@ kata:
     join: { kind: thing_group }
     waza:
       - { kind: thing, subtype: station, minCount: 2 }
-    mark: { label: 線, icon: TrainTrack }
+    # `form: rail` redraws the constellation's own line as track — the map
+    # symbol, one line with sleepers across it. A pair of stations IS a
+    # railway, so the line saying so beats a glyph parked on its middle.
+    mark: { label: 線, icon: TrainTrack, form: rail }
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-aida
