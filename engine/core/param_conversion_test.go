@@ -26,7 +26,11 @@ func TestConvertTimeToDatetimeTakesTheNextOne(t *testing.T) {
 }
 
 func TestConvertSubTypeValueOnlyDoesWhatItKnows(t *testing.T) {
-	v, ok := ConvertSubTypeValue("2026-09-11T22:47:00+09:00", "datetime", "time")
+	// Built in the local zone, because that is what a clock reading is: the
+	// same instant is 22:47 in Tokyo and 13:47 in UTC, and hard-coding either
+	// makes the test pass in one place and fail in the other.
+	instant := time.Date(2026, 9, 11, 22, 47, 0, 0, time.Local).Format(time.RFC3339)
+	v, ok := ConvertSubTypeValue(instant, "datetime", "time")
 	if !ok || v != "22:47" {
 		t.Errorf("datetime → time = %v (ok=%v), want 22:47", v, ok)
 	}
