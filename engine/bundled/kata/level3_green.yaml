@@ -84,7 +84,11 @@ kata:
       # budget, which is how a budget is fed: it adds up what the wants below
       # it report. A budget sitting next to the route knows nothing about it,
       # and that is all the form used to ask for.
-      - { kind: want_type, type: budget, owns: { type: transit_search } }
+      # `status: any` because a budget never finishes. It is a watcher: it sits
+      # at `reaching` and keeps adding up what its children report, so asking
+      # for a 極まった one asks for something that does not happen — and the
+      # board then advised placing a second budget beside the two already there.
+      - { kind: want_type, type: budget, status: any, owns: { type: transit_search } }
     # What it leaves where it was held — a route priced is fare counted out.
     mark: { label: 銭, icon: Coins }
     mastery: { shoden: 1, kaiden: 3 }
