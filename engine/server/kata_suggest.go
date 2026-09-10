@@ -89,7 +89,7 @@ func (s *Server) suggestFor(
 				anchor, anchorKind = ids[0], "want"
 			}
 		}
-		return &KataSuggestion{
+		sg := &KataSuggestion{
 			KataID: k.ID, Name: k.Name, Mark: k.Mark,
 			Constellation: scope.Name, Lone: scope.Lone,
 			Kind: wz.Kind, Type: wz.Type,
@@ -97,6 +97,22 @@ func (s *Server) suggestFor(
 			Anchor:     anchor,
 			AnchorKind: anchorKind,
 		}
+		// The wire, as something the new want can be created already carrying.
+		// Only when the provider is known — a declaration pointing at nothing
+		// in particular would be a guess, and the offer would be handing over
+		// a wire with one end loose.
+		if anchorKind == "want" {
+			ref := wireRef(anchor, relatedState(wz))
+			switch {
+			case wz.ParamFrom != nil && wz.ParamFrom.Into != "":
+				sg.ApplyParams = map[string]any{
+					wz.ParamFrom.Into: map[string]any{"fromGlobalParam": ref},
+				}
+			case wz.ImportFrom != nil && wz.ImportFrom.Into != "":
+				sg.ApplyImports = map[string]string{ref: wz.ImportFrom.Into}
+			}
+		}
+		return sg
 	}
 	if wz.Kind != "thing" || wz.Subtype == "" {
 		return nil
@@ -321,4 +337,22 @@ func (s *Server) paramsFrom(
 		}
 	}
 	return false
+}
+
+// relatedState is the state a waza's relation travels on, if it has one.
+func relatedState(wz mywant.Waza) string {
+	switch {
+	case wz.ImportFrom != nil:
+		return wz.ImportFrom.State
+	case wz.ParamFrom != nil:
+		return wz.ParamFrom.State
+	}
+	return ""
+}
+
+// wireRef writes the reference the engine reconciles — see the wirePhase in
+// engine/core: "want:<id>/<state>" is a declaration that this value comes from
+// that want, and the provider's half is arranged from it.
+func wireRef(wantID, state string) string {
+	return "want:" + wantID + "/" + state
 }

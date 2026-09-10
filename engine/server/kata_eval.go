@@ -67,6 +67,15 @@ type KataSuggestion struct {
 	// a want already on the board. A wire offer anchors on the WANT it would be
 	// wired to — that is where the move happens, and beside a station is not.
 	AnchorKind string `json:"anchorKind,omitempty"`
+	// What the new want must DECLARE for the form to hold once it exists.
+	//
+	// The relation is not something to do afterwards: it is part of what is
+	// being asked for, and the want spec can carry it. So the offer hands over
+	// the declaration itself — a parameter fed from the provider's state, or an
+	// import of it — and creating the want with that in its spec is the whole
+	// move. The engine wires the provider's half on reconcile (see wirePhase).
+	ApplyParams  map[string]any    `json:"applyParams,omitempty"`
+	ApplyImports map[string]string `json:"applyImports,omitempty"`
 	// Anchor is a thing of this scope that is on the board — where the offer is
 	// drawn from. Candidate is the thing that would complete it, for a `thing`
 	// offer; a `want_type` offer has none, because the want it asks for does
