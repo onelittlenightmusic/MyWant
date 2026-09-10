@@ -611,6 +611,12 @@ func (cb *ChainBuilder) reconcileWants() {
 	// Phase 2: ORPHAN CLEANUP - Remove child wants whose parent no longer exists
 	cb.orphanCleanupPhase()
 
+	// Phase 2.5: WIRE - Make the board true to what its wants declared.
+	// A want that says where one of its values comes from has said something
+	// about the want at the other end too; this puts that in place before
+	// anything starts and reads it. See wirePhase.
+	cb.wirePhase()
+
 	// Phase 3: CONNECT - Establish want topology
 	if err := cb.connectPhase(); err != nil {
 		return
