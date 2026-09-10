@@ -32,6 +32,39 @@ type WazaProgress struct {
 	Hint string `json:"hint,omitempty"`
 }
 
+// KataSuggestion is one move that would complete a form the player already
+// knows, on a constellation that is already on the board.
+//
+// The point is that it makes nothing. A form is not produced, no value is
+// invented, nothing is placed — it names a connection the player could draw
+// between two things they already have, and the drawing is theirs to do. The
+// board's own answer to "what now?", built out of what is already there.
+//
+// Only for forms the player HAS: a veiled one is withheld here as everywhere
+// else, because "add a station to 国分寺 and you will find something" is the
+// answer to the question the veil is asking.
+type KataSuggestion struct {
+	KataID string `json:"kataID"`
+	Name   string `json:"name"`
+	// Mark is what the completed form would leave, so the offer can be drawn
+	// as the thing it would become.
+	Mark *mywant.KataMark `json:"mark,omitempty"`
+	// The constellation this is about — the one place the move happens.
+	Constellation string `json:"constellation"`
+	// Lone says the "constellation" is a single value standing on its own —
+	// there is no group yet, and accepting the offer makes one.
+	Lone bool `json:"lone,omitempty"`
+	// What is missing: a `thing` of this subtype.
+	Kind    string `json:"kind"`
+	Subtype string `json:"subtype,omitempty"`
+	// One short phrase naming the move, from the waza's own hint.
+	Hint string `json:"hint,omitempty"`
+	// The two tiles the offer is drawn between: a thing already in the scope,
+	// and the one that would complete it.
+	Anchor    string `json:"anchor"`
+	Candidate string `json:"candidate"`
+}
+
 // KataProgress is a kata's standing: how far along, how deep, and whether it is
 // even visible yet.
 type KataProgress struct {
@@ -47,6 +80,10 @@ type KataProgress struct {
 	Mark      *mywant.KataMark `json:"mark,omitempty"`
 	Contains  []string         `json:"contains,omitempty"`
 	Variation string           `json:"variation,omitempty"`
+	// Suggestions are the moves that would complete this form somewhere it is
+	// one 所作 short. Empty for a form that is masked, complete everywhere, or
+	// nowhere near.
+	Suggestions []KataSuggestion `json:"suggestions,omitempty"`
 	// Constellations is every group this form currently stands on, in the order
 	// they were measured. `Constellation` below is the one the card speaks for;
 	// this is the whole set, because a form is not held in one place only — two
@@ -115,6 +152,10 @@ type thingScope struct {
 	BySubtype map[string]map[string]bool
 	// Every value in the group regardless of subtype.
 	AllValues map[string]bool
+	// MemberIDs are the thing ids behind those values — what a suggestion needs
+	// in order to be a line between two tiles rather than a sentence about two
+	// names. Positions live on a thing's own labels, and labels are keyed by id.
+	MemberIDs []string
 	// Lone marks a value standing on its own — no constellation, just itself.
 	// A form that needs one remembered value holds in such a scope; one that
 	// needs two different KINDS of value cannot, which is the whole point.
@@ -184,6 +225,7 @@ func (s *Server) collectKataScopes() []thingScope {
 			}
 			mg.BySubtype[subtype][value] = true
 			mg.AllValues[value] = true
+			mg.MemberIDs = append(mg.MemberIDs, member)
 		}
 		out = append(out, mg)
 	}
@@ -197,12 +239,18 @@ func (s *Server) collectKataScopes() []thingScope {
 			if value == "" || grouped[key+"::"+value] {
 				continue
 			}
-			out = append(out, thingScope{
+			lone := thingScope{
 				Name:      value,
 				BySubtype: map[string]map[string]bool{subtype: {value: true}},
 				AllValues: map[string]bool{value: true},
 				Lone:      true,
-			})
+			}
+			for _, e := range s.thingStore.Entries() {
+				if e.Catalog == key && e.Value == value {
+					lone.MemberIDs = append(lone.MemberIDs, e.ID)
+				}
+			}
+			out = append(out, lone)
 		}
 	}
 
@@ -310,6 +358,9 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.LiveWantIDs = nil
 			p.LiveThings = nil
 			p.Constellations = nil
+			// "Add a station to 国分寺 and you will find something" is the
+			// answer to the question the veil is asking.
+			p.Suggestions = nil
 			p.Unlocks = nil
 			// The name and its reading name the form as surely as its 所作 do,
 			// so they are withheld too — only the ID and the count of 所作 ship.
@@ -361,6 +412,9 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.LiveWantIDs = nil
 			p.LiveThings = nil
 			p.Constellations = nil
+			// "Add a station to 国分寺 and you will find something" is the
+			// answer to the question the veil is asking.
+			p.Suggestions = nil
 			p.Unlocks = nil
 		}
 		out = append(out, p)
@@ -395,6 +449,8 @@ func (s *Server) evaluateOneKata(
 	credited := false
 	// Every constellation this form stands on, not just the one it speaks for.
 	var standing []string
+	// And every place it is one move from standing.
+	var suggestions []KataSuggestion
 
 	// A joined kata is measured once per group; an unjoined one once, globally.
 	scopes := []*thingScope{nil}
@@ -431,6 +487,20 @@ func (s *Server) evaluateOneKata(
 			total := len(henka.Waza)
 			complete := total > 0 && satisfied == total
 			liveWants, liveThings := liveEvidence(wazaProgress)
+
+			// One move short, and the move is worth naming.
+			//
+			// Collected per scope for the same reason the standings are: the
+			// question "what would finish this" is asked of a place, and the
+			// board has many. Only inside a constellation — a form one 所作
+			// short of holding on a value standing alone has no line for the
+			// player to draw, and "remember another station" is advice, not a
+			// move on the board.
+			if total > 1 && satisfied == total-1 && groupName != "" {
+				if sg := s.suggestFor(k, henka.Waza, wazaProgress, scope); sg != nil {
+					suggestions = append(suggestions, *sg)
+				}
+			}
 
 			// Every place it stands, before anything is ranked.
 			//
@@ -497,6 +567,7 @@ func (s *Server) evaluateOneKata(
 		}
 	}
 	best.Constellations = standing
+	best.Suggestions = suggestions
 
 	best.Mastery = mywant.KataMasteryCount(k.ID)
 	best.MasteryRank = k.RankFor(best.Mastery)
