@@ -63,6 +63,10 @@ type KataSuggestion struct {
 	Type    string `json:"type,omitempty"`
 	// One short phrase naming the move, from the waza's own hint.
 	Hint string `json:"hint,omitempty"`
+	// AnchorKind says which map the anchor lives in: a thing of this scope, or
+	// a want already on the board. A wire offer anchors on the WANT it would be
+	// wired to — that is where the move happens, and beside a station is not.
+	AnchorKind string `json:"anchorKind,omitempty"`
 	// Anchor is a thing of this scope that is on the board — where the offer is
 	// drawn from. Candidate is the thing that would complete it, for a `thing`
 	// offer; a `want_type` offer has none, because the want it asks for does
@@ -516,7 +520,7 @@ func (s *Server) evaluateOneKata(
 			// short of holding on nothing at all has no line for the player to
 			// draw, and "remember another station" is advice, not a move.
 			if total >= 3 && satisfied == total-1 && groupName != "" {
-				if sg := s.suggestFor(k, henka.Waza, wazaProgress, scope); sg != nil {
+				if sg := s.suggestFor(k, henka.Waza, wazaProgress, scope, matchedByType); sg != nil {
 					suggestions = append(suggestions, *sg)
 				}
 			}

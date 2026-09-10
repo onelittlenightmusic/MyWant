@@ -30,6 +30,7 @@ func (s *Server) suggestFor(
 	waza []mywant.Waza,
 	progress []WazaProgress,
 	scope *thingScope,
+	matchedByType map[string][]string,
 ) *KataSuggestion {
 	if scope == nil || s.thingStore == nil || s.thingLabels == nil {
 		return nil
@@ -74,12 +75,27 @@ func (s *Server) suggestFor(
 		if wz.Type == "" {
 			return nil
 		}
+		// Where the offer is drawn from.
+		//
+		// A plain want offer belongs beside the group it is about, so a thing
+		// of that group anchors it. A RELATED one does not: "wire the route's
+		// departure into a reminder" is a move made at the route, and drawn
+		// beside a station it points at the wrong end of its own sentence. So
+		// when the form names another want — and an earlier 所作 has already
+		// settled which one counts — the offer stands next to that want.
+		anchor, anchorKind := anchors[0], "thing"
+		if rel := relatedWantType(wz); rel != "" {
+			if ids := matchedByType[rel]; len(ids) > 0 {
+				anchor, anchorKind = ids[0], "want"
+			}
+		}
 		return &KataSuggestion{
 			KataID: k.ID, Name: k.Name, Mark: k.Mark,
 			Constellation: scope.Name, Lone: scope.Lone,
 			Kind: wz.Kind, Type: wz.Type,
-			Hint:   progress[idx].Hint,
-			Anchor: anchors[0],
+			Hint:       progress[idx].Hint,
+			Anchor:     anchor,
+			AnchorKind: anchorKind,
 		}
 	}
 	if wz.Kind != "thing" || wz.Subtype == "" {
@@ -141,6 +157,7 @@ func (s *Server) suggestFor(
 		Subtype:       wz.Subtype,
 		Hint:          progress[idx].Hint,
 		Anchor:        bestA,
+		AnchorKind:    "thing",
 		Candidate:     bestB,
 	}
 }
@@ -241,4 +258,16 @@ func (s *Server) owns(
 		}
 	}
 	return false
+}
+
+// relatedWantType is the want type a waza is tied to, if it is tied to one at
+// all — the other end of a wire, or the child a parent must own.
+func relatedWantType(wz mywant.Waza) string {
+	switch {
+	case wz.ImportFrom != nil:
+		return wz.ImportFrom.Type
+	case wz.Owns != nil:
+		return wz.Owns.Type
+	}
+	return ""
 }
