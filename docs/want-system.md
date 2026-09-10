@@ -198,6 +198,83 @@ wants:
       using: [{role: "producer"}]  # Fan-out from source
 ```
 
+### Taking a Value From Another Want
+
+`using` says a want *depends* on others. It does not carry a value. Moving a
+value between two wants is a separate thing, and which mechanism you need
+depends on **which inlet the value has to land in** — the two are not
+interchangeable, and picking the wrong one draws the connection on the board
+while changing nothing about how the want behaves.
+
+| The value lands in | Provider declares | Consumer declares | What reads it |
+|:---|:---|:---|:---|
+| a **state** field | `exposes: [{currentState: X, as: KEY}]` | `imports: {KEY: myStateKey}` | `GetState`, and anything reading that state |
+| a **parameter** | `exposes: [{currentState: X, asGlobalParam: KEY}]` | `params: {p: {fromGlobalParam: KEY}}` | `GetStringParam` / `GetParameter` — i.e. the want's own code |
+
+An import is live and read-only: the value is never copied, it resolves on
+every read. A `fromGlobalParam` parameter is resolved into the want's effective
+parameters (`resolvedParams`), which take priority over the literal in
+`spec.params` and over the type's default.
+
+```yaml
+# state → state
+- metadata: {name: weather-watch, type: weather}
+  spec:
+    exposes:
+      - currentState: weather_condition
+        as: weather_condition
+- metadata: {name: overlay, type: weather_effect}
+  spec:
+    imports:
+      weather_condition: weather_condition
+
+# state → parameter
+- metadata: {name: route, type: transit_search}
+  spec:
+    params: {from: 中野坂上, to: 国分寺}
+    exposes:
+      - currentState: departure
+        asGlobalParam: leave_at
+- metadata: {name: alarm, type: reminder}
+  spec:
+    params:
+      message: "そろそろ出る"
+      event_time: {fromGlobalParam: leave_at}
+```
+
+#### Declaring the source instead of arranging it
+
+Both halves above have to agree on a key, which means writing the provider's
+half by hand — and a want that is already running has to be edited to add it.
+
+A reference of the form **`want:<id or name>/<state>`**, written where the
+global key goes, says the same thing declaratively: *this value comes from that
+want's state*. Nothing else is needed. On reconcile the engine looks for the
+publisher, and if the named want is not publishing that field yet it **adds the
+expose itself** — `as` for a state inlet, `asGlobalParam` for a parameter one:
+
+```yaml
+# The whole wire, written on the consumer alone.
+- metadata: {name: alarm, type: reminder}
+  spec:
+    params:
+      message: "そろそろ出る"
+      event_time: {fromGlobalParam: "want:route/departure"}
+```
+
+```yaml
+# The same for a state inlet.
+spec:
+  imports:
+    "want:route/departure": scheduled_at
+```
+
+The reference resolves by id or by name. It is idempotent, so it settles on
+every reconcile; it is silent when the named want is not on the board, so a
+reference to a want that arrives later resolves when it does; and adding the
+expose publishes what the field is already holding rather than waiting for its
+next change — which, for a want that has finished, may never come.
+
 ### State Management
 
 MyWant uses **dual-layer state management** and a semantic labeling system known as **GPC** (Goal → Plan → Current).
