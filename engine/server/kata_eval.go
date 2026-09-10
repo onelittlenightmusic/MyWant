@@ -488,15 +488,24 @@ func (s *Server) evaluateOneKata(
 			complete := total > 0 && satisfied == total
 			liveWants, liveThings := liveEvidence(wazaProgress)
 
-			// One move short, and the move is worth naming.
+			// One move short of a form of THREE or more, and the move is
+			// worth naming.
+			//
+			// The arity is the filter that makes this usable. A form of two is
+			// one thing plus one other thing, so every value on the board is
+			// one move from it and the offers come in dozens — 近 alone
+			// accounted for twenty-two of them, all saying the same thing
+			// about the same city. A form of three or more is something the
+			// player has already half-built on purpose, and being told which
+			// single piece would finish it is an answer to a question they
+			// were actually asking.
 			//
 			// Collected per scope for the same reason the standings are: the
 			// question "what would finish this" is asked of a place, and the
-			// board has many. Only inside a constellation — a form one 所作
-			// short of holding on a value standing alone has no line for the
-			// player to draw, and "remember another station" is advice, not a
-			// move on the board.
-			if total > 1 && satisfied == total-1 && groupName != "" {
+			// board has many. Only inside a scope with a name — a form one 所作
+			// short of holding on nothing at all has no line for the player to
+			// draw, and "remember another station" is advice, not a move.
+			if total >= 3 && satisfied == total-1 && groupName != "" {
 				if sg := s.suggestFor(k, henka.Waza, wazaProgress, scope); sg != nil {
 					suggestions = append(suggestions, *sg)
 				}
