@@ -316,3 +316,48 @@ func TestHintNamesBothMovesOnlyWhenTheWantIsMissing(t *testing.T) {
 		t.Errorf("an alarm already standing should ask only for the wire, got %q", standing.Hint)
 	}
 }
+
+// The other inlet. A reminder reads event_time as a parameter, so the wire it
+// needs is {fromGlobalParam} on the parameter, not an import into the state of
+// the same name — and the two must not be mistaken for each other.
+func paramWant(id, typ string, params map[string]any) *mywant.Want {
+	w := &mywant.Want{}
+	w.Metadata.ID = id
+	w.Metadata.Type = typ
+	w.Spec.Params = params
+	return w
+}
+
+func TestParamsFromFeedsTheParameterNotTheState(t *testing.T) {
+	s := &Server{}
+	req := mywant.WazaImport{Type: "transit_search", State: "departure", Into: "event_time"}
+
+	route := wiredWant("route", "transit_search", nil, []mywant.ExposeEntry{
+		{CurrentState: "departure", AsGlobalParam: "leave_at"},
+	})
+	byType := map[string][]*mywant.Want{"transit_search": {route}}
+
+	fed := paramWant("alarm", "reminder", map[string]any{
+		"event_time": map[string]any{"fromGlobalParam": "leave_at"},
+	})
+	if !s.paramsFrom(fed, req, byType, nil) {
+		t.Error("a reminder whose event_time comes from the route's departure is fed by it")
+	}
+
+	// A literal time somebody typed in is not the route's departure.
+	typed := paramWant("alarm2", "reminder", map[string]any{"event_time": "2026-01-01T09:00:00Z"})
+	if s.paramsFrom(typed, req, byType, nil) {
+		t.Error("a hand-typed time is not a wire")
+	}
+	// The import path is a different wire and must not answer for this one.
+	imported := wiredWant("alarm3", "reminder", map[string]string{"leave_at": "event_time"}, nil)
+	if s.paramsFrom(imported, req, byType, nil) {
+		t.Error("an import into state is not a parameter being fed")
+	}
+	// Right wire, wrong state at the far end.
+	other := map[string][]*mywant.Want{"transit_search": {wiredWant("route2", "transit_search", nil,
+		[]mywant.ExposeEntry{{CurrentState: "arrival", AsGlobalParam: "leave_at"}})}}
+	if s.paramsFrom(fed, req, other, nil) {
+		t.Error("the arrival time is not the departure time")
+	}
+}

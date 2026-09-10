@@ -724,6 +724,11 @@ func (s *Server) evaluateWaza(
 				related++
 				continue
 			}
+			// The same wire into the other kind of inlet. See Waza.ParamFrom.
+			if wz.ParamFrom != nil && !s.paramsFrom(w, *wz.ParamFrom, wantsByType, matchedByType) {
+				related++
+				continue
+			}
 			// Or the other way round: the want must be the PARENT of one, which
 			// is how a budget is fed. See Waza.Owns.
 			if wz.Owns != nil && !s.owns(w, *wz.Owns, wantsByType, matchedByType) {
@@ -735,6 +740,12 @@ func (s *Server) evaluateWaza(
 		wp.Have = len(wp.MatchedIDs)
 		if wp.Have < need {
 			switch {
+			case wz.ParamFrom != nil && related > 0:
+				wp.Hint = fmt.Sprintf("Feed the %s's %s into the %s's %s",
+					wz.ParamFrom.Type, wz.ParamFrom.State, wz.Type, wz.ParamFrom.Into)
+			case wz.ParamFrom != nil:
+				wp.Hint = fmt.Sprintf("Place a %s fed by the %s's %s",
+					wz.Type, wz.ParamFrom.Type, wz.ParamFrom.State)
 			case wz.ImportFrom != nil && related > 0:
 				// One is standing there unwired: placing a second never helps.
 				wp.Hint = fmt.Sprintf("Wire the %s's %s into the %s",

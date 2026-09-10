@@ -266,8 +266,59 @@ func relatedWantType(wz mywant.Waza) string {
 	switch {
 	case wz.ImportFrom != nil:
 		return wz.ImportFrom.Type
+	case wz.ParamFrom != nil:
+		return wz.ParamFrom.Type
 	case wz.Owns != nil:
 		return wz.Owns.Type
 	}
 	return ""
+}
+
+// paramsFrom is importsFrom for a parameter inlet.
+//
+// Same wire, different plumbing, because the board has two of them. A state
+// field is fed by `imports: { <globalKey>: <stateKey> }`; a parameter is fed by
+// `params: { <p>: { fromGlobalParam: <globalKey> } }`, resolved into the want's
+// effective parameters — which is what a want's own code reads. Matching the
+// wrong one draws a line and feeds nothing.
+func (s *Server) paramsFrom(
+	consumer *mywant.Want,
+	req mywant.WazaImport,
+	wantsByType map[string][]*mywant.Want,
+	matchedByType map[string][]string,
+) bool {
+	if req.Type == "" || req.State == "" || consumer == nil || len(consumer.Spec.Params) == 0 {
+		return false
+	}
+	allowed := map[string]bool{}
+	for _, id := range matchedByType[req.Type] {
+		allowed[id] = true
+	}
+	for name, v := range consumer.Spec.Params {
+		if req.Into != "" && name != req.Into {
+			continue
+		}
+		ref, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		key, ok := ref["fromGlobalParam"].(string)
+		if !ok || key == "" {
+			continue
+		}
+		for _, provider := range wantsByType[req.Type] {
+			if provider == nil || provider.Metadata.ID == consumer.Metadata.ID {
+				continue
+			}
+			if len(allowed) > 0 && !allowed[provider.Metadata.ID] {
+				continue
+			}
+			for _, exp := range provider.Spec.Exposes {
+				if exp.AsGlobalParam == key && exp.CurrentState == req.State {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

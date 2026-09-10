@@ -75,6 +75,20 @@ type Waza struct {
 	// alarm anywhere and said nothing about the thing it is named for.
 	ImportFrom *WazaImport `yaml:"importFrom,omitempty" json:"importFrom,omitempty"`
 
+	// ParamFrom is ImportFrom for the wants whose inlet is a PARAMETER.
+	//
+	// The board has two kinds of inlet and they are fed by two different
+	// mechanisms. A state field is fed by `imports` — global state key in, live
+	// and read-only. A parameter is fed by `{fromGlobalParam: key}` — resolved
+	// into the want's effective parameters, which is what its code reads.
+	//
+	// 刻 is the second kind and it took a while to notice: a reminder reads
+	// `event_time` with GetStringParam, so an import into the state of the same
+	// name draws a line on the board and changes nothing about when the alarm
+	// goes off. Two notations because there are genuinely two wires; the
+	// declaration is otherwise identical.
+	ParamFrom *WazaImport `yaml:"paramFrom,omitempty" json:"paramFrom,omitempty"`
+
 	// Owns requires this want to be the PARENT of another.
 	//
 	// The other half of "fed by", for the wants that are fed a different way.
@@ -91,14 +105,16 @@ type WazaOwns struct {
 }
 
 // WazaImport is one wire a waza requires: a value this want takes in, and
-// where it has to come from.
+// where it has to come from. Shared by ImportFrom and ParamFrom, which differ
+// only in which inlet they land in.
 type WazaImport struct {
 	// The want type on the other end.
 	Type string `yaml:"type" json:"type"`
 	// The state field it publishes — what actually travels down the wire.
 	State string `yaml:"state" json:"state"`
-	// Which parameter here receives it. Optional: without it any parameter
-	// will do, which is the right default for a want with one obvious inlet.
+	// Which inlet here receives it — a state key for ImportFrom, a parameter
+	// name for ParamFrom. Optional: without it any inlet will do, which is the
+	// right default for a want with one obvious one.
 	Into string `yaml:"into,omitempty" json:"into,omitempty"`
 }
 
