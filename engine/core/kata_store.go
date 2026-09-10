@@ -74,6 +74,20 @@ type Waza struct {
 	// alarm's event_time. Written without this, the form was satisfied by any
 	// alarm anywhere and said nothing about the thing it is named for.
 	ImportFrom *WazaImport `yaml:"importFrom,omitempty" json:"importFrom,omitempty"`
+
+	// Owns requires this want to be the PARENT of another.
+	//
+	// The other half of "fed by", for the wants that are fed a different way.
+	// A budget does not import a fare from anywhere — it adds up what the
+	// wants under it report, so what makes 銭 true is not a budget beside the
+	// route but a budget the route is under. Same idea as ImportFrom, spelled
+	// in the relation the engine actually uses for it (OwnerReferences).
+	Owns *WazaOwns `yaml:"owns,omitempty" json:"owns,omitempty"`
+}
+
+// WazaOwns is a want this one must be the parent of.
+type WazaOwns struct {
+	Type string `yaml:"type" json:"type"`
 }
 
 // WazaImport is one wire a waza requires: a value this want takes in, and

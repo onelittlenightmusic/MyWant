@@ -206,3 +206,39 @@ func (s *Server) importsFrom(
 	}
 	return false
 }
+
+// owns reports whether `parent` is the controlling owner of a want of the
+// named type.
+//
+// The relation a budget is fed by: it adds up what the wants under it report,
+// so "a budget and a route on the same board" is not the form and "a budget
+// the route is under" is. Pinned providers narrow it the same way importsFrom
+// does — the route that arrives HERE, not any route.
+func (s *Server) owns(
+	parent *mywant.Want,
+	req mywant.WazaOwns,
+	wantsByType map[string][]*mywant.Want,
+	matchedByType map[string][]string,
+) bool {
+	if req.Type == "" || parent == nil {
+		return false
+	}
+	allowed := map[string]bool{}
+	for _, id := range matchedByType[req.Type] {
+		allowed[id] = true
+	}
+	for _, child := range wantsByType[req.Type] {
+		if child == nil || child.Metadata.ID == parent.Metadata.ID {
+			continue
+		}
+		if len(allowed) > 0 && !allowed[child.Metadata.ID] {
+			continue
+		}
+		for _, ref := range child.Metadata.OwnerReferences {
+			if ref.Kind == "Want" && ref.Controller && ref.ID == parent.Metadata.ID {
+				return true
+			}
+		}
+	}
+	return false
+}

@@ -80,7 +80,11 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: want_type, type: transit_search, join: to }
-      - { kind: want_type, type: budget }
+      # "The fare lands in the budget" — so the route has to be UNDER the
+      # budget, which is how a budget is fed: it adds up what the wants below
+      # it report. A budget sitting next to the route knows nothing about it,
+      # and that is all the form used to ask for.
+      - { kind: want_type, type: budget, owns: { type: transit_search } }
     # What it leaves where it was held — a route priced is fare counted out.
     mark: { label: 銭, icon: Coins }
     mastery: { shoden: 1, kaiden: 3 }

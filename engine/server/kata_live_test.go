@@ -273,3 +273,46 @@ func TestImportsFromHonoursTheRouteAlreadyPinned(t *testing.T) {
 		t.Error("wired to a route that arrives somewhere else — not this form")
 	}
 }
+
+// A budget is not fed by a wire but by what is under it, so 銭 asks for
+// ownership. Same shape of question as importsFrom, different relation.
+func TestOwnsWantsTheChildNotTheNeighbour(t *testing.T) {
+	s := &Server{}
+	req := mywant.WazaOwns{Type: "transit_search"}
+
+	budget := wiredWant("budget", "budget", nil, nil)
+	loose := wiredWant("route", "transit_search", nil, nil)
+	byType := map[string][]*mywant.Want{"transit_search": {loose}}
+	if s.owns(budget, req, byType, nil) {
+		t.Error("a route standing beside a budget is not under it")
+	}
+
+	child := wiredWant("route2", "transit_search", nil, nil)
+	child.Metadata.OwnerReferences = []mywant.OwnerReference{
+		{Kind: "Want", Controller: true, ID: "budget"},
+	}
+	if !s.owns(budget, req, map[string][]*mywant.Want{"transit_search": {child}}, nil) {
+		t.Error("a route owned by the budget is under it")
+	}
+}
+
+// The two halves of a compound offer. What is missing decides which sentence
+// is useful: with nothing of the kind on the board, both moves; with one
+// standing there unrelated, only the second — placing a second alarm never
+// helped anybody.
+func TestHintNamesBothMovesOnlyWhenTheWantIsMissing(t *testing.T) {
+	s := &Server{}
+	wz := mywant.Waza{Kind: "want_type", Type: "reminder", Status: "any",
+		ImportFrom: &mywant.WazaImport{Type: "transit_search", State: "departure"}}
+
+	empty := s.evaluateWaza(wz, map[string][]*mywant.Want{}, nil, nil)
+	if !strings.Contains(empty.Hint, "Place a reminder and wire") {
+		t.Errorf("nothing on the board should ask for both moves, got %q", empty.Hint)
+	}
+
+	unwired := map[string][]*mywant.Want{"reminder": {wiredWant("a", "reminder", nil, nil)}}
+	standing := s.evaluateWaza(wz, unwired, nil, nil)
+	if !strings.HasPrefix(standing.Hint, "Wire the") {
+		t.Errorf("an alarm already standing should ask only for the wire, got %q", standing.Hint)
+	}
+}

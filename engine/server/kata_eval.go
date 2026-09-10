@@ -699,6 +699,11 @@ func (s *Server) evaluateWaza(
 
 	switch wz.Kind {
 	case "want_type":
+		// Wants of the right type, in the right place, that fail only the
+		// relation. The difference between "there is no alarm" and "the alarm
+		// is not wired to anything" is the difference between two pieces of
+		// advice, and only one of them is any use.
+		related := 0
 		for _, w := range wantsByType[wz.Type] {
 			if !wantMatchesStatus(w, wz.Status) {
 				continue
@@ -712,6 +717,13 @@ func (s *Server) evaluateWaza(
 			// Wired: the want must be FED BY another, not merely accompanied
 			// by one. See Waza.ImportFrom.
 			if wz.ImportFrom != nil && !s.importsFrom(w, *wz.ImportFrom, wantsByType, matchedByType) {
+				related++
+				continue
+			}
+			// Or the other way round: the want must be the PARENT of one, which
+			// is how a budget is fed. See Waza.Owns.
+			if wz.Owns != nil && !s.owns(w, *wz.Owns, wantsByType, matchedByType) {
+				related++
 				continue
 			}
 			wp.MatchedIDs = append(wp.MatchedIDs, w.Metadata.ID)
@@ -719,11 +731,21 @@ func (s *Server) evaluateWaza(
 		wp.Have = len(wp.MatchedIDs)
 		if wp.Have < need {
 			switch {
-			case wz.ImportFrom != nil:
-				// The wire is the point, so the hint names the wire rather
-				// than the want — placing a second alarm never helps.
-				wp.Hint = fmt.Sprintf("Wire a %s's %s into a %s",
+			case wz.ImportFrom != nil && related > 0:
+				// One is standing there unwired: placing a second never helps.
+				wp.Hint = fmt.Sprintf("Wire the %s's %s into the %s",
 					wz.ImportFrom.Type, wz.ImportFrom.State, wz.Type)
+			case wz.ImportFrom != nil:
+				// Nothing of the kind on the board: both halves of the move,
+				// because arriving with only the first done is arriving
+				// nowhere.
+				wp.Hint = fmt.Sprintf("Place a %s and wire the %s's %s into it",
+					wz.Type, wz.ImportFrom.Type, wz.ImportFrom.State)
+			case wz.Owns != nil && related > 0:
+				wp.Hint = fmt.Sprintf("Put the %s under the %s", wz.Owns.Type, wz.Type)
+			case wz.Owns != nil:
+				wp.Hint = fmt.Sprintf("Place a %s and put the %s under it",
+					wz.Type, wz.Owns.Type)
 			case wz.Join != "" && scope != nil && scope.Name != "":
 				wp.Hint = fmt.Sprintf("Place a %s aimed at %q", wz.Type, scope.Name)
 			case wz.Status == "any":
