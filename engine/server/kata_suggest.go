@@ -47,9 +47,6 @@ func (s *Server) suggestFor(
 		return nil
 	}
 	wz := waza[idx]
-	if wz.Kind != "thing" || wz.Subtype == "" {
-		return nil
-	}
 
 	labels := s.thingLabels.All()
 	onBoard := func(id string) bool {
@@ -65,6 +62,26 @@ func (s *Server) suggestFor(
 		}
 	}
 	if len(anchors) == 0 {
+		return nil
+	}
+
+	// A missing WANT is answered by putting one down, not by joining two things
+	// that exist — so the offer stops here, with somewhere to draw it and the
+	// type to draw. Where exactly the tile goes is the board's business: it
+	// knows which cells are free, and the engine does not.
+	if wz.Kind == "want_type" {
+		if wz.Type == "" {
+			return nil
+		}
+		return &KataSuggestion{
+			KataID: k.ID, Name: k.Name, Mark: k.Mark,
+			Constellation: scope.Name, Lone: scope.Lone,
+			Kind: wz.Kind, Type: wz.Type,
+			Hint:   progress[idx].Hint,
+			Anchor: anchors[0],
+		}
+	}
+	if wz.Kind != "thing" || wz.Subtype == "" {
 		return nil
 	}
 

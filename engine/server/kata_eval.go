@@ -54,15 +54,21 @@ type KataSuggestion struct {
 	// Lone says the "constellation" is a single value standing on its own —
 	// there is no group yet, and accepting the offer makes one.
 	Lone bool `json:"lone,omitempty"`
-	// What is missing: a `thing` of this subtype.
+	// What is missing: a `thing` of this subtype, or a `want_type` of this
+	// type. The two are different offers — one joins two tiles that exist, the
+	// other puts a tile down that does not — so the board draws them
+	// differently, but both are "one move and this form holds".
 	Kind    string `json:"kind"`
 	Subtype string `json:"subtype,omitempty"`
+	Type    string `json:"type,omitempty"`
 	// One short phrase naming the move, from the waza's own hint.
 	Hint string `json:"hint,omitempty"`
-	// The two tiles the offer is drawn between: a thing already in the scope,
-	// and the one that would complete it.
+	// Anchor is a thing of this scope that is on the board — where the offer is
+	// drawn from. Candidate is the thing that would complete it, for a `thing`
+	// offer; a `want_type` offer has none, because the want it asks for does
+	// not exist yet.
 	Anchor    string `json:"anchor"`
-	Candidate string `json:"candidate"`
+	Candidate string `json:"candidate,omitempty"`
 }
 
 // KataProgress is a kata's standing: how far along, how deep, and whether it is
