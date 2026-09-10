@@ -40,6 +40,10 @@ wantType:
       RFC3339 formatted time for the scheduled event.
       Either event_time or duration_from_now or when spec (recurring) must be provided.
     type: string
+    # An instant, not a clock reading. Said out loud so a want feeding this from
+    # a plain `time` — a departure board's "22:47" — is converted on the way in
+    # rather than rejected as malformed.
+    subType: datetime
     required: false
     example: "2025-12-28T14:00:00Z"
 

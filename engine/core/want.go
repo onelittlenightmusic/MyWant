@@ -352,6 +352,15 @@ type Want struct {
 	// (GetStringParam etc.) check this before falling back to Spec.Params.
 	resolvedParams map[string]any `json:"-" yaml:"-"`
 
+	// paramConversions is set when a parameter is fed by another want whose
+	// value is of a compatible but differently-written kind — a departure is
+	// "22:47" and a reminder's event_time is RFC3339. The connection is real
+	// and the value is right; only the writing differs, and asking a person to
+	// insert a converter want between the two would be asking them to do
+	// arithmetic the board can do. Registered where the wire is made (see
+	// wirePhase) and applied on the way out of the param accessors.
+	paramConversions map[string]paramConversion `json:"-" yaml:"-"`
+
 	// Retry mechanism for failed phases
 	PhaseRetryCount map[string]int `json:"phase_retry_count,omitempty" yaml:"phase_retry_count,omitempty"`
 	LastPhaseError  string         `json:"last_phase_error,omitempty" yaml:"last_phase_error,omitempty"`

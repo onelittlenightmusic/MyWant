@@ -269,6 +269,28 @@ spec:
     "want:route/departure": scheduled_at
 ```
 
+#### Compatible kinds are converted, not refused
+
+A wire can be right and still not usable. A route's `departure` is a `time` —
+`"22:47"`, which is what a departure board says — and a reminder's `event_time`
+is a `datetime`, an instant. Both are the moment to leave; only the writing
+differs.
+
+Both ends already declare what they deal in (`subType` on the state field and on
+the parameter). When they differ by writing rather than by meaning, the wire
+registers the conversion and the parameter reads its own kind:
+
+| from | to | reading |
+|:---|:---|:---|
+| `time` | `datetime` | the NEXT occurrence of that clock time — 00:20 read at 23:50 is twenty minutes away, not sixteen hours ago |
+| `date` | `datetime` | midnight, local |
+| `datetime` | `time` / `date` | the clock reading / the day |
+
+Anything else is passed through untouched, so a real mismatch stays visible
+instead of being papered over with a guess. Conversion happens on every read,
+not once when the wire is made: the value behind a live reference changes, and
+a conversion done once would be a copy of the first answer.
+
 The reference resolves by id or by name. It is idempotent, so it settles on
 every reconcile; it is silent when the named want is not on the board, so a
 reference to a want that arrives later resolves when it does; and adding the

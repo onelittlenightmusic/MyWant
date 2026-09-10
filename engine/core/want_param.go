@@ -21,14 +21,84 @@ func (n *Want) setResolvedParam(key string, value any) {
 func (n *Want) getRawParamLocked(key string) (any, bool) {
 	if n.resolvedParams != nil {
 		if v, ok := n.resolvedParams[key]; ok {
-			return v, true
+			return n.convertParamLocked(key, v), true
 		}
 	}
 	if n.Spec.Params == nil {
 		return nil, false
 	}
 	value, exists := n.Spec.Params[key]
-	return value, exists
+	if !exists {
+		return nil, false
+	}
+	return n.convertParamLocked(key, value), true
+}
+
+// convertParamLocked rewrites a value into the kind this parameter is written
+// in, when the wire feeding it carries a compatible but differently-written
+// one. Applied on the way OUT rather than when the wire is made: the value
+// behind a live reference changes, and a conversion done once would be a copy
+// of the first answer.
+func (n *Want) convertParamLocked(key string, v any) any {
+	if len(n.paramConversions) == 0 {
+		return v
+	}
+	c, ok := n.paramConversions[key]
+	if !ok {
+		return v
+	}
+	if converted, ok := ConvertSubTypeValue(v, c.From, c.To); ok {
+		return converted
+	}
+	return v
+}
+
+// ResolveGlobalParamRef re-reads one {fromGlobalParam: key} parameter from the
+// global store.
+//
+// Params are resolved once, when a want's type definition is set — which is
+// before anything has had a chance to publish. A want that declares where its
+// value comes from is exactly the case where the publisher may not have existed
+// yet, so the wire that arranges it re-asks afterwards rather than leaving the
+// reference to resolve on some later restart.
+//
+// Returns whether a value was found.
+func (n *Want) ResolveGlobalParamRef(param string) bool {
+	n.metadataMutex.RLock()
+	raw, ok := n.Spec.Params[param]
+	n.metadataMutex.RUnlock()
+	if !ok {
+		return false
+	}
+	ref, ok := raw.(map[string]any)
+	if !ok {
+		return false
+	}
+	key, ok := ref["fromGlobalParam"].(string)
+	if !ok || key == "" {
+		return false
+	}
+	v, ok := GetGlobalParameter(key)
+	if !ok {
+		return false
+	}
+	n.setResolvedParam(param, v)
+	return true
+}
+
+// SetParamConversion records that this parameter is fed a `from`-shaped value
+// and reads a `to`-shaped one. Idempotent; an empty pair clears it.
+func (n *Want) SetParamConversion(param, from, to string) {
+	n.metadataMutex.Lock()
+	defer n.metadataMutex.Unlock()
+	if from == "" || to == "" || from == to {
+		delete(n.paramConversions, param)
+		return
+	}
+	if n.paramConversions == nil {
+		n.paramConversions = make(map[string]paramConversion)
+	}
+	n.paramConversions[param] = paramConversion{From: from, To: to}
 }
 
 // GetParameter returns the effective parameter value (resolved, if the param

@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"strings"
+	"time"
 
 	ws "github.com/onelittlenightmusic/want-spec"
 )
@@ -52,7 +53,10 @@ func (cb *ChainBuilder) wirePhase() {
 		state    string
 		key      string
 		asParam  bool
-		consumer string
+		consumer *Want
+		// The parameter this lands in, for a param inlet — what a conversion
+		// would have to be registered against.
+		param string
 	}
 	byTarget := map[string][]need{}
 
@@ -63,17 +67,17 @@ func (cb *ChainBuilder) wirePhase() {
 		}
 		for key := range w.Spec.Imports {
 			if target, state, ok := parseWireRef(key); ok {
-				byTarget[target] = append(byTarget[target], need{state: state, key: key, consumer: w.Metadata.Name})
+				byTarget[target] = append(byTarget[target], need{state: state, key: key, consumer: w})
 			}
 		}
-		for _, v := range w.Spec.Params {
+		for pname, v := range w.Spec.Params {
 			ref, ok := v.(map[string]any)
 			if !ok {
 				continue
 			}
 			key, _ := ref["fromGlobalParam"].(string)
 			if target, state, ok := parseWireRef(key); ok {
-				byTarget[target] = append(byTarget[target], need{state: state, key: key, asParam: true, consumer: w.Metadata.Name})
+				byTarget[target] = append(byTarget[target], need{state: state, key: key, asParam: true, consumer: w, param: pname})
 			}
 		}
 	}
@@ -102,7 +106,23 @@ func (cb *ChainBuilder) wirePhase() {
 			}
 			provider.Spec.Exposes = append(provider.Spec.Exposes, entry)
 			changed = true
-			DebugLog("[Wiring] %s now publishes %s for %s", provider.Metadata.Name, n.state, n.consumer)
+			DebugLog("[Wiring] %s now publishes %s for %s", provider.Metadata.Name, n.state, n.consumer.Metadata.Name)
+		}
+		// A wire can be right and still not usable. Both ends declare what kind
+		// of value they deal in, and when those differ by writing rather than by
+		// meaning the board converts rather than complains — see
+		// ConvertSubTypeValue.
+		for _, n := range needs {
+			if !n.asParam || n.param == "" {
+				continue
+			}
+			cb.registerParamConversion(n.consumer, n.param, provider, n.state)
+			// And read it now. A want resolves its {fromGlobalParam} references
+			// when its type definition is set, which is before anything has
+			// published — and a want that declares where its value comes from
+			// is precisely the case where the publisher did not exist yet. Left
+			// alone it would wait for a restart to notice.
+			n.consumer.ResolveGlobalParamRef(n.param)
 		}
 		if changed {
 			// Re-register so the new expose gets its subscription — and so the
@@ -145,4 +165,51 @@ func hasExposeFor(w *Want, state, key string, asParam bool) bool {
 		}
 	}
 	return false
+}
+
+// registerParamConversion tells the consumer what shape the value arriving in
+// this parameter is written in, when it differs from the shape the parameter is
+// read in.
+//
+// Both ends already say so: a state field and a parameter each declare a
+// subType in their want type. Nothing was comparing them, so a departure
+// ("22:47") landed in an event_time that only reads RFC3339, the reminder took
+// it as malformed, and the wire — which was correct — did nothing. The types
+// were there to be asked all along.
+func (cb *ChainBuilder) registerParamConversion(consumer *Want, param string, provider *Want, state string) {
+	if consumer == nil || provider == nil || cb.wantTypeDefinitions == nil {
+		return
+	}
+	from := ""
+	if def, ok := cb.wantTypeDefinitions[provider.Metadata.Type]; ok && def != nil {
+		for _, sd := range def.State {
+			if sd.Name == state {
+				from = sd.SubType
+				break
+			}
+		}
+	}
+	to := ""
+	if def, ok := cb.wantTypeDefinitions[consumer.Metadata.Type]; ok && def != nil {
+		for _, pd := range def.Parameters {
+			if pd.Name == param {
+				to = pd.SubType
+				break
+			}
+		}
+	}
+	if from == "" || to == "" || from == to {
+		return
+	}
+	// Only register what can actually be converted, so an unconvertible
+	// mismatch stays visible rather than being quietly passed through a
+	// conversion that never fires.
+	if _, ok := ConvertSubTypeValue("00:00", from, to); !ok {
+		if _, ok := ConvertSubTypeValue(time.Now().Format(time.RFC3339), from, to); !ok {
+			return
+		}
+	}
+	consumer.SetParamConversion(param, from, to)
+	DebugLog("[Wiring] %s.%s reads %s", consumer.Metadata.Name, param,
+		describeConversion(paramConversion{From: from, To: to}))
 }
