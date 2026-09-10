@@ -208,3 +208,68 @@ func TestCollectKataScopesGivesLoneValuesTheirOwnScope(t *testing.T) {
 		t.Error("a value inside a constellation must not also stand alone")
 	}
 }
+
+// A wire is two halves that have to agree: the provider exposes a state under a
+// key, the consumer imports that key into a parameter. Neither half alone is
+// the form — which is the whole reason 刻 needed importFrom.
+func wiredWant(id, typ string, imports map[string]string, exposes []mywant.ExposeEntry) *mywant.Want {
+	w := &mywant.Want{}
+	w.Metadata.ID = id
+	w.Metadata.Type = typ
+	w.Spec.Imports = imports
+	w.Spec.Exposes = exposes
+	return w
+}
+
+func TestImportsFromNeedsBothHalvesOfTheWire(t *testing.T) {
+	s := &Server{}
+	req := mywant.WazaImport{Type: "transit_search", State: "departure", Into: "event_time"}
+
+	route := wiredWant("route", "transit_search", nil, []mywant.ExposeEntry{
+		{CurrentState: "departure", As: "leave_at"},
+	})
+	byType := map[string][]*mywant.Want{"transit_search": {route}}
+
+	wired := wiredWant("alarm", "reminder", map[string]string{"leave_at": "event_time"}, nil)
+	if !s.importsFrom(wired, req, byType, nil) {
+		t.Error("an alarm importing the route's departure is wired; importsFrom said it was not")
+	}
+
+	// The alarm that merely exists — the case the form used to accept.
+	if s.importsFrom(wiredWant("alarm2", "reminder", nil, nil), req, byType, nil) {
+		t.Error("an alarm with no imports is not wired to anything")
+	}
+	// Right key, wrong inlet.
+	elsewhere := wiredWant("alarm3", "reminder", map[string]string{"leave_at": "message"}, nil)
+	if s.importsFrom(elsewhere, req, byType, nil) {
+		t.Error("the departure landing in `message` is not the form; `into` was ignored")
+	}
+	// Right inlet, but the provider publishes a different state.
+	other := map[string][]*mywant.Want{"transit_search": {wiredWant("route2", "transit_search", nil,
+		[]mywant.ExposeEntry{{CurrentState: "arrival", As: "leave_at"}})}}
+	if s.importsFrom(wired, req, other, nil) {
+		t.Error("importing the arrival is not importing the departure")
+	}
+}
+
+// When an earlier 所作 has already settled which route counts — the one that
+// arrives in THIS group — the wire has to run to that one and not to any other.
+func TestImportsFromHonoursTheRouteAlreadyPinned(t *testing.T) {
+	s := &Server{}
+	req := mywant.WazaImport{Type: "transit_search", State: "departure"}
+	here := wiredWant("route-here", "transit_search", nil, []mywant.ExposeEntry{
+		{CurrentState: "departure", As: "k1"},
+	})
+	elsewhere := wiredWant("route-elsewhere", "transit_search", nil, []mywant.ExposeEntry{
+		{CurrentState: "departure", As: "k2"},
+	})
+	byType := map[string][]*mywant.Want{"transit_search": {here, elsewhere}}
+	pinned := map[string][]string{"transit_search": {"route-here"}}
+
+	if !s.importsFrom(wiredWant("a", "reminder", map[string]string{"k1": "event_time"}, nil), req, byType, pinned) {
+		t.Error("wired to the pinned route, which is the one the form is about")
+	}
+	if s.importsFrom(wiredWant("b", "reminder", map[string]string{"k2": "event_time"}, nil), req, byType, pinned) {
+		t.Error("wired to a route that arrives somewhere else — not this form")
+	}
+}

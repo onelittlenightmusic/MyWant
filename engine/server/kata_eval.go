@@ -477,11 +477,15 @@ func (s *Server) evaluateOneKata(
 			satisfied := 0
 			witnesses := make([]string, 0, 8)
 
+			matchedByType := map[string][]string{}
 			for _, wz := range henka.Waza {
-				wp := s.evaluateWaza(wz, wantsByType, scope)
+				wp := s.evaluateWaza(wz, wantsByType, scope, matchedByType)
 				if wp.Satisfied {
 					satisfied++
 					witnesses = append(witnesses, wp.MatchedIDs...)
+				}
+				if wz.Kind == "want_type" && wz.Type != "" && len(wp.MatchedIDs) > 0 {
+					matchedByType[wz.Type] = append(matchedByType[wz.Type], wp.MatchedIDs...)
 				}
 				wazaProgress = append(wazaProgress, wp)
 			}
@@ -684,6 +688,11 @@ func (s *Server) evaluateWaza(
 	wz mywant.Waza,
 	wantsByType map[string][]*mywant.Want,
 	scope *thingScope,
+	// What the 所作 before this one settled on, by want type. A wire has two
+	// ends, and when a sibling 所作 has already said WHICH want of that type
+	// counts here — the route that arrives in this group, not any route — the
+	// wire has to run to that one. Empty for the types nothing has pinned yet.
+	matchedByType map[string][]string,
 ) WazaProgress {
 	need := wz.Need()
 	wp := WazaProgress{Waza: wz, Need: need}
@@ -700,11 +709,21 @@ func (s *Server) evaluateWaza(
 					continue
 				}
 			}
+			// Wired: the want must be FED BY another, not merely accompanied
+			// by one. See Waza.ImportFrom.
+			if wz.ImportFrom != nil && !s.importsFrom(w, *wz.ImportFrom, wantsByType, matchedByType) {
+				continue
+			}
 			wp.MatchedIDs = append(wp.MatchedIDs, w.Metadata.ID)
 		}
 		wp.Have = len(wp.MatchedIDs)
 		if wp.Have < need {
 			switch {
+			case wz.ImportFrom != nil:
+				// The wire is the point, so the hint names the wire rather
+				// than the want — placing a second alarm never helps.
+				wp.Hint = fmt.Sprintf("Wire a %s's %s into a %s",
+					wz.ImportFrom.Type, wz.ImportFrom.State, wz.Type)
 			case wz.Join != "" && scope != nil && scope.Name != "":
 				wp.Hint = fmt.Sprintf("Place a %s aimed at %q", wz.Type, scope.Name)
 			case wz.Status == "any":

@@ -55,7 +55,12 @@ kata:
     waza:
       - { kind: thing, subtype: station }
       - { kind: want_type, type: transit_search, join: to }
-      - { kind: want_type, type: reminder }
+      # Not "and an alarm somewhere". The route's own departure has to be what
+      # the alarm goes off on — that IS the form, and written as a bare
+      # want_type it was satisfied by any alarm on the board and said nothing
+      # about working the time backwards.
+      - { kind: want_type, type: reminder,
+          importFrom: { type: transit_search, state: departure, into: event_time } }
     # What it leaves where it was held — a departure that tells you when to leave.
     mark: { label: 刻, icon: AlarmClock }
     mastery: { shoden: 1, kaiden: 3 }

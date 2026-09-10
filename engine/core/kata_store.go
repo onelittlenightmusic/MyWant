@@ -61,6 +61,31 @@ type Waza struct {
 	// joined memo group. Only meaningful on want_type waza inside a kata that
 	// declares a join — it is what makes two wants be about the same thing.
 	Join string `yaml:"join,omitempty" json:"join,omitempty"`
+
+	// ImportFrom requires this want to be WIRED to another one.
+	//
+	// Join says two wants are about the same value. This says something
+	// stronger and much rarer: that one of them is FED BY the other — its
+	// parameter is not typed in, it arrives from the other want's state.
+	//
+	// 刻 is the form that needed it. "A departure time worked backwards from
+	// when you want to arrive" is not a route and an alarm that happen to be
+	// on the board together; it is the route's own departure landing in the
+	// alarm's event_time. Written without this, the form was satisfied by any
+	// alarm anywhere and said nothing about the thing it is named for.
+	ImportFrom *WazaImport `yaml:"importFrom,omitempty" json:"importFrom,omitempty"`
+}
+
+// WazaImport is one wire a waza requires: a value this want takes in, and
+// where it has to come from.
+type WazaImport struct {
+	// The want type on the other end.
+	Type string `yaml:"type" json:"type"`
+	// The state field it publishes — what actually travels down the wire.
+	State string `yaml:"state" json:"state"`
+	// Which parameter here receives it. Optional: without it any parameter
+	// will do, which is the right default for a want with one obvious inlet.
+	Into string `yaml:"into,omitempty" json:"into,omitempty"`
 }
 
 // Need returns how many occurrences this waza requires (always >= 1).

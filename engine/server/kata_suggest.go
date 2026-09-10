@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 
@@ -155,4 +156,53 @@ func boardPos(l map[string]string) (x, y float64, ok bool) {
 		return 0, 0, false
 	}
 	return fx, fy, true
+}
+
+// importsFrom reports whether `consumer` takes one of its parameters from a
+// want of the named type, out of the named state.
+//
+// The wire is spelled in two halves and both must be there: the provider
+// declares `exposes: [{ currentState: departure, as: <key> }]`, and the
+// consumer declares `imports: { <key>: event_time }`. Matching them here rather
+// than trusting either side alone is the difference between "a route and an
+// alarm are both on the board" and "this alarm goes off when that route says
+// to leave".
+//
+// When a 所作 earlier in the same form has already settled which wants of the
+// provider's type count — the route that arrives in THIS group, not any route
+// — the wire has to run to one of those. Otherwise any want of the type will
+// do, which is the right answer for a form that never pinned one.
+func (s *Server) importsFrom(
+	consumer *mywant.Want,
+	req mywant.WazaImport,
+	wantsByType map[string][]*mywant.Want,
+	matchedByType map[string][]string,
+) bool {
+	if req.Type == "" || req.State == "" || consumer == nil || len(consumer.Spec.Imports) == 0 {
+		return false
+	}
+	allowed := map[string]bool{}
+	for _, id := range matchedByType[req.Type] {
+		allowed[id] = true
+	}
+	for globalKey, localKey := range consumer.Spec.Imports {
+		// Pinned to one inlet, when the form says which.
+		if req.Into != "" && fmt.Sprintf("%v", localKey) != req.Into {
+			continue
+		}
+		for _, provider := range wantsByType[req.Type] {
+			if provider == nil || provider.Metadata.ID == consumer.Metadata.ID {
+				continue
+			}
+			if len(allowed) > 0 && !allowed[provider.Metadata.ID] {
+				continue
+			}
+			for _, exp := range provider.Spec.Exposes {
+				if exp.As == globalKey && exp.CurrentState == req.State {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
