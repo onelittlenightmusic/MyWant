@@ -799,10 +799,22 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 		// records as: a route takes a named place in a field that records
 		// stations, and a list built from subType alone would have hidden it
 		// from a place being dropped on the board.
+		//
+		// paramSlots keeps the same information un-deduplicated, one entry per
+		// parameter that takes a subtype at all. A selection of several things
+		// has to know whether a type has room for all of them — transit takes
+		// two stations, a weather lookup takes one — and a flattened set of
+		// distinct subtypes cannot answer that: it says "station" once either
+		// way.
 		paramSubtypes := []string{}
+		paramSlots := [][]string{}
 		seen := map[string]bool{}
 		for _, p := range d.Parameters {
-			for _, st := range p.AcceptedSubTypes() {
+			accepted := p.AcceptedSubTypes()
+			if len(accepted) > 0 {
+				paramSlots = append(paramSlots, accepted)
+			}
+			for _, st := range accepted {
 				if !seen[st] {
 					seen[st] = true
 					paramSubtypes = append(paramSubtypes, st)
@@ -821,6 +833,7 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 			"system_type":   d.Metadata.SystemType,
 			"labels":        d.Metadata.Labels,
 			"paramSubtypes": paramSubtypes,
+			"paramSlots":    paramSlots,
 		}
 		if origin := s.wantTypeLoader.GetOrigin(d.Metadata.Name); origin != nil {
 			res[i]["source"] = origin
