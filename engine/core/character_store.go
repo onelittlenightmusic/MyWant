@@ -63,6 +63,22 @@ type Character struct {
 	// default", so a character created before any of this looks exactly as it
 	// always did.
 	Display CharacterDisplay `yaml:"display,omitempty" json:"display,omitempty"`
+	// Shape is the outline this character is drawn inside wherever they appear:
+	// standing on the canvas, on somebody else's screen, in the minimap. One of
+	// the ids the frontend's shape catalog offers ("circle", "star", "ship",
+	// "airplane", …); empty means the circle everybody was before shapes
+	// existed, so no stored character needs migrating.
+	//
+	// Identity, alongside Name/Avatar/Color, rather than one of the Display
+	// preferences above: everyone sharing the board sees a person in the shape
+	// that person chose. That is the whole reason a shape is worth having on
+	// top of a colour — it still tells two people apart at minimap size, under
+	// a glow, or for someone who does not separate those two hues.
+	//
+	// Deliberately not validated against a list here: the catalog is the
+	// frontend's, it grows there, and an id this server has never heard of
+	// draws the default circle rather than nothing (see characterShapePath).
+	Shape string `yaml:"shape,omitempty" json:"shape,omitempty"`
 }
 
 // CharacterDisplay carries one person's look-and-feel choices.
@@ -322,6 +338,15 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			updated.AuraCardWantID = c.AuraCardWantID // preserve aura-card pick
 			updated.TileDesign = c.TileDesign         // preserve design picks (set via /design)
 			updated.AuraDesign = c.AuraDesign
+			// The rest of what /design and /display own. Same rule as the two
+			// above, and it was missing: this endpoint's callers send identity
+			// (name, avatar, colour, shape) and nothing else, so picking a
+			// colour erased how fast that character walks and every
+			// look-and-feel choice they had made. A field belongs to exactly
+			// one endpoint; every other endpoint preserves it.
+			updated.MoveSpeed = c.MoveSpeed
+			updated.Speed = c.Speed
+			updated.Display = c.Display
 			m.store.Characters[i] = updated
 			m.save()
 			return true
