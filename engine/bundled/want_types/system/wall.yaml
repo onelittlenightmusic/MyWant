@@ -26,6 +26,12 @@ wantType:
       # a board that opened a card for each of them would never be about
       # anything else. Standing on one says nothing either.
       highlightable: "false"
+      # Nor worth a count. The same argument as highlightable, for the third
+      # mark a wall was still making: an unread badge on every wall in a room
+      # is a board covered in numbers nobody reads. The notification is still
+      # raised and still counted server-side — this only stops it being drawn
+      # on the canvas tile and in the want list.
+      notification: "false"
       type-icon: "BrickWall"
       category-icon: "BrickWall"
       list-visible: "false"
