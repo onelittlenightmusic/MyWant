@@ -44,6 +44,20 @@ var guiStateVolatileKeys = map[string]bool{
 	"source":               true,
 }
 
+func init() {
+	// Device settings and the roster of connected browsers are not GUI state
+	// either — they are facts about this machine and about who is online right
+	// now, neither of which a board has any business remembering. Carrying them
+	// is what made "set home" come undone: a world writes its GUI state when it
+	// is left and replays it when entered, so switching boards restored the
+	// browser that had been pinned the last time you left THAT board. The
+	// settings now live in devices.yaml (device_store.go) and the roster is
+	// rebuilt by the heartbeat within thirty seconds of any restart.
+	for _, k := range mywant.DeviceGUIStateKeys {
+		guiStateVolatileKeys[k] = true
+	}
+}
+
 // worldGUIStateDir returns <worldsDir>/gui, where every world's GUI state lives.
 func worldGUIStateDir(dir string) string {
 	return filepath.Join(dir, "gui")
@@ -122,6 +136,13 @@ func (s *Server) saveWorldGUIState(dir, name string) error {
 	if prior := readWorldGUIState(dir, name); prior != nil {
 		merged := make(map[string]any, len(prior)+len(state))
 		for k, v := range prior {
+			// Not what the world already wrote down, if the world should never
+			// have been writing it: a file saved before device settings moved
+			// out still carries them, and keeping them would leave a value in
+			// there that nothing applies and somebody will one day believe.
+			if guiStateVolatileKeys[k] {
+				continue
+			}
 			merged[k] = v
 		}
 		for k, v := range state {

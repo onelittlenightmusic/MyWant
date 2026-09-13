@@ -1188,10 +1188,6 @@ type pendingActionResponse struct {
 // polls this used to require. Checked in priority order — auto-launch, then
 // nav-launch, then browser-run — and returns the first one found; an idle
 // poll (nothing pending anywhere) gets back {kind: ""}.
-// homeBrowserDevice is the gui_state key naming the browser that browser work
-// is pinned to. Empty means unpinned.
-const homeBrowserDeviceKey = "homeBrowserDevice"
-
 // pollerIsHomeBrowser reports whether this poller may claim work.
 //
 // Every extension polling this server used to be interchangeable, so whichever
@@ -1200,12 +1196,12 @@ const homeBrowserDeviceKey = "homeBrowserDevice"
 // it is served; work then waits for that browser rather than going somewhere
 // the user cannot see. With no home named, any poller is served, which is the
 // behaviour every existing install has.
+// Read from devices.yaml rather than from the gui_state want: the want is only
+// a mirror, and the mirror is what a world switch overwrites (device_store.go).
+// A poller asking for work while the board was being changed under it used to
+// be able to get an answer meant for a different browser.
 func (s *Server) pollerIsHomeBrowser(r *http.Request) bool {
-	want := s.findWantByIDInAll(guiStateWantID)
-	if want == nil {
-		return true
-	}
-	home := mywant.GetCurrent(want, homeBrowserDeviceKey, "")
+	home := mywant.GetDeviceStore().Home()
 	if home == "" {
 		return true
 	}

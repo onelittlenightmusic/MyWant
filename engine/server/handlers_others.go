@@ -1442,19 +1442,12 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	// Archive ride / web-presence transitions as durable traces.
 	logPresenceTraces(priorPresence, updates)
 
-	// Persist device settings to config.yaml so they survive server restarts.
-	configDirty := false
-	if v, ok := updates["activeLocationDevice"]; ok {
-		s.config.ActiveLocationDevice, _ = v.(string)
-		configDirty = true
-	}
-	if v, ok := updates["locationWantId"]; ok {
-		s.config.LocationWantId, _ = v.(string)
-		configDirty = true
-	}
-	if configDirty {
-		s.saveFrontendConfig()
-	}
+	// Device settings go to devices.yaml, which is their home — a pinned
+	// browser is a fact about this machine, not about the board you happen to
+	// be looking at. The want keeps them as a mirror (stored above with
+	// everything else) so clients reading gui_state see them; the overlay in
+	// guiStateWithConfig is what makes the file the answer.
+	mywant.GetDeviceStore().ApplyGUIUpdates(updates)
 
 	// Append robot log entry when a new robot command arrives (visible=true, nonce present)
 	if vis, ok := updates["robot_visible"]; ok {
@@ -1759,20 +1752,25 @@ func (s *Server) replayRobotLog(w http.ResponseWriter, r *http.Request) {
 }
 
 // guiFields returns the declared GUI state fields via ProvidedStateFields.
-// guiStateWithConfig returns the gui_state want's fields with device settings
-// restored from config.yaml. The gui_state want's own state resets on a server
-// restart, but config.yaml persists activeLocationDevice / locationWantId — so
-// applying them here keeps location sending alive across restarts for both the
-// GET response and every SSE broadcast (an unrelated PUT must not push an empty
-// activeLocationDevice that would turn the sending device off).
+// guiStateWithConfig returns the gui_state want's fields with the device
+// settings put back from devices.yaml, which is where they actually live (see
+// device_store.go).
+//
+// The want carries them too, as a live mirror clients read, but it is not their
+// home: a world's GUI snapshot is replayed over the want's state when the world
+// is entered, so anything kept only there comes undone when you switch boards.
+// That is what happened to the pinned browser. Overlaying on the way out — for
+// the GET response and for every SSE broadcast alike — means an unrelated PUT
+// can never push a stale or empty device setting at a client either.
+//
+// Written unconditionally, empty included: "" is how the GUI unpins a device,
+// and treating it as "no opinion" would make unpinning impossible.
 func (s *Server) guiStateWithConfig(want *mywant.Want) map[string]any {
 	state := guiFields(want)
-	if s.config.ActiveLocationDevice != "" {
-		state["activeLocationDevice"] = s.config.ActiveLocationDevice
-	}
-	if s.config.LocationWantId != "" {
-		state["locationWantId"] = s.config.LocationWantId
-	}
+	d := mywant.GetDeviceStore().Settings()
+	state[mywant.DeviceKeyHome] = d.HomeBrowserDevice
+	state[mywant.DeviceKeyActiveLocation] = d.ActiveLocationDevice
+	state[mywant.DeviceKeyLocationWant] = d.LocationWantID
 	return state
 }
 

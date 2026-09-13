@@ -516,6 +516,28 @@ func (s *Server) Start() error {
 		s.useWorldThings(world)
 	}
 
+	// Device settings belong to this machine, so they now live in devices.yaml
+	// (device_store.go). Adopt what an install made before that file existed:
+	// the two location fields from their config.yaml duplicates, and the pinned
+	// browser out of the gui_state want, which was its only home and therefore
+	// the thing worlds kept undoing. Both only fill what is still empty, so
+	// this is safe on every startup.
+	{
+		store := mywant.GetDeviceStore()
+		store.AdoptLegacy(s.config.ActiveLocationDevice, s.config.LocationWantId)
+		if want := s.findWantByIDInAll(guiStateWantID); want != nil {
+			// The RAW state, not GetCurrent: that accessor requires the key to
+			// carry the "current" label, labels come from the want type's YAML,
+			// and homeBrowserDevice was never declared there — it is one of the
+			// keys PUT /gui/state registers on the fly. So GetCurrent returned
+			// "" for it no matter what was stored, which is also exactly how
+			// pollerIsHomeBrowser silently never honoured a pinned browser.
+			if home, _ := want.GetAllState()[mywant.DeviceKeyHome].(string); home != "" {
+				store.AdoptHome(home)
+			}
+		}
+	}
+
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	s.httpServer = &http.Server{
@@ -673,9 +695,14 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.CurrentWorld != "" {
 		fullConfig["current_world"] = s.config.CurrentWorld
 	}
-	// Device settings — always write (empty string clears the field)
-	fullConfig["active_location_device"] = s.config.ActiveLocationDevice
-	fullConfig["location_want_id"] = s.config.LocationWantId
+	// Device settings live in devices.yaml now (device_store.go). Still written
+	// here so `mywant config` and an old reader keep seeing the current value —
+	// a copy that is refreshed from the file, not a second place to set it.
+	{
+		d := mywant.GetDeviceStore().Settings()
+		fullConfig["active_location_device"] = d.ActiveLocationDevice
+		fullConfig["location_want_id"] = d.LocationWantID
+	}
 	fullConfig["web_inspector_lan_host"] = s.config.WebInspectorLANHost
 	fullConfig["web_inspector_ca_cert_path"] = s.config.WebInspectorCACertPath
 	fullConfig["web_inspector_external_host"] = s.config.WebInspectorExternalHost
