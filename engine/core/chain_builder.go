@@ -1305,6 +1305,12 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 		}
 	}
 
+	// A want's answers came through state.yaml and belong back in the ring —
+	// they are the one history that outlives the process (result_history.go).
+	// After both branches, because both of them have just taken History from
+	// the config and this is the half of it the rings do not get for free.
+	wantPtr.RestoreResultHistory(wantConfig.ResultHistory)
+
 	// Initialize labels from definition
 	if typeDef != nil {
 		wantPtr.SetStateLabels(typeDef)

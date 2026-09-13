@@ -148,7 +148,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			// GetAllStateDeep.
 			stateCopy := runtimeWant.want.GetAllStateDeep()
 			want.storeStateMulti(stateCopy)
-			want.History = runtimeWant.want.BuildHistory() // Include history in stats writes
+			want.History = runtimeWant.want.BuildHistory()  // Include history in stats writes
+			want.ResultHistory = want.History.ResultHistory // ...and persist the answers (result_history.go)
 		}
 		updatedWants = append(updatedWants, want)
 	}
@@ -169,6 +170,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 				Status:  runtimeWant.want.Status,
 				History: runtimeWant.want.BuildHistory(), // Include history in stats writes
 			}
+			wantConfig.ResultHistory = wantConfig.History.ResultHistory // see above
 			wantConfig.storeStateMulti(stateCopy)
 			updatedWants = append(updatedWants, wantConfig)
 		}

@@ -11,7 +11,9 @@ type HistoryManager struct {
 	ParameterHistoryRing *ringBuffer[StateHistoryEntry]
 	LogHistoryRing       *ringBuffer[LogHistoryEntry]
 	AgentHistoryRing     *ringBuffer[AgentExecution]
-	mu                   sync.Mutex
+	// ResultHistoryRing holds the want's answers, shaped (see result_history.go).
+	ResultHistoryRing *ringBuffer[ResultHistoryEntry]
+	mu                sync.Mutex
 
 	// OnStateEntry is called after a state entry is recorded. Used by Want to emit
 	// OTEL span events without coupling HistoryManager to the tracing library.
@@ -25,6 +27,7 @@ func NewHistoryManager() *HistoryManager {
 		ParameterHistoryRing: newRingBuffer[StateHistoryEntry](50),
 		LogHistoryRing:       newRingBuffer[LogHistoryEntry](100),
 		AgentHistoryRing:     newRingBuffer[AgentExecution](100),
+		ResultHistoryRing:    newRingBuffer[ResultHistoryEntry](resultHistoryDepth),
 	}
 }
 
@@ -38,6 +41,7 @@ func (h *HistoryManager) GetHistory() WantHistory {
 		ParameterHistory: h.ParameterHistoryRing.Snapshot(0),
 		LogHistory:       h.LogHistoryRing.Snapshot(0),
 		AgentHistory:     h.AgentHistoryRing.Snapshot(0),
+		ResultHistory:    h.ResultHistoryRing.Snapshot(0),
 	}
 }
 
@@ -67,6 +71,28 @@ func (h *HistoryManager) AddStateEntry(key string, value any) {
 	if h.OnStateEntry != nil {
 		h.OnStateEntry(key, value)
 	}
+}
+
+// AddResultEntry records an answer, or notes that the last one is still current.
+//
+// The merge here is by VALUE, not by time the way AddStateEntry's is: a monitor
+// want re-checks on its own schedule and usually finds what it found last time,
+// and twenty copies of one reservation is not a history of anything. Two
+// answers that fingerprint the same are one answer seen twice, and the second
+// sighting only moves LastSeen.
+func (h *HistoryManager) AddResultEntry(entry ResultHistoryEntry) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	fp := resultFingerprint(entry)
+	if last, ok := h.ResultHistoryRing.PeekLast(); ok && resultFingerprint(last) == fp {
+		h.ResultHistoryRing.UpdateLast(func(e *ResultHistoryEntry) {
+			e.LastSeen = entry.Timestamp
+		})
+		return
+	}
+
+	h.ResultHistoryRing.Append(entry)
 }
 
 // AddParameterEntry adds an entry to parameter history, with similar merging logic

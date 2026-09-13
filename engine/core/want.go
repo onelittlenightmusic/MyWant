@@ -95,6 +95,9 @@ type WantHistory struct {
 	StateHistory     []StateHistoryEntry `json:"stateHistory" yaml:"stateHistory"`
 	AgentHistory     []AgentExecution    `json:"agentHistory,omitempty" yaml:"agentHistory,omitempty"`
 	LogHistory       []LogHistoryEntry   `json:"logHistory,omitempty" yaml:"logHistory,omitempty"`
+	// ResultHistory is what this want has ANSWERED, newest last — one entry per
+	// distinct answer rather than one per write. See result_history.go.
+	ResultHistory []ResultHistoryEntry `json:"resultHistory,omitempty" yaml:"resultHistory,omitempty"`
 }
 
 // LogHistoryEntry represents a collection of log messages from a single Exec cycle
@@ -220,7 +223,14 @@ type Want struct {
 	StateLabels     map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
 	HiddenState     map[string]any        `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
 	History         WantHistory           `json:"history" yaml:"-"`
-	Hash            string                `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
+	// ResultHistory is the one history that goes through state.yaml, so a want's
+	// answers survive a `mywant restart` — History above is `yaml:"-"` because
+	// two hundred per-write snapshots per want would dwarf the state they are
+	// snapshots of. Written from the ring by writeStatsToMemory, read back into
+	// it by RestoreResultHistory; `json:"-"` because the API already carries
+	// these under history.resultHistory and twice is once too many.
+	ResultHistory []ResultHistoryEntry `json:"-" yaml:"result_history,omitempty"`
+	Hash          string               `json:"hash,omitempty" yaml:"hash,omitempty"` // Hash for change detection (metadata, spec, all state fields, status)
 
 	// History ring buffers - private, lock-free concurrent stores (populated at runtime, not serialized)
 	// History tracking (ring buffers)
@@ -250,6 +260,11 @@ type Want struct {
 	// door type has eighteen — can be skipped whole.
 	derivedAtRevision uint64
 	derivedOnce       bool
+	// resultRecordedAtRevision is the same idea for the answer history: an
+	// answer cannot have changed while the state stood still, and this runs on
+	// every reconcile of every want.
+	resultRecordedAtRevision uint64
+	resultRecordedOnce       bool
 
 	// Agent system
 	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`
@@ -733,6 +748,12 @@ func (n *Want) EndProgressCycle() {
 			}
 		}
 	}
+
+	// Keep the answer as an answer. Last in the cycle on purpose: everything
+	// above — the fetchFrom expansion, the derived fields, the final result
+	// itself — is part of what this run found, and an entry taken any earlier
+	// would be the answer half assembled.
+	n.recordResultHistory()
 
 	n.inExecCycle = false
 }
