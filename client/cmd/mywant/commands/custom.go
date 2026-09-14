@@ -293,9 +293,16 @@ func updateCustomsOnTarget(names []string) error {
 	fmt.Printf("Updating %d custom(s) on %s\n\n", len(selected), customTargetLabel())
 
 	var failed []string
+	// One reload for the whole run, after everything is on disk: each reload
+	// re-scans every custom type, so doing it per custom was N full rescans and
+	// N copies of the same summary. Tracked here because the note about agents
+	// needing a restart is only worth printing if some custom actually brought
+	// one.
+	anyAgents := false
 	for _, rec := range selected {
 		fmt.Printf("%s\n", rec.Name)
-		newVersion, newCommit, err := updateOneCustom(rec)
+		newVersion, newCommit, hasAgents, err := updateOneCustom(rec, false)
+		anyAgents = anyAgents || hasAgents
 		if err != nil {
 			fmt.Printf("  failed:     %v\n\n", err)
 			failed = append(failed, rec.Name)
@@ -318,6 +325,12 @@ func updateCustomsOnTarget(names []string) error {
 			fmt.Printf("  updated:    %s -> %s\n", was, now)
 		}
 		fmt.Println()
+	}
+
+	// Only when something was actually installed: an update where every custom
+	// failed has nothing for the server to re-read.
+	if len(failed) < len(selected) && !customNoReload && remoteServer() == "" {
+		reloadLocalWantTypes(anyAgents)
 	}
 
 	if len(failed) > 0 {
@@ -368,7 +381,14 @@ func selectCustomsToUpdate(customs []mywant.CustomRecord, names []string) ([]myw
 // updateOneCustom reinstalls a single record from its own source, keeping the
 // name and component kinds it was installed with, and returns its new version
 // and commit.
-func updateOneCustom(rec mywant.CustomRecord) (version, commit string, err error) {
+// updateOneCustom re-installs one custom.
+//
+// `reload` is false when the caller is updating several and will reload once
+// at the end — see updateCustomsOnTarget. Reloading per custom re-scans the
+// whole custom-types directory each time, so updating eighteen plugins asked
+// the server to re-register all thirty-eight types eighteen times and printed
+// the same "reloaded 38 user custom types" line eighteen times with it.
+func updateOneCustom(rec mywant.CustomRecord, reload bool) (version, commit string, hasAgents bool, err error) {
 	kind := strings.Join(rec.Kinds(), ",")
 
 	// Without --to the source carries no ref and the install keeps whatever pin
@@ -381,25 +401,30 @@ func updateOneCustom(rec mywant.CustomRecord) (version, commit string, err error
 	if target := remoteServer(); target != "" {
 		result, err := client.NewClient(viper.GetString("server")).InstallCustom(source, rec.Name, kind, false)
 		if err != nil {
-			return "", "", err
+			return "", "", false, err
 		}
-		reportReload(result)
+		// A remote install reloads server-side whatever we do, so only the
+		// reporting can be held back — which is the half that was noisy.
+		if reload {
+			reportReload(result)
+		}
 		if custom, ok := result["custom"].(map[string]any); ok {
 			version, _ := custom["version"].(string)
 			commit, _ := custom["commit"].(string)
-			return version, commit, nil
+			return version, commit, false, nil
 		}
-		return "", "", nil
+		return "", "", false, nil
 	}
 
 	updated, err := mywant.InstallCustom(source, rec.Name, kind, false)
 	if err != nil {
-		return "", "", err
+		return "", "", false, err
 	}
-	if !customNoReload {
-		reloadLocalWantTypes(len(updated.Agents) > 0)
+	agents := len(updated.Agents) > 0
+	if reload && !customNoReload {
+		reloadLocalWantTypes(agents)
 	}
-	return updated.Version, updated.Commit, nil
+	return updated.Version, updated.Commit, agents, nil
 }
 
 func uninstallCustomOnTarget(name string) error {

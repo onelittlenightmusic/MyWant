@@ -73,6 +73,9 @@ type WantTypeLoader struct {
 	validPatterns   []string
 	validCategories map[string]bool
 	loadWarnings    []string
+	// warnedGates remembers which finalize-gate notes have already been said,
+	// so a reload does not say them again — see warnFinalizeGates.
+	warnedGates     map[string]bool
 	predefinedState []StateDef                // Common state fields merged into every want type
 	userCustomNames map[string]bool           // types loaded from ~/.mywant/custom-types/ (user-deletable)
 	origins         map[string]WantTypeOrigin // provenance by type name, see want_type_origin.go
@@ -633,14 +636,36 @@ func finalizeGateWarnings(def *WantTypeDefinition) []string {
 	return out
 }
 
-// warnFinalizeGates logs whatever finalizeGateWarnings found. Called wherever a
-// definition is taken into the loader, which is the one place every type passes
-// through however it arrived — a bundled file, ~/.mywant/custom-types, or the
-// API.
+// warnFinalizeGates logs whatever finalizeGateWarnings found, once per gate for
+// the life of the process. Called wherever a definition is taken into the
+// loader, which is the one place every type passes through however it arrived —
+// a bundled file, ~/.mywant/custom-types, or the API.
+//
+// Once, and to the log only, because of how reloading actually works:
+// `mywant custom update` reloads the user custom types ONCE PER PLUGIN and each
+// reload re-scans the whole directory, so a single update of eighteen plugins
+// re-registered all thirty-eight types eighteen times over. Put in
+// loadWarnings — the channel for "what went wrong with THIS reload", which the
+// CLI prints under the plugin it just updated — one type's design note was
+// reported under every plugin on every update, which is both noise and a lie
+// about whose problem it is.
+//
+// A gate that was fixed and then broken again is not warned about twice; this
+// is a hint for whoever is reading the log at startup, not an alert.
 func (w *WantTypeLoader) warnFinalizeGates(def *WantTypeDefinition) {
-	for _, msg := range finalizeGateWarnings(def) {
+	msgs := finalizeGateWarnings(def)
+	if len(msgs) == 0 {
+		return
+	}
+	if w.warnedGates == nil {
+		w.warnedGates = map[string]bool{}
+	}
+	for _, msg := range msgs {
+		if w.warnedGates[msg] {
+			continue
+		}
+		w.warnedGates[msg] = true
 		WarnLog("[WANT-TYPE] %s\n", msg)
-		w.loadWarnings = append(w.loadWarnings, msg)
 	}
 }
 
