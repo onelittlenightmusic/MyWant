@@ -395,11 +395,69 @@ var configGetCmd = &cobra.Command{
 	},
 }
 
+// configResetCmd replaces the whole file, which is why it is the only command
+// here that asks first and the only one that refuses arguments.
+//
+// It takes NO key. Every other write in this package merges onto what is on
+// disk — Save() above, and the server's own saveFrontendConfig — and this one
+// alone calls SaveReplacing(), so what it resets is the file, not a setting.
+// `mywant config reset GOOGLE_MAP_API_KEY` used to be accepted and silently
+// ignore the argument: it wiped the contexts, the current context and every
+// stored environment secret of an install whose owner meant to clear one key,
+// and the loss was only noticed a month later when a `--context` stopped
+// resolving. An argument here is therefore an error with the command that
+// actually does that job, and the no-argument form asks before it acts.
 var configResetCmd = &cobra.Command{
 	Use:     "reset",
 	Aliases: []string{"r"},
-	Short:   "Reset configuration to defaults",
+	Short:   "Reset the whole configuration file to defaults",
+	Long: `Replace ~/.mywant/config.yaml with the built-in defaults.
+
+This resets EVERYTHING — contexts, the current context, stored environment
+secrets, display settings — and cannot be undone. It takes no arguments.
+
+To clear one key instead:
+  mywant config unset <KEY>          # an environment secret
+  mywant config set <key> <value>    # a setting, back to what you want
+  mywant config delete-context <name>`,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return nil
+		}
+		return fmt.Errorf(`reset takes no arguments and resets the WHOLE file, not %[1]q.
+
+To clear just %[1]s:
+  mywant config unset %[1]s            (if it is an environment secret)
+  mywant config set %[1]s <value>      (if it is a setting)
+
+To reset everything anyway: mywant config reset`, args[0])
+	},
 	Run: func(cmd *cobra.Command, args []string) {
+		yes, _ := cmd.Flags().GetBool("yes")
+
+		// Named out loud rather than described: "resets your configuration" is
+		// agreeable-sounding, and the things actually about to go are the ones
+		// nobody keeps a second copy of.
+		if !yes {
+			existing, _ := LoadConfig()
+			fmt.Printf("This replaces %s with the built-in defaults.\n", getConfigPath())
+			if existing != nil {
+				if n := len(existing.Contexts); n > 0 {
+					fmt.Printf("  %d context(s) will be deleted: %s\n", n, strings.Join(contextNames(existing), ", "))
+				}
+				if n := len(existing.Environments); n > 0 {
+					fmt.Printf("  %d stored environment secret(s) will be deleted\n", n)
+				}
+			}
+			fmt.Print("This cannot be undone. Continue? [y/N]: ")
+			reader := bufio.NewReader(os.Stdin)
+			line, _ := reader.ReadString('\n')
+			if line = strings.TrimSpace(strings.ToLower(line)); line != "y" && line != "yes" {
+				fmt.Println("Aborted.")
+				return
+			}
+		}
+
 		config := DefaultConfig()
 
 		if err := config.SaveReplacing(); err != nil {
@@ -530,6 +588,7 @@ func maskSecret(v string) string {
 func init() {
 	ConfigCmd.AddCommand(configSetCmd)
 	ConfigCmd.AddCommand(configGetCmd)
+	configResetCmd.Flags().BoolP("yes", "y", false, "Skip the confirmation prompt")
 	ConfigCmd.AddCommand(configResetCmd)
 	ConfigCmd.AddCommand(configEditCmd)
 }
