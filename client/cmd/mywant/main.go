@@ -186,9 +186,7 @@ func requireConfigFile(path string) {
 }
 
 func initConfig() {
-	configPath := ""
 	if cfgFile != "" {
-		configPath = cfgFile
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := os.UserHomeDir()
@@ -199,7 +197,6 @@ func initConfig() {
 
 		// Use ~/.mywant/config.yaml
 		mywantDir := filepath.Join(home, ".mywant")
-		configPath = filepath.Join(mywantDir, "config.yaml")
 		viper.AddConfigPath(mywantDir)
 		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
@@ -210,14 +207,15 @@ func initConfig() {
 	viper.SetEnvPrefix("MYWANT")
 	viper.AutomaticEnv()
 
-	// Log the config path before reading
-	if _, err := os.Stat(configPath); err == nil {
-		fmt.Printf("Reading config from: %s\n", configPath)
-	}
-
-	if err := viper.ReadInConfig(); err == nil {
-		// fmt.Println("Using config file:", viper.ConfigFileUsed())
-	}
+	// The config path is deliberately NOT announced.
+	//
+	// It was printed on every invocation there is — and to stdout, so it also
+	// sat at the top of anything being piped into jq. Nothing needs telling:
+	// every message that turns on the config file already names it ("context
+	// %q not found in %s"), and `mywant config get` exists to show the rest.
+	// The commented-out line below was the same conclusion reached once
+	// already about its neighbour.
+	_ = viper.ReadInConfig() // a missing or unreadable config is not fatal: defaults stand
 
 	applyServerContext()
 }

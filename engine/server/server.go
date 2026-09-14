@@ -369,6 +369,11 @@ func New(config Config) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// What ~/.mywant/datatypes.yaml overrode, said here rather than from the
+	// package's init() — which runs in the CLI too, and printed it on every
+	// command anybody ran. See thing_store.go's userDataTypes.
+	reportUserDataTypes()
+
 	// Before anything reads a thing: give every one of them a stable id and
 	// move the labels that refer to them onto it. Once, on the way up, so no
 	// request can observe the two files disagreeing.

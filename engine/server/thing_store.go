@@ -43,6 +43,33 @@ func init() {
 	loadUserDataTypes()
 }
 
+// userDataTypes records what loadUserDataTypes found, for the server to report
+// at startup instead of from init().
+//
+// The load has to happen in init() — dataTypeDefs is read by anything that
+// touches a thing — but init() runs in every binary that LINKS this package,
+// before main() has even seen which command was asked for. So the line
+// "[thing] 1 data type(s) added from ~/.mywant/datatypes.yaml" was printed by
+// every `mywant` invocation there is: a config get, a wants list, a shell
+// completion. It is a startup fact about a server, and a server says it at
+// startup (see reportUserDataTypes).
+//
+// A malformed file still complains from init(), on any command: that is a
+// problem somebody has to fix, and a CLI user who never starts a server would
+// otherwise never hear about it.
+var userDataTypes struct {
+	count int
+	path  string
+}
+
+// reportUserDataTypes logs the overrides the embedded catalog was given, if
+// any. Called once from the server's startup.
+func reportUserDataTypes() {
+	if userDataTypes.count > 0 {
+		log.Printf("[thing] %d data type(s) added from %s", userDataTypes.count, userDataTypes.path)
+	}
+}
+
 // loadUserDataTypes merges ~/.mywant/datatypes.yaml over the embedded catalog.
 // Same shape, same keys; an entry naming a type that already exists replaces
 // it, which is how a deployment recolours a kind it disagrees with rather than
@@ -70,9 +97,7 @@ func loadUserDataTypes() {
 		}
 		dataTypeDefs[name] = info
 	}
-	if len(extra) > 0 {
-		log.Printf("[thing] %d data type(s) added from %s", len(extra), path)
-	}
+	userDataTypes.count, userDataTypes.path = len(extra), path
 }
 
 // ThingStore persists user-entered values to ~/.mywant/thing.yaml.
