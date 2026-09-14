@@ -76,7 +76,10 @@ artist:   { key: artists,   icon: Mic2,         color: "#e11d48", base_type: str
 song:     { key: songs,     icon: Music2,       color: "#ec4899", base_type: string }
 # The record a song came off, named by its title — not the artwork, which is an
 # `image` and files itself away under a different roof.
-album:    { key: albums,    icon: DiscAlbum,    color: "#c026d3", base_type: string }
+# Per-instance pictures: the URL lives as a label on the thing itself, so each
+# album shows its own cover and each page its own screenshot. See
+# DataTypeInfo.Background for the two forms.
+album:    { key: albums,    icon: DiscAlbum,    color: "#c026d3", base_type: string, background: "@album_art_url" }
 movie:    { key: movies,    icon: Film,         color: "#64748b", base_type: string }
 favorite: { key: favorites, icon: Heart,        color: "#f97316", base_type: string }
 rating:      { key: ratings,      icon: Star,          color: "#f59e0b", base_type: string }

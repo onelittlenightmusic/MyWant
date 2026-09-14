@@ -466,16 +466,23 @@ type DataTypeInfo struct {
 	// the subtype itself; set it when the data subtype and the catalog it names
 	// into differ — e.g. a location_coordinate value is named as a "place".
 	Catalog string `yaml:"catalog" json:"catalog,omitempty"`
-	// Background names a picture for the cards of things of this subtype, served
-	// from the GUI's own /resources (so `background: station` is
-	// /resources/station.png). Empty — which is every subtype but one — means
-	// the card keeps the flat tint it gets from Color, so nothing has to be
-	// changed for a kind that has no picture.
+	// Background names where the cards of this subtype get their picture. Two
+	// forms, because there are two genuinely different kinds of picture:
 	//
-	// A property of the SUBTYPE rather than of each thing: every station is a
-	// station, and a kind that has a picture has it for all of them. It says a
-	// name and not a path, so the catalog does not encode where the GUI keeps
-	// its files.
+	//   background: station          a file every station shares, shipped with
+	//                                the GUI at /resources/station.png
+	//   background: "@album_art_url" THIS thing's own picture, whose URL is
+	//                                kept as a label on the thing itself
+	//
+	// The first is a property of the KIND: every station is a station, and one
+	// picture serves all of them. The second is for a kind whose picture is per
+	// instance — an album's cover, a page's screenshot — where a label is the
+	// right home because a thing's labels are already its own durable notes
+	// (thing-labels.yaml) and reach the card with the thing.
+	//
+	// Either way it says a NAME and never a path: the catalog does not encode
+	// where the GUI keeps its files, and holds no URL of its own. Empty — which
+	// is most kinds — means the card keeps the flat tint it gets from Color.
 	Background string `yaml:"background" json:"background,omitempty"`
 }
 
