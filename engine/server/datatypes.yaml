@@ -25,14 +25,17 @@ webpage:   { key: webpages,   icon: Globe,        color: "#8b5cf6", base_type: s
 # address a service listens at, never a quantity to do arithmetic on.
 port:      { key: ports,      icon: Plug,         color: "#0891b2", base_type: string }
 date:     { key: dates,     icon: Calendar,     color: "#f59e0b", base_type: string }
-time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string }
+time:     { key: times,     icon: Clock,        color: "#f59e0b", base_type: string, background: time }
 # An instant, written RFC3339 — a date and a time and which side of midnight.
 # Apart from `time` on purpose: "22:47" is a reading of a clock and says nothing
 # about the day, and the difference is exactly what a conversion between the two
 # has to supply (see ConvertSubTypeValue).
 datetime: { key: datetimes, icon: CalendarClock, color: "#f59e0b", base_type: string }
 city:     { key: cities,    icon: Building2,    color: "#2563eb", base_type: string }
-station:  { key: stations,  icon: Train,        color: "#059669", base_type: string }
+# The kinds with a picture of their own: their cards are drawn over
+# /resources/<background>.png (see DataTypeInfo.Background). Everything else
+# keeps the flat tint it gets from its colour.
+station:  { key: stations,  icon: Train,        color: "#059669", base_type: string, background: station }
 location: { key: locations, icon: MapPin,       color: "#7c3aed", base_type: string }
 place:    { key: places,    icon: MapPin,       color: "#db2777", base_type: string }
 # An event is a place and a time bundled into one named thing, which is why a
@@ -45,7 +48,7 @@ address:  { key: addresses, icon: Home,         color: "#64748b", base_type: str
 email:    { key: emails,    icon: Mail,         color: "#64748b", base_type: string }
 phone:    { key: phones,    icon: Phone,        color: "#64748b", base_type: string }
 name:     { key: names,     icon: User,         color: "#64748b", base_type: string }
-person:   { key: people,    icon: User,         color: "#64748b", base_type: string }
+person:   { key: people,    icon: User,         color: "#64748b", base_type: string, background: person }
 tag:      { key: tags,      icon: Tag,          color: "#64748b", base_type: string }
 keyword:  { key: keywords,  icon: Search,       color: "#64748b", base_type: string }
 secret:   { key: secrets,   icon: EyeOff,       color: "#64748b", base_type: string }

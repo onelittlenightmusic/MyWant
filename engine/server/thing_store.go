@@ -466,6 +466,17 @@ type DataTypeInfo struct {
 	// the subtype itself; set it when the data subtype and the catalog it names
 	// into differ — e.g. a location_coordinate value is named as a "place".
 	Catalog string `yaml:"catalog" json:"catalog,omitempty"`
+	// Background names a picture for the cards of things of this subtype, served
+	// from the GUI's own /resources (so `background: station` is
+	// /resources/station.png). Empty — which is every subtype but one — means
+	// the card keeps the flat tint it gets from Color, so nothing has to be
+	// changed for a kind that has no picture.
+	//
+	// A property of the SUBTYPE rather than of each thing: every station is a
+	// station, and a kind that has a picture has it for all of them. It says a
+	// name and not a path, so the catalog does not encode where the GUI keeps
+	// its files.
+	Background string `yaml:"background" json:"background,omitempty"`
 }
 
 // DataTypeDefinitions returns a copy of all known data type definitions.

@@ -50,6 +50,9 @@ type ThingFull struct {
 
 	Icon  string `json:"icon"`
 	Color string `json:"color"`
+	// Background is the subtype's picture name, if it has one — see
+	// DataTypeInfo.Background. Absent for every kind that does not.
+	Background string `json:"background,omitempty"`
 
 	// Definitions are the names given to this value, by every character — the
 	// ledger's word, not any one character's copy.
@@ -104,6 +107,7 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 			Value:       e.Value,
 			Icon:        info.Icon,
 			Color:       info.Color,
+			Background:  info.Background,
 			Definitions: defsByID[pair],
 			WantIDs:     usageByID[pair],
 			Labels:      labels[e.ID],
