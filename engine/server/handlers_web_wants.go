@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -193,9 +194,95 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 // <name>.yaml, main.py, SKILL.md) under UserCustomTypesDir()/<name>/ and reloads
 // the type registry. name must already be validated against validTypeName.
 // Shared by createWebWant (GUI-driven) and captureWebWant (bookmarklet-driven).
+
+// persistWebScreenshot turns a captured page's screenshot into a file and
+// returns the path that serves it.
+//
+// The extension sends the shot as a data: URI, and it used to be stored as one
+// — in the want type's own YAML, where a few hundred kilobytes of base64 sat
+// in a file otherwise made of field definitions, and where nothing else could
+// point at it. A file in ~/.mywant/screenshots (already served, already how
+// replay keeps its own shots) is both smaller in the type and referenceable
+// from elsewhere, which is what lets the page's url THING wear it too.
+//
+// Anything unexpected returns the input unchanged: a capture whose shot cannot
+// be decoded should still produce a want type, with the data URI it always had.
+func (s *Server) persistWebScreenshot(name, dataURI string) string {
+	if !strings.HasPrefix(dataURI, "data:image/") {
+		return dataURI // already a path — a re-capture, or a future sender
+	}
+	comma := strings.Index(dataURI, ",")
+	if comma < 0 {
+		return dataURI
+	}
+	meta := dataURI[len("data:"):comma]
+	if !strings.Contains(meta, ";base64") {
+		return dataURI
+	}
+	ext := "png"
+	switch {
+	case strings.HasPrefix(meta, "image/jpeg"), strings.HasPrefix(meta, "image/jpg"):
+		ext = "jpg"
+	case strings.HasPrefix(meta, "image/webp"):
+		ext = "webp"
+	}
+	raw, err := base64.StdEncoding.DecodeString(dataURI[comma+1:])
+	if err != nil || len(raw) == 0 {
+		return dataURI
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return dataURI
+	}
+	dir := filepath.Join(home, ".mywant", "screenshots")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return dataURI
+	}
+	// Named after the want type, so a re-capture replaces its own shot rather
+	// than leaving the old one behind. The serving route only accepts
+	// [A-Za-z0-9-_.], which a generated type name already is.
+	file := "web-" + name + "." + ext
+	if err := os.WriteFile(filepath.Join(dir, file), raw, 0o644); err != nil {
+		return dataURI
+	}
+	return "/api/v1/screenshots/" + file
+}
+
+// labelThingWithScreenshot gives the page's url thing the picture the capture
+// just took, as a label on the thing itself.
+//
+// That is what the Thing card reads (`background: "@screenshot-url"` on the url
+// data type), and a label is where it belongs: the shot is this page's, not
+// every page's. Only the path is stored, never the image — the picture stays
+// the one file persistWebScreenshot wrote.
+//
+// Quietly does nothing when the page has never been named: there is no thing to
+// label yet, and the next capture of that page will do it. Nothing is created
+// here, because naming is the user's act and a screenshot is not a name.
+func (s *Server) labelThingWithScreenshot(pageURL, servedPath string) {
+	if pageURL == "" || servedPath == "" || strings.HasPrefix(servedPath, "data:") {
+		return
+	}
+	for _, e := range s.thingStore.Entries() {
+		if e.Value != pageURL || keyToSubtype(e.Catalog) != "url" {
+			continue
+		}
+		if err := s.thingLabels.Set(e.ID, "screenshot-url", servedPath); err == nil {
+			go broadcastSSE("thing_changed", e.ID)
+		}
+		return
+	}
+}
+
 func (s *Server) writeWebWantType(name, title, pageURL, hostname, urlTemplate, screenshotURL string, elements []WebWantElement) (dir string, loaded int, warnings []string, err error) {
 	// Enrich elements with field_key for textbox-like roles
 	elements = enrichElements(elements)
+
+	// The shot becomes a file, and the page's own thing learns where it is.
+	if screenshotURL != "" {
+		screenshotURL = s.persistWebScreenshot(name, screenshotURL)
+		s.labelThingWithScreenshot(pageURL, screenshotURL)
+	}
 
 	dir = filepath.Join(mywant.UserCustomTypesDir(), name)
 	if err = os.MkdirAll(dir, 0o755); err != nil {

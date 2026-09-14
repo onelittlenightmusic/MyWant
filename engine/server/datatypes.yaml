@@ -19,7 +19,10 @@ want_type: { key: want_types, icon: Zap,           color: "#a855f7" }
 # ── String subtypes ────────────────────────────────────────────────────────────
 image:     { key: images,     icon: Image,        color: "#a855f7", base_type: string }
 image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string }
-url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string, catalog: webpage }
+# A page's card is drawn over the screenshot the Web Inspector took of it,
+# written onto this thing as a label when the page was captured (see
+# labelThingWithScreenshot).
+url:       { key: urls,       icon: Link,         color: "#8b5cf6", base_type: string, catalog: webpage, background: "@screenshot-url" }
 webpage:   { key: webpages,   icon: Globe,        color: "#8b5cf6", base_type: string }
 # A port number is kept as a string, like the times and dates above it: it is an
 # address a service listens at, never a quantity to do arithmetic on.

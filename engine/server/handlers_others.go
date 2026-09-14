@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -1207,7 +1208,17 @@ func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "not found", err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "image/png")
+	// By extension, not always PNG: a captured page's shot is a JPEG (see
+	// persistWebScreenshot), and calling it a PNG left the browser to sniff its
+	// way out of the mislabel.
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".webp":
+		w.Header().Set("Content-Type", "image/webp")
+	default:
+		w.Header().Set("Content-Type", "image/png")
+	}
 	w.Header().Set("Cache-Control", "max-age=86400")
 	w.Write(data)
 }
