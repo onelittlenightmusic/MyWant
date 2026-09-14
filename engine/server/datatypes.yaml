@@ -41,6 +41,10 @@ city:     { key: cities,    icon: Building2,    color: "#2563eb", base_type: str
 station:  { key: stations,  icon: Train,        color: "#059669", base_type: string, background: station }
 location: { key: locations, icon: MapPin,       color: "#7c3aed", base_type: string }
 place:    { key: places,    icon: MapPin,       color: "#db2777", base_type: string }
+# A named summit, not a place in general: the one a route ends at, the one a
+# plan is about. Stone rather than another shade of green, so it does not read
+# as a station at card size.
+mountain: { key: mountains, icon: Mountain,     color: "#78716c", base_type: string, background: mountain }
 # An event is a place and a time bundled into one named thing, which is why a
 # memo group can hold it alongside the station it happens at.
 event:    { key: events,    icon: PartyPopper,  color: "#7c3aed", base_type: string }
