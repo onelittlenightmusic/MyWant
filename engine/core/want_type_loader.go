@@ -240,6 +240,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		w.mergePredefinedState(def)
 
 		// Register definition
+		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
 		w.indexGlobalParams(def)
@@ -326,6 +327,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 			continue
 		}
 		w.mergePredefinedState(def)
+		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(path)
 		w.indexGlobalParams(def)
@@ -400,6 +402,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 			return nil
 		}
 		w.mergePredefinedState(def)
+		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = resolver.forCustomFile(dir, path, data)
 		w.userCustomNames[def.Metadata.Name] = true
@@ -575,9 +578,76 @@ func (w *WantTypeLoader) ReloadUserCustomTypes() (loaded int, warnings []string)
 
 // RegisterDefinition adds or replaces a want type definition at runtime without loading from file.
 // Used by the hot-reload API to register new types dynamically.
+// finalizeGateWarnings reports the finalize conditions this type can never
+// leave, because the field they read outlives a restart.
+//
+// A restart resets the state fields a type declares, EXCEPT the ones marked
+// `persistent: true` — that flag means "this value is the answer, keep it"
+// (see Want.prepareForRestart). When the field a finalizeWhen condition reads
+// is one of those, the condition is already true the moment the want comes
+// back, so the restart decides nothing:
+//
+//	achieved → the want is achieved on arrival and never runs again. A transit
+//	           search sat on a day-old itinerary and no restart would shift it:
+//	           `summary` was persistent and the achieve gate read it.
+//	failed   → the want is failed on arrival and can never be restarted out of
+//	           it. A 504 froze a smartgolf check for eight days: `error` was
+//	           persistent and the fail gate read it, so every restart
+//	           re-failed the want in the same second and cancelled the monitor
+//	           before it could re-check.
+//
+// Both were found by reading logs after the fact, a month and eight days late
+// respectively, which is the argument for saying it at load time instead. It
+// is a WARNING and not an error because the combination is legitimate for a
+// want whose answer is meant to be final — a recorded execution result, a
+// ticket already secured — and only the type's author can tell those apart.
+//
+// Only the type is inspected, so this cannot know about a want that sets
+// `resetOnRestart: false` and means none of it. That want was never going to
+// reset anyway, and the note names the flag so the reader can tell.
+func finalizeGateWarnings(def *WantTypeDefinition) []string {
+	if def == nil || def.FinalizeWhen == nil {
+		return nil
+	}
+	persistent := map[string]bool{}
+	for _, sd := range def.State {
+		if sd.Persistent {
+			persistent[sd.Name] = true
+		}
+	}
+
+	var out []string
+	check := func(kind string, cond *ConditionDef, consequence string) {
+		if cond == nil || !persistent[cond.Field] {
+			return
+		}
+		out = append(out, fmt.Sprintf(
+			"want type %q: finalizeWhen.%s reads state field %q, which is persistent: true — "+
+				"a restart keeps that value, so %s. Make the field the condition reads "+
+				"persistent: false (the fields that hold the answer can stay persistent), "+
+				"or set resetOnRestart: false if this is meant to be final.",
+			def.Metadata.Name, kind, cond.Field, consequence))
+	}
+	check("achieved", def.FinalizeWhen.Achieved, "the want is achieved again the moment it restarts and never re-runs")
+	check("failed", def.FinalizeWhen.Failed, "the want fails again the moment it restarts and can never be restarted out of it")
+	return out
+}
+
+// warnFinalizeGates logs whatever finalizeGateWarnings found. Called wherever a
+// definition is taken into the loader, which is the one place every type passes
+// through however it arrived — a bundled file, ~/.mywant/custom-types, or the
+// API.
+func (w *WantTypeLoader) warnFinalizeGates(def *WantTypeDefinition) {
+	for _, msg := range finalizeGateWarnings(def) {
+		WarnLog("[WANT-TYPE] %s\n", msg)
+		w.loadWarnings = append(w.loadWarnings, msg)
+	}
+}
+
 func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	w.warnFinalizeGates(def)
 	w.definitions[def.Metadata.Name] = def
 	w.origins[def.Metadata.Name] = WantTypeOrigin{Kind: WantTypeOriginAPI, Version: def.Metadata.Version}
 	w.indexGlobalParams(def)
