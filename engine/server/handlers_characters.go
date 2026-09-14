@@ -259,21 +259,32 @@ func (s *Server) setCharacterAuraCardWant(w http.ResponseWriter, r *http.Request
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
-// cardNameKindValue resolves, for a want's final-result field, the catalog kind
-// its value is NAMED into and the field's current value. The kind comes from the
-// value's self-described `type` (or the field's declared subType), mapped through
-// the data type's catalog relationship (e.g. location_coordinate → place). The
-// client names only the want; the server owns which field and which catalog.
+// cardNameKindValue resolves, for the field a want's aura mark is ABOUT, the
+// catalog kind its value is NAMED into and the field's current value. The kind
+// comes from the value's self-described `type` (or the field's declared
+// subType), mapped through the data type's catalog relationship (e.g.
+// location_coordinate → place). The client names only the want; the server owns
+// which field and which catalog.
+//
+// The field is the want's final result unless the type names another with
+// `aura_mark_field`. What a card is ABOUT and what it ANSWERS are not always
+// the same: Spotify answers with the track playing, but the thing worth marking
+// while it plays is the album — the track is one of the things that were true
+// of the album at that moment, not the subject. A type that says nothing here
+// keeps the behaviour it always had.
 func (s *Server) cardNameKindValue(wantID string) (kind string, value any, ok bool) {
 	want, _, found := s.globalBuilder.FindWantByID(wantID)
 	if !found || want.Metadata.Type == "" {
 		return "", nil, false
 	}
 	def := s.globalBuilder.GetWantTypeDefinition(want.Metadata.Type)
-	if def == nil || def.FinalResultField == "" {
+	if def == nil {
 		return "", nil, false
 	}
-	frf := def.FinalResultField
+	frf := want.GetStringParam("aura_mark_field", def.FinalResultField)
+	if frf == "" {
+		return "", nil, false
+	}
 	value, _ = want.GetCurrent(frf)
 
 	sub := ""
@@ -334,8 +345,80 @@ func (s *Server) cardAuraName(w http.ResponseWriter, r *http.Request) {
 		mywant.WarnLog("[aura] failed to record memo %s=%q: %v", kind, name, err)
 	}
 	s.recordThingEvent(kind, name, MemoSourceCardName, req.WantID, c, value)
+	snapped := s.snapshotAuraLabels(req.WantID, kind, name)
 	go broadcastSSE("character_changed", id)
-	s.JSONResponse(w, http.StatusOK, map[string]any{"character": c, "kind": kind, "name": name})
+	s.JSONResponse(w, http.StatusOK, map[string]any{
+		"character": c, "kind": kind, "name": name, "labels": snapped,
+	})
+}
+
+// snapshotAuraLabels writes what was true about a thing at the moment it was
+// marked onto the thing itself.
+//
+// This is the other half of what an aura mark is for. Marking used to be only
+// an act of naming — this value, called that — and the rest of what the card
+// was showing went nowhere, even though it was the reason the moment was worth
+// marking at all. Pressing X while an album plays is not really "the album is
+// called X": it is "this album, and here is its cover, its artist, the track
+// that was playing". Those are facts about the album that arrived together and
+// were lost separately.
+//
+// So the type says which fields are those facts:
+//
+//	aura_mark_labels  space-separated state fields, copied onto the marked
+//	                  thing as labels of the same name.
+//
+// Space-separated field names in a param is the form this codebase already
+// uses for exactly this (transit's skill_args_keys). Labels are the right home
+// because a thing's labels are already what it keeps about itself
+// (thing-labels.yaml), they travel with it to every card, and the Thing card
+// already reads one of them for its background
+// (`background: "@album_art_url"`).
+//
+// A field that is empty is skipped rather than written blank: an album whose
+// cover has not loaded is still worth marking, and a label nobody wrote reads
+// as "not known" where an empty one reads as "known to be nothing".
+func (s *Server) snapshotAuraLabels(wantID, kind, name string) []string {
+	want := s.findWantByIDOrName(wantID)
+	if want == nil {
+		return nil
+	}
+	keys := strings.Fields(want.GetStringParam("aura_mark_labels", ""))
+	if len(keys) == 0 {
+		return nil
+	}
+
+	// The labels hang off the thing's id, which is what the label store has
+	// moved to — so the entry naming just made or confirmed has to be found.
+	id := ""
+	for _, e := range s.thingStore.Entries() {
+		if e.Value == name && e.Catalog == subtypeToKey(kind) {
+			id = e.ID
+			break
+		}
+	}
+	if id == "" {
+		return nil
+	}
+
+	state := want.GetAllState()
+	written := []string{}
+	for _, key := range keys {
+		v, _ := state[key].(string)
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+		if err := s.thingLabels.Set(id, key, v); err != nil {
+			mywant.WarnLog("[aura] failed to label %s %s: %v", id, key, err)
+			continue
+		}
+		written = append(written, key)
+	}
+	if len(written) > 0 {
+		mywant.InfoLog("[aura] %s: marked %s %q with %v\n", want.Metadata.Name, kind, name, written)
+		go broadcastSSE("thing_changed", id)
+	}
+	return written
 }
 
 // getCardAuraMark reports the catalog names a want's final-result value carries
