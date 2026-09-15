@@ -66,6 +66,13 @@ wantType:
       label: current
       initialValue: ''
 
+    - name: error
+      description: Why the last fetch failed (every source tried); empty when it succeeded
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
     - name: achieving_percentage
       description: Progress percentage
       type: int
