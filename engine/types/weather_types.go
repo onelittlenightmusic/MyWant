@@ -29,6 +29,7 @@ func (w *WeatherWant) Initialize() {
 	w.SetCurrent("weather_text", "")
 	w.SetCurrent("weather_date", "")
 	w.SetCurrent("weather_condition", "")
+	w.SetCurrent("error", "")
 	w.SetCurrent("achieving_percentage", 0)
 	w.ExecuteAgents() //nolint:errcheck
 }
@@ -36,6 +37,12 @@ func (w *WeatherWant) Initialize() {
 func (w *WeatherWant) IsAchieved() bool {
 	text := GetCurrent(w, "weather_text", "")
 	return text != ""
+}
+
+// IsFailed is true once the agent has tried every source and recorded why none
+// answered.
+func (w *WeatherWant) IsFailed() bool {
+	return GetCurrent(w, "error", "") != ""
 }
 
 func (w *WeatherWant) Progress() {

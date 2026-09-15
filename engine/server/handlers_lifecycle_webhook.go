@@ -293,7 +293,12 @@ func (s *Server) RegisterAchievementCallback() {
 		// A per-want alert badges the want's tile until it is opened, and pushes
 		// to any subscribed home-screen app. Separate from the webhooks below,
 		// which push the event to external URLs.
-		if s.notifications != nil && w.Metadata.Name != "" {
+		//
+		// Not for a want that answers something: its answers are its news, and
+		// each new one already raises an alert of its own (RegisterOutputCallback).
+		// Achieving is how a weather fetch or a reservation check ENDS, so saying
+		// both badged the tile twice for every fetch.
+		if s.notifications != nil && w.Metadata.Name != "" && w.Spec.FinalResultField == "" {
 			msg := fmt.Sprintf("「%s」が達成されました", w.Metadata.Name)
 			_ = s.notifications.Record(NotificationEntry{
 				Message:    msg,

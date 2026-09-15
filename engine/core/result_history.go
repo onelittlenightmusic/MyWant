@@ -34,8 +34,21 @@ import (
 // `mywant restart`. Want.ResultHistory carries them through the file, and
 // RestoreResultHistory puts them back in the ring on the way in.
 
-// ResultHistoryEntry is one answer a want arrived at.
+// ResultHistoryEntry is one answer a want arrived at — the want's Output.
+//
+// It is the one shape everything a want says about what it found is carried
+// in. The card turns back through these (history), a new one is what a
+// notification announces (OnWantOutput — the notice carries this same entry,
+// not a sentence made from it), and its Type is the kind of thing it is, so it
+// can be drawn with that kind's icon and named into that kind's catalog.
 type ResultHistoryEntry struct {
+	// Identifies this answer, so a notice can say which one it announced.
+	// Absent on entries recorded before outputs had ids.
+	ID string `json:"id,omitempty" yaml:"id,omitempty"`
+	// What kind of thing the answer is: the data subtype of the want's
+	// finalResultField (song, weather, …), or the `type` a JSON answer names
+	// itself with. Empty when the type does not say.
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 	// When this answer first appeared.
 	Timestamp time.Time `json:"timestamp" yaml:"timestamp"`
 	// When it was last confirmed still current. A monitor that re-checks every
@@ -55,6 +68,14 @@ type ResultHistoryEntry struct {
 	// stood when this answer arrived. See answerFields.
 	Fields map[string]any `json:"fields,omitempty" yaml:"fields,omitempty"`
 }
+
+// OnWantOutput, when set, hears every NEW answer a want arrives at — one whose
+// result differs from the answer before it. The server turns it into the
+// want's notification. Not called for an answer merely seen again, nor for a
+// new entry whose result is unchanged and only its supporting fields moved:
+// that is a better-described version of the same news, and announcing it
+// would badge the tile twice for one reservation or one song.
+var OnWantOutput func(w *Want, out ResultHistoryEntry)
 
 // How many answers a want keeps.
 //
@@ -98,13 +119,55 @@ func (n *Want) recordResultHistory() {
 
 	fields := n.answerFields(field)
 	now := time.Now()
-	n.getHistoryManager().AddResultEntry(ResultHistoryEntry{
+	entry := ResultHistoryEntry{
+		ID:        "out-" + strings.TrimPrefix(GenerateUUID(), "want-"),
+		Type:      n.outputType(field, val),
 		Timestamp: now,
 		LastSeen:  now,
 		About:     answerAbout(fields),
 		Result:    val,
 		Fields:    fields,
-	})
+	}
+	appended, prev := n.getHistoryManager().AddResultEntry(entry)
+	if !appended || OnWantOutput == nil {
+		return
+	}
+	if prev != nil && sameAnswerResult(prev.Result, entry.Result) {
+		return
+	}
+	go OnWantOutput(n, entry)
+}
+
+// outputType is the kind of thing an answer is.
+//
+// The answer's own `type` first, the convention object subtypes follow (see
+// datatypes.yaml): a value that says what it is outranks the schema that
+// declared the field. Otherwise the subType the want type gave its
+// finalResultField. A nested finalResultField has no declaration of its own, so
+// it says nothing unless the value does.
+func (n *Want) outputType(field string, val any) string {
+	if m, ok := val.(map[string]any); ok {
+		if t, ok := m["type"].(string); ok && t != "" {
+			return t
+		}
+	}
+	if n.WantTypeDefinition == nil || strings.Contains(field, ".") {
+		return ""
+	}
+	for _, sd := range n.WantTypeDefinition.State {
+		if sd.Name == field {
+			return sd.SubType
+		}
+	}
+	return ""
+}
+
+// sameAnswerResult compares two results the way resultFingerprint does — as
+// JSON, so a value restored from YAML equals the one that went in.
+func sameAnswerResult(a, b any) bool {
+	ja, errA := json.Marshal(a)
+	jb, errB := json.Marshal(b)
+	return errA == nil && errB == nil && string(ja) == string(jb)
 }
 
 // answerFields is the rest of the answer, beside the result itself.
@@ -294,6 +357,12 @@ func (n *Want) RestoreResultHistory(entries []ResultHistoryEntry) {
 		return
 	}
 	for _, e := range entries {
+		// Answers kept before outputs said what kind of thing they were are
+		// told now, from the same declaration a new answer is typed by — so an
+		// old song draws with a note like a new one, not as a blank dot.
+		if e.Type == "" {
+			e.Type = n.outputType(n.Spec.FinalResultField, e.Result)
+		}
 		h.ResultHistoryRing.Append(e)
 	}
 }

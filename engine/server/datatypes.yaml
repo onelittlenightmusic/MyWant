@@ -90,7 +90,11 @@ album:    { key: albums,    icon: DiscAlbum,    color: "#c026d3", base_type: str
 movie:    { key: movies,    icon: Film,         color: "#64748b", base_type: string }
 favorite: { key: favorites, icon: Heart,        color: "#f97316", base_type: string }
 rating:      { key: ratings,      icon: Star,          color: "#f59e0b", base_type: string }
-weather:     { key: weathers,     icon: Cloud,         color: "#38bdf8", base_type: string }
+# A weather answer is a sentence, but it always comes with its canonical
+# condition (see classifyWeatherCondition), which picks the icon.
+weather:     { key: weathers,     icon: Cloud,         color: "#38bdf8", base_type: string,
+               icon_field: weather_condition,
+               icons: { sunny: Sun, cloudy: Cloud, rain: CloudRain, snow: CloudSnow, storm: CloudLightning, fog: CloudFog } }
 
 # ── Number subtypes ────────────────────────────────────────────────────────────
 percentage:  { key: percentages,  icon: Percent,        color: "#3b82f6", base_type: number }

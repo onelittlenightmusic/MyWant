@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	mywant "mywant/engine/core"
 )
 
 // maxNotifications caps the on-disk notice log. Oldest entries are dropped first.
@@ -39,6 +41,12 @@ type NotificationEntry struct {
 	// robot-bubble log ("" / legacy). Read is only meaningful for "alert".
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Read bool   `json:"read,omitempty" yaml:"read,omitempty"`
+
+	// Output is the answer this alert announces, when it announces one — the
+	// very entry the want's history keeps (see mywant.OnWantOutput), not a
+	// description of it. Message is only that answer said in a sentence, for a
+	// push notification that cannot draw one.
+	Output *mywant.ResultHistoryEntry `json:"output,omitempty" yaml:"output,omitempty"`
 }
 
 // NotificationStore appends notices to ~/.mywant/notifications.yaml.
@@ -135,6 +143,21 @@ func (n *NotificationStore) UnreadWantCounts() map[string]int {
 		}
 	}
 	return counts
+}
+
+// UnreadWantOutputs returns, per want id, the ids of the outputs its unread
+// alerts announce — newest last, the order they were raised in. The canvas
+// draws a want's recent outputs and lights up the ones in this list.
+func (n *NotificationStore) UnreadWantOutputs() map[string][]string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	out := map[string][]string{}
+	for _, e := range n.load() {
+		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID != "" && !e.Read && e.Output != nil && e.Output.ID != "" {
+			out[e.TargetID] = append(out[e.TargetID], e.Output.ID)
+		}
+	}
+	return out
 }
 
 // ForWant returns the notices targeting one want, most-recent first (limit 0 =

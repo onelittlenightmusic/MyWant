@@ -484,6 +484,18 @@ type DataTypeInfo struct {
 	// where the GUI keeps its files, and holds no URL of its own. Empty — which
 	// is most kinds — means the card keeps the flat tint it gets from Color.
 	Background string `yaml:"background" json:"background,omitempty"`
+	// IconField and Icons pick a kind's icon per value, for a kind whose one
+	// icon would say less than its values do. A weather answer is free text
+	// ("曇り 22°C …") but always arrives beside a canonical condition, so:
+	//
+	//   icon_field: weather_condition
+	//   icons: { sunny: Sun, rain: CloudRain, … }
+	//
+	// IconField names a field of the same answer (an Output's fields); its
+	// value is looked up in Icons, and Icon stands whenever the field is absent
+	// or its value is not listed.
+	IconField string            `yaml:"icon_field" json:"iconField,omitempty"`
+	Icons     map[string]string `yaml:"icons"      json:"icons,omitempty"`
 }
 
 // DataTypeDefinitions returns a copy of all known data type definitions.
