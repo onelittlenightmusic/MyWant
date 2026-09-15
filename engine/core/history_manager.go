@@ -80,19 +80,27 @@ func (h *HistoryManager) AddStateEntry(key string, value any) {
 // and twenty copies of one reservation is not a history of anything. Two
 // answers that fingerprint the same are one answer seen twice, and the second
 // sighting only moves LastSeen.
-func (h *HistoryManager) AddResultEntry(entry ResultHistoryEntry) {
+//
+// It reports whether the entry was appended as a new answer (false when it
+// only extended the last one's LastSeen), and the answer it followed, if any.
+func (h *HistoryManager) AddResultEntry(entry ResultHistoryEntry) (appended bool, prev *ResultHistoryEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	fp := resultFingerprint(entry)
-	if last, ok := h.ResultHistoryRing.PeekLast(); ok && resultFingerprint(last) == fp {
+	last, ok := h.ResultHistoryRing.PeekLast()
+	if ok && resultFingerprint(last) == fp {
 		h.ResultHistoryRing.UpdateLast(func(e *ResultHistoryEntry) {
 			e.LastSeen = entry.Timestamp
 		})
-		return
+		return false, nil
 	}
 
 	h.ResultHistoryRing.Append(entry)
+	if ok {
+		return true, &last
+	}
+	return true, nil
 }
 
 // AddParameterEntry adds an entry to parameter history, with similar merging logic

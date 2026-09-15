@@ -496,8 +496,8 @@ func (s *Server) Start() error {
 	// Register push callback for want_achieved lifecycle webhooks
 	s.RegisterAchievementCallback()
 
-	// Watch spotify wants and raise a per-want alert when the track changes.
-	s.startSpotifyTrackWatcher()
+	// Every new answer a want arrives at becomes that want's alert.
+	s.RegisterOutputCallback()
 
 	// Seed "default" so a fresh install is never worldless. Until now a world
 	// file only appeared when you switched worlds (openWorld auto-saves the
