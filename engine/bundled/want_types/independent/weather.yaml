@@ -9,6 +9,11 @@ wantType:
     labels:
       # Drawn on the canvas as a probe: a reach out to the place it reads.
       form-type: probe
+      # The tile wears the weather itself — sun, cloud, rain — read from the
+      # condition of its latest answer (see datatypes.yaml's weather icons).
+      # A temperature would be one half of a sentence; the sky is the whole of
+      # what a glance at this tile is asking.
+      tile-icon: output
   finalResultField: weather_text
 
   parameters:
