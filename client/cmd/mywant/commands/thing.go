@@ -89,6 +89,11 @@ var thingListCmd = &cobra.Command{
 				catalog, len(values), named[catalog], used[catalog], truncateList(values, 5))
 		}
 		w.Flush()
+		// The total, said rather than left to be added up. A reader counting
+		// down a column of fourteen kinds to answer "how many things are
+		// there?" gets it wrong often enough — and a small model reading this
+		// output gets it wrong reliably.
+		fmt.Printf("\nTotal: %d things in %d kinds\n", len(things), len(byCatalog))
 	},
 }
 
