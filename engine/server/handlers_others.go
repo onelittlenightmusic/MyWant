@@ -224,9 +224,21 @@ func (s *Server) restartServer(w http.ResponseWriter, r *http.Request) {
 
 // Health Check
 func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
-	s.wantsMu.RLock()
-	wantsCount := len(s.wants)
-	s.wantsMu.RUnlock()
+	// The wants on the board, which is what anybody asking a server how it is
+	// means by "wants". It used to count s.wants — the deploy executions the
+	// interact flow parks there, almost always none — so a server running
+	// thirty wants reported nought, and anything reading health to answer "how
+	// many are running" (the on-device agent's mywant_status tool among them)
+	// answered "none".
+	wantsCount := 0
+	if s.globalBuilder != nil {
+		for _, want := range s.globalBuilder.GetAllWantStates() {
+			if want == nil || want.Metadata.IsSystemWant {
+				continue
+			}
+			wantsCount++
+		}
+	}
 
 	version, commit := mywant.BuildInfo()
 	health := map[string]any{
