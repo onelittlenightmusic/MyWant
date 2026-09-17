@@ -248,3 +248,13 @@ func (c *Client) ImportWants(yamlData []byte) (*ImportWantsResponse, error) {
 	}
 	return &result, nil
 }
+
+// AddWantLabel attaches (or replaces) one label on a want.
+//
+// The canvas keeps a tile's position in labels, so this is also how a want is
+// moved: set mywant.io/canvas-x and -y. See `thing point`, which walks the
+// robot over to a thing this way.
+func (c *Client) AddWantLabel(wantID, key, value string) error {
+	return c.Request("POST", "/api/v1/wants/"+wantID+"/labels",
+		map[string]string{"key": key, "value": value}, nil)
+}
