@@ -24,7 +24,12 @@ wantType:
 
   parameters:
   - name: provider
-    description: AI provider to use (claude_code or gemini).
+    description: |
+      Who answers: claude_code, gemini, or fm — the Mac's own on-device model
+      (Apple FoundationModels, through the fmtool binary; see
+      engine/types/agent_fm.go). `fm` is local, free and answers in seconds,
+      and has no session: each question starts fresh. Where there is no
+      on-device model — any Linux server — `fm` answers with claude_code.
     type: string
     required: false
     default: "claude_code"
@@ -32,6 +37,7 @@ wantType:
       enum:
       - claude_code
       - gemini
+      - fm
 
   - name: model
     description: |
@@ -119,7 +125,7 @@ wantType:
     label: current
 
   - name: provider
-    description: Active AI provider (claude_code or gemini)
+    description: Active AI provider (claude_code, gemini or fm)
     type: string
     persistent: true
     initialValue: "claude_code"

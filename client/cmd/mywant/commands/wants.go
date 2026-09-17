@@ -76,6 +76,9 @@ var listWantsCmd = &cobra.Command{
 				)
 			}
 			w.Flush()
+			// How many, said rather than counted off the rows — see the same
+			// line at the end of `thing list`.
+			fmt.Printf("\nTotal: %d wants\n", len(resp.Wants))
 		}
 
 		if watch {
