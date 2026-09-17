@@ -6,10 +6,28 @@ func printErr(_ s: String) {
 }
 
 let systemInstructions = """
-You are a local assistant running entirely on this Mac. You have tools available \
-for getting the time, doing arithmetic, listing directories, reading files, \
-searching text, and reading host info. Use a tool whenever the request needs \
-live data instead of guessing. Keep answers short.
+You are the guide to this Mac and to the MyWant board on it. A guide does not \
+recite; a guide shows. When something can be pointed at, point at it, and then \
+say what you pointed at.
+
+You have tools for the clock, arithmetic, the filesystem, host info, and for \
+MyWant — its wants, things (named values), canvas, worlds and server. Use them \
+rather than guessing, and use MORE THAN ONE when a question needs more than \
+one: look something up, then act on what you found, then answer. Finishing \
+after a single tool call is rarely the whole of an answer.
+
+Anything about MyWant, a want, a thing or the board goes to the mywant tool, \
+never to the file search.
+
+Where something is on the board is a question to be SHOWN: send the robot to it \
+(the 'point' commands) rather than reading out coordinates, unless you are \
+asked not to move anything.
+
+Answer in the language the question was asked in. Report what the tool told \
+you — the answer, not the question back, and never the command you would run. \
+Say only what a tool told you or what you were told here; if the tool could not \
+answer, say that it could not, and never fill the gap from your own knowledge \
+of the world. Keep answers short.
 """
 
 // MARK: - CLI arguments
@@ -51,20 +69,28 @@ guard case .available = availability else {
 
 let sandbox = Sandbox(root: URL(fileURLWithPath: rootPath))
 
+// What the MyWant CLI says it can do, asked once at startup rather than at
+// every request: the tool schema is built from it, and building a schema is not
+// something to spend a subprocess on per question. See MyWantCLI.swift for why
+// the list is read from the binary at all.
+let myWantCommands = MyWantCLI.readOnlyCommands()
+
 func makeTools(tracker: CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]) {
-    let localTools: [any LocalTool] = [
+    var localTools: [any LocalTool] = [
         TrackedTool(base: GetTimeTool(), tracker: tracker),
         TrackedTool(base: CalcTool(), tracker: tracker),
         TrackedTool(base: ListDirTool(sandbox: sandbox), tracker: tracker),
         TrackedTool(base: ReadFileTool(sandbox: sandbox), tracker: tracker),
         TrackedTool(base: SearchTool(sandbox: sandbox), tracker: tracker),
         TrackedTool(base: HostInfoTool(), tracker: tracker),
-        TrackedTool(base: MyWantStatusTool(), tracker: tracker),
         TrackedTool(base: MyWantStartTool(), tracker: tracker),
-        TrackedTool(base: MyWantWantsTool(), tracker: tracker),
-        TrackedTool(base: MyWantAgentsTool(), tracker: tracker),
         TrackedTool(base: MyWantDeployTool(), tracker: tracker),
     ]
+    // One tool for the rest of MyWant, offering the commands this CLI actually
+    // has. Absent when there is no CLI here to ask — the other tools still work.
+    if let cli = MyWantCLITool(commands: myWantCommands) {
+        localTools.append(TrackedTool(base: cli, tracker: tracker))
+    }
     let tools: [any Tool] = localTools.map { $0 as any Tool }
     return (localTools, tools)
 }
@@ -109,9 +135,10 @@ let evalCases: [EvalCase] = [
     EvalCase(toolName: "read_file", prompt: "Read the file named eval_fixture.txt and tell me what it says."),
     EvalCase(toolName: "search", prompt: "Search the sandbox for the word \"needle\" and tell me which file it's in."),
     EvalCase(toolName: "host_info", prompt: "What is the hostname and OS version of this Mac?"),
-    EvalCase(toolName: "mywant_status", prompt: "Is the MyWant server running right now?"),
-    EvalCase(toolName: "mywant_wants", prompt: "List all the MyWant wants currently running."),
-    EvalCase(toolName: "mywant_agents", prompt: "List all registered MyWant agent capabilities."),
+    EvalCase(toolName: "mywant_cli", prompt: "Is the MyWant server running right now?"),
+    EvalCase(toolName: "mywant_cli", prompt: "List all the MyWant wants currently running."),
+    EvalCase(toolName: "mywant_cli", prompt: "How many things are named in MyWant?"),
+    EvalCase(toolName: "mywant_cli", prompt: "List all registered MyWant agent capabilities."),
     EvalCase(toolName: "mywant_deploy", prompt: "List the available MyWant recipes."),
 ]
 

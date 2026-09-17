@@ -108,18 +108,6 @@ enum MyWantScript {
     }
 }
 
-struct MyWantStatusTool: LocalTool {
-    let name = "mywant_status"
-    let description = "Check whether the local MyWant server is running, and get its health, want count, and version."
-    var argsSchema: DynamicGenerationSchema {
-        DynamicGenerationSchema(name: "MyWantStatusArgs", properties: [])
-    }
-
-    func call(arguments: GeneratedContent) async throws -> String {
-        try await MyWantScript.run("mywant-status", timeout: 15, args: [:])
-    }
-}
-
 struct MyWantStartTool: LocalTool {
     let name = "mywant_start"
     let description = "Start the local MyWant server (backend API + agent service) in the background, if it isn't already running."
@@ -142,77 +130,10 @@ struct MyWantStartTool: LocalTool {
     }
 }
 
-struct MyWantWantsTool: LocalTool {
-    private static let actions = [
-        "list", "get", "status", "results", "stop", "start", "suspend", "resume", "delete", "export",
-    ]
-
-    let name = "mywant_wants"
-    let description = "Manage MyWant want executions: list all, get details, check status, get results, stop, start, suspend, resume, delete, or export as YAML."
-    var argsSchema: DynamicGenerationSchema {
-        DynamicGenerationSchema(
-            name: "MyWantWantsArgs",
-            properties: [
-                .init(
-                    name: "action",
-                    description: "One of: \(Self.actions.joined(separator: ", ")).",
-                    schema: DynamicGenerationSchema(name: "MyWantWantsAction", anyOf: Self.actions)
-                ),
-                .init(
-                    name: "id",
-                    description: "Want id. Required for every action except list and export.",
-                    schema: .init(type: String.self),
-                    isOptional: true
-                ),
-            ]
-        )
-    }
-
-    func call(arguments: GeneratedContent) async throws -> String {
-        let action = try arguments.value(String.self, forProperty: "action")
-        var payload: [String: Any] = ["action": action]
-        if let id = try? arguments.value(String.self, forProperty: "id"), !id.isEmpty {
-            payload["id"] = id
-        }
-        return try await MyWantScript.run("mywant-wants", timeout: 30, args: payload)
-    }
-}
-
-struct MyWantAgentsTool: LocalTool {
-    private static let actions = [
-        "agents-list", "agents-get", "capabilities-list", "capabilities-get", "types-list", "types-get",
-    ]
-
-    let name = "mywant_agents"
-    let description = "List or inspect registered MyWant agents, capabilities, and want types. Check types-list before deploying a want of a given type."
-    var argsSchema: DynamicGenerationSchema {
-        DynamicGenerationSchema(
-            name: "MyWantAgentsArgs",
-            properties: [
-                .init(
-                    name: "action",
-                    description: "One of: \(Self.actions.joined(separator: ", ")).",
-                    schema: DynamicGenerationSchema(name: "MyWantAgentsAction", anyOf: Self.actions)
-                ),
-                .init(
-                    name: "name",
-                    description: "Agent, capability, or type name to look up. Required for the *-get actions.",
-                    schema: .init(type: String.self),
-                    isOptional: true
-                ),
-            ]
-        )
-    }
-
-    func call(arguments: GeneratedContent) async throws -> String {
-        let action = try arguments.value(String.self, forProperty: "action")
-        var payload: [String: Any] = ["action": action]
-        if let name = try? arguments.value(String.self, forProperty: "name"), !name.isEmpty {
-            payload["name"] = name
-        }
-        return try await MyWantScript.run("mywant-agents", timeout: 30, args: payload)
-    }
-}
+// Wants, agents, capabilities, types, things, worlds, state, logs — everything
+// the CLI can be asked to read — now come through one tool whose command list is
+// read from the CLI itself. See MyWantCLI.swift; the hand-kept lists that used
+// to live here went stale every time the CLI grew.
 
 struct MyWantDeployTool: LocalTool {
     private static let actions = [
