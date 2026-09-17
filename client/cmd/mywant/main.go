@@ -82,6 +82,8 @@ func main() {
 	rootCmd.AddCommand(commands.WorldCmd)
 
 	rootCmd.AddCommand(commands.VersionCmd)
+	rootCmd.AddCommand(commands.CommandsCmd)
+	rootCmd.AddCommand(commands.PointCmd)
 
 	// kubectl-style plugin dispatch: if the first arg is not a known command,
 	// look for mywant-<arg> in PATH and exec it.
