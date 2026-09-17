@@ -50,8 +50,18 @@ func init() {
 // ---------------------------------------------------------------------------
 
 func claudeCodeSessionMonitor(_ context.Context, want *Want) (bool, error) {
-	if GetGoal(want, "provider", "claude_code") == "gemini" {
+	switch GetGoal(want, "provider", "claude_code") {
+	case "gemini":
 		return geminiSessionMonitor(want)
+	case "fm":
+		// Nothing to watch: an on-device request is one process that answers
+		// before it exits (see agent_fm.go), so the answer is already in hand
+		// by the time this would look for it — and saying so is what lets the
+		// want leave `awaiting_response` and hear the next question.
+		if _, ok := fmToolPath(); ok {
+			fmSessionMonitor(want)
+			return false, nil
+		}
 	}
 
 	sessionID := GetCurrent(want, "session_id", "")
@@ -272,8 +282,18 @@ func sanitizedSubprocessEnv() []string {
 }
 
 func claudeCodeRequester(ctx context.Context, want *Want) error {
-	if GetGoal(want, "provider", "claude_code") == "gemini" {
+	switch GetGoal(want, "provider", "claude_code") {
+	case "gemini":
 		return geminiRequester(ctx, want)
+	case "fm":
+		// The Mac's own model, when this machine has one. A server that does
+		// not (fly.io runs Linux, and FoundationModels is Apple's) answers with
+		// Claude instead of not answering — asked BEFORE the request is taken
+		// off the want, so the fallback still has it to send.
+		if binary, ok := fmToolPath(); ok {
+			return fmRequester(ctx, want, binary)
+		}
+		want.StoreLog("[FM_DO] No on-device model here; answering with claude_code instead")
 	}
 
 	sessionID := GetGoal(want, "session_id", "")
