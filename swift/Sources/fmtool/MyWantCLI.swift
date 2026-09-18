@@ -112,13 +112,17 @@ struct MyWantCLITool: LocalTool {
         + "and give the NAME alone there, never the question it was asked in: args \"新宿\", not \"新宿はどこ\". "
         // The confusions worth naming, each one seen: a question about the
         // board answered from the filesystem, and processes counted as wants.
-        // 'point' answers the question AND shows it, so it is the one to reach
-        // for when somebody asks where a thing is — a cell named in words is
-        // only a place once you have found it on the board. 'where' is for the
-        // rare ask that explicitly wants the robot left alone.
-        + "Where a thing is on the board: command 'thing point', args the thing's name — it says the cell "
-        + "AND walks the robot there so the asker can see it. Use 'thing where' only if asked not to move "
-        + "the robot. "
+        // What each command IS, not what order to call them in: the order is the
+        // model's to work out (see Plan.swift), and procedures written here go
+        // stale as fast as the CLI grows.
+        + "'board' names everything on the canvas, spelled as 'point' expects. 'point' takes one name and "
+        + "says where it is AND walks the robot there, so the asker can see it. "
+        // The board is a graph, not a pile: this is the edge between two of its
+        // tiles, and the question "what is X connected to" has one answer that
+        // knows about both kinds of edge.
+        + "Things and wants are CONNECTED to each other: a want reads the things it names and the fields of "
+        + "other wants, and feeds its own fields on. 'relations' takes one name and lists those connections "
+        + "in both directions — use it for 'what is X connected to', 'what feeds X', 'what uses X'. "
         + "A want is something on the board — 'wants list'. 'ps' is the server's own processes, not wants. "
         + "Named values are things — 'thing list'."
     }
@@ -127,10 +131,16 @@ struct MyWantCLITool: LocalTool {
         // The catalogue the model chooses from IS the CLI's own, read at
         // startup — see the note at the top of this file.
         let paths = commands.map(\.path)
+        // Short on purpose. Every word here rides in the prompt of every
+        // request, and this model has 8k tokens for the whole conversation —
+        // a full catalogue with its descriptions left so little room that a
+        // four-word question could overflow the window mid-turn. The paths
+        // alone say most of it; `commands --json` has the rest for anyone who
+        // needs it.
         let summary = commands
-            .prefix(60)
-            .map { "\($0.path): \($0.short ?? "")" }
-            .joined(separator: "; ")
+            .prefix(24)
+            .map(\.path)
+            .joined(separator: ", ")
         return DynamicGenerationSchema(
             name: "MyWantCLIArgs",
             properties: [
@@ -158,7 +168,21 @@ struct MyWantCLITool: LocalTool {
         }
         var argv = command.split(separator: " ").map(String.init)
         if let extra = try? arguments.value(String.self, forProperty: "args"), !extra.isEmpty {
-            argv.append(contentsOf: extra.split(separator: " ").map(String.init))
+            // One argument, unless the command's usage line asks for more.
+            //
+            // Split on spaces, "transit search" reached a command that takes
+            // exactly one name as two of them, and the CLI refused it — for a
+            // want whose tile was on the board the whole time. A name with a
+            // space in it is still one name; only a command whose usage names
+            // two placeholders gets the words handed over separately.
+            let placeholders = (commands.first { $0.path == command }?.use ?? "")
+                .filter { $0 == "<" || $0 == "[" }
+                .count
+            if placeholders > 1 {
+                argv.append(contentsOf: extra.split(separator: " ").map(String.init))
+            } else {
+                argv.append(extra)
+            }
         }
         // What was actually run, on stderr beside the "[tool: …]" line. Without
         // it a wrong answer is a mystery: the tool fired, and nothing says
