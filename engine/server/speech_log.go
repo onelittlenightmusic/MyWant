@@ -194,6 +194,13 @@ func (s *Server) forwardToRobotIfAddressed(speakerID, text string) {
 		log.Printf("[Speech] %s addressed the robot, but no robot want exists", speakerID)
 		return
 	}
+	// What they can see goes with what they said. A question asked at a board
+	// is half gesture — "これ消して", "ここに置いて" — and the gesture is the
+	// speaker's own position, which this server knows and used to drop on the
+	// way out. See contextForSpeaker; it says nothing when nothing is known.
+	if context := s.contextForSpeaker(speakerID); context != "" {
+		request += "\n\n" + context
+	}
 	// Written straight into the want's state rather than posted back through
 	// our own HTTP endpoint: same destination, one fewer round trip, and no way
 	// for the forward to fail because the server is busy answering itself.

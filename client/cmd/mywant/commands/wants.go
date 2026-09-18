@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -226,7 +227,15 @@ var createWantCmd = &cobra.Command{
 Modes:
   -f file.yaml          Create from YAML/JSON file
   -t <type> [-e]        Create want of specific type, optionally with example parameters
-  -i                    Interactive mode: prompts for all inputs`,
+  -i                    Interactive mode: prompts for all inputs
+
+Placing it:
+  --at x,y              Put its tile on the canvas at that cell
+  --name <name>         Call it this instead of "new-<type>"
+
+Without --at the server picks a cell itself (the first free one, scanning from
+the origin), so a new want always lands somewhere — just not anywhere you asked
+for, and usually not near what it has to do with. Say where, when you know.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		file, _ := cmd.Flags().GetString("file")
@@ -250,6 +259,14 @@ Modes:
 
 		var config client.Config
 		c := client.NewClient(viper.GetString("server"))
+
+		at, _ := cmd.Flags().GetString("at")
+		atX, atY, placing, err := parseCell(at)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
+		givenName, _ := cmd.Flags().GetString("name")
 
 		if wantType != "" {
 			if useExample {
@@ -334,6 +351,22 @@ Modes:
 			os.Exit(1)
 		}
 
+		// A name and a cell are decided before the want exists, so they travel
+		// with it rather than being written back afterwards: the tile appears
+		// where it was asked for, once, instead of appearing nowhere and moving.
+		if givenName != "" {
+			config.Wants[0].Metadata.Name = givenName
+		}
+		if placing {
+			for _, want := range config.Wants {
+				if want.Metadata.Labels == nil {
+					want.Metadata.Labels = map[string]string{}
+				}
+				want.Metadata.Labels[canvasXLabel] = strconv.Itoa(atX)
+				want.Metadata.Labels[canvasYLabel] = strconv.Itoa(atY)
+			}
+		}
+
 		resp, err := c.CreateWant(config)
 		if err != nil {
 			fmt.Printf("Error creating want: %v\n", err)
@@ -343,6 +376,17 @@ Modes:
 		fmt.Printf("Successfully created want execution %s with %d wants\n", resp.ID, len(resp.WantIDs))
 		for _, id := range resp.WantIDs {
 			fmt.Printf("- %s\n", id)
+		}
+		// Undoing a creation is deleting what was created, which is safe in the
+		// way deleting generally is not: nothing existed a moment ago, and this
+		// names the exact want rather than a word that matched one.
+		if len(resp.WantIDs) == 1 {
+			recordUndo(fmt.Sprintf("created %s", config.Wants[0].Metadata.Name), "wants", "delete", resp.WantIDs[0])
+		}
+		if placing {
+			fmt.Printf("On the canvas at (%d, %d).\n", atX, atY)
+		} else {
+			fmt.Println("The server chose its cell; `mywant board` says where, and `mywant gui tile set <name> <x> <y>` moves it.")
 		}
 	},
 }
@@ -384,6 +428,8 @@ func init() {
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
 	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")
 	createWantCmd.Flags().BoolP("interactive", "i", false, "Full interactive mode (prompts for all inputs)")
+	createWantCmd.Flags().String("at", "", "Canvas cell for its tile, as x,y (a want without one stands nowhere)")
+	createWantCmd.Flags().String("name", "", "What to call it (default: new-<type>)")
 	exportWantsCmd.Flags().StringP("output", "o", "", "Path to save exported YAML (stdout if not specified)")
 	importWantsCmd.Flags().StringP("file", "f", "", "Path to YAML file to import")
 

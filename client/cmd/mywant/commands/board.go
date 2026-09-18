@@ -71,11 +71,11 @@ answers "which constellation is this in?" without a second call.`,
 		}
 
 		for _, t := range things {
-			if t.Labels[thingCanvasLabel] != "true" {
+			if t.Labels[canvasOnLabel] != "true" {
 				continue
 			}
-			x, _ := strconv.Atoi(t.Labels[thingCanvasXLabel])
-			y, _ := strconv.Atoi(t.Labels[thingCanvasYLabel])
+			x, _ := strconv.Atoi(t.Labels[canvasXLabel])
+			y, _ := strconv.Atoi(t.Labels[canvasYLabel])
 			what := t.Subtype
 			if what == "" {
 				what = t.Catalog
@@ -94,8 +94,8 @@ answers "which constellation is this in?" without a second call.`,
 		}
 
 		for _, w := range resp.Wants {
-			x, errX := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-x"])
-			y, errY := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-y"])
+			x, errX := strconv.Atoi(w.Metadata.Labels[canvasXLabel])
+			y, errY := strconv.Atoi(w.Metadata.Labels[canvasYLabel])
 			if errX != nil || errY != nil {
 				continue
 			}

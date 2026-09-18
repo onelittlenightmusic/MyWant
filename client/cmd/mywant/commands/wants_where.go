@@ -60,8 +60,8 @@ func findWantPlace(c *client.Client, name string) (wantPlace, error) {
 	looseNeedle := looseName(needle)
 
 	place := func(w *client.Want) wantPlace {
-		x, errX := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-x"])
-		y, errY := strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-y"])
+		x, errX := strconv.Atoi(w.Metadata.Labels[canvasXLabel])
+		y, errY := strconv.Atoi(w.Metadata.Labels[canvasYLabel])
 		return wantPlace{
 			id: w.Metadata.ID, name: w.Metadata.Name, wantType: w.Metadata.Type,
 			status: w.Status, x: x, y: y, placed: errX == nil && errY == nil,
@@ -157,8 +157,8 @@ Nothing is changed except where the robot is standing and what it is saying.`,
 		}
 
 		for key, value := range map[string]string{
-			thingCanvasXLabel: strconv.Itoa(place.x),
-			thingCanvasYLabel: strconv.Itoa(place.y),
+			canvasXLabel: strconv.Itoa(place.x),
+			canvasYLabel: strconv.Itoa(place.y),
 		} {
 			if err := c.AddWantLabel(robotWantName, key, value); err != nil {
 				fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)
