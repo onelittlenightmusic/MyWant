@@ -111,10 +111,28 @@ func (s *fmServer) stop() {
 	s.cmd, s.stdin, s.stdout = nil, nil, nil
 }
 
-// ask puts one question and waits for its answer, starting or restarting the
-// agent as needed. Two attempts: a process that died between questions is not
-// an error anybody asked about, it is one to recover from.
+// ask puts one question to the conversation and waits for its answer.
 func (s *fmServer) ask(prompt, root string, timeout time.Duration) (fmReply, error) {
+	return s.request(prompt, root, timeout, false)
+}
+
+// askPlain puts a question to the model alone: no tools, and no memory of the
+// chat going on beside it.
+//
+// For a caller that is not chatting. MyWant works out which of its commands
+// carry out a request and asks this only for the language part — and the first
+// time it asked through the ordinary session, the agent went off and used its
+// own tools to answer a question that was never addressed to it, reporting that
+// "the search results did not provide the required information" and planning
+// nothing.
+func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply, error) {
+	return s.request(prompt, root, timeout, true)
+}
+
+// request does the talking, starting or restarting the agent as needed. Two
+// attempts: a process that died between questions is not an error anybody asked
+// about, it is one to recover from.
+func (s *fmServer) request(prompt, root string, timeout time.Duration, plain bool) (fmReply, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -126,7 +144,11 @@ func (s *fmServer) ask(prompt, root string, timeout time.Duration) (fmReply, err
 			}
 		}
 		s.nextID++
-		request, err := json.Marshal(map[string]any{"id": s.nextID, "prompt": prompt})
+		body := map[string]any{"id": s.nextID, "prompt": prompt}
+		if plain {
+			body["plain"] = true
+		}
+		request, err := json.Marshal(body)
 		if err != nil {
 			return fmReply{}, err
 		}

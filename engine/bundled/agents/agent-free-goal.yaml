@@ -1,0 +1,30 @@
+agents:
+  - name: agent_free_goal
+    runtime: localGo
+    type: do
+    description: Turns a request said in plain words into commands, one step at a time, and runs them
+    version: '1.0'
+    capabilities:
+      - free_goal_planning
+    role: action
+    actions:
+      - name: plan_and_run
+        description: Asks the on-device model what to do next, checks it against the CLI's own command list, runs it, and repeats
+        parameters:
+          request:
+            type: string
+            description: What was asked for, in the words it was asked in
+          max_steps:
+            type: number
+            description: How many commands this goal may run
+            default: 4
+        state_updates:
+          - name: steps
+            type: array
+            description: Each command run, with what it printed
+          - name: answer
+            type: string
+            description: What to tell the person who asked
+          - name: phase
+            type: string
+            description: planning | running | waiting_confirmation | done | failed

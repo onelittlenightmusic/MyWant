@@ -81,6 +81,9 @@ var readOnlyVerbs = map[string]bool{
 	// is 新宿?" by going to stand on it is the whole point of being able to
 	// ask. Nothing on the board is created, moved or deleted by either.
 	"say": true, "point": true,
+	// Asking for something in words is not a read — the goal it makes may run
+	// anything — but it is not a write either: `do` creates a want that decides,
+	// and that want stops at whatever cannot be undone. Left as a change.
 }
 
 func readOnlyCommand(path string) bool {
