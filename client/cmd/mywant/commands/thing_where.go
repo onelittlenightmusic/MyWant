@@ -32,13 +32,32 @@ const (
 	robotWantName = "robot"
 )
 
-// thingPlace is where one thing stands, as far as the board is concerned.
+// thingPlace is where one thing stands, as far as the board is concerned, and
+// what else the board knows about it.
+//
+// More than a cell, because which command gets called is a guess made by
+// whatever is answering: asked "荻窪はどの星座？" it reaches for `point` about
+// as often as for `relations`, and an answer that is only coordinates is then
+// the wrong answer to a question the board could have answered. Every lookup
+// carrying the constellations costs a line of output and makes both guesses
+// right.
 type thingPlace struct {
-	id       string
-	value    string
-	kind     string
-	onCanvas bool
-	x, y     int
+	id             string
+	value          string
+	kind           string
+	onCanvas       bool
+	x, y           int
+	constellations []string
+}
+
+// describe is the thing in one clause: what it is, and which constellations it
+// is in.
+func (p thingPlace) describe() string {
+	out := fmt.Sprintf("%s (%s)", p.value, p.kind)
+	if len(p.constellations) > 0 {
+		out += fmt.Sprintf(" in constellation (星座) %s", strings.Join(p.constellations, ", "))
+	}
+	return out
 }
 
 // thingNameDecorations are what a name arrives wrapped in when it was quoted in
@@ -90,6 +109,26 @@ func bareThingName(name string) string {
 	return out
 }
 
+// looseName is a name with the differences that are not differences taken out:
+// case, and which separator somebody used between words.
+//
+// A want called transit-search-instance is of type transit_search and gets
+// asked about as "transit search" — three spellings of one name, and a matcher
+// that compares them literally finds nothing while the tile sits on the board.
+// Only separators and case; nothing else is touched, so two genuinely different
+// names never collapse into one.
+func looseName(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch r {
+		case ' ', '-', '_', '\u3000':
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // findThingPlace matches a thing by its name — exactly first, then by
 // containing the words, so "新宿" finds 新宿 rather than 新宿駅 when both exist
 // and the exact one was asked for. The name is taken as said: see
@@ -106,7 +145,7 @@ func findThingPlace(c *client.Client, name string) (thingPlace, error) {
 	var partial []thingPlace
 
 	for _, t := range things {
-		place := thingPlace{id: t.ID, value: t.Value, kind: t.Subtype}
+		place := thingPlace{id: t.ID, value: t.Value, kind: t.Subtype, constellations: constellationNames(t)}
 		if place.kind == "" {
 			place.kind = t.Catalog
 		}
@@ -115,10 +154,17 @@ func findThingPlace(c *client.Client, name string) (thingPlace, error) {
 		place.x, _ = strconv.Atoi(labels[thingCanvasXLabel])
 		place.y, _ = strconv.Atoi(labels[thingCanvasYLabel])
 
-		if t.Value == needle {
+		// An id is a name too. `mywant board` prints one for every tile, so
+		// whatever read it can hand back the exact tile rather than the words it
+		// was asked with — which is the point of printing the id at all. The
+		// board prints it short, so the short form has to be enough here.
+		if idMatches(t.ID, name) || idMatches(t.ID, needle) {
 			return place, nil
 		}
-		if strings.Contains(strings.ToLower(t.Value), strings.ToLower(needle)) {
+		if t.Value == needle || looseName(t.Value) == looseName(needle) {
+			return place, nil
+		}
+		if strings.Contains(looseName(t.Value), looseName(needle)) {
 			partial = append(partial, place)
 		}
 	}
@@ -159,14 +205,15 @@ robot, an agent, a person reading a terminal — can repeat it as it is.`,
 			printJSON(map[string]any{
 				"id": place.id, "value": place.value, "kind": place.kind,
 				"onCanvas": place.onCanvas, "x": place.x, "y": place.y,
+				"constellations": place.constellations,
 			})
 			return
 		}
 		if !place.onCanvas {
-			fmt.Printf("%s (%s) is not on the canvas. Pin it to put it there.\n", place.value, place.kind)
+			fmt.Printf("%s is not on the canvas. Pin it to put it there. | id: %s\n", place.describe(), shortID(place.id))
 			return
 		}
-		fmt.Printf("%s (%s) is on the canvas at (%d, %d).\n", place.value, place.kind, place.x, place.y)
+		fmt.Printf("%s is on the canvas at (%d, %d). | id: %s\n", place.describe(), place.x, place.y, shortID(place.id))
 	},
 }
 
@@ -194,7 +241,7 @@ both of which it changes on its own, wandering, every minute or so.`,
 			os.Exit(1)
 		}
 		if !place.onCanvas {
-			fmt.Printf("%s (%s) is not on the canvas, so there is nowhere to point.\n", place.value, place.kind)
+			fmt.Printf("%s is not on the canvas, so there is nowhere to point.\n", place.describe())
 			return
 		}
 
@@ -217,7 +264,8 @@ both of which it changes on its own, wandering, every minute or so.`,
 			fmt.Fprintf(os.Stderr, "Error: the robot got there but could not speak: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("The robot is standing on %s at (%d, %d) and saying: %s\n", place.value, place.x, place.y, words)
+		fmt.Printf("The robot is standing on %s at (%d, %d) and saying: %s | id: %s\n",
+			place.describe(), place.x, place.y, words, shortID(place.id))
 	},
 }
 

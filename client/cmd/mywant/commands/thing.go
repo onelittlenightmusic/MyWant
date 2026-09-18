@@ -110,18 +110,91 @@ var thingGetCmd = &cobra.Command{
 			exitErr("reading memo", err)
 		}
 
+		if len(values) == 0 {
+			// The argument was a catalog key and there is nothing under it —
+			// or, far more often, it was the name of a thing. "get 中野坂上"
+			// asked for everything known about a station and was answered "no
+			// values recorded", which is true of the catalog and false of the
+			// board: the station is standing on it. So a name falls through to
+			// the thing itself.
+			if showThingDetail(args[0], jsonOut(cmd)) {
+				return
+			}
+		}
 		if jsonOut(cmd) {
 			printJSON(values)
 			return
 		}
 		if len(values) == 0 {
-			fmt.Printf("No values recorded for %q.\n", args[0])
+			fmt.Printf("No values recorded for %q, and nothing on the board is named that.\n", args[0])
 			return
 		}
 		for _, v := range values {
 			fmt.Println(v)
 		}
 	},
+}
+
+// showThingDetail prints everything the board knows about one thing, and says
+// whether it found one.
+//
+// Everything, because the cost of a second call is what makes questions go
+// unanswered: whatever is asking has one small window, and a first answer that
+// leaves out the constellation buys a second round trip to learn it.
+func showThingDetail(name string, asJSON bool) bool {
+	place, err := findThingPlace(memoClient(), name)
+	if err != nil {
+		return false
+	}
+	things, err := memoClient().GetThings()
+	if err != nil {
+		return false
+	}
+	var subject client.Thing
+	for _, t := range things {
+		if t.ID == place.id {
+			subject = t
+		}
+	}
+
+	var namedBy []string
+	if wants, err := wantsClient().ListWants("", nil, nil, false, true); err == nil {
+		byID := map[string]string{}
+		for _, w := range wants.Wants {
+			byID[w.Metadata.ID] = w.Metadata.Name
+		}
+		for _, id := range subject.WantIDs {
+			if n, ok := byID[id]; ok {
+				namedBy = append(namedBy, n)
+			}
+		}
+		sort.Strings(namedBy)
+	}
+	constellations := constellationNames(subject)
+
+	if asJSON {
+		printJSON(map[string]any{
+			"id": place.id, "value": place.value, "kind": place.kind,
+			"catalog": subject.Catalog, "onCanvas": place.onCanvas,
+			"x": place.x, "y": place.y,
+			"constellations": constellations, "namedBy": namedBy,
+		})
+		return true
+	}
+
+	fmt.Printf("%s (thing %s) | id: %s\n", place.value, place.kind, shortID(place.id))
+	if place.onCanvas {
+		fmt.Printf("  on the canvas at (%d, %d)\n", place.x, place.y)
+	} else {
+		fmt.Println("  not on the canvas")
+	}
+	if len(constellations) > 0 {
+		fmt.Printf("  constellation (星座): %s\n", strings.Join(constellations, ", "))
+	}
+	if len(namedBy) > 0 {
+		fmt.Printf("  named by: %s\n", strings.Join(namedBy, ", "))
+	}
+	return true
 }
 
 var thingAddCmd = &cobra.Command{
@@ -432,10 +505,32 @@ var memoConstellationsListCmd = &cobra.Command{
 			return
 		}
 
+		// Members are stored as ids; printed as ids alone, the list says which
+		// constellations exist and nothing about what is in them. A reader
+		// asking "which constellation is 荻窪 in" cannot answer it from
+		// thg-28fb4a67-…, and neither can anything reading this for them. So
+		// the name comes first and the id stays after it, shortened: the name
+		// is what the question is about, the id is what a follow-up command
+		// takes.
+		names := map[string]string{}
+		if things, err := memoClient().GetThings(); err == nil {
+			for _, t := range things {
+				names[t.ID] = t.Value
+			}
+		}
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "NAME\tKIND\tMEMBERS")
 		for _, g := range constellations {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", g.Name, g.Kind, truncateList(g.Members, 5))
+			members := make([]string, 0, len(g.Members))
+			for _, m := range g.Members {
+				if name, ok := names[m]; ok {
+					members = append(members, fmt.Sprintf("%s (%s)", name, shortID(m)))
+					continue
+				}
+				members = append(members, shortID(m))
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\n", g.Name, g.Kind, truncateList(members, 8))
 		}
 		w.Flush()
 	},
