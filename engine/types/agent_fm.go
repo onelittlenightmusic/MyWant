@@ -1,13 +1,11 @@
 package types
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -23,12 +21,11 @@ import (
 // Nothing leaves the machine, nothing is billed, and an answer about the board
 // ("is the server up", "what is running") comes back in a few seconds.
 //
-// It is deliberately the SIMPLEST of the three providers. Claude Code and
-// Gemini are sessions the monitor agent reads back out of files; fmtool is one
-// process, one question, one answer — there is no session to resume, and each
-// request starts fresh. That is the trade for local and instant, and it is why
-// this provider suits the header bubble's questions rather than a long piece of
-// work.
+// The conversation is kept. fmtool runs as a live process (`--serve`, see
+// fm_server.go) holding one session, so "新宿はどこ？" and then "その隣は？"
+// are two turns of one talk rather than two strangers. The session is the only
+// memory — this model has 8k tokens for all of it — so the agent drops the
+// transcript and starts again when it fills, and says so when it did.
 
 const (
 	// Where the answer comes from when nothing says otherwise.
@@ -38,9 +35,6 @@ const (
 	// process does not hold the want's cycle.
 	fmDefaultTimeoutSeconds = 120
 )
-
-// fmToolLine picks the tool fmtool reports on stderr: "[tool: mywant_status, native: true]".
-var fmToolLine = regexp.MustCompile(`\[tool: ([a-z_]+), native: (true|false)\]`)
 
 // fmToolPath finds the on-device agent, or reports that this machine has none.
 //
@@ -152,36 +146,29 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	if timeout <= 0 {
 		timeout = fmDefaultTimeoutSeconds * time.Second
 	}
-	runCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	// The context is the want's cycle; the wait for an answer is the timeout
+	// below, which the served agent is given directly.
+	_ = ctx
 
 	want.StoreLog("[FM_DO] Asking the on-device model: %s", binary)
 	want.SetCurrent("last_request_at", time.Now().Unix())
 	want.SetCurrent("cc_streaming_text", "考えています…")
 
-	args := []string{}
-	if root != "" {
-		args = append(args, "--root", root)
-	}
-	args = append(args, request)
+	reply, err := fmServerFor(binary).ask(request, root, timeout)
+	answer := strings.TrimSpace(reply.Text)
+	notes := reply.Error
 
-	cmd := exec.CommandContext(runCtx, binary, args...)
-	// See sanitizedSubprocessEnv (agent_claude_code.go): the same stripping,
-	// for the same reason — a nested agent context is not this one's.
-	cmd.Env = sanitizedSubprocessEnv()
-	if root != "" {
-		cmd.Dir = root
+	// Which tool it reached for, if any — the chat shows it the same way it
+	// shows Claude Code's tool calls.
+	if reply.Tool != "" {
+		RecordCCActivity(want, CCActivityTool, reply.Tool)
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
-	answer := strings.TrimSpace(string(out))
-	notes := strings.TrimSpace(stderr.String())
-
-	// Which tool it reached for, if any — fmtool says so on stderr, and the
-	// chat shows it the same way it shows Claude Code's tool calls.
-	if m := fmToolLine.FindStringSubmatch(notes); m != nil {
-		RecordCCActivity(want, CCActivityTool, m[1])
+	// The conversation was trimmed to make room — the recent turns carried, the
+	// older talk and its tool output dropped. Said out loud, because what the
+	// next question can refer back to has just got shorter.
+	if reply.Trimmed {
+		want.StoreLog("[FM_DO] The conversation was trimmed to its recent turns")
+		RecordCCActivity(want, CCActivityNote, "（会話が長くなったので、古いやり取りを整理しました）")
 	}
 
 	if err != nil {
@@ -193,6 +180,20 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		want.StoreLog("[FM_DO] ERROR: %s", errMsg)
 		want.SetCurrent("last_error", errMsg)
 		RecordCCActivity(want, CCActivityError, errMsg)
+		// Say so, rather than going quiet.
+		//
+		// A failure used to end here: the error went to the log and the want's
+		// last_error, and the person who asked got nothing at all — the same
+		// silence as not having been heard. Being told "I could not answer" is
+		// a different thing from being ignored, and the one thing the asker
+		// needs to know before asking again.
+		// firstLine + truncateRunes: the reason fmtool printed first, kept short
+		// enough for a speech bubble (both live in web_inspector_naming.go).
+		reason := strings.TrimSpace(firstLine(notes))
+		if reason == "" {
+			reason = "理由は分かりません"
+		}
+		recordFMAnswer(want, "答えられませんでした: "+truncateRunes(reason, 160))
 		return fmt.Errorf("%s", errMsg)
 	}
 
@@ -204,6 +205,19 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		return nil
 	}
 
+	recordFMAnswer(want, answer)
+	want.SetCurrent("last_response_raw", answer)
+
+	if requestID != "" {
+		writeClaudeRequestLog("", requestID, "sent")
+	}
+	want.StoreLog("[FM_DO] Answered (len=%d)", len(answer))
+	return nil
+}
+
+// recordFMAnswer puts one answer where every provider's answers go: the chat's
+// ring buffer, and the robot's own mouth.
+func recordFMAnswer(want *Want, answer string) {
 	responses := GetCurrent(want, "cc_responses", []any{})
 	responses = append(responses, map[string]any{
 		"text":      answer,
@@ -214,16 +228,9 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		responses = responses[len(responses)-20:]
 	}
 	want.SetCurrent("cc_responses", responses)
-	want.SetCurrent("last_response_raw", answer)
 	// The robot answering is the robot speaking — see the same call in
 	// claudeCodeRequester for why only the robot has a mouth.
 	if want.Metadata.Type == "robot" {
 		CharacterSpeaks("robot", answer, "agent")
 	}
-
-	if requestID != "" {
-		writeClaudeRequestLog("", requestID, "sent")
-	}
-	want.StoreLog("[FM_DO] Answered (len=%d)", len(answer))
-	return nil
 }
