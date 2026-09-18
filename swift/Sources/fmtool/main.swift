@@ -83,7 +83,18 @@ let sandbox = Sandbox(root: URL(fileURLWithPath: rootPath))
 // every request: the tool schema is built from it, and building a schema is not
 // something to spend a subprocess on per question. See MyWantCLI.swift for why
 // the list is read from the binary at all.
-let myWantCommands = MyWantCLI.readOnlyCommands()
+// Writing is on unless it is turned off: a robot that can only describe a board
+// is not much of a hand on it, and everything it can reach either undoes
+// (`mywant undo`) or waits for a yes (see Destructive.swift).
+let allowWrites = ProcessInfo.processInfo.environment["MYWANT_ROBOT_WRITE"] != "0"
+let offeredCommands = MyWantCLI.offered(writes: allowWrites)
+let myWantCommands = offeredCommands.safe
+let myWantDangerousCommands = offeredCommands.dangerous
+let consentGate = ConsentGate()
+// What this agent can reach, said once at startup: a wrong answer about the
+// board is a different bug depending on whether the verb was even offered.
+printErr("[fmtool] \(myWantCommands.count) mywant commands offered"
+         + (allowWrites ? ", \(myWantDangerousCommands.count) behind a confirmation" : " (reading only)"))
 
 func makeTools(tracker: CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]) {
     var localTools: [any LocalTool] = [
@@ -100,6 +111,11 @@ func makeTools(tracker: CallTracker) -> (localTools: [any LocalTool], tools: [an
     // has. Absent when there is no CLI here to ask — the other tools still work.
     if let cli = MyWantCLITool(commands: myWantCommands) {
         localTools.append(TrackedTool(base: cli, tracker: tracker))
+    }
+    // What cannot be undone is a tool of its own, so that reaching it is a
+    // decision rather than a slip of the enum.
+    if let danger = MyWantDestructiveTool(commands: myWantDangerousCommands, gate: consentGate) {
+        localTools.append(TrackedTool(base: danger, tracker: tracker))
     }
     let tools: [any Tool] = localTools.map { $0 as any Tool }
     return (localTools, tools)
@@ -211,7 +227,7 @@ func runEval(count: Int) async {
 // MARK: - Entry point
 
 if serveMode {
-    await serve(makeTools: makeTools, instructions: systemInstructions)
+    await serve(makeTools: makeTools, instructions: systemInstructions, consent: consentGate)
 } else if let n = evalCount {
     await runEval(count: n)
 } else {
