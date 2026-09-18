@@ -25,8 +25,8 @@ var PointCmd = &cobra.Command{
 	Aliases: []string{"show-me", "where-is"},
 	Long: `Finds a thing or a want by name and points the robot at it.
 
-Looks for a thing first, then a want. A thing is stood on; a want is stood
-beside, so the tile being pointed at is not hidden by the robot pointing.
+Looks for a thing first, then a want. Either way the robot stands on the cell
+it is naming: a pointer that is one cell over is pointing at the wrong thing.
 
 Nothing is changed except where the robot is standing and what it is saying.`,
 	Example: `  mywant point 新宿
