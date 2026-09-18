@@ -17,11 +17,16 @@ one: look something up, then act on what you found, then answer. Finishing \
 after a single tool call is rarely the whole of an answer.
 
 Anything about MyWant, a want, a thing or the board goes to the mywant tool, \
-never to the file search.
+never to the file search. The board is not a pile of separate tiles: a want \
+reads the things it names and the fields of other wants, and feeds its own \
+fields on, so "what is X connected to" has an answer to look up. Not everything is about MyWant, though: remarks, \
+greetings and questions about what was just said are answered from the \
+conversation, with no tool at all.
 
-Where something is on the board is a question to be SHOWN: send the robot to it \
-(the 'point' commands) rather than reading out coordinates, unless you are \
-asked not to move anything.
+Where something is on the board is a question to be SHOWN, not read out as \
+coordinates. Work out the steps that answer it and take them; the words of a \
+question are rarely the name of a tile, so what a tool reports beats what the \
+question called it.
 
 Answer in the language the question was asked in. Report what the tool told \
 you — the answer, not the question back, and never the command you would run. \
@@ -36,6 +41,7 @@ var arguments = Array(CommandLine.arguments.dropFirst())
 var rootPath = FileManager.default.currentDirectoryPath
 var evalCount: Int?
 var forceRescue = false
+var serveMode = false
 var promptParts: [String] = []
 
 var argIndex = 0
@@ -55,6 +61,10 @@ while argIndex < arguments.count {
         evalCount = n
     case "--rescue":
         forceRescue = true
+    case "--serve":
+        // Stay alive and keep one session, answering questions off stdin. See
+        // Serve.swift.
+        serveMode = true
     default:
         promptParts.append(arg)
     }
@@ -110,12 +120,38 @@ func run(prompt: String, forceRescue: Bool = false) async throws -> RunOutcome {
 
     if !forceRescue {
         let session = LanguageModelSession(tools: tools, instructions: systemInstructions)
-        let response = try await session.respond(to: prompt)
-        if await tracker.count > 0 {
-            return RunOutcome(native: true, text: response.content, toolUsed: await tracker.lastToolName)
+        do {
+            let response = try await session.respond(to: prompt)
+            if await tracker.count > 0 {
+                return RunOutcome(native: true, text: response.content, toolUsed: await tracker.lastToolName)
+            }
+        } catch {
+            // A native turn can end in no answer at all rather than in a wrong
+            // one: the framework's own tool loop retries, the transcript grows,
+            // and the request comes back "Provided 56,113 tokens, but the
+            // maximum allowed is 8,192" — for a four-word question, before a
+            // single tool had run. Whatever the reason, the rescue path below
+            // starts a fresh session and is exactly what this situation needs;
+            // failing here instead left the asker with silence.
+            printErr("[native attempt failed: \(error.localizedDescription) — falling back to rescue]")
         }
     }
 
+    // Nothing fired on its own, so ask for a plan and carry it out. This is
+    // where a question that takes two steps gets them — from the model, not
+    // from a procedure written into a tool's description. See Plan.swift.
+    let planSession = LanguageModelSession(tools: tools, instructions: systemInstructions)
+    do {
+        let planned = try await planRespond(session: planSession, prompt: prompt, tools: localTools)
+        if planned.toolUsed != nil {
+            return RunOutcome(native: false, text: planned.finalText, toolUsed: planned.toolUsed)
+        }
+    } catch {
+        printErr("[plan failed: \(error.localizedDescription) — falling back to one tool]")
+    }
+
+    // A plan that named nothing runnable still leaves the question asked: the
+    // older one-tool path is the floor under all of this.
     let rescueSession = LanguageModelSession(tools: tools, instructions: systemInstructions)
     let rescued = try await rescueRespond(session: rescueSession, prompt: prompt, tools: localTools)
     return RunOutcome(native: false, text: rescued.finalText, toolUsed: rescued.toolName)
@@ -174,12 +210,14 @@ func runEval(count: Int) async {
 
 // MARK: - Entry point
 
-if let n = evalCount {
+if serveMode {
+    await serve(makeTools: makeTools, instructions: systemInstructions)
+} else if let n = evalCount {
     await runEval(count: n)
 } else {
     let prompt = promptParts.joined(separator: " ")
     guard !prompt.isEmpty else {
-        printErr("usage: fmtool [--root <path>] [--eval <n>] <prompt>")
+        printErr("usage: fmtool [--root <path>] [--eval <n>] [--serve] <prompt>")
         exit(1)
     }
     do {
