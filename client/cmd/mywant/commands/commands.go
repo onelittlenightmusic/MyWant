@@ -65,7 +65,7 @@ var readOnlyVerbs = map[string]bool{
 	"logs": true, "export": true, "version": true, "help": true, "search": true,
 	"stats": true, "events": true, "labels": true, "groups": true,
 	"current-context": true, "get-contexts": true, "commands": true,
-	"where": true,
+	"where": true, "board": true, "names": true, "relations": true, "connections": true,
 	// Two that do change something, and are here anyway: what the robot is
 	// saying, and where it is standing. Both are things the robot changes by
 	// itself every minute as it wanders, neither is kept, and answering "where
