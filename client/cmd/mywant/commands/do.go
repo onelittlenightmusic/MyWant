@@ -36,7 +36,11 @@ was done stay together. Commands that only read or that can be undone are run;
 a command that cannot be undone stops the goal and asks you first.
 
 Needs an on-device model (macOS). Without one the goal says so rather than
-guessing.`,
+guessing.
+
+--show-prompts prints each question put to the model and what it answered. A
+goal is several small questions — which command, which want type, which
+values — and a surprising answer is almost always a surprising question.`,
 	Example: `  mywant do "荻窪はどの星座？"
   mywant do "Parasomniaを(9,-9)に移動して"
   mywant do "weatherの隣に新しいbuttonを置いて" --dry-run`,
@@ -53,6 +57,7 @@ guessing.`,
 		}
 		maxSteps, _ := cmd.Flags().GetInt("max-steps")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		showPrompts, _ := cmd.Flags().GetBool("show-prompts")
 
 		want := &client.Want{
 			Metadata: client.Metadata{
@@ -61,9 +66,10 @@ guessing.`,
 				Labels: map[string]string{},
 			},
 			Spec: client.WantSpec{Params: map[string]any{
-				"request":   request,
-				"max_steps": maxSteps,
-				"dry_run":   dryRun,
+				"request":      request,
+				"max_steps":    maxSteps,
+				"dry_run":      dryRun,
+				"show_prompts": showPrompts,
 			}},
 		}
 		if placing {
@@ -99,8 +105,9 @@ guessing.`,
 // which command it chose, and that is known long before the answer is.
 func watchGoal(api *client.Client, id string, cmd *cobra.Command) {
 	timeout, _ := cmd.Flags().GetDuration("timeout")
+	showPrompts, _ := cmd.Flags().GetBool("show-prompts")
 	deadline := time.Now().Add(timeout)
-	shown := 0
+	shown, shownPrompts := 0, 0
 
 	for time.Now().Before(deadline) {
 		want, err := api.GetWant(id, false)
@@ -115,6 +122,25 @@ func watchGoal(api *client.Client, id string, cmd *cobra.Command) {
 		if state == nil {
 			state = want.State
 		}
+		// What was asked of the model, before what came of it: the questions
+		// are the part nobody can see otherwise, and they are where a strange
+		// answer usually comes from.
+		if showPrompts {
+			prompts, _ := state["prompts"].([]any)
+			for ; shownPrompts < len(prompts); shownPrompts++ {
+				entry, _ := prompts[shownPrompts].(map[string]any)
+				fmt.Printf("\n┌─ asked (%v) ─────────────────────────────\n", entry["asked"])
+				for _, line := range strings.Split(strings.TrimRight(fmt.Sprint(entry["prompt"]), "\n"), "\n") {
+					fmt.Println("│ " + line)
+				}
+				fmt.Println("├─ answered ──────────────────────────────")
+				for _, line := range strings.Split(strings.TrimRight(fmt.Sprint(entry["answer"]), "\n"), "\n") {
+					fmt.Println("│ " + line)
+				}
+				fmt.Println("└─────────────────────────────────────────")
+			}
+		}
+
 		steps, _ := state["steps"].([]any)
 		for ; shown < len(steps); shown++ {
 			step, _ := steps[shown].(map[string]any)
@@ -232,4 +258,5 @@ func init() {
 	DoCmd.Flags().Bool("wait", true, "Follow the goal until it finishes")
 	DoCmd.Flags().Duration("timeout", 3*time.Minute, "How long to follow it before leaving it running")
 	DoCmd.Flags().Bool("yes", false, "Answer yes to the goal's question, if it has to stop and ask one")
+	DoCmd.Flags().Bool("show-prompts", false, "Print every question put to the model, and its answer")
 }

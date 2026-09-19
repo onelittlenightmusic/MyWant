@@ -58,6 +58,31 @@ type freeGoalStep struct {
 // the model. A want list is tens of KB; the model's whole world is 8k tokens.
 const freeGoalOutputLimit = 1200
 
+// freeGoalAsking puts one question to the model and, when the goal was asked
+// to show its working, keeps it.
+//
+// Every question goes through here — the step question, the want type, the
+// parameters, the offer — so "what did you actually send?" has one answer and
+// not four places to look. Kept on the want rather than logged: the goal is
+// the record of itself, and `mywant do --show-prompts` reads it back.
+func freeGoalAsking(want *Want, agent *fmServer, label, prompt string, timeout time.Duration) (fmReply, error) {
+	reply, err := agent.askPlain(prompt, "", timeout)
+	if !GetCurrent(want, "show_prompts", false) {
+		return reply, err
+	}
+	answer := reply.Text
+	if err != nil {
+		answer = "(no answer: " + err.Error() + ")"
+	}
+	prompts := GetCurrent(want, "prompts", []any{})
+	want.SetCurrent("prompts", append(prompts, map[string]any{
+		"asked":  label,
+		"prompt": prompt,
+		"answer": strings.TrimSpace(answer),
+	}))
+	return reply, err
+}
+
 // executeFreeGoal carries out one request, step by step.
 func executeFreeGoal(ctx context.Context, want *Want) error {
 	request := GetCurrent(want, "request", "")
@@ -82,7 +107,7 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		want.SetCurrent("error", "このマシンには on-device モデルがないので、手順を立てられません")
 		return nil
 	}
-	catalogue, err := freeGoalCatalogue()
+	catalogue, wholeCLI, err := freeGoalCatalogues()
 	if err != nil || len(catalogue) == 0 {
 		want.SetCurrent("phase", "failed")
 		want.SetCurrent("error", fmt.Sprintf("mywant のコマンド一覧を読めませんでした: %v", err))
@@ -119,16 +144,28 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 
 	var steps []freeGoalStep
 	emptyTurns := 0
+	// Which list is in front of the model: the board's commands, or the whole
+	// CLI. It starts with the board and widens only when the model asks (see
+	// freeGoalMoreCommand), because the administration of the server is not
+	// what a goal about the board is usually reaching for.
+	offered := catalogue
 	for len(steps) < maxSteps {
-		prompt := freeGoalPrompt(want, request, catalogue, steps)
-		reply, err := agent.askPlain(prompt, "", timeout)
+		prompt := freeGoalPrompt(want, request, offered, steps)
+		reply, err := freeGoalAsking(want, agent, fmt.Sprintf("step %d", len(steps)+1), prompt, timeout)
 		if err != nil {
 			want.SetCurrent("phase", "failed")
 			want.SetCurrent("error", fmt.Sprintf("モデルが答えませんでした: %v", err))
 			freeGoalStore(want, steps)
 			return nil
 		}
-		command, args, answer := freeGoalParse(reply.Text, catalogue)
+		command, args, answer := freeGoalParse(reply.Text, offered)
+		if command == "" && mentionsMore(reply.Text) && len(offered) < len(wholeCLI) {
+			// Nothing above fits: show everything and ask again. A turn, not a
+			// step — widening the list is not work on the board.
+			offered = wholeCLI
+			want.StoreLog("[FREE_GOAL] widened to the whole CLI")
+			continue
+		}
 		if command == "" && strings.TrimSpace(answer) == "" {
 			answer = strings.TrimSpace(reply.Text)
 		}
@@ -149,7 +186,7 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			if emptyTurns < 3 {
 				continue
 			}
-			if command, args := freeGoalPropose(agent, request, catalogue, steps, timeout); command != "" {
+			if command, args := freeGoalPropose(want, agent, request, offered, steps, timeout); command != "" {
 				freeGoalAsk(want, steps, command, args, "missing")
 				return nil
 			}
@@ -166,7 +203,7 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			// that would have worked. Offer that instead and wait for a
 			// person: see freeGoalPropose, and freeGoalAsk for the waiting.
 			if !anyStepWorked(steps) {
-				if next, nextArgs := freeGoalPropose(agent, request, catalogue, steps, timeout); next != "" {
+				if next, nextArgs := freeGoalPropose(want, agent, request, offered, steps, timeout); next != "" {
 					freeGoalAsk(want, steps, next, nextArgs, "missing")
 					return nil
 				}
@@ -175,7 +212,7 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			return nil
 		}
 
-		entry := catalogue[command]
+		entry := offered[command]
 		// The name it acts on has to be a name that exists, and preferably one
 		// the request actually used. See freeGoalFixName: asked "tokyo thingは
 		// ある？" the model ran `thing get weather`, a word from nowhere.
@@ -187,12 +224,12 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		// the choice is put as its own small question rather than left to
 		// memory. See freeGoalFixType.
 		if strings.HasPrefix(command, "wants ") && flagNeedsWantType(entry) {
-			args = freeGoalFixType(agent, request, args, timeout)
+			args = freeGoalFixType(want, agent, request, args, timeout)
 			// A want that is made without its parameters is made for nowhere:
 			// a weather want with no `at` reads Tokyo, whatever was asked for.
 			// The type declares what it takes, so the values are the only part
 			// worth asking about — one question, one line per parameter.
-			args = freeGoalFillParams(agent, request, args, timeout)
+			args = freeGoalFillParams(want, agent, request, args, timeout)
 		}
 		step := freeGoalStep{Command: command, Args: args}
 		if entry.Risk == "destroy" {
@@ -236,7 +273,7 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 	// list of failures but the command that would have done it — put to the
 	// person, who can say yes.
 	if !anyStepWorked(steps) {
-		if command, args := freeGoalPropose(agent, request, catalogue, steps, timeout); command != "" {
+		if command, args := freeGoalPropose(want, agent, request, offered, steps, timeout); command != "" {
 			freeGoalAsk(want, steps, command, args, "missing")
 			return nil
 		}
@@ -258,6 +295,10 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 	b.WriteString("You are carrying out one request on a MyWant board, one command at a time.\n\n")
 	b.WriteString("Commands you may use:\n")
 	b.WriteString(freeGoalMenu(catalogue))
+	if _, widened := catalogue["config get"]; !widened {
+		b.WriteString("  " + freeGoalMoreCommand + "  — ask for the rest of this CLI (agents, recipes, config, logs, …)\n" +
+			"        only if nothing above can do it\n")
+	}
 
 	if len(steps) > 0 {
 		b.WriteString("\nWhat has been run so far:\n")
@@ -270,7 +311,7 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 			if s.Failed {
 				mark = "  -> FAILED: "
 			}
-			b.WriteString(mark + truncateRunes(strings.TrimSpace(s.Output), 400) + "\n")
+			b.WriteString(mark + freeGoalRelevantOutput(s.Output, request, 400) + "\n")
 		}
 	}
 
@@ -329,6 +370,70 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 	b.WriteString("Say only what the output above actually shows; do not invent names. The names of things\n")
 	b.WriteString("and wants on the board come from 'board'; the names of want TYPES come from 'types list'.\n")
 	return b.String()
+}
+
+// freeGoalRelevantOutput is as much of a command's output as fits, chosen so
+// that the part about the request is in it.
+//
+// `board` prints forty lines and the first four hundred characters are the
+// first two of them. Asked "荻窪はどの星座？" the model was shown a board whose
+// visible part began with Kokubunji and 国分寺, and answered 国分寺 — a real
+// station, the wrong one, and the only one it could see.
+//
+// So the lines that name what the request named come first. The head follows,
+// because context helps, and a count of what was left out follows that, so
+// nothing silently disappears.
+func freeGoalRelevantOutput(output, request string, limit int) string {
+	text := strings.TrimSpace(output)
+	if len([]rune(text)) <= limit {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+
+	var wanted []string
+	lowerRequest := strings.ToLower(request)
+	for _, name := range freeGoalBoardNames() {
+		if name == "" || !strings.Contains(lowerRequest, strings.ToLower(name)) {
+			continue
+		}
+		for _, line := range lines {
+			if strings.Contains(strings.ToLower(line), strings.ToLower(name)) {
+				wanted = append(wanted, line)
+			}
+		}
+	}
+
+	var kept []string
+	used := 0
+	add := func(line string) bool {
+		if used+len([]rune(line)) > limit {
+			return false
+		}
+		for _, already := range kept {
+			if already == line {
+				return true
+			}
+		}
+		kept = append(kept, line)
+		used += len([]rune(line))
+		return true
+	}
+	for _, line := range wanted {
+		if !add(line) {
+			break
+		}
+	}
+	for _, line := range lines {
+		if !add(line) {
+			break
+		}
+	}
+	left := len(lines) - len(kept)
+	out := strings.Join(kept, "\n")
+	if left > 0 {
+		out += fmt.Sprintf("\n     …(%d more lines)", left)
+	}
+	return out
 }
 
 // freeGoalParse reads the model's line: a command to run, or an answer.
@@ -483,7 +588,7 @@ func flagNeedsWantType(entry freeGoalCommand) bool {
 // nothing else in the prompt: choosing one name from a list is the kind of
 // thing a small model is good at, and composing a command line while
 // remembering a hundred type names is not.
-func freeGoalFixType(agent *fmServer, request, args string, timeout time.Duration) string {
+func freeGoalFixType(want *Want, agent *fmServer, request, args string, timeout time.Duration) string {
 	types := freeGoalWantTypes()
 	if len(types) == 0 {
 		return args
@@ -506,7 +611,7 @@ func freeGoalFixType(agent *fmServer, request, args string, timeout time.Duratio
 
 	prompt := "Which want type does this request need? Answer with ONE name from this list and nothing else.\n\n" +
 		strings.Join(types, ", ") + "\n\nRequest: " + request + "\n"
-	reply, err := agent.askPlain(prompt, "", timeout)
+	reply, err := freeGoalAsking(want, agent, "which want type", prompt, timeout)
 	if err != nil {
 		return args
 	}
@@ -544,7 +649,7 @@ type freeGoalParam struct {
 // for, what is each one? Secrets are never asked about — they come from the
 // environment, and a model inventing an API key would be worse than an empty
 // one.
-func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Duration) string {
+func freeGoalFillParams(want *Want, agent *fmServer, request, args string, timeout time.Duration) string {
 	fields := strings.Fields(args)
 	wantType := ""
 	for i, token := range fields {
@@ -589,7 +694,7 @@ func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Dura
 	// "already exists". A second question costs three seconds and is asked
 	// before anything exists.
 	for attempt := 0; attempt < 2; attempt++ {
-		reply, err := agent.askPlain(b.String(), "", timeout)
+		reply, err := freeGoalAsking(want, agent, "parameters", b.String(), timeout)
 		if err != nil {
 			return args
 		}
@@ -798,11 +903,13 @@ func freeGoalRun(ctx context.Context, command, args string) (string, bool) {
 
 // freeGoalCommand is one command as the CLI describes it.
 type freeGoalCommand struct {
-	Path  string         `json:"path"`
-	Short string         `json:"short"`
-	Use   string         `json:"use"`
-	Risk  string         `json:"risk"`
-	Flags []freeGoalFlag `json:"flags"`
+	Path   string         `json:"path"`
+	Short  string         `json:"short"`
+	Use    string         `json:"use"`
+	Risk   string         `json:"risk"`
+	Kind   string         `json:"kind"`
+	Canvas bool           `json:"canvas"`
+	Flags  []freeGoalFlag `json:"flags"`
 }
 
 // freeGoalFlag is one option a command takes. The type matters: a boolean flag
@@ -824,31 +931,99 @@ func (c freeGoalCommand) flagsByName() map[string]freeGoalFlag {
 // The groups a goal on this board has business in. Reads are all allowed;
 // writing is confined to what the board is made of, because the same CLI also
 // installs plugins and rewrites config, and neither is canvas work.
-var freeGoalWriteGroups = map[string]bool{
-	"wants": true, "thing": true, "world": true, "state": true, "undo": true,
-}
-
-// freeGoalWritePaths are single commands allowed in from a group that is
-// otherwise not a goal's business.
+// What a goal is offered first is what the CLI says is about the canvas.
 //
-// `gui tile set` moves a want's tile, which is board work. The rest of `gui`
-// drives the viewer's screen — where the cursor is, which page is open — and
-// offering it to a goal asked to MOVE something cost every attempt: `gui i
-// set --x 9 --y -9` reads exactly like the answer, moves the cursor, and
-// leaves the tile where it was.
-var freeGoalWritePaths = map[string]bool{
-	"gui tile set": true,
-}
-
-// freeGoalCatalogue is what the CLI says it can do, asked once per process.
+// Each command now declares two things about itself (see the CLI's own
+// `commands --json`): whether it observes or controls, and whether it concerns
+// what is drawn — the tiles, the things, where they stand — or the server
+// behind it. A goal is work on the board, so the board's commands are the ones
+// in front of it, and the rest is a question away.
 //
-// From the binary, not from a list kept here: a command added to the CLI is
-// usable by a goal the next time this server starts, with nothing to change.
+// This replaces a list of group names kept here, which was the same judgement
+// made in the wrong place: the CLI knows what its commands are for, and a copy
+// of that knowledge in another repository goes stale the day a command moves.
+
+// freeGoalCatalogueCache is the board's own commands, read once per process.
 var freeGoalCatalogueCache map[string]freeGoalCommand
+
+// freeGoalCatalogues returns what a goal is offered first — the board's own
+// commands — and everything else the CLI has, for when none of them fit.
+//
+// The second list is not in the first question. Printing the prompt showed why:
+// with every read command in it, the menu opened with achievements, agents,
+// capabilities, config and custom, and the board's commands were somewhere in
+// the middle of a list of server administration. So the board comes first and
+// the rest is one line away — see the "more" entry in freeGoalMenu, and the
+// drill-down in the loop.
+func freeGoalCatalogues() (board, whole map[string]freeGoalCommand, err error) {
+	board, err = freeGoalCatalogue()
+	if err != nil {
+		return nil, nil, err
+	}
+	whole, err = freeGoalWholeCLI()
+	if err != nil {
+		return board, board, nil
+	}
+	return board, whole, nil
+}
+
+// freeGoalMoreCommand is the menu entry that asks for the rest of the CLI. It
+// is not a command; choosing it re-asks the same question with everything in
+// it, and costs a turn rather than a step.
+const freeGoalMoreCommand = "more"
+
+// freeGoalWholeCLI is every command, read or reversible, wherever it lives.
+var freeGoalWholeCache map[string]freeGoalCommand
+
+func freeGoalWholeCLI() (map[string]freeGoalCommand, error) {
+	if freeGoalWholeCache != nil {
+		return freeGoalWholeCache, nil
+	}
+	all, err := freeGoalAllCommands()
+	if err != nil {
+		return nil, err
+	}
+	whole := map[string]freeGoalCommand{}
+	for _, c := range all {
+		if c.Path == "commands" || c.Path == "" || c.Risk == "destroy" {
+			continue
+		}
+		whole[c.Path] = c
+	}
+	freeGoalWholeCache = whole
+	return whole, nil
+}
 
 func freeGoalCatalogue() (map[string]freeGoalCommand, error) {
 	if freeGoalCatalogueCache != nil {
 		return freeGoalCatalogueCache, nil
+	}
+	all, err := freeGoalAllCommands()
+	if err != nil {
+		return nil, err
+	}
+	catalogue := map[string]freeGoalCommand{}
+	for _, c := range all {
+		if c.Path == "commands" || c.Path == "" || !c.Canvas {
+			continue
+		}
+		// Destroying is never offered in the list: it goes through the offer,
+		// where a person says yes (see freeGoalAsk).
+		if c.Risk == "destroy" {
+			continue
+		}
+		catalogue[c.Path] = c
+	}
+	freeGoalCatalogueCache = catalogue
+	return catalogue, nil
+}
+
+// freeGoalAllCommands asks the CLI what it can do, once per process.
+var freeGoalAllCache []freeGoalCommand
+
+func freeGoalAllCommands() ([]freeGoalCommand, error) {
+	if freeGoalAllCache != nil {
+		return freeGoalAllCache, nil
 	}
 	binary, err := mywantBinaryPath()
 	if err != nil {
@@ -864,23 +1039,8 @@ func freeGoalCatalogue() (map[string]freeGoalCommand, error) {
 	if err := json.Unmarshal(out, &all); err != nil {
 		return nil, err
 	}
-	catalogue := map[string]freeGoalCommand{}
-	for _, c := range all {
-		if c.Path == "commands" || c.Path == "" {
-			continue
-		}
-		group := strings.Fields(c.Path)[0]
-		switch c.Risk {
-		case "read":
-			catalogue[c.Path] = c
-		case "change", "destroy":
-			if freeGoalWriteGroups[group] || freeGoalWritePaths[c.Path] {
-				catalogue[c.Path] = c
-			}
-		}
-	}
-	freeGoalCatalogueCache = catalogue
-	return catalogue, nil
+	freeGoalAllCache = all
+	return all, nil
 }
 
 // freeGoalMenu is the catalogue as the model sees it: the path, what it takes,
@@ -898,58 +1058,91 @@ func freeGoalMenu(catalogue map[string]freeGoalCommand) string {
 		paths = append(paths, path)
 	}
 	sortStrings(paths)
+
+	// In two halves, the way the CLI labels them: the commands that tell you
+	// something, and the commands that change something. A request is nearly
+	// always one or the other, and a flat alphabetical list made the model
+	// read every line to find out which was which.
 	var b strings.Builder
-	for _, path := range paths {
-		c := catalogue[path]
-		takes := ""
-		if fields := strings.Fields(c.Use); len(fields) > 1 {
-			takes = " " + strings.Join(fields[1:], " ")
+	for _, kind := range []string{"observe", "control"} {
+		heading := "To find something out:\n"
+		if kind == "control" {
+			heading = "To change something:\n"
 		}
-		b.WriteString("  " + path + takes)
-		// The flags, because for some commands they are the whole of the
-		// instruction: `wants create` takes no positional argument at all, and
-		// a menu that showed only its name said nothing about --type or
-		// --param — so a goal asking for "a weather want for Nakano" could not
-		// have expressed it. --json is left out; it changes the shape of the
-		// answer and never the work.
-		// Only where the flags ARE the command. `wants create` names no
-		// positional argument and everything it needs is a flag, so without
-		// them it cannot be used at all. Everywhere else they doubled the
-		// length of the menu, and a longer menu measurably costs picks: with
-		// flags on every line, "荻窪はどの星座？" stopped running `relations`
-		// and started inventing constellations.
-		var options []string
-		if strings.ContainsAny(c.Use, "<[") {
-			b.WriteString("  " + path + takes)
-			if short := truncateRunes(strings.TrimSpace(c.Short), 64); short != "" {
-				b.WriteString("  — " + short)
-			}
-			b.WriteString("\n")
-			continue
-		}
-		for _, f := range c.Flags {
-			// Eight, not five: flags are listed alphabetically, and five cut
-			// `wants create` off at --name — losing --param and --type, which
-			// are the entire instruction for creating anything. A menu that
-			// stops before the useful flag is worse than no menu.
-			if f.Name == "json" || f.Name == "help" || len(options) >= 8 {
+		written := false
+		for _, path := range paths {
+			if catalogue[path].Kind != kind {
 				continue
 			}
-			options = append(options, f.Name)
+			if !written {
+				b.WriteString(heading)
+				written = true
+			}
+			b.WriteString(freeGoalMenuLine(catalogue[path]))
 		}
-		// Named, not written out as a command line. Printed as "[--type
-		// --param …]" the model copied the whole bracket into its arguments
-		// and ran `wants create --example --file --interactive --name --param
-		// --type]`. A list of names cannot be pasted as a line.
-		if len(options) > 0 {
-			b.WriteString(" (flags: " + strings.Join(options, ", ") + ")")
+	}
+	// Anything the CLI did not label falls in at the end rather than going
+	// missing.
+	for _, path := range paths {
+		if k := catalogue[path].Kind; k != "observe" && k != "control" {
+			b.WriteString(freeGoalMenuLine(catalogue[path]))
 		}
+	}
+	return b.String()
+}
+
+// freeGoalMenuLine is one command as the model sees it.
+func freeGoalMenuLine(c freeGoalCommand) string {
+	var b strings.Builder
+	{
+		path := c.Path
+		b.WriteString("  " + path)
+
+		// What it takes: the placeholders from its usage line, or — for a
+		// command that names none and is driven entirely by flags — the flag
+		// names. `wants create` is the second kind: a line showing only its
+		// name says nothing about --type or --param, and a goal asking for a
+		// weather want could not have expressed it.
+		//
+		// Flags only where they ARE the command, because on every line they
+		// doubled the menu's length, and a longer menu measurably costs picks.
+		// Named, not written out as "[--type --param …]": shown that way the
+		// model pasted the bracket into its arguments and ran `wants create
+		// --type]`.
+		if fields := strings.Fields(c.Use); len(fields) > 1 {
+			b.WriteString(" " + strings.Join(fields[1:], " "))
+		} else {
+			var options []string
+			for _, f := range c.Flags {
+				if f.Name == "json" || f.Name == "help" || len(options) >= 8 {
+					continue
+				}
+				options = append(options, f.Name)
+			}
+			if len(options) > 0 {
+				b.WriteString(" (flags: " + strings.Join(options, ", ") + ")")
+			}
+		}
+
 		if short := truncateRunes(strings.TrimSpace(c.Short), 64); short != "" {
 			b.WriteString("  — " + short)
 		}
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// mentionsMore reports whether the model asked for the rest of the CLI.
+func mentionsMore(text string) bool {
+	for _, line := range strings.Split(text, "\n") {
+		fields := strings.Fields(strings.ToLower(strings.Trim(strings.TrimSpace(line), "`*-• ")))
+		for i, word := range fields {
+			if word == freeGoalMoreCommand && (i == 0 || fields[i-1] == "run") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // mywantBinaryPath finds this CLI: the one running the server, then PATH, then
@@ -1001,7 +1194,7 @@ func freeGoalAsk(want *Want, steps []freeGoalStep, command, args, why string) {
 // and the useful thing to say is not "no" but "this would do it — shall I?".
 // The model names the command; it is checked against the catalogue and filled
 // in like any other, and then it waits. Nothing is run.
-func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeGoalCommand, steps []freeGoalStep, timeout time.Duration) (string, string) {
+func freeGoalPropose(want *Want, agent *fmServer, request string, catalogue map[string]freeGoalCommand, steps []freeGoalStep, timeout time.Duration) (string, string) {
 	var b strings.Builder
 	b.WriteString("A request on a MyWant board could not be carried out with what is already there.\n\n")
 	b.WriteString("Request: " + request + "\n")
@@ -1030,7 +1223,7 @@ func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeG
 	question := b.String()
 	var command, args string
 	for attempt := 0; attempt < 2; attempt++ {
-		reply, err := agent.askPlain(question, "", timeout)
+		reply, err := freeGoalAsking(want, agent, "what would do it", question, timeout)
 		if err != nil {
 			return "", ""
 		}
@@ -1063,10 +1256,30 @@ func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeG
 			return "", ""
 		}
 	}
+	// Never offer to create something the board already has under that name.
+	// Asked "荻窪はどの星座？" a goal that had looked for a WANT called 荻窪 —
+	// there is none; 荻窪 is a thing — offered to create a character_chat by
+	// that name. The question was about a station that exists, and the offer
+	// would have added a second 荻窪 of a different kind.
+	if command == "wants create" {
+		name := ""
+		fields := strings.Fields(args)
+		for i, token := range fields {
+			if token == "--name" && i+1 < len(fields) {
+				name = fields[i+1]
+			}
+		}
+		for _, existing := range freeGoalBoardNames() {
+			if name != "" && strings.EqualFold(existing, name) {
+				return "", ""
+			}
+		}
+	}
+
 	entry := catalogue[command]
 	if strings.HasPrefix(command, "wants ") && flagNeedsWantType(entry) {
-		args = freeGoalFixType(agent, request, args, timeout)
-		args = freeGoalFillParams(agent, request, args, timeout)
+		args = freeGoalFixType(want, agent, request, args, timeout)
+		args = freeGoalFillParams(want, agent, request, args, timeout)
 	}
 	return command, args
 }

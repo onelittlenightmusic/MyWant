@@ -65,6 +65,12 @@ wantType:
       required: false
       default: false
 
+    - name: show_prompts
+      description: Keep every question put to the model, so it can be read back
+      type: boolean
+      required: false
+      default: false
+
   state:
     - name: request
       description: The sentence this goal is about (copied from the parameter)
@@ -116,6 +122,20 @@ wantType:
       label: plan
       initialValue: []
 
+    - name: show_prompts
+      description: Whether to keep every question put to the model (copied from the parameter)
+      type: boolean
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: prompts
+      description: Every question put to the model, in order, when show_prompts is on
+      type: array
+      persistent: false
+      label: current
+      initialValue: []
+
     - name: steps
       description: What has been run, in order, with what it printed
       type: array
@@ -154,6 +174,7 @@ wantType:
 
   onInitialize:
     params:
+      show_prompts: show_prompts
       request: request
       asked_by: asked_by
       goal_context: context

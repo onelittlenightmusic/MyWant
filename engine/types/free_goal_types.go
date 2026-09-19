@@ -54,6 +54,8 @@ func (g *FreeGoalWant) Initialize() {
 	g.SetCurrent("goal_context", g.GetStringParam("context", ""))
 	g.SetCurrent("max_steps", g.GetIntParam("max_steps", 4))
 	g.SetCurrent("dry_run", g.GetBoolParam("dry_run", false))
+	g.SetCurrent("show_prompts", g.GetBoolParam("show_prompts", false))
+	g.SetCurrent("prompts", []any{})
 	g.SetCurrent("phase", "planning")
 	g.SetCurrent("steps", []any{})
 	g.SetCurrent("pending_command", "")
