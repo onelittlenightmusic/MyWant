@@ -50,6 +50,17 @@ actor ConsentGate {
 
     func clearPending() { pending = nil }
 
+    /// The command a person is being asked about, as they would read it, or ""
+    /// when nothing is waiting.
+    ///
+    /// Read by the serving loop after each turn so the asker's screen can put
+    /// the question as a question — a sentence and two buttons — instead of
+    /// leaving it buried in what the robot said.
+    func pendingSentence() -> String {
+        guard let pending else { return "" }
+        return "mywant " + pending.command + (pending.args.isEmpty ? "" : " " + pending.args)
+    }
+
     /// A short message that is agreement and little else.
     ///
     /// Short on purpose: "はい" is consent, and "はい、でも先に天気を見せて" is a
