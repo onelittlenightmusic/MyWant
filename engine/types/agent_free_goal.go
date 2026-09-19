@@ -460,9 +460,11 @@ func freeGoalStore(want *Want, steps []freeGoalStep) {
 
 // freeGoalFinish records the answer, says it out loud, and marks the goal done.
 //
-// Out loud because somebody asked: a goal started by a person talking to the
-// robot is answered where they are looking, over the robot's own tile. A goal
-// started from a terminal has nobody standing on the board to tell.
+// Out loud when the goal says who asked for it: whoever set `asked_by` is a
+// person standing on the board, and the answer belongs where they are looking.
+// A goal from a terminal names nobody, and its answer is printed there instead.
+// (Talking to the robot on the canvas is a conversation, not a goal — that goes
+// to the robot's own want; see forwardToRobotIfAddressed.)
 func freeGoalFinish(want *Want, steps []freeGoalStep, answer string) {
 	freeGoalStore(want, steps)
 	answer = strings.TrimSpace(answer)
