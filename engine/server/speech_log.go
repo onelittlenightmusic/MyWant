@@ -189,28 +189,23 @@ func (s *Server) forwardToRobotIfAddressed(speakerID, text string) {
 	if request == "" {
 		return
 	}
-	// What they can see goes with what they said. A question asked at a board
-	// is half gesture — "これ消して", "ここに置いて" — and the gesture is the
-	// speaker's own position, which this server knows and used to drop on the
-	// way out. See contextForSpeaker; it says nothing when nothing is known.
-	context := s.contextForSpeaker(speakerID)
-
-	// The request becomes a want that works out what to do (see speech_goal.go).
-	// The board is here, the command list is here, and what was decided should
-	// be somewhere anybody can look at afterwards — none of which is true of a
-	// prompt handed to a model.
-	if _, err := s.startFreeGoal(request, speakerID, context); err == nil {
-		return
-	} else {
-		log.Printf("[Speech] could not start a goal (%v); handing it to the robot instead", err)
-	}
-
 	robot := s.findWantByIDOrName(robotCharacterID)
 	if robot == nil {
 		log.Printf("[Speech] %s addressed the robot, but no robot want exists", speakerID)
 		return
 	}
-	if context != "" {
+	// Talking to the robot is a conversation, and it stays one: the message
+	// goes to the robot's own want, which answers with whichever provider it is
+	// set to (fm, on this machine — see agent_fm.go). A goal want was tried
+	// here and is the wrong shape for chat: every remark became a tile on the
+	// board, and a question that wanted a sentence back got a work item. What
+	// plans and runs several commands is `mywant do`, asked for on purpose.
+	//
+	// What they can see goes with what they said, though. A question asked at a
+	// board is half gesture — "これ消して", "ここに置いて" — and the gesture is
+	// the speaker's own position, which this server knows and used to drop on
+	// the way out. See contextForSpeaker; it says nothing when nothing is known.
+	if context := s.contextForSpeaker(speakerID); context != "" {
 		request += "\n\n" + context
 	}
 	// Written straight into the want's state rather than posted back through

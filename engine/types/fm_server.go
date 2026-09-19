@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -32,6 +34,35 @@ type fmServer struct {
 	stdout  *bufio.Reader
 	nextID  int
 	started bool
+	// What the binary looked like when this process was started. A resident
+	// agent outlives every install: the robot was answering from a build made
+	// eleven minutes before the one on disk, with the day's fixes in the file
+	// and not in the process, and nothing said so. Compared before each
+	// question; a changed binary means a new process.
+	stamp string
+
+	// Where the agent's running commentary goes while it works. Set for the
+	// duration of one question (ask holds the lock, so there is only ever
+	// one), and called from the goroutine draining the agent's stderr — which
+	// is why what it writes to must be safe to write to from anywhere.
+	activityMu sync.Mutex
+	onActivity func(kind, text string)
+}
+
+// watch installs the commentary handler for one question.
+func (s *fmServer) watch(handler func(kind, text string)) {
+	s.activityMu.Lock()
+	s.onActivity = handler
+	s.activityMu.Unlock()
+}
+
+func (s *fmServer) say(kind, text string) {
+	s.activityMu.Lock()
+	handler := s.onActivity
+	s.activityMu.Unlock()
+	if handler != nil {
+		handler(kind, text)
+	}
 }
 
 var (
@@ -58,7 +89,20 @@ type fmReply struct {
 	Tool    string `json:"tool"`
 	Calls   int    `json:"calls"`
 	Trimmed bool   `json:"trimmed"`
+	// A command the agent will not run until a person says yes, written as
+	// they would read it. Empty when nothing is waiting.
+	Pending string `json:"pending"`
 	Error   string `json:"error"`
+}
+
+// binaryStamp identifies the build on disk: when it was written, and how big
+// it is. Enough to notice an install, cheap enough to check every time.
+func (s *fmServer) binaryStamp() string {
+	info, err := os.Stat(s.binary)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d-%d", info.ModTime().UnixNano(), info.Size())
 }
 
 // start brings the process up. The caller holds the lock.
@@ -80,14 +124,21 @@ func (s *fmServer) start(root string) error {
 	if err != nil {
 		return err
 	}
-	// Its stderr is the agent's own commentary — which tool it reached for, why
-	// a session was dropped. Left to flow to this server's log rather than
-	// collected: nothing here reads it, and a full pipe would wedge the agent.
-	cmd.Stderr = nil
+	// Its stderr is the agent's own commentary — which tool it reached for,
+	// which command it ran, why a session was dropped. Read, not left to the
+	// log: "考えています" is all anybody could see while it worked, and every
+	// line of what it was actually doing was going past on a pipe nobody was
+	// holding. Drained continuously, so a full pipe can never wedge the agent.
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 	s.cmd, s.stdin, s.stdout, s.started = cmd, stdin, bufio.NewReaderSize(stdout, 1<<20), true
+	s.stamp = s.binaryStamp()
+	go s.readCommentary(stderr)
 	go func() {
 		_ = cmd.Wait()
 		s.mu.Lock()
@@ -97,6 +148,30 @@ func (s *fmServer) start(root string) error {
 		s.mu.Unlock()
 	}()
 	return nil
+}
+
+// readCommentary turns the agent's stderr into activity, line by line, until
+// the process ends.
+//
+// Two kinds of line are worth passing on: the command it ran, and the tool it
+// reached for. The rest is its own bookkeeping — how many commands it was
+// offered, when a session was trimmed — which belongs in the log it is already
+// going to.
+func (s *fmServer) readCommentary(stderr io.Reader) {
+	scanner := bufio.NewScanner(stderr)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		log.Printf("[fmtool] %s", line)
+		switch {
+		case strings.HasPrefix(line, "[mywant WOULD RUN"):
+			s.say("note", strings.TrimSuffix(strings.TrimPrefix(line, "[mywant WOULD RUN "), "]"))
+		case strings.HasPrefix(line, "[mywant "):
+			s.say("tool", strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
+		case strings.HasPrefix(line, "[tool:"):
+			s.say("tool", strings.Trim(line, "[]"))
+		}
+	}
 }
 
 // stop closes the conversation down. The caller holds the lock.
@@ -135,6 +210,14 @@ func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply
 func (s *fmServer) request(prompt, root string, timeout time.Duration, plain bool) (fmReply, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// A new build on disk retires the running one. The conversation goes with
+	// it, which is the right trade: an agent that answers from a binary
+	// nobody has any more is worse than one that forgets what was just said.
+	if s.started && s.stamp != "" && s.binaryStamp() != s.stamp {
+		log.Printf("[fmtool] the binary changed; starting the new one")
+		s.stop()
+	}
 
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {

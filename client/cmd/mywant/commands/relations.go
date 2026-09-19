@@ -110,9 +110,21 @@ is how to read them without opening a card.`,
 				}
 				for _, t := range things {
 					for _, v := range paramValues {
-						if t.Value == v {
-							lines = append(lines, relationLine{Direction: "reads", Other: t.Value, Kind: "thing"})
+						if t.Value != v {
+							continue
 						}
+						// Named by its catalog, because one word can be two
+						// things: 荻窪 is filed under both stations and
+						// cities, and a want that names it reads both. Two
+						// identical lines read as a bug; two lines that say
+						// which is which read as the board.
+						kind := "thing"
+						if t.Subtype != "" {
+							kind = "thing " + t.Subtype
+						} else if t.Catalog != "" {
+							kind = "thing " + t.Catalog
+						}
+						lines = append(lines, relationLine{Direction: "reads", Other: t.Value, Kind: kind})
 					}
 				}
 			}

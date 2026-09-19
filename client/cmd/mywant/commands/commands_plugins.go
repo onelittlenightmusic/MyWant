@@ -34,6 +34,8 @@ const pluginTimeout = 5 * time.Second
 type pluginCommandInfo struct {
 	Path     string     `json:"path"`
 	Risk     string     `json:"risk"`
+	Kind     string     `json:"kind"`
+	Canvas   *bool      `json:"canvas"`
 	Short    string     `json:"short"`
 	Use      string     `json:"use"`
 	Long     string     `json:"long"`
@@ -88,6 +90,17 @@ func commandsOfPlugin(name, path string) []CommandInfo {
 				risk = "read"
 			}
 		}
+		kind := r.Kind
+		if kind != "observe" && kind != "control" {
+			kind = commandKind(full)
+		}
+		// A plugin knows which of its commands touch the canvas better than a
+		// group name can: `gui tile set` moves a tile, `gui show` moves the
+		// viewer's eyes.
+		canvas := commandCanvas(nil, full)
+		if r.Canvas != nil {
+			canvas = *r.Canvas
+		}
 		infos = append(infos, CommandInfo{
 			Path:     full,
 			Short:    r.Short,
@@ -97,6 +110,8 @@ func commandsOfPlugin(name, path string) []CommandInfo {
 			Flags:    r.Flags,
 			ReadOnly: readOnly,
 			Risk:     risk,
+			Kind:     kind,
+			Canvas:   canvas,
 		})
 	}
 	return infos

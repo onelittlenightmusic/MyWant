@@ -126,9 +126,14 @@ func resolveRefs(c *client.Client, refs []string) []string {
 }
 
 var getWantCmd = &cobra.Command{
-	Use:               "get [name-or-id]",
-	Aliases:           []string{"g"},
-	Short:             "Get want details",
+	Use:     "get [name-or-id]",
+	Aliases: []string{"g"},
+	// What it holds, first, because that is what a want is for and what
+	// anybody — a person, an agent answering a question — is usually after.
+	// "Get want details" named the command and said nothing about the answer
+	// inside it, and a goal asked to KNOW something reached for `point`
+	// instead and reported where the want was standing.
+	Short:             "Show one want: the answer it holds, plus its parameters and state",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -229,9 +234,15 @@ Modes:
   -t <type> [-e]        Create want of specific type, optionally with example parameters
   -i                    Interactive mode: prompts for all inputs
 
-Placing it:
+Giving it what it needs:
+  --param <key>=<value> One of the want's own parameters, repeatable
   --at x,y              Put its tile on the canvas at that cell
   --name <name>         Call it this instead of "new-<type>"
+
+A want type's parameters are what it works on: the weather want reads "at", so
+--type weather --param at=Nakano is a weather want for Nakano, and
+"mywant types get <type>" lists what a type takes. Note that --at is the CELL,
+and --param at= is a parameter that happens to share the name.
 
 Without --at the server picks a cell itself (the first free one, scanning from
 the origin), so a new want always lands somewhere — just not anywhere you asked
@@ -267,6 +278,11 @@ for, and usually not near what it has to do with. Say where, when you know.`,
 			os.Exit(1)
 		}
 		givenName, _ := cmd.Flags().GetString("name")
+		givenParams, err := parseParamFlags(cmd)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			os.Exit(1)
+		}
 
 		if wantType != "" {
 			if useExample {
@@ -351,11 +367,21 @@ for, and usually not near what it has to do with. Say where, when you know.`,
 			os.Exit(1)
 		}
 
-		// A name and a cell are decided before the want exists, so they travel
-		// with it rather than being written back afterwards: the tile appears
-		// where it was asked for, once, instead of appearing nowhere and moving.
+		// A name, a cell and the want's own parameters are decided before it
+		// exists, so they travel with it rather than being written back
+		// afterwards: the tile appears where it was asked for, once, instead of
+		// appearing nowhere and moving, and the want starts work with the
+		// values it was meant to have instead of with the type's defaults.
 		if givenName != "" {
 			config.Wants[0].Metadata.Name = givenName
+		}
+		if len(givenParams) > 0 {
+			if config.Wants[0].Spec.Params == nil {
+				config.Wants[0].Spec.Params = map[string]any{}
+			}
+			for key, value := range givenParams {
+				config.Wants[0].Spec.Params[key] = value
+			}
 		}
 		if placing {
 			for _, want := range config.Wants {
@@ -428,7 +454,8 @@ func init() {
 	createWantCmd.Flags().StringP("type", "t", "", "Create want of specific type")
 	createWantCmd.Flags().BoolP("example", "e", false, "Use example parameters for the specified type (requires --type)")
 	createWantCmd.Flags().BoolP("interactive", "i", false, "Full interactive mode (prompts for all inputs)")
-	createWantCmd.Flags().String("at", "", "Canvas cell for its tile, as x,y (a want without one stands nowhere)")
+	createWantCmd.Flags().String("at", "", "Canvas cell for its tile, as x,y (the server picks one when this is left out)")
+	createWantCmd.Flags().StringArray("param", nil, "One of the want's own parameters as key=value, repeatable (e.g. --param at=Nakano)")
 	createWantCmd.Flags().String("name", "", "What to call it (default: new-<type>)")
 	exportWantsCmd.Flags().StringP("output", "o", "", "Path to save exported YAML (stdout if not specified)")
 	importWantsCmd.Flags().StringP("file", "f", "", "Path to YAML file to import")
