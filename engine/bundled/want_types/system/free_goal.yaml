@@ -123,8 +123,15 @@ wantType:
       label: current
       initialValue: []
 
+    - name: pending_reason
+      description: Why it is waiting — "destroy" (cannot be undone) or "missing" (nothing on the board answers this yet)
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
     - name: pending_command
-      description: The step that cannot be undone, waiting for a yes
+      description: The step waiting for a yes
       type: string
       persistent: true
       label: current

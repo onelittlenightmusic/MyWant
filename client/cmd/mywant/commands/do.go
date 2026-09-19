@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -139,13 +141,80 @@ func watchGoal(api *client.Client, id string, cmd *cobra.Command) {
 			os.Exit(1)
 		case "waiting_confirmation":
 			pending, _ := state["pending_command"].(string)
-			fmt.Printf("\nStopped before something that cannot be undone:\n  %s\n", pending)
-			fmt.Printf("Run it yourself if you want it, or `mywant wants delete %s` to drop the goal.\n", shortID(id))
+			reason, _ := state["pending_reason"].(string)
+			askToRun(api, id, pending, reason, cmd)
 			return
 		}
 		time.Sleep(700 * time.Millisecond)
 	}
 	fmt.Printf("\nStill running after %s. `mywant wants get %s` shows where it got to.\n", timeout, id)
+}
+
+// askToRun puts the goal's one pending command to the person, and runs it if
+// they say yes.
+//
+// A goal stops for two reasons and they deserve different words: a command
+// that cannot be undone is a warning, and a request that nothing on the board
+// answers yet is an offer. Asked to know the weather somewhere with no want
+// for it, "there is no such want" is true and unhelpful — "shall I make one?"
+// is the same fact with the next move in it.
+//
+// Only asked when somebody is there to answer. Piped or scripted, the command
+// is printed and nothing runs: a goal that quietly created something because
+// nobody was watching is the failure this whole mechanism exists to prevent.
+func askToRun(api *client.Client, id, pending, reason string, cmd *cobra.Command) {
+	if pending == "" {
+		fmt.Println("\nStopped without finishing, and with nothing to suggest.")
+		return
+	}
+	if reason == "destroy" {
+		fmt.Printf("\nThis cannot be undone:\n  %s\n", pending)
+	} else {
+		fmt.Printf("\nNothing on the board answers that yet. This would do it:\n  %s\n", pending)
+	}
+
+	yes, _ := cmd.Flags().GetBool("yes")
+	if !yes {
+		if !isTerminal(os.Stdin) {
+			fmt.Println("Run it yourself if you want it, or pass --yes next time.")
+			return
+		}
+		fmt.Print("Run it? [y/N] ")
+		reader := bufio.NewReader(os.Stdin)
+		line, _ := reader.ReadString('\n')
+		switch strings.ToLower(strings.TrimSpace(line)) {
+		case "y", "yes", "はい":
+		default:
+			fmt.Println("Left alone.")
+			return
+		}
+	}
+
+	self, err := os.Executable()
+	if err != nil {
+		self = os.Args[0]
+	}
+	argv := strings.Fields(strings.TrimPrefix(pending, "mywant "))
+	out, err := exec.Command(self, argv...).CombinedOutput()
+	fmt.Print(string(out))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	// The goal records what became of it, so its card does not sit forever at
+	// "waiting" for a question that was answered.
+	_ = api.SetWantState(id, map[string]any{
+		"phase":           "done",
+		"pending_command": "",
+		"pending_reason":  "",
+		"answer":          strings.TrimSpace(firstLine(string(out))),
+	})
+}
+
+// isTerminal reports whether somebody is there to be asked.
+func isTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
 func firstLine(text string) string {
@@ -162,4 +231,5 @@ func init() {
 	DoCmd.Flags().Bool("dry-run", false, "Work out the first step and run none of it")
 	DoCmd.Flags().Bool("wait", true, "Follow the goal until it finishes")
 	DoCmd.Flags().Duration("timeout", 3*time.Minute, "How long to follow it before leaving it running")
+	DoCmd.Flags().Bool("yes", false, "Answer yes to the goal's question, if it has to stop and ask one")
 }

@@ -149,13 +149,28 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			if emptyTurns < 3 {
 				continue
 			}
+			if command, args := freeGoalPropose(agent, request, catalogue, steps, timeout); command != "" {
+				freeGoalAsk(want, steps, command, args, "missing")
+				return nil
+			}
 			freeGoalFinish(want, steps, freeGoalSummary(steps))
 			return nil
 		}
 		emptyTurns = 0
 		if command == "" {
-			// Nothing runnable came back. What it said is the answer — the job
-			// may simply have been a question.
+			// It said something instead of running something. If anything has
+			// worked, that sentence is the answer and the job is done.
+			//
+			// If nothing has, the sentence is an apology — "値は未知的です" —
+			// and an apology is the wrong last word when there is a command
+			// that would have worked. Offer that instead and wait for a
+			// person: see freeGoalPropose, and freeGoalAsk for the waiting.
+			if !anyStepWorked(steps) {
+				if next, nextArgs := freeGoalPropose(agent, request, catalogue, steps, timeout); next != "" {
+					freeGoalAsk(want, steps, next, nextArgs, "missing")
+					return nil
+				}
+			}
 			freeGoalFinish(want, steps, answer)
 			return nil
 		}
@@ -177,14 +192,10 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		}
 		step := freeGoalStep{Command: command, Args: args}
 		if entry.Risk == "destroy" {
-			// Written down, not run. What is waiting is a sentence a person can
-			// read and agree to, which is the only form of consent worth having.
-			sentence := strings.TrimSpace("mywant " + command + " " + args)
-			want.SetCurrent("pending_command", sentence)
-			want.SetCurrent("phase", "waiting_confirmation")
-			want.SetCurrent("answer", fmt.Sprintf("`%s` を実行すると元に戻せません。よろしければ「はい」と答えてください。", sentence))
-			freeGoalStore(want, steps)
-			want.StoreLog("[FREE_GOAL] waiting for a yes: %s", sentence)
+			// Written down, not run. What is waiting is a sentence a person
+			// can read and agree to, which is the only form of consent worth
+			// having.
+			freeGoalAsk(want, steps, command, args, "destroy")
 			return nil
 		}
 		if repeatsLastStep(steps, step) {
@@ -217,7 +228,15 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		want.StoreLog("[FREE_GOAL] ran %s %s -> %s", command, args, truncateRunes(out, 120))
 	}
 
-	// Out of steps: say what was done rather than nothing at all.
+	// Out of steps. If none of them worked, the useful last word is not a
+	// list of failures but the command that would have done it — put to the
+	// person, who can say yes.
+	if !anyStepWorked(steps) {
+		if command, args := freeGoalPropose(agent, request, catalogue, steps, timeout); command != "" {
+			freeGoalAsk(want, steps, command, args, "missing")
+			return nil
+		}
+	}
 	freeGoalFinish(want, steps, freeGoalSummary(steps))
 	return nil
 }
@@ -918,6 +937,119 @@ func mywantBinaryPath() (string, error) {
 	return "", fmt.Errorf("mywant not found on PATH")
 }
 
+// freeGoalAsk stops the goal and puts one command to the person.
+//
+// Two things end a goal without finishing it, and both are answered the same
+// way: a command that cannot be undone, and a request that cannot be carried
+// out with what is on the board. Neither is a decision for a model or for this
+// code — "「荻窪のWeather」はまだありません" is a fact, and "作りますか？" is a
+// question — so the command is written down, the goal waits, and a person says.
+func freeGoalAsk(want *Want, steps []freeGoalStep, command, args, why string) {
+	sentence := strings.TrimSpace("mywant " + command + " " + args)
+	want.SetCurrent("pending_command", sentence)
+	want.SetCurrent("pending_reason", why)
+	want.SetCurrent("phase", "waiting_confirmation")
+	if why == "destroy" {
+		want.SetCurrent("answer", fmt.Sprintf("`%s` は元に戻せません。実行しますか？", sentence))
+	} else {
+		want.SetCurrent("answer", fmt.Sprintf("まだありません。`%s` で作れます。実行しますか？", sentence))
+	}
+	freeGoalStore(want, steps)
+	want.StoreLog("[FREE_GOAL] waiting for a yes (%s): %s", why, sentence)
+}
+
+// freeGoalPropose asks what would carry the request out, when nothing has.
+//
+// One question, asked only at the end: the goal has looked and come up empty,
+// and the useful thing to say is not "no" but "this would do it — shall I?".
+// The model names the command; it is checked against the catalogue and filled
+// in like any other, and then it waits. Nothing is run.
+func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeGoalCommand, steps []freeGoalStep, timeout time.Duration) (string, string) {
+	var b strings.Builder
+	b.WriteString("A request on a MyWant board could not be carried out with what is already there.\n\n")
+	b.WriteString("Request: " + request + "\n")
+	if len(steps) > 0 {
+		b.WriteString("\nWhat was tried:\n")
+		for _, s := range steps {
+			b.WriteString("- mywant " + strings.TrimSpace(s.Command+" "+s.Args) + "\n")
+			b.WriteString("  -> " + truncateRunes(strings.TrimSpace(s.Output), 200) + "\n")
+		}
+	}
+	b.WriteString("\nCommands:\n")
+	b.WriteString(freeGoalMenu(catalogue))
+	b.WriteString("\nName the ONE command that would carry the request out, as:\n")
+	b.WriteString("  RUN <command path> | <arguments>\n")
+	b.WriteString("Nothing will be run: it will be put to the person, who decides. If no command would\n")
+	b.WriteString("help, write NONE.\n")
+
+	// Twice at most, and never a command that has already been tried. Asked
+	// what would carry the request out, the model's first answer was the
+	// lookup that had just failed — an offer to do the thing that did not
+	// work, which is worse than no offer.
+	tried := map[string]bool{}
+	for _, s := range steps {
+		tried[strings.TrimSpace(s.Command+" "+s.Args)] = true
+	}
+	question := b.String()
+	var command, args string
+	for attempt := 0; attempt < 2; attempt++ {
+		reply, err := agent.askPlain(question, "", timeout)
+		if err != nil {
+			return "", ""
+		}
+		command, args, _ = freeGoalParse(reply.Text, catalogue)
+		fmt.Fprintf(os.Stderr, "[FREE_GOAL] proposal: %q -> %s %s\n", truncateRunes(reply.Text, 120), command, args)
+		if command == "" {
+			return "", ""
+		}
+		if !tried[strings.TrimSpace(command+" "+args)] {
+			break
+		}
+		question = b.String() + "\n'" + command + "' has already been tried and did not work.\n" +
+			"Name a different command — the one that would make what is missing.\n"
+		command = ""
+	}
+	if command == "" {
+		// Nothing usable from the model. The situation itself says what is
+		// missing: a lookup by name came back not-found, and what was asked
+		// for is a want of that name. Offering it is not deciding to make it
+		// — the offer is the point, and a person answers.
+		if command, args = freeGoalMissingWant(steps, catalogue); command == "" {
+			return "", ""
+		}
+	}
+	entry := catalogue[command]
+	if strings.HasPrefix(command, "wants ") && flagNeedsWantType(entry) {
+		args = freeGoalFixType(agent, request, args, timeout)
+		args = freeGoalFillParams(agent, request, args, timeout)
+	}
+	return command, args
+}
+
+// freeGoalMissingWant reads an offer out of a failed lookup.
+//
+// `wants get 中野坂上のWeather` → "want not found" is the whole situation: the
+// thing the request is about does not exist, and it has a name. What TYPE it
+// should be and what it should read are still the model's to say (see
+// freeGoalFixType, freeGoalFillParams) — this only supplies the shape of the
+// offer, and the offer is put to a person before anything happens.
+func freeGoalMissingWant(steps []freeGoalStep, catalogue map[string]freeGoalCommand) (string, string) {
+	if _, ok := catalogue["wants create"]; !ok {
+		return "", ""
+	}
+	for i := len(steps) - 1; i >= 0; i-- {
+		s := steps[i]
+		if !s.Failed || s.Command != "wants get" || strings.TrimSpace(s.Args) == "" {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(s.Output), "not found") {
+			continue
+		}
+		return "wants create", "--name " + strings.Fields(s.Args)[0]
+	}
+	return "", ""
+}
+
 // freeGoalStore keeps the steps where anybody can see them: the want's own
 // state, which is what the card shows.
 func freeGoalStore(want *Want, steps []freeGoalStep) {
@@ -973,6 +1105,15 @@ func freeGoalSummary(steps []freeGoalStep) string {
 		parts = append(parts, strings.TrimSpace(s.Command+" "+s.Args))
 	}
 	return "実行しました: " + strings.Join(parts, " / ")
+}
+
+func anyStepWorked(steps []freeGoalStep) bool {
+	for _, s := range steps {
+		if !s.Failed {
+			return true
+		}
+	}
+	return false
 }
 
 func repeatsLastStep(steps []freeGoalStep, step freeGoalStep) bool {
