@@ -210,6 +210,13 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         let trimmedAfter = await box.finishedTurn()
         var reply: [String: Any] = ["id": id, "text": answer.text, "calls": calls]
         if let tool = answer.tool { reply["tool"] = tool }
+        // What the turn is waiting on, if anything: a command that will not
+        // run until a person says yes. Sent as its own field rather than left
+        // inside the answer, so the asker's screen can show it as a question
+        // with two buttons instead of a sentence to read and retype.
+        if let pending = await consent?.pendingSentence(), !pending.isEmpty {
+            reply["pending"] = pending
+        }
         if answer.trimmed || trimmedAfter { reply["trimmed"] = true }
         writeLine(reply)
     }

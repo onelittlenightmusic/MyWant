@@ -50,6 +50,17 @@ actor ConsentGate {
 
     func clearPending() { pending = nil }
 
+    /// The command a person is being asked about, as they would read it, or ""
+    /// when nothing is waiting.
+    ///
+    /// Read by the serving loop after each turn so the asker's screen can put
+    /// the question as a question — a sentence and two buttons — instead of
+    /// leaving it buried in what the robot said.
+    func pendingSentence() -> String {
+        guard let pending else { return "" }
+        return "mywant " + pending.command + (pending.args.isEmpty ? "" : " " + pending.args)
+    }
+
     /// A short message that is agreement and little else.
     ///
     /// Short on purpose: "はい" is consent, and "はい、でも先に天気を見せて" is a
@@ -98,9 +109,14 @@ struct MyWantDestructiveTool: LocalTool {
         DynamicGenerationSchema(
             name: "MyWantDeleteArgs",
             properties: [
+                // With what each one does, because they are near neighbours
+                // that do very different things: asked to DELETE a want the
+                // model chose `wants disconnect`, which removes a connection
+                // between two wants and leaves both standing. Fifteen lines is
+                // a cheap way to tell them apart.
                 .init(
                     name: "command",
-                    description: "Which one. \(commands.prefix(12).map(\.path).joined(separator: ", "))",
+                    description: "Which one:\n" + commands.map { "\($0.path) — \($0.short ?? "")" }.joined(separator: "\n"),
                     schema: DynamicGenerationSchema(name: "MyWantDeleteCommand", anyOf: commands.map(\.path))
                 ),
                 // Required, not optional. Left optional, the model filled in
@@ -133,6 +149,24 @@ struct MyWantDestructiveTool: LocalTool {
         if extra.isEmpty, let remembered = await gate.pendingArgs(for: command) {
             extra = remembered
         }
+        // The name has to be one the board has, and spelled its way.
+        //
+        // Asked to delete "NakanoのWeather" the model wrote "Nakanoのweather",
+        // and a confirmation was offered for a want that does not exist: the
+        // person would have said yes to nothing. The board's own names are one
+        // command away, so they are checked — and a near miss is corrected
+        // rather than refused, since the difference is usually a capital.
+        if !extra.isEmpty {
+            switch MyWantCLI.boardName(matching: extra) {
+            case .exact(let name), .corrected(let name):
+                extra = name
+            case .unknown(let candidates):
+                return "NOT DONE — nothing on the board is called \"\(extra)\". "
+                    + (candidates.isEmpty
+                       ? "Check the name with 'board' before trying again."
+                       : "Did you mean: \(candidates.joined(separator: ", "))?")
+            }
+        }
         if !extra.isEmpty { argv.append(extra) }
         let sentence = "mywant " + argv.joined(separator: " ")
 
@@ -152,11 +186,16 @@ struct MyWantDestructiveTool: LocalTool {
             // that asked and got no answer should wait rather than ask again.
             await gate.remember(command: command, args: extra)
             FileHandle.standardError.write("[mywant WOULD RUN \(sentence) — waiting for a yes]\n".data(using: .utf8)!)
-            return "NOT DONE — nothing was run. This would run `\(sentence)`, and it cannot be undone. "
-                + "Say exactly that to the person, in their language, and ask them to answer yes or no. "
+            // Worded so it cannot be read as a failure. "It cannot be
+            // undone" came back to the person as "the want cannot be
+            // deleted" — the model paraphrased a warning into an
+            // impossibility, and the person believed it and stopped.
+            return "WAITING FOR A YES — nothing has been tried yet, and nothing has failed. "
+                + "Ask the person, in their language, whether to run this exact command now: `\(sentence)`. "
+                + "Tell them it is permanent. Do not say it failed, and do not say it is impossible. "
                 + (claimed && !consented
-                   ? "They have not said yes yet in their own message."
-                   : "Then call this again with confirmed=true.")
+                   ? "They have not answered yes in their own message yet."
+                   : "When they answer yes, call this again with confirmed=true.")
         }
 
         await gate.clearPending()
