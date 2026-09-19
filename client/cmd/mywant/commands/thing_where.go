@@ -24,9 +24,9 @@ import (
 //	mywant thing point 新宿     the robot goes and stands there, and says so
 
 const (
-	thingCanvasLabel  = "mywant.io/canvas"
-	thingCanvasXLabel = "mywant.io/canvas-x"
-	thingCanvasYLabel = "mywant.io/canvas-y"
+	canvasOnLabel = "mywant.io/canvas"
+	canvasXLabel  = "mywant.io/canvas-x"
+	canvasYLabel  = "mywant.io/canvas-y"
 	// The want the robot is. Its tile is what moves when it points at
 	// something; see robot_types.go, where the same labels carry its position.
 	robotWantName = "robot"
@@ -150,9 +150,9 @@ func findThingPlace(c *client.Client, name string) (thingPlace, error) {
 			place.kind = t.Catalog
 		}
 		labels := t.Labels
-		place.onCanvas = labels[thingCanvasLabel] == "true"
-		place.x, _ = strconv.Atoi(labels[thingCanvasXLabel])
-		place.y, _ = strconv.Atoi(labels[thingCanvasYLabel])
+		place.onCanvas = labels[canvasOnLabel] == "true"
+		place.x, _ = strconv.Atoi(labels[canvasXLabel])
+		place.y, _ = strconv.Atoi(labels[canvasYLabel])
 
 		// An id is a name too. `mywant board` prints one for every tile, so
 		// whatever read it can hand back the exact tile rather than the words it
@@ -247,8 +247,8 @@ both of which it changes on its own, wandering, every minute or so.`,
 
 		api := client.NewClient(viper.GetString("server"))
 		for key, value := range map[string]string{
-			thingCanvasXLabel: strconv.Itoa(place.x),
-			thingCanvasYLabel: strconv.Itoa(place.y),
+			canvasXLabel: strconv.Itoa(place.x),
+			canvasYLabel: strconv.Itoa(place.y),
 		} {
 			if err := api.AddWantLabel(robotWantName, key, value); err != nil {
 				fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)

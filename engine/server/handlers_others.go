@@ -18,6 +18,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
+	"mywant/engine/types"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -246,6 +247,10 @@ func (s *Server) healthCheck(w http.ResponseWriter, r *http.Request) {
 		"wants":   wantsCount,
 		"version": version,
 		"server":  "mywant",
+		// Whether this machine has an on-device model to ask (see
+		// types.HasOnDeviceModel). The dashboard reads it to say whether
+		// "Apple FM" is a real choice here or a fallback to Claude.
+		"onDeviceModel": types.HasOnDeviceModel(),
 	}
 	if commit != "" {
 		health["commit"] = commit

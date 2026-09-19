@@ -1,0 +1,18 @@
+capabilities:
+  - name: free_goal_planning
+    gives:
+      - free_goal_planning
+    description: Works out which commands answer a request said in plain words, and runs them
+    stateAccess:
+      - name: steps
+        type: array
+        description: What has been run, and what it printed
+        accessType: readUpdate
+      - name: phase
+        type: string
+        description: Where the goal has got to
+        accessType: readUpdate
+      - name: answer
+        type: string
+        description: What to tell the person who asked
+        accessType: readUpdate

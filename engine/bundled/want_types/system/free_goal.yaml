@@ -1,0 +1,150 @@
+wantType:
+  metadata:
+    name: free_goal
+    title: Free Goal
+    description: |
+      Something asked for in plain words, kept as a want.
+
+      "Parasomniaを(9,-9)に移動して" is a goal, not a question, and answering it
+      takes several commands whose order depends on what the earlier ones found.
+      Working that out inside the on-device model meant the plan lived nowhere:
+      it was gone when the answer came back, nobody could see what was about to
+      happen, and a wrong step could only be described afterwards.
+
+      So the request is a want. The sentence is its parameter, the plan is its
+      state, each step and what it printed is kept, and a step that cannot be
+      undone waits here for a yes. The model is asked what to do next — one
+      short question at a time — and this want decides what actually runs.
+    version: '1.0'
+    category: agent
+    pattern: independent
+    labels:
+      form-type: probe
+      tile-icon: output
+      user-control: 'true'
+      full-screen-display: 'true'
+      category-icon: ListChecks
+      category-bg-light: "linear-gradient(160deg, #ddd6fe 0%, #bfdbfe 100%)"
+      category-bg-dark: "linear-gradient(160deg, #5b21b6 0%, #1e3a8a 100%)"
+
+  finalResultField: answer
+
+  achievedWhen:
+    field: phase
+    operator: "=="
+    value: "done"
+
+  parameters:
+    - name: request
+      description: What was asked for, in the words it was asked in
+      type: string
+      required: true
+      default: ""
+
+    - name: asked_by
+      description: Who asked, when anybody did
+      type: string
+      required: false
+      default: ""
+
+    - name: context
+      description: What the asker could see — their cell and what stands on it
+      type: string
+      required: false
+      default: ""
+
+    - name: max_steps
+      description: How many commands this goal may run before it stops and reports
+      type: number
+      required: false
+      default: 4
+
+    - name: dry_run
+      description: Work out the plan and run none of it
+      type: boolean
+      required: false
+      default: false
+
+  state:
+    - name: request
+      description: The sentence this goal is about (copied from the parameter)
+      type: string
+      persistent: true
+      label: current
+      exposable: true
+      initialValue: ''
+
+    - name: asked_by
+      description: Who asked (copied from the parameter)
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: goal_context
+      description: What the asker could see when they asked
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+    - name: max_steps
+      description: How many commands this goal may run
+      type: number
+      persistent: false
+      label: current
+      initialValue: 4
+
+    - name: dry_run
+      description: Work out the plan and run none of it
+      type: boolean
+      persistent: false
+      label: current
+      initialValue: false
+
+    - name: phase
+      description: planning | running | waiting_confirmation | done | failed
+      type: string
+      persistent: true
+      label: current
+      initialValue: 'planning'
+
+    - name: steps
+      description: What has been run, in order, with what it printed
+      type: array
+      persistent: true
+      label: current
+      initialValue: []
+
+    - name: pending_command
+      description: The step that cannot be undone, waiting for a yes
+      type: string
+      persistent: true
+      label: current
+      initialValue: ''
+
+    - name: answer
+      description: What to tell the person who asked
+      type: string
+      persistent: true
+      label: current
+      exposable: true
+      initialValue: ''
+
+    - name: error
+      description: Why this goal could not be carried out; empty when it could
+      type: string
+      persistent: false
+      label: current
+      initialValue: ''
+
+  onInitialize:
+    params:
+      request: request
+      asked_by: asked_by
+      goal_context: context
+      max_steps: max_steps
+      dry_run: dry_run
+
+  requires:
+    - free_goal_planning

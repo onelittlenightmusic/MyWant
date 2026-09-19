@@ -38,11 +38,27 @@ const (
 
 // fmToolPath finds the on-device agent, or reports that this machine has none.
 //
-// Three places, in order: MYWANT_FM_BIN for a build kept somewhere particular,
-// then PATH, then ~/.local/bin, which is where `make install` puts the binaries
-// in this project. macOS only — FoundationModels is Apple's, and a Linux server
-// (fly.io) has no such model to ask, which is exactly when the caller falls
-// back to Claude.
+// Four places, in order: MYWANT_FM_BIN for a build kept somewhere particular,
+// then PATH, then beside the binary that is running — `make fmtool` puts it in
+// this project's bin/ next to mywant itself — then ~/.local/bin, where
+// `make install-fmtool` puts it. macOS only: FoundationModels is Apple's, and a
+// Linux server (fly.io) has no such model to ask, which is exactly when the
+// caller falls back to Claude.
+//
+// The agent's source lives in this repository (fmtool/). It was a second repo
+// for as long as it was an experiment; a want type that depends on it is not an
+// experiment, and two repositories that have to be in step are one repository
+// with a gap in it.
+// HasOnDeviceModel reports whether this machine can answer with its own model.
+//
+// Asked by the server so a person choosing who answers is not offered a choice
+// that silently turns into another one: `provider: fm` on a Linux box falls
+// back to Claude, which is the right behaviour and a confusing thing to pick.
+func HasOnDeviceModel() bool {
+	_, ok := fmToolPath()
+	return ok
+}
+
 func fmToolPath() (string, bool) {
 	if runtime.GOOS != "darwin" {
 		return "", false
@@ -55,6 +71,12 @@ func fmToolPath() (string, bool) {
 	}
 	if found, err := exec.LookPath(fmToolDefaultBinary); err == nil {
 		return found, true
+	}
+	if self, err := os.Executable(); err == nil {
+		beside := filepath.Join(filepath.Dir(self), fmToolDefaultBinary)
+		if info, err := os.Stat(beside); err == nil && !info.IsDir() {
+			return beside, true
+		}
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

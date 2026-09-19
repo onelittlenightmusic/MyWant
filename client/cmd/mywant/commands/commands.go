@@ -21,9 +21,15 @@ import (
 // out of Cobra at the moment of asking, and a command added anywhere appears
 // here with no further work.
 //
+// The plugins on PATH are part of that tree, even though they are separate
+// binaries reached by exec: each is asked for its own commands and answers
+// under the name you would type (`gui tile set`). See commands_plugins.go — a
+// verb nothing could find is a verb nobody has.
+//
 //	mywant commands           what can be run, one line each
 //	mywant commands --json    the same, with flags and arguments, for a program
 //	mywant commands --json --safe-only   only the ones that read
+//	mywant commands --core-only          leave the plugins out
 
 // CommandInfo is one runnable command, named by the whole path you would type.
 type CommandInfo struct {
@@ -42,6 +48,9 @@ type CommandInfo struct {
 	Flags []FlagInfo `json:"flags,omitempty"`
 	// Whether running it only reads. See readOnlyCommand.
 	ReadOnly bool `json:"readOnly"`
+	// What running it costs if it was the wrong command: "read", "change" or
+	// "destroy". See commandRisk.
+	Risk string `json:"risk"`
 }
 
 // FlagInfo is one flag of one command.
@@ -72,6 +81,9 @@ var readOnlyVerbs = map[string]bool{
 	// is 新宿?" by going to stand on it is the whole point of being able to
 	// ask. Nothing on the board is created, moved or deleted by either.
 	"say": true, "point": true,
+	// Asking for something in words is not a read — the goal it makes may run
+	// anything — but it is not a write either: `do` creates a want that decides,
+	// and that want stops at whatever cannot be undone. Left as a change.
 }
 
 func readOnlyCommand(path string) bool {
@@ -82,9 +94,50 @@ func readOnlyCommand(path string) bool {
 	return readOnlyVerbs[fields[len(fields)-1]]
 }
 
+// The verbs that take something away.
+//
+// "Only reads" and "changes something" is the wrong place to stop when the
+// caller is an agent acting on what somebody said out loud. Moving a tile and
+// deleting a want are both writes, and they are nothing alike: one is a
+// gesture you can take back (see `mywant undo`), the other is a want that is
+// gone, along with everything it was keeping. A misheard name costs a shrug in
+// the first case and the afternoon's work in the second.
+//
+// So the answer has three parts, and the third one is what anything driving
+// this CLI should stop and ask about. Matched on the last word of the path, as
+// readOnlyVerbs is.
+var destructiveVerbs = map[string]bool{
+	"delete": true, "remove": true, "uninstall": true, "clear": true,
+	"reset": true, "stop": true, "suspend": true, "disconnect": true,
+	// Switching or replacing the world puts every want on the board back to
+	// what a snapshot says, which is a deletion of everything since.
+	"open": true, "import": true,
+}
+
+// commandRisk says what running a command costs if it was the wrong one:
+// "read" (nothing), "change" (something, reversibly) or "destroy" (something
+// that is not coming back).
+func commandRisk(path string) string {
+	fields := strings.Fields(path)
+	if len(fields) == 0 {
+		return "change"
+	}
+	verb := fields[len(fields)-1]
+	switch {
+	case readOnlyVerbs[verb]:
+		return "read"
+	case destructiveVerbs[verb]:
+		return "destroy"
+	default:
+		return "change"
+	}
+}
+
 var (
 	commandsJSON     bool
 	commandsSafeOnly bool
+	commandsCoreOnly bool
+	commandsRisk     string
 )
 
 // CommandsCmd prints this CLI's command tree.
@@ -101,6 +154,18 @@ needs to drive the CLI without a hand-written copy of this list going stale.`,
   mywant commands --json --safe-only`,
 	Run: func(cmd *cobra.Command, args []string) {
 		infos := collectCommands(cmd.Root(), "")
+		if !commandsCoreOnly {
+			infos = append(infos, pluginCommands()...)
+		}
+		if commandsRisk != "" {
+			kept := infos[:0]
+			for _, info := range infos {
+				if info.Risk == commandsRisk {
+					kept = append(kept, info)
+				}
+			}
+			infos = kept
+		}
 		if commandsSafeOnly {
 			kept := infos[:0]
 			for _, info := range infos {
@@ -122,9 +187,14 @@ needs to drive the CLI without a hand-written copy of this list going stale.`,
 			return
 		}
 		for _, info := range infos {
+			// r reads, ! is not coming back, a space changes something you can
+			// put back: the three the risk field names, in one column.
 			mark := " "
-			if info.ReadOnly {
+			switch info.Risk {
+			case "read":
 				mark = "r"
+			case "destroy":
+				mark = "!"
 			}
 			fmt.Printf("%s  %-28s %s\n", mark, info.Path, info.Short)
 		}
@@ -150,6 +220,7 @@ func collectCommands(cmd *cobra.Command, prefix string) []CommandInfo {
 				Example:  strings.TrimSpace(child.Example),
 				Flags:    collectFlags(child),
 				ReadOnly: readOnlyCommand(path),
+				Risk:     commandRisk(path),
 			})
 		}
 		infos = append(infos, collectCommands(child, path)...)
@@ -177,4 +248,6 @@ func collectFlags(cmd *cobra.Command) []FlagInfo {
 func init() {
 	CommandsCmd.Flags().BoolVar(&commandsJSON, "json", false, "Print the tree as JSON, with flags and arguments")
 	CommandsCmd.Flags().BoolVar(&commandsSafeOnly, "safe-only", false, "Only the commands that read (see readOnly in the JSON)")
+	CommandsCmd.Flags().BoolVar(&commandsCoreOnly, "core-only", false, "Leave out the plugins on PATH, which are asked for their own commands")
+	CommandsCmd.Flags().StringVar(&commandsRisk, "risk", "", "Only commands of this risk: read, change or destroy (see risk in the JSON)")
 }
