@@ -131,6 +131,48 @@ enum MyWantCLI {
     }
 }
 
+/// What the board calls something, if it calls anything that.
+enum BoardName {
+    case exact(String)
+    /// The same name, spelled the way the board spells it.
+    case corrected(String)
+    /// Nothing close enough, with whatever was nearest for the asking.
+    case unknown([String])
+}
+
+extension MyWantCLI {
+    /// Matches a name against everything standing on the board.
+    ///
+    /// Exactly first, then ignoring case — "Nakanoのweather" and
+    /// "NakanoのWeather" are the same want and only one of them exists — then
+    /// by containment, which is what turns "Nakano" into a list to choose
+    /// from rather than a silent miss.
+    static func boardName(matching name: String) -> BoardName {
+        let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !wanted.isEmpty, let binary = binaryPath(),
+              let result = try? run(binary, ["board", "--json"], timeout: 20),
+              result.status == 0,
+              let data = result.out.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([BoardEntry].self, from: data)
+        else { return .exact(name) } // no board to check against: let the CLI answer
+
+        let names = entries.map(\.name)
+        if names.contains(wanted) { return .exact(wanted) }
+        if let same = names.first(where: { $0.lowercased() == wanted.lowercased() }) {
+            return .corrected(same)
+        }
+        let near = names.filter {
+            $0.lowercased().contains(wanted.lowercased()) || wanted.lowercased().contains($0.lowercased())
+        }
+        if near.count == 1 { return .corrected(near[0]) }
+        return .unknown(Array(near.prefix(5)))
+    }
+}
+
+private struct BoardEntry: Decodable {
+    let name: String
+}
+
 /// One tool for every command the CLI can be asked to read.
 struct MyWantCLITool: LocalTool {
     let name = "mywant_cli"
