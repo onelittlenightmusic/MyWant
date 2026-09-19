@@ -126,9 +126,14 @@ func resolveRefs(c *client.Client, refs []string) []string {
 }
 
 var getWantCmd = &cobra.Command{
-	Use:               "get [name-or-id]",
-	Aliases:           []string{"g"},
-	Short:             "Get want details",
+	Use:     "get [name-or-id]",
+	Aliases: []string{"g"},
+	// What it holds, first, because that is what a want is for and what
+	// anybody — a person, an agent answering a question — is usually after.
+	// "Get want details" named the command and said nothing about the answer
+	// inside it, and a goal asked to KNOW something reached for `point`
+	// instead and reported where the want was standing.
+	Short:             "Show one want: the answer it holds, plus its parameters and state",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeWantIDs,
 	Run: func(cmd *cobra.Command, args []string) {

@@ -102,20 +102,35 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 
 	var steps []freeGoalStep
 	for len(steps) < maxSteps {
-		prompt := freeGoalPrompt(want, request, catalogue, steps)
-		reply, err := agent.askPlain(prompt, "", timeout)
-		if err != nil {
-			want.SetCurrent("phase", "failed")
-			want.SetCurrent("error", fmt.Sprintf("モデルが答えませんでした: %v", err))
-			freeGoalStore(want, steps)
-			return nil
-		}
-
-		command, args, answer := freeGoalParse(reply.Text, catalogue)
+		// Looking for something that is not there is not the end of a request
+		// on this board — it is the middle of one. A want holds an answer, so
+		// "荻窪のWeatherを知りたい" is answered by the want existing, and the
+		// missing want is the next step rather than the reply.
+		//
+		// Decided here rather than asked. Told in the prompt to create what is
+		// missing, the model reported the absence instead; told more firmly,
+		// it reported the absence in my own words. This is a rule of the board
+		// and the board is this side of the conversation.
+		command, args := freeGoalCreateMissing(steps)
+		answer := ""
 		if command == "" {
-			// Nothing runnable came back. If it said something, that is the
-			// answer — the job may simply have been a question.
-			freeGoalFinish(want, steps, firstNonEmpty(answer, reply.Text))
+			prompt := freeGoalPrompt(want, request, catalogue, steps)
+			reply, err := agent.askPlain(prompt, "", timeout)
+			if err != nil {
+				want.SetCurrent("phase", "failed")
+				want.SetCurrent("error", fmt.Sprintf("モデルが答えませんでした: %v", err))
+				freeGoalStore(want, steps)
+				return nil
+			}
+			command, args, answer = freeGoalParse(reply.Text, catalogue)
+			if command == "" && strings.TrimSpace(answer) == "" {
+				answer = strings.TrimSpace(reply.Text)
+			}
+		}
+		if command == "" {
+			// Nothing runnable came back. What it said is the answer — the job
+			// may simply have been a question.
+			freeGoalFinish(want, steps, answer)
 			return nil
 		}
 
@@ -160,6 +175,16 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		}
 
 		out, failed := freeGoalRun(ctx, command, args)
+		// A want that was just made is not finished being made. `wants create`
+		// answers the moment the want exists, and the thing it was created for
+		// — the weather, the unread count — arrives seconds later. Asked to
+		// KNOW something, a goal that stopped here would report having made a
+		// want and never say what it found out.
+		if !failed && command == "wants create" {
+			if result := freeGoalAwaitResult(ctx, args); result != "" {
+				out += "\n" + result
+			}
+		}
 		step.Output, step.Failed = out, failed
 		steps = append(steps, step)
 		freeGoalStore(want, steps)
@@ -169,6 +194,34 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 	// Out of steps: say what was done rather than nothing at all.
 	freeGoalFinish(want, steps, freeGoalSummary(steps))
 	return nil
+}
+
+// freeGoalCreateMissing turns "that want does not exist" into the command that
+// makes it, and returns nothing when the last step was anything else.
+//
+// Only after a read, only once per goal, and only for a lookup by name: the
+// point is to carry on with what was asked, not to create something whenever
+// a command fails. The name looked for becomes the want's name — it is the
+// asker's own words for the thing they want to exist — and the type and the
+// parameters are worked out as they are for any create (freeGoalFixType,
+// freeGoalFillParams).
+func freeGoalCreateMissing(steps []freeGoalStep) (string, string) {
+	if len(steps) == 0 {
+		return "", ""
+	}
+	for _, s := range steps {
+		if s.Command == "wants create" {
+			return "", "" // already made something; not again
+		}
+	}
+	last := steps[len(steps)-1]
+	if !last.Failed || last.Command != "wants get" || strings.TrimSpace(last.Args) == "" {
+		return "", ""
+	}
+	if !strings.Contains(strings.ToLower(last.Output), "not found") {
+		return "", ""
+	}
+	return "wants create", "--name " + strings.Fields(last.Args)[0]
 }
 
 // freeGoalPrompt asks for one thing: the next command, or an answer.
@@ -205,6 +258,20 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 	}
 	b.WriteString("\nRequest: " + request + "\n\n")
 
+	// What this board is, said plainly, because it is the part a model cannot
+	// infer from a command list: MyWant answers questions by HAVING wants. A
+	// weather want for a place holds that place's weather and keeps it
+	// current. So "I want to know X" and "I want to make a thing that knows X"
+	// are the same request here, and the only difference is whether the want
+	// already exists.
+	b.WriteString("How this board works: a want holds an answer and keeps it up to date — a weather want\n")
+	b.WriteString("for a place holds that place's weather. So wanting to KNOW something and wanting to MAKE\n")
+	b.WriteString("the want that knows it are the same request: look for a want that already provides it\n")
+	b.WriteString("('board' / 'wants list'), read its value with 'wants get' if there is one, and create it\n")
+	b.WriteString("with 'wants create' if there is not. Answer with the value, not with what you ran.\n")
+	b.WriteString("'wants get <name>' is how you read what a want holds. 'point' only shows WHERE something\n")
+	b.WriteString("stands — it never tells you what it knows, so it is no use for a question about a value.\n\n")
+
 	if len(steps) == 0 {
 		// The first step is always a command, never an answer. Left free to
 		// choose, the model answered "荻窪は丙座です" — a constellation that does
@@ -218,8 +285,17 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 		b.WriteString("Answer with ONE line and nothing else:\n")
 		b.WriteString("  RUN <command path> | <arguments>   — if anything still has to be done or looked up\n")
 		b.WriteString("  ANSWER <what to tell the person, in their language>   — only once it is done\n")
-		b.WriteString("If the last command FAILED, run it again with the arguments it asked for — corrected,\n")
-		b.WriteString("not repeated unchanged, and not abandoned for a different command.\n")
+		// Two kinds of failure, and they call for opposite things. The first
+		// version said only "run it again, corrected", which told a goal that
+		// had just learned a want does not exist to go and look for it a
+		// second time — instead of creating it, which was the whole request.
+		b.WriteString("A command that FAILED because its arguments were wrong (usage, unknown flag, missing\n")
+		b.WriteString("value) should be run again, corrected — not repeated unchanged, not abandoned.\n")
+		b.WriteString("A command that FAILED because what you looked for does not exist has answered you:\n")
+		b.WriteString("do not look again. If the request is to know, see or watch something, CREATE the want\n")
+		b.WriteString("that provides it — on this board that IS the answer, and reporting the absence is not.\n")
+		b.WriteString("Say 'it is not there' only about something that cannot be made, such as a name nobody\n")
+		b.WriteString("on the board has.\n")
 		b.WriteString("Otherwise never repeat a command that has already been run above.\n")
 		b.WriteString("ANSWER reports what has been DONE. If the request asked for something to be made,\n")
 		b.WriteString("moved, connected or removed and no command above has done it, you have not finished:\n")
@@ -470,13 +546,16 @@ func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Dura
 	}
 
 	var b strings.Builder
+	// The form is shown with the real names filled in, because "answer as
+	// name=value" was read as literally that: the model replied
+	// "name=荻窪のWeather", the line was discarded, and the want was created
+	// with no parameters and read Tokyo's weather under the name 荻窪のWeather.
 	b.WriteString("A want of type \"" + wantType + "\" is being created for this request:\n")
-	b.WriteString(request + "\n\nIt takes these parameters:\n")
+	b.WriteString(request + "\n\nFill in the lines below, one per line, and write nothing else.\n")
+	b.WriteString("Use only what the request actually says; delete any line it says nothing about.\n\n")
 	for _, p := range askable {
-		b.WriteString("  " + p.Name + " — " + truncateRunes(strings.TrimSpace(p.Description), 80) + "\n")
+		b.WriteString("  " + p.Name + "=       (" + truncateRunes(strings.TrimSpace(p.Description), 80) + ")\n")
 	}
-	b.WriteString("\nAnswer one line per parameter, exactly \"name=value\", using only values the request\n")
-	b.WriteString("actually gives. Leave out any parameter the request says nothing about. Nothing else.\n")
 	declared := map[string]bool{}
 	for _, p := range askable {
 		declared[p.Name] = true
@@ -495,7 +574,21 @@ func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Dura
 		out := args
 		for _, line := range strings.Split(reply.Text, "\n") {
 			line = strings.TrimSpace(strings.Trim(strings.TrimSpace(line), "`*-• "))
+			// "at=荻窪" was asked for and "at: 荻窪" came back, which was
+			// dropped for want of an equals sign — so the want was created
+			// with no parameters at all and read Tokyo's weather under the
+			// name 荻窪のWeather. Either separator; the answer is the same.
 			name, value, found := strings.Cut(line, "=")
+			if !found {
+				name, value, found = strings.Cut(line, ":")
+			}
+			// A bare value, when there is only one thing it could be. Shown
+			// the line "at=" to fill in, the model answers "荻窪" — which is
+			// the whole of what was asked for, and was thrown away for not
+			// repeating the name back.
+			if !found && len(askable) == 1 && line != "" && len([]rune(line)) <= 60 {
+				name, value, found = askable[0].Name, line, true
+			}
 			name, value = strings.TrimSpace(name), strings.Trim(strings.TrimSpace(value), "\"'")
 			if !found || !declared[name] || value == "" || strings.ContainsAny(value, " <>") {
 				continue
@@ -578,6 +671,48 @@ func freeGoalWantTypes() []string {
 	}
 	sortStrings(names)
 	return names
+}
+
+// freeGoalAwaitResult waits a little for a newly created want to have
+// something to say, and reports it.
+//
+// A little: long enough for the things a want does by itself (a weather fetch
+// took five seconds), short enough that a goal does not sit on a want that
+// waits for a person.
+func freeGoalAwaitResult(ctx context.Context, args string) string {
+	name := ""
+	fields := strings.Fields(args)
+	for i, token := range fields {
+		if token == "--name" && i+1 < len(fields) {
+			name = fields[i+1]
+		}
+	}
+	if name == "" {
+		return ""
+	}
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ""
+		case <-time.After(2 * time.Second):
+		}
+		builder := GetGlobalChainBuilder()
+		if builder == nil {
+			return ""
+		}
+		for _, want := range builder.GetAllWantStates() {
+			if want == nil || want.Metadata.Name != name {
+				continue
+			}
+			// final_result is where a want puts what it is for — see
+			// FinalResultField in the want type.
+			if result := strings.TrimSpace(fmt.Sprint(want.GetAllState()["final_result"])); result != "" && result != "<nil>" {
+				return "The want " + name + " now holds: " + truncateRunes(result, 200)
+			}
+		}
+	}
+	return ""
 }
 
 // freeGoalRun runs one command through the CLI, and reports whether it failed.
