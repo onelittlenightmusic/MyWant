@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -33,6 +34,12 @@ type fmServer struct {
 	stdout  *bufio.Reader
 	nextID  int
 	started bool
+	// What the binary looked like when this process was started. A resident
+	// agent outlives every install: the robot was answering from a build made
+	// eleven minutes before the one on disk, with the day's fixes in the file
+	// and not in the process, and nothing said so. Compared before each
+	// question; a changed binary means a new process.
+	stamp string
 
 	// Where the agent's running commentary goes while it works. Set for the
 	// duration of one question (ask holds the lock, so there is only ever
@@ -88,6 +95,16 @@ type fmReply struct {
 	Error   string `json:"error"`
 }
 
+// binaryStamp identifies the build on disk: when it was written, and how big
+// it is. Enough to notice an install, cheap enough to check every time.
+func (s *fmServer) binaryStamp() string {
+	info, err := os.Stat(s.binary)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d-%d", info.ModTime().UnixNano(), info.Size())
+}
+
 // start brings the process up. The caller holds the lock.
 func (s *fmServer) start(root string) error {
 	args := []string{"--serve"}
@@ -120,6 +137,7 @@ func (s *fmServer) start(root string) error {
 		return err
 	}
 	s.cmd, s.stdin, s.stdout, s.started = cmd, stdin, bufio.NewReaderSize(stdout, 1<<20), true
+	s.stamp = s.binaryStamp()
 	go s.readCommentary(stderr)
 	go func() {
 		_ = cmd.Wait()
@@ -192,6 +210,14 @@ func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply
 func (s *fmServer) request(prompt, root string, timeout time.Duration, plain bool) (fmReply, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// A new build on disk retires the running one. The conversation goes with
+	// it, which is the right trade: an agent that answers from a binary
+	// nobody has any more is worse than one that forgets what was just said.
+	if s.started && s.stamp != "" && s.binaryStamp() != s.stamp {
+		log.Printf("[fmtool] the binary changed; starting the new one")
+		s.stop()
+	}
 
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
