@@ -186,12 +186,21 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			if emptyTurns < 3 {
 				continue
 			}
-			if command, args := freeGoalPropose(want, agent, request, offered, steps, timeout); command != "" {
-				freeGoalAsk(want, steps, command, args, "missing")
+			if next, nextArgs := freeGoalPropose(want, agent, request, offered, steps, timeout); next != "" {
+				// A proposal that only looks is not something to ask
+				// permission for: "Run `wants point X`? [y/N]" is a question
+				// about a robot walking somewhere, put to the person who
+				// asked where something was.
+				if offered[next].Risk == "read" {
+					command, args, answer = next, nextArgs, ""
+				} else {
+					freeGoalAsk(want, steps, next, nextArgs, "missing")
+					return nil
+				}
+			} else {
+				freeGoalFinish(want, steps, freeGoalSummary(steps))
 				return nil
 			}
-			freeGoalFinish(want, steps, freeGoalSummary(steps))
-			return nil
 		}
 		emptyTurns = 0
 		if command == "" {
@@ -204,8 +213,12 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 			// person: see freeGoalPropose, and freeGoalAsk for the waiting.
 			if !anyStepWorked(steps) {
 				if next, nextArgs := freeGoalPropose(want, agent, request, offered, steps, timeout); next != "" {
-					freeGoalAsk(want, steps, next, nextArgs, "missing")
-					return nil
+					if offered[next].Risk == "read" {
+						command, args, answer = next, nextArgs, ""
+					} else {
+						freeGoalAsk(want, steps, next, nextArgs, "missing")
+						return nil
+					}
 				}
 			}
 			freeGoalFinish(want, steps, answer)
@@ -273,9 +286,14 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 	// list of failures but the command that would have done it — put to the
 	// person, who can say yes.
 	if !anyStepWorked(steps) {
-		if command, args := freeGoalPropose(want, agent, request, offered, steps, timeout); command != "" {
-			freeGoalAsk(want, steps, command, args, "missing")
-			return nil
+		if next, nextArgs := freeGoalPropose(want, agent, request, offered, steps, timeout); next != "" {
+			if offered[next].Risk == "read" {
+				out, failed := freeGoalRun(ctx, next, nextArgs)
+				steps = append(steps, freeGoalStep{Command: next, Args: nextArgs, Output: out, Failed: failed})
+			} else {
+				freeGoalAsk(want, steps, next, nextArgs, "missing")
+				return nil
+			}
 		}
 	}
 	freeGoalFinish(want, steps, freeGoalSummary(steps))
@@ -1280,6 +1298,14 @@ func freeGoalPropose(want *Want, agent *fmServer, request string, catalogue map[
 	if strings.HasPrefix(command, "wants ") && flagNeedsWantType(entry) {
 		args = freeGoalFixType(want, agent, request, args, timeout)
 		args = freeGoalFillParams(want, agent, request, args, timeout)
+		// The want it would make may already be standing there. Asked
+		// "Nakanoの天気は？" this offered to create a weather want reading
+		// nakano — which is NakanoのWeather, made an hour earlier and holding
+		// the answer. An offer to duplicate is not an offer; reading the one
+		// that exists is the whole request.
+		if existing := freeGoalExistingLike(args); existing != "" {
+			return "wants get", existing
+		}
 	}
 	return command, args
 }
@@ -1415,8 +1441,34 @@ func freeGoalStore(want *Want, steps []freeGoalStep) {
 // (Talking to the robot on the canvas is a conversation, not a goal — that goes
 // to the robot's own want; see forwardToRobotIfAddressed.)
 func freeGoalFinish(want *Want, steps []freeGoalStep, answer string) {
+	// Stand where the answer came from.
+	//
+	// An answer read off a want is an answer with a place: "Nakanoの天気は？"
+	// is held by a weather want sitting somewhere on the board, and saying the
+	// value while the robot stands wherever it was last leaves the asker to
+	// find it themselves. So the last thing a goal does is walk to whatever it
+	// answered about — the want it read, or, when it only named a thing, the
+	// want that reads that thing.
+	subject := freeGoalPointAtAnswer(GetCurrent(want, "request", ""), steps)
 	freeGoalStore(want, steps)
 	answer = strings.TrimSpace(answer)
+	// The want it walked to is holding something, and when the goal has
+	// nothing better to say, that is the answer. "Nakanoの天気は？" ended on
+	// the error from a lookup that used the wrong name, while the weather
+	// want it had just pointed at held the weather.
+	// The value it is holding goes in the answer, always: as the answer when
+	// there is nothing else, and beside it otherwise. Left to its own words
+	// the model said "13.5℃" about a want holding "Patchy rain nearby +24°C" —
+	// a number from nowhere, stated plainly. What the board holds is not
+	// something to paraphrase.
+	if held := freeGoalHeldValue(subject); held != "" {
+		switch {
+		case answer == "" || !anyStepWorked(steps):
+			answer = held
+		case !strings.Contains(answer, held):
+			answer = held + "（" + subject + "）\n" + answer
+		}
+	}
 	want.SetCurrent("answer", answer)
 	want.SetCurrent("phase", "done")
 	want.StoreLog("[FREE_GOAL] done: %s", truncateRunes(answer, 160))
@@ -1435,6 +1487,156 @@ func freeGoalSay(answer string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	_ = exec.CommandContext(ctx, binary, "wants", "say", "robot", truncateRunes(answer, 300)).Run()
+}
+
+// freeGoalPointAtAnswer walks the robot to whatever the goal answered about.
+//
+// Quietly: it is a gesture, not a step, and a goal whose subject cannot be
+// worked out simply does not move anything.
+func freeGoalPointAtAnswer(request string, steps []freeGoalStep) string {
+	subject := ""
+	for i := len(steps) - 1; i >= 0 && subject == ""; i-- {
+		s := steps[i]
+		if s.Failed {
+			continue
+		}
+		for _, token := range strings.Fields(s.Args) {
+			if strings.HasPrefix(token, "-") {
+				continue
+			}
+			subject = token
+			break
+		}
+	}
+	// A command that names nothing still leaves a subject: the one board name
+	// the request itself used. "Nakanoの天気は？" answered off `board` — which
+	// takes no argument — left nothing to walk to until the request was read
+	// the same way an argument is.
+	if subject == "" {
+		mentioned := map[string]string{}
+		lower := strings.ToLower(request)
+		for _, name := range freeGoalBoardNames() {
+			if name != "" && strings.Contains(lower, strings.ToLower(name)) {
+				mentioned[strings.ToLower(name)] = name
+			}
+		}
+		if len(mentioned) != 1 {
+			return ""
+		}
+		for _, name := range mentioned {
+			subject = name
+		}
+	}
+	// A thing is named by wants, and the answer about a place is usually held
+	// by one of them: nakano is a city, and what knows its weather is the
+	// weather want that reads it. One such want is the place to stand; several
+	// is a choice nobody asked this to make, so the thing itself will do.
+	if named := freeGoalWantsNaming(subject); len(named) == 1 {
+		subject = named[0]
+	}
+	binary, err := mywantBinaryPath()
+	if err != nil {
+		return subject
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	_ = exec.CommandContext(ctx, binary, "point", subject).Run()
+	return subject
+}
+
+// freeGoalHeldValue is what a want is holding, by name, or "" for anything
+// that is not a want or is holding nothing yet.
+func freeGoalHeldValue(name string) string {
+	if name == "" {
+		return ""
+	}
+	builder := GetGlobalChainBuilder()
+	if builder == nil {
+		return ""
+	}
+	for _, w := range builder.GetAllWantStates() {
+		if w == nil || !strings.EqualFold(w.Metadata.Name, name) {
+			continue
+		}
+		result := strings.TrimSpace(fmt.Sprint(w.GetAllState()["final_result"]))
+		if result == "" || result == "<nil>" {
+			return ""
+		}
+		return truncateRunes(result, 200)
+	}
+	return ""
+}
+
+// freeGoalExistingLike finds a want that a proposed create would duplicate:
+// same type, and every parameter the offer names already set to that value.
+func freeGoalExistingLike(args string) string {
+	fields := strings.Fields(args)
+	wantType := ""
+	params := map[string]string{}
+	for i, token := range fields {
+		switch {
+		case token == "--type" && i+1 < len(fields):
+			wantType = fields[i+1]
+		case token == "--param" && i+1 < len(fields):
+			if key, value, ok := strings.Cut(fields[i+1], "="); ok {
+				params[key] = value
+			}
+		}
+	}
+	if wantType == "" || len(params) == 0 {
+		return ""
+	}
+	builder := GetGlobalChainBuilder()
+	if builder == nil {
+		return ""
+	}
+	for _, w := range builder.GetAllWantStates() {
+		if w == nil || w.Metadata.Type != wantType {
+			continue
+		}
+		matches := true
+		for key, value := range params {
+			if got, ok := w.Spec.Params[key]; !ok || !strings.EqualFold(strings.TrimSpace(fmt.Sprint(got)), value) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return w.Metadata.Name
+		}
+	}
+	return ""
+}
+
+// freeGoalWantsNaming is the wants that name one thing, by want name.
+func freeGoalWantsNaming(value string) []string {
+	binary, err := mywantBinaryPath()
+	if err != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "relations", value, "--json").Output()
+	if err != nil {
+		return nil
+	}
+	var doc struct {
+		Relations []struct {
+			Direction string `json:"direction"`
+			Other     string `json:"other"`
+			Kind      string `json:"kind"`
+		} `json:"relations"`
+	}
+	if err := json.Unmarshal(out, &doc); err != nil {
+		return nil
+	}
+	var names []string
+	for _, r := range doc.Relations {
+		if r.Direction == "named by" && r.Other != "" {
+			names = append(names, r.Other)
+		}
+	}
+	return names
 }
 
 // freeGoalSummary is the fallback answer: what was run, when the model never
