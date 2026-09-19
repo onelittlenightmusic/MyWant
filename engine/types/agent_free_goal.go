@@ -120,6 +120,20 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		}
 
 		entry := catalogue[command]
+		// A want type is a hundred-odd names this model has never seen, and it
+		// guesses: asked for a weather want it wrote `--type aura`, which is a
+		// real type and the wrong one, and the board got an aura called
+		// "NakanoのWeather". The names are knowable, so they are looked up and
+		// the choice is put as its own small question rather than left to
+		// memory. See freeGoalFixType.
+		if strings.HasPrefix(command, "wants ") && flagNeedsWantType(entry) {
+			args = freeGoalFixType(agent, request, args, timeout)
+			// A want that is made without its parameters is made for nowhere:
+			// a weather want with no `at` reads Tokyo, whatever was asked for.
+			// The type declares what it takes, so the values are the only part
+			// worth asking about — one question, one line per parameter.
+			args = freeGoalFillParams(agent, request, args, timeout)
+		}
 		step := freeGoalStep{Command: command, Args: args}
 		if entry.Risk == "destroy" {
 			// Written down, not run. What is waiting is a sentence a person can
@@ -159,44 +173,63 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 
 // freeGoalPrompt asks for one thing: the next command, or an answer.
 //
-// The catalogue rides in the first question only — the agent keeps the session,
-// so repeating a hundred command names every step would fill the window with
-// what it has already been told.
+// The whole question every time — menu, what has been run, the request. The
+// planning call is answered by the model alone, on a session made and dropped
+// for that one question (see askPlain), so nothing carries over between steps:
+// the first version sent the command list only in the first prompt, and from
+// the second step the model was choosing from a list it could no longer see. It
+// did the only thing it could and repeated the command it had just run.
 func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCommand, steps []freeGoalStep) string {
 	var b strings.Builder
-	if len(steps) == 0 {
-		b.WriteString("You are working out how to carry out one request on a MyWant board, one command at a time.\n\n")
-		b.WriteString("Commands you may use:\n")
-		b.WriteString(freeGoalMenu(catalogue))
-		// The first step is always a command, never an answer. Left free to
-		// choose, the model answered "荻窪は丙座です" — a constellation that does
-		// not exist, about a board it had not looked at. It has no knowledge of
-		// this board at all; everything it can truthfully say has to be read
-		// first, and reading is what these commands are for.
-		b.WriteString("\nAnswer with ONE line and nothing else:\n")
-		b.WriteString("  RUN <command path> | <arguments>\n")
-		b.WriteString("Arguments are only what the command names — a name, or a name then numbers.\n")
-		b.WriteString("You know nothing about this board yet, so you cannot answer yet: choose the command that\n")
-		b.WriteString("finds out. `board` names everything on the canvas; `relations` says what one is connected to.\n\n")
-		if context := GetCurrent(want, "goal_context", ""); context != "" {
-			b.WriteString("Where the person is: " + context + "\n")
+	b.WriteString("You are carrying out one request on a MyWant board, one command at a time.\n\n")
+	b.WriteString("Commands you may use:\n")
+	b.WriteString(freeGoalMenu(catalogue))
+
+	if len(steps) > 0 {
+		b.WriteString("\nWhat has been run so far:\n")
+		for _, s := range steps {
+			b.WriteString("- mywant " + strings.TrimSpace(s.Command+" "+s.Args) + "\n")
+			// Said in a word, because the model reads a failure as a result
+			// otherwise: it ran a create that the CLI refused for a missing
+			// flag, was shown the refusal, and reported the want as made.
+			mark := "  -> "
+			if s.Failed {
+				mark = "  -> FAILED: "
+			}
+			b.WriteString(mark + truncateRunes(strings.TrimSpace(s.Output), 400) + "\n")
 		}
-		b.WriteString("Request: " + request + "\n")
-		return b.String()
 	}
 
-	b.WriteString("What has been run so far:\n")
-	for _, s := range steps {
-		b.WriteString("- mywant " + strings.TrimSpace(s.Command+" "+s.Args) + "\n")
-		b.WriteString("  -> " + truncateRunes(strings.TrimSpace(s.Output), 400) + "\n")
+	if context := GetCurrent(want, "goal_context", ""); context != "" {
+		b.WriteString("\nWhere the person is: " + context + "\n")
 	}
-	b.WriteString("\nRequest: " + request + "\n")
-	b.WriteString("One line only, and nothing else:\n")
-	b.WriteString("  RUN <command path> | <arguments>   — if something still has to be done or looked up\n")
-	b.WriteString("  ANSWER <what to tell the person, in their language>   — if the request is carried out\n")
-	b.WriteString("Say only what the output above actually shows. Do not invent names, and never answer with\n")
-	b.WriteString("the raw output. If the request asks for something to be CHANGED, it is not carried out until\n")
-	b.WriteString("you have RUN the command that changes it — looking is not doing.\n")
+	b.WriteString("\nRequest: " + request + "\n\n")
+
+	if len(steps) == 0 {
+		// The first step is always a command, never an answer. Left free to
+		// choose, the model answered "荻窪は丙座です" — a constellation that does
+		// not exist, about a board it had not looked at. It knows nothing about
+		// this board; everything it can truthfully say has to be read first.
+		b.WriteString("Answer with ONE line and nothing else:\n")
+		b.WriteString("  RUN <command path> | <arguments>\n")
+		b.WriteString("You know nothing about this board yet, so you cannot answer yet: choose the command\n")
+		b.WriteString("that finds out, or the one that does what was asked.\n")
+	} else {
+		b.WriteString("Answer with ONE line and nothing else:\n")
+		b.WriteString("  RUN <command path> | <arguments>   — if anything still has to be done or looked up\n")
+		b.WriteString("  ANSWER <what to tell the person, in their language>   — only once it is done\n")
+		b.WriteString("If the last command FAILED, run it again with the arguments it asked for — corrected,\n")
+		b.WriteString("not repeated unchanged, and not abandoned for a different command.\n")
+		b.WriteString("Otherwise never repeat a command that has already been run above.\n")
+		b.WriteString("ANSWER reports what has been DONE. If the request asked for something to be made,\n")
+		b.WriteString("moved, connected or removed and no command above has done it, you have not finished:\n")
+		b.WriteString("RUN the command that does it, using the exact names the output above showed.\n")
+	}
+	b.WriteString("Arguments are only what the command needs — a name, numbers, or its flags.\n")
+	b.WriteString("A flag is written --name value, one you actually need; never copy a command's whole\n")
+	b.WriteString("flag list from the menu.\n")
+	b.WriteString("Say only what the output above actually shows; do not invent names. The names of things\n")
+	b.WriteString("and wants on the board come from 'board'; the names of want TYPES come from 'types list'.\n")
 	return b.String()
 }
 
@@ -287,15 +320,47 @@ func fitArgs(command, args string, catalogue map[string]freeGoalCommand) string 
 	if args == "" {
 		return ""
 	}
-	placeholders := strings.Count(catalogue[command].Use, "<") + strings.Count(catalogue[command].Use, "[")
+	entry := catalogue[command]
+	placeholders := strings.Count(entry.Use, "<") + strings.Count(entry.Use, "[")
+	flags := entry.flagsByName()
+
 	var kept []string
 	values := 0
+	expectFlagValue := false
 	for _, token := range strings.Fields(args) {
 		if strings.ContainsAny(token, "<>") {
 			continue // usage text, not a value
 		}
-		if strings.HasPrefix(token, "--") {
+		// Words out of the prompt rather than out of the request: the step
+		// list marks a failure with "FAILED:", and that word came back as an
+		// argument the very next turn.
+		if strings.Contains(token, "FAILED") || strings.Trim(token, "-—–>|:") == "" {
+			continue
+		}
+		// The word after a flag that takes one belongs to it: "--param
+		// at=Nakano" is a flag and its value, and counting that value against
+		// the command's positional arguments threw it away — `wants create`
+		// names none, so the parameter went missing and a weather want was
+		// created for nowhere.
+		if expectFlagValue {
 			kept = append(kept, token)
+			expectFlagValue = false
+			continue
+		}
+		if strings.HasPrefix(token, "--") {
+			name := strings.TrimPrefix(strings.SplitN(token, "=", 2)[0], "--")
+			f, known := flags[name]
+			// A flag the command does not have is not an argument, it is
+			// something the model read somewhere else: "--type]" came out of
+			// the menu's own punctuation and the CLI refused the whole line
+			// for it.
+			if !known {
+				continue
+			}
+			kept = append(kept, token)
+			if f.Type != "bool" && !strings.Contains(token, "=") {
+				expectFlagValue = true
+			}
 			continue
 		}
 		if values >= placeholders {
@@ -305,6 +370,214 @@ func fitArgs(command, args string, catalogue map[string]freeGoalCommand) string 
 		values++
 	}
 	return strings.Join(kept, " ")
+}
+
+// flagNeedsWantType reports whether this command takes a --type that means a
+// want type.
+func flagNeedsWantType(entry freeGoalCommand) bool {
+	_, ok := entry.flagsByName()["type"]
+	return ok
+}
+
+// freeGoalFixType makes sure a --type is one the server actually has.
+//
+// Asked as its own question, with the whole list in front of the model and
+// nothing else in the prompt: choosing one name from a list is the kind of
+// thing a small model is good at, and composing a command line while
+// remembering a hundred type names is not.
+func freeGoalFixType(agent *fmServer, request, args string, timeout time.Duration) string {
+	types := freeGoalWantTypes()
+	if len(types) == 0 {
+		return args
+	}
+	known := map[string]bool{}
+	for _, t := range types {
+		known[t] = true
+	}
+
+	fields := strings.Fields(args)
+	current, at := "", -1
+	for i, token := range fields {
+		if token == "--type" && i+1 < len(fields) {
+			current, at = fields[i+1], i+1
+		}
+	}
+	if current != "" && known[current] {
+		return args
+	}
+
+	prompt := "Which want type does this request need? Answer with ONE name from this list and nothing else.\n\n" +
+		strings.Join(types, ", ") + "\n\nRequest: " + request + "\n"
+	reply, err := agent.askPlain(prompt, "", timeout)
+	if err != nil {
+		return args
+	}
+	chosen := ""
+	for _, word := range strings.Fields(strings.ToLower(reply.Text)) {
+		word = strings.Trim(word, "`\"'.,:;()[]")
+		if known[word] {
+			chosen = word
+			break
+		}
+	}
+	if chosen == "" {
+		return args
+	}
+	if at >= 0 {
+		fields[at] = chosen
+		return strings.Join(fields, " ")
+	}
+	return strings.TrimSpace(args + " --type " + chosen)
+}
+
+// freeGoalParam is one parameter a want type declares.
+type freeGoalParam struct {
+	Name        string `json:"name"`
+	SubType     string `json:"subType"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+}
+
+// freeGoalFillParams gives a new want the values it is being made for.
+//
+// The type says what it takes; the request says what it is for. Neither is
+// something to guess at, so the question put to the model is small and
+// closed: here are the parameters this type declares, here is what was asked
+// for, what is each one? Secrets are never asked about — they come from the
+// environment, and a model inventing an API key would be worse than an empty
+// one.
+func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Duration) string {
+	fields := strings.Fields(args)
+	wantType := ""
+	for i, token := range fields {
+		if token == "--type" && i+1 < len(fields) {
+			wantType = fields[i+1]
+		}
+	}
+	if wantType == "" || strings.Contains(args, "--param") {
+		return args
+	}
+	params := freeGoalTypeParams(wantType)
+	var askable []freeGoalParam
+	for _, p := range params {
+		if p.SubType == "secret" || p.Name == "" {
+			continue
+		}
+		askable = append(askable, p)
+	}
+	if len(askable) == 0 {
+		return args
+	}
+
+	var b strings.Builder
+	b.WriteString("A want of type \"" + wantType + "\" is being created for this request:\n")
+	b.WriteString(request + "\n\nIt takes these parameters:\n")
+	for _, p := range askable {
+		b.WriteString("  " + p.Name + " — " + truncateRunes(strings.TrimSpace(p.Description), 80) + "\n")
+	}
+	b.WriteString("\nAnswer one line per parameter, exactly \"name=value\", using only values the request\n")
+	b.WriteString("actually gives. Leave out any parameter the request says nothing about. Nothing else.\n")
+	declared := map[string]bool{}
+	for _, p := range askable {
+		declared[p.Name] = true
+	}
+
+	// Twice, if the first answer parses to nothing. A want is created once and
+	// then the name is taken: the first attempt at this came back as prose,
+	// the want was made for Tokyo, and the correction could only fail with
+	// "already exists". A second question costs three seconds and is asked
+	// before anything exists.
+	for attempt := 0; attempt < 2; attempt++ {
+		reply, err := agent.askPlain(b.String(), "", timeout)
+		if err != nil {
+			return args
+		}
+		out := args
+		for _, line := range strings.Split(reply.Text, "\n") {
+			line = strings.TrimSpace(strings.Trim(strings.TrimSpace(line), "`*-• "))
+			name, value, found := strings.Cut(line, "=")
+			name, value = strings.TrimSpace(name), strings.Trim(strings.TrimSpace(value), "\"'")
+			if !found || !declared[name] || value == "" || strings.ContainsAny(value, " <>") {
+				continue
+			}
+			out += " --param " + name + "=" + freeGoalKnownThing(value)
+		}
+		if out != args {
+			return out
+		}
+	}
+	return args
+}
+
+// freeGoalKnownThing answers with the board's own spelling of a value.
+//
+// "NakanoのWeather" gives "Nakano"; the board has been calling that place
+// "nakano" since somebody typed it that way. Same word, two spellings, and the
+// canvas draws a road between a want and a thing only when they match — so a
+// new want would stand next to the place it is about, unconnected.
+func freeGoalKnownThing(value string) string {
+	binary, err := mywantBinaryPath()
+	if err != nil {
+		return value
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "board", "--json").Output()
+	if err != nil {
+		return value
+	}
+	var entries []struct {
+		Name string `json:"name"`
+		Kind string `json:"kind"`
+	}
+	if err := json.Unmarshal(out, &entries); err != nil {
+		return value
+	}
+	for _, e := range entries {
+		if e.Kind == "thing" && strings.EqualFold(e.Name, value) {
+			return e.Name
+		}
+	}
+	return value
+}
+
+// freeGoalTypeParams is what one want type declares it takes.
+func freeGoalTypeParams(wantType string) []freeGoalParam {
+	builder := GetGlobalChainBuilder()
+	if builder == nil {
+		return nil
+	}
+	def := builder.GetWantTypeDefinition(wantType)
+	if def == nil {
+		return nil
+	}
+	var params []freeGoalParam
+	for _, p := range def.Parameters {
+		params = append(params, freeGoalParam{
+			Name:        p.Name,
+			SubType:     p.SubType,
+			Description: p.Description,
+			Required:    p.Required,
+		})
+	}
+	return params
+}
+
+// freeGoalWantTypes is every want type the server knows.
+//
+// From the running builder, not from a subprocess: this agent runs inside the
+// server that loaded them.
+func freeGoalWantTypes() []string {
+	builder := GetGlobalChainBuilder()
+	if builder == nil {
+		return nil
+	}
+	var names []string
+	for name := range builder.AllWantTypeDefinitions() {
+		names = append(names, name)
+	}
+	sortStrings(names)
+	return names
 }
 
 // freeGoalRun runs one command through the CLI, and reports whether it failed.
@@ -335,10 +608,27 @@ func freeGoalRun(ctx context.Context, command, args string) (string, bool) {
 
 // freeGoalCommand is one command as the CLI describes it.
 type freeGoalCommand struct {
-	Path  string `json:"path"`
-	Short string `json:"short"`
-	Use   string `json:"use"`
-	Risk  string `json:"risk"`
+	Path  string         `json:"path"`
+	Short string         `json:"short"`
+	Use   string         `json:"use"`
+	Risk  string         `json:"risk"`
+	Flags []freeGoalFlag `json:"flags"`
+}
+
+// freeGoalFlag is one option a command takes. The type matters: a boolean flag
+// stands alone, and every other kind swallows the word after it.
+type freeGoalFlag struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// flagsByName indexes a command's flags for the argument fitting below.
+func (c freeGoalCommand) flagsByName() map[string]freeGoalFlag {
+	out := make(map[string]freeGoalFlag, len(c.Flags))
+	for _, f := range c.Flags {
+		out[f.Name] = f
+	}
+	return out
 }
 
 // The groups a goal on this board has business in. Reads are all allowed;
@@ -414,6 +704,30 @@ func freeGoalMenu(catalogue map[string]freeGoalCommand) string {
 			takes = " " + strings.Join(fields[1:], " ")
 		}
 		b.WriteString("  " + path + takes)
+		// The flags, because for some commands they are the whole of the
+		// instruction: `wants create` takes no positional argument at all, and
+		// a menu that showed only its name said nothing about --type or
+		// --param — so a goal asking for "a weather want for Nakano" could not
+		// have expressed it. --json is left out; it changes the shape of the
+		// answer and never the work.
+		var options []string
+		for _, f := range c.Flags {
+			// Eight, not five: flags are listed alphabetically, and five cut
+			// `wants create` off at --name — losing --param and --type, which
+			// are the entire instruction for creating anything. A menu that
+			// stops before the useful flag is worse than no menu.
+			if f.Name == "json" || f.Name == "help" || len(options) >= 8 {
+				continue
+			}
+			options = append(options, f.Name)
+		}
+		// Named, not written out as a command line. Printed as "[--type
+		// --param …]" the model copied the whole bracket into its arguments
+		// and ran `wants create --example --file --interactive --name --param
+		// --type]`. A list of names cannot be pasted as a line.
+		if len(options) > 0 {
+			b.WriteString(" (flags: " + strings.Join(options, ", ") + ")")
+		}
 		if short := truncateRunes(strings.TrimSpace(c.Short), 64); short != "" {
 			b.WriteString("  — " + short)
 		}
