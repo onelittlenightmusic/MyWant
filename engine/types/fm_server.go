@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os/exec"
 	"strings"
 	"sync"
@@ -32,6 +33,29 @@ type fmServer struct {
 	stdout  *bufio.Reader
 	nextID  int
 	started bool
+
+	// Where the agent's running commentary goes while it works. Set for the
+	// duration of one question (ask holds the lock, so there is only ever
+	// one), and called from the goroutine draining the agent's stderr — which
+	// is why what it writes to must be safe to write to from anywhere.
+	activityMu sync.Mutex
+	onActivity func(kind, text string)
+}
+
+// watch installs the commentary handler for one question.
+func (s *fmServer) watch(handler func(kind, text string)) {
+	s.activityMu.Lock()
+	s.onActivity = handler
+	s.activityMu.Unlock()
+}
+
+func (s *fmServer) say(kind, text string) {
+	s.activityMu.Lock()
+	handler := s.onActivity
+	s.activityMu.Unlock()
+	if handler != nil {
+		handler(kind, text)
+	}
 }
 
 var (
@@ -58,6 +82,9 @@ type fmReply struct {
 	Tool    string `json:"tool"`
 	Calls   int    `json:"calls"`
 	Trimmed bool   `json:"trimmed"`
+	// A command the agent will not run until a person says yes, written as
+	// they would read it. Empty when nothing is waiting.
+	Pending string `json:"pending"`
 	Error   string `json:"error"`
 }
 
@@ -80,14 +107,20 @@ func (s *fmServer) start(root string) error {
 	if err != nil {
 		return err
 	}
-	// Its stderr is the agent's own commentary — which tool it reached for, why
-	// a session was dropped. Left to flow to this server's log rather than
-	// collected: nothing here reads it, and a full pipe would wedge the agent.
-	cmd.Stderr = nil
+	// Its stderr is the agent's own commentary — which tool it reached for,
+	// which command it ran, why a session was dropped. Read, not left to the
+	// log: "考えています" is all anybody could see while it worked, and every
+	// line of what it was actually doing was going past on a pipe nobody was
+	// holding. Drained continuously, so a full pipe can never wedge the agent.
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 	s.cmd, s.stdin, s.stdout, s.started = cmd, stdin, bufio.NewReaderSize(stdout, 1<<20), true
+	go s.readCommentary(stderr)
 	go func() {
 		_ = cmd.Wait()
 		s.mu.Lock()
@@ -97,6 +130,30 @@ func (s *fmServer) start(root string) error {
 		s.mu.Unlock()
 	}()
 	return nil
+}
+
+// readCommentary turns the agent's stderr into activity, line by line, until
+// the process ends.
+//
+// Two kinds of line are worth passing on: the command it ran, and the tool it
+// reached for. The rest is its own bookkeeping — how many commands it was
+// offered, when a session was trimmed — which belongs in the log it is already
+// going to.
+func (s *fmServer) readCommentary(stderr io.Reader) {
+	scanner := bufio.NewScanner(stderr)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1<<20)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		log.Printf("[fmtool] %s", line)
+		switch {
+		case strings.HasPrefix(line, "[mywant WOULD RUN"):
+			s.say("note", strings.TrimSuffix(strings.TrimPrefix(line, "[mywant WOULD RUN "), "]"))
+		case strings.HasPrefix(line, "[mywant "):
+			s.say("tool", strings.TrimSuffix(strings.TrimPrefix(line, "["), "]"))
+		case strings.HasPrefix(line, "[tool:"):
+			s.say("tool", strings.Trim(line, "[]"))
+		}
+	}
 }
 
 // stop closes the conversation down. The caller holds the lock.

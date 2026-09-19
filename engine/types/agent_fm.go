@@ -175,8 +175,18 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	want.StoreLog("[FM_DO] Asking the on-device model: %s", binary)
 	want.SetCurrent("last_request_at", time.Now().Unix())
 	want.SetCurrent("cc_streaming_text", "考えています…")
+	RecordCCActivity(want, "note", truncateRunes(request, 80))
 
-	reply, err := fmServerFor(binary).ask(request, root, timeout)
+	// What it is doing, as it does it. The agent says on its stderr which
+	// command it is running and which tool it reached for; those lines used to
+	// go to the server log, where the person waiting cannot see them, and all
+	// the board showed for the whole thirty seconds was "考えています".
+	server := fmServerFor(binary)
+	server.watch(func(kind, text string) {
+		RecordCCActivity(want, kind, truncateRunes(text, 90))
+	})
+	reply, err := server.ask(request, root, timeout)
+	server.watch(nil)
 	answer := strings.TrimSpace(reply.Text)
 	notes := reply.Error
 
@@ -229,6 +239,11 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 
 	recordFMAnswer(want, answer)
 	want.SetCurrent("last_response_raw", answer)
+	// What the robot is waiting on, where a screen can see it: a command it
+	// will not run until somebody agrees. Said in the chat too, but a sentence
+	// in a conversation is something to read and retype, and this is something
+	// to answer — see the confirmation overlay in the dashboard.
+	want.SetCurrent("pending_command", reply.Pending)
 
 	if requestID != "" {
 		writeClaudeRequestLog("", requestID, "sent")

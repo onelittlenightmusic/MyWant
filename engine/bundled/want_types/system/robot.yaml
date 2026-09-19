@@ -124,6 +124,13 @@ wantType:
     initialValue: monitoring
     label: current
 
+  - name: pending_command
+    description: A command the robot will not run until somebody says yes, as they would read it
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
   - name: provider
     description: Active AI provider (claude_code, gemini or fm)
     type: string
