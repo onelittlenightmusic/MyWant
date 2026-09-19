@@ -49,6 +49,16 @@ const (
 // for as long as it was an experiment; a want type that depends on it is not an
 // experiment, and two repositories that have to be in step are one repository
 // with a gap in it.
+// HasOnDeviceModel reports whether this machine can answer with its own model.
+//
+// Asked by the server so a person choosing who answers is not offered a choice
+// that silently turns into another one: `provider: fm` on a Linux box falls
+// back to Claude, which is the right behaviour and a confusing thing to pick.
+func HasOnDeviceModel() bool {
+	_, ok := fmToolPath()
+	return ok
+}
+
 func fmToolPath() (string, bool) {
 	if runtime.GOOS != "darwin" {
 		return "", false
