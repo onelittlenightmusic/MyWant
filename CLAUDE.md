@@ -98,7 +98,7 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 
 ## File Organization
 
-`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client + HTTP client library) • `client/cmd/mywant/` (CLI entrypoint) • `docs/` • `web/` (React frontend + embedded assets)
+`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client + HTTP client library) • `client/cmd/mywant/` (CLI entrypoint) • `fmtool/` (on-device agent, Swift/macOS — `make fmtool`) • `docs/` • `web/` (React frontend + embedded assets)
 
 ## Coding Rules
 

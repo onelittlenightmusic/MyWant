@@ -12,6 +12,10 @@ engine/engine/server
 engine/demo_*
 !engine/demos/
 
+# The on-device agent's Swift build (fmtool/)
+fmtool/.build/
+fmtool/.swiftpm/
+
 # External agent binaries
 examples/external_agent_grpc/external-agent-grpc
 examples/external_agent_webhook/external-agent

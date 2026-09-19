@@ -1,4 +1,4 @@
-.PHONY: clean build build-cli build-mywant-gui build-playwright-app install-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type
+.PHONY: clean build build-cli build-mywant-gui build-playwright-app install-playwright-app release test test-build fmt lint vet check run-qnet run-prime run-fibonacci run-fibonacci-loop run-travel run-sample-owner run-qnet-target run-qnet-using-recipe run-hierarchical-approval run-travel-recipe run-travel-agent test-all-runs build-mock build-mock-plugin run-mock run-flight test-all troubleshoot-mcp fix-mcp install uninstall reload-want-type fmtool install-fmtool
 
 INSTALL_DIR ?= $(HOME)/.local/bin
 PLAYWRIGHT_APP_DIR ?= $(HOME)/.mywant/playwright-app
@@ -243,6 +243,35 @@ install: release
 	@cp bin/mywant $(INSTALL_DIR)/mywant
 	@codesign --sign - --force $(INSTALL_DIR)/mywant 2>/dev/null || true
 	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
+
+# ── The on-device agent (fmtool/) ─────────────────────────────────────────────
+#
+# Apple's FoundationModels runs on the machine, so this half of MyWant is Swift
+# and macOS-only. It is not part of `make release`: a Linux build (CI, fly.io)
+# has no such model to ask, and a want asking for `provider: fm` there falls
+# back to Claude on its own.
+#
+#   make fmtool           build it into bin/fmtool
+#   make install-fmtool   ...and put it where the server looks
+#
+# Codesigned after copying, always: a copied Swift binary loses its signature
+# and macOS kills it on sight — silently, with exit 137, which reads like the
+# binary is fine and the tool is broken.
+fmtool:
+	@if [ "$$(uname -s)" != "Darwin" ]; then 		echo "⏭️  fmtool needs macOS (Apple FoundationModels); skipping"; exit 0; 	fi
+	@echo "🔨 Building fmtool (on-device agent)..."
+	@cd fmtool && swift build -c release
+	@mkdir -p bin
+	@cp fmtool/.build/release/fmtool bin/fmtool
+	@codesign --sign - --force bin/fmtool 2>/dev/null || true
+	@echo "🚀 Build complete: bin/fmtool"
+
+install-fmtool: fmtool
+	@if [ ! -f bin/fmtool ]; then exit 0; fi
+	@mkdir -p $(INSTALL_DIR)
+	@cp bin/fmtool $(INSTALL_DIR)/fmtool
+	@codesign --sign - --force $(INSTALL_DIR)/fmtool 2>/dev/null || true
+	@echo "✅ Installed: $(INSTALL_DIR)/fmtool"
 
 # Opt-in: only the `replay` want type needs this, and it costs a Node toolchain
 # plus ~42MB of dependencies. It shells out to the Node server, so the server has
