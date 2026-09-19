@@ -109,7 +109,25 @@ private struct ServeRequest: Decodable {
     let id: Int?
     let prompt: String?
     let reset: Bool?
+    /// Answer with the model alone: no tools, no memory of this conversation.
+    ///
+    /// The caller that asks for this is not chatting — it is MyWant working out
+    /// which of its own commands carry out a request, and it has the command
+    /// list, the results so far and the rules in the prompt it just wrote. Sent
+    /// through the ordinary session, that planning question met a model with
+    /// tools of its own: it went and ran searches, answered "the search results
+    /// did not provide the required information", and planned nothing. What is
+    /// wanted here is the one thing this model has that the caller does not —
+    /// language — and none of its initiative.
+    let plain: Bool?
 }
+
+/// What a plain session is told: answer the question as asked, in the form
+/// asked, and nothing else.
+private let plainInstructions = """
+    You turn a request into exactly the line you are asked for.
+    Follow the answer format in the prompt exactly. Add no explanation, no     greeting and no commentary. If the prompt offers a list to choose from,     choose only from that list.
+    """
 
 private func writeLine(_ object: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: object),
@@ -141,7 +159,7 @@ func servedRespond(prompt: String, box: SessionBox, tools: [any LocalTool], trac
 }
 
 /// Read questions off stdin until it closes, answering each on the kept session.
-func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]), instructions: String) async {
+func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]), instructions: String, consent: ConsentGate? = nil) async {
     let tracker = CallTracker()
     let (localTools, tools) = makeTools(tracker)
     let box = SessionBox(tools: tools, instructions: instructions)
@@ -166,6 +184,25 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
             writeLine(["id": id, "error": "prompt is required"])
             continue
         }
+
+        if request.plain == true {
+            // A session of its own, made and dropped: no tools to reach for and
+            // no transcript to fill, so the answer is about this prompt only.
+            let session = LanguageModelSession(instructions: plainInstructions)
+            do {
+                let response = try await session.respond(to: prompt)
+                writeLine(["id": id, "text": response.content, "calls": 0])
+            } catch {
+                writeLine(["id": id, "error": "\(error.localizedDescription)"])
+            }
+            continue
+        }
+
+
+        // Whether this message is the person saying yes is read from the
+        // message itself, before the model sees it — it is the one thing in the
+        // conversation the model does not get to write. See ConsentGate.
+        await consent?.note(prompt: prompt)
 
         let before = await tracker.count
         let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)

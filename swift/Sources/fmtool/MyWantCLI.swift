@@ -13,15 +13,22 @@ import FoundationModels
 /// the model picks from the commands the binary actually has. A command added to
 /// the CLI is available the next time fmtool starts, with nothing to change here.
 ///
-/// Reading only, by construction: the schema offers `--safe-only` commands, the
-/// ones the CLI itself marks `readOnly`. Deleting a want or opening a world is
-/// not something that should follow from a question in a chat bubble, and the
-/// model cannot reach them because they were never offered.
+/// What is offered is decided by the CLI too. Every command says what it costs
+/// if it was the wrong one — "read", "change" or "destroy" — and the three are
+/// treated differently rather than the whole write half being shut off:
+///
+///   read     always offered; a question cannot break anything.
+///   change   offered, for the board: moving a tile, pinning a thing, making a
+///            want. A misheard name here costs a shrug and `mywant undo`.
+///   destroy  a separate tool that refuses to run until the person has said yes
+///            (see Destructive.swift). A deleted want is not coming back, and
+///            nothing in a chat bubble should be able to reach one by accident.
 struct MyWantCommand: Decodable {
     let path: String
     let short: String?
     let use: String?
     let readOnly: Bool
+    let risk: String?
 }
 
 enum MyWantCLI {
@@ -64,16 +71,48 @@ enum MyWantCLI {
         )
     }
 
-    /// The commands this CLI has that only read, or none when there is no CLI
-    /// here to ask.
-    static func readOnlyCommands() -> [MyWantCommand] {
+    /// Everything the CLI says it can do, or nothing when there is no CLI here
+    /// to ask. Plugins included: the core CLI collects them (`gui tile set` is
+    /// how a tile moves, and it lives in another binary entirely).
+    static func allCommands() -> [MyWantCommand] {
         guard let binary = binaryPath() else { return [] }
-        guard let result = try? run(binary, ["commands", "--json", "--safe-only"], timeout: 20),
+        guard let result = try? run(binary, ["commands", "--json"], timeout: 20),
               result.status == 0,
               let data = result.out.data(using: .utf8),
               let commands = try? JSONDecoder().decode([MyWantCommand].self, from: data)
         else { return [] }
-        // Two kinds are left out of what the model is offered, and only out of
+        return commands
+    }
+
+    /// The groups a guide to a board has business in.
+    ///
+    /// Read commands are offered whatever group they are in — asking is free.
+    /// Writing is not, and this CLI can also install plugins, rewrite config and
+    /// create want types, none of which is canvas work and all of which a small
+    /// model would sometimes pick when it meant something else. So the writing
+    /// half is narrowed to what the board is made of.
+    static let boardGroups: Set<String> = ["wants", "thing", "world", "state", "gui", "undo"]
+
+    /// Starting and stopping the GUI server is not arranging a canvas; it is
+    /// turning off the screen the canvas is on.
+    static let neverOffered: Set<String> = ["gui start", "gui stop"]
+
+    /// What to offer the model: the ones it may run, and the ones it must ask
+    /// about first.
+    static func offered(writes: Bool) -> (safe: [MyWantCommand], dangerous: [MyWantCommand]) {
+        let commands = allCommands()
+        let risk = { (c: MyWantCommand) in c.risk ?? (c.readOnly ? "read" : "change") }
+        let inBoard = { (c: MyWantCommand) in
+            MyWantCLI.boardGroups.contains(c.path.split(separator: " ").first.map(String.init) ?? "")
+                && !MyWantCLI.neverOffered.contains(c.path)
+        }
+        var safe = commands.filter { risk($0) == "read" || (writes && risk($0) == "change" && inBoard($0)) }
+        let dangerous = writes ? commands.filter { risk($0) == "destroy" && inBoard($0) } : []
+        safe = trimmed(safe)
+        return (safe, dangerous)
+    }
+
+    /// Two kinds are left out of what the model is offered, and only out of
         // THAT — both stay in the CLI for people and scripts.
         //
         //   commands   lists what the CLI can do, which this tool's description
@@ -85,6 +124,7 @@ enum MyWantCLI {
         //              asker got coordinates and a robot standing where it was.
         //              A guide shows; anybody who wants the quiet form can run
         //              it themselves.
+    static func trimmed(_ commands: [MyWantCommand]) -> [MyWantCommand] {
         let superseded = Set(commands.map(\.path).filter { $0.hasSuffix(" point") }
             .map { $0.replacingOccurrences(of: " point", with: " where") })
         return commands.filter { $0.path != "commands" && !superseded.contains($0.path) }
@@ -95,6 +135,9 @@ enum MyWantCLI {
 struct MyWantCLITool: LocalTool {
     let name = "mywant_cli"
     let commands: [MyWantCommand]
+    /// Whether the offered list includes commands that change the board, which
+    /// decides whether the description bothers to say what they are.
+    var canWrite: Bool { commands.contains { ($0.risk ?? "read") == "change" } }
     private let binary: String
     private static let outputLimit = 4000
 
@@ -108,8 +151,10 @@ struct MyWantCLITool: LocalTool {
         "THE tool for any question about MyWant: wants, things (named values), the canvas/board, worlds, "
         + "state, agents, recipes, logs, server status. Use it — never the file search — whenever MyWant, "
         + "a want, a thing or the board is mentioned. "
-        + "Pick `command` from the list and give `args` only when the command names an id or a name — "
-        + "and give the NAME alone there, never the question it was asked in: args \"新宿\", not \"新宿はどこ\". "
+        + "Pick `command` from the list and give `args` everything that command needs and nothing else — "
+        + "a name alone for a question about one thing (args \"新宿\", never \"新宿はどこ\"), and a name "
+        + "followed by the numbers when the command places something (args \"新宿 5 0\"). Never the sentence "
+        + "it was asked in. "
         // The confusions worth naming, each one seen: a question about the
         // board answered from the filesystem, and processes counted as wants.
         // What each command IS, not what order to call them in: the order is the
@@ -125,6 +170,20 @@ struct MyWantCLITool: LocalTool {
         + "in both directions — use it for 'what is X connected to', 'what feeds X', 'what uses X'. "
         + "A want is something on the board — 'wants list'. 'ps' is the server's own processes, not wants. "
         + "Named values are things — 'thing list'."
+        // What the writing verbs ARE. The model chooses from bare command
+        // paths — the descriptions the CLI carries never reach the schema — so
+        // "Parasomniaを(9,-9)に移動して" met a list in which nothing said "move"
+        // and picked 'point', which walked over and reported the old cell.
+        // Still no procedures: which of these to call, and in what order, is
+        // the model's to work out.
+        + (canWrite
+           ? " Asked to take back, revert or undo what was just done (元に戻す), call 'undo' with no args — "
+             + "never work out the reverse yourself, it is recorded. "
+             + "To PLACE or MOVE a thing: 'thing pin' with args \"<name> <x> <y>\"; to take it off the board: "
+             + "'thing unpin'. To move a want's tile: 'gui tile set' with args \"<name> <x> <y>\". "
+             + "To make a want: 'wants create' with args \"--type <type> --at <x>,<y>\". "
+             + "To take back the last change: 'undo', with no args."
+           : "")
     }
 
     var argsSchema: DynamicGenerationSchema {
@@ -151,7 +210,7 @@ struct MyWantCLITool: LocalTool {
                 ),
                 .init(
                     name: "args",
-                    description: "Extra words the command needs, space-separated — usually an id. Leave empty for a plain list.",
+                    description: "Everything the command needs, space-separated and in order: a name, or a name then numbers. Leave empty for a plain list.",
                     schema: .init(type: String.self),
                     isOptional: true
                 ),
@@ -178,7 +237,12 @@ struct MyWantCLITool: LocalTool {
             let placeholders = (commands.first { $0.path == command }?.use ?? "")
                 .filter { $0 == "<" || $0 == "[" }
                 .count
-            if placeholders > 1 {
+            // Flags are words of their own however the usage line reads:
+            // `wants create` takes no placeholders and everything it needs is
+            // flags, so handing it "--type button --at 3,4" as one argument
+            // gave the CLI one very long type name.
+            let hasFlags = extra.hasPrefix("-") || extra.contains(" -")
+            if placeholders > 1 || hasFlags {
                 argv.append(contentsOf: extra.split(separator: " ").map(String.init))
             } else {
                 argv.append(extra)
@@ -199,9 +263,24 @@ struct MyWantCLITool: LocalTool {
         // then reports as a success: a command that names something, called
         // with nothing to name. Said plainly and first, so it is not lost in a
         // page of usage text.
-        if result.status != 0 && argv == commandWords {
-            text = "ERROR: '\(command)' needs a name in `args` — none was given, so nothing happened. "
-                + "Call it again with `args` set to the name alone."
+        // The failure worth naming, because it is the one the model makes and
+        // then reports as a success: a command called with less than it names.
+        // The usage line says what it wanted, so the correction is exact rather
+        // than an invitation to try a different command — which is what
+        // happened when it only said "failed": three commands in a row, none of
+        // them given a cell.
+        if result.status != 0 {
+            let usage = commands.first { $0.path == command }?.use ?? ""
+            let wanted = usage.split(separator: " ").dropFirst().joined(separator: " ")
+            let given = argv.count > commandWords.count
+                ? argv.suffix(from: commandWords.count).joined(separator: " ")
+                : ""
+            if !wanted.isEmpty {
+                text = "ERROR: '\(command)' takes \(wanted) — "
+                    + (given.isEmpty ? "nothing was given" : "you gave \"\(given)\"")
+                    + ", so nothing happened. Call '\(command)' again with `args` holding all of it, "
+                    + "space-separated, and nothing else."
+            }
         }
         if text.isEmpty { return "mywant \(argv.joined(separator: " ")) printed nothing" }
         // The same clip ReadFileTool uses: on-device context is ~8k tokens and a
