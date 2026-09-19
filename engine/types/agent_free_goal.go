@@ -176,6 +176,10 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 		}
 
 		entry := catalogue[command]
+		// The name it acts on has to be a name that exists, and preferably one
+		// the request actually used. See freeGoalFixName: asked "tokyo thingは
+		// ある？" the model ran `thing get weather`, a word from nowhere.
+		args = freeGoalFixName(entry, request, args)
 		// A want type is a hundred-odd names this model has never seen, and it
 		// guesses: asked for a weather want it wrote `--type aura`, which is a
 		// real type and the wrong one, and the board got an aura called
@@ -620,6 +624,39 @@ func freeGoalFillParams(agent *fmServer, request, args string, timeout time.Dura
 	return args
 }
 
+// freeGoalThingValues is every remembered value, whether or not it stands on
+// the canvas.
+//
+// Every one, because a name is a name wherever it is filed: Tokyo is a thing
+// this board remembers and does not draw, and taking the names from `board`
+// meant a request that said "tokyo" matched nothing — so an invented argument
+// went uncorrected and `thing get weather` ran.
+func freeGoalThingValues() []string {
+	binary, err := mywantBinaryPath()
+	if err != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "thing", "list", "--json").Output()
+	if err != nil {
+		return nil
+	}
+	var things []struct {
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(out, &things); err != nil {
+		return nil
+	}
+	var values []string
+	for _, t := range things {
+		if t.Value != "" {
+			values = append(values, t.Value)
+		}
+	}
+	return values
+}
+
 // freeGoalKnownThing answers with the board's own spelling of a value.
 //
 // "NakanoのWeather" gives "Nakano"; the board has been calling that place
@@ -1002,7 +1039,15 @@ func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeG
 		if command == "" {
 			return "", ""
 		}
-		if !tried[strings.TrimSpace(command+" "+args)] {
+		// An offer has to be actionable. "RUN wants get [name-or-id]" — the
+		// usage line copied back — became the offer "mywant wants get
+		// [name-or-id]", which is nothing anybody can say yes to.
+		args = freeGoalFixName(catalogue[command], request, args)
+		// Actionable, and about something that exists. "RUN wants get
+		// [name-or-id]" became the offer "mywant wants get [name-or-id]", and
+		// "wants connect Create an" was the command's own description read
+		// back as its arguments. Neither is something a person can say yes to.
+		if !tried[strings.TrimSpace(command+" "+args)] && offerIsActionable(catalogue[command], args) {
 			break
 		}
 		question = b.String() + "\n'" + command + "' has already been tried and did not work.\n" +
@@ -1024,6 +1069,91 @@ func freeGoalPropose(agent *fmServer, request string, catalogue map[string]freeG
 		args = freeGoalFillParams(agent, request, args, timeout)
 	}
 	return command, args
+}
+
+// freeGoalFixName replaces an invented name with one the request names.
+//
+// Asked "tokyo thingはある？" the model chose the right family of command and
+// then filled its argument with "weather" — a word that is in neither the
+// request nor the board. The board's names are knowable and the request's
+// words are right there, so a first argument that is on neither list, when
+// exactly one board name IS in the request, is replaced by that one.
+//
+// Only that case. Several matches, or none, are left alone: guessing between
+// two names would be a worse error than passing through a wrong one, which at
+// least fails loudly.
+func freeGoalFixName(entry freeGoalCommand, request, args string) string {
+	if args == "" || !strings.ContainsAny(entry.Use, "<[") {
+		return args
+	}
+	fields := strings.Fields(args)
+	if len(fields) == 0 || strings.HasPrefix(fields[0], "--") {
+		return args
+	}
+	given := fields[0]
+
+	names := freeGoalBoardNames()
+	for _, name := range names {
+		if strings.EqualFold(name, given) {
+			return args // already a name the board has
+		}
+	}
+
+	// Deduplicated, because one word can be two things: Tokyo is filed under
+	// both cities and stations, and counting it twice made "exactly one match"
+	// false for a request that names exactly one place.
+	mentioned := map[string]string{}
+	lowerRequest := strings.ToLower(request)
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		if strings.Contains(lowerRequest, strings.ToLower(name)) {
+			mentioned[strings.ToLower(name)] = name
+		}
+	}
+	if len(mentioned) != 1 {
+		return args
+	}
+	for _, name := range mentioned {
+		fields[0] = name
+	}
+	return strings.Join(fields, " ")
+}
+
+// offerIsActionable reports whether an offer names something real.
+//
+// A command that takes a name must have been given one, and it must be a name
+// this board has — anything else is a sentence dressed as a command.
+func offerIsActionable(entry freeGoalCommand, args string) bool {
+	if !strings.ContainsAny(entry.Use, "<[") {
+		return true
+	}
+	fields := strings.Fields(args)
+	if len(fields) == 0 || strings.HasPrefix(fields[0], "--") {
+		return false
+	}
+	for _, name := range freeGoalBoardNames() {
+		if strings.EqualFold(name, fields[0]) {
+			return true
+		}
+	}
+	return false
+}
+
+// freeGoalBoardNames is every name the board answers to: the things it
+// remembers and the wants standing on it.
+func freeGoalBoardNames() []string {
+	names := freeGoalThingValues()
+	if builder := GetGlobalChainBuilder(); builder != nil {
+		for _, w := range builder.GetAllWantStates() {
+			if w == nil || w.Metadata.IsSystemWant || w.Metadata.Name == "" {
+				continue
+			}
+			names = append(names, w.Metadata.Name)
+		}
+	}
+	return names
 }
 
 // freeGoalMissingWant reads an offer out of a failed lookup.
