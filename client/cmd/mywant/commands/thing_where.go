@@ -143,6 +143,13 @@ func findThingPlace(c *client.Client, name string) (thingPlace, error) {
 		return thingPlace{}, fmt.Errorf("no thing named %q", strings.TrimSpace(name))
 	}
 	var partial []thingPlace
+	// One word, two things: 荻窪 is filed under stations and, since a weather
+	// want was made for it, under cities as well. Both match exactly, and
+	// which one was returned came down to map order — so "荻窪はどの星座？"
+	// answered about the copy that is not on the canvas and has no
+	// constellations, half the time. A question about a name is a question
+	// about the one you can see.
+	var exact []thingPlace
 
 	for _, t := range things {
 		place := thingPlace{id: t.ID, value: t.Value, kind: t.Subtype, constellations: constellationNames(t)}
@@ -162,11 +169,21 @@ func findThingPlace(c *client.Client, name string) (thingPlace, error) {
 			return place, nil
 		}
 		if t.Value == needle || looseName(t.Value) == looseName(needle) {
-			return place, nil
+			exact = append(exact, place)
+			continue
 		}
 		if strings.Contains(looseName(t.Value), looseName(needle)) {
 			partial = append(partial, place)
 		}
+	}
+
+	if len(exact) > 0 {
+		for _, place := range exact {
+			if place.onCanvas {
+				return place, nil
+			}
+		}
+		return exact[0], nil
 	}
 
 	switch len(partial) {

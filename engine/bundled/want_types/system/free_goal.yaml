@@ -109,6 +109,13 @@ wantType:
       label: current
       initialValue: 'planning'
 
+    - name: plan
+      description: The steps the model said it would take, before any of them ran
+      type: array
+      persistent: true
+      label: plan
+      initialValue: []
+
     - name: steps
       description: What has been run, in order, with what it printed
       type: array

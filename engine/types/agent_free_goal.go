@@ -100,33 +100,59 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 	want.SetCurrent("phase", "running")
 	want.StoreLog("[FREE_GOAL] %s", request)
 
+	// No plan is asked for, and that is a measurement rather than a
+	// preference.
+	//
+	// Asked to lay out the steps first, this model plans confidently and
+	// wrongly, and then follows its own plan: told to move a tile it planned
+	// around `gui i set` and spent every step there, where the same model with
+	// no plan picks `thing pin` and is done in one. Same for handing it the
+	// board's contents up front — it planned around the nearest familiar name
+	// rather than the one in the request. An 8k on-device model does better
+	// answering the small question in front of it than the large one about
+	// what it is going to do.
+	//
+	// What that costs is the multi-step goal: "know X" where X does not exist
+	// yet needs a look, a create and a read, and it will do the look and stop.
+	// Ask for the create in so many words and it does that in one step. The
+	// trade is deliberate — see the commit that removed the planning call.
+
 	var steps []freeGoalStep
+	emptyTurns := 0
 	for len(steps) < maxSteps {
-		// Looking for something that is not there is not the end of a request
-		// on this board — it is the middle of one. A want holds an answer, so
-		// "荻窪のWeatherを知りたい" is answered by the want existing, and the
-		// missing want is the next step rather than the reply.
-		//
-		// Decided here rather than asked. Told in the prompt to create what is
-		// missing, the model reported the absence instead; told more firmly,
-		// it reported the absence in my own words. This is a rule of the board
-		// and the board is this side of the conversation.
-		command, args := freeGoalCreateMissing(steps)
-		answer := ""
-		if command == "" {
-			prompt := freeGoalPrompt(want, request, catalogue, steps)
-			reply, err := agent.askPlain(prompt, "", timeout)
-			if err != nil {
-				want.SetCurrent("phase", "failed")
-				want.SetCurrent("error", fmt.Sprintf("モデルが答えませんでした: %v", err))
-				freeGoalStore(want, steps)
-				return nil
-			}
-			command, args, answer = freeGoalParse(reply.Text, catalogue)
-			if command == "" && strings.TrimSpace(answer) == "" {
-				answer = strings.TrimSpace(reply.Text)
-			}
+		prompt := freeGoalPrompt(want, request, catalogue, steps)
+		reply, err := agent.askPlain(prompt, "", timeout)
+		if err != nil {
+			want.SetCurrent("phase", "failed")
+			want.SetCurrent("error", fmt.Sprintf("モデルが答えませんでした: %v", err))
+			freeGoalStore(want, steps)
+			return nil
 		}
+		command, args, answer := freeGoalParse(reply.Text, catalogue)
+		if command == "" && strings.TrimSpace(answer) == "" {
+			answer = strings.TrimSpace(reply.Text)
+		}
+		// An answer before anything has been looked at is not an answer.
+		//
+		// Asked "荻窪はどの星座？" this model will happily reply "荻窪は北辰座
+		// です" — a constellation it made up — without running a command,
+		// because it is a language model and the question sounds answerable.
+		// Nothing here says which command to run; it says that a first turn
+		// has to run one. What is on this board is not in the model.
+		if command == "" && len(steps) == 0 {
+			answer = ""
+		}
+		if command == "" && strings.TrimSpace(answer) == "" {
+			// Nothing usable came back. Ask again — twice — rather than
+			// ending a request on an unreadable reply.
+			emptyTurns++
+			if emptyTurns < 3 {
+				continue
+			}
+			freeGoalFinish(want, steps, freeGoalSummary(steps))
+			return nil
+		}
+		emptyTurns = 0
 		if command == "" {
 			// Nothing runnable came back. What it said is the answer — the job
 			// may simply have been a question.
@@ -196,34 +222,6 @@ func executeFreeGoal(ctx context.Context, want *Want) error {
 	return nil
 }
 
-// freeGoalCreateMissing turns "that want does not exist" into the command that
-// makes it, and returns nothing when the last step was anything else.
-//
-// Only after a read, only once per goal, and only for a lookup by name: the
-// point is to carry on with what was asked, not to create something whenever
-// a command fails. The name looked for becomes the want's name — it is the
-// asker's own words for the thing they want to exist — and the type and the
-// parameters are worked out as they are for any create (freeGoalFixType,
-// freeGoalFillParams).
-func freeGoalCreateMissing(steps []freeGoalStep) (string, string) {
-	if len(steps) == 0 {
-		return "", ""
-	}
-	for _, s := range steps {
-		if s.Command == "wants create" {
-			return "", "" // already made something; not again
-		}
-	}
-	last := steps[len(steps)-1]
-	if !last.Failed || last.Command != "wants get" || strings.TrimSpace(last.Args) == "" {
-		return "", ""
-	}
-	if !strings.Contains(strings.ToLower(last.Output), "not found") {
-		return "", ""
-	}
-	return "wants create", "--name " + strings.Fields(last.Args)[0]
-}
-
 // freeGoalPrompt asks for one thing: the next command, or an answer.
 //
 // The whole question every time — menu, what has been run, the request. The
@@ -291,11 +289,12 @@ func freeGoalPrompt(want *Want, request string, catalogue map[string]freeGoalCom
 		// second time — instead of creating it, which was the whole request.
 		b.WriteString("A command that FAILED because its arguments were wrong (usage, unknown flag, missing\n")
 		b.WriteString("value) should be run again, corrected — not repeated unchanged, not abandoned.\n")
-		b.WriteString("A command that FAILED because what you looked for does not exist has answered you:\n")
-		b.WriteString("do not look again. If the request is to know, see or watch something, CREATE the want\n")
-		b.WriteString("that provides it — on this board that IS the answer, and reporting the absence is not.\n")
-		b.WriteString("Say 'it is not there' only about something that cannot be made, such as a name nobody\n")
-		b.WriteString("on the board has.\n")
+		// No sentence in quotes here, ever. This model reads a quoted example
+		// as a thing to say: given one, it answered "it is not there" to a
+		// question about constellations, to a request to move a tile, and to
+		// a want whose weather it had already read. Rules, not phrasings.
+		b.WriteString("A command that FAILED because what it looked for does not exist has answered you:\n")
+		b.WriteString("do not look for it again.\n")
 		b.WriteString("Otherwise never repeat a command that has already been run above.\n")
 		b.WriteString("ANSWER reports what has been DONE. If the request asked for something to be made,\n")
 		b.WriteString("moved, connected or removed and no command above has done it, you have not finished:\n")
@@ -770,7 +769,19 @@ func (c freeGoalCommand) flagsByName() map[string]freeGoalFlag {
 // writing is confined to what the board is made of, because the same CLI also
 // installs plugins and rewrites config, and neither is canvas work.
 var freeGoalWriteGroups = map[string]bool{
-	"wants": true, "thing": true, "world": true, "state": true, "gui": true, "undo": true,
+	"wants": true, "thing": true, "world": true, "state": true, "undo": true,
+}
+
+// freeGoalWritePaths are single commands allowed in from a group that is
+// otherwise not a goal's business.
+//
+// `gui tile set` moves a want's tile, which is board work. The rest of `gui`
+// drives the viewer's screen — where the cursor is, which page is open — and
+// offering it to a goal asked to MOVE something cost every attempt: `gui i
+// set --x 9 --y -9` reads exactly like the answer, moves the cursor, and
+// leaves the tile where it was.
+var freeGoalWritePaths = map[string]bool{
+	"gui tile set": true,
 }
 
 // freeGoalCatalogue is what the CLI says it can do, asked once per process.
@@ -807,7 +818,7 @@ func freeGoalCatalogue() (map[string]freeGoalCommand, error) {
 		case "read":
 			catalogue[c.Path] = c
 		case "change", "destroy":
-			if freeGoalWriteGroups[group] && c.Path != "gui start" && c.Path != "gui stop" {
+			if freeGoalWriteGroups[group] || freeGoalWritePaths[c.Path] {
 				catalogue[c.Path] = c
 			}
 		}
@@ -845,7 +856,21 @@ func freeGoalMenu(catalogue map[string]freeGoalCommand) string {
 		// --param — so a goal asking for "a weather want for Nakano" could not
 		// have expressed it. --json is left out; it changes the shape of the
 		// answer and never the work.
+		// Only where the flags ARE the command. `wants create` names no
+		// positional argument and everything it needs is a flag, so without
+		// them it cannot be used at all. Everywhere else they doubled the
+		// length of the menu, and a longer menu measurably costs picks: with
+		// flags on every line, "荻窪はどの星座？" stopped running `relations`
+		// and started inventing constellations.
 		var options []string
+		if strings.ContainsAny(c.Use, "<[") {
+			b.WriteString("  " + path + takes)
+			if short := truncateRunes(strings.TrimSpace(c.Short), 64); short != "" {
+				b.WriteString("  — " + short)
+			}
+			b.WriteString("\n")
+			continue
+		}
 		for _, f := range c.Flags {
 			// Eight, not five: flags are listed alphabetically, and five cut
 			// `wants create` off at --name — losing --param and --type, which
