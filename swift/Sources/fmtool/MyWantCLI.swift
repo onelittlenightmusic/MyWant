@@ -190,17 +190,20 @@ struct MyWantCLITool: LocalTool {
     let commands: [MyWantCommand]
     /// What was asked this turn, for the one command that takes a request.
     var request: CurrentRequest?
+    /// Where a request to make or find something is handed back to the caller.
+    var goals: GoalBox?
     /// Whether the offered list includes commands that change the board, which
     /// decides whether the description bothers to say what they are.
     var canWrite: Bool { commands.contains { ($0.risk ?? "read") == "change" } }
     private let binary: String
     private static let outputLimit = 4000
 
-    init?(commands: [MyWantCommand], request: CurrentRequest? = nil) {
+    init?(commands: [MyWantCommand], request: CurrentRequest? = nil, goals: GoalBox? = nil) {
         guard let binary = MyWantCLI.binaryPath(), !commands.isEmpty else { return nil }
         self.binary = binary
         self.commands = commands
         self.request = request
+        self.goals = goals
     }
 
     var description: String {
@@ -286,19 +289,22 @@ struct MyWantCLITool: LocalTool {
             return "mywant cannot do that, or it changes something: \(command)"
         }
         var argv = command.split(separator: " ").map(String.init)
-        // `do` is handed the request itself. Everything else is given what the
-        // model chose; this one command is about the words, and the words are
-        // already known.
+        // `do` is not run here at all: it is handed back, with the words as
+        // they were said.
+        //
+        // It used to shell out to `mywant do`, which made a want of the
+        // request and waited on it — a tile on the board for every question
+        // the robot was asked, and this turn blocked while a second
+        // conversation with the same model tried to start inside it. The
+        // caller has the goal loop and can run it the moment this turn is
+        // over; all it needs from here is the request itself, unparaphrased
+        // (see GoalBox and CurrentRequest).
         if command == "do", let said = await request?.words(), !said.isEmpty {
-            argv.append(said)
-            FileHandle.standardError.write(("[mywant " + argv.joined(separator: " ") + "]\n").data(using: .utf8)!)
-            let result = try MyWantCLI.run(binary, argv, timeout: 180)
-            let text = result.status == 0
-                ? result.out.trimmingCharacters(in: .whitespacesAndNewlines)
-                : "ERROR: " + result.err.trimmingCharacters(in: .whitespacesAndNewlines)
-            return text.count > Self.outputLimit
-                ? String(text.prefix(Self.outputLimit)) + "\n...(truncated)"
-                : text
+            await goals?.hand(over: said)
+            FileHandle.standardError.write(("[goal] " + said + "\n").data(using: .utf8)!)
+            return "Handed to the board, which is working it out now. "
+                + "Say only that you are on it — do not describe what will happen, "
+                + "and do not answer the question yourself."
         }
         if let extra = try? arguments.value(String.self, forProperty: "args"), !extra.isEmpty {
             // One argument, unless the command's usage line asks for more.

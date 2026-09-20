@@ -23,6 +23,32 @@ import FoundationModels
 /// build something the model passed it "AAA-test Weather" — its own shortening
 /// of "AAA-testのWeatherを作りたい", with the verb and the ownership gone. The
 /// request is not the model's to paraphrase when it is right here.
+/// A request the agent handed back rather than carrying out.
+///
+/// Building or finding something on the board takes several commands, and
+/// which ones depends on what the earlier ones found. That is worked out by
+/// the caller — MyWant's own goal loop, which asks a model one short question
+/// at a time and checks every answer against the CLI's own catalogue — not by
+/// an 8k model holding the whole job in its head.
+///
+/// It used to be handed over by running `mywant do`, which made a want of the
+/// request: a tile on the board for every question the robot was asked, and a
+/// second conversation with the same model started from inside this one, each
+/// waiting on the other. Now the tool writes the words down here, the turn
+/// ends, and the caller reads them off the reply and does the work itself.
+actor GoalBox {
+    private var pending = ""
+
+    func hand(over words: String) { pending = words }
+
+    /// The request, and the box is empty again: one handover per turn.
+    func take() -> String {
+        let words = pending
+        pending = ""
+        return words
+    }
+}
+
 actor CurrentRequest {
     private var text = ""
 

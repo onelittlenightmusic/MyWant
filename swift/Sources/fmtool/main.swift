@@ -92,6 +92,7 @@ let myWantCommands = offeredCommands.safe
 let myWantDangerousCommands = offeredCommands.dangerous
 let consentGate = ConsentGate()
 let currentRequest = CurrentRequest()
+let goalBox = GoalBox()
 // What this agent can reach, said once at startup: a wrong answer about the
 // board is a different bug depending on whether the verb was even offered.
 printErr("[fmtool] \(myWantCommands.count) mywant commands offered"
@@ -110,7 +111,7 @@ func makeTools(tracker: CallTracker) -> (localTools: [any LocalTool], tools: [an
     ]
     // One tool for the rest of MyWant, offering the commands this CLI actually
     // has. Absent when there is no CLI here to ask — the other tools still work.
-    if let cli = MyWantCLITool(commands: myWantCommands, request: currentRequest) {
+    if let cli = MyWantCLITool(commands: myWantCommands, request: currentRequest, goals: goalBox) {
         localTools.append(TrackedTool(base: cli, tracker: tracker))
     }
     // What cannot be undone is a tool of its own, so that reaching it is a
@@ -228,7 +229,7 @@ func runEval(count: Int) async {
 // MARK: - Entry point
 
 if serveMode {
-    await serve(makeTools: makeTools, instructions: systemInstructions, consent: consentGate, said: currentRequest)
+    await serve(makeTools: makeTools, instructions: systemInstructions, consent: consentGate, said: currentRequest, goals: goalBox)
 } else if let n = evalCount {
     await runEval(count: n)
 } else {
