@@ -144,6 +144,25 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		return nil
 	}
 
+	// A yes to what a goal proposed is carried out here.
+	//
+	// A goal that found nothing on the board to answer with does not guess and
+	// does not act: it writes down the command that would do it and asks (see
+	// freeGoalAsk). The question reaches the person as a sentence in the chat
+	// and as the board's own two-button overlay, and both answer it by saying
+	// "はい" to the robot — so this is where the yes lands.
+	//
+	// Not left to the model. The goal is over by the time the question is
+	// asked, it ran outside the conversation, and the model was never told
+	// what was proposed: asked "はい" it has nothing to say yes to and says
+	// something agreeable instead. The sentence is right here, and running it
+	// is not a judgement call.
+	if done, reply := answerGoalPending(ctx, want, request); done {
+		recordFMAnswer(want, reply)
+		want.SetCurrent("last_request_at", time.Now().Unix())
+		return nil
+	}
+
 	// The same idempotency log the other providers write. There is no session
 	// id here, so the log is keyed by the request alone.
 	if requestID != "" && isClaudeRequestSent("", requestID) {
@@ -232,6 +251,30 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	want.SetCurrent("cc_streaming_text", "")
 	want.SetCurrent("last_error", "")
 
+	// The agent handed the request back instead of answering it: making or
+	// finding something takes several commands, and which ones depends on what
+	// the earlier ones found. That is worked out here, step by step, with the
+	// model asked one short question at a time — the same loop `mywant do`
+	// runs, run quietly against a want that is never put on the board. What
+	// comes back is the robot's answer, because it is the answer.
+	if goal := strings.TrimSpace(reply.Goal); goal != "" {
+		want.StoreLog("[FM_DO] Working out: %s", goal)
+		want.SetCurrent("cc_streaming_text", "手順を考えています…")
+		RecordCCActivity(want, CCActivityNote, "手順を考えています…")
+		goalAnswer, goalPending := runGoalInline(ctx, goal, func(line string) {
+			RecordCCActivity(want, CCActivityTool, truncateRunes(line, 90))
+		})
+		want.SetCurrent("cc_streaming_text", "")
+		if goalAnswer != "" {
+			answer = goalAnswer
+		}
+		if goalPending != "" {
+			reply.Pending = goalPending
+		}
+		// What a yes would carry out, kept where the next turn can find it.
+		want.SetCurrent("goal_pending", goalPending)
+	}
+
 	if answer == "" {
 		want.StoreLog("[FM_DO] Answered with nothing")
 		return nil
@@ -270,4 +313,97 @@ func recordFMAnswer(want *Want, answer string) {
 	if want.Metadata.Type == "robot" {
 		CharacterSpeaks("robot", answer, "agent")
 	}
+}
+
+// goalYesWords are the ways a person says yes to the robot, in either
+// language, as the two places that ask for one write it: the chat (typed) and
+// the board's confirmation overlay (which says 「はい」 as the person).
+var goalYesWords = []string{"はい", "yes", "y", "ok", "okay", "お願い", "おねがい", "うん", "そう", "やって", "実行"}
+
+// goalNoWords end the offer without running it. Read before the yes list, so
+// "いいえ" is not answered by the "い" in it.
+var goalNoWords = []string{"いいえ", "no", "n", "やめ", "キャンセル", "cancel", "しない", "結構"}
+
+// answerGoalPending carries out what a goal proposed, when this message is the
+// yes it was waiting for.
+//
+// Returns whether the message was an answer to the offer at all. A message
+// that is neither yes nor no is a new subject, and the offer lapses with it:
+// leaving it armed meant a "はい" three questions later ran something the
+// person had long stopped thinking about.
+func answerGoalPending(ctx context.Context, want *Want, message string) (bool, string) {
+	pending := strings.TrimSpace(GetCurrent(want, "goal_pending", ""))
+	if pending == "" {
+		return false, ""
+	}
+	said := strings.ToLower(strings.TrimSpace(message))
+	// Addressed to the robot, so the name is not part of the answer.
+	said = strings.TrimSpace(strings.TrimPrefix(said, "@robot"))
+	clear := func() {
+		want.SetCurrent("goal_pending", "")
+		want.SetCurrent("pending_command", "")
+	}
+	for _, no := range goalNoWords {
+		if strings.HasPrefix(said, no) {
+			clear()
+			return true, "やめておきます。"
+		}
+	}
+	isYes := false
+	for _, yes := range goalYesWords {
+		if strings.HasPrefix(said, yes) {
+			isYes = true
+			break
+		}
+	}
+	if !isYes {
+		// A new subject. The offer is dropped and the message goes on to the
+		// model as it would have anyway.
+		clear()
+		return false, ""
+	}
+
+	command, args := splitPendingCommand(pending)
+	if command == "" {
+		clear()
+		return true, "何を実行するのか分からなくなりました。もう一度お願いします。"
+	}
+	clear()
+	want.StoreLog("[FM_DO] Yes — running %s", pending)
+	RecordCCActivity(want, CCActivityTool, truncateRunes("mywant "+command+" "+args, 90))
+	out, failed := freeGoalRun(ctx, command, args)
+	if failed {
+		return true, "うまくいきませんでした: " + truncateRunes(strings.TrimSpace(firstLine(out)), 160)
+	}
+	done := strings.TrimSpace(out)
+	if done == "" {
+		done = "やりました。"
+	}
+	return true, truncateRunes(done, 300)
+}
+
+// splitPendingCommand takes the sentence a goal wrote down — "mywant wants
+// create --type weather …" — back apart into the command path the catalogue
+// knows and the arguments after it.
+func splitPendingCommand(sentence string) (command, args string) {
+	rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(sentence), "mywant "))
+	if rest == "" {
+		return "", ""
+	}
+	catalogue, _, err := freeGoalCatalogues()
+	if err != nil || len(catalogue) == 0 {
+		return "", ""
+	}
+	// The longest path that this sentence starts with: "wants create" before
+	// "wants", so the subcommand is not read as the first argument.
+	for path := range catalogue {
+		if !strings.HasPrefix(rest, path) {
+			continue
+		}
+		after := strings.TrimSpace(strings.TrimPrefix(rest, path))
+		if len(path) > len(command) {
+			command, args = path, after
+		}
+	}
+	return command, args
 }

@@ -131,6 +131,21 @@ wantType:
     initialValue: ""
     label: current
 
+  - name: goal_pending
+    description: |
+      The command a goal worked out but would not run, waiting on a yes.
+
+      The same sentence as pending_command, kept separately because the two
+      have different authors: pending_command is also written by the agent's
+      own consent gate, which answers its own yes. This one is the robot's, and
+      a yes to it is carried out here (see agent_fm.go) — the goal that
+      proposed it is over, and the model it was proposed through remembers
+      nothing about it.
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
   - name: provider
     description: Active AI provider (claude_code, gemini or fm)
     type: string
