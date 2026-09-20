@@ -91,7 +91,18 @@ enum MyWantCLI {
     /// create want types, none of which is canvas work and all of which a small
     /// model would sometimes pick when it meant something else. So the writing
     /// half is narrowed to what the board is made of.
-    static let boardGroups: Set<String> = ["wants", "thing", "world", "state", "gui", "undo"]
+    /// "do" is in here because making something takes more than one command.
+    ///
+    /// Asked "NakanoのWeatherを作りたい" in chat, this agent ran
+    /// `wants create AAA-test Weather` — the words of the request as
+    /// positional arguments — which the CLI refuses, since a want is created
+    /// with a type and its parameters. Working those out is a handful of small
+    /// questions, and MyWant already does it: `mywant do "<what was asked>"`
+    /// makes a goal want that looks up the type, fills the parameters, runs
+    /// the create, and stops to ask about anything it cannot undo.
+    ///
+    /// So the chat answers questions and hands over the building.
+    static let boardGroups: Set<String> = ["wants", "thing", "world", "state", "gui", "undo", "do"]
 
     /// Starting and stopping the GUI server is not arranging a canvas; it is
     /// turning off the screen the canvas is on.
@@ -177,16 +188,19 @@ private struct BoardEntry: Decodable {
 struct MyWantCLITool: LocalTool {
     let name = "mywant_cli"
     let commands: [MyWantCommand]
+    /// What was asked this turn, for the one command that takes a request.
+    var request: CurrentRequest?
     /// Whether the offered list includes commands that change the board, which
     /// decides whether the description bothers to say what they are.
     var canWrite: Bool { commands.contains { ($0.risk ?? "read") == "change" } }
     private let binary: String
     private static let outputLimit = 4000
 
-    init?(commands: [MyWantCommand]) {
+    init?(commands: [MyWantCommand], request: CurrentRequest? = nil) {
         guard let binary = MyWantCLI.binaryPath(), !commands.isEmpty else { return nil }
         self.binary = binary
         self.commands = commands
+        self.request = request
     }
 
     var description: String {
@@ -219,7 +233,11 @@ struct MyWantCLITool: LocalTool {
         // Still no procedures: which of these to call, and in what order, is
         // the model's to work out.
         + (canWrite
-           ? " Asked to take back, revert or undo what was just done (元に戻す), call 'undo' with no args — "
+           ? " To MAKE something that does not exist yet — a want for a place, a tile for a thing — call "
+             + "'do' with the person's own request as its one argument: args \"NakanoのWeatherを作りたい\". "
+             + "It works out the type and the values and reports back; never try to build one with "
+             + "'wants create' from here. "
+             + "Asked to take back, revert or undo what was just done (元に戻す), call 'undo' with no args — "
              + "never work out the reverse yourself, it is recorded. "
              + "To PLACE or MOVE a thing: 'thing pin' with args \"<name> <x> <y>\"; to take it off the board: "
              + "'thing unpin'. To move a want's tile: 'gui tile set' with args \"<name> <x> <y>\". "
@@ -268,6 +286,20 @@ struct MyWantCLITool: LocalTool {
             return "mywant cannot do that, or it changes something: \(command)"
         }
         var argv = command.split(separator: " ").map(String.init)
+        // `do` is handed the request itself. Everything else is given what the
+        // model chose; this one command is about the words, and the words are
+        // already known.
+        if command == "do", let said = await request?.words(), !said.isEmpty {
+            argv.append(said)
+            FileHandle.standardError.write(("[mywant " + argv.joined(separator: " ") + "]\n").data(using: .utf8)!)
+            let result = try MyWantCLI.run(binary, argv, timeout: 180)
+            let text = result.status == 0
+                ? result.out.trimmingCharacters(in: .whitespacesAndNewlines)
+                : "ERROR: " + result.err.trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.count > Self.outputLimit
+                ? String(text.prefix(Self.outputLimit)) + "\n...(truncated)"
+                : text
+        }
         if let extra = try? arguments.value(String.self, forProperty: "args"), !extra.isEmpty {
             // One argument, unless the command's usage line asks for more.
             //

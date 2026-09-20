@@ -16,6 +16,27 @@ import FoundationModels
 /// alone would let any "はい" in a conversation fire whatever was pending. Both
 /// together mean the words were asked for and then said.
 
+/// What the person actually said this turn.
+///
+/// Held aside because one tool needs the words themselves, not a summary of
+/// them: `mywant do` takes a request and works out the commands, and asked to
+/// build something the model passed it "AAA-test Weather" — its own shortening
+/// of "AAA-testのWeatherを作りたい", with the verb and the ownership gone. The
+/// request is not the model's to paraphrase when it is right here.
+actor CurrentRequest {
+    private var text = ""
+
+    func note(prompt: String) {
+        // The first line only: the server appends the asker's position as a
+        // context line, which is for the model and not part of what was said.
+        text = prompt
+            .components(separatedBy: "\n\n").first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    func words() -> String { text }
+}
+
 /// Whether the person's most recent message was a yes.
 ///
 /// Set from the incoming request (see Serve.swift), not from anything the model
