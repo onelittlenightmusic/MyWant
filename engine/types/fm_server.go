@@ -92,6 +92,12 @@ type fmReply struct {
 	// A command the agent will not run until a person says yes, written as
 	// they would read it. Empty when nothing is waiting.
 	Pending string `json:"pending"`
+	// A request the agent handed back rather than answering: making or
+	// finding something takes several commands in an order that depends on
+	// what the earlier ones found, and that is worked out here (see
+	// runGoalInline) rather than in an 8k model. The words are the person's
+	// own, because the model paraphrasing them is the first thing to go wrong.
+	Goal string `json:"goal"`
 	Error   string `json:"error"`
 }
 

@@ -83,6 +83,93 @@ func freeGoalAsking(want *Want, agent *fmServer, label, prompt string, timeout t
 	return reply, err
 }
 
+// freeGoalScratchKeys are the state keys the loop writes.
+//
+// A want made by the server knows its own state definition (free_goal.yaml)
+// and every key below is declared there with label `current`. A scratch want
+// (see runGoalInline) has no definition behind it, so it is told the same
+// thing here — otherwise every write warns about an undeclared key and counts
+// as a governance violation, which is the right complaint about a real want
+// and noise about this one.
+var freeGoalScratchKeys = []string{
+	"request", "asked_by", "goal_context", "max_steps", "dry_run", "phase",
+	"show_prompts", "prompts", "steps", "pending_reason", "pending_command",
+	"answer", "error",
+}
+
+// runGoalInline carries out one request the way a free_goal want does, without
+// being one.
+//
+// The loop below is written against a Want because that is where a goal keeps
+// what it is doing — the steps, the questions it put to the model, the answer
+// it arrived at. It does not need that want to be ON the board. Asked for in
+// the middle of a conversation with the robot, a goal is a way of answering a
+// question, not a thing somebody wanted kept: one tile per question buried the
+// board in the robot's working, and every one of them a want that has to be
+// deleted by hand.
+//
+// So the want here is a scratch one, alive for the length of the request, and
+// what it arrives at goes back into the conversation. `mywant do` still makes
+// a real want — asked for from a terminal, a goal with no chat around it is
+// the only record there is.
+//
+// `report` is called with each command as it is run, so the person watching
+// the robot think sees the same steps the want would have shown.
+func runGoalInline(ctx context.Context, request string, report func(string)) (answer, pending string) {
+	scratch := &Want{}
+	scratch.Metadata.Name = "goal"
+	scratch.Metadata.Type = "free_goal"
+	scratch.StateLabels = make(map[string]StateLabel, len(freeGoalScratchKeys))
+	for _, key := range freeGoalScratchKeys {
+		scratch.StateLabels[key] = LabelCurrent
+	}
+	scratch.SetCurrent("request", request)
+	scratch.SetCurrent("phase", "planning")
+
+	done := make(chan struct{})
+	if report != nil {
+		// Read off the want rather than threaded through the loop: the steps
+		// are already written there as they happen (see freeGoalStore), and a
+		// reporter passed down would have to be carried through every function
+		// that might run one.
+		go func() {
+			seen := 0
+			tick := time.NewTicker(400 * time.Millisecond)
+			defer tick.Stop()
+			for {
+				select {
+				case <-done:
+					return
+				case <-tick.C:
+					steps := GetCurrent(scratch, "steps", []any{})
+					for i := seen; i < len(steps); i++ {
+						step, ok := steps[i].(map[string]any)
+						if !ok {
+							continue
+						}
+						if command, _ := step["command"].(string); command != "" {
+							report("mywant " + command)
+						}
+					}
+					if len(steps) > seen {
+						seen = len(steps)
+					}
+				}
+			}
+		}()
+	}
+	err := executeFreeGoal(ctx, scratch)
+	close(done)
+	if err != nil {
+		return "", ""
+	}
+	answer = strings.TrimSpace(GetCurrent(scratch, "answer", ""))
+	if answer == "" {
+		answer = strings.TrimSpace(GetCurrent(scratch, "error", ""))
+	}
+	return answer, strings.TrimSpace(GetCurrent(scratch, "pending_command", ""))
+}
+
 // executeFreeGoal carries out one request, step by step.
 func executeFreeGoal(ctx context.Context, want *Want) error {
 	request := GetCurrent(want, "request", "")
