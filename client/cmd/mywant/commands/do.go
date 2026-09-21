@@ -45,6 +45,13 @@ values — and a surprising answer is almost always a surprising question.`,
   mywant do "Parasomniaを(9,-9)に移動して"
   mywant do "weatherの隣に新しいbuttonを置いて" --dry-run`,
 	Args: cobra.MinimumNArgs(1),
+	// Board work, whatever its group says. `do` is how anything gets built on
+	// the canvas, and the on-device agent picks what it may write from this
+	// label alone (see MyWantCLI.offered in fmtool) — without it, the robot
+	// can describe a board and not add anything to it. The goal loop leaves it
+	// out for itself, since a goal asking for a goal is a goal asking for a
+	// goal (see freeGoalCatalogue).
+	Annotations: map[string]string{AnnotationCanvas: "true"},
 	Run: func(cmd *cobra.Command, args []string) {
 		request := strings.Join(args, " ")
 		api := wantsClient()

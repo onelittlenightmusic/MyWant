@@ -47,12 +47,33 @@ type fmServer struct {
 	// is why what it writes to must be safe to write to from anywhere.
 	activityMu sync.Mutex
 	onActivity func(kind, text string)
+
+	// Who runs the commands the agent asks for. Set for the duration of one
+	// question, like onActivity, and called on the goroutine that is reading
+	// the agent's answers — so it must not go back through ask().
+	onRun func(command string, args []string) (ran, ok bool, output string)
+}
+
+// fmAsk is the agent asking to have a command run. It arrives on the same
+// stream as an answer and is told apart by the "ask" field.
+type fmAsk struct {
+	Ask     string   `json:"ask"`
+	Seq     int      `json:"seq"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
 }
 
 // watch installs the commentary handler for one question.
 func (s *fmServer) watch(handler func(kind, text string)) {
 	s.activityMu.Lock()
 	s.onActivity = handler
+	s.activityMu.Unlock()
+}
+
+// broker installs the command runner for one question.
+func (s *fmServer) broker(handler func(command string, args []string) (bool, bool, string)) {
+	s.activityMu.Lock()
+	s.onRun = handler
 	s.activityMu.Unlock()
 }
 
@@ -89,16 +110,13 @@ type fmReply struct {
 	Tool    string `json:"tool"`
 	Calls   int    `json:"calls"`
 	Trimmed bool   `json:"trimmed"`
-	// A command the agent will not run until a person says yes, written as
-	// they would read it. Empty when nothing is waiting.
-	Pending string `json:"pending"`
 	// A request the agent handed back rather than answering: making or
 	// finding something takes several commands in an order that depends on
 	// what the earlier ones found, and that is worked out here (see
 	// runGoalInline) rather than in an 8k model. The words are the person's
 	// own, because the model paraphrasing them is the first thing to go wrong.
-	Goal string `json:"goal"`
-	Error   string `json:"error"`
+	Goal  string `json:"goal"`
+	Error string `json:"error"`
 }
 
 // binaryStamp identifies the build on disk: when it was written, and how big
@@ -261,10 +279,70 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, plain boo
 	return fmReply{}, fmt.Errorf("the on-device agent did not answer: %w", lastErr)
 }
 
-// readReply waits for one line, or gives up. A timeout kills the process: the
-// session is mid-answer and no longer in step with this side, and a fresh one
-// is cheaper than an interleaved one.
+// readReply waits for the answer to one question, running whatever the agent
+// asks for along the way.
+//
+// The stream carries two kinds of line now. Most are the answer, and one turn
+// has exactly one. Before it can come any number of "ask" lines: the agent
+// naming a command and waiting to be told what happened (see Broker.swift in
+// fmtool). This is where the command is judged and run — the agent runs
+// nothing itself — so a deletion never happens because a model decided it had
+// been agreed to.
+//
+// A timeout kills the process: the session is mid-answer and no longer in step
+// with this side, and a fresh one is cheaper than an interleaved one.
 func (s *fmServer) readReply(timeout time.Duration) (fmReply, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		line, err := s.readLine(time.Until(deadline))
+		if err != nil {
+			return fmReply{}, err
+		}
+		var ask fmAsk
+		if json.Unmarshal([]byte(line), &ask) == nil && ask.Ask == "run" {
+			// Our own work is not the agent going quiet, which is what the
+			// timeout is watching for. Running a command on its behalf can
+			// take seconds; the clock waits for us.
+			started := time.Now()
+			s.answer(ask)
+			deadline = deadline.Add(time.Since(started))
+			continue
+		}
+		var reply fmReply
+		if err := json.Unmarshal([]byte(line), &reply); err != nil {
+			return fmReply{}, fmt.Errorf("unreadable answer: %s", line)
+		}
+		return reply, nil
+	}
+}
+
+// answer runs what the agent asked for, or says why it will not, and writes
+// the result back on the agent's stdin.
+func (s *fmServer) answer(ask fmAsk) {
+	s.activityMu.Lock()
+	handler := s.onRun
+	s.activityMu.Unlock()
+
+	ran, ok, output := false, false, "NOT RUN — nothing here is running commands for this question."
+	if handler != nil {
+		ran, ok, output = handler(ask.Command, ask.Args)
+	}
+	reply, err := json.Marshal(map[string]any{
+		"seq": ask.Seq, "ran": ran, "ok": ok, "output": output,
+	})
+	if err != nil {
+		return
+	}
+	if _, err := s.stdin.Write(append(reply, '\n')); err != nil {
+		log.Printf("[fmtool] could not answer an ask: %v", err)
+	}
+}
+
+// readLine waits for one line of the agent's output, or gives up.
+func (s *fmServer) readLine(timeout time.Duration) (string, error) {
+	if timeout <= 0 {
+		return "", fmt.Errorf("no answer in time")
+	}
 	type result struct {
 		line string
 		err  error
@@ -279,15 +357,11 @@ func (s *fmServer) readReply(timeout time.Duration) (fmReply, error) {
 	select {
 	case r := <-done:
 		if r.err != nil {
-			return fmReply{}, r.err
+			return "", r.err
 		}
-		var reply fmReply
-		if err := json.Unmarshal([]byte(strings.TrimSpace(r.line)), &reply); err != nil {
-			return fmReply{}, fmt.Errorf("unreadable answer: %s", strings.TrimSpace(r.line))
-		}
-		return reply, nil
+		return strings.TrimSpace(r.line), nil
 	case <-time.After(timeout):
-		return fmReply{}, fmt.Errorf("no answer within %s", timeout)
+		return "", fmt.Errorf("no answer within %s", timeout)
 	}
 }
 

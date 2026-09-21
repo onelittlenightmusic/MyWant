@@ -133,14 +133,21 @@ wantType:
 
   - name: goal_pending
     description: |
-      The command a goal worked out but would not run, waiting on a yes.
+      The command that was worked out but not run, waiting on a yes. Two things
+      write it: a goal that found nothing and proposed something instead, and
+      the on-device agent reaching for a command that cannot be undone
+      (see fm_broker.go). Both write the same sentence as pending_command.
 
-      The same sentence as pending_command, kept separately because the two
-      have different authors: pending_command is also written by the agent's
-      own consent gate, which answers its own yes. This one is the robot's, and
-      a yes to it is carried out here (see agent_fm.go) — the goal that
-      proposed it is over, and the model it was proposed through remembers
-      nothing about it.
+      Kept separately because pending_command is the question on the screen and
+      this is the answer's instructions. The board's confirmation overlay clears
+      the question as soon as somebody answers it — it has to, since every want
+      with something waiting shows through that one key, a goal from `mywant do`
+      included — and a yes that arrived to find the display already cleared
+      would have nothing left to act on.
+
+      A yes is carried out here (see answerGoalPending in agent_fm.go), never by
+      the model: the work is over by the time the question is asked, and the
+      model it was proposed through remembers nothing about it.
     type: string
     persistent: false
     initialValue: ""
