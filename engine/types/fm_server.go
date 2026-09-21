@@ -136,7 +136,18 @@ func (s *fmServer) start(root string) error {
 		args = append(args, "--root", root)
 	}
 	cmd := exec.Command(s.binary, args...)
-	cmd.Env = sanitizedSubprocessEnv()
+	env := sanitizedSubprocessEnv()
+	// Which mywant to ask. The agent builds its whole tool schema from
+	// `mywant commands --json` at startup, and left to its own search
+	// (/opt/homebrew, /usr/local, ~/.local) it can read that list from a
+	// different build than the one that will run the commands — so the labels
+	// the model chooses from and the labels this side enforces would come from
+	// two binaries. It has no way to work out which one is running this
+	// server; this side does.
+	if binary, err := mywantBinaryPath(); err == nil {
+		env = append(env, "MYWANT_BIN="+binary)
+	}
+	cmd.Env = env
 	if root != "" {
 		cmd.Dir = root
 	}

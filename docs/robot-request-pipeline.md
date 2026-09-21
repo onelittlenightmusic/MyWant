@@ -330,14 +330,30 @@ Swift 側は自分のコメントが挙げる反例「はい、でも先に天�
 git remote add fm-tools-proto https://github.com/onelittlenightmusic/fm-tools-proto.git  # 初回のみ
 git subtree pull --prefix=fmtool fm-tools-proto main
 make fmtool          # bin/fmtool を作り直す
-make install-fmtool  # ~/.local/bin にも置く（後述の探索順のため）
+make install-fmtool  # インストール環境で動かすなら
 ```
 
-取り込み直したら**バイナリも作り直すこと**。`fmToolPath()` の探索順は
-`MYWANT_FM_BIN` → `PATH` → **実行中バイナリの隣** → `~/.local/bin` なので
-(`agent_fm.go:62`)、`bin/` に古い方が残っているとサーバはそちらを掴みます。
-常駐プロセスの方は `binaryStamp`（mtime+size）を毎回見ているので、置き換えれば自分で起動し直します
-(`fm_server.go:223`)。
+取り込み直したら**バイナリも作り直すこと**。常駐プロセスの方は `binaryStamp`（mtime+size）を
+毎回見ているので、置き換えれば自分で起動し直します (`fm_server.go`)。
+
+### どのバイナリが選ばれるか
+
+3つの探索がありますが、**一緒にビルドしたものが一緒に使われる**ように並べてあります。
+
+| 誰が探すか | 順序 |
+|---|---|
+| サーバ → mywant CLI (`mywantBinaryPath`) | `MYWANT_BIN` → **実行中の自分** → PATH → `~/.local/bin` |
+| サーバ → fmtool (`fmToolPath`) | `MYWANT_FM_BIN` → **実行中バイナリの隣** → PATH → `~/.local/bin` |
+| fmtool → mywant CLI (`MyWantCLI.binaryPath`) | `MYWANT_BIN`（**サーバが渡す**） → Homebrew → `~/.local/bin` |
+
+サーバと CLI は**同じバイナリ**（`mywant start` は他のコマンドと同じツリーのサブコマンド）なので、
+実行中の自分を使えばバージョン差は原理的に生じません。以前は PATH が先で、実際に開きました:
+サーバが `bin/` の v0.7.0、走るコマンドは `~/.local/bin` の v0.6.0 で、**ロボットが選ぶコマンド一覧も
+そちらから読まれていました**。その日は偶然一致していただけです。
+
+fmtool には自分から mywant を導く手がかりがないので、サーバが起動時に `MYWANT_BIN` を
+環境変数で渡します (`fm_server.go` の `start`)。これでツール schema を作るカタログと、
+実際にコマンドを走らせるバイナリが必ず同じものになります。
 
 > `agent_fm.go:47-51` のコメントはこの構造自体をこう書いています ——「実験の間は別リポジトリでよかったが、
 > want type が依存するならもう実験ではない。歩調を合わせなければならない2つのリポジトリは、
