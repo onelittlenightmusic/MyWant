@@ -159,7 +159,7 @@ func servedRespond(prompt: String, box: SessionBox, tools: [any LocalTool], trac
 }
 
 /// Read questions off stdin until it closes, answering each on the kept session.
-func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]), instructions: String, consent: ConsentGate? = nil) async {
+func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]), instructions: String, consent: ConsentGate? = nil, said: CurrentRequest? = nil, goals: GoalBox? = nil) async {
     let tracker = CallTracker()
     let (localTools, tools) = makeTools(tracker)
     let box = SessionBox(tools: tools, instructions: instructions)
@@ -203,6 +203,7 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         // message itself, before the model sees it — it is the one thing in the
         // conversation the model does not get to write. See ConsentGate.
         await consent?.note(prompt: prompt)
+        await said?.note(prompt: prompt)
 
         let before = await tracker.count
         let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
@@ -210,6 +211,20 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         let trimmedAfter = await box.finishedTurn()
         var reply: [String: Any] = ["id": id, "text": answer.text, "calls": calls]
         if let tool = answer.tool { reply["tool"] = tool }
+        // What the turn is waiting on, if anything: a command that will not
+        // run until a person says yes. Sent as its own field rather than left
+        // inside the answer, so the asker's screen can show it as a question
+        // with two buttons instead of a sentence to read and retype.
+        if let pending = await consent?.pendingSentence(), !pending.isEmpty {
+            reply["pending"] = pending
+        }
+        // A request handed back rather than answered: the caller runs it (see
+        // GoalBox). Its own field, because what comes back from that work is
+        // the real answer to this turn, and the text above is only the agent
+        // saying it is on it.
+        if let goal = await goals?.take(), !goal.isEmpty {
+            reply["goal"] = goal
+        }
         if answer.trimmed || trimmedAfter { reply["trimmed"] = true }
         writeLine(reply)
     }

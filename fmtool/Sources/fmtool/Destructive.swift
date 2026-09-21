@@ -16,6 +16,53 @@ import FoundationModels
 /// alone would let any "はい" in a conversation fire whatever was pending. Both
 /// together mean the words were asked for and then said.
 
+/// What the person actually said this turn.
+///
+/// Held aside because one tool needs the words themselves, not a summary of
+/// them: `mywant do` takes a request and works out the commands, and asked to
+/// build something the model passed it "AAA-test Weather" — its own shortening
+/// of "AAA-testのWeatherを作りたい", with the verb and the ownership gone. The
+/// request is not the model's to paraphrase when it is right here.
+/// A request the agent handed back rather than carrying out.
+///
+/// Building or finding something on the board takes several commands, and
+/// which ones depends on what the earlier ones found. That is worked out by
+/// the caller — MyWant's own goal loop, which asks a model one short question
+/// at a time and checks every answer against the CLI's own catalogue — not by
+/// an 8k model holding the whole job in its head.
+///
+/// It used to be handed over by running `mywant do`, which made a want of the
+/// request: a tile on the board for every question the robot was asked, and a
+/// second conversation with the same model started from inside this one, each
+/// waiting on the other. Now the tool writes the words down here, the turn
+/// ends, and the caller reads them off the reply and does the work itself.
+actor GoalBox {
+    private var pending = ""
+
+    func hand(over words: String) { pending = words }
+
+    /// The request, and the box is empty again: one handover per turn.
+    func take() -> String {
+        let words = pending
+        pending = ""
+        return words
+    }
+}
+
+actor CurrentRequest {
+    private var text = ""
+
+    func note(prompt: String) {
+        // The first line only: the server appends the asker's position as a
+        // context line, which is for the model and not part of what was said.
+        text = prompt
+            .components(separatedBy: "\n\n").first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    func words() -> String { text }
+}
+
 /// Whether the person's most recent message was a yes.
 ///
 /// Set from the incoming request (see Serve.swift), not from anything the model
@@ -49,6 +96,17 @@ actor ConsentGate {
     }
 
     func clearPending() { pending = nil }
+
+    /// The command a person is being asked about, as they would read it, or ""
+    /// when nothing is waiting.
+    ///
+    /// Read by the serving loop after each turn so the asker's screen can put
+    /// the question as a question — a sentence and two buttons — instead of
+    /// leaving it buried in what the robot said.
+    func pendingSentence() -> String {
+        guard let pending else { return "" }
+        return "mywant " + pending.command + (pending.args.isEmpty ? "" : " " + pending.args)
+    }
 
     /// A short message that is agreement and little else.
     ///
@@ -98,9 +156,14 @@ struct MyWantDestructiveTool: LocalTool {
         DynamicGenerationSchema(
             name: "MyWantDeleteArgs",
             properties: [
+                // With what each one does, because they are near neighbours
+                // that do very different things: asked to DELETE a want the
+                // model chose `wants disconnect`, which removes a connection
+                // between two wants and leaves both standing. Fifteen lines is
+                // a cheap way to tell them apart.
                 .init(
                     name: "command",
-                    description: "Which one. \(commands.prefix(12).map(\.path).joined(separator: ", "))",
+                    description: "Which one:\n" + commands.map { "\($0.path) — \($0.short ?? "")" }.joined(separator: "\n"),
                     schema: DynamicGenerationSchema(name: "MyWantDeleteCommand", anyOf: commands.map(\.path))
                 ),
                 // Required, not optional. Left optional, the model filled in
@@ -133,6 +196,24 @@ struct MyWantDestructiveTool: LocalTool {
         if extra.isEmpty, let remembered = await gate.pendingArgs(for: command) {
             extra = remembered
         }
+        // The name has to be one the board has, and spelled its way.
+        //
+        // Asked to delete "NakanoのWeather" the model wrote "Nakanoのweather",
+        // and a confirmation was offered for a want that does not exist: the
+        // person would have said yes to nothing. The board's own names are one
+        // command away, so they are checked — and a near miss is corrected
+        // rather than refused, since the difference is usually a capital.
+        if !extra.isEmpty {
+            switch MyWantCLI.boardName(matching: extra) {
+            case .exact(let name), .corrected(let name):
+                extra = name
+            case .unknown(let candidates):
+                return "NOT DONE — nothing on the board is called \"\(extra)\". "
+                    + (candidates.isEmpty
+                       ? "Check the name with 'board' before trying again."
+                       : "Did you mean: \(candidates.joined(separator: ", "))?")
+            }
+        }
         if !extra.isEmpty { argv.append(extra) }
         let sentence = "mywant " + argv.joined(separator: " ")
 
@@ -152,11 +233,16 @@ struct MyWantDestructiveTool: LocalTool {
             // that asked and got no answer should wait rather than ask again.
             await gate.remember(command: command, args: extra)
             FileHandle.standardError.write("[mywant WOULD RUN \(sentence) — waiting for a yes]\n".data(using: .utf8)!)
-            return "NOT DONE — nothing was run. This would run `\(sentence)`, and it cannot be undone. "
-                + "Say exactly that to the person, in their language, and ask them to answer yes or no. "
+            // Worded so it cannot be read as a failure. "It cannot be
+            // undone" came back to the person as "the want cannot be
+            // deleted" — the model paraphrased a warning into an
+            // impossibility, and the person believed it and stopped.
+            return "WAITING FOR A YES — nothing has been tried yet, and nothing has failed. "
+                + "Ask the person, in their language, whether to run this exact command now: `\(sentence)`. "
+                + "Tell them it is permanent. Do not say it failed, and do not say it is impossible. "
                 + (claimed && !consented
-                   ? "They have not said yes yet in their own message."
-                   : "Then call this again with confirmed=true.")
+                   ? "They have not answered yes in their own message yet."
+                   : "When they answer yes, call this again with confirmed=true.")
         }
 
         await gate.clearPending()

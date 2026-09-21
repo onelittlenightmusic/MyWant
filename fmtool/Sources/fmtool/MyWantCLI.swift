@@ -91,7 +91,18 @@ enum MyWantCLI {
     /// create want types, none of which is canvas work and all of which a small
     /// model would sometimes pick when it meant something else. So the writing
     /// half is narrowed to what the board is made of.
-    static let boardGroups: Set<String> = ["wants", "thing", "world", "state", "gui", "undo"]
+    /// "do" is in here because making something takes more than one command.
+    ///
+    /// Asked "NakanoのWeatherを作りたい" in chat, this agent ran
+    /// `wants create AAA-test Weather` — the words of the request as
+    /// positional arguments — which the CLI refuses, since a want is created
+    /// with a type and its parameters. Working those out is a handful of small
+    /// questions, and MyWant already does it: `mywant do "<what was asked>"`
+    /// makes a goal want that looks up the type, fills the parameters, runs
+    /// the create, and stops to ask about anything it cannot undo.
+    ///
+    /// So the chat answers questions and hands over the building.
+    static let boardGroups: Set<String> = ["wants", "thing", "world", "state", "gui", "undo", "do"]
 
     /// Starting and stopping the GUI server is not arranging a canvas; it is
     /// turning off the screen the canvas is on.
@@ -131,20 +142,68 @@ enum MyWantCLI {
     }
 }
 
+/// What the board calls something, if it calls anything that.
+enum BoardName {
+    case exact(String)
+    /// The same name, spelled the way the board spells it.
+    case corrected(String)
+    /// Nothing close enough, with whatever was nearest for the asking.
+    case unknown([String])
+}
+
+extension MyWantCLI {
+    /// Matches a name against everything standing on the board.
+    ///
+    /// Exactly first, then ignoring case — "Nakanoのweather" and
+    /// "NakanoのWeather" are the same want and only one of them exists — then
+    /// by containment, which is what turns "Nakano" into a list to choose
+    /// from rather than a silent miss.
+    static func boardName(matching name: String) -> BoardName {
+        let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !wanted.isEmpty, let binary = binaryPath(),
+              let result = try? run(binary, ["board", "--json"], timeout: 20),
+              result.status == 0,
+              let data = result.out.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([BoardEntry].self, from: data)
+        else { return .exact(name) } // no board to check against: let the CLI answer
+
+        let names = entries.map(\.name)
+        if names.contains(wanted) { return .exact(wanted) }
+        if let same = names.first(where: { $0.lowercased() == wanted.lowercased() }) {
+            return .corrected(same)
+        }
+        let near = names.filter {
+            $0.lowercased().contains(wanted.lowercased()) || wanted.lowercased().contains($0.lowercased())
+        }
+        if near.count == 1 { return .corrected(near[0]) }
+        return .unknown(Array(near.prefix(5)))
+    }
+}
+
+private struct BoardEntry: Decodable {
+    let name: String
+}
+
 /// One tool for every command the CLI can be asked to read.
 struct MyWantCLITool: LocalTool {
     let name = "mywant_cli"
     let commands: [MyWantCommand]
+    /// What was asked this turn, for the one command that takes a request.
+    var request: CurrentRequest?
+    /// Where a request to make or find something is handed back to the caller.
+    var goals: GoalBox?
     /// Whether the offered list includes commands that change the board, which
     /// decides whether the description bothers to say what they are.
     var canWrite: Bool { commands.contains { ($0.risk ?? "read") == "change" } }
     private let binary: String
     private static let outputLimit = 4000
 
-    init?(commands: [MyWantCommand]) {
+    init?(commands: [MyWantCommand], request: CurrentRequest? = nil, goals: GoalBox? = nil) {
         guard let binary = MyWantCLI.binaryPath(), !commands.isEmpty else { return nil }
         self.binary = binary
         self.commands = commands
+        self.request = request
+        self.goals = goals
     }
 
     var description: String {
@@ -177,7 +236,11 @@ struct MyWantCLITool: LocalTool {
         // Still no procedures: which of these to call, and in what order, is
         // the model's to work out.
         + (canWrite
-           ? " Asked to take back, revert or undo what was just done (元に戻す), call 'undo' with no args — "
+           ? " To MAKE something that does not exist yet — a want for a place, a tile for a thing — call "
+             + "'do' with the person's own request as its one argument: args \"NakanoのWeatherを作りたい\". "
+             + "It works out the type and the values and reports back; never try to build one with "
+             + "'wants create' from here. "
+             + "Asked to take back, revert or undo what was just done (元に戻す), call 'undo' with no args — "
              + "never work out the reverse yourself, it is recorded. "
              + "To PLACE or MOVE a thing: 'thing pin' with args \"<name> <x> <y>\"; to take it off the board: "
              + "'thing unpin'. To move a want's tile: 'gui tile set' with args \"<name> <x> <y>\". "
@@ -226,6 +289,23 @@ struct MyWantCLITool: LocalTool {
             return "mywant cannot do that, or it changes something: \(command)"
         }
         var argv = command.split(separator: " ").map(String.init)
+        // `do` is not run here at all: it is handed back, with the words as
+        // they were said.
+        //
+        // It used to shell out to `mywant do`, which made a want of the
+        // request and waited on it — a tile on the board for every question
+        // the robot was asked, and this turn blocked while a second
+        // conversation with the same model tried to start inside it. The
+        // caller has the goal loop and can run it the moment this turn is
+        // over; all it needs from here is the request itself, unparaphrased
+        // (see GoalBox and CurrentRequest).
+        if command == "do", let said = await request?.words(), !said.isEmpty {
+            await goals?.hand(over: said)
+            FileHandle.standardError.write(("[goal] " + said + "\n").data(using: .utf8)!)
+            return "Handed to the board, which is working it out now. "
+                + "Say only that you are on it — do not describe what will happen, "
+                + "and do not answer the question yourself."
+        }
         if let extra = try? arguments.value(String.self, forProperty: "args"), !extra.isEmpty {
             // One argument, unless the command's usage line asks for more.
             //
