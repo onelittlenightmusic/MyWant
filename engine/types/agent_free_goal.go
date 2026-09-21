@@ -982,14 +982,21 @@ func freeGoalAwaitResult(ctx context.Context, args string) string {
 
 // freeGoalRun runs one command through the CLI, and reports whether it failed.
 func freeGoalRun(ctx context.Context, command, args string) (string, bool) {
+	return freeGoalRunArgv(ctx, command, strings.Fields(args))
+}
+
+// freeGoalRunArgv is the same with the arguments already separated.
+//
+// Which matters for one caller: the on-device agent decides where the spaces
+// in its arguments are, and a want called "transit search" is one of them
+// (see fm_broker.go). Splitting it again here made the CLI refuse a command
+// that named something real.
+func freeGoalRunArgv(ctx context.Context, command string, args []string) (string, bool) {
 	binary, err := mywantBinaryPath()
 	if err != nil {
 		return fmt.Sprintf("mywant が見つかりません: %v", err), true
 	}
-	argv := strings.Fields(command)
-	if args != "" {
-		argv = append(argv, strings.Fields(args)...)
-	}
+	argv := append(strings.Fields(command), args...)
 	runCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(runCtx, binary, argv...).CombinedOutput()
@@ -1110,6 +1117,12 @@ func freeGoalCatalogue() (map[string]freeGoalCommand, error) {
 	catalogue := map[string]freeGoalCommand{}
 	for _, c := range all {
 		if c.Path == "commands" || c.Path == "" || !c.Canvas {
+			continue
+		}
+		// `do` is board work — the CLI says so, and the on-device agent needs
+		// it — but not for a goal: `do` makes a goal, and a goal that can ask
+		// for one can spend the afternoon making them.
+		if c.Path == "do" {
 			continue
 		}
 		// Destroying is never offered in the list: it goes through the offer,

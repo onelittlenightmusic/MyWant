@@ -187,9 +187,9 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	if timeout <= 0 {
 		timeout = fmDefaultTimeoutSeconds * time.Second
 	}
-	// The context is the want's cycle; the wait for an answer is the timeout
-	// below, which the served agent is given directly.
-	_ = ctx
+	// The context is the want's cycle: it carries the commands the broker runs
+	// on the agent's behalf. The wait for an answer is the timeout below, which
+	// the served agent is given directly.
 
 	want.StoreLog("[FM_DO] Asking the on-device model: %s", binary)
 	want.SetCurrent("last_request_at", time.Now().Unix())
@@ -204,8 +204,16 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	server.watch(func(kind, text string) {
 		RecordCCActivity(want, kind, truncateRunes(text, 90))
 	})
+	// Every command the agent wants run comes back through here first. It runs
+	// none itself any more: what is safe, what is the board's and what needs a
+	// person are all this side's to say, and saying them twice in two languages
+	// is how the two answers came apart. See fm_broker.go.
+	server.broker(func(command string, args []string) (bool, bool, string) {
+		return fmBrokerRun(ctx, want, request, command, args)
+	})
 	reply, err := server.ask(request, root, timeout)
 	server.watch(nil)
+	server.broker(nil)
 	answer := strings.TrimSpace(reply.Text)
 	notes := reply.Error
 
@@ -268,11 +276,11 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		if goalAnswer != "" {
 			answer = goalAnswer
 		}
-		if goalPending != "" {
-			reply.Pending = goalPending
-		}
 		// What a yes would carry out, kept where the next turn can find it.
-		want.SetCurrent("goal_pending", goalPending)
+		if goalPending != "" {
+			want.SetCurrent("goal_pending", goalPending)
+			want.SetCurrent("pending_command", goalPending)
+		}
 	}
 
 	if answer == "" {
@@ -282,11 +290,11 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 
 	recordFMAnswer(want, answer)
 	want.SetCurrent("last_response_raw", answer)
-	// What the robot is waiting on, where a screen can see it: a command it
-	// will not run until somebody agrees. Said in the chat too, but a sentence
-	// in a conversation is something to read and retype, and this is something
-	// to answer — see the confirmation overlay in the dashboard.
-	want.SetCurrent("pending_command", reply.Pending)
+	// pending_command is not set here: whatever is waiting was written the
+	// moment it came up — by the broker when the agent reached for something
+	// destructive, or by the goal loop when it had a proposal — and a blanket
+	// write at the end of the turn would clear it again. Where a screen can
+	// see it, either way: see the confirmation overlay in the dashboard.
 
 	if requestID != "" {
 		writeClaudeRequestLog("", requestID, "sent")
@@ -315,17 +323,107 @@ func recordFMAnswer(want *Want, answer string) {
 	}
 }
 
-// goalYesWords are the ways a person says yes to the robot, in either
-// language, as the two places that ask for one write it: the chat (typed) and
-// the board's confirmation overlay (which says 「はい」 as the person).
-var goalYesWords = []string{"はい", "yes", "y", "ok", "okay", "お願い", "おねがい", "うん", "そう", "やって", "実行"}
+// The ways a person says yes to the robot, and the ways they say no.
+//
+// One list, in one language's worth of code, because there used to be two: one
+// here and one in the on-device agent's own gate, and they had stopped agreeing
+// about どうぞ, いいよ, そう and 実行. Both are read the same way now — this is
+// the only place a yes is recognised at all (see fm_broker.go for why the agent
+// no longer has an opinion about it).
+//
+// Both spellings of the question end up here: typed into the chat, or clicked
+// on the board's confirmation overlay, which says 「はい」 as the person.
+var goalYesWords = []string{
+	"はい", "うん", "ええ", "そう", "そうして", "どうぞ", "いいよ", "お願い", "おねがい",
+	"やって", "実行", "消して", "削除して", "ok", "okay", "yes", "y", "sure",
+	"go ahead", "do it", "please",
+}
 
 // goalNoWords end the offer without running it. Read before the yes list, so
 // "いいえ" is not answered by the "い" in it.
-var goalNoWords = []string{"いいえ", "no", "n", "やめ", "キャンセル", "cancel", "しない", "結構"}
+var goalNoWords = []string{"いいえ", "no", "n", "やめ", "キャンセル", "cancel", "しない", "結構", "だめ"}
 
-// answerGoalPending carries out what a goal proposed, when this message is the
+// goalPoliteTails are what a yes may be wearing and still be only a yes.
+var goalPoliteTails = []string{"します", "してください", "して", "ください", "よ", "ね", "です", "ます", "!", "！"}
+
+// isOnlyConsent reports whether a message is agreement and nothing else.
+//
+// The distinction that matters: 「はい」 is consent, and
+// 「はい、でも先に天気を見せて」 is a new request that happens to start with one.
+// The agent's old gate claimed to make it and did not — it accepted any short
+// message beginning with a yes, and that example is thirteen characters — so a
+// delete could be confirmed by a sentence that was asking for something else.
+//
+// The rule: cut the message at its punctuation, and every piece that is left
+// has to be a yes. A piece that is anything else means the person moved on, and
+// what was waiting lapses rather than fires.
+func isOnlyConsent(said string) bool {
+	pieces := strings.FieldsFunc(said, func(r rune) bool {
+		return strings.ContainsRune("、。，．,.!！?？\n", r)
+	})
+	found := false
+	for _, piece := range pieces {
+		piece = strings.TrimSpace(piece)
+		if piece == "" {
+			continue
+		}
+		if !isYesWord(piece) {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+// isYesWord reports whether one piece is a yes, politeness and all.
+//
+// The piece has to come apart into nothing but yes: a yes word, a yes wearing a
+// tail ("はいです"), or two of them run together ("はいお願いします"). Anything
+// left over that is not one of those makes it not a yes — which is what keeps
+// "はいでも天気を見せて" out, punctuation or no punctuation.
+//
+// The length cap is a stop on the recursion below, not the rule: a yes is
+// short, and the rule that decides is the decomposition, not the size. (The
+// gate this replaces had the cap AS the rule, and a thirteen-character request
+// walked straight through it.)
+func isYesWord(piece string) bool {
+	piece = strings.TrimSpace(piece)
+	if piece == "" || len(piece) > 64 {
+		return false
+	}
+	for _, yes := range goalYesWords {
+		if piece == yes {
+			return true
+		}
+	}
+	for _, tail := range goalPoliteTails {
+		if len(piece) > len(tail) && strings.HasSuffix(piece, tail) {
+			if isYesWord(strings.TrimSuffix(piece, tail)) {
+				return true
+			}
+		}
+	}
+	for _, yes := range goalYesWords {
+		if len(piece) > len(yes) && strings.HasPrefix(piece, yes) {
+			if isYesWord(piece[len(yes):]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// answerGoalPending carries out whatever is waiting, when this message is the
 // yes it was waiting for.
+//
+// The one place a yes is acted on. Two things put something here — a goal that
+// found nothing and proposed a command (freeGoalAsk), and the agent reaching
+// for something that cannot be undone (fmBrokerRun) — and both write the same
+// sentence to the same key, so there is nothing to tell apart here.
+//
+// Not left to the model, in either case. The work is over by the time the
+// question is asked and the agent was never told what was proposed: asked
+// "はい" it has nothing to say yes to and says something agreeable instead.
 //
 // Returns whether the message was an answer to the offer at all. A message
 // that is neither yes nor no is a new subject, and the offer lapses with it:
@@ -336,7 +434,12 @@ func answerGoalPending(ctx context.Context, want *Want, message string) (bool, s
 	if pending == "" {
 		return false, ""
 	}
+	// What was said, and only that: the server appends the asker's position
+	// after a blank line, which is for the model and not part of the answer.
 	said := strings.ToLower(strings.TrimSpace(message))
+	if first, _, found := strings.Cut(said, "\n\n"); found {
+		said = strings.TrimSpace(first)
+	}
 	// Addressed to the robot, so the name is not part of the answer.
 	said = strings.TrimSpace(strings.TrimPrefix(said, "@robot"))
 	clear := func() {
@@ -349,14 +452,7 @@ func answerGoalPending(ctx context.Context, want *Want, message string) (bool, s
 			return true, "やめておきます。"
 		}
 	}
-	isYes := false
-	for _, yes := range goalYesWords {
-		if strings.HasPrefix(said, yes) {
-			isYes = true
-			break
-		}
-	}
-	if !isYes {
+	if !isOnlyConsent(said) {
 		// A new subject. The offer is dropped and the message goes on to the
 		// model as it would have anyway.
 		clear()
@@ -382,15 +478,21 @@ func answerGoalPending(ctx context.Context, want *Want, message string) (bool, s
 	return true, truncateRunes(done, 300)
 }
 
-// splitPendingCommand takes the sentence a goal wrote down — "mywant wants
+// splitPendingCommand takes the sentence that was written down — "mywant wants
 // create --type weather …" — back apart into the command path the catalogue
 // knows and the arguments after it.
+//
+// Against the WHOLE catalogue, destroying included. The goal loop's own menu
+// leaves those out, because the loop may never choose one — but what is waiting
+// for a yes is very often exactly one of them, and read back against that menu
+// a deletion came apart into nothing: the person said yes and was told
+// "何を実行するのか分からなくなりました".
 func splitPendingCommand(sentence string) (command, args string) {
 	rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(sentence), "mywant "))
 	if rest == "" {
 		return "", ""
 	}
-	catalogue, _, err := freeGoalCatalogues()
+	catalogue, err := fmEveryCommand()
 	if err != nil || len(catalogue) == 0 {
 		return "", ""
 	}

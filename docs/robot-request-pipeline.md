@@ -17,11 +17,13 @@
 | 決めること | 決める場所 |
 |---|---|
 | 日本語/英語の理解・返答の文面 | fmtool（モデル） |
+| どのコマンドをどの引数で呼ぶか | fmtool（モデル） |
 | どの CLI コマンドが存在するか | mywant CLI `mywant commands --json` |
 | そのコマンドが read / change / destroy か | mywant CLI（`commandRisk`） |
-| コマンドを実際に走らせてよいか | mywant（カタログ照合後） |
+| 盤面のコマンドかどうか | mywant CLI（`commandCanvas`） |
+| **コマンドを実際に走らせるか** | **mywant（`fmBrokerRun`）** — fmtool は1つも実行しない |
 | 何ステップで打ち切るか | mywant（`max_steps`、同一コマンド反復検出） |
-| 「はい」が本人の発話かどうか | fmtool（`ConsentGate`）と mywant（`answerGoalPending`）の両方 |
+| 「はい」が本人の発話かどうか | mywant（`isOnlyConsent`）— 1箇所のみ |
 | 答えをどこに書くか（吹き出し・履歴・カード） | mywant |
 
 ## 全体シーケンス
@@ -46,8 +48,16 @@ sequenceDiagram
         F->>M: planRespond（最大3ステップの計画→逐次実行）
     end
     M-->>F: mywant_cli(command,args) を選択
-    F->>C: exec mywant <command> <args>
-    C-->>F: stdout（4000字で切る）
+    F-->>R: {"ask":"run","command","args"}
+    R->>R: カタログ照合 → risk 判定
+    alt risk = destroy
+        R->>R: 実行しない。pending_command に書いて人に聞く
+        R-->>F: {"ran":false,"output":"NOT RUN, 人に聞いています"}
+    else read / change
+        R->>C: exec mywant <command> <args>
+        C-->>R: stdout
+        R-->>F: {"ran":true,"ok":true,"output":"…"}
+    end
     F-->>R: {"text","tool","calls","pending","goal"}
     alt goal が返ってきた（作る/探す系）
         R->>R: runGoalInline（scratch want で goal ループ）
@@ -112,7 +122,21 @@ sequenceDiagram
 | タイムアウト | 既定120秒。超えたらプロセスごと kill（途中応答と噛み合わないため） |
 | 実況 | fmtool の **stderr** を1行ずつ読み、`[mywant ...]` / `[tool: ...]` を `RecordCCActivity` に流す。「考えています」しか出ないのを避けるため |
 
-リクエスト JSON は2種類:
+ストリームに流れる行は3種類あります。mywant → fmtool が質問、fmtool → mywant が
+**許可の要求**と**答え**です。`readReply` は答えが来るまでの間、要求を捌き続けます。
+
+```
+mywant → fmtool  {"id":1,"prompt":"荻窪はどこ？"}
+fmtool → mywant  {"ask":"run","seq":1,"command":"point","args":["荻窪"]}
+mywant → fmtool  {"seq":1,"ran":true,"ok":true,"output":"The robot is standing on 荻窪 …"}
+fmtool → mywant  {"id":1,"text":"荻窪はここです (6, 0).","tool":"mywant_cli","calls":1}
+```
+
+コマンドを走らせている間は**タイムアウトの時計を止めます**（`readReply` が自分の所要時間を
+deadline に足し直す）。タイムアウトが見張っているのは「エージェントが黙ったこと」であって、
+こちらが代わりに働いている時間ではないからです。
+
+質問 JSON は2種類:
 
 | | `ask`（通常） | `askPlain` |
 |---|---|---|
@@ -145,11 +169,19 @@ sequenceDiagram
 
 | ツール | 中身 |
 |---|---|
-| `mywant_cli` | risk=read の全部 ＋ risk=change のうち**盤面グループ**のみ (`boardGroups`) |
-| `mywant_delete` | risk=destroy のみ。**同意ゲート付き**の別ツール |
+| `mywant_cli` | risk=read の全部 ＋ **canvas=true なら change も destroy も**（+ `do`） |
 | `mywant_start` / `mywant_deploy` | サーバ起動・レシピデプロイ |
 
-オファーから外すもの: `commands` 自身、`... where`（`point` が上位互換）、`gui start|stop`。
+**削除用の別ツールはもうありません。** かつては `mywant_delete` が
+「モデルが `confirmed=true` と言い、かつ人の直前発話が yes」という二重ゲートを持っていましたが、
+1段目はモデルの自己採点なので2段目が必要になる、という構造でした。いまは実行者が mywant なので
+モデルに同意を聞くこと自体をやめ、ツールは1つです。
+
+盤面かどうかの判断も CLI の `canvas` ラベルをそのまま使います（Swift 側の `boardGroups` は削除）。
+`do` だけ canvas=false なので明示的に足しています — `do` は盤面を作る唯一の入口だからです。
+`gui start|stop` や `config`・`custom` は canvas=false なので自動的に外れます。
+
+オファーから外すもの: `commands` 自身、`... where`（`point` が上位互換）。
 
 `call()` (`MyWantCLI.swift:284`) がやる整形:
 
@@ -166,7 +198,7 @@ sequenceDiagram
 fmtool は `GoalBox` に**人の発話そのまま**を書いてターンを終え、返信 JSON に `goal` フィールドを載せます
 (`MyWantCLI.swift:302-308`)。
 
-理由は2つ、どちらも実測された失敗です (`Destructive.swift:26-38`, mywant commit `b8239e41`)。
+理由は2つ、どちらも実測された失敗です (`Handback.swift`, mywant commit `b8239e41`)。
 
 - 以前は `mywant do` を shell out していた → **質問するたびに free_goal の want が盤面に残った**。
 - しかもそれは同じ8kモデルとの**2本目の会話を1本目の内部から始める**ことで、互いに待ち合った。
@@ -220,25 +252,38 @@ flowchart TD
 見せます。全 read コマンドを入れたら achievements・agents・config が先頭に並び、盤面のコマンドが埋もれたため。
 モデルが `more` と言ったときだけ全CLIに広げます。
 
-### 7. 「はい」はどこで読まれるか
+### 7. 「はい」は1箇所でだけ読まれる
 
-同意の判定が**2箇所に独立して存在します**。どちらも「モデルが書けない唯一の信号 = 人の直前の発話」を見ます。
+`answerGoalPending` (`agent_fm.go`) だけです。**モデルには同意を聞きません。**
 
-| | fmtool 側 `ConsentGate` | mywant 側 `answerGoalPending` |
-|---|---|---|
-| 場所 | `Destructive.swift:70` | `agent_fm.go:334` |
-| 対象 | `mywant_delete` ツール（destroy 系） | goal ループが出した提案 (`goal_pending`) |
-| 条件 | モデルが `confirmed=true` **かつ** 人の直前発話が yes | 直前発話が yes（no なら破棄、無関係な発話でも失効） |
-| 実行者 | fmtool が exec | mywant が `freeGoalRun` |
-| 理由 | 片方だけでは「モデルの自己採点」か「会話中のどの"はい"でも発火」になる | goal は会話の外で終わっており、モデルは何を提案したか知らない |
+待ち状態を書くのは2つ — goal ループの提案 (`freeGoalAsk`) と、エージェントが
+destroy に手を伸ばしたとき (`fmBrokerRun`) — ですが、どちらも同じ文を同じキーに書くので、
+読む側は区別しません。
 
-人から見ると、どちらも同じ形で届きます:
+```
+待ちを書く ──┬─ freeGoalAsk      （goal が「まだありません。作れます」）
+             └─ fmBrokerRun      （エージェントが削除を選んだ）
+                     ↓  goal_pending / pending_command に同じ1文
+人が答える ──┬─ チャットに「はい」
+             └─ Yes/No オーバーレイ（本人として「@robot はい」と発話する）
+                     ↓
+          answerGoalPending  ← ここだけ。モデルは通らない
+```
 
-- チャットの文章（「`mywant wants delete X` は元に戻せません。実行しますか？」）
-- want state の `pending_command` を読む **Yes/No オーバーレイ**
-  (mywant-gui `web/src/components/dashboard/PendingConfirmOverlay.tsx`)。
-  Yes は本人として `@robot はい` と発話する — エージェントが待っているのは
-  フラグではなく**人の発話そのもの**だから。
+以前は fmtool 側にも `ConsentGate` があり、同意語のリストが2つ存在しました。すでに食い違っていて、
+Swift 側は自分のコメントが挙げる反例「はい、でも先に天気を見せて」を同意として通していました
+（13文字なので24字ガードを抜ける）。いまのルールは長さではなく**分解**です:
+
+- 句読点で切り、残った断片が**すべて** yes であること (`isOnlyConsent`)
+- 断片は yes 語そのもの、丁寧語の尻尾付き（「はいです」）、yes の連結（「はいお願いします」）のいずれか
+- 1つでも別の内容が混じれば同意ではない。待ちは失効し、その発話は新しい依頼としてモデルへ行く
+
+「いいえ」系は先に読まれ、待ちを捨てて何も実行しません。
+
+`pending_command` と `goal_pending` の2キーは今も別物です。前者は**画面に出ている質問**で、
+答えた瞬間にクライアントが消してよいもの（`mywant do` の goal want も同じキーで表示される）。
+後者は**yes が実行する文**で、この want だけのもの。表示を楽観的に消しても、答えが
+実行対象を見失わないようにするためです。
 
 ### 8. 答えの着地
 
@@ -255,7 +300,7 @@ flowchart TD
 |---|---|
 | fmtool セッション | 6ターンごと、かつ溢れたときに transcript を trim。直近6エントリを**プロンプト境界から**繰り越す（途中で切ると "Unable to tokenize prompt"） |
 | ツールスキーマ | コマンド説明は載せず path のみ。要約は先頭24件 |
-| `mywant_cli` 出力 | 4000字 / `mywant_delete` 2000字で切る |
+| `mywant_cli` 出力 | 4000字で切る（mywant 側も `freeGoalOutputLimit` で1200字）|
 | goal ループ出力 | 1200字で保持、プロンプトには400字 |
 | goal プロンプト内の出力 | `freeGoalRelevantOutput` — 依頼が名指しした名前を含む行を**先頭に**並べる（`board` の40行のうち先頭2行しか見えず、見えていた別の駅を答えた事例） |
 | 計画 | 最大3ステップ |
@@ -263,9 +308,12 @@ flowchart TD
 ## リポジトリ境界と、同期のしかた
 
 `mywant/fmtool/` は fm-tools-proto を `git subtree` で取り込んだコピーです。**歩調が合っていないと
-静かに壊れる**関係にあります: Go 側は返信の `goal` / `pending` を読む前提で書かれていて
-(`fm_server.go:94`, `agent_fm.go:260`)、それを送らない古い fmtool と組み合わせても
-エラーにはならず、ただハンドバックが起きなくなるだけだからです。
+静かに壊れる**関係にあります。いまは両方向に壊れます:
+
+- 古い fmtool + 新しい mywant → エージェントが自分でコマンドを実行してしまう（門番を通らない）
+- 新しい fmtool + 古い mywant → `ask` に誰も答えず、ターンがタイムアウトまで固まる
+
+どちらもエラーメッセージは出ません。**必ず対で更新すること。**
 
 実際に一度開きました。取り込みが `a88e408` で止まっている間に proto が3コミット進み、
 `make fmtool` が作るバイナリは `goal` も `pending` も送らない状態でした。
@@ -303,10 +351,11 @@ make install-fmtool  # ~/.local/bin にも置く（後述の探索順のため�
 | robot want / phase | `engine/types/robot_types.go`, `claude_code_types.go`, `engine/bundled/want_types/system/robot.yaml` |
 | slash command 分岐 | `engine/types/robot_slash_command.go` |
 | プロバイダ選択 | `engine/types/agent_claude_code.go` |
-| 端末内モデル呼び出し | `engine/types/agent_fm.go` |
+| 端末内モデル呼び出し・同意 | `engine/types/agent_fm.go` |
+| 実行の門番 | `engine/types/fm_broker.go` ↔ `fmtool/Sources/fmtool/Broker.swift` |
 | 常駐プロセス管理 | `engine/types/fm_server.go` |
 | goal ループ | `engine/types/agent_free_goal.go`, `free_goal_types.go` |
 | コマンドカタログ（risk/kind/canvas） | `client/cmd/mywant/commands/commands.go` |
 | `mywant do` | `client/cmd/mywant/commands/do.go` |
-| fmtool 本体 | `fmtool/Sources/fmtool/{main,Serve,Plan,Rescue,MyWantCLI,Destructive,Tools}.swift`（上流: `fm-tools-proto/swift/`） |
+| fmtool 本体 | `fmtool/Sources/fmtool/{main,Serve,Plan,Rescue,MyWantCLI,Broker,Handback,Tools}.swift`（上流: `fm-tools-proto/swift/`） |
 | Yes/No UI | `mywant-gui/web/src/components/dashboard/PendingConfirmOverlay.tsx` |
