@@ -39,9 +39,16 @@ const (
 // fmToolPath finds the on-device agent, or reports that this machine has none.
 //
 // Four places, in order: MYWANT_FM_BIN for a build kept somewhere particular,
-// then PATH, then beside the binary that is running — `make fmtool` puts it in
-// this project's bin/ next to mywant itself — then ~/.local/bin, where
-// `make install-fmtool` puts it. macOS only: FoundationModels is Apple's, and a
+// then beside the binary that is running — `make fmtool` puts it in this
+// project's bin/ next to mywant itself — then PATH, then ~/.local/bin, where
+// `make install-fmtool` puts it.
+//
+// Beside before PATH, so that a pair built together is a pair used together.
+// The two have to match: an agent older than this side runs commands nobody
+// gated, and a newer one waits on an ask nobody answers (see fm_broker.go).
+// Searching PATH first meant a server started from bin/ could pick up a stale
+// install two directories away, and nothing would say so. For an installed
+// setup the two answers are the same directory anyway. macOS only: FoundationModels is Apple's, and a
 // Linux server (fly.io) has no such model to ask, which is exactly when the
 // caller falls back to Claude.
 //
@@ -69,14 +76,14 @@ func fmToolPath() (string, bool) {
 		}
 		return "", false
 	}
-	if found, err := exec.LookPath(fmToolDefaultBinary); err == nil {
-		return found, true
-	}
 	if self, err := os.Executable(); err == nil {
 		beside := filepath.Join(filepath.Dir(self), fmToolDefaultBinary)
 		if info, err := os.Stat(beside); err == nil && !info.IsDir() {
 			return beside, true
 		}
+	}
+	if found, err := exec.LookPath(fmToolDefaultBinary); err == nil {
+		return found, true
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

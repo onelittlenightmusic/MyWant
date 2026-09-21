@@ -1263,13 +1263,32 @@ func mentionsMore(text string) bool {
 	return false
 }
 
-// mywantBinaryPath finds this CLI: the one running the server, then PATH, then
-// where `make install` puts it.
+// mywantBinaryPath finds this CLI: the process that is running, then an
+// explicit one, then PATH, then where `make install` puts it.
+//
+// This process first, because the server and the CLI are one binary — `mywant
+// start` is a subcommand of the same tree every other command lives in. The
+// build that is running is therefore the build that should answer, and looking
+// on PATH ahead of it found a different one: measured on the machine this was
+// written on, the server was running v0.7.0 out of the project's bin/ while
+// every command it ran went through a v0.6.0 install in ~/.local/bin — which
+// is also where the command list the robot chooses from was coming from. The
+// two agreed that day by luck, and the next command added to the CLI would
+// have ended that.
+//
+// The comment here used to say it worked this way. The code did not.
+//
+// Matched by name, because this is also reached from a test binary, and
+// exec'ing THAT with "commands --json" is not a command list. A CLI renamed to
+// something else falls through to the search below, as before.
 func mywantBinaryPath() (string, error) {
 	if custom := strings.TrimSpace(os.Getenv("MYWANT_BIN")); custom != "" {
 		if info, err := os.Stat(custom); err == nil && !info.IsDir() {
 			return custom, nil
 		}
+	}
+	if self, err := os.Executable(); err == nil && filepath.Base(self) == "mywant" {
+		return self, nil
 	}
 	if found, err := exec.LookPath("mywant"); err == nil {
 		return found, nil
