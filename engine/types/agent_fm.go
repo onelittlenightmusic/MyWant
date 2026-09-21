@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -235,6 +236,19 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	if reply.Trimmed {
 		want.StoreLog("[FM_DO] The conversation was trimmed to its recent turns")
 		RecordCCActivity(want, CCActivityNote, "（会話が長くなったので、古いやり取りを整理しました）")
+	}
+
+	// A person pressed stop. Not a failure, and not something to say much
+	// about: they know what they did and why. The turn ends here with an
+	// answer like any other, so the want goes back to listening instead of
+	// through the error phase and its retry.
+	if errors.Is(err, errFMInterrupted) {
+		want.SetCurrent("cc_streaming_text", "")
+		want.SetCurrent("last_error", "")
+		want.StoreLog("[FM_DO] Stopped by a person")
+		RecordCCActivity(want, CCActivityNote, "止めました")
+		recordFMAnswer(want, "止めました。")
+		return nil
 	}
 
 	if err != nil {

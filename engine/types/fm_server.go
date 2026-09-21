@@ -3,6 +3,7 @@ package types
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -48,6 +49,21 @@ type fmServer struct {
 	activityMu sync.Mutex
 	onActivity func(kind, text string)
 
+	// How a person stops a turn that is already running.
+	//
+	// The agent answers on its own schedule and this side is blocked reading
+	// for it, so there is nothing to poll: the stop has to arrive from
+	// outside, on another goroutine, while `request` holds the lock. Hence a
+	// channel of its own and a mutex that is not the one the request holds.
+	//
+	// Stopping kills the process, as a timeout does, and for the same reason:
+	// the session is mid-answer and no longer in step with this side. The
+	// conversation goes with it. That is the honest price of interrupting a
+	// model that cannot be told to stop — it is not reading anything until it
+	// has finished thinking.
+	cancelMu sync.Mutex
+	cancel   chan struct{}
+
 	// Who runs the commands the agent asks for. Set for the duration of one
 	// question, like onActivity, and called on the goroutine that is reading
 	// the agent's answers — so it must not go back through ask().
@@ -61,6 +77,26 @@ type fmAsk struct {
 	Seq     int      `json:"seq"`
 	Command string   `json:"command"`
 	Args    []string `json:"args"`
+}
+
+// interrupt stops the turn in flight, and reports whether there was one.
+func (s *fmServer) interrupt() bool {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	if s.cancel == nil {
+		return false
+	}
+	close(s.cancel)
+	s.cancel = nil
+	return true
+}
+
+// stopper is the channel to watch while waiting, or nil when nothing is in
+// flight — a nil channel blocks forever in a select, which is exactly right.
+func (s *fmServer) stopper() chan struct{} {
+	s.cancelMu.Lock()
+	defer s.cancelMu.Unlock()
+	return s.cancel
 }
 
 // watch installs the commentary handler for one question.
@@ -90,6 +126,56 @@ var (
 	fmServers   = map[string]*fmServer{}
 	fmServersMu sync.Mutex
 )
+
+// errFMInterrupted says a person stopped the turn, which is not a failure and
+// must not be retried: asking the same question again is the one thing they
+// just said not to do.
+var errFMInterrupted = errors.New("stopped")
+
+// liveFMServers is every agent this process has started.
+func liveFMServers() []*fmServer {
+	fmServersMu.Lock()
+	defer fmServersMu.Unlock()
+	servers := make([]*fmServer, 0, len(fmServers))
+	for _, s := range fmServers {
+		servers = append(servers, s)
+	}
+	return servers
+}
+
+// StopOnDeviceAgent interrupts whatever the on-device agent is working on, and
+// reports whether anything was in flight to interrupt.
+//
+// The conversation does not survive it — see the note on fmServer.cancel.
+func StopOnDeviceAgent() bool {
+	stopped := false
+	for _, s := range liveFMServers() {
+		if s.interrupt() {
+			stopped = true
+		}
+	}
+	return stopped
+}
+
+// ClearOnDeviceSession forgets the conversation without restarting the agent,
+// and reports whether it could.
+//
+// It cannot while a turn is running: the session is in use, and a reset that
+// waited for the lock would hold the request that asked for it until the
+// answer everybody just stopped caring about arrived. Stop it first.
+func ClearOnDeviceSession() (bool, error) {
+	cleared := false
+	for _, s := range liveFMServers() {
+		ok, err := s.reset()
+		if err != nil {
+			return false, err
+		}
+		if ok {
+			cleared = true
+		}
+	}
+	return cleared, nil
+}
 
 // fmServerFor returns the live agent for one binary, starting nothing yet.
 func fmServerFor(binary string) *fmServer {
@@ -254,6 +340,17 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, plain boo
 		s.stop()
 	}
 
+	// Armed for the length of this exchange, so a stop arriving between
+	// questions has nothing to close and says so.
+	s.cancelMu.Lock()
+	s.cancel = make(chan struct{})
+	s.cancelMu.Unlock()
+	defer func() {
+		s.cancelMu.Lock()
+		s.cancel = nil
+		s.cancelMu.Unlock()
+	}()
+
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		if !s.started {
@@ -280,6 +377,11 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, plain boo
 		if err != nil {
 			lastErr = err
 			s.stop()
+			// A person stopping the turn is not a process that died between
+			// questions. Asking again is the one thing they just said not to.
+			if errors.Is(err, errFMInterrupted) {
+				return fmReply{}, errFMInterrupted
+			}
 			continue
 		}
 		if reply.Error != "" {
@@ -371,26 +473,40 @@ func (s *fmServer) readLine(timeout time.Duration) (string, error) {
 			return "", r.err
 		}
 		return strings.TrimSpace(r.line), nil
+	case <-s.stopper():
+		return "", errFMInterrupted
 	case <-time.After(timeout):
 		return "", fmt.Errorf("no answer within %s", timeout)
 	}
 }
 
-// resetSession forgets the conversation without restarting the process.
-func (s *fmServer) resetSession() {
-	s.mu.Lock()
+// reset forgets the conversation without restarting the process, and reports
+// whether there was one to forget.
+//
+// TryLock, not Lock: a turn in flight owns the session, and waiting for it
+// would hold the person's "clear" until the answer they stopped caring about
+// arrived. Busy is an answer.
+func (s *fmServer) reset() (bool, error) {
+	if !s.mu.TryLock() {
+		return false, fmt.Errorf("the agent is in the middle of a turn — stop it first")
+	}
 	defer s.mu.Unlock()
 	if !s.started {
-		return
+		// Nothing running means nothing remembered: the next question starts
+		// a new process and a new session anyway.
+		return false, nil
 	}
 	s.nextID++
 	request, _ := json.Marshal(map[string]any{"id": s.nextID, "reset": true})
 	if _, err := s.stdin.Write(append(request, '\n')); err != nil {
 		s.stop()
-		return
+		// The process is gone, which forgets the conversation just as
+		// thoroughly. The person asked for it to be forgotten; it is.
+		return true, nil
 	}
 	// The acknowledgement is read so it is not mistaken for the next answer.
 	if _, err := s.readReply(10 * time.Second); err != nil {
 		s.stop()
 	}
+	return true, nil
 }
