@@ -47,6 +47,11 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/status", s.getWantStatus).Methods("GET")
 	wants.HandleFunc("/{id}/results", s.getWantResults).Methods("GET")
+	// Stopping the robot mid-thought, and forgetting what it was told. Not
+	// "/{id}/stop", which stops the want itself — these two are about the
+	// conversation inside it (see handlers_chat_control.go).
+	wants.HandleFunc("/{id}/chat/interrupt", s.interruptWantChat).Methods("POST", "OPTIONS")
+	wants.HandleFunc("/{id}/chat/session", s.clearWantChatSession).Methods("DELETE", "OPTIONS")
 	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
