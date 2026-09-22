@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 
 	mywant "mywant/engine/core"
 )
@@ -97,6 +98,18 @@ func (h *WantTypeDefaultsHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*myw
 
 // ThingHook records parameter values into the ThingStore when the parameter's
 // WantTypeDefinition declares a non-empty SubType.
+//
+// It records under the SubType, which is what the parameter says a value typed
+// into it IS — a name typed into a route's `from` is a station, even though
+// that field also takes a place, an address or a coordinate.
+//
+// But only when the value is new. A parameter that widened what it takes
+// (Accepts) is usually filled from something already on the board, and naming
+// it a second time under the field's own heading is how 東京ドーム — a location
+// somebody had already named — became a station as well, standing beside
+// itself under two kinds. So whatever the field accepts, and whatever is
+// interchangeable with those, is looked at first: something already named is
+// left as what it is.
 type ThingHook struct {
 	memo    *ThingStore
 	events  *ThingEventStore
@@ -124,25 +137,95 @@ func (h *ThingHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) e
 		if !ok {
 			continue
 		}
-		str, ok := val.(string)
-		if !ok || str == "" {
-			continue
-		}
-		if err := h.memo.Record(pd.SubType, str); err != nil {
-			mywant.WarnLog("[ThingHook] failed to record %s=%q: %v", pd.SubType, str, err)
-		}
-		if h.events != nil {
-			_ = h.events.Record(ThingEvent{
-				Catalog:  subtypeToKey(pd.SubType),
-				Subtype:  pd.SubType,
-				Value:    str,
-				Source:   MemoSourceWantParam,
-				WantID:   want.Metadata.ID,
-				WantType: want.Metadata.Type,
-			})
+		// One value or a list of them. A parameter that takes several places —
+		// a route's stops on the way — names each of them as surely as the one
+		// that takes a single place does, and reading only the string form left
+		// every one of them unremembered.
+		for _, str := range stringValues(val) {
+			// Already named — as this, or as anything this field takes.
+			// Nothing to record, and no event either: nothing happened to the
+			// board's things.
+			if known := h.memo.KnownAs(thingSubtypesFor(pd), str); known != "" {
+				continue
+			}
+			if err := h.memo.Record(pd.SubType, str); err != nil {
+				mywant.WarnLog("[ThingHook] failed to record %s=%q: %v", pd.SubType, str, err)
+			}
+			if h.events != nil {
+				_ = h.events.Record(ThingEvent{
+					Catalog:  subtypeToKey(pd.SubType),
+					Subtype:  pd.SubType,
+					Value:    str,
+					Source:   MemoSourceWantParam,
+					WantID:   want.Metadata.ID,
+					WantType: want.Metadata.Type,
+				})
+			}
 		}
 	}
 	return nil
+}
+
+// stringValues is the strings a parameter holds: the one it is, or the ones in
+// the list it is. Anything else — a number, a nested object — is not a name and
+// is not remembered as one. Blanks are dropped: an empty entry in a list is
+// somebody part-way through typing one.
+func stringValues(val any) []string {
+	add := func(out []string, v any) []string {
+		s, ok := v.(string)
+		if !ok {
+			return out
+		}
+		if s = strings.TrimSpace(s); s == "" {
+			return out
+		}
+		return append(out, s)
+	}
+	switch v := val.(type) {
+	case string:
+		return add(nil, v)
+	case []string:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			out = add(out, item)
+		}
+		return out
+	case []any:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			out = add(out, item)
+		}
+		return out
+	}
+	return nil
+}
+
+// thingSubtypesFor is every heading a parameter's value might already be
+// recorded under, most specific first.
+//
+// The parameter's own SubType, then everything it says it Accepts — and for
+// each of those, the subtypes sharing its base type, which is the same
+// "near enough to be the same thing" the usage listing and the field matcher
+// already use (see subtypesInterchangeable). A station and a location are one
+// place under two names; a want type that takes either should not create the
+// second when the first is already there.
+func thingSubtypesFor(pd mywant.ParameterDef) []string {
+	out := make([]string, 0, 8)
+	seen := map[string]bool{}
+	add := func(s string) {
+		if s == "" || seen[s] {
+			return
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	for _, accepted := range pd.AcceptedSubTypes() {
+		add(accepted)
+		for _, sibling := range orderedInterchangeable(accepted) {
+			add(sibling)
+		}
+	}
+	return out
 }
 
 // ── Built-in hook: canvas coordinate assignment ───────────────────────────────

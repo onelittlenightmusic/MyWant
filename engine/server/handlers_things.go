@@ -59,8 +59,11 @@ type ThingFull struct {
 	Definitions []ThingDefinition `json:"definitions,omitempty"`
 	Stats       *MemoStat         `json:"stats,omitempty"`
 	// WantIDs are the live wants naming this value right now.
-	WantIDs []string          `json:"wantIDs,omitempty"`
-	Labels  map[string]string `json:"labels,omitempty"`
+	WantIDs []string `json:"wantIDs,omitempty"`
+	// ListWantIDs are those of them that name it as one of several — a stop on
+	// a route rather than either end of it. The board draws those dashed.
+	ListWantIDs []string          `json:"listWantIDs,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // GET /api/v1/things
@@ -70,8 +73,10 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 	types := DataTypeDefinitions()
 
 	usageByID := map[string][]string{}
+	listByID := map[string][]string{}
 	for _, u := range s.deriveThingUsage() {
 		usageByID[u.ID] = u.WantIDs
+		listByID[u.ID] = u.ListWantIDs
 	}
 
 	// Definitions are keyed by the name they gave, which is the catalog entry
@@ -110,6 +115,7 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 			Background:  info.Background,
 			Definitions: defsByID[pair],
 			WantIDs:     usageByID[pair],
+			ListWantIDs: listByID[pair],
 			Labels:      labels[e.ID],
 		}
 		if t.Icon == "" {

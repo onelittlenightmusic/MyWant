@@ -33,6 +33,15 @@ type memoUsage struct {
 	Subtype string   `json:"subtype"`
 	Value   string   `json:"value"`
 	WantIDs []string `json:"wantIDs"`
+	// ListWantIDs is the subset of WantIDs that name this value through a
+	// parameter taking a LIST of them rather than one.
+	//
+	// The difference is worth drawing: a want that names a thing in a slot of
+	// its own is about that thing, and a want that names it among several has
+	// it as one of a set — a stop on a route rather than either end of it. The
+	// board draws the second as a dashed line (see ThingRoadsLayer), which is
+	// the same distinction a map makes between a destination and a waypoint.
+	ListWantIDs []string `json:"listWantIDs,omitempty"`
 }
 
 // getThingUsage handles GET /api/v1/memo/usage
@@ -118,43 +127,49 @@ func (s *Server) deriveThingUsage() []memoUsage {
 				if !pd.ShouldRecordThing() {
 					continue
 				}
-				str, ok := want.Spec.Params[pd.Name].(string)
-				if !ok {
-					continue
-				}
-				str = strings.TrimSpace(str)
-				if str == "" {
-					continue
-				}
-				catalog := subtypeToKey(pd.SubType)
-				// The declared subtype first; failing that, any catalog holding
-				// this value whose subtype is interchangeable with it. The
-				// field asked for a string with a meaning, and these all are.
-				if !remembered[catalog+"::"+str] {
-					catalog = ""
-					for _, c := range catalogsByValue[str] {
-						if subtypesInterchangeable(pd.SubType, keyToSubtype(c)) {
-							catalog = c
-							break
+				// One value or a list of them: a parameter that takes several
+				// places names each of them, and reading only the string form left
+				// every stop on a route unconnected to the want that goes through
+				// it — no road drawn, and nothing to say it was in use at all.
+				// A parameter that takes a LIST names this value among several —
+				// a stop on a route rather than either end of it. Carried
+				// through so the board can draw the difference.
+				namedAsOneOfMany := pd.Type == "array"
+				for _, str := range stringValues(want.Spec.Params[pd.Name]) {
+					catalog := subtypeToKey(pd.SubType)
+					// The declared subtype first; failing that, any catalog
+					// holding this value whose subtype is interchangeable with
+					// it. The field asked for a string with a meaning, and
+					// these all are.
+					if !remembered[catalog+"::"+str] {
+						catalog = ""
+						for _, c := range catalogsByValue[str] {
+							if subtypesInterchangeable(pd.SubType, keyToSubtype(c)) {
+								catalog = c
+								break
+							}
+						}
+						if catalog == "" {
+							continue
 						}
 					}
-					if catalog == "" {
-						continue
+					id := catalog + "::" + str
+					if byID[id] == nil {
+						byID[id] = &memoUsage{
+							ID:      id,
+							Catalog: catalog,
+							Subtype: keyToSubtype(catalog),
+							Value:   str,
+						}
+						seen[id] = map[string]bool{}
 					}
-				}
-				id := catalog + "::" + str
-				if byID[id] == nil {
-					byID[id] = &memoUsage{
-						ID:      id,
-						Catalog: catalog,
-						Subtype: keyToSubtype(catalog),
-						Value:   str,
+					if wid := want.Metadata.ID; wid != "" && !seen[id][wid] {
+						seen[id][wid] = true
+						byID[id].WantIDs = append(byID[id].WantIDs, wid)
+						if namedAsOneOfMany {
+							byID[id].ListWantIDs = append(byID[id].ListWantIDs, wid)
+						}
 					}
-					seen[id] = map[string]bool{}
-				}
-				if wid := want.Metadata.ID; wid != "" && !seen[id][wid] {
-					seen[id][wid] = true
-					byID[id].WantIDs = append(byID[id].WantIDs, wid)
 				}
 			}
 		}
@@ -164,6 +179,7 @@ func (s *Server) deriveThingUsage() []memoUsage {
 	out := make([]memoUsage, 0, len(byID))
 	for _, u := range byID {
 		sort.Strings(u.WantIDs)
+		sort.Strings(u.ListWantIDs)
 		out = append(out, *u)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
