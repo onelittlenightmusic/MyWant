@@ -826,11 +826,20 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 		// way.
 		paramSubtypes := []string{}
 		paramSlots := [][]string{}
+		// Which of those slots takes a LIST of values rather than one.
+		//
+		// A selection of several things has to know not only how many slots a
+		// type has but whether one of them has no ceiling: a route takes a
+		// start, an end, and any number of stops between them, and counted as
+		// three slots it would refuse a fourth place. Aligned with paramSlots,
+		// index for index.
+		paramSlotIsList := []bool{}
 		seen := map[string]bool{}
 		for _, p := range d.Parameters {
 			accepted := p.AcceptedSubTypes()
 			if len(accepted) > 0 {
 				paramSlots = append(paramSlots, accepted)
+				paramSlotIsList = append(paramSlotIsList, p.Type == "array")
 			}
 			for _, st := range accepted {
 				if !seen[st] {
@@ -847,11 +856,12 @@ func (s *Server) listWantTypes(w http.ResponseWriter, r *http.Request) {
 			// "version" is the author's hand-written metadata.version and is
 			// kept for compatibility; "source" carries the version derived from
 			// the artifact itself, which is the one that cannot go stale.
-			"version":       d.Metadata.Version,
-			"system_type":   d.Metadata.SystemType,
-			"labels":        d.Metadata.Labels,
-			"paramSubtypes": paramSubtypes,
-			"paramSlots":    paramSlots,
+			"version":         d.Metadata.Version,
+			"system_type":     d.Metadata.SystemType,
+			"labels":          d.Metadata.Labels,
+			"paramSubtypes":   paramSubtypes,
+			"paramSlots":      paramSlots,
+			"paramSlotIsList": paramSlotIsList,
 		}
 		if origin := s.wantTypeLoader.GetOrigin(d.Metadata.Name); origin != nil {
 			res[i]["source"] = origin

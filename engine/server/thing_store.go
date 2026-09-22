@@ -391,6 +391,37 @@ func (m *ThingStore) Record(subtype, value string) error {
 	return m.save(data)
 }
 
+// KnownAs reports which of `subtypes` already has this value recorded, or ""
+// when none of them does.
+//
+// Asked before a want parameter records what was typed into it: a value that
+// is already named somewhere does not want naming again under a second heading
+// (see ThingHook). The subtypes are tried in the order given, so a caller that
+// puts the parameter's own SubType first gets that answer when both are true.
+func (m *ThingStore) KnownAs(subtypes []string, value string) string {
+	if value == "" || len(subtypes) == 0 {
+		return ""
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	data, err := m.load()
+	if err != nil {
+		return ""
+	}
+	for _, subtype := range subtypes {
+		if subtype == "" {
+			continue
+		}
+		for _, v := range data[subtypeToKey(subtype)] {
+			if v == value {
+				return subtype
+			}
+		}
+	}
+	return ""
+}
+
 // Suggestions returns up to limit recorded values for subtype, most-recent first.
 func (m *ThingStore) Suggestions(subtype string, limit int) []string {
 	if subtype == "" {
