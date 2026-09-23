@@ -1,0 +1,158 @@
+wantType:
+  metadata:
+    name: picture
+    title: Picture
+    description: |
+      A photograph pinned to the board beside this want, the way a photo is
+      pinned to a cork board.
+
+      The picture belongs to the want: it keeps the URL, and the canvas draws
+      the photo on the ground a few cells from the want's tile. Which cells is
+      the pin — a grid offset (pin_dx, pin_dy) from the tile, set the same way
+      a direction want's heading is set, by standing on the tile and aiming.
+
+      `url` is a Google Photos share link (photos.app.goo.gl/…, or a
+      photos.google.com/share/… link) or any direct image URL. A share link is
+      resolved to the image it shares when the want starts or the URL changes;
+      the resolved image is what the canvas shows (image_url).
+    version: '1.0'
+    category: ui
+    pattern: independent
+    labels:
+      user-control: "true"
+      type-icon: "ImagePlus"
+
+  parameters:
+    - name: url
+      description: Google Photos share link, or a direct image URL
+      type: string
+      subType: url
+      required: false
+      default: ""
+    - name: pin_dx
+      description: Grid-cell X offset of the photo from this want's tile (east is +)
+      type: float64
+      default: 2
+      required: false
+    - name: pin_dy
+      description: Grid-cell Y offset of the photo from this want's tile (south is +)
+      type: float64
+      default: 0
+      required: false
+    - name: size
+      description: Width of the photo on the board, in grid cells (1-4)
+      type: float64
+      default: 2
+      required: false
+
+  finalResultField: image_url
+
+  state:
+    - name: url
+      description: The link this picture was given — a share link or a direct image URL
+      type: string
+      subType: url
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: image_url
+      description: The image the canvas draws, resolved from url
+      type: string
+      subType: image_url
+      label: current
+      persistent: true
+      exposable: true
+      initialValue: ""
+    - name: resolved_from
+      description: The url that image_url was resolved from, so a link is only fetched once
+      type: string
+      label: internal
+      persistent: true
+      initialValue: ""
+    - name: param_url
+      description: The url param as last seen, so a changed param replaces a link given through the card
+      type: string
+      label: internal
+      persistent: true
+      initialValue: ""
+    - name: pin_dx
+      description: Grid-cell X offset of the photo from the tile
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 2
+    - name: pin_dy
+      description: Grid-cell Y offset of the photo from the tile
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 0
+    - name: size
+      description: Width of the photo on the board, in grid cells
+      type: float64
+      label: current
+      persistent: true
+      initialValue: 2
+    - name: status
+      description: What happened to the link — resolved, waiting, or error
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: last_error
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: text
+      description: >-
+        The words written in the picture, read once by the on-device text
+        recogniser: one line per row, cells in a row separated by " | ".
+      type: string
+      label: current
+      persistent: true
+      exposable: true
+      initialValue: ""
+    - name: text_error
+      description: Why the picture has no text, when it could not be read
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: text_from
+      description: The image_url that text was read from, so an image is only read once
+      type: string
+      label: internal
+      persistent: true
+      initialValue: ""
+    - name: answers
+      description: >-
+        Questions asked about this picture and the answers given, newest last:
+        {id, question, answer, at, by, feedback ("good" | "wrong" | "")}
+      type: array
+      label: current
+      persistent: true
+    - name: webhook_payload
+      description: >-
+        Payload received via POST /api/v1/webhooks/{id}:
+        {"action":"pin","dx":..,"dy":..}, {"action":"set_url","url":".."},
+        {"action":"record_answer","id":..,"question":..,"answer":..} or
+        {"action":"feedback","id":..,"value":"good"|"wrong"|""}
+      type: object
+      label: current
+    - name: webhook_received_at
+      type: string
+      label: current
+
+  examples:
+    - title: A photo pinned east of its tile
+      description: Pins a Google Photos shared picture two cells to the right of the want
+      want:
+        metadata:
+          name: trip-photo
+          type: picture
+        spec:
+          params:
+            url: https://photos.app.goo.gl/XXXXXXXXXXXXXXXXX
+            pin_dx: 2
+            pin_dy: 0

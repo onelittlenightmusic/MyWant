@@ -42,6 +42,7 @@ var rootPath = FileManager.default.currentDirectoryPath
 var evalCount: Int?
 var forceRescue = false
 var serveMode = false
+var ocrPath: String?
 var promptParts: [String] = []
 
 var argIndex = 0
@@ -61,6 +62,11 @@ while argIndex < arguments.count {
         evalCount = n
     case "--rescue":
         forceRescue = true
+    case "--ocr":
+        // Read the text in an image and exit. See OCR.swift.
+        argIndex += 1
+        guard argIndex < arguments.count else { printErr("--ocr requires an image path"); exit(1) }
+        ocrPath = arguments[argIndex]
     case "--serve":
         // Stay alive and keep one session, answering questions off stdin. See
         // Serve.swift.
@@ -69,6 +75,12 @@ while argIndex < arguments.count {
         promptParts.append(arg)
     }
     argIndex += 1
+}
+
+// Before the model and before the MyWant command list: reading text needs
+// neither, and a caller that only wants the words should not wait on either.
+if let ocrPath {
+    await runOCR(path: ocrPath)
 }
 
 let availability = SystemLanguageModel.default.availability
@@ -228,7 +240,7 @@ if serveMode {
 } else {
     let prompt = promptParts.joined(separator: " ")
     guard !prompt.isEmpty else {
-        printErr("usage: fmtool [--root <path>] [--eval <n>] [--serve] <prompt>")
+        printErr("usage: fmtool [--root <path>] [--eval <n>] [--serve] [--ocr <image>] <prompt>")
         exit(1)
     }
     do {
