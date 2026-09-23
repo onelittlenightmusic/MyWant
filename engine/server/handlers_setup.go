@@ -390,6 +390,8 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/browser-run", s.browserRun).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run-result", s.browserRunResultHandler).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/ca-cert", s.serveCACert).Methods("GET", "OPTIONS")
+	// Whether the page a browser is on is already saved (see lookupWebWant).
+	webWants.HandleFunc("/lookup", s.lookupWebWant).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/_nav/callback", s.navCallback).Methods("POST", "OPTIONS")
