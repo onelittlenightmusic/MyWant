@@ -1110,11 +1110,25 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 		if r.Host == "" {
 			origin = "http://localhost:8080"
 		}
-		s.JSONResponse(w, http.StatusOK, activeInspectionResponse{
+		resp := activeInspectionResponse{
 			DoneWebhookURL: origin + "/api/v1/web-wants/capture",
 			SuggestNameURL: origin + "/api/v1/web-wants/suggest-name",
 			ExistingMarks:  mywant.GetWebMarks(pageHost),
-		})
+		}
+		// Who is capturing is otherwise unknown here: "my character" lives
+		// in the GUI's own browser storage, which a bookmarklet on another
+		// site cannot read. The bookmarklet carries it instead (?character=,
+		// baked in when it was made), so the CursorMan it draws is the one
+		// the dashboard draws — resolved on every launch, so a character's
+		// later colour or avatar change still shows.
+		if id := r.URL.Query().Get("character"); id != "" {
+			if character, ok := mywant.GetCharacter(id); ok {
+				resp.CharacterID = character.ID
+				resp.Color = character.Color
+				resp.Avatar = character.Avatar
+			}
+		}
+		s.JSONResponse(w, http.StatusOK, resp)
 		return
 	}
 	sort.Slice(pool, func(i, j int) bool {
