@@ -244,7 +244,9 @@ func downloadPicture(ctx context.Context, imageURL string) (string, error) {
 	if resp.StatusCode >= 300 {
 		return "", fmt.Errorf("image HTTP %d", resp.StatusCode)
 	}
-	f, err := os.CreateTemp("", "mywant-picture-*")
+	// Named for what it is: whoever opens it — Claude's Read tool among them —
+	// goes by the extension to know it is a picture.
+	f, err := os.CreateTemp("", "mywant-picture-*"+imageExtension(resp.Header.Get("Content-Type")))
 	if err != nil {
 		return "", err
 	}
@@ -255,6 +257,22 @@ func downloadPicture(ctx context.Context, imageURL string) (string, error) {
 	}
 	f.Close()
 	return f.Name(), nil
+}
+
+// imageExtension is the file extension for an image's Content-Type.
+func imageExtension(contentType string) string {
+	switch ct := strings.ToLower(contentType); {
+	case strings.Contains(ct, "png"):
+		return ".png"
+	case strings.Contains(ct, "gif"):
+		return ".gif"
+	case strings.Contains(ct, "webp"):
+		return ".webp"
+	case strings.Contains(ct, "heic"):
+		return ".heic"
+	default:
+		return ".jpg"
+	}
 }
 
 // ocrPicture downloads the image and asks fmtool what is written in it.

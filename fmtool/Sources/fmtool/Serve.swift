@@ -97,6 +97,19 @@ actor SessionBox {
         return false
     }
 
+    /// Add an exchange that happened outside this session — a question about
+    /// a photo, answered on a session of its own — to what this one remembers.
+    /// Only what was said and answered: the photo stays out, since this window
+    /// is 8k tokens for everything.
+    func remember(prompt: String, answer: String) {
+        var entries = Array(session.transcript)
+        entries.append(.prompt(Transcript.Prompt(segments: [.text(Transcript.TextSegment(content: prompt))])))
+        entries.append(.response(Transcript.Response(assetIDs: [], segments: [.text(Transcript.TextSegment(content: answer))])))
+        session = LanguageModelSession(tools: tools, transcript: Transcript(entries: entries))
+        turns += 1
+        if turns >= Self.turnsBeforeTrim { trim() }
+    }
+
     /// Start again with nothing remembered at all — for a caller asking
     /// outright to forget.
     func reset() {
@@ -120,6 +133,15 @@ private struct ServeRequest: Decodable {
     /// wanted here is the one thing this model has that the caller does not —
     /// language — and none of its initiative.
     let plain: Bool?
+    /// A question about one photo: the photo, and the words already read out
+    /// of it. Answered from those alone (Picture.swift), not by the tools —
+    /// the caller has already decided what the question is about.
+    let picture: PictureInput?
+}
+
+struct PictureInput: Decodable, Sendable {
+    let image: String
+    let lines: [String]?
 }
 
 /// What a plain session is told: answer the question as asked, in the form
@@ -188,6 +210,17 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
             continue
         }
 
+        if let picture = request.picture {
+            let text = await answerFromPicture(question: prompt, image: picture.image, lines: picture.lines ?? [])
+                ?? "写真から答えを見つけられませんでした。"
+            // Kept in the conversation, as asked and as answered, so "and the
+            // hole after that?" has something to follow — and so the memory
+            // says what the person was actually told.
+            await box.remember(prompt: prompt, answer: text)
+            writeLine(["id": id, "text": text, "calls": 0])
+            continue
+        }
+
         if request.plain == true {
             // A session of its own, made and dropped: no tools to reach for and
             // no transcript to fill, so the answer is about this prompt only.
@@ -209,15 +242,7 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         await said?.note(prompt: prompt)
 
         let before = await tracker.count
-        _ = await Broker.shared.takePicture()  // nothing carried over from the last turn
-        var answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
-        // The turn read a picture: the question was about it, and is answered
-        // from the photo and the words in it rather than from the command's
-        // text — see Picture.swift for why.
-        if let picture = await Broker.shared.takePicture(),
-           let picked = await answerFromPicture(question: prompt, picture: picture) {
-            answer.text = picked
-        }
+        let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
         let calls = await tracker.count - before
         let trimmedAfter = await box.finishedTurn()
         var reply: [String: Any] = ["id": id, "text": answer.text, "calls": calls]

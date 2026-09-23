@@ -22,10 +22,12 @@ import FoundationModels
 // course, the date and the par all came back right, where either input alone
 // got some of them wrong.
 //
-// Asked on a session of its own, not the conversation's: the conversation has
-// 8k tokens for everything, and a photo would crowd out what came before. The
-// conversation's own turn is over by the time this runs, so the two never wait
-// on each other.
+// The caller has already decided the question is about this photo (see
+// robot_subject.go in mywant) and sends it with the photo attached; the
+// conversation's tools are not consulted. Asked on a session of its own, since
+// the conversation has 8k tokens for everything and a photo would crowd out
+// what came before; the exchange is written into the conversation afterwards
+// (SessionBox.remember), without the photo.
 
 private let pictureInstructions = """
     You are given a photo and the text recognized in it, line by line; cells \
@@ -36,11 +38,11 @@ private let pictureInstructions = """
 
 /// The recognised cell that answers `question`, or nil when there is nothing
 /// to choose from or the model could not answer.
-func answerFromPicture(question: String, picture: Broker.SeenPicture) async -> String? {
+func answerFromPicture(question: String, image: String, lines: [String]) async -> String? {
     guard #available(macOS 27.0, *) else { return nil }
 
     var seen = Set<String>()
-    let cells = picture.lines
+    let cells = lines
         .flatMap { $0.components(separatedBy: " | ") }
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -49,8 +51,8 @@ func answerFromPicture(question: String, picture: Broker.SeenPicture) async -> S
     do {
         let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "Cell", anyOf: cells), dependencies: [])
         let session = LanguageModelSession(instructions: pictureInstructions)
-        let text = picture.lines.joined(separator: "\n")
-        let url = URL(fileURLWithPath: picture.image)
+        let text = lines.joined(separator: "\n")
+        let url = URL(fileURLWithPath: image)
         let prompt = Prompt {
             "Text recognized in the image:\n\(text)"
             Attachment(imageURL: url)

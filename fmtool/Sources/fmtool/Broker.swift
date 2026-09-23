@@ -40,22 +40,6 @@ actor Broker {
 
     private var listening = false
     private var seq = 0
-    /// The last picture a command read this turn — see takePicture.
-    private var picture: SeenPicture?
-
-    /// A photo the caller handed over with a command's result, and the words
-    /// already read out of it.
-    struct SeenPicture: Sendable {
-        let image: String
-        let lines: [String]
-    }
-
-    /// The picture read this turn, if any, forgotten as it is taken: the next
-    /// turn starts without one.
-    func takePicture() -> SeenPicture? {
-        defer { picture = nil }
-        return picture
-    }
 
     /// What came back: whether it ran, whether it worked, and what it printed.
     struct Answer {
@@ -90,12 +74,6 @@ actor Broker {
             // guessed: a tool that quietly ran the command itself here would
             // be exactly the ungated path this file exists to remove.
             return Answer(ran: false, ok: false, output: "NOT RUN — mywant did not answer.")
-        }
-        // What the caller read was a picture: it says where the photo is and
-        // what is written in it. Kept for the end of the turn, when the
-        // question is asked again of the photo itself (Picture.swift).
-        if let pic = object["picture"] as? [String: Any], let image = pic["image"] as? String {
-            picture = SeenPicture(image: image, lines: pic["lines"] as? [String] ?? [])
         }
         return Answer(
             ran: object["ran"] as? Bool ?? false,

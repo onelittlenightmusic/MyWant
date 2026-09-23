@@ -90,6 +90,30 @@ sequenceDiagram
 
 渡し方は HTTP ではなく want の state への直接書き込み（`storeWebhookMessage`）。
 
+### 0.5 何について聞かれているか — 答え手より先に決める
+
+どの provider に渡すより前に、**依頼が特定の want についてのものか**を mywant が決めます
+(`engine/types/robot_subject.go`)。モデルには決めさせません。写真のスコアを聞かれた端末内モデルが
+`point` を選んで写真の位置を答え、同じ質問を繰り返すとコマンドを何も走らせず記憶だけで答えた、
+という失敗があったためです。
+
+1. 質問文に want の名前がある → それ（複数一致なら最長）
+2. 名前がなく、指し示す語（これ・この・それ・ここ・this…）がある → 立ち位置の行
+   （`contextForSpeaker`）の「立っているマス」、次に「隣」の want。候補が2つ以上なら決めない
+3. どちらでもなければ対象なし → いつもどおり provider に任せる
+
+いま対象として探すのは **picture** だけです（`subjectTypes`）。picture が対象のときは、写真を一時ファイルに落とし、
+picture want が取り込み時に OCR で読んだ文字（`text`）と一緒に答え手へ渡します。
+
+| provider | 写真の見せ方 |
+|---|---|
+| `claude_code` | 依頼文に写真のファイルパスと OCR の行を添える。Claude が Read で写真を開いて答える |
+| `fm` | `fmtool` に `{"prompt","picture":{"image","lines"}}` を送る。会話セッションとは別のセッションで写真と文字を見せ、答えを **OCR で読めた文字列のどれか1つ**に縛る（`Picture.swift`）。その問答は会話の記憶に書き戻す（写真は入れない） |
+
+どちらでも答えは `recordRobotAnswer` が記録し、picture の `answers` に質問と答えを残し、
+チャットの返答に `picture_id` / `answer_id` を付けます。GUI はその返答に「いいね / 違う」を出し、
+評価は同じ `answers` に入ります（`ChatThread.tsx`）。
+
 ### 1. robot want — いつ送るかを決める
 
 `robot` want は coding want と同じ3エージェント構成で、`provider` パラメータで答え手を選びます
@@ -131,21 +155,6 @@ fmtool → mywant  {"ask":"run","seq":1,"command":"point","args":["荻窪"]}
 mywant → fmtool  {"seq":1,"ran":true,"ok":true,"output":"The robot is standing on 荻窪 …"}
 fmtool → mywant  {"id":1,"text":"荻窪はここです (6, 0).","tool":"mywant_cli","calls":1}
 ```
-
-コマンドが **picture want を読んだ**とき（risk=read のコマンドの引数が picture want を名指ししていたとき）は、
-実行結果に写真のファイルと、picture want が取り込み時に OCR で読んだ文字の行を添えます:
-
-```
-mywant → fmtool  {"seq":1,"ran":true,"ok":true,"output":"…","picture":{"image":"/tmp/mywant-picture-…","lines":["SCORE CARD | …","PAR | 5 | 3 | …"]}}
-```
-
-fmtool はターンの答えが出たあと、**別の使い捨てセッション**で写真と文字の両方を見せて質問をもう一度聞き、
-答えを **OCR で読めた文字列のどれか1つ**に縛ります（`Picture.swift`）。モデルは「どれか」を選ぶだけで
-文字を書かないので、写真の文字を読み違えることも作ることもありません。文字だけ渡すとパーを合計と取り違え、
-写真だけ渡すと日付やパーを読み違えたため、この組み合わせにしています。会話のセッションを使わないのは、
-8k の枠に写真を入れると以降の会話が押し出されるためです。
-その答えは picture want の `answers` に残り、チャットの返答には `picture_id` / `answer_id` が付いて
-「いいね / 違う」の評価も同じ `answers` に記録されます（`recordFMAnswerAbout`、`ChatThread.tsx`）。
 
 コマンドを走らせている間は**タイムアウトの時計を止めます**（`readReply` が自分の所要時間を
 deadline に足し直す）。タイムアウトが見張っているのは「エージェントが黙ったこと」であって、
@@ -383,7 +392,8 @@ fmtool には自分から mywant を導く手がかりがないので、サー�
 | slash command 分岐 | `engine/types/robot_slash_command.go` |
 | プロバイダ選択 | `engine/types/agent_claude_code.go` |
 | 端末内モデル呼び出し・同意 | `engine/types/agent_fm.go` |
-| 写真について答える | `engine/types/picture_types.go`（OCR・`answers`）↔ `fmtool/Sources/fmtool/{OCR,Picture}.swift` |
+| 何について聞かれているか・写真の受け渡し・答えの記録 | `engine/types/robot_subject.go` |
+| 写真の OCR・`answers` | `engine/types/picture_types.go` ↔ `fmtool/Sources/fmtool/{OCR,Picture}.swift` |
 | 実行の門番 | `engine/types/fm_broker.go` ↔ `fmtool/Sources/fmtool/Broker.swift` |
 | 常駐プロセス管理 | `engine/types/fm_server.go` |
 | goal ループ | `engine/types/agent_free_goal.go`, `free_goal_types.go` |

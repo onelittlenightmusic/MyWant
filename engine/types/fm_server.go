@@ -67,23 +67,7 @@ type fmServer struct {
 	// Who runs the commands the agent asks for. Set for the duration of one
 	// question, like onActivity, and called on the goroutine that is reading
 	// the agent's answers — so it must not go back through ask().
-	onRun func(command string, args []string) fmRunResult
-}
-
-// fmRunResult is what running one command came to, as the agent is told it.
-type fmRunResult struct {
-	Ran    bool
-	OK     bool
-	Output string
-	// Set when the command read a picture: the photo, saved where the agent
-	// can open it, and the words already read out of it. The agent answers a
-	// question about the picture by looking at both — see Picture.swift.
-	Picture *fmPicture
-}
-
-type fmPicture struct {
-	Image string   `json:"image"`
-	Lines []string `json:"lines"`
+	onRun func(command string, args []string) (ran, ok bool, output string)
 }
 
 // fmAsk is the agent asking to have a command run. It arrives on the same
@@ -123,7 +107,7 @@ func (s *fmServer) watch(handler func(kind, text string)) {
 }
 
 // broker installs the command runner for one question.
-func (s *fmServer) broker(handler func(command string, args []string) fmRunResult) {
+func (s *fmServer) broker(handler func(command string, args []string) (bool, bool, string)) {
 	s.activityMu.Lock()
 	s.onRun = handler
 	s.activityMu.Unlock()
@@ -325,7 +309,17 @@ func (s *fmServer) stop() {
 
 // ask puts one question to the conversation and waits for its answer.
 func (s *fmServer) ask(prompt, root string, timeout time.Duration) (fmReply, error) {
-	return s.request(prompt, root, timeout, false)
+	return s.request(prompt, root, timeout, nil)
+}
+
+// askPicture puts a question about one photo to the agent, handing it the
+// photo and the words already read out of it (see robot_subject.go). It is
+// answered from those, not from the agent's tools, and the exchange is kept in
+// the conversation so the next question can refer back to it.
+func (s *fmServer) askPicture(prompt, root string, timeout time.Duration, image string, lines []string) (fmReply, error) {
+	return s.request(prompt, root, timeout, map[string]any{
+		"picture": map[string]any{"image": image, "lines": lines},
+	})
 }
 
 // askPlain puts a question to the model alone: no tools, and no memory of the
@@ -338,13 +332,13 @@ func (s *fmServer) ask(prompt, root string, timeout time.Duration) (fmReply, err
 // "the search results did not provide the required information" and planning
 // nothing.
 func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply, error) {
-	return s.request(prompt, root, timeout, true)
+	return s.request(prompt, root, timeout, map[string]any{"plain": true})
 }
 
 // request does the talking, starting or restarting the agent as needed. Two
 // attempts: a process that died between questions is not an error anybody asked
 // about, it is one to recover from.
-func (s *fmServer) request(prompt, root string, timeout time.Duration, plain bool) (fmReply, error) {
+func (s *fmServer) request(prompt, root string, timeout time.Duration, extra map[string]any) (fmReply, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -376,8 +370,8 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, plain boo
 		}
 		s.nextID++
 		body := map[string]any{"id": s.nextID, "prompt": prompt}
-		if plain {
-			body["plain"] = true
+		for k, v := range extra {
+			body[k] = v
 		}
 		request, err := json.Marshal(body)
 		if err != nil {
@@ -452,17 +446,13 @@ func (s *fmServer) answer(ask fmAsk) {
 	handler := s.onRun
 	s.activityMu.Unlock()
 
-	result := fmRunResult{Output: "NOT RUN — nothing here is running commands for this question."}
+	ran, ok, output := false, false, "NOT RUN — nothing here is running commands for this question."
 	if handler != nil {
-		result = handler(ask.Command, ask.Args)
+		ran, ok, output = handler(ask.Command, ask.Args)
 	}
-	body := map[string]any{
-		"seq": ask.Seq, "ran": result.Ran, "ok": result.OK, "output": result.Output,
-	}
-	if result.Picture != nil {
-		body["picture"] = result.Picture
-	}
-	reply, err := json.Marshal(body)
+	reply, err := json.Marshal(map[string]any{
+		"seq": ask.Seq, "ran": ran, "ok": ok, "output": output,
+	})
 	if err != nil {
 		return
 	}

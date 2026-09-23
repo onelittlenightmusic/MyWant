@@ -216,40 +216,21 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	// none itself any more: what is safe, what is the board's and what needs a
 	// person are all this side's to say, and saying them twice in two languages
 	// is how the two answers came apart. See fm_broker.go.
-	// Which picture the agent read this turn, if any. What it answers is then
-	// an answer about that picture, and is kept on it — see pictureLooked.
-	//
-	// The agent is handed the photo too, and the words read out of it: it
-	// answers from both, which it cannot do from the command's text alone —
-	// asked for the score from the text, it took the par for the total. The
-	// photo is saved to a file for the length of this turn.
-	var picture *Want
-	var pictureFiles []string
-	defer func() {
-		for _, f := range pictureFiles {
-			os.Remove(f)
-		}
-	}()
-	server.broker(func(command string, args []string) fmRunResult {
-		ran, ok, output := fmBrokerRun(ctx, want, request, command, args)
-		result := fmRunResult{Ran: ran, OK: ok, Output: output}
-		if !ran || !ok {
-			return result
-		}
-		p := pictureLooked(command, args)
-		if p == nil {
-			return result
-		}
-		picture = p
-		if file, lines, err := pictureForAgent(ctx, p); err != nil {
-			want.StoreLog("[FM_DO] Picture %s not handed over: %v", p.Metadata.Name, err)
-		} else {
-			pictureFiles = append(pictureFiles, file)
-			result.Picture = &fmPicture{Image: file, Lines: lines}
-		}
-		return result
+	server.broker(func(command string, args []string) (bool, bool, string) {
+		return fmBrokerRun(ctx, want, request, command, args)
 	})
-	reply, err := server.ask(request, root, timeout)
+	// A question about a photo is answered from the photo and the words in
+	// it, not from whatever command the model would reach for — see
+	// robot_subject.go for how the subject is decided and why here.
+	picture := prepareRobotPicture(ctx, want, request)
+	defer picture.close()
+	var reply fmReply
+	var err error
+	if picture != nil {
+		reply, err = server.askPicture(picture.Question, root, timeout, picture.Image, picture.Lines)
+	} else {
+		reply, err = server.ask(request, root, timeout)
+	}
 	server.watch(nil)
 	server.broker(nil)
 	answer := strings.TrimSpace(reply.Text)
@@ -339,11 +320,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		return nil
 	}
 
-	if picture != nil {
-		recordFMAnswerAbout(want, answer, picture, request)
-	} else {
-		recordFMAnswer(want, answer)
-	}
+	recordRobotAnswer(want, answer, "fm", picture)
 	want.SetCurrent("last_response_raw", answer)
 	// pending_command is not set here: whatever is waiting was written the
 	// moment it came up — by the broker when the agent reached for something
@@ -361,113 +338,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 // recordFMAnswer puts one answer where every provider's answers go: the chat's
 // ring buffer, and the robot's own mouth.
 func recordFMAnswer(want *Want, answer string) {
-	recordFMAnswerWith(want, answer, nil)
-}
-
-// recordFMAnswerWith is recordFMAnswer with extra fields on the chat entry.
-func recordFMAnswerWith(want *Want, answer string, extra map[string]any) {
-	entry := map[string]any{
-		"text":      answer,
-		"timestamp": time.Now().Format(time.RFC3339),
-		"subtype":   "fm",
-	}
-	for k, v := range extra {
-		entry[k] = v
-	}
-	responses := GetCurrent(want, "cc_responses", []any{})
-	responses = append(responses, entry)
-	if len(responses) > 20 {
-		responses = responses[len(responses)-20:]
-	}
-	want.SetCurrent("cc_responses", responses)
-	// The robot answering is the robot speaking — see the same call in
-	// claudeCodeRequester for why only the robot has a mouth.
-	if want.Metadata.Type == "robot" {
-		CharacterSpeaks("robot", answer, "agent")
-	}
-}
-
-// pictureLooked is the picture want a command read, when it read one.
-//
-// A question about a photo is answered by reading the picture want, and the
-// command that was run is what says which photo it is about — the model's
-// answer is a paraphrase and names nothing reliably. Any command that only
-// reads counts, not just `wants get`: asked about the course in the photo, the
-// agent reached for `relations picture-instance`, and a check for one command
-// missed it. Commands that change something do not count: "move the photo"
-// names the picture too, and its answer is not one of the words in it.
-func pictureLooked(command string, args []string) *Want {
-	catalogue, err := fmEveryCommand()
-	if err != nil || catalogue[command].Risk != "read" {
-		return nil
-	}
-	cb := GetGlobalChainBuilder()
-	if cb == nil {
-		return nil
-	}
-	// The same corrections the broker made before running it, so this looks
-	// for the want that was actually read (see fmBrokerRun).
-	args = fmDropEcho(command, args)
-	if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-		return nil
-	}
-	name := strings.TrimSpace(args[0])
-	if fixed := fmBoardName(name); fixed != "" {
-		name = fixed
-	}
-	for _, w := range cb.GetAllWantStates() {
-		if w == nil || w.Metadata.Type != "picture" {
-			continue
-		}
-		if w.Metadata.Name == name || w.Metadata.ID == name {
-			return w
-		}
-	}
-	return nil
-}
-
-// pictureForAgent saves the picture's photo to a file the agent can open, and
-// returns it with the lines of text the picture already read out of it.
-func pictureForAgent(ctx context.Context, picture *Want) (string, []string, error) {
-	imageURL := GetCurrent(picture, "image_url", "")
-	if imageURL == "" {
-		return "", nil, fmt.Errorf("no image yet")
-	}
-	var lines []string
-	if text := GetCurrent(picture, "text", ""); text != "" {
-		lines = strings.Split(text, "\n")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	file, err := downloadPicture(ctx, imageURL)
-	if err != nil {
-		return "", nil, err
-	}
-	return file, lines, nil
-}
-
-// recordFMAnswerAbout is recordFMAnswer for an answer about a picture: the
-// question and the answer are kept on the picture too, and the chat entry says
-// which picture and which of its answers it is, so the chat can offer 👍 / 違う
-// on it and the verdict lands next to the answer it is about.
-func recordFMAnswerAbout(want *Want, answer string, picture *Want, question string) {
-	id := fmt.Sprintf("ans-%d", time.Now().UnixNano())
-	StoreStateMulti(picture, map[string]any{
-		"webhook_payload": map[string]any{
-			"action":   "record_answer",
-			"id":       id,
-			"question": question,
-			"answer":   answer,
-			"by":       want.Metadata.Name,
-		},
-		"webhook_received_at": time.Now().Format(time.RFC3339Nano),
-	})
-	want.StoreLog("[FM_DO] Answer %s kept on picture %s", id, picture.Metadata.Name)
-	recordFMAnswerWith(want, answer, map[string]any{
-		"picture_id":   picture.Metadata.ID,
-		"picture_name": picture.Metadata.Name,
-		"answer_id":    id,
-	})
+	recordRobotAnswer(want, answer, "fm", nil)
 }
 
 // The ways a person says yes to the robot, and the ways they say no.

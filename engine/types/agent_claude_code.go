@@ -326,6 +326,18 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 		writeClaudeRequestLog(sessionID, requestID, "pending")
 	}
 
+	// A question about a photo: Claude is told where the photo is and what
+	// is written in it, and looks for itself (see robot_subject.go). The
+	// robot only — a coding want is somebody's agent, not the board's.
+	var picture *robotPicture
+	if want.Metadata.Type == "robot" {
+		picture = prepareRobotPicture(ctx, want, autoRequest)
+		defer picture.close()
+		if picture != nil {
+			autoRequest = claudePicturePrompt(autoRequest, picture)
+		}
+	}
+
 	// Build and execute Claude CLI command (stream-json for real-time progress)
 	args := []string{"--print", "--output-format", "stream-json", "--verbose"}
 	if sessionID != "" {
@@ -446,23 +458,10 @@ func claudeCodeRequester(ctx context.Context, want *Want) error {
 
 	// Append final response to cc_responses ring buffer (FIFO, max 20).
 	if finalResult != "" {
-		responses := GetCurrent(want, "cc_responses", []any{})
-		responses = append(responses, map[string]any{
-			"text":      finalResult,
-			"timestamp": time.Now().Format(time.RFC3339),
-			"subtype":   finalSubtype,
-		})
-		if len(responses) > 20 {
-			responses = responses[len(responses)-20:]
-		}
-		want.SetCurrent("cc_responses", responses)
+		// The same place every provider's answers go — and onto the picture,
+		// when the question was about one (see recordRobotAnswer).
+		recordRobotAnswer(want, finalResult, finalSubtype, picture)
 		want.SetCurrent("last_response_raw", finalResult)
-		// The robot answering is the robot speaking, and it goes in the same
-		// column as everybody else's words. Only the robot: a `coding` want is
-		// somebody's agent on the board, not a character, and has no mouth.
-		if want.Metadata.Type == "robot" {
-			CharacterSpeaks("robot", finalResult, "agent")
-		}
 		// The closing text arrives twice — once as an assistant event (recorded
 		// as a note above) and again as the result. Drop the note so the chat
 		// does not show the answer immediately before itself.
