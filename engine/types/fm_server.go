@@ -67,7 +67,23 @@ type fmServer struct {
 	// Who runs the commands the agent asks for. Set for the duration of one
 	// question, like onActivity, and called on the goroutine that is reading
 	// the agent's answers — so it must not go back through ask().
-	onRun func(command string, args []string) (ran, ok bool, output string)
+	onRun func(command string, args []string) fmRunResult
+}
+
+// fmRunResult is what running one command came to, as the agent is told it.
+type fmRunResult struct {
+	Ran    bool
+	OK     bool
+	Output string
+	// Set when the command read a picture: the photo, saved where the agent
+	// can open it, and the words already read out of it. The agent answers a
+	// question about the picture by looking at both — see Picture.swift.
+	Picture *fmPicture
+}
+
+type fmPicture struct {
+	Image string   `json:"image"`
+	Lines []string `json:"lines"`
 }
 
 // fmAsk is the agent asking to have a command run. It arrives on the same
@@ -107,7 +123,7 @@ func (s *fmServer) watch(handler func(kind, text string)) {
 }
 
 // broker installs the command runner for one question.
-func (s *fmServer) broker(handler func(command string, args []string) (bool, bool, string)) {
+func (s *fmServer) broker(handler func(command string, args []string) fmRunResult) {
 	s.activityMu.Lock()
 	s.onRun = handler
 	s.activityMu.Unlock()
@@ -436,13 +452,17 @@ func (s *fmServer) answer(ask fmAsk) {
 	handler := s.onRun
 	s.activityMu.Unlock()
 
-	ran, ok, output := false, false, "NOT RUN — nothing here is running commands for this question."
+	result := fmRunResult{Output: "NOT RUN — nothing here is running commands for this question."}
 	if handler != nil {
-		ran, ok, output = handler(ask.Command, ask.Args)
+		result = handler(ask.Command, ask.Args)
 	}
-	reply, err := json.Marshal(map[string]any{
-		"seq": ask.Seq, "ran": ran, "ok": ok, "output": output,
-	})
+	body := map[string]any{
+		"seq": ask.Seq, "ran": result.Ran, "ok": result.OK, "output": result.Output,
+	}
+	if result.Picture != nil {
+		body["picture"] = result.Picture
+	}
+	reply, err := json.Marshal(body)
 	if err != nil {
 		return
 	}

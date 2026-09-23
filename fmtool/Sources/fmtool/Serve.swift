@@ -209,7 +209,15 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         await said?.note(prompt: prompt)
 
         let before = await tracker.count
-        let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
+        _ = await Broker.shared.takePicture()  // nothing carried over from the last turn
+        var answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
+        // The turn read a picture: the question was about it, and is answered
+        // from the photo and the words in it rather than from the command's
+        // text — see Picture.swift for why.
+        if let picture = await Broker.shared.takePicture(),
+           let picked = await answerFromPicture(question: prompt, picture: picture) {
+            answer.text = picked
+        }
         let calls = await tracker.count - before
         let trimmedAfter = await box.finishedTurn()
         var reply: [String: Any] = ["id": id, "text": answer.text, "calls": calls]

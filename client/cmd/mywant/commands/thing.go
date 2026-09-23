@@ -126,6 +126,15 @@ var thingGetCmd = &cobra.Command{
 			return
 		}
 		if len(values) == 0 {
+			// Not a thing, but maybe a want. "Nothing on the board is named
+			// that" was said of a picture want standing right there, and the
+			// robot that asked took it at its word and gave up — so a want by
+			// that name is named, with the command that reads it.
+			if place, err := findWantPlace(wantsClient(), args[0]); err == nil {
+				fmt.Printf("No thing is named %q — %q is a want (type %s). Read it with: mywant wants get %s\n",
+					args[0], place.name, place.wantType, place.name)
+				return
+			}
 			fmt.Printf("No values recorded for %q, and nothing on the board is named that.\n", args[0])
 			return
 		}

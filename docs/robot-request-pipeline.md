@@ -132,6 +132,21 @@ mywant → fmtool  {"seq":1,"ran":true,"ok":true,"output":"The robot is standing
 fmtool → mywant  {"id":1,"text":"荻窪はここです (6, 0).","tool":"mywant_cli","calls":1}
 ```
 
+コマンドが **picture want を読んだ**とき（risk=read のコマンドの引数が picture want を名指ししていたとき）は、
+実行結果に写真のファイルと、picture want が取り込み時に OCR で読んだ文字の行を添えます:
+
+```
+mywant → fmtool  {"seq":1,"ran":true,"ok":true,"output":"…","picture":{"image":"/tmp/mywant-picture-…","lines":["SCORE CARD | …","PAR | 5 | 3 | …"]}}
+```
+
+fmtool はターンの答えが出たあと、**別の使い捨てセッション**で写真と文字の両方を見せて質問をもう一度聞き、
+答えを **OCR で読めた文字列のどれか1つ**に縛ります（`Picture.swift`）。モデルは「どれか」を選ぶだけで
+文字を書かないので、写真の文字を読み違えることも作ることもありません。文字だけ渡すとパーを合計と取り違え、
+写真だけ渡すと日付やパーを読み違えたため、この組み合わせにしています。会話のセッションを使わないのは、
+8k の枠に写真を入れると以降の会話が押し出されるためです。
+その答えは picture want の `answers` に残り、チャットの返答には `picture_id` / `answer_id` が付いて
+「いいね / 違う」の評価も同じ `answers` に記録されます（`recordFMAnswerAbout`、`ChatThread.tsx`）。
+
 コマンドを走らせている間は**タイムアウトの時計を止めます**（`readReply` が自分の所要時間を
 deadline に足し直す）。タイムアウトが見張っているのは「エージェントが黙ったこと」であって、
 こちらが代わりに働いている時間ではないからです。
@@ -368,6 +383,7 @@ fmtool には自分から mywant を導く手がかりがないので、サー�
 | slash command 分岐 | `engine/types/robot_slash_command.go` |
 | プロバイダ選択 | `engine/types/agent_claude_code.go` |
 | 端末内モデル呼び出し・同意 | `engine/types/agent_fm.go` |
+| 写真について答える | `engine/types/picture_types.go`（OCR・`answers`）↔ `fmtool/Sources/fmtool/{OCR,Picture}.swift` |
 | 実行の門番 | `engine/types/fm_broker.go` ↔ `fmtool/Sources/fmtool/Broker.swift` |
 | 常駐プロセス管理 | `engine/types/fm_server.go` |
 | goal ループ | `engine/types/agent_free_goal.go`, `free_goal_types.go` |
