@@ -28,6 +28,22 @@ type WebWantElement struct {
 	Selector string `json:"selector,omitempty"`
 	FieldKey string `json:"field_key,omitempty"` // ASCII param key for textbox inputs (empty for buttons)
 	HtmlName string `json:"html_name,omitempty"` // HTML name attribute of the element (e.g. "q" for Google search)
+	// Where the element was on the page when it was saved, and what it looked
+	// like there: its box in document CSS pixels, and that box cut out of the
+	// save-time screenshot as a small JPEG data URL. Kept so each object can be
+	// drawn with its own picture (the sidebar's cards use it as a background).
+	// Image is absent when the element was off screen at save time, or the
+	// saver could not take a screenshot (the bookmarklet).
+	Rect  *WebWantRect `json:"rect,omitempty"`
+	Image string       `json:"image,omitempty"`
+}
+
+// WebWantRect is an element's box in document CSS pixels.
+type WebWantRect struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
 }
 
 // createWebWantRequest is the body for POST /api/v1/web-wants/create.
@@ -71,9 +87,15 @@ func fieldKeyFromSelector(sel string) string {
 	return ""
 }
 
+// sanitizeFieldKey makes a name usable as a field key — which is also a
+// parameter name, so it must match ^[a-z][a-z0-9_]*$. A name with nothing
+// ASCII in it (ポスト本文) used to come out as "_____": a key that says nothing,
+// and one no parameter may be called. It now comes out empty, so the caller
+// falls back to the selector or a numbered key.
 func sanitizeFieldKey(s string) string {
-	r := reNonASCII.ReplaceAllString(s, "_")
-	r = strings.ToLower(r)
+	r := strings.ToLower(reNonASCII.ReplaceAllString(s, "_"))
+	r = reRepeatedUnderscore.ReplaceAllString(r, "_")
+	r = strings.Trim(r, "_")
 	if len(r) == 0 {
 		return ""
 	}
@@ -82,6 +104,8 @@ func sanitizeFieldKey(s string) string {
 	}
 	return r
 }
+
+var reRepeatedUnderscore = regexp.MustCompile(`_+`)
 
 // enrichElements assigns FieldKey to every captured element.
 // Input roles  → field key derived from selector/name (e.g. "email").
@@ -268,6 +292,16 @@ func frameBlockedByHeaders(h http.Header) bool {
 // Anything unexpected returns the input unchanged: a capture whose shot cannot
 // be decoded should still produce a want type, with the data URI it always had.
 func (s *Server) persistWebScreenshot(name, dataURI string) string {
+	// Named after the want type, so a re-capture replaces its own shot rather
+	// than leaving the old one behind.
+	return persistScreenshotFile("web-"+name, dataURI)
+}
+
+// persistScreenshotFile writes a data: URI image to ~/.mywant/screenshots as
+// base.<ext> and returns the path that serves it; anything it cannot decode is
+// returned unchanged. The serving route only accepts [A-Za-z0-9-_.], which a
+// generated type name and field key already are.
+func persistScreenshotFile(base, dataURI string) string {
 	if !strings.HasPrefix(dataURI, "data:image/") {
 		return dataURI // already a path — a re-capture, or a future sender
 	}
@@ -298,10 +332,7 @@ func (s *Server) persistWebScreenshot(name, dataURI string) string {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return dataURI
 	}
-	// Named after the want type, so a re-capture replaces its own shot rather
-	// than leaving the old one behind. The serving route only accepts
-	// [A-Za-z0-9-_.], which a generated type name already is.
-	file := "web-" + name + "." + ext
+	file := base + "." + ext
 	if err := os.WriteFile(filepath.Join(dir, file), raw, 0o644); err != nil {
 		return dataURI
 	}
@@ -355,7 +386,20 @@ func (s *Server) writeWebWantType(name, title, pageURL, hostname, urlTemplate, s
 		return "", 0, nil, fmt.Errorf("failed to write elements.json: %w", err)
 	}
 
-	yamlContent := buildWebWantYAML(name, title, pageURL, hostname, urlTemplate, screenshotURL, probeFrameBlocked(pageURL), elements)
+	// Each object's picture as a file of its own, for its parameter card to
+	// point at. elements.json keeps the data: URL too — the extension's sidebar
+	// draws it inside the page, where a URL to this server may not load.
+	objectImages := map[string]string{}
+	for _, el := range elements {
+		if el.FieldKey == "" || !strings.HasPrefix(el.Image, "data:image/") {
+			continue
+		}
+		if u := persistScreenshotFile("web-"+name+"-obj-"+el.FieldKey, el.Image); strings.HasPrefix(u, "/api/") {
+			objectImages[el.FieldKey] = u
+		}
+	}
+
+	yamlContent := buildWebWantYAML(name, title, pageURL, hostname, urlTemplate, screenshotURL, probeFrameBlocked(pageURL), elements, objectImages)
 	if err = os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(yamlContent), 0o644); err != nil {
 		return "", 0, nil, fmt.Errorf("failed to write YAML: %w", err)
 	}
@@ -445,7 +489,8 @@ func reserveWebWantTypeDir(base string) (name, dir string, err error) {
 // into its parts. On any validation failure it writes the HTTP error itself and
 // returns ok=false, so callers just `if !ok { return }`.
 func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate, screenshotURL string, u *url.URL, elements []WebWantElement, ok bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	// 8MB: the page screenshot plus one small cut-out per element (Image).
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
@@ -483,9 +528,10 @@ func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request
 		}
 		elements = append(elements, els...)
 	}
-	if len(elements) == 0 {
-		http.Error(w, "no elements selected", http.StatusBadRequest)
-		return
+	// No elements is a page saved as it is: a Web Want that opens it, with
+	// nothing on it to operate yet. Marks can be added later by overwriting.
+	if elements == nil {
+		elements = []WebWantElement{}
 	}
 	if len(elements) > 500 {
 		http.Error(w, "too many elements", http.StatusBadRequest)
@@ -596,10 +642,45 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL string, frameBlocked bool, elements []WebWantElement) string {
+func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL string, frameBlocked bool, elements []WebWantElement, objectImages map[string]string) string {
 	var elemComments strings.Builder
 	var inputStateFields strings.Builder
 	var buttonStateFields strings.Builder
+	var objectParams strings.Builder
+
+	// Every saved object is also a parameter, so deploying the want shows it as
+	// a card — titled with the object's own name, drawn over its picture from
+	// the page. A field's parameter is the value to type into it (the web form
+	// monitor copies it into the plan field of the same name when the want
+	// starts); a button's is whether to press it after filling (default yes).
+	for _, el := range elements {
+		if el.FieldKey == "" {
+			continue
+		}
+		bg := ""
+		if u := objectImages[el.FieldKey]; u != "" {
+			bg = fmt.Sprintf("\n      backgroundImage: %q", u)
+		}
+		if isInputRole(el.Role) {
+			objectParams.WriteString(fmt.Sprintf(`
+    - name: %s
+      title: %q
+      description: %q
+      type: string
+      required: false
+      default: ""%s
+`, el.FieldKey, el.Name, "Value to type into \""+el.Name+"\"", bg))
+		} else {
+			objectParams.WriteString(fmt.Sprintf(`
+    - name: %s
+      title: %q
+      description: %q
+      type: bool
+      required: false
+      default: true%s
+`, el.FieldKey, el.Name, "Press \""+el.Name+"\" after filling in the fields", bg))
+		}
+	}
 
 	for _, el := range elements {
 		if isInputRole(el.Role) {
@@ -611,25 +692,25 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
 				}
 				inputStateFields.WriteString(fmt.Sprintf(`
     - name: %s
-      description: "Value for \"%s\" (%s)"
+      description: %q
       type: string
       subType: %s
       label: plan
       persistent: true
       initialValue: ""
-`, el.FieldKey, el.Name, el.Role, subType))
+`, el.FieldKey, fmt.Sprintf("Value for %q (%s)", el.Name, el.Role), subType))
 			}
 		} else {
 			elemComments.WriteString(fmt.Sprintf("    # - [button] %s  selector: %s\n", el.Name, el.Selector))
 			if el.FieldKey != "" {
 				buttonStateFields.WriteString(fmt.Sprintf(`
     - name: %s
-      description: "Click \"%s\" (%s) — set by the want after form submission"
+      description: %q
       type: bool
       label: current
       persistent: true
       initialValue: false
-`, el.FieldKey, el.Name, el.Role))
+`, el.FieldKey, fmt.Sprintf("Click %q (%s) — set by the want after form submission", el.Name, el.Role)))
 			}
 		}
 	}
@@ -703,7 +784,7 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
       type: string
       required: false
       default: %q
-
+%s
   state:
     - name: status
       description: Current status (idle / active / done)
@@ -765,7 +846,7 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
     - web_form_monitoring
 
   finalResultField: status
-`, name, title, url, hostname, elemComments.String(), url, urlTemplateLabel, screenshotLabel, url, elementStateBlock)
+`, name, title, url, hostname, elemComments.String(), url, urlTemplateLabel, screenshotLabel, url, objectParams.String(), elementStateBlock)
 }
 
 // launchWebWant handles POST /api/v1/web-wants/{name}/launch
@@ -813,10 +894,8 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	for _, elems := range allElems {
 		elements = append(elements, elems...)
 	}
-	if len(elements) == 0 {
-		http.Error(w, "no elements found in elements.json", http.StatusBadRequest)
-		return
-	}
+	// No elements is a page saved as it is (see parseWebWantElementsBody):
+	// launching it just opens the page.
 
 	// Auto-fill mode when field_values are provided — this is what
 	// agent_web_form_monitor.go's webFormMonitorSubmit calls when a web want

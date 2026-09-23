@@ -20,6 +20,8 @@ func init() {
 }
 
 func monitorWebFormPhase(ctx context.Context, want *Want) (bool, error) {
+	webFormSeedPlanFromParams(want)
+
 	phase := ""
 	if v, ok := want.GetCurrent("phase"); ok {
 		phase, _ = v.(string)
@@ -91,6 +93,52 @@ func monitorWebFormPhase(ctx context.Context, want *Want) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// webFormSeedPlanFromParams copies a parameter's value into the plan field of
+// the same name. A web want's saved objects are its parameters as well as its
+// plan fields (see buildWebWantYAML): a value given when the want is deployed,
+// or edited on its parameter card later, is the value to type into that field.
+// It is copied again only when the parameters change, so a value set straight
+// on the plan afterwards is not overwritten on the next tick.
+func webFormSeedPlanFromParams(want *Want) {
+	typeDef := want.WantTypeDefinition
+	if typeDef == nil {
+		return
+	}
+	isParam := map[string]bool{}
+	for _, pd := range typeDef.Parameters {
+		if pd.Type == "string" {
+			isParam[pd.Name] = true
+		}
+	}
+	values := map[string]string{}
+	pairs := []string{}
+	for _, sd := range typeDef.State {
+		if !isParam[sd.Name] || sd.Type == "bool" || sd.Type == "boolean" {
+			continue
+		}
+		if label, ok := want.StateLabels[sd.Name]; !ok || label != LabelPlan {
+			continue
+		}
+		v := want.GetStringParam(sd.Name, "")
+		values[sd.Name] = v
+		pairs = append(pairs, sd.Name+"="+v)
+	}
+	if len(pairs) == 0 {
+		return
+	}
+	sort.Strings(pairs)
+	snapshot := strings.Join(pairs, "\x00")
+	if GetCurrent(want, "params_seeded", "") == snapshot {
+		return
+	}
+	for name, v := range values {
+		if v != "" {
+			want.SetPlan(name, v)
+		}
+	}
+	want.SetCurrent("params_seeded", snapshot)
 }
 
 // webFormBuildPlanSnapshot returns a deterministic string of all non-system plan field values.
@@ -198,6 +246,15 @@ func webFormMonitorSubmit(_ context.Context, want *Want) error {
 			v, ok := want.GetPlan(sd.Name)
 			if s, _ := v.(string); ok && s != "" {
 				fieldValues[sd.Name] = s
+			}
+		}
+	}
+	// A button whose parameter is off is not pressed (mywantFillAndSubmit in
+	// the extension skips a button whose field value is "false").
+	if typeDef := want.WantTypeDefinition; typeDef != nil {
+		for _, pd := range typeDef.Parameters {
+			if (pd.Type == "bool" || pd.Type == "boolean") && !want.GetBoolParam(pd.Name, true) {
+				fieldValues[pd.Name] = "false"
 			}
 		}
 	}
