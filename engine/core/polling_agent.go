@@ -84,6 +84,9 @@ func (p *PollingAgent) Start(ctx context.Context, w *Want) error {
 		p.want.StoreLog("[%s] Starting continuous monitoring for want %s\n", p.name, w.Metadata.Name)
 
 		runPoll := func() {
+			if p.want.pausedGlobally() {
+				return
+			}
 			if !p.want.TryStartAgentRun(p.name) {
 				return
 			}

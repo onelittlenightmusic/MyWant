@@ -55,6 +55,9 @@ func (t *ThinkingAgent) Start(ctx context.Context, w *Want) error {
 				t.want.StoreLog("[%s] Context cancelled, stopping thinking for %s\n", t.name, w.Metadata.Name)
 				return
 			case <-t.ticker.C:
+				if t.want.pausedGlobally() {
+					continue
+				}
 				t.BeginProgressCycle()
 				err := t.think(t.ctx, t.want)
 				t.EndProgressCycle()

@@ -907,8 +907,8 @@ func (n *Want) StartProgressionLoop(
 				}
 			}
 
-			// 3. Skip execution if suspended
-			if n.IsSuspended() {
+			// 3. Skip execution if suspended, or while everything is paused
+			if n.IsSuspended() || n.pausedGlobally() {
 				time.Sleep(GlobalExecutionInterval)
 				continue
 			}

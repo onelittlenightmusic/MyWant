@@ -40,6 +40,12 @@ func (n *Want) IsSuspended() bool {
 	return n.suspended.Load()
 }
 
+// pausedGlobally reports whether the global pause covers this want. System
+// wants are exempt: the pause is operated through them.
+func (n *Want) pausedGlobally() bool {
+	return !n.Metadata.IsSystemWant && IsGloballyPaused()
+}
+
 func (n *Want) SetSuspended(suspended bool) {
 	n.suspended.Store(suspended)
 }

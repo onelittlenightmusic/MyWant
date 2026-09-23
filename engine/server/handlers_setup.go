@@ -414,6 +414,10 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/form-designs", s.listFormDesigns).Methods("GET", "OPTIONS")
 	api.HandleFunc("/form-designs/{filename}", s.serveFormDesign).Methods("GET", "OPTIONS")
 
+	// Global pause — the emergency stop every tab's control pill can reach.
+	api.HandleFunc("/system/pause", s.getSystemPause).Methods("GET", "OPTIONS")
+	api.HandleFunc("/system/pause", s.setSystemPause).Methods("PUT", "OPTIONS")
+
 	// GUI state endpoint — backing store is the gui_state want, surfaced here for CLI/frontend
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")

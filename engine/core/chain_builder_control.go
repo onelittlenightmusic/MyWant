@@ -124,21 +124,34 @@ func (cb *ChainBuilder) initializeSystemScheduler() {
 	InfoLog("[SYSTEM] System Scheduler Want initialized\n")
 }
 
-// Suspend pauses the execution of all wants (deprecated - use SuspendWant instead)
+// Suspend pauses every want at once — the global "pause" the GUI's control
+// pill offers from any tab, as an emergency stop. Unlike SuspendWant nothing
+// is sent to the wants: each progression loop and background agent asks
+// IsGloballyPaused before doing work, so the pause takes effect on the next
+// tick and resuming simply lets the next tick through. System wants (the GUI
+// state, the robot, the scheduler) keep running — they are what the pause is
+// operated through.
 func (cb *ChainBuilder) Suspend() error {
 	cb.suspended.Store(true)
 	return nil
 }
 
-// Resume resumes the execution of all wants (deprecated - use ResumeWant instead)
+// Resume lifts the global pause set by Suspend.
 func (cb *ChainBuilder) Resume() error {
 	cb.suspended.Store(false)
 	return nil
 }
 
-// IsSuspended returns the current suspension state
+// IsSuspended returns whether the global pause is on.
 func (cb *ChainBuilder) IsSuspended() bool {
 	return cb.suspended.Load()
+}
+
+// IsGloballyPaused reports whether the global pause is on. False when there is
+// no global builder (tests, demos that run wants directly).
+func IsGloballyPaused() bool {
+	cb := GetGlobalChainBuilder()
+	return cb != nil && cb.IsSuspended()
 }
 
 // distributeControlCommand distributes a control command to target want(s) and propagates to child wants if the target is a parent want
