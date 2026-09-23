@@ -387,6 +387,13 @@ wantType:
     initialValue: []
     label: current
 
+  - name: cc_session_resets
+    description: When the session was reset (RFC3339 times). The history stays; the chat thread draws a break at each of these.
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
   - name: cc_message_count
     description: Total webhook messages received
     type: int
