@@ -227,7 +227,7 @@ func New(config Config) *Server {
 	systemTypes := mywant.SystemWantTypes(systemWants)
 	// Most system wants (gui_state, capability_manager, scheduler) are pure
 	// control-plane and always start fresh from system_wants.yaml. "robot" is
-	// the one exception: it must resume its own chat thread and wandered
+	// the one exception: it must resume its own chat thread and its
 	// canvas position across restarts, so its persisted instance (if any) is
 	// kept instead of being replaced by the fresh yaml definition.
 	statefulSystemTypes := map[string]bool{"robot": true}
@@ -464,6 +464,12 @@ func (s *Server) Start() error {
 	// driveOneCharacterTick for the actual resolve-and-apply logic.
 	mywant.CharacterMotionTick = func(characterID string, motionWant *mywant.Want) (float64, float64, bool) {
 		return driveOneCharacterTick(s, characterID, motionWant)
+	}
+
+	// Where somebody is standing, for the robot that follows them (see
+	// engine/types/robot_types.go's follow) — the same lookup canvas-near uses.
+	mywant.LocateCharacter = func(target string) (int, int, bool) {
+		return resolveCanvasNear(target, s.globalBuilder.GetWants())
 	}
 
 	// Wire in-process rule registration so want agents can register without HTTP

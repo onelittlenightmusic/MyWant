@@ -246,7 +246,7 @@ robot goes and stands on it, which is the same answer pointed at rather than
 spelled out.
 
 Nothing is changed except where the robot is standing and what it is saying —
-both of which it changes on its own, wandering, every minute or so.`,
+both of which change anyway, whenever it speaks or follows somebody.`,
 	Example: `  mywant thing point 新宿
   mywant thing point 新宿 --say "ここが新宿です"`,
 	Args: cobra.ExactArgs(1),

@@ -13,8 +13,9 @@ wantType:
       - DoAgent:      Executes the appropriate CLI (claude / gemini)
 
       Unlike coding, this want is a permanent system want (never completes,
-      cannot be deleted/suspended) and wanders its canvas position slowly and
-      autonomously, independent of chat activity.
+      cannot be deleted/suspended). It stands still on the canvas unless told to
+      follow somebody (`follow`), in which case it walks after them a beat
+      behind, independent of chat activity.
     version: '1.0'
     category: system
     pattern: independent
@@ -98,11 +99,31 @@ wantType:
     required: false
     default: ""
 
-  - name: wander_interval_seconds
-    description: Minimum seconds between autonomous canvas moves
+  - name: follow
+    description: |
+      Who the robot follows around the canvas: a character id, or "cursor" for
+      whoever is at the controls. Empty (the default) and it stays where it is.
+    type: string
+    required: false
+    default: ""
+
+  - name: follow_distance
+    description: How close (in cells, counting diagonals as one) the robot comes before it stops. At least 1.
     type: int
     required: false
-    default: 45
+    default: 1
+
+  - name: follow_delay_ms
+    description: How long the robot waits after its target steps out of reach before it sets off after them.
+    type: int
+    required: false
+    default: 600
+
+  - name: follow_step_ms
+    description: Time per cell while following — larger is slower.
+    type: int
+    required: false
+    default: 350
 
   - name: spawn_x
     description: Initial canvas x coordinate (only used the very first time the want is created)
@@ -418,13 +439,6 @@ wantType:
     type: bool
     persistent: false
     initialValue: false
-    label: current
-
-  - name: last_wander_at
-    description: Unix timestamp of the last autonomous canvas move
-    type: int
-    persistent: true
-    initialValue: 0
     label: current
 
   requires:

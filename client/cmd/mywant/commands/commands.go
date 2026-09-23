@@ -93,8 +93,8 @@ var readOnlyVerbs = map[string]bool{
 	"current-context": true, "get-contexts": true, "commands": true,
 	"where": true, "board": true, "names": true, "relations": true, "connections": true,
 	// Two that do change something, and are here anyway: what the robot is
-	// saying, and where it is standing. Both are things the robot changes by
-	// itself every minute as it wanders, neither is kept, and answering "where
+	// saying, and where it is standing. Both change anyway whenever it speaks
+	// or follows somebody, neither is kept, and answering "where
 	// is 新宿?" by going to stand on it is the whole point of being able to
 	// ask. Nothing on the board is created, moved or deleted by either.
 	"say": true, "point": true,

@@ -17,19 +17,18 @@ func init() {
 // RobotLocals holds type-specific local state for the robot want.
 type RobotLocals struct {
 	WebhookLocals
-	Provider          string `mywant:"internal,provider"`
-	SessionID         string `mywant:"internal,session_id"`
-	ReqCount          int    `mywant:"internal,request_count"`
-	TimeoutSec        int    `mywant:"internal,timeout_seconds"`
-	WorkingDir        string `mywant:"internal,working_dir"`
-	WanderIntervalSec int    `mywant:"internal,wander_interval_seconds"`
+	Provider   string `mywant:"internal,provider"`
+	SessionID  string `mywant:"internal,session_id"`
+	ReqCount   int    `mywant:"internal,request_count"`
+	TimeoutSec int    `mywant:"internal,timeout_seconds"`
+	WorkingDir string `mywant:"internal,working_dir"`
 }
 
 // RobotWant is the always-on chat companion (backs the header interact bubble
 // and the "robot" canvas character). It reuses the coding want's Monitor/Think/Do
 // machinery unchanged (session/thread persistence, FIFO chat, idempotency — see
-// coding_types.go) and adds slow autonomous wandering across the canvas,
-// independent of chat phase, so it visibly moves like a character.
+// coding_types.go) and, when asked to, follows a character around the canvas
+// independent of chat phase (see follow).
 type RobotWant struct {
 	Want
 }
@@ -54,7 +53,6 @@ func (w *RobotWant) Initialize() {
 	}
 	locals.TimeoutSec = w.GetIntParam("timeout_seconds", 300)
 	locals.WorkingDir = w.GetStringParam("working_dir", "")
-	locals.WanderIntervalSec = w.GetIntParam("wander_interval_seconds", 45)
 
 	existingCount := GetCurrent(&w.Want, "request_count", -1)
 	if existingCount < 0 {
@@ -105,102 +103,69 @@ func (w *RobotWant) ensureCanvasPosition() {
 	}
 }
 
-// wander nudges the robot's canvas position by at most one cell every
-// wander_interval_seconds, independent of chat phase, so it wanders even
-// while idle or mid-conversation. Ticks (Progress calls) are frequent
-// relative to the interval, so this is a plain elapsed-time gate, not a timer.
-func (w *RobotWant) wander(locals *RobotLocals) {
-	interval := locals.WanderIntervalSec
-	if interval <= 0 {
-		interval = 45
-	}
-	now := time.Now().Unix()
-	last := GetCurrent(&w.Want, "last_wander_at", int64(0))
-	if now-last < int64(interval) {
+// follow walks the robot toward whoever it has been told to follow, one cell
+// at a time and a beat behind them.
+//
+// It used to wander instead: a one-cell drift every forty-five seconds, on a
+// leash tied to wherever it was last put. Nobody asked it to go anywhere, and
+// on a board people are arranging by hand a thing that moves on its own is
+// something to keep finding again. So it stands still unless it is following,
+// and following is something you ask for — the `follow` parameter, naming a
+// character (or "cursor" for whoever is at the controls).
+//
+// Behind them, not on top of them: it waits followDelay after they step out of
+// reach before it sets off, walks one cell per followStep, and stops once it is
+// within follow_distance of them. That lag is the whole look of being followed
+// — something that arrives the instant you do is attached, not following.
+func (w *RobotWant) follow() {
+	target := w.GetStringParam("follow", "")
+	selfID := w.Metadata.ID
+	if target == "" || LocateCharacter == nil {
+		forgetFollow(selfID)
 		return
 	}
-	w.SetCurrent("last_wander_at", now)
-
+	tx, ty, ok := LocateCharacter(target)
+	if !ok {
+		return
+	}
 	x, errX := strconv.Atoi(w.GetLabel("mywant.io/canvas-x"))
 	y, errY := strconv.Atoi(w.GetLabel("mywant.io/canvas-y"))
 	if errX != nil || errY != nil {
 		return
 	}
 
-	step := (time.Now().UnixNano() / int64(time.Millisecond)) % 9 // 0..8 -> one of 9 moves (incl. staying put)
-	dx := int(step%3) - 1
-	dy := int(step/3) - 1
-
-	// One cell, on a leash — but tied to where it was last put, not to the
-	// origin.
-	//
-	// Both extremes were wrong. Clamping into an absolute box (0..bound) yanked
-	// a robot that had been called to somebody standing outside it straight back
-	// inside, so being called looked like the robot flying off somewhere nobody
-	// asked for. Removing the leash entirely fixed that and introduced a slower
-	// version of the same complaint: with nothing to hold it, a one-cell drift
-	// every forty-five seconds walked the robot clean off the board — 448 steps
-	// took it from (7,-4) to (-16,-51), which is not wandering, it is leaving.
-	//
-	// So it wanders around wherever it was last placed. anchorFor works that out
-	// by noticing when the robot is somewhere wander did not leave it: only
-	// something else — a call, a take, an agent — moves it that way, and that is
-	// exactly the event that should re-tie the leash.
-	bound := w.GetIntParam("wander_bound", 6)
-	ax, ay := anchorFor(w.Metadata.ID, x, y)
-	nx := clampInt(x+dx, ax-bound, ax+bound)
-	ny := clampInt(y+dy, ay-bound, ay+bound)
-
-	// And inside the board, whatever the leash says.
-	//
-	// The leash is relative — it holds the robot near wherever it was last put —
-	// so it has nothing to say about where the board IS. That was enough while
-	// the leash held, and when it slipped (see rememberWanderLeftAt below) the
-	// robot walked to (201, -166) with every other want between (-4,-4) and
-	// (14,14). Nothing was broken by it standing there; what broke was
-	// everything that asks how big the board is. The canvas sizes itself to hold
-	// every want, so one wanderer 160 cells out stretched a 19×19 board to
-	// 207×181 — the minimap drew that whole empty expanse, and the opening
-	// camera framed its middle, which is nowhere near anything.
-	//
-	// So the robot is not allowed to be the want that defines the board. It
-	// wanders within what the others already span; if it is the only thing
-	// placed there is no board to leave, and the leash alone decides.
-	if minX, minY, maxX, maxY, ok := canvasBounds(w.Metadata.ID); ok {
-		nx = clampInt(nx, minX, maxX)
-		ny = clampInt(ny, minY, maxY)
+	reach := w.GetIntParam("follow_distance", 1)
+	if reach < 1 {
+		reach = 1 // never onto the cell they are standing on
 	}
+	now := time.Now()
+	if chebyshev(x-tx, y-ty) <= reach {
+		forgetFollow(selfID)
+		return
+	}
+	if !followDue(selfID, now,
+		time.Duration(w.GetIntParam("follow_delay_ms", 600))*time.Millisecond,
+		time.Duration(w.GetIntParam("follow_step_ms", 350))*time.Millisecond) {
+		return
+	}
+
+	nx, ny := x+sign(tx-x), y+sign(ty-y)
 
 	// Same wall / locked-door boundaries a player's cursor can't cross (see
-	// WantCanvas.tsx's wallCells) — try the diagonal move, then slide along
+	// WantCanvas.tsx's wallCells) — try the diagonal step, then slide along
 	// one axis at a time (matching the player's own slide-along-wall
-	// behavior), before giving up and staying put this tick. This is what
-	// keeps the robot inside a room enclosed by walls instead of phasing
-	// through them.
-	selfID := w.Metadata.ID
+	// behavior), before giving up and staying put this step. A robot that
+	// cannot get round a wall waits at it rather than phasing through.
 	switch {
 	case !isCanvasBlocked(nx, ny, selfID):
-		// diagonal (or straight) move is clear as-is
-	case !isCanvasBlocked(nx, y, selfID):
+	case nx != x && !isCanvasBlocked(nx, y, selfID):
 		ny = y
-	case !isCanvasBlocked(x, ny, selfID):
+	case ny != y && !isCanvasBlocked(x, ny, selfID):
 		nx = x
 	default:
-		nx, ny = x, y
+		return
 	}
 
-	// Record the move before writing it, and for a move on either axis.
-	//
-	// This used to sit inside the `nx != x` branch, so a step that only changed
-	// y was never remembered. anchorFor then compared the robot's new y against
-	// a leftY that had not moved, decided somebody else must have put it there,
-	// and re-tied the leash to where the robot had just walked itself. A leash
-	// that follows is not a leash: every vertical step re-anchored, the anchor
-	// crept along behind the robot, and the drift the bound was meant to stop
-	// resumed at full speed in both axes.
-	if nx != x || ny != y {
-		rememberWanderLeftAt(w.Metadata.ID, nx, ny)
-	}
 	if nx != x {
 		w.SetLabel("mywant.io/canvas-x", strconv.Itoa(nx))
 	}
@@ -209,50 +174,70 @@ func (w *RobotWant) wander(locals *RobotLocals) {
 	}
 }
 
-// canvasBounds is the rectangle the OTHER placed wants span, in grid cells.
-//
-// This is the board as far as anything that draws it is concerned: the canvas
-// and the minimap both size themselves to hold every want, so this is exactly
-// the region the robot must stay inside to avoid resizing them. Reports ok =
-// false when nothing else carries a position, which is a board with no extent
-// rather than an empty one.
-func canvasBounds(selfID string) (minX, minY, maxX, maxY int, ok bool) {
-	cb := GetGlobalChainBuilder()
-	if cb == nil {
-		return 0, 0, 0, 0, false
+// ── How far behind the robot is ──────────────────────────────────────────────
+
+// Held in memory rather than in state: it is a few hundred milliseconds of
+// timing, and a restart that forgets it just means the robot hesitates once.
+type followTiming struct{ outSince, lastStep time.Time }
+
+var (
+	followMu      sync.Mutex
+	followTimings = map[string]followTiming{}
+)
+
+// followDue reports whether the robot may take a step now: the target has
+// been out of reach for at least delay, and the last step was at least step
+// ago. Records the step when it says yes.
+func followDue(wantID string, now time.Time, delay, step time.Duration) bool {
+	followMu.Lock()
+	defer followMu.Unlock()
+	t := followTimings[wantID]
+	if t.outSince.IsZero() {
+		t.outSince = now
+		followTimings[wantID] = t
 	}
-	for _, sib := range cb.GetWants() {
-		if sib.Metadata.ID == selfID {
-			continue
-		}
-		x, errX := strconv.Atoi(sib.GetLabel("mywant.io/canvas-x"))
-		y, errY := strconv.Atoi(sib.GetLabel("mywant.io/canvas-y"))
-		if errX != nil || errY != nil {
-			continue
-		}
-		if !ok {
-			minX, maxX, minY, maxY, ok = x, x, y, y, true
-			continue
-		}
-		if x < minX {
-			minX = x
-		}
-		if x > maxX {
-			maxX = x
-		}
-		if y < minY {
-			minY = y
-		}
-		if y > maxY {
-			maxY = y
-		}
+	if now.Sub(t.outSince) < delay || now.Sub(t.lastStep) < step {
+		return false
 	}
-	return minX, minY, maxX, maxY, ok
+	t.lastStep = now
+	followTimings[wantID] = t
+	return true
+}
+
+// forgetFollow resets the lag once the robot has caught up (or stopped
+// following), so the next time its target walks off it hesitates again.
+func forgetFollow(wantID string) {
+	followMu.Lock()
+	defer followMu.Unlock()
+	delete(followTimings, wantID)
+}
+
+func chebyshev(dx, dy int) int {
+	if dx < 0 {
+		dx = -dx
+	}
+	if dy < 0 {
+		dy = -dy
+	}
+	if dx > dy {
+		return dx
+	}
+	return dy
+}
+
+func sign(v int) int {
+	switch {
+	case v > 0:
+		return 1
+	case v < 0:
+		return -1
+	}
+	return 0
 }
 
 // isCanvasBlocked reports whether (x,y) is occupied by a wall or a locked
 // door — the same boundaries WantCanvas.tsx's wallCells memo enforces for the
-// player's own cursor — so the robot's autonomous wandering can't cross them
+// player's own cursor — so the robot following someone can't cross them
 // either. Reuses wantFootprint (aura_types.go) for multi-cell wall/door spans.
 func isCanvasBlocked(x, y int, selfID string) bool {
 	cb := GetGlobalChainBuilder()
@@ -286,12 +271,12 @@ func isCanvasBlocked(x, y int, selfID string) bool {
 
 // Progress reads ThinkAgent's Plan decisions and executes state transitions.
 // Identical phase machine to CodingWant.Progress (see coding_types.go), plus
-// the unconditional wander step and a phase that never reaches "achieved" —
+// the follow step and a phase that never reaches "achieved" —
 // the robot is a permanent system want, not a completable task.
 func (w *RobotWant) Progress() {
 	locals := w.GetLocals()
 
-	w.wander(locals)
+	w.follow()
 
 	w.SetCurrent("achieving_percentage", 50)
 
@@ -354,51 +339,4 @@ func (w *RobotWant) Progress() {
 // IsAchieved always returns false: the robot is a permanent system want.
 func (w *RobotWant) IsAchieved() bool {
 	return false
-}
-
-// ── Where the robot is tethered while it wanders ─────────────────────────────
-
-// Its leash is tied to wherever it was last put by something other than its own
-// wandering: called to somebody, taken, moved by an agent. Held in memory
-// rather than in state because a leash is not worth persisting — a restart
-// simply re-ties it wherever the robot is standing, which is the same answer
-// anybody would give.
-type wanderAnchor struct{ anchorX, anchorY, leftX, leftY int }
-
-var (
-	wanderAnchorsMu sync.Mutex
-	wanderAnchors   = map[string]wanderAnchor{}
-)
-
-// anchorFor returns the cell to wander around, re-tying to (x, y) when the
-// robot is not where wander left it — the mark of somebody else having moved it.
-func anchorFor(wantID string, x, y int) (int, int) {
-	wanderAnchorsMu.Lock()
-	defer wanderAnchorsMu.Unlock()
-	a, known := wanderAnchors[wantID]
-	if !known || a.leftX != x || a.leftY != y {
-		a = wanderAnchor{anchorX: x, anchorY: y, leftX: x, leftY: y}
-		wanderAnchors[wantID] = a
-	}
-	return a.anchorX, a.anchorY
-}
-
-// rememberWanderLeftAt records where this tick's wander put the robot, so the
-// next tick can tell its own move apart from anybody else's.
-func rememberWanderLeftAt(wantID string, x, y int) {
-	wanderAnchorsMu.Lock()
-	defer wanderAnchorsMu.Unlock()
-	a := wanderAnchors[wantID]
-	a.leftX, a.leftY = x, y
-	wanderAnchors[wantID] = a
-}
-
-func clampInt(v, min, max int) int {
-	if v < min {
-		return min
-	}
-	if v > max {
-		return max
-	}
-	return v
 }
