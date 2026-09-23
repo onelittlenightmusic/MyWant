@@ -190,6 +190,66 @@ func (s *Server) createWebWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// frameRewrites mirrors FRAME_REWRITES in the GUI's WebFrameCardPlugin: hosts
+// that refuse to be framed as-is but have a way in. Probed through the same
+// door the card will use, or Google would be reported as unframeable.
+var frameRewrites = map[string]func(u *url.URL){
+	"www.google.com": func(u *url.URL) { q := u.Query(); q.Set("igu", "1"); u.RawQuery = q.Encode() },
+	"google.com":     func(u *url.URL) { q := u.Query(); q.Set("igu", "1"); u.RawQuery = q.Encode() },
+}
+
+// probeFrameBlocked reports whether pageURL tells browsers not to show it
+// inside another site's iframe (X-Frame-Options, or a CSP frame-ancestors that
+// does not allow everyone). A browser cannot find this out afterwards — a
+// refused cross-origin frame looks the same as a slow one — so it is asked
+// once, here, when the type is made. Anything that stops the question being
+// answered (network, timeout) counts as "not blocked": the card then tries the
+// frame, which is what it did before this existed.
+func probeFrameBlocked(pageURL string) bool {
+	u, err := url.Parse(pageURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return false
+	}
+	if rw, ok := frameRewrites[u.Hostname()]; ok {
+		rw(u)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return frameBlockedByHeaders(resp.Header)
+}
+
+func frameBlockedByHeaders(h http.Header) bool {
+	switch strings.ToUpper(strings.TrimSpace(h.Get("X-Frame-Options"))) {
+	case "DENY", "SAMEORIGIN":
+		return true
+	}
+	for _, csp := range h.Values("Content-Security-Policy") {
+		for _, directive := range strings.Split(csp, ";") {
+			fields := strings.Fields(strings.ToLower(directive))
+			if len(fields) == 0 || fields[0] != "frame-ancestors" {
+				continue
+			}
+			for _, src := range fields[1:] {
+				if src == "*" {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // writeWebWantType writes a web want type's on-disk artifacts (elements.json,
 // <name>.yaml, main.py, SKILL.md) under UserCustomTypesDir()/<name>/ and reloads
 // the type registry. name must already be validated against validTypeName.
@@ -295,7 +355,7 @@ func (s *Server) writeWebWantType(name, title, pageURL, hostname, urlTemplate, s
 		return "", 0, nil, fmt.Errorf("failed to write elements.json: %w", err)
 	}
 
-	yamlContent := buildWebWantYAML(name, title, pageURL, hostname, urlTemplate, screenshotURL, elements)
+	yamlContent := buildWebWantYAML(name, title, pageURL, hostname, urlTemplate, screenshotURL, probeFrameBlocked(pageURL), elements)
 	if err = os.WriteFile(filepath.Join(dir, name+".yaml"), []byte(yamlContent), 0o644); err != nil {
 		return "", 0, nil, fmt.Errorf("failed to write YAML: %w", err)
 	}
@@ -536,7 +596,7 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL string, elements []WebWantElement) string {
+func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL string, frameBlocked bool, elements []WebWantElement) string {
 	var elemComments strings.Builder
 	var inputStateFields strings.Builder
 	var buttonStateFields strings.Builder
@@ -608,8 +668,13 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
 	}
 
 	screenshotLabel := ""
+	if frameBlocked {
+		// Read by the card (WebFrameCardPlugin): show the shot, not a frame
+		// the browser is going to refuse.
+		screenshotLabel = "\n      frameable: \"false\""
+	}
 	if screenshotURL != "" {
-		screenshotLabel = fmt.Sprintf("\n      screenshot-url: %q", screenshotURL)
+		screenshotLabel += fmt.Sprintf("\n      screenshot-url: %q", screenshotURL)
 	}
 
 	return fmt.Sprintf(`wantType:
@@ -687,6 +752,13 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
       type: object
       label: current
       persistent: false
+
+    - name: embed_url
+      description: Page the want card shows (set when an approved form resolves to a URL)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
 %s
   requires:
     - reminder_monitoring

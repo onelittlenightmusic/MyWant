@@ -176,6 +176,11 @@ func webFormMonitorSubmit(_ context.Context, want *Want) error {
 			"type": "open-url",
 			"url":  builtURL,
 		})
+		// The card shows the page it arrived at. Types generated before
+		// embed_url existed do not declare it; leave those as they were.
+		if _, ok := want.StateLabels["embed_url"]; ok {
+			want.SetCurrent("embed_url", builtURL)
+		}
 		return nil
 	}
 
