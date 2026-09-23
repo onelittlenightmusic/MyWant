@@ -17,8 +17,9 @@ wantType:
         scope        = https://www.googleapis.com/auth/drive.file
 
       The callback stores the code as `oauth_code`; the first run exchanges it
-      for a refresh token and keeps it in state, and every run after refreshes
-      an access token from it.
+      for a refresh token and keeps it in ~/.mywant/secrets as the server's
+      shared Google token, and every run after refreshes an access token from
+      it. A server already holding that token needs no consent step.
     version: '1.0'
     category: utility
     pattern: independent
@@ -118,9 +119,10 @@ wantType:
       initialValue: ''
 
     # The refresh token itself is NOT kept in state — it lives in
-    # ~/.mywant/secrets/backup_google_tokens.json (chmod 600), the same place
-    # the Spotify plugin keeps its tokens, so it never lands in state.yaml or
-    # in the Drive snapshot. This flag just says whether one is on file.
+    # ~/.mywant/secrets/google.json (chmod 600) as the server's one Google
+    # token, shared with every other Google want, so it never lands in
+    # state.yaml or in the Drive snapshot. This flag just says whether one is
+    # on file.
     - name: authorized
       description: True once a Google refresh token is on file for this want
       type: boolean

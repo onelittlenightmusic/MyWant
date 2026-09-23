@@ -30,7 +30,9 @@ import (
 // send the user to Google's consent screen with state=<want name> and
 // redirect_uri=<host>/api/v1/oauth/callback, and the callback stores the code
 // as `oauth_code`. The first run exchanges that code for a refresh token and
-// keeps it in ~/.mywant/secrets; every run after refreshes an access token from it.
+// keeps it in ~/.mywant/secrets as the server's shared Google token (see
+// google_token.go); every run after refreshes an access token from it. A
+// server that already holds that token is authorized without the consent step.
 const backupGoogleAgentName = "agent_backup_google"
 
 func init() {
@@ -62,12 +64,13 @@ func executeBackupToGoogle(ctx context.Context, want *Want) error {
 
 	// The refresh token lives in ~/.mywant/secrets, not in want state — so it
 	// stays out of state.yaml and out of the snapshot this very agent writes to
-	// Drive. Same place the Spotify plugin keeps its tokens.
-	refreshToken := LoadSecretField("backup_google", want.Metadata.ID, "refresh_token")
+	// Drive. It is the server's one Google token, shared with every other
+	// Google want (see google_token.go).
+	refreshToken := loadGoogleRefreshToken(want.Metadata.ID)
 	// One-time migration: a want authorized before the token moved out of state.
 	if refreshToken == "" {
 		if legacy := GetCurrent(want, "google_refresh_token", ""); legacy != "" {
-			if err := SaveSecretField("backup_google", want.Metadata.ID, "refresh_token", legacy); err == nil {
+			if err := saveGoogleRefreshToken(legacy); err == nil {
 				want.SetCurrent("google_refresh_token", "")
 				refreshToken = legacy
 				want.StoreLog("[BACKUP-GOOGLE] migrated refresh token from state to ~/.mywant/secrets")
@@ -90,7 +93,7 @@ func executeBackupToGoogle(ctx context.Context, want *Want) error {
 		if err != nil {
 			return backupGoogleFail(want, "code exchange", err)
 		}
-		if err := SaveSecretField("backup_google", want.Metadata.ID, "refresh_token", rt); err != nil {
+		if err := saveGoogleRefreshToken(rt); err != nil {
 			return backupGoogleFail(want, "save token", err)
 		}
 		refreshToken = rt
@@ -107,7 +110,7 @@ func executeBackupToGoogle(ctx context.Context, want *Want) error {
 		// week) can only be fixed by authorizing again — drop it so the card
 		// goes back to "authorize" rather than failing forever.
 		if strings.Contains(err.Error(), "invalid_grant") {
-			ClearSecret("backup_google", want.Metadata.ID)
+			clearGoogleRefreshToken()
 			want.SetCurrent("authorized", false)
 		}
 		return backupGoogleFail(want, "token refresh", err)
