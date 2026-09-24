@@ -259,6 +259,10 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	includeSystemWants := strings.ToLower(r.URL.Query().Get("includeSystemWants")) == "true"
 	includeCancelled := strings.ToLower(r.URL.Query().Get("includeCancelled")) == "true"
+	// The versions of one want: every want carries a series, and the GUI asks
+	// for a want's siblings each time one is selected. Without this it fetched
+	// the whole board (cancelled wants included) to keep a handful of them.
+	series := r.URL.Query().Get("series")
 
 	filters := mywant.WantFilters{
 		Type:         r.URL.Query().Get("type"),
@@ -317,6 +321,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		if !want.MatchesFilters(filters) {
 			continue
 		}
+		if series != "" && want.Metadata.Series != series {
+			continue
+		}
 		rawHashes = append(rawHashes, mywant.CalculateWantHash(want))
 	}
 	collectionHash := computeCollectionHash(rawHashes)
@@ -337,6 +344,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if !want.MatchesFilters(filters) {
+			continue
+		}
+		if series != "" && want.Metadata.Series != series {
 			continue
 		}
 		resp := s.buildWantAPIResponse(want, false)
