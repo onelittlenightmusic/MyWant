@@ -267,3 +267,53 @@ func stripRobotMention(text string) string {
 		i = end
 	}
 }
+
+// postSpeech handles POST /api/v1/speech {"characterId", "text"} — saying
+// something as a character without saying where they are.
+//
+// The other way to speak, a cursor PUT, carries a position, which is right for
+// a browser standing on the board and wrong for everyone else: the control
+// pill on some other site knows who is speaking but not where they stand, and
+// a PUT from it would either invent a cell or walk them to one. So this takes
+// the same path a new cursor message takes — the conversation record, their
+// chat window, the robot when addressed — and moves nobody. If they ARE on the
+// board, the words appear over them there too, as any `say` would.
+func (s *Server) postSpeech(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		CharacterID string `json:"characterId"`
+		Text        string `json:"text"`
+	}
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	text := strings.TrimSpace(body.Text)
+	if body.CharacterID == "" || text == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "characterId and text are required", "")
+		return
+	}
+
+	now := time.Now().UnixMilli()
+	cursorsMu.Lock()
+	cur, onBoard := cursors[body.CharacterID]
+	if onBoard {
+		cur.Message, cur.MessageAt = text, now
+		cursors[body.CharacterID] = cur
+		lastCursorPos[body.CharacterID] = cur
+	}
+	cursorsMu.Unlock()
+	if onBoard {
+		go broadcastSSE("cursor", snapshotCursors())
+	}
+
+	recordSpeech(body.CharacterID, text, "say")
+	s.appendToCharacterChat(body.CharacterID, text)
+	s.forwardToRobotIfAddressed(body.CharacterID, text)
+
+	mywant.AppendWorkLog(mywant.WorkLogEntry{
+		Type:      "speech",
+		Important: true,
+		Data:      map[string]any{"character_id": body.CharacterID, "message": text},
+	})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"at": now})
+}

@@ -414,6 +414,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/form-designs", s.listFormDesigns).Methods("GET", "OPTIONS")
 	api.HandleFunc("/form-designs/{filename}", s.serveFormDesign).Methods("GET", "OPTIONS")
 
+	// What needs a person, and where it is — the control pill's attention button.
+	api.HandleFunc("/attention", s.getAttention).Methods("GET", "OPTIONS")
+
 	// Global pause — the emergency stop every tab's control pill can reach.
 	api.HandleFunc("/system/pause", s.getSystemPause).Methods("GET", "OPTIONS")
 	api.HandleFunc("/system/pause", s.setSystemPause).Methods("PUT", "OPTIONS")
@@ -431,6 +434,7 @@ func (s *Server) setupRoutes() {
 	// Multi-cursor: per-character canvas cursor positions (in-memory, TTL-based, no locking)
 	// The recent conversation, in the order it happened — see speech_log.go.
 	api.HandleFunc("/speech", s.listSpeech).Methods("GET", "OPTIONS")
+	api.HandleFunc("/speech", s.postSpeech).Methods("POST")
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")

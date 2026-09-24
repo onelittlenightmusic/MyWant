@@ -1143,6 +1143,11 @@ func loadWebWantNavElements(wantTypeName string) []WebWantElement {
 // target_url hostname matches the page the loader is running on (passed as
 // ?url=); falls back to the most recently created still-open one.
 func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
+	// The bookmarklet says so (?via=bookmarklet): this device can use it. See
+	// recordWebInspectorUse.
+	if r.URL.Query().Get("via") == "bookmarklet" {
+		s.recordWebInspectorUse(r)
+	}
 	pageHost := hostnameOfURL(r.URL.Query().Get("url"))
 
 	var matched, all []*mywant.Want
@@ -1358,6 +1363,9 @@ var browserRunQueue = &claimQueue[browserRunClaim]{}
 var (
 	browserRunPendingMu sync.Mutex
 	browserRunPending   = map[string]chan browserRunResult{}
+	// The URL each pending run is for, so its outcome can be filed against
+	// the tab it happened in (see recordWebRunOutcome).
+	browserRunPendingURL = map[string]string{}
 )
 
 const defaultBrowserRunTimeoutMs = 90000
@@ -1396,6 +1404,7 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 
 	browserRunPendingMu.Lock()
 	browserRunPending[requestID] = resultCh
+	browserRunPendingURL[requestID] = req.URL
 	browserRunPendingMu.Unlock()
 	browserRunQueue.enqueue(browserRunClaim{
 		RequestID:  requestID,
@@ -1412,6 +1421,8 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 	case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
 		browserRunPendingMu.Lock()
 		delete(browserRunPending, requestID)
+		// No browser took it, so there is no tab to send anyone to.
+		delete(browserRunPendingURL, requestID)
 		browserRunPendingMu.Unlock()
 		s.JSONResponse(w, http.StatusGatewayTimeout, browserRunResult{
 			RequestID: requestID,
@@ -1496,7 +1507,10 @@ func (s *Server) browserRunResultHandler(w http.ResponseWriter, r *http.Request)
 	if ok {
 		delete(browserRunPending, res.RequestID)
 	}
+	runURL := browserRunPendingURL[res.RequestID]
+	delete(browserRunPendingURL, res.RequestID)
 	browserRunPendingMu.Unlock()
+	recordWebRunOutcome(runURL, res)
 
 	if ok {
 		ch <- res
