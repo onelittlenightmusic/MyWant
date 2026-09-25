@@ -38,6 +38,7 @@ kata:
       - { kind: want_type, type: weather, join: weather_city }
     # What it leaves where it was held — a route plus a forecast is knowing to take one.
     mark: { label: 傘, icon: Umbrella }
+    colors: ["#059669", "#2563eb", "#7dd3fc"]   # station → city → weather
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The pair earns a name"] }
@@ -67,6 +68,7 @@ kata:
           paramFrom: { type: transit_search, state: departure, into: event_time } }
     # What it leaves where it was held — a departure that tells you when to leave.
     mark: { label: 刻, icon: AlarmClock }
+    colors: ["#059669", "#0891b2", "#f97316"]   # station → transit → reminder
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The pair earns a name"] }
@@ -95,6 +97,7 @@ kata:
       - { kind: want_type, type: budget, status: any, owns: { type: transit_search } }
     # What it leaves where it was held — a route priced is fare counted out.
     mark: { label: 銭, icon: Coins }
+    colors: ["#059669", "#0891b2", "#eab308"]   # station → transit → budget
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The pair earns a name"] }
@@ -115,6 +118,7 @@ kata:
       - { kind: want_type, type: place_arrival, status: any, join: place }
     # What it leaves where it was held — a place two people arrive at is a meeting.
     mark: { label: 待, icon: Handshake }
+    colors: ["#db2777", "#0891b2", "#fb923c"]   # place → transit → arrival
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Arrivals are kept in the record"] }
@@ -140,6 +144,7 @@ kata:
       - { kind: want_type, type: transit_search, join: to }
     # What it leaves where it was held — an occasion travelled to is a place visited.
     mark: { label: 詣, icon: Landmark }
+    colors: ["#7c3aed", "#c026d3", "#059669"]   # event → ticket → station
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The occasion and the way there count as one thing"] }
@@ -158,6 +163,7 @@ kata:
       - { kind: want_type, type: budget }
     # What it leaves where it was held — a meal within a budget is still a meal.
     mark: { label: 糧, icon: Utensils }
+    colors: ["#ef4444", "#eab308"]   # restaurant → budget
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The restaurant's cost joins the total"] }

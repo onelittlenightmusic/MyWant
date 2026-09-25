@@ -96,9 +96,12 @@ type KataProgress struct {
 	// Mark is what the form leaves where it was 極まった, drawn rather than
 	// described. Behind a veil only its icon ships, without the word under it —
 	// enough to be curious about, not enough to be the answer.
-	Mark      *mywant.KataMark `json:"mark,omitempty"`
-	Contains  []string         `json:"contains,omitempty"`
-	Variation string           `json:"variation,omitempty"`
+	Mark *mywant.KataMark `json:"mark,omitempty"`
+	// Colors is the form's own colour (see mywant.Kata.Colors). Kept behind a
+	// veil, like the mark's icon: a colour is a picture, not the answer.
+	Colors    []string `json:"colors,omitempty"`
+	Contains  []string `json:"contains,omitempty"`
+	Variation string   `json:"variation,omitempty"`
 	// Suggestions are the moves that would complete this form somewhere it is
 	// one 所作 short. Empty for a form that is masked, complete everywhere, or
 	// nowhere near.
@@ -370,6 +373,7 @@ func (s *Server) evaluateKataPass() ([]LevelProgress, []KataProgress, []string) 
 			p.Intent = ""
 			p.Yields = ""
 			p.Mark = nil
+			p.Colors = nil
 			p.Group = ""
 			p.Constellation = ""
 			// The witnesses would draw the form on the canvas as plainly as the
@@ -595,6 +599,7 @@ func (s *Server) evaluateOneKata(
 				Hidden:        k.Hidden,
 				Veiled:        k.Veiled,
 				Mark:          k.Mark,
+				Colors:        k.Colors,
 			}
 		}
 	}

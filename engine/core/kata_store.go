@@ -214,6 +214,16 @@ type Kata struct {
 	// to say in prose.
 	Mark *KataMark `yaml:"mark,omitempty" json:"mark,omitempty"`
 
+	// Colors is the form's own colour — one stop for a flat colour, several
+	// for a gradient, in order. It is what the form is ABOUT, so it is usually
+	// the colours of the kinds it joins: 近 joins a station and a city, and is
+	// green running into blue. Separate from the belt's colour, which says how
+	// far along the ladder a form sits, not what it is.
+	//
+	// The board paints a folded constellation the form stands on with it, and
+	// the catalogue paints the form's card.
+	Colors []string `yaml:"colors,omitempty" json:"colors,omitempty"`
+
 	// Veiled: the kata is LISTED, with the right number of blanks, and only
 	// what goes in them is withheld — a form you are told exists and have to
 	// find the 所作 of.

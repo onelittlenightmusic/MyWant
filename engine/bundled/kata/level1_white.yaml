@@ -32,6 +32,7 @@ kata:
       - { kind: thing, subtype: station }
     # What it leaves where it was held — the thing that comes to the name you just gave.
     mark: { label: 駅, icon: TramFront }
+    colors: ["#059669"]   # station
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a destination instead of typing it"] }
@@ -48,6 +49,7 @@ kata:
       - { kind: thing, subtype: city }
     # What it leaves where it was held — a city named is a skyline you can point at.
     mark: { label: 市, icon: Building2 }
+    colors: ["#2563eb"]   # city
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick a city instead of typing it"] }
@@ -64,6 +66,7 @@ kata:
       - { kind: thing, subtype: place }
     # What it leaves where it was held — a coordinate with a name on it is a pin.
     mark: { label: 標, icon: MapPin }
+    colors: ["#db2777"]   # place
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Places can be referred to by name"] }
@@ -83,6 +86,7 @@ kata:
       - { kind: thing, subtype: event }
     # What it leaves where it was held — an occasion is a square on the calendar.
     mark: { label: 催, icon: CalendarDays }
+    colors: ["#7c3aed"]   # event
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Pick an occasion instead of typing it"] }
@@ -107,6 +111,7 @@ kata:
     # What this form leaves on the constellation it was held on — a station is
     # what a city is WALKED to, so the line between them wears footprints.
     mark: { label: 近, icon: Footprints }
+    colors: ["#059669", "#2563eb"]   # station → city
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The two values count as one area"] }
