@@ -879,6 +879,11 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TargetURL   string            `json:"target_url"`
 		FieldValues map[string]string `json:"field_values,omitempty"`
+		// FillOnly types the values in and stops there: no button is pressed
+		// and nothing is submitted. The want card's "open in a new tab" asks
+		// for this, so the page comes up with the want's parameters already
+		// entered and the person decides what to do with them.
+		FillOnly bool `json:"fill_only,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
@@ -906,11 +911,15 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	// present to run mywantFillAndSubmit instead of the read-only
 	// mywantNavOverlay.
 	if len(body.FieldValues) > 0 {
-		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues})
+		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues, FillOnly: body.FillOnly})
+		mode := "fill"
+		if body.FillOnly {
+			mode = "prefill"
+		}
 		s.JSONResponse(w, http.StatusOK, map[string]any{
 			"ok":      true,
 			"url":     targetURL,
-			"mode":    "fill",
+			"mode":    mode,
 			"fields":  len(body.FieldValues),
 			"message": fmt.Sprintf("queued %s (%d field(s)) for the Chrome extension", name, len(body.FieldValues)),
 		})
@@ -982,6 +991,8 @@ type navLaunchClaim struct {
 	// extension to run mywantFillAndSubmit instead of the read-only
 	// mywantNavOverlay. Keyed by WebWantElement.FieldKey.
 	FieldValues map[string]string `json:"field_values,omitempty"`
+	// With FieldValues: fill them in but press nothing (see launchWebWant).
+	FillOnly bool `json:"fill_only,omitempty"`
 }
 
 // claimQueue is a generic mutex-guarded FIFO — the shared shape behind
