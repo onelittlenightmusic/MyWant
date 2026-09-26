@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	mywant "mywant/engine/core"
+	"mywant/engine/ext"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -43,12 +44,16 @@ type MyWantConfig struct {
 	// Appearance settings edited from the GUI Settings modal. These are saved
 	// to config.yaml by the server, so they must be read back here too —
 	// otherwise they survive on disk but not across a server restart.
-	IconFont             string              `yaml:"icon_font"`              // lucide, lucide-thin, heroicons-outline, heroicons-solid
-	GeocodeCountry       string              `yaml:"geocode_country"`        // ISO 3166-1 alpha-2 ("jp"); restricts place-name lookups. "" = worldwide
-	CanvasBgColor        string              `yaml:"canvas_bg_color"`        // canvas background colour (hex)
-	CanvasDPad           *bool               `yaml:"canvas_dpad"`            // software D-Pad overlay
-	CanvasWeatherEffect  string              `yaml:"canvas_weather_effect"`  // manual weather override ("" = auto)
-	CanvasDesign         string              `yaml:"canvas_design"`          // canvas skin id (cubic, forest, simple, sky)
+	IconFont            string `yaml:"icon_font"`             // lucide, lucide-thin, heroicons-outline, heroicons-solid
+	GeocodeCountry      string `yaml:"geocode_country"`       // ISO 3166-1 alpha-2 ("jp"); restricts place-name lookups. "" = worldwide
+	CanvasWeatherEffect string `yaml:"canvas_weather_effect"` // manual weather override ("" = auto)
+	// Ext is the GUI extensions' own settings, keyed by extension name — the
+	// canvas's pad is ext.canvas.dpad. Set with `mywant config set ext.<path>`.
+	// See engine/ext.
+	Ext map[string]any `yaml:"ext,omitempty"`
+	// LegacyCanvasDPad is canvas_dpad from before ext: read once, moved to
+	// ext.canvas.dpad by LoadConfig, never written.
+	LegacyCanvasDPad     *bool               `yaml:"canvas_dpad,omitempty"`
 	InteractionMode      string              `yaml:"interaction_mode"`       // edit or game
 	Environments         map[string]string   `yaml:"environments"`           // arbitrary env vars applied at startup
 	OTELEndpoint         string              `yaml:"otel_endpoint"`          // OTLP/gRPC endpoint (e.g. "localhost:4317"). Falls back to OTEL_EXPORTER_OTLP_ENDPOINT env var.
@@ -138,8 +143,18 @@ func LoadConfig() (*MyWantConfig, error) {
 	if err := yaml.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
+	config.migrateToExt()
 
 	return config, nil
+}
+
+// migrateToExt moves the canvas settings that predate ext into it. A value
+// already under ext wins: it is the newer one.
+func (c *MyWantConfig) migrateToExt() {
+	if c.LegacyCanvasDPad != nil && ext.Get(c.Ext, "canvas", "dpad") == nil {
+		c.Ext = ext.Set(c.Ext, *c.LegacyCanvasDPad, "canvas", "dpad")
+	}
+	c.LegacyCanvasDPad = nil
 }
 
 // SaveConfig saves configuration to file.
@@ -185,6 +200,14 @@ func (c *MyWantConfig) Save() error {
 	// would sit in the file looking like a setting rather than the absence of one.
 	if len(c.Environments) == 0 {
 		delete(merged, "environments")
+	}
+	if len(c.Ext) == 0 {
+		delete(merged, "ext")
+	}
+	// Moved under ext (canvas_dpad), or read by nothing any more
+	// (canvas_bg_color, canvas_design — a character's own now).
+	for _, k := range []string{"canvas_dpad", "canvas_bg_color", "canvas_design"} {
+		delete(merged, k)
 	}
 
 	out, err := yaml.Marshal(merged)
@@ -529,12 +552,40 @@ func displayConfig(config *MyWantConfig) {
 		}
 	}
 
+	if len(config.Ext) > 0 {
+		fmt.Println()
+		fmt.Println("Extensions (ext):")
+		if out, err := yaml.Marshal(config.Ext); err == nil {
+			for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+				fmt.Printf("  %s\n", line)
+			}
+		}
+	}
+
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Printf("Config file: %s\n", getConfigPath())
 }
 
 // applyConfigKey sets a single config field by name.
 func applyConfigKey(config *MyWantConfig, key, value string) error {
+	// ext.<extension>.<setting>: the GUI extensions' own settings, which this
+	// CLI stores without knowing what they mean. The value is read as YAML, so
+	// true, 2 and "text" arrive as a bool, a number and a string; "null"
+	// removes the key.
+	if path, ok := strings.CutPrefix(key, "ext."); ok {
+		parts := strings.Split(path, ".")
+		for _, p := range parts {
+			if p == "" {
+				return fmt.Errorf("invalid ext key %q", key)
+			}
+		}
+		var v any
+		if err := yaml.Unmarshal([]byte(value), &v); err != nil {
+			v = value
+		}
+		config.Ext = ext.Set(config.Ext, v, parts...)
+		return nil
+	}
 	switch key {
 	case "agent_mode":
 		config.AgentMode = value
@@ -572,7 +623,7 @@ func applyConfigKey(config *MyWantConfig, key, value string) error {
 	case "otel_endpoint":
 		config.OTELEndpoint = value
 	default:
-		return fmt.Errorf("unknown config key %q. Valid keys: agent_mode, current_context, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint", key)
+		return fmt.Errorf("unknown config key %q. Valid keys: agent_mode, current_context, server_host, server_port, agent_service_host, agent_service_port, mock_flight_port, header_position, color_mode, otel_endpoint, ext.<extension>.<setting>", key)
 	}
 	return nil
 }

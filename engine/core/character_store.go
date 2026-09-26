@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+	"mywant/engine/ext"
 	"mywant/engine/labels"
 )
 
@@ -40,7 +41,7 @@ type Character struct {
 	AuraCardWantID string `yaml:"auraCardWantId,omitempty" json:"auraCardWantId,omitempty"`
 	// TileDesign / AuraDesign are the design-plugin ids this character picks for
 	// the want tiles and aura they own on the canvas (e.g. "cubic", "forest").
-	// Empty = inherit the canvas-level design (config.canvas_design).
+	// Empty = inherit the board's design (display ext.canvas.design).
 	//
 	// Kept as the labels tile-design / aura-design (LabelTileDesign,
 	// LabelAuraDesign): a pick of one string is what a label is for, the way a
@@ -118,13 +119,29 @@ type CharacterDisplay struct {
 	CardOpacity *float64 `yaml:"cardOpacity,omitempty" json:"card_opacity,omitempty"`
 	// Icon family for category/type icons ("lucide", "heroicons-solid", …).
 	IconFont string `yaml:"iconFont,omitempty" json:"icon_font,omitempty"`
-	// Canvas skin id ("cubic", "forest", …) — the whole board's look, as
-	// opposed to TileDesign/AuraDesign, which are this character's own tiles.
-	CanvasDesign string `yaml:"canvasDesign,omitempty" json:"canvas_design,omitempty"`
+	// LegacyCanvasDesign is the canvas skin id from before Ext; it lives at
+	// ext.canvas.design now. Read from old files and old clients, moved by
+	// moveToExt, never written again.
+	LegacyCanvasDesign string `yaml:"canvasDesign,omitempty" json:"canvas_design,omitempty"`
 	// Solid canvas ground colour, and the background image URL. Both are what
 	// THIS person sees; the board underneath is the same board.
 	CanvasBgColor string `yaml:"canvasBgColor,omitempty" json:"canvas_bg_color,omitempty"`
 	CanvasBgURL   string `yaml:"canvasBgUrl,omitempty" json:"canvas_bg_url,omitempty"`
+	// Ext is the GUI extensions' own choices for this person, keyed by
+	// extension name — the canvas skin is ext.canvas.design. The one free-form
+	// corner of a struct that is otherwise named fields on purpose: these are
+	// settings the engine never reads, so it has no values to check them
+	// against. See package ext.
+	Ext map[string]any `yaml:"ext,omitempty" json:"ext,omitempty"`
+}
+
+// moveToExt carries the canvas skin from before Ext into it. A value already
+// under ext wins.
+func (d *CharacterDisplay) moveToExt() {
+	if d.LegacyCanvasDesign != "" && ext.Get(d.Ext, "canvas", "design") == nil {
+		d.Ext = ext.Set(d.Ext, d.LegacyCanvasDesign, "canvas", "design")
+	}
+	d.LegacyCanvasDesign = ""
 }
 
 // AuraTarget addresses what an aura mark is about. Scope (Kind+Name) names
@@ -274,6 +291,7 @@ func (m *characterManager) load() {
 			s.Characters[i].AssignedDeviceIDs = []string{}
 		}
 		s.Characters[i].moveDesignToLabels()
+		s.Characters[i].Display.moveToExt()
 	}
 	m.store = s
 	m.lastHash = fmt.Sprintf("%x", md5.Sum(data))
@@ -601,6 +619,8 @@ func (m *characterManager) SetDisplay(characterID string, d CharacterDisplay) (*
 		if c.ID != characterID {
 			continue
 		}
+		d.moveToExt()
+		d.Ext = ext.Clone(d.Ext)
 		m.store.Characters[i].Display = d
 		m.save()
 		cp := m.store.Characters[i]

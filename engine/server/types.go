@@ -26,11 +26,15 @@ type Config struct {
 	SystemFontSize string `json:"system_font_size,omitempty" yaml:"system_font_size,omitempty"`
 	// TunnelURL is the public URL captured from a managed_launch want (e.g.
 	// cloudflared/ngrok) whose result_field is "tunnel_url" — see SetTunnelURL.
-	TunnelURL           string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
-	CanvasBgColor       string `json:"canvas_bg_color,omitempty" yaml:"canvas_bg_color,omitempty"`
-	CanvasDPad          *bool  `json:"canvas_dpad,omitempty" yaml:"canvas_dpad,omitempty"`
+	TunnelURL string `json:"tunnel_url,omitempty" yaml:"tunnel_url,omitempty"`
+	// CanvasWeatherEffect overrides the weather drawn over the wants — the
+	// list's as well as the board's, despite the name.
 	CanvasWeatherEffect string `json:"canvas_weather_effect,omitempty" yaml:"canvas_weather_effect,omitempty"`
-	CanvasDesign        string `json:"canvas_design,omitempty" yaml:"canvas_design,omitempty"`
+	// Ext is the GUI extensions' own settings, keyed by extension name
+	// (ext.canvas.dpad). The server keeps and merges it and reads nothing in
+	// it, so an extension adds a setting without a field here — see package
+	// ext. PATCH merges it (JSON Merge Patch); PUT replaces it.
+	Ext map[string]any `json:"ext,omitempty" yaml:"ext,omitempty"`
 	// InteractionMode is "edit" (default, canvas tiles draggable) or "game"
 	// (tile positions locked — see the game-mode barrier in updateWant and
 	// the label-mutation endpoints in handlers_modifications.go).

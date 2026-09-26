@@ -58,13 +58,6 @@ wantType:
       persistent: false
       initialValue: ""
 
-    - name: canvas_scale
-      description: Zoom scale of the 2D canvas view (0.2–2.5)
-      type: float64
-      label: current
-      persistent: false
-      initialValue: 1.0
-
     - name: canvas_cursor_x
       description: X tile coordinate of the CursorMan on the 2D canvas (used for cross-tab cursor sync)
       type: float64
@@ -250,40 +243,12 @@ wantType:
       persistent: false
       initialValue: ""
 
-    - name: float_card_corner
-      description: Corner of the screen where the canvas float card is anchored ("top-left" | "top-right" | "bottom-left" | "bottom-right")
-      type: string
-      label: current
-      persistent: false
-      initialValue: "bottom-left"
-
     - name: form_situation
       description: Dashboard form/interaction mode ("type-selection" | "fields" | "closed" | "select-mode" | "batch-action")
       type: string
       label: current
       persistent: false
       initialValue: "closed"
-
-    - name: canvas_mode
-      description: Whether the dashboard is showing the 2D canvas view (true) or the list/grid view (false)
-      type: bool
-      label: current
-      persistent: false
-      initialValue: false
-
-    - name: canvas_center_x
-      description: X canvas coordinate of the viewport center (used for cross-tab pan sync)
-      type: float64
-      label: current
-      persistent: false
-      initialValue: 0
-
-    - name: canvas_center_y
-      description: Y canvas coordinate of the viewport center (used for cross-tab pan sync)
-      type: float64
-      label: current
-      persistent: false
-      initialValue: 0
 
     # ── Add Want form control (driven by CLI) ─────────────────────────────────
 
@@ -337,6 +302,17 @@ wantType:
 
     - name: pendingDeviceActions
       description: Queue of open-url actions pushed by agents for connected browser clients.
+      type: object
+      label: current
+      persistent: false
+
+    # ── Extensions ─────────────────────────────────────────────────────────────
+    # A GUI extension (the canvas) keeps its own view state here, under its own
+    # name — ext.canvas.<character>.scale and so on. The engine merges it (JSON
+    # Merge Patch, see engine/ext) and never reads inside it, so an extension
+    # adds a key without a change here.
+    - name: ext
+      description: Open slot for GUI extensions' own state, keyed by extension name (merged on write, never interpreted by the engine).
       type: object
       label: current
       persistent: false

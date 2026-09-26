@@ -18,6 +18,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
+	"mywant/engine/ext"
 	"mywant/engine/types"
 
 	"github.com/google/uuid"
@@ -71,10 +72,8 @@ func (s *Server) applyFrontendConfig(newConfig Config) {
 	if newConfig.GeocodeCountry != "" {
 		s.config.GeocodeCountry = newConfig.GeocodeCountry
 	}
-	s.config.CanvasBgColor = newConfig.CanvasBgColor
-	s.config.CanvasDPad = newConfig.CanvasDPad
 	s.config.CanvasWeatherEffect = newConfig.CanvasWeatherEffect
-	s.config.CanvasDesign = newConfig.CanvasDesign
+	s.config.Ext = ext.Clone(newConfig.Ext)
 	s.config.InteractionMode = newConfig.InteractionMode
 	s.config.WebInspectorLANHost = newConfig.WebInspectorLANHost
 	s.config.WebInspectorCACertPath = newConfig.WebInspectorCACertPath
@@ -96,6 +95,15 @@ func (s *Server) updateConfig(w http.ResponseWriter, r *http.Request) {
 
 	s.applyFrontendConfig(newConfig)
 	s.JSONResponse(w, http.StatusOK, s.config)
+}
+
+// extOf reads the ext object out of a marshalled config.
+func extOf(configJSON []byte) map[string]any {
+	var c struct {
+		Ext map[string]any `json:"ext"`
+	}
+	_ = json.Unmarshal(configJSON, &c)
+	return c.Ext
 }
 
 // patchConfig is a partial update: only the keys present in the request body
@@ -126,6 +134,11 @@ func (s *Server) patchConfig(w http.ResponseWriter, r *http.Request) {
 	// left alone.
 	for k, v := range patch {
 		merged[k] = v
+	}
+	// ext is merged, not replaced: toggling one extension's setting must not
+	// drop the others'. See package ext.
+	if p, ok := patch["ext"]; ok {
+		merged["ext"] = ext.MergePatch(extOf(currentJSON), p)
 	}
 
 	mergedJSON, err := json.Marshal(merged)
@@ -1416,6 +1429,9 @@ func (s *Server) getGUIState(w http.ResponseWriter, r *http.Request) {
 //   - Omitted  → unconditional write (legacy / robot CLI path).
 //
 // If the payload carries robot fields with a new nonce, appends a RobotLogEntry.
+// guiStateExtMu serialises the read-merge-store of gui_state's `ext`.
+var guiStateExtMu sync.Mutex
+
 func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want == nil {
@@ -1462,12 +1478,28 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	// speech_log.go — so the record is taken on the way through.
 	recordRobotSayFromGUIState(want, updates)
 
+	// `ext` is the GUI extensions' own corner (see package ext): merged, never
+	// replaced, so one window writing its character's camera does not wipe
+	// another's. What is inside it is not the engine's to read.
+	// Read, merge and store under one lock: two windows PUTting at once would
+	// otherwise each merge onto the same old value and one write would be lost.
+	if patch, ok := updates["ext"].(map[string]any); ok {
+		guiStateExtMu.Lock()
+		current, _ := want.GetAllState()["ext"].(map[string]any)
+		want.StoreState("ext", ext.Merge(current, patch))
+		if !mywant.Contains(want.ProvidedStateFields, "ext") {
+			want.ProvidedStateFields = append(want.ProvidedStateFields, "ext")
+		}
+		guiStateExtMu.Unlock()
+		delete(updates, "ext")
+	}
+
 	for key, val := range updates {
 		if val == nil {
 			want.DeleteState(key) // null from client means "remove this field"
 		} else {
 			want.StoreState(key, val)
-			// gui_state keys are frequently per-character (e.g. canvas_scale_<id>),
+			// gui_state keys are frequently per-character (e.g. canvas_cursor_x_<id>),
 			// so the static YAML schema can't enumerate them in advance. Register
 			// any new key as explicit state so GET returns it instead of dropping
 			// it into hidden state (same pattern as derived_fields.go).

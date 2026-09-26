@@ -694,17 +694,20 @@ func (s *Server) saveFrontendConfig() {
 	if s.config.HTTPSPath != "" {
 		fullConfig["https_path"] = s.config.HTTPSPath
 	}
-	if s.config.CanvasBgColor != "" {
-		fullConfig["canvas_bg_color"] = s.config.CanvasBgColor
-	}
-	if s.config.CanvasDPad != nil {
-		fullConfig["canvas_dpad"] = *s.config.CanvasDPad
-	}
 	if s.config.CanvasWeatherEffect != "" {
 		fullConfig["canvas_weather_effect"] = s.config.CanvasWeatherEffect
 	}
-	if s.config.CanvasDesign != "" {
-		fullConfig["canvas_design"] = s.config.CanvasDesign
+	// The canvas's settings live under ext now (ext.canvas.dpad). The flat
+	// keys are dropped: canvas_dpad was moved there when the config was read,
+	// and canvas_bg_color / canvas_design had not been read by anything since
+	// both became a character's own.
+	delete(fullConfig, "canvas_dpad")
+	delete(fullConfig, "canvas_bg_color")
+	delete(fullConfig, "canvas_design")
+	if len(s.config.Ext) > 0 {
+		fullConfig["ext"] = s.config.Ext
+	} else {
+		delete(fullConfig, "ext")
 	}
 	if s.config.CurrentWorld != "" {
 		fullConfig["current_world"] = s.config.CurrentWorld
