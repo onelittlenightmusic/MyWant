@@ -261,7 +261,7 @@ func buildPayloadWithEvent(event string, w *mywant.Want) LifecycleWebhookPayload
 		Name:   w.Metadata.Name,
 		Type:   w.Metadata.Type,
 		Status: string(w.GetStatus()),
-		Labels: w.Metadata.Labels,
+		Labels: w.GetLabels(), // copied under the want's lock; the payload is marshalled later
 	}
 	for _, ref := range w.Metadata.OwnerReferences {
 		info.OwnerReferences = append(info.OwnerReferences, LifecycleOwnerReference{
@@ -349,8 +349,9 @@ func ruleMatchesWant(match mywant.LifecycleRuleMatch, w *mywant.Want) bool {
 			return false
 		}
 	}
+	labels := w.GetLabels() // a live want's map is written under its lock
 	for k, v := range match.Labels {
-		if w.Metadata.Labels[k] != v {
+		if labels[k] != v {
 			return false
 		}
 	}

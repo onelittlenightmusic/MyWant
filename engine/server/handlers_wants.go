@@ -351,7 +351,9 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 		resp := s.buildWantAPIResponse(want, false)
 		if extra := kataLabels[want.Metadata.ID]; len(extra) > 0 {
-			// Copy: the map on the response still points at the live want's own.
+			// The response's map is already its own copy (see buildWantAPIResponse);
+			// merged into a fresh one all the same, so the kata labels never leak
+			// back into anything else holding that copy.
 			labels := make(map[string]string, len(resp.Metadata.Labels)+len(extra))
 			maps.Copy(labels, resp.Metadata.Labels)
 			maps.Copy(labels, extra)
@@ -456,6 +458,10 @@ type wantAPIResponse struct {
 // into current/goal/plan buckets. Unlabeled explicit state fields (including system-reserved
 // fields like final_result) fall into the current bucket.
 func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIResponse {
+	// One snapshot of the metadata, copied under the want's lock. The response
+	// used to carry want.Metadata itself, so its labels map was the live want's
+	// own and was read again, unlocked, when the response was encoded.
+	md := want.GetMetadata()
 	explicitState := want.GetExplicitState()
 	current := make(map[string]any)
 	goal := make(map[string]any)
@@ -491,18 +497,18 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 		current[k] = v
 	}
 
-	exposableFields := s.exposableFieldsCache[want.Metadata.Type]
-	importableFields := s.importableFieldsCache[want.Metadata.Type]
+	exposableFields := s.exposableFieldsCache[md.Type]
+	importableFields := s.importableFieldsCache[md.Type]
 
 	// Build enriched correlation entries with RelationIDs.
-	enrichedCorr := make([]enrichedCorrelationEntry, 0, len(want.Metadata.Correlation))
-	for _, ce := range want.Metadata.Correlation {
+	enrichedCorr := make([]enrichedCorrelationEntry, 0, len(md.Correlation))
+	for _, ce := range md.Correlation {
 		var relationID string
 		for _, l := range ce.Labels {
 			if strings.HasPrefix(l, "stateAccess/consumer:expose/") {
 				// This want is the provider; compute ID from own ID + field name.
 				fn := strings.TrimPrefix(l, "stateAccess/consumer:expose/")
-				relationID = computeRelationID(want.Metadata.ID, fn)
+				relationID = computeRelationID(md.ID, fn)
 				break
 			}
 			if strings.HasPrefix(l, "stateAccess/provider:expose/") {
@@ -529,7 +535,7 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 	// list under their own Kind.
 	enrichedCorr = append(enrichedCorr, s.constellationCorrelationEntries(want)...)
 	enrichedCorr = append(enrichedCorr, s.parameterCorrelationEntries(want)...)
-	meta := apiMetadata{Metadata: want.Metadata, Correlation: enrichedCorr}
+	meta := apiMetadata{Metadata: md, Correlation: enrichedCorr}
 
 	resp := wantAPIResponse{
 		Metadata:         meta,
@@ -617,8 +623,11 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	if updatedWant.Metadata.Type == "" {
 		updatedWant.Metadata.Type = foundWant.Metadata.Type
 	}
+	// A copy taken under the lock: foundWant is live, and its labels map is
+	// both written concurrently and must not become shared with the update.
+	foundLabels := foundWant.GetLabels()
 	if updatedWant.Metadata.Labels == nil {
-		updatedWant.Metadata.Labels = foundWant.Metadata.Labels
+		updatedWant.Metadata.Labels = foundLabels
 	}
 	if updatedWant.Metadata.OwnerReferences == nil {
 		updatedWant.Metadata.OwnerReferences = foundWant.Metadata.OwnerReferences
@@ -648,8 +657,8 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	// values actually changed (many unrelated PUTs, e.g. `params set`,
 	// re-send the untouched canvas-x/-y labels as part of the full metadata).
 	if s.config.InteractionMode == "game" {
-		if foundWant.Metadata.Labels[canvasLabelX] != updatedWant.Metadata.Labels[canvasLabelX] ||
-			foundWant.Metadata.Labels[canvasLabelY] != updatedWant.Metadata.Labels[canvasLabelY] {
+		if foundLabels[canvasLabelX] != updatedWant.Metadata.Labels[canvasLabelX] ||
+			foundLabels[canvasLabelY] != updatedWant.Metadata.Labels[canvasLabelY] {
 			s.JSONError(w, r, http.StatusConflict, "Tile movement is disabled in game mode", "")
 			return
 		}

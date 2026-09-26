@@ -101,8 +101,9 @@ func (s *Server) tilesAround(x, y int) []tileNear {
 			if want == nil || want.Metadata.IsSystemWant {
 				continue
 			}
-			wx, errX := strconv.Atoi(want.Metadata.Labels[canvasXLabelKey])
-			wy, errY := strconv.Atoi(want.Metadata.Labels[canvasYLabelKey])
+			labels := want.GetLabels() // a live want's map is written under its lock
+			wx, errX := strconv.Atoi(labels[canvasXLabelKey])
+			wy, errY := strconv.Atoi(labels[canvasYLabelKey])
 			if errX != nil || errY != nil {
 				continue
 			}

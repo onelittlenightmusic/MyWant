@@ -148,7 +148,7 @@ func (s *Server) addLabelToWant(w http.ResponseWriter, r *http.Request) {
 	// Game mode locks canvas tile positions — reject only if the value
 	// actually changes (mirrors the guard in updateWant).
 	if s.config.InteractionMode == "game" && (req.Key == canvasLabelX || req.Key == canvasLabelY) {
-		if want, _, found := s.globalBuilder.FindWantByID(wantID); found && want.Metadata.Labels[req.Key] != req.Value {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found && want.GetLabels()[req.Key] != req.Value {
 			http.Error(w, "Tile movement is disabled in game mode", http.StatusConflict)
 			return
 		}
@@ -349,8 +349,9 @@ func (s *Server) getWantCluster(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		x, _ := strconv.Atoi(want.Metadata.Labels["mywant.io/canvas-x"])
-		y, _ := strconv.Atoi(want.Metadata.Labels["mywant.io/canvas-y"])
+		labels := want.GetLabels() // a live want's map is written under its lock
+		x, _ := strconv.Atoi(labels["mywant.io/canvas-x"])
+		y, _ := strconv.Atoi(labels["mywant.io/canvas-y"])
 		members = append(members, ClusterMember{
 			ID:   current,
 			Name: want.Metadata.Name,

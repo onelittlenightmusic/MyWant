@@ -88,10 +88,11 @@ func (s *Server) constellationMemberRank(kind, name, id string) (int, bool) {
 	if kind == "want" {
 		if s.globalBuilder != nil {
 			if wnt, _, found := s.globalBuilder.FindWantByID(id); found && wnt != nil {
-				if v, ok := wnt.Metadata.Labels[key]; ok {
+				labels := wnt.GetLabels() // a live want's map is written under its lock
+				if v, ok := labels[key]; ok {
 					raw = v
 				} else {
-					raw = wnt.Metadata.Labels[legacy]
+					raw = labels[legacy]
 				}
 			}
 		}
@@ -211,7 +212,7 @@ func (s *Server) constellationCorrelationEntries(want *mywant.Want) []enrichedCo
 	if want == nil {
 		return nil
 	}
-	return s.constellationEntriesFor("want", want.Metadata.ID, want.Metadata.Labels, map[string]bool{})
+	return s.constellationEntriesFor("want", want.Metadata.ID, want.GetLabels(), map[string]bool{})
 }
 
 // parameterCorrelationEntries returns one entry per thing this want currently

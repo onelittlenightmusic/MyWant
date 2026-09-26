@@ -111,7 +111,10 @@ func (s *Server) collectWantConstellations() []constellationDTO {
 	colorByName := map[string]string{}
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
-			for key, val := range want.Metadata.Labels {
+			// GetLabels, not Metadata.Labels: a label change is applied to the
+			// live want's own map under its metadata lock, and ranging over it
+			// unlocked is a concurrent map read the runtime kills the process for.
+			for key, val := range want.GetLabels() {
 				if name := constellationNameFromKey(key); name != "" {
 					byName[name] = append(byName[name], want.Metadata.ID)
 				}
@@ -262,7 +265,10 @@ func (s *Server) constellationColor(kind, name string) string {
 	if kind == "want" {
 		if s.globalBuilder != nil {
 			for _, want := range s.globalBuilder.GetAllWantStates() {
-				if c, ok := want.Metadata.Labels[colorKey]; ok && c != "" {
+				// A copy under the lock — see collectWantConstellations. Joining a
+				// group queues the membership label and then reads the colour
+				// here, while the reconcile loop is writing that same map.
+				if c, ok := want.GetLabels()[colorKey]; ok && c != "" {
 					return c
 				}
 			}
@@ -524,8 +530,9 @@ func (s *Server) membersOfConstellation(kind, name string) []string {
 		var out []string
 		if s.globalBuilder != nil {
 			for _, want := range s.globalBuilder.GetAllWantStates() {
-				_, has := want.Metadata.Labels[key]
-				_, hadLegacy := want.Metadata.Labels[legacy]
+				labels := want.GetLabels() // see collectWantConstellations
+				_, has := labels[key]
+				_, hadLegacy := labels[legacy]
 				if has || hadLegacy {
 					out = append(out, want.Metadata.ID)
 				}
