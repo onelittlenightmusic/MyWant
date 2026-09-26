@@ -1451,12 +1451,12 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// A character's canvas position, written here by the canvas Call action and
-	// by `mywant-gui i take`, is an instruction — and for a character that is
+	// by `mywant-guiex i take`, is an instruction — and for a character that is
 	// played by a want (the robot) it has to reach that want, or it reaches
 	// nothing at all. See character_want_bridge.go.
 	s.applyCharacterCursorToWant(updates)
 
-	// `mywant gui robot say` writes the words here, alongside a fresh nonce that
+	// `mywant guiex robot say` writes the words here, alongside a fresh nonce that
 	// marks them as newly said rather than carried along by an unrelated update.
 	// The robot speaks into the same conversation as everybody else — see
 	// speech_log.go — so the record is taken on the way through.

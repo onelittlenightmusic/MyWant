@@ -32,7 +32,7 @@ type SpeechEntry struct {
 	Text        string `json:"text"`
 	// Unix ms. The sort key, and what a client's expiry counts from.
 	At int64 `json:"at"`
-	// How it was said: "say" (a cursor message, e.g. `mywant gui i say`) or
+	// How it was said: "say" (a cursor message, e.g. `mywant guiex i say`) or
 	// "chat" (posted to the character's chat want). Kept because they are
 	// different acts even though they land in the same column.
 	Source string `json:"source"`
@@ -118,7 +118,7 @@ func characterIDForChatWant(want *mywant.Want) string {
 	return ""
 }
 
-// recordRobotSayFromGUIState notices `mywant gui robot say` going past.
+// recordRobotSayFromGUIState notices `mywant guiex robot say` going past.
 //
 // The robot's words arrive as a gui_state write rather than as a cursor message
 // or a chat want, because the robot has no browser publishing a cursor and its
@@ -167,7 +167,7 @@ func toInt64(v any) int64 {
 //
 // So the rule inverted: everything said is speech, and the agent is addressed
 // on purpose. One rule, applied where the utterance is recorded, so it holds
-// for the header bubble, `mywant gui i say`, a chat want and anything added
+// for the header bubble, `mywant guiex i say`, a chat want and anything added
 // later without each of them having to remember it.
 const robotMention = "@robot"
 

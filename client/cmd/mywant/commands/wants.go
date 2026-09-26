@@ -412,7 +412,7 @@ for, and usually not near what it has to do with. Say where, when you know.`,
 		if placing {
 			fmt.Printf("On the canvas at (%d, %d).\n", atX, atY)
 		} else {
-			fmt.Println("The server chose its cell; `mywant board` says where, and `mywant gui tile set <name> <x> <y>` moves it.")
+			fmt.Println("The server chose its cell; `mywant board` says where, and `mywant guiex tile set <name> <x> <y>` moves it.")
 		}
 	},
 }

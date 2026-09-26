@@ -135,7 +135,7 @@ func (s *Server) removeCharacterChatWant(characterID string) {
 //
 // Saying something and having it appear in your chat window are the same event
 // seen twice, and only one of them used to happen: the header bubble and
-// `mywant gui i say` published speech, which the board drew and the speech
+// `mywant guiex i say` published speech, which the board drew and the speech
 // record kept, while the want that IS the character's chat window heard
 // nothing. Anybody opening their card found it empty however much they had
 // said.

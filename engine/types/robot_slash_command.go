@@ -33,7 +33,7 @@ func tryRunSlashCommand(want *Want, text string) bool {
 		return true
 	}
 	if len(args) == 0 {
-		appendSlashCommandResponse(want, `使い方: /<command> [args...]（例: /gui robot say "hello"、/agents list）`)
+		appendSlashCommandResponse(want, `使い方: /<command> [args...]（例: /guiex robot say "hello"、/agents list）`)
 		return true
 	}
 

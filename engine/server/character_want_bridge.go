@@ -21,7 +21,7 @@ import (
 //
 // This is that translation, and it lives here rather than in the GUI because
 // every caller deserves it without knowing the secret: the canvas action
-// bubble, `mywant-gui i take`, and any agent driving the same state keys all
+// bubble, `mywant-guiex i take`, and any agent driving the same state keys all
 // speak to the character and all reach the want.
 
 // characterWantTypes are the want types that ARE a character rather than a
@@ -46,7 +46,7 @@ var characterWantTypes = map[string]bool{
 // time would move the want to a half-updated position.
 //
 // The unsuffixed canvas_cursor_x / canvas_cursor_y are deliberately not
-// matched: those are the CursorMan robot cursor (`mywant-gui i set`), which is
+// matched: those are the CursorMan robot cursor (`mywant-guiex i set`), which is
 // not a character.
 func (s *Server) applyCharacterCursorToWant(updates map[string]any) {
 	for key, val := range updates {

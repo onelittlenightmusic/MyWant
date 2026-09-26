@@ -10,7 +10,7 @@ import (
 
 // The commands that are not in this binary.
 //
-// `mywant gui tile set <want> <x> <y>` moves a tile on the canvas. It has
+// `mywant guiex tile set <want> <x> <y>` moves a tile on the canvas. It has
 // existed for months, and nothing driving this CLI has ever been able to find
 // it: plugins are dispatched by exec (see main.go), so they are not in the
 // command tree `mywant commands` walks. An agent reading the tree therefore
@@ -74,7 +74,7 @@ func commandsOfPlugin(name, path string) []CommandInfo {
 			continue
 		}
 		// Under the name you would type it: the plugin says "tile set", and
-		// what runs it is `mywant gui tile set`.
+		// what runs it is `mywant guiex tile set`.
 		full := name + " " + r.Path
 		readOnly := readOnlyCommand(full)
 		if r.ReadOnly != nil {

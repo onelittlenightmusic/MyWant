@@ -169,7 +169,7 @@ func serverAuthoredSeq(characterID string) int64 {
 }
 
 // Per-character canvas position, as written into gui_state by the canvas Call
-// action and by `mywant-gui i take`. Read by character_want_bridge.go.
+// action and by `mywant-guiex i take`. Read by character_want_bridge.go.
 const (
 	cursorStateXPrefix = "canvas_cursor_x_"
 	cursorStateYPrefix = "canvas_cursor_y_"
@@ -465,7 +465,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 	// Somebody who says something without stamping it said it now.
 	//
 	// The test below is "does this carry a messageAt we have not seen", which
-	// silently answered no for a client that sends none: `mywant gui i say`
+	// silently answered no for a client that sends none: `mywant guiex i say`
 	// sends the words and no timestamp, so its utterances compared 0 against 0
 	// and were taken for a repeat of themselves — never recorded, never spoken.
 	// Stamping here is what makes them utterances; browsers already stamp their
@@ -495,7 +495,7 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 
 	// A live speech bubble survives position updates that say nothing about it.
 	// Without this, a message set by one writer is wiped by the next position
-	// PUT from another: `mywant-gui i say` publishes the message, the SSE echo
+	// PUT from another: `mywant-guiex i say` publishes the message, the SSE echo
 	// makes the speaker's own browser re-sync and re-PUT its position, and that
 	// PUT — which knows nothing of the CLI's message — would blank the bubble
 	// milliseconds after it appeared.
@@ -696,7 +696,7 @@ func FireCharacterEffect(characterID, effectType string) {
 //
 // The durable roster is normally fed by the browser publishing a cursor. A
 // character without one is moved by other means — called across the board,
-// taken by `mywant-gui i take`, driven by an agent — and those write the
+// taken by `mywant-guiex i take`, driven by an agent — and those write the
 // position into gui_state instead. This is how that reaches the roster the
 // board actually draws from.
 //
