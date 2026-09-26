@@ -173,19 +173,12 @@ func (cb *ChainBuilder) selectorsMatch(selector1, selector2 map[string]string) b
 }
 
 func (cb *ChainBuilder) addConnectionLabel(sourceWant *Want, consumerWant *Want) {
-	sourceWant.metadataMutex.Lock()
-	if sourceWant.Metadata.Labels == nil {
-		sourceWant.Metadata.Labels = make(map[string]string)
-	}
-
 	// Generate unique connection label based on consumer want Extract meaningful identifier from consumer (e.g., level1, level2, etc.)
 	connectionKey := cb.generateConnectionKey(consumerWant)
 
 	if connectionKey != "" {
-		labelKey := fmt.Sprintf("used_by_%s", connectionKey)
-		sourceWant.Metadata.Labels[labelKey] = consumerWant.Metadata.Name
+		sourceWant.SetLabel(fmt.Sprintf("used_by_%s", connectionKey), consumerWant.Metadata.Name)
 	}
-	sourceWant.metadataMutex.Unlock()
 }
 
 // generateConnectionKey creates a unique key based on consumer want characteristics

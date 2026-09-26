@@ -255,13 +255,12 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			}
 
 			if want, _, found := cb.FindWantByID(wantID); found && want != nil {
-				want.metadataMutex.Lock()
-				if want.Metadata.Labels == nil {
-					want.Metadata.Labels = make(map[string]string)
-				}
-				want.Metadata.Labels[key] = value
-				want.metadataMutex.Unlock()
-				want.Metadata.UpdatedAt = time.Now().Unix()
+				// UpdatedAt inside the same lock: it is Metadata too, and was
+				// being written after the unlock.
+				want.UpdateLabels(func(m map[string]string) {
+					m[key] = value
+					want.Metadata.UpdatedAt = time.Now().Unix()
+				})
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
 				return
@@ -280,12 +279,10 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 			}
 
 			if want, _, found := cb.FindWantByID(wantID); found && want != nil {
-				want.metadataMutex.Lock()
-				if want.Metadata.Labels != nil {
-					delete(want.Metadata.Labels, key)
-				}
-				want.metadataMutex.Unlock()
-				want.Metadata.UpdatedAt = time.Now().Unix()
+				want.UpdateLabels(func(m map[string]string) {
+					delete(m, key)
+					want.Metadata.UpdatedAt = time.Now().Unix()
+				})
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
 				return

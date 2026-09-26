@@ -32,7 +32,7 @@ kata:
       - { kind: want_type, type: budget }
     # What it leaves where it was held — a night priced is a night with a bed in it.
     mark: { label: 宿, icon: BedDouble }
-    colors: ["#6366f1", "#eab308"]   # hotel → budget
+    labels: { color: "#6366f1,#eab308" }   # hotel → budget
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The room rate joins the total"] }
@@ -53,7 +53,7 @@ kata:
       - { kind: repeat, kata: kata-kasa, minCount: 3 }
     # What it leaves where it was held — the same station again and again.
     mark: { label: 常, icon: Repeat }
-    colors: ["#059669", "#7dd3fc", "#059669"]   # station, again and again
+    labels: { color: "#059669,#7dd3fc,#059669" }   # station, again and again
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Last time's record is attached automatically"] }
@@ -76,7 +76,7 @@ kata:
       - { kind: repeat, kata: kata-ken, minCount: 3 }
     # What it leaves where it was held — the same way walked until it is a way of yours.
     mark: { label: 通, icon: Waypoints }
-    colors: ["#7c3aed", "#c026d3", "#7c3aed"]   # event, again and again
+    labels: { color: "#7c3aed,#c026d3,#7c3aed" }   # event, again and again
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Last time's ticket is attached automatically"] }
@@ -102,7 +102,7 @@ kata:
       - { kind: want_type, type: budget }
     # What it leaves where it was held — a whole day answered for.
     mark: { label: 日, icon: CalendarCheck }
-    colors: ["#059669", "#2563eb", "#f97316", "#eab308"]   # station → city → reminder → budget
+    labels: { color: "#059669,#2563eb,#f97316,#eab308" }   # station → city → reminder → budget
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The day at that destination comes together on one sheet"] }
@@ -129,7 +129,7 @@ kata:
       - { kind: want_type, type: weather, join: weather_city }
     # What it leaves where it was held — everything the belt knows, spent on one outing.
     mark: { label: 祭, icon: PartyPopper }
-    colors: ["#7c3aed", "#059669", "#2563eb"]   # event → station → city
+    labels: { color: "#7c3aed,#059669,#2563eb" }   # event → station → city
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The day at that occasion comes together on one sheet"] }

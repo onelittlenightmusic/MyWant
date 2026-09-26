@@ -5,6 +5,7 @@ import (
 	"log"
 	"mywant/engine/core/chain"
 	"mywant/engine/core/pubsub"
+	"mywant/engine/labels"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -311,12 +312,7 @@ func NewChainBuilderWithPaths(configPath, memoryPath string) *ChainBuilder {
 
 // matchesSelector checks if want labels match the selector criteria
 func (cb *ChainBuilder) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
-	for key, value := range selector {
-		if wantLabels[key] != value {
-			return false
-		}
-	}
-	return true
+	return labels.Matches(wantLabels, selector)
 }
 
 // generatePathsFromConnections creates paths based on labels and using, eliminating output requirements

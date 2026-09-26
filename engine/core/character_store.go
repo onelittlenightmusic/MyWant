@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+	"mywant/engine/labels"
 )
 
 // Character represents a named persona that can be assigned to one or more browser devices.
@@ -39,6 +41,13 @@ type Character struct {
 	// TileDesign / AuraDesign are the design-plugin ids this character picks for
 	// the want tiles and aura they own on the canvas (e.g. "cubic", "forest").
 	// Empty = inherit the canvas-level design (config.canvas_design).
+	//
+	// Kept as the labels tile-design / aura-design (LabelTileDesign,
+	// LabelAuraDesign): a pick of one string is what a label is for, the way a
+	// want type's form-type is one. These two fields are only the old shape —
+	// read from a file written before the move (see load, which moves them into
+	// labels) and filled from the labels on the way out (MarshalJSON), so the
+	// API still answers tile_design / aura_design. Never written to disk again.
 	TileDesign string `yaml:"tileDesign,omitempty" json:"tile_design,omitempty"`
 	AuraDesign string `yaml:"auraDesign,omitempty" json:"aura_design,omitempty"`
 	// MoveSpeed multiplies how fast this character's movement is ANIMATED on the
@@ -63,6 +72,12 @@ type Character struct {
 	// default", so a character created before any of this looks exactly as it
 	// always did.
 	Display CharacterDisplay `yaml:"display,omitempty" json:"display,omitempty"`
+
+	// Labels are the character's own labels, as a want or a thing carries
+	// them. Owned by the labels endpoint (SetLabel / DeleteLabel), which
+	// replaces the map rather than writing into it: characters are handed out
+	// by copy (List, Get), and a copy shares this map — see labels.With.
+	Labels map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 	// Shape is the outline this character is drawn inside wherever they appear:
 	// standing on the canvas, on somebody else's screen, in the minimap. One of
 	// the ids the frontend's shape catalog offers ("circle", "star", "ship",
@@ -258,6 +273,7 @@ func (m *characterManager) load() {
 		if s.Characters[i].AssignedDeviceIDs == nil {
 			s.Characters[i].AssignedDeviceIDs = []string{}
 		}
+		s.Characters[i].moveDesignToLabels()
 	}
 	m.store = s
 	m.lastHash = fmt.Sprintf("%x", md5.Sum(data))
@@ -336,8 +352,9 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			}
 			updated.AuraDefaults = c.AuraDefaults     // preserve aura-default marks
 			updated.AuraCardWantID = c.AuraCardWantID // preserve aura-card pick
-			updated.TileDesign = c.TileDesign         // preserve design picks (set via /design)
-			updated.AuraDesign = c.AuraDesign
+			// Design picks ride in Labels (set via /design), preserved below
+			// with the rest of them; the old fields are never kept.
+			updated.TileDesign, updated.AuraDesign = "", ""
 			// The rest of what /design and /display own. Same rule as the two
 			// above, and it was missing: this endpoint's callers send identity
 			// (name, avatar, colour, shape) and nothing else, so picking a
@@ -347,6 +364,7 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			updated.MoveSpeed = c.MoveSpeed
 			updated.Speed = c.Speed
 			updated.Display = c.Display
+			updated.Labels = c.Labels // owned by SetLabel / DeleteLabel
 			m.store.Characters[i] = updated
 			m.save()
 			return true
@@ -561,8 +579,7 @@ func (m *characterManager) SetDesign(characterID, tileDesign, auraDesign string,
 		if c.ID != characterID {
 			continue
 		}
-		m.store.Characters[i].TileDesign = tileDesign
-		m.store.Characters[i].AuraDesign = auraDesign
+		m.store.Characters[i].Labels = withDesignLabels(m.store.Characters[i].Labels, tileDesign, auraDesign)
 		m.store.Characters[i].MoveSpeed = moveSpeed
 		m.store.Characters[i].Speed = speed
 		m.save()
@@ -585,6 +602,86 @@ func (m *characterManager) SetDisplay(characterID string, d CharacterDisplay) (*
 			continue
 		}
 		m.store.Characters[i].Display = d
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
+// The labels a character's design picks are kept under — see
+// Character.TileDesign.
+const (
+	LabelTileDesign = "tile-design"
+	LabelAuraDesign = "aura-design"
+)
+
+// withDesignLabels returns labels with the two design picks set, an empty pick
+// removing its label (empty = inherit the canvas's design). Copy-on-write,
+// like every write to a character's labels.
+func withDesignLabels(l map[string]string, tile, aura string) map[string]string {
+	out := labels.Clone(l)
+	for key, v := range map[string]string{LabelTileDesign: tile, LabelAuraDesign: aura} {
+		if v == "" {
+			delete(out, key)
+		} else {
+			out[key] = v
+		}
+	}
+	return out
+}
+
+// moveDesignToLabels carries picks from a file written before they were
+// labels into the labels, once, and clears the old fields so they are not
+// written again. A label already there wins.
+func (c *Character) moveDesignToLabels() {
+	if c.TileDesign == "" && c.AuraDesign == "" {
+		return
+	}
+	l := labels.Clone(c.Labels)
+	if _, ok := l[LabelTileDesign]; !ok && c.TileDesign != "" {
+		l[LabelTileDesign] = c.TileDesign
+	}
+	if _, ok := l[LabelAuraDesign]; !ok && c.AuraDesign != "" {
+		l[LabelAuraDesign] = c.AuraDesign
+	}
+	c.Labels = l
+	c.TileDesign, c.AuraDesign = "", ""
+}
+
+// MarshalJSON answers tile_design / aura_design from the labels, so the API
+// keeps the shape it has always had — see Character.TileDesign.
+func (c Character) MarshalJSON() ([]byte, error) {
+	type plain Character
+	p := plain(c)
+	p.TileDesign = c.Labels[LabelTileDesign]
+	p.AuraDesign = c.Labels[LabelAuraDesign]
+	return json.Marshal(p)
+}
+
+// SetLabel sets one label on a character. The map is replaced, not written
+// into — see Character.Labels.
+func (m *characterManager) SetLabel(characterID, key, value string) (*Character, bool) {
+	return m.editLabels(characterID, func(l map[string]string) map[string]string {
+		return labels.With(l, key, value)
+	})
+}
+
+// DeleteLabel removes one label from a character.
+func (m *characterManager) DeleteLabel(characterID, key string) (*Character, bool) {
+	return m.editLabels(characterID, func(l map[string]string) map[string]string {
+		return labels.Without(l, key)
+	})
+}
+
+func (m *characterManager) editLabels(characterID string, edit func(map[string]string) map[string]string) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].Labels = edit(c.Labels)
 		m.save()
 		cp := m.store.Characters[i]
 		return &cp, true
@@ -674,18 +771,24 @@ func (m *characterManager) AllAuraDefinitions() []AuraMark {
 }
 
 // Package-level functions
-func ListCharacters() []Character                 { return GetCharacterManager().List() }
+func ListCharacters() []Character { return GetCharacterManager().List() }
 func ResolveAuraDefinition(kind, name, path string) (any, bool) {
 	return GetCharacterManager().ResolveAuraDefinition(kind, name, path)
 }
 func AuraDefinitions(kind string) map[string]AuraMark {
 	return GetCharacterManager().AuraDefinitions(kind)
 }
-func AllAuraDefinitions() []AuraMark { return GetCharacterManager().AllAuraDefinitions() }
+func AllAuraDefinitions() []AuraMark              { return GetCharacterManager().AllAuraDefinitions() }
 func GetCharacter(id string) (*Character, bool)   { return GetCharacterManager().Get(id) }
 func AddCharacter(c Character) Character          { return GetCharacterManager().Add(c) }
 func UpdateCharacter(id string, c Character) bool { return GetCharacterManager().Update(id, c) }
 func DeleteCharacter(id string) bool              { return GetCharacterManager().Delete(id) }
+func SetCharacterLabel(id, key, value string) (*Character, bool) {
+	return GetCharacterManager().SetLabel(id, key, value)
+}
+func DeleteCharacterLabel(id, key string) (*Character, bool) {
+	return GetCharacterManager().DeleteLabel(id, key)
+}
 func AssignDevicesToCharacter(charID string, deviceIDs []string) (*Character, bool) {
 	return GetCharacterManager().AssignDevices(charID, deviceIDs)
 }
@@ -702,6 +805,7 @@ func SetCharacterAuraCardWant(characterID, wantID string) (*Character, bool) {
 func SetCharacterDesign(characterID, tileDesign, auraDesign string, moveSpeed int, speed float64) (*Character, bool) {
 	return GetCharacterManager().SetDesign(characterID, tileDesign, auraDesign, moveSpeed, speed)
 }
+
 // SetCharacterCanvasBg gives one character a canvas background picture,
 // leaving the rest of how they like the app untouched.
 //

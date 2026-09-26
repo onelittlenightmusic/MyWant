@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"mywant/engine/labels"
 	"reflect"
 	"strings"
 	"sync"
@@ -2097,94 +2098,56 @@ func (w *Want) GetMetadata() Metadata {
 	return cloneMetadata(w.Metadata)
 }
 
-// GetLabels returns a copy of the want's labels map in a thread-safe way
-func (n *Want) GetLabels() map[string]string {
-	n.metadataMutex.RLock()
-	defer n.metadataMutex.RUnlock()
-
-	if n.Metadata.Labels == nil {
-		return make(map[string]string)
-	}
-
-	// Return a deep copy to prevent external modification
-	result := make(map[string]string, len(n.Metadata.Labels))
-	maps.Copy(result, n.Metadata.Labels)
-	return result
-}
-
-// SetLabel sets one label under the metadata write lock.
+// labelSet is the want's labels as the shared label handling sees them: its
+// Metadata.Labels, guarded by its own metadataMutex, with every write bumping
+// the persistence epoch (labels are saved with the want). See package labels.
 //
 // Writing n.Metadata.Labels directly is a crash, not just a race: GetLabels
-// iterates the same map under RLock, and Go's runtime aborts the whole
-// process with "concurrent map iteration and map write" — a fatal error that
-// recover() cannot catch. Every mutation of Metadata.Labels must go through
-// these helpers.
-func (n *Want) SetLabel(key, value string) {
-	n.metadataMutex.Lock()
-	defer n.metadataMutex.Unlock()
-	if n.Metadata.Labels == nil {
-		n.Metadata.Labels = make(map[string]string)
-	}
-	n.Metadata.Labels[key] = value
-	bumpStateEpoch() // Labels are persisted with the want
+// iterates the same map under RLock, and Go's runtime aborts the whole process
+// with "concurrent map iteration and map write" — a fatal error that recover()
+// cannot catch. Every access to a live want's labels goes through here. Code
+// that already holds metadataMutex must not call these — the RWMutex is not
+// reentrant — and touches the map directly inside its own critical section.
+func (n *Want) labelSet() labels.Guarded {
+	return labels.Guard(&n.metadataMutex, &n.Metadata.Labels, bumpStateEpoch)
 }
+
+// GetLabels returns a copy of the want's labels.
+func (n *Want) GetLabels() map[string]string { return n.labelSet().All() }
+
+// SetLabel sets one label under the metadata write lock.
+func (n *Want) SetLabel(key, value string) { n.labelSet().Set(key, value) }
 
 // SetLabels merges the given labels in under the metadata write lock.
-func (n *Want) SetLabels(labels map[string]string) {
-	if len(labels) == 0 {
-		return
-	}
-	n.metadataMutex.Lock()
-	defer n.metadataMutex.Unlock()
-	if n.Metadata.Labels == nil {
-		n.Metadata.Labels = make(map[string]string, len(labels))
-	}
-	maps.Copy(n.Metadata.Labels, labels)
-	bumpStateEpoch() // Labels are persisted with the want
-}
+func (n *Want) SetLabels(l map[string]string) { n.labelSet().SetMany(l) }
 
 // DeleteLabel removes one label under the metadata write lock.
-func (n *Want) DeleteLabel(key string) {
-	n.metadataMutex.Lock()
-	defer n.metadataMutex.Unlock()
-	delete(n.Metadata.Labels, key)
-	bumpStateEpoch() // Labels are persisted with the want
-}
+func (n *Want) DeleteLabel(key string) { n.labelSet().Delete(key) }
 
 // ReplaceLabels swaps the whole label map under the metadata write lock. The
 // caller's map is copied, so it stays safe to mutate afterwards.
-func (n *Want) ReplaceLabels(labels map[string]string) {
-	n.metadataMutex.Lock()
-	defer n.metadataMutex.Unlock()
-	replacement := make(map[string]string, len(labels))
-	maps.Copy(replacement, labels)
-	n.Metadata.Labels = replacement
-	bumpStateEpoch() // Labels are persisted with the want
-}
+func (n *Want) ReplaceLabels(l map[string]string) { n.labelSet().Replace(l) }
+
+// UpdateLabels applies several label changes as one, under the write lock.
+func (n *Want) UpdateLabels(fn func(m map[string]string)) { n.labelSet().Update(fn) }
 
 // GetLabel reads one label under the metadata read lock.
 func (n *Want) GetLabel(key string) string {
-	n.metadataMutex.RLock()
-	defer n.metadataMutex.RUnlock()
-	return n.Metadata.Labels[key]
+	v, _ := n.labelSet().Get(key)
+	return v
 }
 
 // LookupLabel reads one label and reports whether it was present.
-func (n *Want) LookupLabel(key string) (string, bool) {
-	n.metadataMutex.RLock()
-	defer n.metadataMutex.RUnlock()
-	v, ok := n.Metadata.Labels[key]
-	return v, ok
+func (n *Want) LookupLabel(key string) (string, bool) { return n.labelSet().Get(key) }
+
+// MatchesLabels reports whether the want carries every key=value in selector.
+func (n *Want) MatchesLabels(selector map[string]string) bool {
+	return n.labelSet().Matches(selector)
 }
 
 // matchesSelector checks if want labels match the selector criteria
 func (n *Want) matchesSelector(wantLabels map[string]string, selector map[string]string) bool {
-	for key, value := range selector {
-		if wantLabels[key] != value {
-			return false
-		}
-	}
-	return true
+	return labels.Matches(wantLabels, selector)
 }
 
 // emitOwnerCompletionEventIfOwned emits an OwnerCompletionEvent if this want has an owner

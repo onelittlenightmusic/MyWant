@@ -559,3 +559,35 @@ func (s *Server) pruneCharacterDevices(w http.ResponseWriter, r *http.Request) {
 	go broadcastSSE("character_changed", req.DeviceIDs)
 	s.JSONResponse(w, http.StatusOK, map[string]string{"message": "pruned"})
 }
+
+// POST /api/v1/characters/{id}/labels   body: {key, value}
+func (s *Server) setCharacterLabel(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	if err := DecodeRequest(r, &req); err != nil || req.Key == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", "key is required")
+		return
+	}
+	c, ok := mywant.SetCharacterLabel(id, req.Key, req.Value)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// DELETE /api/v1/characters/{id}/labels/{key}
+func (s *Server) removeCharacterLabel(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	c, ok := mywant.DeleteCharacterLabel(vars["id"], vars["key"])
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", vars["id"])
+		return
+	}
+	go broadcastSSE("character_changed", vars["id"])
+	s.JSONResponse(w, http.StatusOK, c)
+}

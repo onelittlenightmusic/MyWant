@@ -356,6 +356,8 @@ func (s *Server) setupRoutes() {
 	// Before /{id}, or "live" is read as a kata id.
 	kata.HandleFunc("/live", s.listLiveKata).Methods("GET", "OPTIONS")
 	kata.HandleFunc("/{id}", s.getKata).Methods("GET", "OPTIONS")
+	kata.HandleFunc("/{id}/labels", s.setKataLabel).Methods("POST", "OPTIONS")
+	kata.HandleFunc("/{id}/labels/{key}", s.removeKataLabel).Methods("DELETE", "OPTIONS")
 
 	// Characters CRUD
 	characters := api.PathPrefix("/characters").Subrouter()
@@ -377,6 +379,8 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}/card-aura-mark", s.getCardAuraMark).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/design", s.setCharacterDesign).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/display", s.setCharacterDisplay).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}/labels", s.setCharacterLabel).Methods("POST", "OPTIONS")
+	characters.HandleFunc("/{id}/labels/{key}", s.removeCharacterLabel).Methods("DELETE", "OPTIONS")
 
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"mywant/engine/labels"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -74,6 +75,7 @@ type Server struct {
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
 	pushStore            *PushStore                      // Web Push subscriptions for per-want alerts (~/.mywant/push-subscriptions.yaml)
 	vapid                vapidKeys                       // Web Push signing keypair (~/.mywant/vapid.json or MYWANT_VAPID_*)
+	kataLabels           *labels.FileStore               // Labels set on kata at runtime (~/.mywant/kata-labels.yaml); see kata_labels.go
 	thingLabels          *ThingLabelStore                // Per-memo-value labels (~/.mywant/memo-labels.yaml); groups ride on group/* keys
 	exposableFieldsCache map[string][]ExposableFieldInfo // type name → exposable state fields (built once at startup)
 	// The mirror: slots a want type is asking to have filled. Built the same
@@ -352,6 +354,7 @@ func New(config Config) *Server {
 		pushStore:             newPushStore(),
 		vapid:                 loadVAPIDKeys(),
 		thingLabels:           newThingLabelStore(),
+		kataLabels:            newKataLabelStore(),
 		exposableFieldsCache:  exposableFieldsCache,
 		importableFieldsCache: importableFieldsCache,
 		wantCreationHooks: []WantCreationHook{

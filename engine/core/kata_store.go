@@ -214,15 +214,22 @@ type Kata struct {
 	// to say in prose.
 	Mark *KataMark `yaml:"mark,omitempty" json:"mark,omitempty"`
 
-	// Colors is the form's own colour — one stop for a flat colour, several
-	// for a gradient, in order. It is what the form is ABOUT, so it is usually
-	// the colours of the kinds it joins: 近 joins a station and a city, and is
-	// green running into blue. Separate from the belt's colour, which says how
-	// far along the ladder a form sits, not what it is.
+	// Labels are the kata's own labels, as a want or a thing carries them —
+	// written in its definition. Labels set at runtime are kept apart (a
+	// bundled definition is not the user's to edit; see the server's
+	// kataLabels) and layered over these, so a definition gives defaults and
+	// the user has the last word.
 	//
-	// The board paints a folded constellation the form stands on with it, and
-	// the catalogue paints the form's card.
-	Colors []string `yaml:"colors,omitempty" json:"colors,omitempty"`
+	// What a form looks like rides here, the way a want type's form-type does:
+	//
+	//   color  the form's own colour — one stop for a flat colour, several
+	//          comma-separated for a gradient, in order ("#059669,#2563eb").
+	//          What the form is ABOUT, so usually the colours of the kinds it
+	//          joins: 近 is station green running into city blue. Not the
+	//          belt's colour, which says how far along the ladder it sits. The
+	//          board paints a folded group the form stands on with it, and the
+	//          catalogue paints its card.
+	Labels map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 
 	// Veiled: the kata is LISTED, with the right number of blanks, and only
 	// what goes in them is withheld — a form you are told exists and have to

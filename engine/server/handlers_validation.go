@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mywant/engine/labels"
 	"net/http"
 	"os"
 	"strings"
@@ -315,7 +316,7 @@ func (s *Server) checkDependencySatisfaction(want *mywant.Want) []ValidationWarn
 	for i, selector := range want.Spec.Using {
 		matched := false
 		for _, deployed := range deployedWants {
-			if s.matchesSelector(deployed.Metadata.Labels, selector.ToLabelMap()) {
+			if s.matchesSelector(deployed.GetLabels(), selector.ToLabelMap()) {
 				matched = true
 				break
 			}
@@ -333,13 +334,8 @@ func (s *Server) checkDependencySatisfaction(want *mywant.Want) []ValidationWarn
 	return warnings
 }
 
-func (s *Server) matchesSelector(labels map[string]string, selector map[string]string) bool {
-	for key, value := range selector {
-		if labels[key] != value {
-			return false
-		}
-	}
-	return true
+func (s *Server) matchesSelector(l map[string]string, selector map[string]string) bool {
+	return labels.Matches(l, selector)
 }
 
 func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWarning {
@@ -357,7 +353,7 @@ func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWa
 	inputCount := 0
 	for _, selector := range want.Spec.Using {
 		for _, deployed := range deployedWants {
-			if s.matchesSelector(deployed.Metadata.Labels, selector.ToLabelMap()) {
+			if s.matchesSelector(deployed.GetLabels(), selector.ToLabelMap()) {
 				inputCount++
 				break
 			}
@@ -366,7 +362,7 @@ func (s *Server) checkConnectivityRequirements(want *mywant.Want) []ValidationWa
 
 	outputCount := 0
 	for _, deployed := range deployedWants {
-		for _, deployedSelector := range deployed.Spec.Using {
+		for _, deployedSelector := range deployed.GetSpec().Using {
 			if s.matchesSelector(want.Metadata.Labels, deployedSelector.ToLabelMap()) {
 				outputCount++
 				break

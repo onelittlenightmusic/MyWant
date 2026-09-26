@@ -32,7 +32,7 @@ kata:
       - { kind: want_type, type: transit_search, join: to }
     # What it leaves where it was held — a search aimed at a station draws a route to it.
     mark: { label: 宛, icon: Route }
-    colors: ["#059669", "#0891b2"]   # station → transit
+    labels: { color: "#059669,#0891b2" }   # station → transit
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Choosing a destination is enough to pull a route"] }
@@ -52,7 +52,7 @@ kata:
       - { kind: want_type, type: weather, join: weather_city }
     # What it leaves where it was held — what a city is asked about is its sky.
     mark: { label: 空, icon: CloudSun }
-    colors: ["#2563eb", "#7dd3fc"]   # city → weather
+    labels: { color: "#2563eb,#7dd3fc" }   # city → weather
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { shortcuts: ["Choosing a city is enough to pull the weather"] }
@@ -72,7 +72,7 @@ kata:
       - { kind: want_type, type: place_arrival, status: any, join: place }
     # What it leaves where it was held — arriving somewhere plants a flag there.
     mark: { label: 着, icon: Flag }
-    colors: ["#db2777", "#fb923c"]   # place → arrival
+    labels: { color: "#db2777,#fb923c" }   # place → arrival
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["Arrivals and departures are recorded"] }
@@ -97,7 +97,7 @@ kata:
       - { kind: want_type, type: event_ticket, join: event }
     # What it leaves where it was held — what an occasion is answered with is a ticket.
     mark: { label: 券, icon: Ticket }
-    colors: ["#7c3aed", "#c026d3"]   # event → ticket
+    labels: { color: "#7c3aed,#c026d3" }   # event → ticket
     mastery: { shoden: 1, kaiden: 3 }
     unlocks:
       shoden: { vocabulary: ["The stages of a sale are kept in the record"] }

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	mywant "mywant/engine/core"
+	mwlabels "mywant/engine/labels"
 )
 
 func wazaWant(satisfied bool, ids ...string) WazaProgress {
@@ -151,7 +152,7 @@ func TestKataLabelFingerprintStable(t *testing.T) {
 func TestCollectKataScopesGivesLoneValuesTheirOwnScope(t *testing.T) {
 	dir := t.TempDir()
 	store := &ThingStore{path: filepath.Join(dir, "memo.yaml")}
-	labels := &ThingLabelStore{path: filepath.Join(dir, "memo-labels.yaml")}
+	labels := &ThingLabelStore{mwlabels.NewFileStore(filepath.Join(dir, "memo-labels.yaml"))}
 
 	for _, v := range []string{"国分寺", "新宿"} {
 		if err := store.Record("station", v); err != nil {

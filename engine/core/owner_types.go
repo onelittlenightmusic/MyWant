@@ -395,19 +395,13 @@ func (t *Target) CreateChildWants() []*Want {
 				BlockOwnerDeletion: true,
 			},
 		}
-		config[i].metadataMutex.Lock()
-		if config[i].Metadata.Labels == nil {
-			config[i].Metadata.Labels = make(map[string]string)
-		}
-		config[i].Metadata.Labels["owner"] = "child"
 		// Inject affinity label to namespace children of this target
 		// Use both name and ID to ensure uniqueness across redeployments
 		instanceID := t.Metadata.Name
 		if t.Metadata.ID != "" {
 			instanceID = fmt.Sprintf("%s-%s", t.Metadata.Name, t.Metadata.ID)
 		}
-		config[i].Metadata.Labels["owner-name"] = instanceID
-		config[i].metadataMutex.Unlock()
+		config[i].SetLabels(map[string]string{"owner": "child", "owner-name": instanceID})
 
 		// Inject the same affinity label into all 'using' selectors of the child
 		// This ensures sibling wants within the same target connect to each other

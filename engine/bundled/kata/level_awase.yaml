@@ -71,7 +71,7 @@ kata:
     # symbol, one line with sleepers across it. A pair of stations IS a
     # railway, so the line saying so beats a glyph parked on its middle.
     mark: { label: 線, icon: TrainTrack, form: rail }
-    colors: ["#059669", "#34d399"]   # station → station
+    labels: { color: "#059669,#34d399" }   # station → station
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-aida
@@ -86,7 +86,7 @@ kata:
     waza:
       - { kind: thing, subtype: city, minCount: 2 }
     mark: { label: 間, icon: ArrowLeftRight }
-    colors: ["#2563eb", "#60a5fa"]   # city → city
+    labels: { color: "#2563eb,#60a5fa" }   # city → city
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-kei
@@ -101,7 +101,7 @@ kata:
     waza:
       - { kind: thing, subtype: place, minCount: 2 }
     mark: { label: 径, icon: Spline }
-    colors: ["#db2777", "#f472b6"]   # place → place
+    labels: { color: "#db2777,#f472b6" }   # place → place
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-ren
@@ -116,7 +116,7 @@ kata:
     waza:
       - { kind: thing, subtype: event, minCount: 2 }
     mark: { label: 連, icon: CalendarRange }
-    colors: ["#7c3aed", "#a78bfa"]   # event → event
+    labels: { color: "#7c3aed,#a78bfa" }   # event → event
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-haba
@@ -131,7 +131,7 @@ kata:
     waza:
       - { kind: thing, subtype: time, minCount: 2 }
     mark: { label: 幅, icon: Hourglass }
-    colors: ["#f59e0b", "#fcd34d"]   # time → time
+    labels: { color: "#f59e0b,#fcd34d" }   # time → time
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-kumi
@@ -146,7 +146,7 @@ kata:
     waza:
       - { kind: thing, subtype: song, minCount: 2 }
     mark: { label: 組, icon: ListMusic }
-    colors: ["#ec4899", "#f9a8d4"]   # song → song
+    labels: { color: "#ec4899,#f9a8d4" }   # song → song
     mastery: { shoden: 1, kaiden: 3 }
 
   # ── 違うもの二つ ──────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ kata:
       - { kind: thing, subtype: station }
       - { kind: thing, subtype: time }
     mark: { label: 発着, icon: CalendarClock }
-    colors: ["#059669", "#f59e0b"]   # station → time
+    labels: { color: "#059669,#f59e0b" }   # station → time
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-sou
@@ -179,7 +179,7 @@ kata:
       - { kind: thing, subtype: song }
       - { kind: thing, subtype: artist }
     mark: { label: 奏, icon: Guitar }
-    colors: ["#ec4899", "#e11d48"]   # song → artist
+    labels: { color: "#ec4899,#e11d48" }   # song → artist
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-kai
@@ -195,7 +195,7 @@ kata:
       - { kind: thing, subtype: event }
       - { kind: thing, subtype: place }
     mark: { label: 会, icon: MapPinned }
-    colors: ["#7c3aed", "#db2777"]   # event → place
+    labels: { color: "#7c3aed,#db2777" }   # event → place
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-yaku
@@ -211,7 +211,7 @@ kata:
       - { kind: thing, subtype: place }
       - { kind: thing, subtype: time }
     mark: { label: 約, icon: CalendarCheck2 }
-    colors: ["#db2777", "#f59e0b"]   # place → time
+    labels: { color: "#db2777,#f59e0b" }   # place → time
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-koro
@@ -227,7 +227,7 @@ kata:
       - { kind: thing, subtype: city }
       - { kind: thing, subtype: time }
     mark: { label: 頃, icon: Globe }
-    colors: ["#2563eb", "#f59e0b"]   # city → time
+    labels: { color: "#2563eb,#f59e0b" }   # city → time
     mastery: { shoden: 1, kaiden: 3 }
 
   - id: kata-en
@@ -243,5 +243,5 @@ kata:
       - { kind: thing, subtype: artist }
       - { kind: thing, subtype: event }
     mark: { label: 演, icon: Mic2 }
-    colors: ["#e11d48", "#7c3aed"]   # artist → event
+    labels: { color: "#e11d48,#7c3aed" }   # artist → event
     mastery: { shoden: 1, kaiden: 3 }
