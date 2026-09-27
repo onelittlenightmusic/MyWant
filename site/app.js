@@ -30,6 +30,12 @@
   document.querySelector('.title h1').textContent = site.brand;
   $('#github-link').href = site.github;
 
+  // The page's own picture, under the lead: what the thing looks like, first.
+  if (site.heroImage) {
+    $('.hero').insertAdjacentHTML('beforeend',
+      `<a class="hero-shot" href="img/${site.heroImage}" target="_blank" rel="noopener"><img src="img/${site.heroImage}" alt="${site.brand}" /></a>`);
+  }
+
   /** A link to another guide, in the language being read where it has one. */
   const guideHref = g => (g.noLang ? g.href : `${g.href}?lang=${lang}`);
   let current = null;

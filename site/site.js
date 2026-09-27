@@ -5,10 +5,19 @@
  * between the sites (index.html differs only in its <title> and description),
  * so copy them across when one changes.
  */
+/**
+ * A screenshot inside a topic's body: shot('menu.jpg', 'caption'), or with
+ * { phone: true } for a tall phone capture. Images live in site/img/.
+ */
+window.shot = (file, caption, opts = {}) =>
+  `<figure class="shot${opts.phone ? ' shot-phone' : ''}"><a href="img/${file}" target="_blank" rel="noopener">` +
+  `<img src="img/${file}" alt="${caption}" loading="lazy" /></a><figcaption>${caption}</figcaption></figure>`;
+
 window.GUIDE_SITE = {
   current: 'mywant',
   brand: 'MyWant',
   github: 'https://github.com/onelittlenightmusic/mywant',
+  heroImage: 'dashboard-detail.jpg',
   guides: [
     {
       id: 'mywant',

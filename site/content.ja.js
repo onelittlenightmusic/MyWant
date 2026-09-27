@@ -65,6 +65,7 @@ Want を置くと、それを得意とする <strong>Agent（エージェント�
   <dt>mywant</dt><dd>本体のサーバーと、操作用のコマンド</dd>
   <dt>mywant-gui</dt><dd>ブラウザで見る画面（ダッシュボード）</dd>
 </dl>
+${shot("dashboard.jpg", "ブラウザで見た MyWant。置いた Want が 1 枚ずつカードになります")}
 `,
         },
         {
@@ -130,6 +131,7 @@ mywant stop</pre></div>
   <p class="box-title"><i data-lucide="info"></i>ポート番号</p>
   <p>サーバーは 8080 番、画面は 8081 番を使います。ほかのアプリと重なるときは <code>mywant start -D --port 9090</code> のように変えられます。</p>
 </div>
+${shot("dashboard.jpg", "http://localhost:8081 を開いたところ")}
 `,
         },
         {
@@ -163,6 +165,8 @@ mywant stop</pre></div>
 <p>ヘッダ右端の <strong>＋</strong> ボタンからも Want を追加できます。種類を選んで、項目を埋めるだけです。</p>
 <h4>片づける</h4>
 <div class="code"><pre>mywant wants delete coffee-break</pre></div>
+${shot("dashboard-detail.jpg", "東京の天気の Want。カードを押すと、右に中身が開きます")}
+${shot("add-want-form.jpg", "画面の ＋ から追加するときのフォーム")}
 `,
         },
         {
@@ -194,6 +198,8 @@ mywant stop</pre></div>
   <p>同じネットワークにあるスマホからも開けます。画面はスマホの幅に合わせて並び替わります。</p>
 </div>
 <p>画面の使い方は <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=ja">mywant-gui ガイド</a> でくわしく説明しています。</p>
+${shot("menu.jpg", "左上の Menu から、それぞれのページへ移ります")}
+${shot("canvas-detail.jpg", "キャンバス拡張（mywant-guiex）を入れると、Want をタイルとして盤面に並べられます")}
 `,
         },
       ],
@@ -228,6 +234,7 @@ mywant stop</pre></div>
 <p>途中で止めたり、また動かしたりもできます。</p>
 <div class="code"><pre>mywant wants suspend coffee-break
 mywant wants resume coffee-break</pre></div>
+${shot("dashboard-results.jpg", "Results タブ：エージェントが書き込んだ結果が見られます")}
 `,
         },
         {
@@ -249,6 +256,7 @@ mywant wants resume coffee-break</pre></div>
   <p class="box-title"><i data-lucide="puzzle"></i>自分で増やせる</p>
   <p>種類は追加できます。くわしくは「追加機能を入れる」を見てください。</p>
 </div>
+${shot("want-types.jpg", "画面の Want Types ページ。種類を押すと説明と例が開きます")}
 `,
         },
         {
@@ -270,6 +278,7 @@ mywant wants resume coffee-break</pre></div>
 <div class="code"><pre>mywant agents list
 mywant capabilities list</pre></div>
 <p>自分で Agent を書く必要はありません。はじめは、すでにある Agent に任せておけば大丈夫です。</p>
+${shot("agents.jpg", "画面の Agents ページ。エージェントを押すと、できることが見られます")}
 `,
         },
         {
@@ -312,6 +321,7 @@ mywant capabilities list</pre></div>
 <h4>質問に答えながら作る</h4>
 <div class="code"><pre>mywant recipes create -i</pre></div>
 <p>ダッシュボードでは、選んだ Want をまとめてレシピとして保存することもできます。</p>
+${shot("recipes.jpg", "画面の Recipes ページ")}
 `,
         },
         {
@@ -328,6 +338,7 @@ mywant thing add station 中野
 # 見る
 mywant thing list</pre></div>
 <p>ダッシュボードでは、Thing のカードから直接 Want を作れます。関係のある Thing どうしはまとめて星座（constellation）にできます。</p>
+${shot("thing.jpg", "画面の Thing ページ。覚えさせた値がカードで並びます")}
 `,
         },
         {
@@ -346,6 +357,7 @@ mywant world open travel</pre></div>
 <h4>ほかの人に渡す</h4>
 <div class="code"><pre>mywant world export travel -o travel.yaml
 mywant world import travel -f travel.yaml</pre></div>
+${shot("worlds.jpg", "画面の Worlds ページ。押すとその World に切り替わります")}
 `,
         },
       ],

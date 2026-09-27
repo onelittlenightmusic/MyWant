@@ -61,6 +61,7 @@ When you place a Want, an <strong>Agent</strong> that is good at it gets to work
   <dt>mywant</dt><dd>The server itself, and the command you control it with</dd>
   <dt>mywant-gui</dt><dd>The screen you look at in your browser (the dashboard)</dd>
 </dl>
+${shot("dashboard.jpg", "MyWant in the browser: every Want you place becomes a card")}
 `,
         },
         {
@@ -126,6 +127,7 @@ mywant stop</pre></div>
   <p class="box-title"><i data-lucide="info"></i>Ports</p>
   <p>The server uses port 8080 and the screen uses 8081. If another app already uses one, change it, like <code>mywant start -D --port 9090</code>.</p>
 </div>
+${shot("dashboard.jpg", "What you see at http://localhost:8081")}
 `,
         },
         {
@@ -159,6 +161,8 @@ Save this as <code>coffee.yaml</code>.</p>
 <p>You can also add a Want with the <strong>+</strong> button at the right end of the header. Pick a kind and fill in the fields.</p>
 <h4>Clean up</h4>
 <div class="code"><pre>mywant wants delete coffee-break</pre></div>
+${shot("dashboard-detail.jpg", "A Want for the weather in Tokyo. Press its card and the details open on the right")}
+${shot("add-want-form.jpg", "The form behind the + button")}
 `,
         },
         {
@@ -190,6 +194,8 @@ Save this as <code>coffee.yaml</code>.</p>
   <p>A phone on the same network can open it as well. The screen rearranges itself to fit.</p>
 </div>
 <p>The <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=en">mywant-gui guide</a> explains the screen in detail.</p>
+${shot("menu.jpg", "Menu, at the top left, leads to every page")}
+${shot("canvas-detail.jpg", "With the canvas extension (mywant-guiex), Wants become tiles on a board")}
 `,
         },
       ],
@@ -224,6 +230,7 @@ Save this as <code>coffee.yaml</code>.</p>
 <p>You can pause it and carry on later.</p>
 <div class="code"><pre>mywant wants suspend coffee-break
 mywant wants resume coffee-break</pre></div>
+${shot("dashboard-results.jpg", "The Results tab: what the agents wrote back")}
 `,
         },
         {
@@ -245,6 +252,7 @@ mywant wants resume coffee-break</pre></div>
   <p class="box-title"><i data-lucide="puzzle"></i>You can add more</p>
   <p>New kinds can be added — see "Add-ons".</p>
 </div>
+${shot("want-types.jpg", "The Want Types page. Press a kind to see its description and examples")}
 `,
         },
         {
@@ -266,6 +274,7 @@ Each has things it can do (<strong>Capabilities</strong>), and an Agent that can
 <div class="code"><pre>mywant agents list
 mywant capabilities list</pre></div>
 <p>You don't need to write Agents yourself. To begin with, leave it to the ones already there.</p>
+${shot("agents.jpg", "The Agents page. Press an agent to see what it can do")}
 `,
         },
         {
@@ -308,6 +317,7 @@ Just like a cooking recipe, change only the ingredients (values) and make it as 
 <h4>Make one by answering questions</h4>
 <div class="code"><pre>mywant recipes create -i</pre></div>
 <p>On the dashboard you can also save the Wants you have selected as a recipe.</p>
+${shot("recipes.jpg", "The Recipes page")}
 `,
         },
         {
@@ -324,6 +334,7 @@ mywant thing add station Nakano
 # look at them
 mywant thing list</pre></div>
 <p>On the dashboard you can make a Want right from a Thing's card. Related Things can be grouped into a constellation.</p>
+${shot("thing.jpg", "The Thing page: the values you have kept, as cards")}
 `,
         },
         {
@@ -342,6 +353,7 @@ mywant world open travel</pre></div>
 <h4>Hand it to someone else</h4>
 <div class="code"><pre>mywant world export travel -o travel.yaml
 mywant world import travel -f travel.yaml</pre></div>
+${shot("worlds.jpg", "The Worlds page. Press one to switch to it")}
 `,
         },
       ],
