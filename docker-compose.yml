@@ -1,0 +1,45 @@
+# MyWant with Docker: the server and the dashboard, the same two containers
+# that run together on Fly.io (see docs/DEPLOY_FLY.md), on your own machine.
+#
+#   docker compose up -d        # then open http://localhost:8081
+#   docker compose down         # stop (your wants stay in the volume)
+#
+# Both images are public on GHCR and built for linux/amd64 and linux/arm64.
+
+services:
+  backend:
+    image: ghcr.io/onelittlenightmusic/mywant-backend:latest
+    volumes:
+      # Everything MyWant keeps (~/.mywant: wants, things, worlds, customs…).
+      - mywant-data:/data
+    environment:
+      TZ: UTC               # your time zone, e.g. Asia/Tokyo, for reminders
+    ports:
+      # The API has no authentication of its own, so it is published on this
+      # machine only — enough for the `mywant` CLI, never for the network.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+    restart: unless-stopped
+
+  gui:
+    image: ghcr.io/onelittlenightmusic/mywant-gui-public:latest
+    environment:
+      MYWANT_BACKEND: http://backend:8080
+      # Basic auth (user "mywant"). Set it before this port is reachable from
+      # anywhere but this machine.
+      # MYWANT_AUTH_PASSWORD: change-me
+    ports:
+      # This machine only, like `mywant-gui start`. To open it to your phone on
+      # the LAN, set MYWANT_AUTH_PASSWORD above and use "8081:8080".
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mywant-data:

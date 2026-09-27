@@ -1,9 +1,13 @@
-# MyWant backend — single always-on container for Fly.io.
-# Serves the API (engine/server) only; the GUI (mywant-gui) is deployed
-# separately as an autostop/event-driven app. See docs/DEPLOY_FLY.md.
+# MyWant backend — the server, as a container (Fly.io, or Docker anywhere).
+# Serves the API (engine/server) only; the GUI (mywant-gui) runs in its own
+# container. Built for linux/amd64 and linux/arm64. See docs/DEPLOY_FLY.md and
+# docker-compose.yml.
 
 # ---- Build stage ----------------------------------------------------------
-FROM golang:1.26-alpine AS builder
+# Cross-compiled on the build platform (CGO off), so arm64 needs no emulation.
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /src
 
@@ -17,7 +21,7 @@ RUN cd client && go mod download
 # Copy sources and build the static CLI binary (same invocation as `make build-cli`).
 COPY engine/ ./engine/
 COPY client/ ./client/
-RUN cd client && CGO_ENABLED=0 GOOS=linux go build \
+RUN cd client && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
         -trimpath -ldflags="-s -w" \
         -o /out/mywant ./cmd/mywant
 

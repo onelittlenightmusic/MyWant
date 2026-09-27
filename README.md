@@ -39,6 +39,22 @@ To upgrade later: `brew upgrade mywant mywant-gui`. If you skip `brew trust`, Ho
 
 To build from source instead, run `make release` (the CLI lands in `./bin/mywant`).
 
+#### Or: run with Docker
+
+Two public images on GHCR, for linux/amd64 and linux/arm64 — the server `ghcr.io/onelittlenightmusic/mywant-backend` and the dashboard `ghcr.io/onelittlenightmusic/mywant-gui-public`. [`docker-compose.yml`](docker-compose.yml) runs them together, the same two containers MyWant runs as on Fly.io ([docs/DEPLOY_FLY.md](docs/DEPLOY_FLY.md)):
+
+```bash
+curl -O https://raw.githubusercontent.com/onelittlenightmusic/MyWant/master/docker-compose.yml
+docker compose up -d        # then open http://localhost:8081
+```
+
+- Everything MyWant keeps lives in the `mywant-data` volume. `docker compose down` leaves it; `down -v` erases it.
+- The server's API is published on `127.0.0.1:8080` only, so the `mywant` CLI on this machine works as usual (steps 4–5 below).
+- Set `TZ` in the file to your time zone for reminders.
+- To open the dashboard to other devices, set `MYWANT_AUTH_PASSWORD` (Basic auth, user `mywant`) and publish `8081:8080`.
+- Upgrade with `docker compose pull && docker compose up -d`.
+- The canvas (mywant-guiex) is not in the image; install it with Homebrew.
+
 ### 2. Start the System
 
 ```bash
