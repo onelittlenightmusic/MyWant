@@ -1,6 +1,6 @@
 # MyWant
 
-![The MyWant dashboard (mywant-gui)](docs/img/gui-dashboard.png)
+![The MyWant dashboard (mywant-gui)](docs/img/gui-dashboard.jpg)
 
 **Declarative chain programming with YAML configuration.** Express what you want to achieve, not how to do it.
 
@@ -91,7 +91,7 @@ mywant wants create -t reminder -e   # place a type's own example
 
 ### mywant-gui — the dashboard
 
-![mywant-gui's Add Want form](docs/img/gui-add-want.png)
+![mywant-gui's Add Want form](docs/img/gui-add-want.jpg)
 
 The open-source web GUI ([onelittlenightmusic/mywant-gui](https://github.com/onelittlenightmusic/mywant-gui)). A header, a grid of cards and a sidebar: every want as a card with its live state, an Add Want form built from each type's parameters, and pages for things, want types, worlds, agents, recipes and logs. Keyboard- and phone-friendly, and scriptable from its CLI (`mywant-gui show want <ID>`, `mywant-gui capture want <ID>`, …). Extensions can add pages, menu entries and designs at runtime.
 
@@ -99,7 +99,7 @@ The open-source web GUI ([onelittlenightmusic/mywant-gui](https://github.com/one
 
 ### mywant-guiex — the canvas
 
-![mywant-guiex canvas](docs/img/guiex-canvas.png)
+![mywant-guiex canvas](docs/img/guiex-canvas.jpg)
 
 An extension of mywant-gui that lays your wants out as tiles on a board. Things float beside the wants that use them, wires show how wants connect, and a character walks the board — press a tile to open it, or drive the board from `mywant guiex`. Install it with `brew install mywant-guiex`; the dashboard picks it up on its next start.
 
