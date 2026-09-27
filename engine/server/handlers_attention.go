@@ -13,9 +13,11 @@ import (
 // What needs a person, across everything that is running — the list behind
 // the control pill's attention button, which warps to where each thing is.
 //
-// Four kinds, each answering "go where?" differently:
+// Five kinds, each answering "go where?" differently:
 //   - approval:    a want is waiting on a yes (pending_command, or the
 //                  waiting_user_action status). Answered in the GUI.
+//   - alert:       one of the want's own promises holds (spec.alerts) — its
+//                  person said "call me when this happens". Looked at in the GUI.
 //   - want_error:  a want failed (failed / config_error / module_error).
 //                  Looked at in the GUI.
 //   - web_failed:  an automated run in a browser tab (browser-run) came back
@@ -23,7 +25,7 @@ import (
 //   - needs_human: such a run reached a page only a person can get past (a
 //                  login, a CAPTCHA), as the extension judged it. That tab too.
 //
-// The first two are read off the wants every time; the last two are events
+// The first three are read off the wants every time; the last two are events
 // the extension reports, kept here until a later run of the same URL
 // succeeds — the tab working again is what makes them no longer news.
 
@@ -37,12 +39,21 @@ type AttentionItem struct {
 	// Where to go: a page URL to bring its tab forward (or open), or "" for
 	// the GUI itself.
 	URL string `json:"url,omitempty"`
-	At  int64  `json:"at"`
+	// Rule is the promise that holds, for an alert.
+	Rule string `json:"rule,omitempty"`
+	// At is when the item began, for an alert (so it is the same item on
+	// every read, and the extension notifies it once); otherwise now.
+	At int64 `json:"at"`
 }
 
 var (
 	webAttentionMu sync.Mutex
 	webAttention   = map[string]AttentionItem{} // by URL
+
+	// When each held alert began, by item ID. An alert that stops holding is
+	// forgotten, so holding again later is a new item.
+	alertSinceMu sync.Mutex
+	alertSince   = map[string]int64{}
 )
 
 // recordWebRunOutcome keeps or clears the tab-side attention for a run's URL.
@@ -77,6 +88,9 @@ func recordWebRunOutcome(url string, res browserRunResult) {
 // getAttention handles GET /api/v1/attention — newest first.
 func (s *Server) getAttention(w http.ResponseWriter, r *http.Request) {
 	items := []AttentionItem{}
+	now := time.Now()
+	paused := mywant.IsGloballyPaused()
+	held := map[string]bool{}
 	for _, want := range s.globalBuilder.GetAllWantStates() {
 		if want.Metadata.IsSystemWant && want.Metadata.Name != "robot" {
 			continue
@@ -97,19 +111,53 @@ func (s *Server) getAttention(w http.ResponseWriter, r *http.Request) {
 				At: time.Now().UnixMilli(),
 			})
 		}
+		for _, a := range want.HeldAlerts(now, paused) {
+			itemID := "alert:" + id + ":" + a.Rule.Name
+			held[itemID] = true
+			items = append(items, AttentionItem{
+				ID: itemID, Kind: "alert", Title: title, Detail: a.Detail, WantID: id,
+				Rule: a.Rule.Name, At: alertBegan(itemID, now),
+			})
+		}
 	}
+	forgetAlertsNotIn(held)
 	webAttentionMu.Lock()
 	for _, it := range webAttention {
 		items = append(items, it)
 	}
 	webAttentionMu.Unlock()
 	// Approvals first — someone is blocked on them — then newest.
-	rank := map[string]int{"approval": 0, "needs_human": 1, "web_failed": 2, "want_error": 3}
+	rank := map[string]int{"approval": 0, "alert": 1, "needs_human": 2, "web_failed": 3, "want_error": 4}
 	sort.SliceStable(items, func(i, j int) bool {
 		if rank[items[i].Kind] != rank[items[j].Kind] {
 			return rank[items[i].Kind] < rank[items[j].Kind]
 		}
 		return items[i].At > items[j].At
 	})
-	s.JSONResponse(w, http.StatusOK, map[string]any{"items": items})
+	// checkedAt: the moment this answer was true. An empty list is only
+	// "nothing needs you" while it is recent — the pill's lamp reads it.
+	s.JSONResponse(w, http.StatusOK, map[string]any{"items": items, "checkedAt": now.UnixMilli()})
+}
+
+// alertBegan is when the alert with this item ID started holding: now, the
+// first time it is seen.
+func alertBegan(itemID string, now time.Time) int64 {
+	alertSinceMu.Lock()
+	defer alertSinceMu.Unlock()
+	if at, ok := alertSince[itemID]; ok {
+		return at
+	}
+	alertSince[itemID] = now.UnixMilli()
+	return alertSince[itemID]
+}
+
+// forgetAlertsNotIn drops the start of every alert that no longer holds.
+func forgetAlertsNotIn(held map[string]bool) {
+	alertSinceMu.Lock()
+	defer alertSinceMu.Unlock()
+	for id := range alertSince {
+		if !held[id] {
+			delete(alertSince, id)
+		}
+	}
 }

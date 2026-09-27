@@ -61,6 +61,7 @@ type WantSpec struct {
 	When    []WhenSpec      `json:"when,omitempty"`
 	Exposes []ExposeEntry   `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 	Imports map[string]any  `json:"imports,omitempty" yaml:"imports,omitempty"`
+	Alerts  []ws.AlertRule  `json:"alerts,omitempty" yaml:"alerts,omitempty"`
 }
 
 // WhenSpec defines a scheduled execution time for a Want

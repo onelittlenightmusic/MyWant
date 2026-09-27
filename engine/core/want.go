@@ -2023,7 +2023,7 @@ func (n *Want) IncrementIntState(key string) int {
 //
 // This used to clone only Params and Imports, the two fields that happen to
 // get read on a hot path (GetAllState's Imports overlay). The rest — Exposes,
-// Using, Requires, When, StateSubscriptions, NotificationFilters,
+// Using, Requires, When, StateSubscriptions, NotificationFilters, Alerts,
 // UnknownFields — were just as shared and just as reassignable, and one of
 // them (a slice, not caught until `go test -race` on the fix for the others)
 // was still enough to crash writeStatsToMemory's marshal against a
@@ -2053,6 +2053,9 @@ func cloneSpec(s WantSpec) WantSpec {
 	}
 	if s.When != nil {
 		s.When = append([]WhenSpec(nil), s.When...)
+	}
+	if s.Alerts != nil {
+		s.Alerts = append([]AlertRule(nil), s.Alerts...)
 	}
 	if s.UnknownFields != nil {
 		s.UnknownFields = append([]string(nil), s.UnknownFields...)

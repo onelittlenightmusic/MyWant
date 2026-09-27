@@ -145,6 +145,7 @@ func (cb *ChainBuilder) deepCopyWants(src []*Want) []*Want {
 				When:                copyWhen(want.Spec.When),
 				Exposes:             copyExposes(want.Spec.Exposes),
 				Imports:             copyStringMap(want.Spec.Imports),
+				Alerts:              append([]AlertRule(nil), want.Spec.Alerts...),
 			},
 		}
 		copiedWants = append(copiedWants, copiedWant)
