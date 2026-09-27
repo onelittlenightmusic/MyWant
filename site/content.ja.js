@@ -72,7 +72,7 @@ ${shot("dashboard.jpg", "ブラウザで見た MyWant。置いた Want が 1 枚
           id: 'install',
           step: 'Step 2',
           title: 'インストール',
-          sub: 'Mac なら Homebrew で 3 行',
+          sub: 'Mac なら Homebrew で 3 行。Docker でも',
           icon: 'download',
           color: '#10b981',
           body: `
@@ -94,6 +94,25 @@ ${shot("dashboard.jpg", "ブラウザで見た MyWant。置いた Want が 1 枚
   <p>次のコマンドでバージョンが表示されれば成功です。</p>
 </div>
 <div class="code"><pre>mywant version</pre></div>
+<h4>Docker で動かす</h4>
+<p>Docker が使えるなら、インストールせずに動かすこともできます。MyWant 本体と画面の 2 つのコンテナを、1 つのファイル（<code>docker-compose.yml</code>）でまとめて起動します。</p>
+<ol class="steps">
+  <li><strong>ファイルを取ってくる</strong>
+    <div class="code"><pre>curl -O https://raw.githubusercontent.com/onelittlenightmusic/MyWant/master/docker-compose.yml</pre></div>
+  </li>
+  <li><strong>起動する</strong>
+    <div class="code"><pre>docker compose up -d</pre></div>
+  </li>
+  <li><strong><a href="http://localhost:8081" target="_blank" rel="noopener">http://localhost:8081</a> を開く</strong></li>
+</ol>
+<ul>
+  <li>置いた Want などは <code>mywant-data</code> というボリュームに残ります。<code>docker compose down</code> で止めても消えません（<code>down -v</code> で消えます）</li>
+  <li>MyWant のサーバーは、このマシンにだけ（<code>127.0.0.1:8080</code>）公開されるので、<code>mywant</code> コマンドはそのまま使えます</li>
+  <li>リマインダーの時刻を合わせるには、ファイルの <code>TZ</code> を自分のタイムゾーン（例：<code>Asia/Tokyo</code>）にします</li>
+  <li>スマホなどほかの機器から開くときは、先に <code>MYWANT_AUTH_PASSWORD</code>（パスワード）を設定してから、ポートを <code>"8081:8080"</code> にします</li>
+  <li>アップデートは <code>docker compose pull &amp;&amp; docker compose up -d</code></li>
+  <li>キャンバス（mywant-guiex）はイメージに入っていません。使うときは Homebrew で入れてください</li>
+</ul>
 <h4>キャンバスも使いたいとき</h4>
 <p>拡張 <strong>mywant-guiex</strong> を入れると、画面に <strong>キャンバス</strong>（Want を盤面のタイルとして並べる）と <strong>Web Want</strong>（いつものサイトを Want にする）が加わります。入れなくても MyWant はそのまま使えます。</p>
 <div class="code"><pre>brew install mywant-guiex</pre></div>

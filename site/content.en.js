@@ -68,7 +68,7 @@ ${shot("dashboard.jpg", "MyWant in the browser: every Want you place becomes a c
           id: 'install',
           step: 'Step 2',
           title: 'Install',
-          sub: 'Three lines with Homebrew on a Mac',
+          sub: 'Three lines with Homebrew on a Mac — or Docker',
           icon: 'download',
           color: '#10b981',
           body: `
@@ -90,6 +90,25 @@ Open the Terminal app and paste the commands below, one at a time.</p>
   <p>If this command prints a version, you are all set.</p>
 </div>
 <div class="code"><pre>mywant version</pre></div>
+<h4>Run it with Docker</h4>
+<p>With Docker, you can run it without installing anything: one file (<code>docker-compose.yml</code>) starts the two containers, MyWant itself and the screen.</p>
+<ol class="steps">
+  <li><strong>Get the file</strong>
+    <div class="code"><pre>curl -O https://raw.githubusercontent.com/onelittlenightmusic/MyWant/master/docker-compose.yml</pre></div>
+  </li>
+  <li><strong>Start it</strong>
+    <div class="code"><pre>docker compose up -d</pre></div>
+  </li>
+  <li><strong>Open <a href="http://localhost:8081" target="_blank" rel="noopener">http://localhost:8081</a></strong></li>
+</ol>
+<ul>
+  <li>Your Wants and the rest are kept in the <code>mywant-data</code> volume. <code>docker compose down</code> keeps them; <code>down -v</code> erases them</li>
+  <li>The MyWant server is published on this machine only (<code>127.0.0.1:8080</code>), so the <code>mywant</code> command works as usual</li>
+  <li>For reminders at the right time, set <code>TZ</code> in the file to your time zone (e.g. <code>Europe/London</code>)</li>
+  <li>To open it from a phone or another machine, first set <code>MYWANT_AUTH_PASSWORD</code> (a password), then change the port to <code>"8081:8080"</code></li>
+  <li>Upgrade with <code>docker compose pull &amp;&amp; docker compose up -d</code></li>
+  <li>The canvas (mywant-guiex) is not in the images; install it with Homebrew to use it</li>
+</ul>
 <h4>Want the canvas too?</h4>
 <p>The <strong>mywant-guiex</strong> extension adds the <strong>canvas</strong> (Wants as tiles on a board) and <strong>Web Wants</strong> (the sites you use, as Wants) to the screen. MyWant works fine without it.</p>
 <div class="code"><pre>brew install mywant-guiex</pre></div>
