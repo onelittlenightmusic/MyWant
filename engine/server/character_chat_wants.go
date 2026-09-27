@@ -142,7 +142,14 @@ func (s *Server) removeCharacterChatWant(characterID string) {
 //
 // Not called for a message that arrived through the chat want itself — that one
 // is already in there, and adding it again would show it twice.
+//
+// The robot has no chat want: its chat window is its own robot want, and what
+// it says there is a reply, not a message to it — see appendToRobotChat.
 func (s *Server) appendToCharacterChat(characterID, text string) {
+	if characterID == robotCharacterID {
+		s.appendToRobotChat(text)
+		return
+	}
 	want := s.findWantByIDOrName(characterChatWantName(characterID))
 	if want == nil {
 		return
@@ -152,4 +159,39 @@ func (s *Server) appendToCharacterChat(characterID, text string) {
 		Text:      text,
 		Timestamp: time.Now().Format(time.RFC3339),
 	}, ccStateCfg)
+}
+
+// robotNoticeSubtype marks a line the robot said on the app's behalf — a hint,
+// "saved", "✗ failed" — rather than an answer its agent gave.
+const robotNoticeSubtype = "notice"
+
+// robotResponsesMax is how many of the robot's own lines its chat keeps, the
+// same as the agent's answers (see recordRobotAnswer).
+const robotResponsesMax = 20
+
+// appendToRobotChat puts what the robot said into its chat window, as one of
+// its own lines.
+//
+// The robot's chat is two lists on its want: cc_messages, what was said to it —
+// which its agent answers — and cc_responses, what it said. A hint the app
+// gives in the robot's voice used to go to neither: it appeared in a bubble of
+// its own over the robot's cursor, a different thing from everything else the
+// robot says, and was gone from the conversation once the bubble faded. Written
+// as a response it is in the chat with the rest of the robot's words, and it
+// asks the agent nothing.
+func (s *Server) appendToRobotChat(text string) {
+	robot := s.findWantByIDOrName(robotCharacterID)
+	if robot == nil {
+		return
+	}
+	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
+	responses = append(responses, map[string]any{
+		"text":      text,
+		"timestamp": time.Now().Format(time.RFC3339),
+		"subtype":   robotNoticeSubtype,
+	})
+	if len(responses) > robotResponsesMax {
+		responses = responses[len(responses)-robotResponsesMax:]
+	}
+	robot.SetCurrent("cc_responses", responses)
 }
