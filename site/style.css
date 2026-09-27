@@ -513,3 +513,9 @@ svg.lucide { width: 1em; height: 1em; flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
+
+/* ── Links to the other guides ────────────────────────────────────────────── */
+.card-link { text-decoration: none; color: inherit; }
+.card-go { margin-left: auto; align-self: flex-start; font-size: 16px; color: var(--ink-3); }
+.menu-item { text-decoration: none; text-align: center; }
+.menu-item-here { border-color: var(--ring); color: var(--ink); cursor: default; }

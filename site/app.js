@@ -3,7 +3,9 @@
  * menu of sections, and the right-hand sidebar a card opens. The open topic
  * lives in the URL hash (#install), so every topic has a link and Back closes
  * it. The language is on <html lang> (set before first paint in index.html);
- * switching it redraws everything and keeps the open topic open.
+ * switching it redraws everything and keeps the open topic open. Which guide
+ * this is — its name, repository, and the other guides to link — comes from
+ * window.GUIDE_SITE (site.js); everything else here is shared between guides.
  */
 (function () {
   const $ = sel => document.querySelector(sel);
@@ -22,7 +24,14 @@
     node.style.setProperty('--accent-soft', color + '33');
   }
 
+  const site = window.GUIDE_SITE;
   let lang, ui, sections, topics, byId;
+
+  document.querySelector('.title h1').textContent = site.brand;
+  $('#github-link').href = site.github;
+
+  /** A link to another guide, in the language being read where it has one. */
+  const guideHref = g => (g.noLang ? g.href : `${g.href}?lang=${lang}`);
   let current = null;
 
   function setLanguage(l) {
@@ -39,6 +48,7 @@
     // bilingual site does — the one you are reading needs no button.
     $('#lang-label').textContent = window.GUIDE[other()].ui.langName;
     buildGrid();
+    buildGuides();
     buildMenu();
   }
   const other = () => (lang === 'ja' ? 'en' : 'ja');
@@ -71,6 +81,28 @@
     }
   }
 
+  // ── The other guides: a last row of cards that leave for them ────────────
+  function buildGuides() {
+    const others = site.guides.filter(g => g.id !== site.current);
+    if (!others.length) return;
+    const sec = el('section', { class: 'section', id: 'section-guides' });
+    sec.append(el('div', { class: 'section-heading' }, `<h2>${ui.guides}</h2><p>${ui.guidesNote}</p>`));
+    const grid = el('div', { class: 'grid' });
+    for (const g of others) {
+      const card = el('a', { class: 'card card-link', href: guideHref(g) }, `
+        <span class="tile"><i data-lucide="${g.icon}"></i></span>
+        <span class="card-text">
+          <span class="card-title">${g.title[lang]}</span>
+          <span class="card-sub">${g.sub[lang]}</span>
+        </span>
+        <i data-lucide="arrow-up-right" class="card-go"></i>`);
+      accentVars(card, g.color);
+      grid.append(card);
+    }
+    sec.append(grid);
+    $('#sections').append(sec);
+  }
+
   // ── Menu ──────────────────────────────────────────────────────────────────
   const menu = $('#menu');
   const menuBtn = $('#menu-btn');
@@ -98,6 +130,21 @@
       startGrid.append(item);
     }
     menu.append(startGrid);
+
+    // Every guide, this one lit, so the menu says where you are among them.
+    menu.append(el('p', { class: 'menu-heading', style: 'margin-top:12px' }, ui.guides));
+    const guideGrid = el('div', { class: 'menu-grid' });
+    for (const g of site.guides) {
+      const here = g.id === site.current;
+      const item = el(here ? 'span' : 'a', {
+        class: 'menu-item' + (here ? ' menu-item-here' : ''),
+        role: 'menuitem',
+        ...(here ? { 'aria-current': 'page' } : { href: guideHref(g) }),
+      }, `<i data-lucide="${g.icon}"></i>${g.title[lang]}`);
+      item.querySelector('i').style.color = g.color;
+      guideGrid.append(item);
+    }
+    menu.append(guideGrid);
   }
 
   function openMenu() { menu.hidden = false; menuBtn.setAttribute('aria-expanded', 'true'); }

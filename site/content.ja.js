@@ -26,6 +26,8 @@ window.GUIDE.ja = {
     prev: '前へ',
     grid: '一覧',
     next: '次へ',
+    guides: 'ガイド',
+    guidesNote: 'MyWant のほかのガイド',
   },
   sections: [
     {
@@ -191,6 +193,7 @@ mywant stop</pre></div>
   <p class="box-title"><i data-lucide="smartphone"></i>スマホでも</p>
   <p>同じネットワークにあるスマホからも開けます。画面はスマホの幅に合わせて並び替わります。</p>
 </div>
+<p>画面の使い方は <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=ja">mywant-gui ガイド</a> でくわしく説明しています。</p>
 `,
         },
       ],

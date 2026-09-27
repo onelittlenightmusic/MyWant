@@ -22,6 +22,8 @@ window.GUIDE.en = {
     prev: 'Prev',
     grid: 'All',
     next: 'Next',
+    guides: 'Guides',
+    guidesNote: 'More guides to MyWant',
   },
   sections: [
     {
@@ -187,6 +189,7 @@ Save this as <code>coffee.yaml</code>.</p>
   <p class="box-title"><i data-lucide="smartphone"></i>On your phone too</p>
   <p>A phone on the same network can open it as well. The screen rearranges itself to fit.</p>
 </div>
+<p>The <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=en">mywant-gui guide</a> explains the screen in detail.</p>
 `,
         },
       ],
