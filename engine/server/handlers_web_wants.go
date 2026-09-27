@@ -1143,6 +1143,11 @@ type browserRunClaim struct {
 	Steps      json.RawMessage `json:"steps"`
 	KeepOpen   bool            `json:"keep_open,omitempty"`
 	Background bool            `json:"background,omitempty"` // open the tab non-active (see handleBrowserRun) — for callers polled often enough that stealing focus every run would be disruptive (e.g. claude_info's 60s gauge poll)
+	// Quiet: this run must never get in its person's way. A login or a
+	// CAPTCHA it runs into is not filed as needing them, a failure is not
+	// filed either, and its tab closes as asked instead of being kept open
+	// for them. The caller hears the outcome; the person is not called.
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 // browserRunResult is both what the extension POSTs back (browserRunResult
@@ -1162,6 +1167,8 @@ var (
 	// The URL each pending run is for, so its outcome can be filed against
 	// the tab it happened in (see recordWebRunOutcome).
 	browserRunPendingURL = map[string]string{}
+	// Runs asked to be quiet (browserRunClaim.Quiet), by request ID.
+	browserRunPendingQuiet = map[string]bool{}
 )
 
 const defaultBrowserRunTimeoutMs = 90000
@@ -1180,6 +1187,7 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 		Steps      json.RawMessage `json:"steps"`
 		KeepOpen   bool            `json:"keep_open,omitempty"`
 		Background bool            `json:"background,omitempty"`
+		Quiet      bool            `json:"quiet,omitempty"`
 		TimeoutMs  int             `json:"timeout_ms,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1201,6 +1209,9 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 	browserRunPendingMu.Lock()
 	browserRunPending[requestID] = resultCh
 	browserRunPendingURL[requestID] = req.URL
+	if req.Quiet {
+		browserRunPendingQuiet[requestID] = true
+	}
 	browserRunPendingMu.Unlock()
 	browserRunQueue.enqueue(browserRunClaim{
 		RequestID:  requestID,
@@ -1208,6 +1219,7 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 		Steps:      req.Steps,
 		KeepOpen:   req.KeepOpen,
 		Background: req.Background,
+		Quiet:      req.Quiet,
 	})
 	go broadcastSSE("pending_action", nil)
 
@@ -1219,6 +1231,7 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 		delete(browserRunPending, requestID)
 		// No browser took it, so there is no tab to send anyone to.
 		delete(browserRunPendingURL, requestID)
+		delete(browserRunPendingQuiet, requestID)
 		browserRunPendingMu.Unlock()
 		s.JSONResponse(w, http.StatusGatewayTimeout, browserRunResult{
 			RequestID: requestID,
@@ -1298,8 +1311,14 @@ func (s *Server) browserRunResultHandler(w http.ResponseWriter, r *http.Request)
 	}
 	runURL := browserRunPendingURL[res.RequestID]
 	delete(browserRunPendingURL, res.RequestID)
+	quiet := browserRunPendingQuiet[res.RequestID]
+	delete(browserRunPendingQuiet, res.RequestID)
 	browserRunPendingMu.Unlock()
-	recordWebRunOutcome(runURL, res)
+	if quiet {
+		clearWebAttention(runURL)
+	} else {
+		recordWebRunOutcome(runURL, res)
+	}
 
 	if ok {
 		ch <- res

@@ -48,3 +48,15 @@ func TestAlertBegan(t *testing.T) {
 		t.Fatalf("holding again is a new item: %d", got)
 	}
 }
+
+// A quiet run files nothing, and takes back what an earlier run of its URL filed.
+func TestClearWebAttention(t *testing.T) {
+	const url = "https://example.com/reserve"
+	t.Cleanup(func() { delete(webAttention, url) })
+
+	recordWebRunOutcome(url, browserRunResult{Result: map[string]any{"needs_human": "login"}})
+	clearWebAttention(url)
+	if _, still := webAttention[url]; still {
+		t.Fatalf("a quiet run should take the tab's item back")
+	}
+}

@@ -85,6 +85,15 @@ func recordWebRunOutcome(url string, res browserRunResult) {
 	}
 }
 
+// clearWebAttention drops whatever a tab had filed: a quiet run of that URL
+// (browserRunClaim.Quiet) files nothing, and its caller has said the page is
+// not something to call anyone about.
+func clearWebAttention(url string) {
+	webAttentionMu.Lock()
+	defer webAttentionMu.Unlock()
+	delete(webAttention, url)
+}
+
 // getAttention handles GET /api/v1/attention — newest first.
 func (s *Server) getAttention(w http.ResponseWriter, r *http.Request) {
 	items := []AttentionItem{}
