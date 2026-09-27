@@ -279,7 +279,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		// a different thing from being ignored, and the one thing the asker
 		// needs to know before asking again.
 		// firstLine + truncateRunes: the reason fmtool printed first, kept short
-		// enough for a speech bubble (both live in web_inspector_naming.go).
+		// enough for a speech bubble (both live in web_element_naming.go).
 		reason := strings.TrimSpace(firstLine(notes))
 		if reason == "" {
 			reason = "理由は分かりません"

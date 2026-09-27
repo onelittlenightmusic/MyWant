@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -477,7 +475,7 @@ func reserveWebWantTypeDir(base string) (name, dir string, err error) {
 
 // captureWebWant handles POST /api/v1/web-wants/capture — the always-on ingest
 // for bookmarklet-driven captures. Unlike createWebWant it needs no
-// pre-registered web_inspector want and no user-entered metadata: the overlay
+// user-entered metadata: the overlay
 // sends its selected elements keyed by hostname plus __page_url / __page_title
 // taken from the page itself, and the type name is derived from the hostname
 // (uniquified via reserveWebWantTypeDir). Deliberately unauthenticated and
@@ -926,13 +924,9 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default ("Inspect" in the GUI, WebWantPage.tsx's handleInspect): queue
-	// for the Chrome extension's own poll instead of driving CDP directly —
-	// same reasoning as claimPendingAutoLaunch above for web_inspector
-	// wants: this never creates a want, so it can't reuse that mechanism,
-	// but the extension side is symmetric (see handleNavLaunch in
-	// background.js). No CDP fallback, matching that same precedent — if
-	// nothing is polling pending-action, this silently does nothing until
+	// Default: queue for the Chrome extension's own poll instead of driving
+	// CDP directly (see handleNavLaunch in background.js). No CDP fallback —
+	// if nothing is polling pending-action, this silently does nothing until
 	// something does.
 	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
 
@@ -981,9 +975,7 @@ func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
 // background.js's JS equivalent of BuildNavJS below (in mywant-gui's
 // webext/), run via chrome.scripting.executeScript's func+args instead of a
 // CDP-injected string, so it isn't subject to page CSP the way
-// build-standalone-overlay.js injecting a <script src> would be (see
-// webInspectorOverlayCore.ts's fetchImpl comment for the same CSP story on
-// the web_inspector side).
+// build-standalone-overlay.js injecting a <script src> would be.
 type navLaunchClaim struct {
 	TargetURL string           `json:"target_url"`
 	Elements  []WebWantElement `json:"nav_elements"`
@@ -997,12 +989,7 @@ type navLaunchClaim struct {
 
 // claimQueue is a generic mutex-guarded FIFO — the shared shape behind
 // nav-launch and browser-run's "enqueue now, extension dequeues later via
-// polling" queues (see pendingBrowserAction). Auto-launch doesn't use this:
-// it claims by setting a flag directly on the want's own state rather than
-// through a separate queue, so a still-open want is never handed out twice
-// even across service worker restarts — that lifecycle is different enough
-// from a plain FIFO that folding it into claimQueue would just hide the
-// distinction rather than remove it.
+// polling" queues (see pendingBrowserAction).
 type claimQueue[T any] struct {
 	mu    sync.Mutex
 	items []T
@@ -1075,31 +1062,15 @@ func (s *Server) suggestElementName(w http.ResponseWriter, r *http.Request) {
 }
 
 // activeInspectionResponse is the payload for GET /api/v1/web-wants/active-inspection —
-// everything the standalone overlay loader (Chrome extension, bookmarklet, or
-// iOS Shortcut — see webInspectorOverlayCore.ts) needs to run itself.
+// everything the standalone overlay loader (Chrome extension or bookmarklet)
+// needs to capture the page it runs on.
 type activeInspectionResponse struct {
-	WantID         string                  `json:"want_id"`
-	TargetURL      string                  `json:"target_url"`
 	DoneWebhookURL string                  `json:"done_webhook_url"`
 	SuggestNameURL string                  `json:"suggest_name_url"`
 	CharacterID    string                  `json:"character_id"`
 	Color          string                  `json:"color"`
 	Avatar         string                  `json:"avatar"`
 	ExistingMarks  []mywant.WebElementMark `json:"existing_marks"`
-	NavElements    []WebWantElement        `json:"nav_elements"`
-}
-
-// paramOrCurrentStr reads a string field via its current-labeled mirror first,
-// falling back to the raw request param (Spec.Params) — mirrors engine/types'
-// unexported paramOrCurrent, duplicated here since it isn't exported.
-func paramOrCurrentStr(want *mywant.Want, key string) string {
-	if v := mywant.GetCurrent(want, key, ""); v != "" {
-		return v
-	}
-	if v, ok := want.Spec.Params[key].(string); ok {
-		return v
-	}
-	return ""
 }
 
 // hostnameOfURL returns targetURL's hostname, or "" if it doesn't parse.
@@ -1111,48 +1082,10 @@ func hostnameOfURL(targetURL string) string {
 	return u.Hostname()
 }
 
-// wantNameTimestamp extracts the trailing "-<epoch-ms>" suffix web_inspector
-// want names always carry (see WebInspectorModal.tsx's `web-inspector-${Date.now()}`).
-// Metadata has no CreatedAt field to sort by, so this is the only way to tell
-// which of several open inspection wants is newest.
-func wantNameTimestamp(name string) int64 {
-	idx := strings.LastIndex(name, "-")
-	if idx < 0 {
-		return 0
-	}
-	ts, err := strconv.ParseInt(name[idx+1:], 10, 64)
-	if err != nil {
-		return 0
-	}
-	return ts
-}
-
-// loadWebWantNavElements mirrors engine/types' unexported loadWantTypeNavElements —
-// reads the same elements.json a want type's Launch action uses, flattened
-// across hostnames.
-func loadWebWantNavElements(wantTypeName string) []WebWantElement {
-	elemFile := filepath.Join(mywant.UserCustomTypesDir(), wantTypeName, "elements.json")
-	data, err := os.ReadFile(elemFile)
-	if err != nil {
-		return nil
-	}
-	var allElems map[string][]WebWantElement
-	if err := json.Unmarshal(data, &allElems); err != nil {
-		return nil
-	}
-	var elements []WebWantElement
-	for _, elems := range allElems {
-		elements = append(elements, elems...)
-	}
-	return elements
-}
-
-// activeInspection lets a static, session-agnostic overlay loader — a desktop
-// bookmarklet or an iOS Shortcut, neither of which can have a want ID baked in
-// since both are meant to be installed once and reused across sessions —
-// discover which web_inspector want it's acting on. Prefers a want whose
-// target_url hostname matches the page the loader is running on (passed as
-// ?url=); falls back to the most recently created still-open one.
+// activeInspection tells a static, session-agnostic overlay loader — a
+// bookmarklet or the extension, neither of which has anything baked in but
+// this server's address — where to send what it captures on the page it runs
+// on (passed as ?url=), and which marks are already there.
 func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 	// The bookmarklet says so (?via=bookmarklet): this device can use it. See
 	// recordWebInspectorUse.
@@ -1161,187 +1094,39 @@ func (s *Server) activeInspection(w http.ResponseWriter, r *http.Request) {
 	}
 	pageHost := hostnameOfURL(r.URL.Query().Get("url"))
 
-	var matched, all []*mywant.Want
-	for _, want := range s.globalBuilder.GetAllWantStates() {
-		if want.Metadata.Type != "web_inspector" {
-			continue
-		}
-		if mywant.GetCurrent(want, "inspection_complete", false) {
-			continue
-		}
-		if mywant.GetCurrent(want, "inspector_error", "") != "" {
-			continue
-		}
-		all = append(all, want)
-		if pageHost != "" && hostnameOfURL(mywant.GetCurrent(want, "target_url", "")) == pageHost {
-			matched = append(matched, want)
-		}
-	}
-
-	// NOTE: an open web_inspector want always wins over the always-on capture
-	// fallback below — even for a bookmarklet click on an unrelated site (the
-	// fall-back-to-`all` when no hostname matches). This is longstanding
-	// behavior that review mode depends on; while a review session is open,
-	// bookmarklet clicks bind to it rather than creating a new type.
-	pool := matched
-	if len(pool) == 0 {
-		pool = all
-	}
-	if len(pool) == 0 {
-		// Always-on capture fallback: no open web_inspector want. Instead of
-		// 404ing (which used to force the GUI's 検査開始 step before the
-		// bookmarklet could do anything), hand the overlay the always-on
-		// capture endpoint so a bookmarklet click on ANY site can create a
-		// web want type directly (see captureWebWant). No want → no
-		// character/nav context; existing marks are still served per-hostname
-		// for display. Origin derivation matches the want branch below (see
-		// the comment there); the r.Host=="" fallback uses the default port
-		// since there is no want to read mywant_api_port from.
-		scheme := r.Header.Get("X-Forwarded-Proto")
-		if scheme == "" {
-			scheme = "http"
-		}
-		origin := scheme + "://" + r.Host
-		if r.Host == "" {
-			origin = "http://localhost:8080"
-		}
-		resp := activeInspectionResponse{
-			DoneWebhookURL: origin + "/api/v1/web-wants/capture",
-			SuggestNameURL: origin + "/api/v1/web-wants/suggest-name",
-			ExistingMarks:  mywant.GetWebMarks(pageHost),
-		}
-		// Who is capturing is otherwise unknown here: "my character" lives
-		// in the GUI's own browser storage, which a bookmarklet on another
-		// site cannot read. The bookmarklet carries it instead (?character=,
-		// baked in when it was made), so the CursorMan it draws is the one
-		// the dashboard draws — resolved on every launch, so a character's
-		// later colour or avatar change still shows.
-		if id := r.URL.Query().Get("character"); id != "" {
-			if character, ok := mywant.GetCharacter(id); ok {
-				resp.CharacterID = character.ID
-				resp.Color = character.Color
-				resp.Avatar = character.Avatar
-			}
-		}
-		s.JSONResponse(w, http.StatusOK, resp)
-		return
-	}
-	sort.Slice(pool, func(i, j int) bool {
-		return wantNameTimestamp(pool[i].Metadata.Name) > wantNameTimestamp(pool[j].Metadata.Name)
-	})
-	s.JSONResponse(w, http.StatusOK, buildActiveInspectionResponse(pool[0], r))
-}
-
-// buildActiveInspectionResponse assembles the payload a browser-side overlay
-// loader (bookmarklet, iOS Shortcut, or the Chrome extension's content.js)
-// needs to run itself against want — shared by activeInspection (looked up by
-// the page's own hostname or "most recent") and claimPendingAutoLaunch
-// (looked up by claim, for the extension's own auto-tab-open path).
-func buildActiveInspectionResponse(want *mywant.Want, r *http.Request) activeInspectionResponse {
-	targetURL := mywant.GetCurrent(want, "target_url", "")
-	webhookID := mywant.GetCurrent(want, "doneWebhookId", want.Metadata.ID+"-done")
-	mywantPort := mywant.GetCurrent(want, "mywant_api_port", "8080")
-
-	// Built from the request's own Host header, not a hardcoded "localhost" —
-	// this handler is only ever reached by a browser fetch from the
-	// standalone (non-CDP) overlay loader (see WebInspectorModal.tsx), which
-	// may be a phone on the LAN via mywant-gui's reverse proxy (port 8081,
-	// bound to all interfaces) rather than this machine itself (mywant's own
-	// port 8080 is loopback-only — see project memory
-	// project_web_inspector_manual_launch — so "localhost" would be wrong and
-	// unreachable from that same caller). Go's default reverse proxy forwards
-	// the original Host header through unchanged, so r.Host here is exactly
-	// whatever origin the caller used to reach us, and is guaranteed
-	// reachable by that same caller.
-	//
-	// Scheme comes from X-Forwarded-Proto (set by Caddy — see
-	// mywant-gui/docs/WebInspectorIPhone.md), not r.TLS, since TLS is
-	// terminated at Caddy and this backend only ever sees plain HTTP from
-	// the proxy chain. Getting this wrong sends the overlay a plain-http
-	// webhook URL, which then fails the exact same mixed-content block
-	// (fetch, not just <script src>) that Caddy was added to fix.
+	// Built from the request's own Host header, not a hardcoded "localhost":
+	// the caller may be a phone on the LAN via mywant-gui's reverse proxy, and
+	// r.Host is exactly the origin it used to reach us. Scheme comes from
+	// X-Forwarded-Proto (set by Caddy, which terminates TLS), not r.TLS —
+	// getting it wrong sends the overlay a plain-http URL that fails the
+	// mixed-content block Caddy was added to fix.
 	scheme := r.Header.Get("X-Forwarded-Proto")
 	if scheme == "" {
 		scheme = "http"
 	}
 	origin := scheme + "://" + r.Host
 	if r.Host == "" {
-		origin = fmt.Sprintf("http://localhost:%s", mywantPort)
+		origin = "http://localhost:8080"
 	}
-
-	characterID := paramOrCurrentStr(want, "characterId")
-	color, avatar := "", ""
-	if character, ok := mywant.GetCharacter(characterID); ok {
-		color = character.Color
-		avatar = character.Avatar
-	}
-
-	var navElements []WebWantElement
-	if wantTypeName := paramOrCurrentStr(want, "wantTypeName"); wantTypeName != "" {
-		navElements = loadWebWantNavElements(wantTypeName)
-	}
-
-	return activeInspectionResponse{
-		WantID:         want.Metadata.ID,
-		TargetURL:      targetURL,
-		DoneWebhookURL: origin + "/api/v1/webhooks/" + webhookID,
+	resp := activeInspectionResponse{
+		DoneWebhookURL: origin + "/api/v1/web-wants/capture",
 		SuggestNameURL: origin + "/api/v1/web-wants/suggest-name",
-		CharacterID:    characterID,
-		Color:          color,
-		Avatar:         avatar,
-		ExistingMarks:  mywant.GetWebMarks(hostnameOfURL(targetURL)),
-		NavElements:    navElements,
+		ExistingMarks:  mywant.GetWebMarks(pageHost),
 	}
-}
-
-// autoLaunchClaimMu serializes claimPendingAutoLaunch's read-then-claim so two
-// near-simultaneous polls (e.g. the Chrome extension firing its alarm right
-// as a second one wakes) can never both claim the same want and open two
-// tabs for it.
-var autoLaunchClaimMu sync.Mutex
-
-// claimPendingAutoLaunch finds and claims the oldest web_inspector want with
-// no tab open for it yet, so the extension can open one itself — the
-// auto-launch branch of pendingBrowserAction (see its doc comment for why
-// this stays a separate want-flag claim rather than a claimQueue). Returns
-// nil if nothing is pending.
-//
-// The oldest unclaimed candidate wins (FIFO) so wants opened while the
-// extension is offline are worked through in creation order once it comes
-// back, and the matched want is marked auto_launch_claimed=true before
-// returning so this same want is never handed out again even if opening/
-// injecting the tab takes a while.
-func (s *Server) claimPendingAutoLaunch(r *http.Request) *activeInspectionResponse {
-	autoLaunchClaimMu.Lock()
-	defer autoLaunchClaimMu.Unlock()
-
-	var candidates []*mywant.Want
-	for _, want := range s.globalBuilder.GetAllWantStates() {
-		if want.Metadata.Type != "web_inspector" {
-			continue
+	// Who is capturing is otherwise unknown here: "my character" lives in the
+	// GUI's own browser storage, which a bookmarklet on another site cannot
+	// read. The bookmarklet carries it instead (?character=, baked in when it
+	// was made), so the CursorMan it draws is the one the dashboard draws —
+	// resolved on every launch, so a character's later colour or avatar
+	// change still shows.
+	if id := r.URL.Query().Get("character"); id != "" {
+		if character, ok := mywant.GetCharacter(id); ok {
+			resp.CharacterID = character.ID
+			resp.Color = character.Color
+			resp.Avatar = character.Avatar
 		}
-		if mywant.GetCurrent(want, "inspection_complete", false) {
-			continue
-		}
-		if mywant.GetCurrent(want, "inspector_error", "") != "" {
-			continue
-		}
-		if mywant.GetCurrent(want, "auto_launch_claimed", false) {
-			continue
-		}
-		candidates = append(candidates, want)
 	}
-	if len(candidates) == 0 {
-		return nil
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		return wantNameTimestamp(candidates[i].Metadata.Name) < wantNameTimestamp(candidates[j].Metadata.Name)
-	})
-	want := candidates[0]
-	want.SetCurrent("auto_launch_claimed", true)
-
-	resp := buildActiveInspectionResponse(want, r)
-	return &resp
+	s.JSONResponse(w, http.StatusOK, resp)
 }
 
 // browserRunClaim is a pending request queued for the Chrome extension to
@@ -1386,7 +1171,7 @@ const defaultBrowserRunTimeoutMs = 90000
 // buildWebWantMainPy-style skill scripts, and the hand-written equivalent in
 // ~/.mywant/custom-types/*/main.py for gmail/smartgolf). Queues the request
 // for the extension's pollForPendingAction (same 1-minute alarm tick as
-// auto-launch/nav-launch) and blocks until browserRunResult delivers a
+// nav-launch) and blocks until browserRunResult delivers a
 // result or the timeout elapses — the caller gets a single ordinary HTTP
 // response either way, no separate polling needed on the Python side.
 func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
@@ -1444,23 +1229,20 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 
 // pendingActionResponse is the single envelope GET
 // /api/v1/web-wants/pending-action returns — replaces the formerly separate
-// pending-auto-launch/pending-nav-launch/pending-browser-run endpoints (and
-// background.js's three separate poll functions) with one polled endpoint,
-// dispatched by Kind. The three underlying mechanisms keep their own
-// distinct lifecycles (see claimPendingAutoLaunch's doc comment); only the
-// poll transport and response envelope are unified.
+// pending-nav-launch/pending-browser-run endpoints (and background.js's
+// separate poll functions) with one polled endpoint,
+// dispatched by Kind.
 type pendingActionResponse struct {
-	Kind       string                    `json:"kind"` // "auto_launch" | "nav_launch" | "browser_run" | "" when nothing is pending
-	AutoLaunch *activeInspectionResponse `json:"auto_launch,omitempty"`
-	NavLaunch  *navLaunchClaim           `json:"nav_launch,omitempty"`
-	BrowserRun *browserRunClaim          `json:"browser_run,omitempty"`
+	Kind       string           `json:"kind"` // "nav_launch" | "browser_run" | "" when nothing is pending
+	NavLaunch  *navLaunchClaim  `json:"nav_launch,omitempty"`
+	BrowserRun *browserRunClaim `json:"browser_run,omitempty"`
 }
 
 // pendingBrowserAction is GET /api/v1/web-wants/pending-action — polled by
 // the extension's background service worker on a single alarm tick (see
 // pollForPendingAction in background.js) in place of the three separate
-// polls this used to require. Checked in priority order — auto-launch, then
-// nav-launch, then browser-run — and returns the first one found; an idle
+// polls this used to require. Checked in priority order — nav-launch, then
+// browser-run — and returns the first one found; an idle
 // poll (nothing pending anywhere) gets back {kind: ""}.
 // pollerIsHomeBrowser reports whether this poller may claim work.
 //
@@ -1485,10 +1267,6 @@ func (s *Server) pollerIsHomeBrowser(r *http.Request) bool {
 func (s *Server) pendingBrowserAction(w http.ResponseWriter, r *http.Request) {
 	if !s.pollerIsHomeBrowser(r) {
 		s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
-		return
-	}
-	if resp := s.claimPendingAutoLaunch(r); resp != nil {
-		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "auto_launch", AutoLaunch: resp})
 		return
 	}
 	if claim, ok := navLaunchQueue.dequeue(); ok {

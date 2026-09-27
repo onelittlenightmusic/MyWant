@@ -193,8 +193,8 @@ func launchProcessStart(ctx context.Context, want *mywant.Want) error {
 
 // storeLaunchResultURL saves the captured URL as want state and, when
 // result_field is "tunnel_url" (as set by cloudflared/ngrok managed_launch
-// configs), also persists it to ~/.mywant/config.yaml so other wants (e.g.
-// web_inspector) and the GUI can read it. Mirrors how dynamic_background
+// configs), also persists it to ~/.mywant/config.yaml so other wants and the GUI
+// can read it. Mirrors how dynamic_background
 // applies it to a character's canvas (see SetCharacterCanvasBg).
 func storeLaunchResultURL(want *mywant.Want, resultField, url string) {
 	want.SetCurrent(resultField, url)
