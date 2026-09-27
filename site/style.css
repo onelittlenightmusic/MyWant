@@ -227,6 +227,7 @@ svg.lucide { width: 1em; height: 1em; flex-shrink: 0; }
 }
 .section-heading h2 {
   margin: 0;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-3);
