@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>MyWant ガイド</title>
+    <meta name="description" content="MyWant のインストール手順と機能を、はじめての人向けにやさしく説明します。" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <!-- Same first-paint colours as mywant-gui (bg-gray-100 / bg-gray-950), so
+         there is no white flash before the stylesheet and script arrive. -->
+    <style>
+      html, body { margin: 0; background-color: #f3f4f6; }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme="light"]), html:not([data-theme="light"]) body { background-color: #030712; color: #f9fafb; }
+      }
+      html[data-theme="dark"], html[data-theme="dark"] body { background-color: #030712; }
+    </style>
+    <script>
+      try {
+        var t = localStorage.getItem('mywant-guide-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-left">
+        <div class="menu-wrap">
+          <button class="cell" id="menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="メニュー">
+            <i data-lucide="menu"></i><span class="cell-label">Menu</span>
+          </button>
+          <div class="menu" id="menu" role="menu" hidden></div>
+        </div>
+        <a class="title" href="#" id="home-link">
+          <h1>MyWant</h1>
+          <span class="count">やさしいガイド · <span id="topic-count"></span></span>
+        </a>
+      </div>
+      <div class="header-right">
+        <a class="cell" href="https://github.com/onelittlenightmusic/mywant" target="_blank" rel="noopener" aria-label="GitHub">
+          <i data-lucide="github"></i><span class="cell-label">GitHub</span>
+        </a>
+        <button class="cell" id="theme-btn" aria-label="明るさの切り替え">
+          <i data-lucide="sun-moon"></i><span class="cell-label">Theme</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="main" id="main">
+      <section class="hero">
+        <p class="hero-lead">「やってほしいこと」を書くと、エージェントが代わりに動いてくれる仕組みです。</p>
+        <p class="hero-sub">カードを押すと、右側にくわしい説明が開きます。上から順に読めば、インストールから最初の一歩まで進めます。</p>
+      </section>
+      <div id="sections"></div>
+    </main>
+
+    <div class="scrim" id="scrim" hidden></div>
+    <aside class="sidebar" id="sidebar" aria-hidden="true" aria-labelledby="sb-title">
+      <div class="sb-grip" aria-hidden="true"><span></span></div>
+      <div class="sb-head">
+        <h2 id="sb-title"><i data-lucide="circle" id="sb-icon"></i><span id="sb-title-text"></span></h2>
+        <button class="sb-close" id="sb-close" aria-label="閉じる"><i data-lucide="x"></i></button>
+      </div>
+      <div class="sb-body" id="sb-body"></div>
+      <nav class="sb-tabs">
+        <button class="tab" id="sb-prev"><i data-lucide="chevron-left"></i><span class="cell-label">前へ</span></button>
+        <button class="tab" id="sb-grid"><i data-lucide="layout-grid"></i><span class="cell-label">一覧</span></button>
+        <button class="tab" id="sb-next"><i data-lucide="chevron-right"></i><span class="cell-label">次へ</span></button>
+      </nav>
+    </aside>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="content.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
