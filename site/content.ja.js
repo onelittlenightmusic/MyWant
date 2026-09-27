@@ -94,6 +94,10 @@ ${shot("dashboard.jpg", "ブラウザで見た MyWant。置いた Want が 1 枚
   <p>次のコマンドでバージョンが表示されれば成功です。</p>
 </div>
 <div class="code"><pre>mywant version</pre></div>
+<h4>キャンバスも使いたいとき</h4>
+<p>拡張 <strong>mywant-guiex</strong> を入れると、画面に <strong>キャンバス</strong>（Want を盤面のタイルとして並べる）と <strong>Web Want</strong>（いつものサイトを Want にする）が加わります。入れなくても MyWant はそのまま使えます。</p>
+<div class="code"><pre>brew install mywant-guiex</pre></div>
+<p>入れたらブラウザで画面を再読み込みするだけです。アップデートは mywant-gui と一緒に行います。くわしくは <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=ja#install">mywant-gui ガイドのインストール</a> を見てください。</p>
 <h4>ソースから作る場合</h4>
 <p>Go が入っていれば、リポジトリから自分でビルドすることもできます。できあがったコマンドは <code>./bin/mywant</code> にあります。</p>
 <div class="code"><pre>git clone https://github.com/onelittlenightmusic/mywant.git

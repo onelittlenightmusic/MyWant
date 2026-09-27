@@ -90,6 +90,10 @@ Open the Terminal app and paste the commands below, one at a time.</p>
   <p>If this command prints a version, you are all set.</p>
 </div>
 <div class="code"><pre>mywant version</pre></div>
+<h4>Want the canvas too?</h4>
+<p>The <strong>mywant-guiex</strong> extension adds the <strong>canvas</strong> (Wants as tiles on a board) and <strong>Web Wants</strong> (the sites you use, as Wants) to the screen. MyWant works fine without it.</p>
+<div class="code"><pre>brew install mywant-guiex</pre></div>
+<p>Then just reload the screen in your browser. Upgrade it together with mywant-gui — see <a href="https://onelittlenightmusic.github.io/mywant-gui/?lang=en#install">Install in the mywant-gui guide</a>.</p>
 <h4>Building from source</h4>
 <p>If you have Go, you can build it yourself from the repository. The command ends up in <code>./bin/mywant</code>.</p>
 <div class="code"><pre>git clone https://github.com/onelittlenightmusic/mywant.git
