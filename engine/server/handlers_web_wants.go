@@ -105,6 +105,15 @@ func sanitizeFieldKey(s string) string {
 
 var reRepeatedUnderscore = regexp.MustCompile(`_+`)
 
+// oneLine collapses every run of whitespace — newlines included — to a single
+// space. An element's name is its visible text, which on a card or a button
+// spanning two lines carries the line break and the indentation after it; the
+// name is a title, not a paragraph, and written raw into the type's YAML
+// comments a newline ends the comment and breaks the file.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
+
 // enrichElements assigns FieldKey to every captured element.
 // Input roles  → field key derived from selector/name (e.g. "email").
 // Button roles → "click_" + sanitized element name (e.g. "click_login").
@@ -114,6 +123,7 @@ func enrichElements(elements []WebWantElement) []WebWantElement {
 	autoInputIdx := 0
 	autoButtonIdx := 0
 	for i, el := range elements {
+		el.Name = oneLine(el.Name)
 		enriched := el
 		if isInputRole(el.Role) {
 			key := sanitizeFieldKey(el.Name)
@@ -682,7 +692,7 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
 
 	for _, el := range elements {
 		if isInputRole(el.Role) {
-			elemComments.WriteString(fmt.Sprintf("    # - [input] %s  selector: %s\n", el.Name, el.Selector))
+			elemComments.WriteString(fmt.Sprintf("    # - [input] %s  selector: %s\n", oneLine(el.Name), oneLine(el.Selector)))
 			if el.FieldKey != "" {
 				subType := "text"
 				if el.Role == "combobox" {
@@ -699,7 +709,7 @@ func buildWebWantYAML(name, title, url, hostname, urlTemplate, screenshotURL str
 `, el.FieldKey, fmt.Sprintf("Value for %q (%s)", el.Name, el.Role), subType))
 			}
 		} else {
-			elemComments.WriteString(fmt.Sprintf("    # - [button] %s  selector: %s\n", el.Name, el.Selector))
+			elemComments.WriteString(fmt.Sprintf("    # - [button] %s  selector: %s\n", oneLine(el.Name), oneLine(el.Selector)))
 			if el.FieldKey != "" {
 				buttonStateFields.WriteString(fmt.Sprintf(`
     - name: %s

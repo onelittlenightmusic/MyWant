@@ -85,3 +85,21 @@ func TestBuildWebWantYAMLObjectsAreParameters(t *testing.T) {
 		t.Errorf("button without a picture got backgroundImage %q", button.BackgroundImage)
 	}
 }
+
+// A name taken from a card's visible text spans lines. It is kept as one line,
+// so the type's YAML still parses: written raw into the element comments, the
+// newline used to end the comment and break the file.
+func TestBuildWebWantYAMLMultilineNames(t *testing.T) {
+	els := enrichElements([]WebWantElement{
+		{Role: "button", Name: "The robot\n            An AI companion, a", Selector: "#section div > button"},
+		{Role: "textbox", Name: "Search\n  the site", Selector: "#q"},
+	})
+	if els[0].Name != "The robot An AI companion, a" {
+		t.Errorf("name kept its line break: %q", els[0].Name)
+	}
+	out := buildWebWantYAML("t_web", "T", "https://t.example/", "t.example", "", "", false, els, nil)
+	var doc map[string]any
+	if err := yaml.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatalf("generated YAML does not parse: %v\n%s", err, out)
+	}
+}
