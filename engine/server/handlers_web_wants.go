@@ -904,6 +904,8 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 		// for this, so the page comes up with the want's parameters already
 		// entered and the person decides what to do with them.
 		FillOnly bool `json:"fill_only,omitempty"`
+		// Device is the browser that asked (see navLaunchClaim.Device).
+		Device string `json:"device,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
@@ -931,7 +933,7 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	// present to run mywantFillAndSubmit instead of the read-only
 	// mywantNavOverlay.
 	if len(body.FieldValues) > 0 {
-		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues, FillOnly: body.FillOnly})
+		enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, FieldValues: body.FieldValues, FillOnly: body.FillOnly, Device: body.Device})
 		mode := "fill"
 		if body.FillOnly {
 			mode = "prefill"
@@ -950,7 +952,7 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 	// CDP directly (see handleNavLaunch in background.js). No CDP fallback —
 	// if nothing is polling pending-action, this silently does nothing until
 	// something does.
-	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements})
+	enqueueNavLaunch(navLaunchClaim{TargetURL: targetURL, Elements: elements, Device: body.Device})
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"ok":       true,
@@ -971,6 +973,8 @@ func (s *Server) launchWebWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		URL string `json:"url"`
+		// Device is the browser that asked (see navLaunchClaim.Device).
+		Device string `json:"device,omitempty"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -982,7 +986,7 @@ func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "url must be http(s)", body.URL)
 		return
 	}
-	enqueueNavLaunch(navLaunchClaim{TargetURL: body.URL})
+	enqueueNavLaunch(navLaunchClaim{TargetURL: body.URL, Device: body.Device})
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"url":     body.URL,
@@ -1007,6 +1011,11 @@ type navLaunchClaim struct {
 	FieldValues map[string]string `json:"field_values,omitempty"`
 	// With FieldValues: fill them in but press nothing (see launchWebWant).
 	FillOnly bool `json:"fill_only,omitempty"`
+	// Device, when set, is the browser a person clicked in to ask for this
+	// tab, and only that browser's extension is handed it — the home browser
+	// (pollerIsHomeBrowser) is for work nobody is watching, and a tab asked
+	// for from one Chrome opening in another is a click that did nothing.
+	Device string `json:"-"`
 }
 
 // claimQueue is a generic mutex-guarded FIFO — the shared shape behind
@@ -1024,15 +1033,22 @@ func (q *claimQueue[T]) enqueue(item T) {
 }
 
 func (q *claimQueue[T]) dequeue() (T, bool) {
+	return q.dequeueWhere(func(T) bool { return true })
+}
+
+// dequeueWhere takes the oldest item that match accepts, leaving the rest in
+// order.
+func (q *claimQueue[T]) dequeueWhere(match func(T) bool) (T, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	var zero T
-	if len(q.items) == 0 {
-		return zero, false
+	for i, item := range q.items {
+		if match(item) {
+			q.items = append(q.items[:i:i], q.items[i+1:]...)
+			return item, true
+		}
 	}
-	item := q.items[0]
-	q.items = q.items[1:]
-	return item, true
+	return zero, false
 }
 
 var navLaunchQueue = &claimQueue[navLaunchClaim]{}
@@ -1300,19 +1316,28 @@ func (s *Server) pollerIsHomeBrowser(r *http.Request) bool {
 }
 
 func (s *Server) pendingBrowserAction(w http.ResponseWriter, r *http.Request) {
-	if !s.pollerIsHomeBrowser(r) {
-		s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
-		return
+	s.JSONResponse(w, http.StatusOK, nextPendingAction(r.URL.Query().Get("device"), s.pollerIsHomeBrowser(r)))
+}
+
+// nextPendingAction picks what a poller gets: first a tab its own browser
+// asked for (navLaunchClaim.Device), home or not; then, only for the home
+// browser, the unaddressed work — nav-launch before browser-run.
+func nextPendingAction(device string, isHome bool) pendingActionResponse {
+	if device != "" {
+		if claim, ok := navLaunchQueue.dequeueWhere(func(c navLaunchClaim) bool { return c.Device == device }); ok {
+			return pendingActionResponse{Kind: "nav_launch", NavLaunch: &claim}
+		}
 	}
-	if claim, ok := navLaunchQueue.dequeue(); ok {
-		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "nav_launch", NavLaunch: &claim})
-		return
+	if !isHome {
+		return pendingActionResponse{}
+	}
+	if claim, ok := navLaunchQueue.dequeueWhere(func(c navLaunchClaim) bool { return c.Device == "" }); ok {
+		return pendingActionResponse{Kind: "nav_launch", NavLaunch: &claim}
 	}
 	if claim, ok := browserRunQueue.dequeue(); ok {
-		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "browser_run", BrowserRun: &claim})
-		return
+		return pendingActionResponse{Kind: "browser_run", BrowserRun: &claim}
 	}
-	s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
+	return pendingActionResponse{}
 }
 
 // browserRunResultHandler is POST /api/v1/web-wants/browser-run-result — the

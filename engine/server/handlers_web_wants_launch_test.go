@@ -49,3 +49,32 @@ func TestLaunchWebWantFillOnlyReachesTheClaim(t *testing.T) {
 		}
 	}
 }
+
+// A tab asked for from one browser opens in that browser, even when another is
+// the home browser — and the home browser still gets the unaddressed work.
+func TestPendingActionServesAClaimToTheBrowserThatAskedForIt(t *testing.T) {
+	for _, ok := navLaunchQueue.dequeue(); ok; _, ok = navLaunchQueue.dequeue() {
+	}
+	t.Cleanup(func() {
+		for _, ok := navLaunchQueue.dequeue(); ok; _, ok = navLaunchQueue.dequeue() {
+		}
+	})
+	navLaunchQueue.enqueue(navLaunchClaim{TargetURL: "https://mine.example/", Device: "here"})
+	navLaunchQueue.enqueue(navLaunchClaim{TargetURL: "https://anyone.example/"})
+
+	// The home browser is elsewhere: it gets the unaddressed claim, not ours.
+	if got := nextPendingAction("home", true); got.NavLaunch == nil || got.NavLaunch.TargetURL != "https://anyone.example/" {
+		t.Fatalf("home poll = %+v, want the unaddressed claim", got)
+	}
+	if got := nextPendingAction("home", true); got.Kind != "" {
+		t.Fatalf("home poll took another browser's claim: %+v", got)
+	}
+	// A third browser gets nothing.
+	if got := nextPendingAction("other", false); got.Kind != "" {
+		t.Fatalf("other poll = %+v, want nothing", got)
+	}
+	// The browser that asked gets its claim, though it is not home.
+	if got := nextPendingAction("here", false); got.NavLaunch == nil || got.NavLaunch.TargetURL != "https://mine.example/" {
+		t.Fatalf("asking browser's poll = %+v, want its claim", got)
+	}
+}
