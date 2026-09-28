@@ -20,6 +20,8 @@ type webWantLookupResponse struct {
 	Title     string           `json:"title,omitempty"`
 	SourceURL string           `json:"source_url,omitempty"`
 	Elements  []WebWantElement `json:"elements,omitempty"`
+	// The page's aura marks joined into constellations (see WebWantConstellation).
+	Constellations []WebWantConstellation `json:"constellations,omitempty"`
 	// How the page matched: "url" (the page it was captured from), "path"
 	// (same host and path) or "host".
 	Match string `json:"match,omitempty"`
@@ -194,6 +196,7 @@ func (s *Server) lookupWebWant(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	resp.Constellations = readWebWantConstellations(best.name)
 	for _, c := range ranked[1:] {
 		resp.Others = append(resp.Others, c.name)
 	}

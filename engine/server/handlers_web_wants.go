@@ -496,7 +496,7 @@ func reserveWebWantTypeDir(base string) (name, dir string, err error) {
 // ({__page_url, __page_title, __url_template, [hostname]: []WebWantElement})
 // into its parts. On any validation failure it writes the HTTP error itself and
 // returns ok=false, so callers just `if !ok { return }`.
-func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate, screenshotURL string, u *url.URL, elements []WebWantElement, ok bool) {
+func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request) (pageURL, pageTitle, urlTemplate, screenshotURL string, u *url.URL, elements []WebWantElement, constellations []WebWantConstellation, ok bool) {
 	// 8MB: the page screenshot plus one small cut-out per element (Image).
 	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
 	var raw map[string]json.RawMessage
@@ -516,9 +516,12 @@ func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request
 	pageTitle = str("__page_title")
 	urlTemplate = str("__url_template")
 	screenshotURL = str("__screenshot_url")
+	if rawC, okk := raw["__constellations"]; okk {
+		_ = json.Unmarshal(rawC, &constellations)
+	}
 	// Strip reserved/metadata keys — the same set the GUI's handleSave strips,
 	// plus the page-context keys — so only hostname→elements entries remain.
-	for _, k := range []string{"__page_url", "__page_title", "__url_template", "characterId", "color", "__screenshot_url"} {
+	for _, k := range []string{"__page_url", "__page_title", "__url_template", "characterId", "color", "__screenshot_url", "__constellations"} {
 		delete(raw, k)
 	}
 
@@ -545,12 +548,13 @@ func (s *Server) parseWebWantElementsBody(w http.ResponseWriter, r *http.Request
 		http.Error(w, "too many elements", http.StatusBadRequest)
 		return
 	}
+	constellations = cleanWebWantConstellations(constellations, elements)
 	ok = true
 	return
 }
 
 func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
-	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, constellations, ok := s.parseWebWantElementsBody(w, r)
 	if !ok {
 		return
 	}
@@ -573,6 +577,10 @@ func (s *Server) captureWebWant(w http.ResponseWriter, r *http.Request) {
 		// uniquification with an empty husk.
 		os.RemoveAll(dir)
 		http.Error(w, werr.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := writeWebWantConstellations(name, constellations); err != nil {
+		http.Error(w, "failed to save constellations: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -623,7 +631,7 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, ok := s.parseWebWantElementsBody(w, r)
+	pageURL, pageTitle, urlTemplate, screenshotURL, u, elements, constellations, ok := s.parseWebWantElementsBody(w, r)
 	if !ok {
 		return
 	}
@@ -636,6 +644,10 @@ func (s *Server) updateWebWant(w http.ResponseWriter, r *http.Request) {
 	_, loaded, warnings, werr := s.writeWebWantType(name, title, pageURL, u.Hostname(), urlTemplate, screenshotURL, elements)
 	if werr != nil {
 		http.Error(w, werr.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := writeWebWantConstellations(name, constellations); err != nil {
+		http.Error(w, "failed to save constellations: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 

@@ -398,6 +398,7 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/lookup", s.lookupWebWant).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/{name}/launch", s.launchWebWant).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/{name}/nav-callback", s.navCallback).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/{name}/constellations", s.getWebWantConstellations).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/_nav/callback", s.navCallback).Methods("POST", "OPTIONS")
 	// Inspect flow: GET preloads an existing type's marks, PUT overwrites them
 	// ("上書き保存"). Registered after the literal single-segment routes above
