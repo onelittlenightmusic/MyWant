@@ -28,6 +28,11 @@ type webWantLookupResponse struct {
 	// Other saved types that also match this page, best first — a host can
 	// have several (Google's search page and its images page, say).
 	Others []string `json:"others,omitempty"`
+	// The want of this type on the board, as GET /wants/{id} gives it — for the
+	// extension's sidebar, which shows it as the GUI's want details do. Here
+	// rather than behind /wants/{id} because the bookmarklet's capability token
+	// reaches /web-wants/ only. Absent when none is deployed.
+	Want *wantAPIResponse `json:"want,omitempty"`
 }
 
 // webWantCandidate is one saved web want type as the lookup sees it.
@@ -200,5 +205,29 @@ func (s *Server) lookupWebWant(w http.ResponseWriter, r *http.Request) {
 	for _, c := range ranked[1:] {
 		resp.Others = append(resp.Others, c.name)
 	}
+	if want := s.webWantOnBoard(best.name); want != nil {
+		built := s.buildWantAPIResponse(want, false)
+		resp.Want = &built
+	}
 	s.JSONResponse(w, http.StatusOK, resp)
+}
+
+// webWantOnBoard is the want of the given web want type that is on the board —
+// not cancelled, not a system want. With several, the one with the lowest ID,
+// so the same page shows the same want every time.
+func (s *Server) webWantOnBoard(typeName string) *mywant.Want {
+	if s.globalBuilder == nil {
+		return nil
+	}
+	var picked *mywant.Want
+	for _, want := range s.globalBuilder.GetAllWantStates() {
+		if want.Metadata.Type != typeName || shouldHideSystemWant(want, false) ||
+			want.GetStatus() == mywant.WantStatusCancelled {
+			continue
+		}
+		if picked == nil || want.Metadata.ID < picked.Metadata.ID {
+			picked = want
+		}
+	}
+	return picked
 }
