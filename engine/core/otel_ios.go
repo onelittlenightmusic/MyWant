@@ -5,6 +5,7 @@ package mywant
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -26,4 +27,4 @@ func (n *Want) otelEmitWantInfo(_ string)                    {}
 func (n *Want) otelEmitWantLog(_ otellog.Severity, _ string) {}
 func (n *Want) otelEmitStateChange(_ string, _ any)          {}
 
-func otelEmitLog(_ context.Context, _ otellog.Severity, _ string, _ ...otellog.KeyValue) {}
+func otelEmitLog(_ context.Context, _ otellog.Severity, _ string, _ ...attribute.KeyValue) {}

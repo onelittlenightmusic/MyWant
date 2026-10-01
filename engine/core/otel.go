@@ -190,9 +190,9 @@ func (n *Want) otelEmitWantLog(severity otellog.Severity, body string) {
 		ctx = context.Background()
 	}
 	otelEmitLog(ctx, severity, body,
-		otellog.String("want.name", n.Metadata.Name),
-		otellog.String("want.type", n.Metadata.Type),
-		otellog.String("want.status", string(n.Status)),
+		attribute.String("want.name", n.Metadata.Name),
+		attribute.String("want.type", n.Metadata.Type),
+		attribute.String("want.status", string(n.Status)),
 	)
 }
 
@@ -224,7 +224,7 @@ func (n *Want) otelEmitStateChange(key string, value any) {
 
 // otelEmitLog emits a single log record via the OTEL LoggerProvider.
 // attrs is a flat list of key, value pairs (both string).
-func otelEmitLog(ctx context.Context, severity otellog.Severity, body string, attrs ...otellog.KeyValue) {
+func otelEmitLog(ctx context.Context, severity otellog.Severity, body string, attrs ...attribute.KeyValue) {
 	globalOTELMu.RLock()
 	logger := globalOTELLogger
 	enabled := globalOTELEnabled
@@ -237,7 +237,7 @@ func otelEmitLog(ctx context.Context, severity otellog.Severity, body string, at
 	var r otellog.Record
 	r.SetTimestamp(time.Now())
 	r.SetSeverity(severity)
-	r.SetBody(otellog.StringValue(body))
+	r.SetBody(attribute.StringValue(body))
 	r.AddAttributes(attrs...)
 	logger.Emit(ctx, r)
 }
