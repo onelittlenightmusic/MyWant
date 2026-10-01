@@ -420,6 +420,19 @@ wantType:
     initialValue: []
     label: current
 
+  - name: fm_turns
+    description: |
+      The last 20 turns of talking to the robot from a model elsewhere (an
+      iPhone's FoundationModels) — each {id, question, steps, answer, error,
+      started_at, finished_at, by}, a step being {tool, arguments, output,
+      done, at}. The whole exchange, kept so it outlives a restart and can be
+      read back or played again (POST /api/v1/fm/turns/{id}/replay). See
+      engine/server/fm_turns.go.
+    type: object
+    persistent: true
+    initialValue: []
+    label: current
+
   - name: cc_streaming_text
     description: Live partial text from the current Claude response (cleared when response completes)
     type: string

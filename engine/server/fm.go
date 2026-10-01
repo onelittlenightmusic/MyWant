@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	mywant "mywant/engine/core"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -21,8 +19,9 @@ import (
 // The model runs on the device; who it is and everything it reaches for come
 // from here. The app fetches /api/v1/fm/manifest — the robot's instructions
 // and each tool's name, description and string arguments — builds its tools
-// from that at runtime, sends every call back to /api/v1/fm/call, and hands
-// each answer to /api/v1/fm/said so the robot on the board says it too. So the
+// from that at runtime, and sends every call back to /api/v1/fm/call — each
+// as a step of a turn (fm_turns.go): the question, what the robot did, and
+// what it answered, kept here whole so the robot on the board has done it. So the
 // app holds no knowledge of MyWant at all: the frame is this file, and
 // changing the robot is a change here, not a new build on the phone.
 //
@@ -37,6 +36,10 @@ type fmTool struct {
 	Description string    `json:"description"`
 	Arguments   []fmParam `json:"arguments"`
 	run         func(s *Server, args map[string]string) (string, error)
+	// replays: run again when a turn is played again (fm_turns.go) — the
+	// steps that show something. Not the ones that make something, which a
+	// second run would make twice, nor the ones that only read.
+	replays bool
 }
 
 // fmParam is one argument. Every argument is a string: the device builds its
@@ -54,7 +57,7 @@ type fmParam struct {
 }
 
 const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
-The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). A question about where something is, like "荻窪はどこ？", is about the board: call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it. Use board to see what is on it.
+The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). A question about where something is, like "荻窪はどこ？", is about the board: always call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say that you are standing on it. Use board to see what is on it.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used, in one or two short sentences.`
@@ -62,16 +65,17 @@ Say only what a tool told you or what you were told here; if a tool could not an
 var fmTools = []fmTool{
 	{
 		Name:        "board",
-		Description: "Everything on the board: each thing and want, its kind and its cell.",
+		Description: "The names of everything on the board, things and wants, with their kinds. To say where one is, use point.",
 		run:         (*Server).fmBoard,
 	},
 	{
 		Name:        "point",
-		Description: "Where one thing or want on the board is. Walks the robot onto its cell so the person sees it, and says the cell.",
+		Description: "Where one thing or want on the board is: walks the robot onto it so the person sees it. The only way to answer where something is.",
 		Arguments: []fmParam{
 			{Name: "name", Description: "The name alone, e.g. 荻窪 or note-instance", Required: true},
 		},
-		run: (*Server).fmPoint,
+		run:     (*Server).fmPoint,
+		replays: true,
 	},
 	{
 		Name:        "describe_type",
@@ -127,88 +131,57 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Tool      string            `json:"tool"`
 		Arguments map[string]string `json:"arguments"`
+		// The turn this call is a step of (fm_turns.go); recorded there and
+		// shown in the robot's chat. Without one the call is only run.
+		Turn string `json:"turn"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if fmToolByName(req.Tool).Name == "" {
+		http.Error(w, "unknown tool: "+req.Tool, http.StatusNotFound)
+		return
+	}
+	if req.Arguments == nil {
+		req.Arguments = map[string]string{}
+	}
+	step := fmStep{Tool: req.Tool, Arguments: req.Arguments}
+	s.fmRunStep(&step, "")
+	if req.Turn != "" {
+		if _, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
+			t.Steps = append(t.Steps, step)
+			return nil
+		}); err != nil {
+			log.Printf("[fm] step outside a known turn: %v", err)
+		}
+	}
+	fmWriteJSON(w, map[string]any{"output": step.Output})
+}
+
+// fmToolByName is the tool of that name, or the zero tool.
+func fmToolByName(name string) fmTool {
 	for _, t := range fmTools {
-		if t.Name != req.Tool {
-			continue
+		if t.Name == name {
+			return t
 		}
-		if req.Arguments == nil {
-			req.Arguments = map[string]string{}
-		}
-		out, err := t.run(s, req.Arguments)
-		// A failure is an answer too: the model reads it and can try again,
-		// so it goes back as output rather than as an HTTP error.
-		if err != nil {
-			out = "Error: " + err.Error()
-		}
-		log.Printf("[fm] %s %v → %s", t.Name, req.Arguments, firstLine(out, 160))
-		fmWriteJSON(w, map[string]any{"output": out})
-		return
 	}
-	http.Error(w, "unknown tool: "+req.Tool, http.StatusNotFound)
+	return fmTool{}
 }
 
-// handleFMSaid takes what was asked and what the model answered, so the robot
-// on the board has said it: the phone is where the person asked, the board is
-// where the robot is, and it is one robot.
-//
-// Into the robot's chat as one exchange — the question to cc_messages, the
-// answer to cc_responses, the two lists its chat window pairs up — and out of
-// its mouth as any answer of its own is (CharacterSpeaks: the bubble and the
-// speech log). Nothing here asks its agent anything: what sets that going is
-// webhook_auto_request, which is left alone.
-func (s *Server) handleFMSaid(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
+// fmRunTool runs a tool and hands back its output. A failure is an answer
+// too: the model reads it and can try again, so it comes back as output.
+func (s *Server) fmRunTool(name string, args map[string]string) string {
+	t := fmToolByName(name)
+	if t.run == nil {
+		return "Error: unknown tool " + name
 	}
-	var req struct {
-		Question string `json:"question"`
-		Answer   string `json:"answer"`
+	out, err := t.run(s, args)
+	if err != nil {
+		out = "Error: " + err.Error()
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	log.Printf("[fm] said: %q → %q", firstLine(req.Question, 80), firstLine(req.Answer, 160))
-	robot := s.findWantByIDOrName(fmRobotWant)
-	if robot == nil {
-		http.Error(w, "no robot on this board", http.StatusNotFound)
-		return
-	}
-	now := time.Now().Format(time.RFC3339)
-	question := strings.TrimSpace(req.Question)
-	answer := strings.TrimSpace(req.Answer)
-	if question != "" {
-		messages := mywant.GetCurrent(robot, "cc_messages", []any{})
-		messages = append(messages, map[string]any{
-			"sender": fmDeviceSender, "text": question, "timestamp": now, "channel_id": fmDeviceSender,
-		})
-		robot.SetCurrent("cc_messages", fmLastN(messages))
-	}
-	if answer != "" {
-		responses := mywant.GetCurrent(robot, "cc_responses", []any{})
-		responses = append(responses, map[string]any{"text": answer, "timestamp": now, "subtype": "fm"})
-		robot.SetCurrent("cc_responses", fmLastN(responses))
-		mywant.CharacterSpeaks(fmRobotWant, answer, "agent")
-	}
-	fmWriteJSON(w, map[string]any{"ok": true})
-}
-
-// Who asked, in the robot's chat: the on-device model's phone.
-const fmDeviceSender = "fm-device"
-
-// fmLastN keeps the robot's chat lists as long as the rest of the code keeps
-// them (robotResponsesMax).
-func fmLastN(list []any) []any {
-	if len(list) > robotResponsesMax {
-		return list[len(list)-robotResponsesMax:]
-	}
-	return list
+	log.Printf("[fm] %s %v → %s", name, args, firstLine(out, 160))
+	return out
 }
 
 func fmWriteJSON(w http.ResponseWriter, v any) {
@@ -411,6 +384,11 @@ type fmTile struct {
 
 func (t fmTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
 
+// named is the tile without its cell, as board lists it: a model handed the
+// cells reads them out ("荻窪 is at (6, 0)") rather than showing the place, so
+// where a tile is comes only from point, which walks the robot there.
+func (t fmTile) named() string { return fmt.Sprintf("%s (%s)", t.name, t.kind) }
+
 // fmTiles is the board: things first, then wants, each only when it has a cell.
 func (s *Server) fmTiles() ([]fmTile, error) {
 	var things struct {
@@ -490,7 +468,7 @@ func (s *Server) fmBoard(map[string]string) (string, error) {
 			fmt.Fprintf(&b, "...and %d more\n", len(tiles)-fmBoardLimit)
 			break
 		}
-		b.WriteString(t.String() + "\n")
+		b.WriteString(t.named() + "\n")
 	}
 	return b.String(), nil
 }
