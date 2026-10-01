@@ -57,7 +57,10 @@ type fmParam struct {
 }
 
 const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
-The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). A question about where something is, like "荻窪はどこ？", is about the board: always call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」. A question about what a want knows or did — the weather in Nakano, a timer, a checklist — is answered by look with the want's name (find it with board, e.g. NakanoのWeather): tell the person what look reports. Use board to see what is on it.
+The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). Two kinds of question, two tools:
+- WHERE something is (「荻窪はどこ？」): call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」.
+- WHAT something says or how it is (「Nakanoの天気は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」. Never point for these.
+Use board to see the names of what is on it.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
@@ -70,7 +73,7 @@ var fmTools = []fmTool{
 	},
 	{
 		Name:        "point",
-		Description: "Where one thing or want on the board is: walks the robot onto it so the person sees it. The only way to answer where something is.",
+		Description: "For WHERE questions only: walks the robot onto a thing or want so the person sees where it is.",
 		Arguments: []fmParam{
 			{Name: "name", Description: "The name alone, e.g. 荻窪 or note-instance", Required: true},
 		},
@@ -79,9 +82,9 @@ var fmTools = []fmTool{
 	},
 	{
 		Name:        "look",
-		Description: "What one want on the board knows and how it is doing: its status and its results (the weather a weather want fetched, a timer's time left).",
+		Description: "For WHAT questions: what a want on the board says and how it is doing — the weather a weather want fetched, a timer's time left, its status.",
 		Arguments: []fmParam{
-			{Name: "name", Description: "The want's name, from board, e.g. NakanoのWeather", Required: true},
+			{Name: "name", Description: "The want's name or part of it, e.g. Nakano for NakanoのWeather", Required: true},
 		},
 		run: (*Server).fmLook,
 	},
@@ -161,12 +164,15 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 		fmWriteJSON(w, map[string]any{"output": s.fmRunTool(req.Tool, req.Arguments)})
 		return
 	}
-	s.fmRunStep(&step, "")
-	if _, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
+	s.fmRunStep(&step)
+	turn, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
 		t.Steps = append(t.Steps, step)
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		log.Printf("[fm] step outside a known turn: %v", err)
+	} else if !turn.Quiet {
+		s.fmShowStep(step, "")
 	}
 	fmWriteJSON(w, map[string]any{"output": step.Output})
 }

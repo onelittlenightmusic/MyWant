@@ -241,8 +241,15 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         // caller's, which is the only side that knows what was offered.
         await said?.note(prompt: prompt)
 
+        // A turn on the server for this question, so what the robot does about
+        // it is kept there whole, the same as when a phone's model answers
+        // (engine/server/fm_turns.go). The server's tools read its id.
+        let turnID = await ServerTools.openTurn(question: prompt)
+        await TurnBox.shared.set(turnID)
         let before = await tracker.count
         let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
+        await TurnBox.shared.set(nil)
+        if let turnID { await ServerTools.closeTurn(turnID, answer: answer.text) }
         let calls = await tracker.count - before
         let trimmedAfter = await box.finishedTurn()
         var reply: [String: Any] = ["id": id, "text": answer.text, "calls": calls]

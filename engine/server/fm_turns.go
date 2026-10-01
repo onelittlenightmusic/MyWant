@@ -48,8 +48,14 @@ type fmTurn struct {
 	Error      string   `json:"error,omitempty"`
 	StartedAt  string   `json:"started_at"`
 	FinishedAt string   `json:"finished_at,omitempty"`
-	// Where the answering model ran: "device" for one elsewhere.
+	// Where the answering model ran: "device" for one elsewhere, "robot" for
+	// the Mac's own (fmtool).
 	By string `json:"by,omitempty"`
+	// Quiet: kept here, not written into the robot's chat. The Mac's own
+	// model is asked through the robot want, which already puts the question,
+	// the tool it used and the answer in the chat; writing them again would
+	// say everything twice. Posted as {"chat": false}.
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 const (
@@ -179,12 +185,11 @@ func (s *Server) fmShowStep(step fmStep, prefix string) {
 	types.RecordCCActivityDetail(robot, "tool", firstLine(summary, 120), step.Output)
 }
 
-// fmRunStep runs a step here and records what came of it.
-func (s *Server) fmRunStep(step *fmStep, prefix string) {
+// fmRunStep runs a step here and notes what came of it.
+func (s *Server) fmRunStep(step *fmStep) {
 	step.Output = s.fmRunTool(step.Tool, step.Arguments)
 	step.Done = true
 	step.At = time.Now().Format(time.RFC3339)
-	s.fmShowStep(*step, prefix)
 }
 
 // ── Handlers ────────────────────────────────────────────────────────────────
@@ -195,11 +200,16 @@ func (s *Server) fmRunStep(step *fmStep, prefix string) {
 //	{question, steps, answer}      a whole turn, brought back afterwards:
 //	                               steps not done here are run now
 func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
-	var turn fmTurn
-	if err := json.NewDecoder(r.Body).Decode(&turn); err != nil {
+	var body struct {
+		fmTurn
+		Chat *bool `json:"chat"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	turn := body.fmTurn
+	turn.Quiet = body.Chat != nil && !*body.Chat
 	turn.Question = strings.TrimSpace(turn.Question)
 	if turn.Question == "" {
 		http.Error(w, "question is required", http.StatusBadRequest)
@@ -210,20 +220,25 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 	if turn.By == "" {
 		turn.By = "device"
 	}
-	s.fmAsked(turn.Question)
+	if !turn.Quiet {
+		s.fmAsked(turn.Question)
+	}
 	for i := range turn.Steps {
 		if turn.Steps[i].Arguments == nil {
 			turn.Steps[i].Arguments = map[string]string{}
 		}
-		if turn.Steps[i].Done {
+		if !turn.Steps[i].Done {
+			s.fmRunStep(&turn.Steps[i])
+		}
+		if !turn.Quiet {
 			s.fmShowStep(turn.Steps[i], "")
-		} else {
-			s.fmRunStep(&turn.Steps[i], "")
 		}
 	}
 	if turn.Answer = strings.TrimSpace(turn.Answer); turn.Answer != "" {
 		turn.FinishedAt = time.Now().Format(time.RFC3339)
-		s.fmAnswered(turn.Answer)
+		if !turn.Quiet {
+			s.fmAnswered(turn.Answer)
+		}
 	}
 	if err := s.fmAddTurn(turn); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -256,10 +271,10 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	if turn.Answer != "" {
+	if turn.Answer != "" && !turn.Quiet {
 		s.fmAnswered(turn.Answer)
 	}
-	if turn.Error != "" {
+	if turn.Error != "" && !turn.Quiet {
 		if robot, err := s.fmRobot(); err == nil {
 			types.RecordCCActivityDetail(robot, "error", firstLine(turn.Error, 120), turn.Error)
 		}
@@ -310,7 +325,8 @@ func (s *Server) handleFMTurnReplay(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		again := fmStep{Tool: step.Tool, Arguments: step.Arguments}
-		s.fmRunStep(&again, "↻ ")
+		s.fmRunStep(&again)
+		s.fmShowStep(again, "↻ ")
 		replayed = append(replayed, again)
 	}
 	if turn.Answer != "" {

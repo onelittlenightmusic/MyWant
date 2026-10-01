@@ -100,15 +100,49 @@ let sandbox = Sandbox(root: URL(fileURLWithPath: rootPath))
 // (`mywant undo`) or is stopped by the caller until a person says yes (see
 // Broker.swift).
 let allowWrites = ProcessInfo.processInfo.environment["MYWANT_ROBOT_WRITE"] != "0"
-let myWantCommands = MyWantCLI.offered(writes: allowWrites)
+
+// The robot's tools and instructions come from the server — the one set a
+// phone's model gets too (ServerTools.swift). This agent's own MyWant tools
+// (the CLI as a tool, start, deploy) are what it falls back to when the server
+// cannot be reached, or when MYWANT_FM_LEGACY_CLI=1 asks for them.
+let legacyCLI = ProcessInfo.processInfo.environment["MYWANT_FM_LEGACY_CLI"] == "1"
+let serverManifest: ServerManifest? = legacyCLI ? nil : await ServerTools.fetch()
+let myWantCommands = serverManifest == nil ? MyWantCLI.offered(writes: allowWrites) : []
+
+/// What only a Mac has, said after the server's instructions.
+let macInstructions = """
+    On this Mac you also have its clock, arithmetic, the files in the folder you were started in, and its host \
+    information. Use those only for questions about this Mac itself; everything about the board goes to the \
+    board's tools.
+    """
+let robotInstructions = serverManifest.map { $0.instructions + "\n\n" + macInstructions } ?? systemInstructions
 let currentRequest = CurrentRequest()
 let goalBox = GoalBox()
 // What this agent can reach, said once at startup: a wrong answer about the
 // board is a different bug depending on whether the verb was even offered.
-printErr("[fmtool] \(myWantCommands.count) mywant commands offered"
-         + (allowWrites ? "" : " (reading only)"))
+if let serverManifest {
+    printErr("[fmtool] \(serverManifest.tools.count) tools from \(ServerTools.baseURL.absoluteString)")
+} else {
+    printErr("[fmtool] \(myWantCommands.count) mywant commands offered"
+             + (allowWrites ? "" : " (reading only)"))
+}
 
 func makeTools(tracker: CallTracker) -> (localTools: [any LocalTool], tools: [any Tool]) {
+    if let serverManifest {
+        // The server's tools first, then the Mac's own.
+        var localTools: [any LocalTool] = serverManifest.tools.map {
+            TrackedTool(base: ServerTool(spec: $0), tracker: tracker)
+        }
+        localTools += [
+            TrackedTool(base: GetTimeTool(), tracker: tracker),
+            TrackedTool(base: CalcTool(), tracker: tracker),
+            TrackedTool(base: ListDirTool(sandbox: sandbox), tracker: tracker),
+            TrackedTool(base: ReadFileTool(sandbox: sandbox), tracker: tracker),
+            TrackedTool(base: SearchTool(sandbox: sandbox), tracker: tracker),
+            TrackedTool(base: HostInfoTool(), tracker: tracker),
+        ]
+        return (localTools, localTools.map { $0 as any Tool })
+    }
     var localTools: [any LocalTool] = [
         TrackedTool(base: GetTimeTool(), tracker: tracker),
         TrackedTool(base: CalcTool(), tracker: tracker),
@@ -142,7 +176,7 @@ func run(prompt: String, forceRescue: Bool = false) async throws -> RunOutcome {
     let (localTools, tools) = makeTools(tracker: tracker)
 
     if !forceRescue {
-        let session = LanguageModelSession(tools: tools, instructions: systemInstructions)
+        let session = LanguageModelSession(tools: tools, instructions: robotInstructions)
         do {
             let response = try await session.respond(to: prompt)
             if await tracker.count > 0 {
@@ -163,7 +197,7 @@ func run(prompt: String, forceRescue: Bool = false) async throws -> RunOutcome {
     // Nothing fired on its own, so ask for a plan and carry it out. This is
     // where a question that takes two steps gets them — from the model, not
     // from a procedure written into a tool's description. See Plan.swift.
-    let planSession = LanguageModelSession(tools: tools, instructions: systemInstructions)
+    let planSession = LanguageModelSession(tools: tools, instructions: robotInstructions)
     do {
         let planned = try await planRespond(session: planSession, prompt: prompt, tools: localTools)
         if planned.toolUsed != nil {
@@ -175,7 +209,7 @@ func run(prompt: String, forceRescue: Bool = false) async throws -> RunOutcome {
 
     // A plan that named nothing runnable still leaves the question asked: the
     // older one-tool path is the floor under all of this.
-    let rescueSession = LanguageModelSession(tools: tools, instructions: systemInstructions)
+    let rescueSession = LanguageModelSession(tools: tools, instructions: robotInstructions)
     let rescued = try await rescueRespond(session: rescueSession, prompt: prompt, tools: localTools)
     return RunOutcome(native: false, text: rescued.finalText, toolUsed: rescued.toolName)
 }
@@ -234,7 +268,7 @@ func runEval(count: Int) async {
 // MARK: - Entry point
 
 if serveMode {
-    await serve(makeTools: makeTools, instructions: systemInstructions, said: currentRequest, goals: goalBox)
+    await serve(makeTools: makeTools, instructions: robotInstructions, said: currentRequest, goals: goalBox)
 } else if let n = evalCount {
     await runEval(count: n)
 } else {

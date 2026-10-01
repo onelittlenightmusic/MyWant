@@ -323,6 +323,13 @@ func New(config Config) *Server {
 	// Initialize internal HTTP client for agents
 	baseURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
 	globalBuilder.SetHTTPClient(mywant.NewHTTPClient(baseURL))
+	// The Mac's own robot model asks this server for its tools; on this
+	// machine, so by loopback whatever address the server binds.
+	selfHost := config.Host
+	if selfHost == "" || selfHost == "0.0.0.0" || selfHost == "::" {
+		selfHost = "localhost"
+	}
+	types.FMServerURL = fmt.Sprintf("http://%s:%d", selfHost, config.Port)
 
 	// Create interaction manager for interactive want creation
 	gooseManager, err := types.GetGooseManager(context.Background())

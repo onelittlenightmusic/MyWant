@@ -28,6 +28,11 @@ import (
 // memory — this model has 8k tokens for all of it — so the agent drops the
 // transcript and starts again when it fills, and says so when it did.
 
+// FMServerURL is this server's own address, handed to the on-device agent so
+// it can take its tools and instructions from /api/v1/fm/manifest — the robot's
+// one set, the same a phone's model gets. Set by the server at start.
+var FMServerURL string
+
 const (
 	// Where the answer comes from when nothing says otherwise.
 	fmToolDefaultBinary = "fmtool"
