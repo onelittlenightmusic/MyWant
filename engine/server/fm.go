@@ -57,10 +57,10 @@ type fmParam struct {
 }
 
 const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
-The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). A question about where something is, like "荻窪はどこ？", is about the board: always call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say that you are standing on it. Use board to see what is on it.
+The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). A question about where something is, like "荻窪はどこ？", is about the board: always call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」. A question about what a want knows or did — the weather in Nakano, a timer, a checklist — is answered by look with the want's name (find it with board, e.g. NakanoのWeather): tell the person what look reports. Use board to see what is on it.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want.
 Greetings and remarks about what was just said need no tool.
-Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used, in one or two short sentences.`
+Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
 
 var fmTools = []fmTool{
 	{
@@ -76,6 +76,14 @@ var fmTools = []fmTool{
 		},
 		run:     (*Server).fmPoint,
 		replays: true,
+	},
+	{
+		Name:        "look",
+		Description: "What one want on the board knows and how it is doing: its status and its results (the weather a weather want fetched, a timer's time left).",
+		Arguments: []fmParam{
+			{Name: "name", Description: "The want's name, from board, e.g. NakanoのWeather", Required: true},
+		},
+		run: (*Server).fmLook,
 	},
 	{
 		Name:        "describe_type",
@@ -147,14 +155,18 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 		req.Arguments = map[string]string{}
 	}
 	step := fmStep{Tool: req.Tool, Arguments: req.Arguments}
+	if req.Turn == "" {
+		// Outside a turn it is only run: nobody asked the robot anything, so
+		// its chat has nothing to show.
+		fmWriteJSON(w, map[string]any{"output": s.fmRunTool(req.Tool, req.Arguments)})
+		return
+	}
 	s.fmRunStep(&step, "")
-	if req.Turn != "" {
-		if _, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
-			t.Steps = append(t.Steps, step)
-			return nil
-		}); err != nil {
-			log.Printf("[fm] step outside a known turn: %v", err)
-		}
+	if _, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
+		t.Steps = append(t.Steps, step)
+		return nil
+	}); err != nil {
+		log.Printf("[fm] step outside a known turn: %v", err)
 	}
 	fmWriteJSON(w, map[string]any{"output": step.Output})
 }
@@ -525,6 +537,114 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("The robot is standing on %s and saying: %s", found, words), nil
+}
+
+// fmLook reads one want: its status and the state it has gathered, short.
+//
+// Only what says something — not the bookkeeping every want carries
+// (achieving_percentage, action_by_agent…), not empty values, not the chat
+// buffers, and never a value whose name says it is a secret: what this
+// returns is read by a model and may be read out.
+func (s *Server) fmLook(args map[string]string) (string, error) {
+	name := strings.TrimSpace(args["name"])
+	if name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+	var resp struct {
+		Wants []struct {
+			Metadata struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			} `json:"metadata"`
+			Status string `json:"status"`
+			State  struct {
+				Current     map[string]any `json:"current"`
+				FinalResult any            `json:"final_result"`
+			} `json:"state"`
+		} `json:"wants"`
+	}
+	if err := s.backend("GET", "/api/v1/wants", nil, &resp); err != nil {
+		return "", err
+	}
+	loose := func(v string) string {
+		return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(v))
+	}
+	found, near := -1, []string{}
+	for i, w := range resp.Wants {
+		if w.Metadata.Name == name || loose(w.Metadata.Name) == loose(name) {
+			found = i
+			break
+		}
+		if strings.Contains(loose(w.Metadata.Name), loose(name)) {
+			near = append(near, w.Metadata.Name)
+		}
+	}
+	if found < 0 && len(near) == 1 {
+		for i, w := range resp.Wants {
+			if w.Metadata.Name == near[0] {
+				found = i
+			}
+		}
+	}
+	if found < 0 {
+		if len(near) > fmNearMatches {
+			near = near[:fmNearMatches]
+		}
+		if len(near) > 0 {
+			return "", fmt.Errorf("no want named %q; did you mean: %s", name, strings.Join(near, ", "))
+		}
+		return "", fmt.Errorf("no want named %q; use board to see the names", name)
+	}
+	w := resp.Wants[found]
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s (%s): %s\n", w.Metadata.Name, w.Metadata.Type, w.Status)
+	keys := make([]string, 0, len(w.State.Current))
+	for k := range w.State.Current {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if fmLookSkip(k) {
+			continue
+		}
+		v := w.State.Current[k]
+		text := fmt.Sprint(v)
+		if _, isText := v.(string); !isText {
+			raw, _ := json.Marshal(v)
+			text = string(raw)
+		}
+		if text == "" || text == "[]" || text == "{}" || text == "null" || text == "0" || text == "false" {
+			continue
+		}
+		fmt.Fprintf(&b, "- %s: %s\n", k, firstLine(text, 160))
+		if b.Len() > 900 {
+			b.WriteString("…\n")
+			break
+		}
+	}
+	if fr := fmt.Sprint(w.State.FinalResult); w.State.FinalResult != nil && fr != "" && fr != "map[]" {
+		raw, _ := json.Marshal(w.State.FinalResult)
+		fmt.Fprintf(&b, "- final result: %s\n", firstLine(string(raw), 200))
+	}
+	return b.String(), nil
+}
+
+// fmLookSkip: the state every want keeps for its own running, and secrets.
+func fmLookSkip(key string) bool {
+	switch key {
+	case "achieved", "achieving_percentage", "action_by_agent", "completed", "say":
+		return true
+	}
+	lower := strings.ToLower(key)
+	if strings.HasPrefix(lower, "cc_") || strings.HasPrefix(lower, "webhook_") || strings.HasPrefix(lower, "fm_") {
+		return true
+	}
+	for _, secret := range []string{"key", "token", "secret", "password", "credential", "auth"} {
+		if strings.Contains(lower, secret) {
+			return true
+		}
+	}
+	return false
 }
 
 // fmSay puts words in the robot's speech bubble on the board.
