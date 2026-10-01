@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	mywant "mywant/engine/core"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -150,9 +152,15 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "unknown tool: "+req.Tool, http.StatusNotFound)
 }
 
-// handleFMSaid takes what the model answered, so the robot on the board says
-// it as well: the phone is where the person asked, the board is where the
-// robot is, and it is one robot.
+// handleFMSaid takes what was asked and what the model answered, so the robot
+// on the board has said it: the phone is where the person asked, the board is
+// where the robot is, and it is one robot.
+//
+// Into the robot's chat as one exchange — the question to cc_messages, the
+// answer to cc_responses, the two lists its chat window pairs up — and out of
+// its mouth as any answer of its own is (CharacterSpeaks: the bubble and the
+// speech log). Nothing here asks its agent anything: what sets that going is
+// webhook_auto_request, which is left alone.
 func (s *Server) handleFMSaid(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -167,11 +175,40 @@ func (s *Server) handleFMSaid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("[fm] said: %q → %q", firstLine(req.Question, 80), firstLine(req.Answer, 160))
-	if err := s.fmSay(req.Answer); err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+	robot := s.findWantByIDOrName(fmRobotWant)
+	if robot == nil {
+		http.Error(w, "no robot on this board", http.StatusNotFound)
 		return
 	}
+	now := time.Now().Format(time.RFC3339)
+	question := strings.TrimSpace(req.Question)
+	answer := strings.TrimSpace(req.Answer)
+	if question != "" {
+		messages := mywant.GetCurrent(robot, "cc_messages", []any{})
+		messages = append(messages, map[string]any{
+			"sender": fmDeviceSender, "text": question, "timestamp": now, "channel_id": fmDeviceSender,
+		})
+		robot.SetCurrent("cc_messages", fmLastN(messages))
+	}
+	if answer != "" {
+		responses := mywant.GetCurrent(robot, "cc_responses", []any{})
+		responses = append(responses, map[string]any{"text": answer, "timestamp": now, "subtype": "fm"})
+		robot.SetCurrent("cc_responses", fmLastN(responses))
+		mywant.CharacterSpeaks(fmRobotWant, answer, "agent")
+	}
 	fmWriteJSON(w, map[string]any{"ok": true})
+}
+
+// Who asked, in the robot's chat: the on-device model's phone.
+const fmDeviceSender = "fm-device"
+
+// fmLastN keeps the robot's chat lists as long as the rest of the code keeps
+// them (robotResponsesMax).
+func fmLastN(list []any) []any {
+	if len(list) > robotResponsesMax {
+		return list[len(list)-robotResponsesMax:]
+	}
+	return list
 }
 
 func fmWriteJSON(w http.ResponseWriter, v any) {
