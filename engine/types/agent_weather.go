@@ -66,9 +66,11 @@ func executeWeatherFetch(ctx context.Context, want *Want) error {
 }
 
 // fetchWeatherText asks each source in turn until one answers: OpenWeatherMap
-// when a key is given, then wttr.in, then Open-Meteo. wttr.in is a single
-// free host that goes down (expired certificates, HTTP/2 stream resets), so
-// Open-Meteo — also keyless — stands behind it.
+// when a key is given, then Open-Meteo, then wttr.in. Open-Meteo comes first
+// of the keyless two: it reads the national weather services' models (the
+// JMA's in Japan) at the city's own point, where wttr.in reported "Patchy
+// rain nearby" for Tokyo on a clear evening. wttr.in — a single free host that
+// also goes down — only stands behind it.
 func fetchWeatherText(ctx context.Context, city, apiKey string) (text, source string, err error) {
 	type weatherSource struct {
 		name  string
@@ -81,8 +83,8 @@ func fetchWeatherText(ctx context.Context, city, apiKey string) (text, source st
 		}})
 	}
 	sources = append(sources,
-		weatherSource{"wttr.in", fetchWeatherWttr},
 		weatherSource{"open-meteo", fetchWeatherOpenMeteo},
+		weatherSource{"wttr.in", fetchWeatherWttr},
 	)
 
 	var errs []error
