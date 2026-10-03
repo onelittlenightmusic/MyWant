@@ -61,7 +61,8 @@ The board holds things (named values: stations, cities, places, albums) and want
 - WHERE something is (「荻窪はどこ？」): call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」.
 - WHAT something says or how it is (「Nakanoの天気は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」. Never point for these.
 Use board to see the names of what is on it.
-To add a want, choose its type, read its parameters with describe_type, then deploy_want.
+To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
+A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params {"from":"中野坂上","to":"銀座"} — the station names alone.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
 
@@ -98,7 +99,7 @@ var fmTools = []fmTool{
 	},
 	{
 		Name:        "deploy_want",
-		Description: "Put a new want on the board, next to the person.",
+		Description: "Put a new want on the board, next to the person — or, if one of that type with the same parameters is already there, walk to it instead.",
 		Arguments: []fmParam{
 			{Name: "type", Description: "The type of the want", Required: true},
 			{Name: "params", Description: `The parameters as a JSON object, e.g. {"content":"Tea"}. Use {} when there are none.`, Required: true},
@@ -365,6 +366,16 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 			return "", fmt.Errorf("params is not a JSON object: %v", err)
 		}
 	}
+	// Already on the board — the same type asked the same thing — is not a
+	// reason to make it twice: the robot goes to the one there is, and says so.
+	// 「中野坂上から銀座の乗り換え」 asked again walks to the route already
+	// found rather than finding it again beside it.
+	if existing, err := s.fmFindWant(typ, params); err == nil && existing != "" {
+		if _, err := s.fmPoint(map[string]string{"name": existing}); err == nil {
+			return fmt.Sprintf("%q (%s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ), nil
+		}
+		return fmt.Sprintf("%q (%s) with these parameters is already on the board. Nothing new was made.", existing, typ), nil
+	}
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
 		name = fmt.Sprintf("%s-%d", strings.ReplaceAll(typ, " ", "-"), time.Now().Unix()%100000)
@@ -383,6 +394,54 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("Deployed %q (%s).", name, typ), nil
+}
+
+// fmFindWant names a want of this type whose parameters already say what
+// these say (every non-empty one equal, as text), or "" when there is none.
+func (s *Server) fmFindWant(typ string, params map[string]any) (string, error) {
+	var wants struct {
+		Wants []struct {
+			Metadata struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			} `json:"metadata"`
+			Spec struct {
+				Params map[string]any `json:"params"`
+			} `json:"spec"`
+		} `json:"wants"`
+	}
+	if err := s.backend("GET", "/api/v1/wants", nil, &wants); err != nil {
+		return "", err
+	}
+	text := func(v any) string { return strings.TrimSpace(fmt.Sprint(v)) }
+	asked := 0
+	for _, v := range params {
+		if v != nil && text(v) != "" {
+			asked++
+		}
+	}
+	if asked == 0 {
+		return "", nil
+	}
+	for _, w := range wants.Wants {
+		if w.Metadata.Type != typ || w.Metadata.Name == fmRobotWant {
+			continue
+		}
+		same := true
+		for k, v := range params {
+			if v == nil || text(v) == "" {
+				continue
+			}
+			if got, ok := w.Spec.Params[k]; !ok || text(got) != text(v) {
+				same = false
+				break
+			}
+		}
+		if same {
+			return w.Metadata.Name, nil
+		}
+	}
+	return "", nil
 }
 
 const (
