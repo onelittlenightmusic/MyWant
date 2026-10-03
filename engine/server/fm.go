@@ -162,10 +162,12 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	if req.Turn == "" {
 		// Outside a turn it is only run: nobody asked the robot anything, so
 		// its chat has nothing to show.
-		fmWriteJSON(w, map[string]any{"output": s.fmRunTool(req.Tool, req.Arguments)})
+		out := s.fmRunTool(req.Tool, req.Arguments)
+		fmWriteJSON(w, map[string]any{"output": out, "card": fmTakeCard(req.Arguments)})
 		return
 	}
 	s.fmRunStep(&step)
+	step.Card = fmTakeCard(step.Arguments)
 	turn, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
 		t.Steps = append(t.Steps, step)
 		return nil
@@ -175,7 +177,19 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	} else if !turn.Quiet {
 		s.fmShowStep(step, "")
 	}
-	fmWriteJSON(w, map[string]any{"output": step.Output})
+	fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card})
+}
+
+// fmTakeCard takes out of a step's arguments the want its tool brought the
+// robot to (fmCardArg), if any.
+func fmTakeCard(args map[string]string) *fmCard {
+	c, ok := args[fmCardArg]
+	if !ok {
+		return nil
+	}
+	delete(args, fmCardArg)
+	id, name, _ := strings.Cut(c, "\x00")
+	return &fmCard{Kind: "want", ID: id, Name: name}
 }
 
 // fmToolByName is the tool of that name, or the zero tool.
@@ -371,7 +385,11 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// 「中野坂上から銀座の乗り換え」 asked again walks to the route already
 	// found rather than finding it again beside it.
 	if existing, err := s.fmFindWant(typ, params); err == nil && existing != "" {
-		if _, err := s.fmPoint(map[string]string{"name": existing}); err == nil {
+		pointed := map[string]string{"name": existing}
+		if _, err := s.fmPoint(pointed); err == nil {
+			if c, ok := pointed[fmCardArg]; ok {
+				args[fmCardArg] = c
+			}
 			return fmt.Sprintf("%q (%s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ), nil
 		}
 		return fmt.Sprintf("%q (%s) with these parameters is already on the board. Nothing new was made.", existing, typ), nil
@@ -457,6 +475,20 @@ const (
 type fmTile struct {
 	name, kind string
 	x, y       int
+	// id: a want's id ("" for a thing) — what a chat shows its card by.
+	id string
+}
+
+// fmCardArg is the key under which a tool notes, in its own arguments, the
+// want it brought the robot to; handleFMCall takes it out again and hands it
+// back as the call's card — what the chat shows under the robot's words.
+const fmCardArg = "_card"
+
+// fmCard is a want a step brought the robot to.
+type fmCard struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func (t fmTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
@@ -482,6 +514,7 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 	var wants struct {
 		Wants []struct {
 			Metadata struct {
+				ID     string            `json:"id"`
 				Name   string            `json:"name"`
 				Type   string            `json:"type"`
 				Labels map[string]string `json:"labels"`
@@ -509,6 +542,7 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 			continue
 		}
 		if tile, ok := fmTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
+			tile.id = w.Metadata.ID
 			tiles = append(tiles, tile)
 		}
 	}
@@ -596,6 +630,9 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		if err := s.backend("POST", "/api/v1/wants/"+fmRobotWant+"/labels", body, nil); err != nil {
 			return "", fmt.Errorf("could not walk the robot there: %v", err)
 		}
+	}
+	if found.id != "" {
+		args[fmCardArg] = found.id + "\x00" + found.name
 	}
 	words := fmt.Sprintf("「%s」はここです (%d, %d)", found.name, found.x, found.y)
 	if err := s.fmSay(words); err != nil {

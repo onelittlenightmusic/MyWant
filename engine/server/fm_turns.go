@@ -34,6 +34,8 @@ type fmStep struct {
 	Tool      string            `json:"tool"`
 	Arguments map[string]string `json:"arguments"`
 	Output    string            `json:"output,omitempty"`
+	// Card: the want this step brought the robot to, shown under its words.
+	Card *fmCard `json:"card,omitempty"`
 	// Done: run against this server already. A step posted without it is
 	// run when the turn arrives.
 	Done bool   `json:"done"`
