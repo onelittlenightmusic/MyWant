@@ -114,3 +114,16 @@ func TestIntersectionKeepsMoverKindsApart(t *testing.T) {
 		t.Fatalf("the thing is still listed after leaving: %v", got)
 	}
 }
+
+// An archived want keeps its cell but is put away: standing on it is not
+// standing on anything.
+func TestIntersectionIgnoresAnArchivedWant(t *testing.T) {
+	bin := wantAt("bin-1", "trash", 2, 2)
+	bin.SetLabel(mywant.ArchivedLabel, "true")
+	live := wantAt("note-1", "note", 2, 2)
+
+	got := wantsAtCell("2", "2", []*mywant.Want{bin, live})
+	if len(got) != 1 || got[0] != live {
+		t.Fatalf("archived want still on its cell: %v", got)
+	}
+}

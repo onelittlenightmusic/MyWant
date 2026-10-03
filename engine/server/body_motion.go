@@ -32,9 +32,13 @@ const (
 	thingMovingLabel = "mywant.io/moving"
 	// The pin: whether a thing is on the board at all. Three states, and the
 	// absent one matters — no label means nobody has answered and the board's
-	// own rule decides. "false" is a thing taken off by hand, which is also
-	// what a thing's archive is (see intersection.go's trash rule).
+	// own rule decides. "false" is a thing taken off by hand.
 	thingCanvasPinLabel = "mywant.io/canvas"
+	// The archive: a thing put away. Not the pin — an unpinned thing is only
+	// off the board, an archived one is out of play (it does not move or set
+	// off a rule) and the board shows it only when asked to show the archive.
+	// The same label a want is archived with.
+	thingArchivedLabel = "mywant.io/archived" // mywant.ArchivedLabel
 )
 
 // body is what the mover needs to know about anything it moves: where it is

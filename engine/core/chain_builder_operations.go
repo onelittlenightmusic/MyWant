@@ -261,6 +261,9 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 					m[key] = value
 					want.Metadata.UpdatedAt = time.Now().Unix()
 				})
+				if key == ArchivedLabel {
+					cb.reconcileWants()
+				}
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
 				return
@@ -283,6 +286,9 @@ func (cb *ChainBuilder) processWantOperation(op *WantOperation) {
 					delete(m, key)
 					want.Metadata.UpdatedAt = time.Now().Unix()
 				})
+				if key == ArchivedLabel {
+					cb.reconcileWants()
+				}
 			} else {
 				sendError(fmt.Errorf("want with ID %s not found", wantID))
 				return

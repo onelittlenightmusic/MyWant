@@ -126,6 +126,7 @@ const (
 	WantStatusModuleError         WantStatus = "module_error"        // Want type implementation error (GetState failure, cast failure, etc.)
 	WantStatusPrepareAgent        WantStatus = "prepare_agent"       // Preparing agent runtime
 	WantStatusWaitingUserAction   WantStatus = "waiting_user_action" // Waiting for user action (e.g., reaction approval)
+	WantStatusArchived            WantStatus = "archived"            // Put away: kept with its metadata and history, but no longer progressing (see want_archive.go)
 )
 
 // IsAchievedStatus returns true if the status represents a completed/achieved state (with or without warnings).
@@ -302,6 +303,10 @@ type Want struct {
 
 	// Control state tracking
 	suspended atomic.Bool `json:"-" yaml:"-"` // Current suspension state
+
+	// archiveHeld is set by the reconcile's archive phase when this want, or
+	// a want that owns it, carries the archive label (see want_archive.go).
+	archiveHeld atomic.Bool `json:"-" yaml:"-"`
 
 	// Fields for eliminating duplicate methods in want types
 	WantType             string               `json:"-" yaml:"-"`
@@ -906,6 +911,14 @@ func (n *Want) StartProgressionLoop(
 				case loopSignalContinue:
 					continue
 				}
+			}
+
+			// 2.5. Put away: the archive label stops the cycle for good
+			// (until it is taken off — see want_archive.go).
+			if n.archiveHeldNow() {
+				n.stopAgents("on archive")
+				n.putAway(n.GetStatus())
+				return
 			}
 
 			// 3. Skip execution if suspended, or while everything is paused

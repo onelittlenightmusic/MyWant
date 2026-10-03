@@ -123,6 +123,9 @@ func (s *Server) syncThingOccupancy(thingID string, newX, newY float64) {
 	if s.globalBuilder == nil {
 		return
 	}
+	if s.thingLabels != nil && s.thingLabels.Get(thingID)[thingArchivedLabel] == "true" {
+		return
+	}
 	applyIntersections(s, mover{moverThing, thingID}, newX, newY,
 		s.globalBuilder.GetWants(), s.isButtonFormType)
 }
@@ -256,6 +259,11 @@ func forgetIntersections(m mover) {
 func wantsAtCell(x, y string, allWants []*mywant.Want) []*mywant.Want {
 	var out []*mywant.Want
 	for _, want := range allWants {
+		// An archived want still has its cell, but it is put away: nothing
+		// standing there sets it off.
+		if want.IsArchived() {
+			continue
+		}
 		if want.GetLabel(canvasLabelX) == x && want.GetLabel(canvasLabelY) == y {
 			out = append(out, want)
 		}
@@ -352,9 +360,10 @@ var goingRule = intersectionRule{
 // there is nothing to archive, and "you have been filed away" is not a thing to
 // do to somebody without asking.
 //
-// Archive, not delete — a bin you cannot reach back into is a shredder. For a
-// thing the archive IS the pin: `mywant.io/canvas: false` takes it off the
-// board and the Thing list's archive drawer is where it comes back from.
+// Archive, not delete — a bin you cannot reach back into is a shredder. A
+// thing's archive is its own label (thingArchivedLabel), the one a want is
+// archived with; the pin is left as it was, so taking the thing back out puts
+// it where it stood.
 var trashRule = intersectionRule{
 	name: "trash",
 	applies: func(ctx intersectionContext, want *mywant.Want, m mover) bool {
@@ -364,7 +373,7 @@ var trashRule = intersectionRule{
 		if ctx.s.thingLabels == nil {
 			return
 		}
-		_ = ctx.s.thingLabels.Set(m.id, thingCanvasPinLabel, "false")
+		_ = ctx.s.thingLabels.Set(m.id, thingArchivedLabel, "true")
 		// Stopped as well as archived. A thing that kept its speed while off
 		// the board would go on travelling in the dark, and reappear at
 		// whatever cell it had drifted to whenever someone un-archived it.

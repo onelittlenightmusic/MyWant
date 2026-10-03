@@ -618,6 +618,9 @@ func (cb *ChainBuilder) reconcileWants() {
 		return
 	}
 
+	// Phase 3.5: ARCHIVE - Put away archived wants, take out unarchived ones
+	cb.archivePhase()
+
 	// Phase 4: START - Launch new/updated wants
 	cb.startPhase()
 
@@ -1626,6 +1629,11 @@ func (cb *ChainBuilder) startWant(wantKey string, want *runtimeWant) {
 	displayName := want.want.Metadata.Name
 	// Check if already in a terminal state
 	status := want.want.GetStatus()
+	// Archived (by its own label or an owner's): kept, never run.
+	if want.want.archiveHeldNow() || status == WantStatusArchived {
+		want.want.putAway(status)
+		return
+	}
 	if IsAchievedStatus(status) || status == WantStatusFailed {
 		log.Printf("[START-WANT] '%s' already in terminal state (%s), skipping\n", displayName, status)
 		return

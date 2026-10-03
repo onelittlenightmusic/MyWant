@@ -53,7 +53,7 @@ func (s *Server) suggestFor(
 	labels := s.thingLabels.All()
 	onBoard := func(id string) bool {
 		l := labels[id]
-		return l != nil && l[thingCanvasPinLabel] == "true"
+		return l != nil && l[thingCanvasPinLabel] == "true" && l[thingArchivedLabel] != "true"
 	}
 
 	// Where the offer starts: a member of this scope that is actually drawn.

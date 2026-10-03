@@ -116,7 +116,8 @@ func (s *Server) thingMotionTick() {
 
 	for id, labels := range all {
 		b, moving, ok := thingBodyOf(labels)
-		if !ok || !moving {
+		// An archived thing is put away, not parked: it does not travel.
+		if !ok || !moving || labels[thingArchivedLabel] == "true" {
 			// Stopped from outside — somebody turned the flag off, or took the
 			// thing off the board — rather than by running out of speed. Put it
 			// down where it actually is first: the label still says where the
