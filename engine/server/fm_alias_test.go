@@ -88,3 +88,21 @@ func TestFMByGlossary(t *testing.T) {
 		}
 	}
 }
+
+// The one rule every client's card follows for a want's result in a line.
+func TestFMCardSummary(t *testing.T) {
+	for _, c := range []struct {
+		in   any
+		want string
+	}{
+		{nil, ""},
+		{"晴れ 20°C", "晴れ 20°C"},
+		{[]any{}, ""},
+		{[]any{1, 2, 3}, "3 件"},
+		{map[string]any{"store": "北新宿店", "datetime": "2026-10-04 16:00", "datetime_rfc3339": "x", "nested": map[string]any{}}, "datetime: 2026-10-04 16:00 · store: 北新宿店"},
+	} {
+		if got := fmCardSummary(c.in); got != c.want {
+			t.Errorf("%v: got %q, want %q", c.in, got, c.want)
+		}
+	}
+}

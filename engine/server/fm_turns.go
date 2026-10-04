@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -58,6 +59,9 @@ type fmTurn struct {
 	// the tool it used and the answer in the chat; writing them again would
 	// say everything twice. Posted as {"chat": false}.
 	Quiet bool `json:"quiet,omitempty"`
+	// Cards: the wants the answer is about, as every client shows them under
+	// it — settled with the answer (fmAnswerCards).
+	Cards []fmCard `json:"cards,omitempty"`
 }
 
 const (
@@ -154,17 +158,115 @@ func (s *Server) fmAsked(question string) {
 // answer of its own is (CharacterSpeaks: the bubble and the speech log).
 // Nothing here asks the robot's agent anything: webhook_auto_request, which
 // sets that going, is left alone.
-func (s *Server) fmAnswered(answer string) {
+//
+// The wants the turn's steps brought the robot to go with it, as cards: the
+// chat shows each under the answer, so what the answer is about is there at a
+// glance (and a press away), as on the phone.
+func (s *Server) fmAnswered(answer string, cards []fmCard) {
 	robot, err := s.fmRobot()
 	if err != nil || answer == "" {
 		return
 	}
-	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
-	responses = append(responses, map[string]any{
+	entry := map[string]any{
 		"text": answer, "timestamp": time.Now().Format(time.RFC3339), "subtype": "fm",
-	})
+	}
+	if len(cards) > 0 {
+		entry["cards"] = cards
+	}
+	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
+	responses = append(responses, entry)
 	robot.SetCurrent("cc_responses", fmLastN(responses))
 	mywant.CharacterSpeaks(fmRobotWant, answer, "agent")
+}
+
+// fmAnswerCards is the turn's cards, each filled with what its want says now
+// — its type, how it is doing and its result in a line. Settled once, with the
+// answer, so every client shows the same card under the same answer.
+func (s *Server) fmAnswerCards(turn fmTurn) []fmCard {
+	cards := fmTurnCards(turn)
+	for i, c := range cards {
+		var w struct {
+			Metadata struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			} `json:"metadata"`
+			Status string `json:"status"`
+			State  struct {
+				FinalResult any `json:"final_result"`
+			} `json:"state"`
+		}
+		if err := s.backend("GET", "/api/v1/wants/"+c.ID, nil, &w); err != nil {
+			continue
+		}
+		if w.Metadata.Name != "" {
+			cards[i].Name = w.Metadata.Name
+		}
+		cards[i].Type = w.Metadata.Type
+		cards[i].Status = w.Status
+		cards[i].Summary = fmCardSummary(w.State.FinalResult)
+	}
+	return cards
+}
+
+// fmCardSummary is a want's result in a line: text as it is; an object as its
+// first few plain values (not the machine copies, *_rfc3339); a list as its
+// count. The one rule every client's card follows.
+func fmCardSummary(v any) string {
+	const max = 140
+	cut := func(s string) string {
+		if r := []rune(s); len(r) > max {
+			return string(r[:max])
+		}
+		return s
+	}
+	switch x := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return cut(x)
+	case bool, float64, int:
+		return fmt.Sprint(x)
+	case []any:
+		if len(x) == 0 {
+			return ""
+		}
+		return fmt.Sprintf("%d 件", len(x))
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var parts []string
+		for _, k := range keys {
+			if strings.HasSuffix(k, "_rfc3339") {
+				continue
+			}
+			switch x[k].(type) {
+			case map[string]any, []any, nil:
+				continue
+			}
+			parts = append(parts, fmt.Sprintf("%s: %v", k, x[k]))
+			if len(parts) == 4 {
+				break
+			}
+		}
+		return cut(strings.Join(parts, " · "))
+	}
+	return ""
+}
+
+// fmTurnCards is every want the turn's steps brought the robot to, once each.
+func fmTurnCards(turn fmTurn) []fmCard {
+	var out []fmCard
+	seen := map[string]bool{}
+	for _, st := range turn.Steps {
+		if st.Card != nil && !seen[st.Card.ID] {
+			seen[st.Card.ID] = true
+			out = append(out, *st.Card)
+		}
+	}
+	return out
 }
 
 // fmShowStep writes a step into the robot's working log, the line its chat
@@ -232,14 +334,19 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 		if !turn.Steps[i].Done {
 			s.fmRunStep(&turn.Steps[i])
 		}
+		// The want the step brought the robot to, as its card (see fmTakeCard).
+		if turn.Steps[i].Card == nil {
+			turn.Steps[i].Card = fmTakeCard(turn.Steps[i].Arguments)
+		}
 		if !turn.Quiet {
 			s.fmShowStep(turn.Steps[i], "")
 		}
 	}
 	if turn.Answer = strings.TrimSpace(turn.Answer); turn.Answer != "" {
 		turn.FinishedAt = time.Now().Format(time.RFC3339)
+		turn.Cards = s.fmAnswerCards(turn)
 		if !turn.Quiet {
-			s.fmAnswered(turn.Answer)
+			s.fmAnswered(turn.Answer, turn.Cards)
 		}
 	}
 	if err := s.fmAddTurn(turn); err != nil {
@@ -273,8 +380,13 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	if turn.Answer != "" && !turn.Quiet {
-		s.fmAnswered(turn.Answer)
+	if turn.Answer != "" {
+		turn.Cards = s.fmAnswerCards(turn)
+		cards := turn.Cards
+		_, _ = s.fmUpdateTurn(turn.ID, func(t *fmTurn) error { t.Cards = cards; return nil })
+		if !turn.Quiet {
+			s.fmAnswered(turn.Answer, turn.Cards)
+		}
 	}
 	if turn.Error != "" && !turn.Quiet {
 		if robot, err := s.fmRobot(); err == nil {

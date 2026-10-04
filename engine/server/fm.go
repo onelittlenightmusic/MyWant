@@ -686,6 +686,13 @@ type fmCard struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// What the card says, filled when the answer is settled (fmAnswerCards):
+	// the same for every client that shows it — the GUI's chat, guiex, the
+	// phone's chat, answer window and Live Activity — which each draw it their
+	// own way.
+	Type    string `json:"type,omitempty"`
+	Status  string `json:"status,omitempty"`
+	Summary string `json:"summary,omitempty"`
 }
 
 func (t fmTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
