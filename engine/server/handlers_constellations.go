@@ -614,5 +614,8 @@ func (s *Server) removeThingLabel(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to remove memo label", err.Error())
 		return
 	}
+	// The same news as setting one: taking a thing out of the archive, or
+	// unpinning it back to the board's own rule, is a label going away.
+	go broadcastSSE("thing_changed", body.ValueID)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label removed"})
 }
