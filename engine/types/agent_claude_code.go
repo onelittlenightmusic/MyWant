@@ -158,6 +158,11 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 					want.SetCurrent("cc_webhook_processed", msgCount)
 				} else {
 					want.StoreLog("[CC_THINK] Webhook message received, overriding auto_request")
+					// What the speaker can see goes to the model with what they
+					// said; the chat keeps them apart (see forwardToRobotIfAddressed).
+					if context, _ := latestMsg["context"].(string); context != "" {
+						text += "\n\n" + context
+					}
 					want.SetCurrent("webhook_auto_request", text)
 					want.SetCurrent("cc_webhook_processed", msgCount)
 				}

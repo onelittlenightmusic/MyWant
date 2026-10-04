@@ -12,6 +12,11 @@ type webhookMessage struct {
 	Text      string `json:"text"`
 	Timestamp string `json:"timestamp"`
 	ChannelID string `json:"channel_id"`
+	// Context: what goes to the model with the words but is not part of what
+	// was said — where the speaker stands on the board (contextForSpeaker).
+	// Kept apart so a chat shows the words alone; the agent joins the two
+	// when it asks (claudeCodeWatcherThink).
+	Context string `json:"context,omitempty"`
 }
 
 // webhookStateConfig holds state key names for a specific webhook platform.
@@ -34,6 +39,9 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 		"text":       msg.Text,
 		"timestamp":  msg.Timestamp,
 		"channel_id": msg.ChannelID,
+	}
+	if msg.Context != "" {
+		msgMap["context"] = msg.Context
 	}
 	messages = append(messages, msgMap)
 	if len(messages) > 20 {

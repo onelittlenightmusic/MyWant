@@ -205,9 +205,11 @@ func (s *Server) forwardToRobotIfAddressed(speakerID, text string) {
 	// board is half gesture — "これ消して", "ここに置いて" — and the gesture is
 	// the speaker's own position, which this server knows and used to drop on
 	// the way out. See contextForSpeaker; it says nothing when nothing is known.
-	if context := s.contextForSpeaker(speakerID); context != "" {
-		request += "\n\n" + context
-	}
+	//
+	// Beside the words, not in them: the model reads the two together, the
+	// chat shows what was said — a person shown their own question with a
+	// paragraph about canvas coordinates under it reads it as something wrong.
+	context := s.contextForSpeaker(speakerID)
 	// Written straight into the want's state rather than posted back through
 	// our own HTTP endpoint: same destination, one fewer round trip, and no way
 	// for the forward to fail because the server is busy answering itself.
@@ -215,6 +217,7 @@ func (s *Server) forwardToRobotIfAddressed(speakerID, text string) {
 		Sender:    speakerID,
 		Text:      request,
 		Timestamp: time.Now().Format(time.RFC3339),
+		Context:   context,
 	}, ccStateCfg)
 	log.Printf("[Speech] %s asked the robot: %s", speakerID, request)
 }
