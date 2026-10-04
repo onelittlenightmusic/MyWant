@@ -189,8 +189,21 @@ func fmTakeCard(args map[string]string) *fmCard {
 		return nil
 	}
 	delete(args, fmCardArg)
-	id, name, _ := strings.Cut(c, "\x00")
-	return &fmCard{Kind: "want", ID: id, Name: name}
+	parts := strings.SplitN(c, "\x00", 3)
+	card := &fmCard{Kind: "want", ID: parts[0]}
+	if len(parts) > 1 {
+		card.Name = parts[1]
+	}
+	if len(parts) > 2 && parts[2] != "" {
+		card.Kind = parts[2]
+	}
+	return card
+}
+
+// fmCardValue is how a tool notes the want or thing it brought the robot to
+// (fmCardArg): id, name and kind, for fmTakeCard to read back.
+func fmCardValue(kind, id, name string) string {
+	return id + "\x00" + name + "\x00" + kind
 }
 
 // fmToolByName is the tool of that name, or the zero tool.
@@ -672,8 +685,10 @@ type fmTile struct {
 	// typ: a want's type ("" for a thing); aliases: what its type is also called.
 	typ     string
 	aliases []string
-	// id: a want's id ("" for a thing) — what a chat shows its card by.
-	id string
+	// id and cardKind: what a chat shows its card by — a want's id or a
+	// thing's, and which of the two it is.
+	id       string
+	cardKind string
 }
 
 // fmCardArg is the key under which a tool notes, in its own arguments, the
@@ -711,6 +726,7 @@ func (t fmTile) named() string {
 func (s *Server) fmTiles() ([]fmTile, error) {
 	var things struct {
 		Things []struct {
+			ID      string            `json:"id"`
 			Value   string            `json:"value"`
 			Subtype string            `json:"subtype"`
 			Catalog string            `json:"catalog"`
@@ -744,6 +760,7 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 			kind = t.Catalog
 		}
 		if tile, ok := fmTileAt(t.Value, kind, t.Labels); ok {
+			tile.id, tile.cardKind = t.ID, "thing"
 			tiles = append(tiles, tile)
 		}
 	}
@@ -752,7 +769,7 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 			continue
 		}
 		if tile, ok := fmTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
-			tile.id = w.Metadata.ID
+			tile.id, tile.cardKind = w.Metadata.ID, "want"
 			tile.typ = w.Metadata.Type
 			tile.aliases = aliases[w.Metadata.Type]
 			tiles = append(tiles, tile)
@@ -866,7 +883,7 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		}
 	}
 	if found.id != "" {
-		args[fmCardArg] = found.id + "\x00" + found.name
+		args[fmCardArg] = fmCardValue(found.cardKind, found.id, found.name)
 	}
 	words := fmt.Sprintf("「%s」はここです (%d, %d)", found.name, found.x, found.y)
 	if err := s.fmSay(words); err != nil {
@@ -959,7 +976,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// about, at a glance — a person who asked about 国分寺 sees the card says
 	// Nakano.
 	if w.Metadata.ID != "" {
-		args[fmCardArg] = w.Metadata.ID + "\x00" + w.Metadata.Name
+		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	}
 
 	// Everything there is about it — the whole type definition (what it is,

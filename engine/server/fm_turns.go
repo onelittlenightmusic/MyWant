@@ -184,7 +184,34 @@ func (s *Server) fmAnswered(answer string, cards []fmCard) {
 // answer, so every client shows the same card under the same answer.
 func (s *Server) fmAnswerCards(turn fmTurn) []fmCard {
 	cards := fmTurnCards(turn)
+	var things []struct {
+		ID      string `json:"id"`
+		Value   string `json:"value"`
+		Subtype string `json:"subtype"`
+	}
 	for i, c := range cards {
+		if c.Kind == "thing" {
+			// A thing has no status or result: its name and what kind of
+			// thing it is (a city, a station) are what its card says.
+			if things == nil {
+				var resp struct {
+					Things []struct {
+						ID      string `json:"id"`
+						Value   string `json:"value"`
+						Subtype string `json:"subtype"`
+					} `json:"things"`
+				}
+				if s.backend("GET", "/api/v1/things", nil, &resp) == nil {
+					things = resp.Things
+				}
+			}
+			for _, t := range things {
+				if t.ID == c.ID {
+					cards[i].Name, cards[i].Type = t.Value, t.Subtype
+				}
+			}
+			continue
+		}
 		var w struct {
 			Metadata struct {
 				Name string `json:"name"`
