@@ -18,6 +18,10 @@ func (s *Server) setupRoutes() {
 	s.router.Use(corsMiddleware)
 
 	api := s.router.PathPrefix("/api/v1").Subrouter()
+	// ?token-limit= on any GET, and the ledger of measured sizes it decides
+	// by (token_budget.go).
+	api.Use(tokenBudgetMiddleware)
+	api.HandleFunc("/payload-ledger", s.getPayloadLedger).Methods("GET")
 
 	// Wants CRUD
 	wants := api.PathPrefix("/wants").Subrouter()

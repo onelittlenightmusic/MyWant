@@ -144,10 +144,49 @@ That gives an order for shrinking a response to a budget, cheapest loss first:
 
 Steps 1 and 2 alone take about 70% off an average want.
 
-A general mechanism would take a budget on the request (for example a
-`token-limit` on any GET that returns wants or types) and apply these steps in
-order until the response fits, so a small client asks for what it can read
-instead of every client getting the largest form.
+## The token budget built on it
+
+Any GET under `/api/v1` takes `?token-limit=` (`4096`, `4k`, `8K`; also
+`token_limit`) and is cut until it fits, in the order above
+(`engine/server/token_budget.go`). Without the parameter a response is
+untouched.
+
+| Stage | Cuts |
+|---|---|
+| `history` | a want's `history` |
+| `bookkeeping` | `state_timestamps`, `connectivity_metadata`, `hash`, `exposable_fields`, `hidden_state`, `metadata.correlation` / `series`; a type's `source`, `connectivity` |
+| `display` | labels that only tell a GUI how to draw (`category-bg-*`, `*-icon`, `tile-*`, `mywant.io/canvas-*`, …) |
+| `shared-state` | the framework's shared state fields, in a want's current state and a type's state definitions |
+| `how-made` | a type's `examples`, `onInitialize`, `finalizeWhen`, `agents`, …; state and parameter definitions down to name, type and description; a want's `spec` down to `params` |
+| `long-values` | any string past 1,000 characters, any list past 20 items |
+| `short-values` | any string past 200 characters, any list past 5 items |
+| `items` | when all that is not enough: the first entries of the response's main list |
+
+How far to cut is decided from a **ledger**, not by measuring the request.
+Every ordinary GET that returns wants or want types is measured afterwards,
+off the request path, and the ledger keeps, for each want and type, its size
+in tokens untouched and after each stage. A want is measured again only when
+its `hash` changes, and one path at most every 30 seconds (the GUI polls the
+want list). A request with a limit reads the ledger, takes the first stage at
+which the whole response fits, and cuts once; only an object the ledger has
+not seen yet is measured on the spot. The ledger is kept in
+`~/.mywant/payload-ledger.json` and can be read at `GET /api/v1/payload-ledger`.
+
+The response says what was done:
+
+| Header | |
+|---|---|
+| `X-Token-Limit` | the limit asked for, in tokens |
+| `X-Token-Estimate` | the cut response's size, in tokens |
+| `X-Token-Trimmed` | the stages applied, in order |
+| `X-Token-Fits` | whether it fits; `false` when even every stage leaves it over |
+
+Tokens are estimated, not counted: about 2.8 ASCII characters a token and a
+token per other character, measured on the robot's model and erring large.
+
+The robot's `look` tool uses the same budget: one want and its type's whole
+definition, cut to 1,500 tokens — what is left of an iPhone's 4,096 after the
+instructions, the tool schemas, the question and the reply.
 
 ## Measuring it yourself
 

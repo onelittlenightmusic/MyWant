@@ -59,7 +59,8 @@ type fmParam struct {
 const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
 The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). Two kinds of question, two tools:
 - WHERE something is (「荻窪はどこ？」): call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」.
-- WHAT something says or how it is (「Nakanoの天気は？」, 「スマートゴルフの予約は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather, 「スマートゴルフ」 finds the SmartGolf want), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」 or, for a reservation, the store, the room and the time it reports, e.g. 「<店>の<部屋>、<日時>に予約があります」 (or that there is none). Never point for these.
+- WHAT something says or how it is (「Nakanoの天気は？」, 「スマートゴルフの予約は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather, 「スマートゴルフ」 finds the SmartGolf want), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」 — the values that answer the question, read by what the type says they mean.
+Pointing is showing, and showing is good: when the answer is on the board and seeing it helps — the want you just read, the place it is about — you may also point to it, so the person sees it while you say it. Point to the same name you looked at. Never point instead of answering: the words come from look.
 Use board to see the names of what is on it — it only lists names, so after board, call look (or point) with the name you found; never answer from board alone.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
 A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params {"from":"中野坂上","to":"銀座"} — the station names alone.
@@ -798,13 +799,57 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
+
+	// Everything there is about it — the whole type definition (what it is,
+	// what each of its values means, how it is made) and the whole want — cut
+	// to what the smallest model can take (fmLookFull). A want that cannot be
+	// cut to fit falls back to the short form below.
+	if full := s.fmLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
+		return full, nil
+	}
+	// What the type says it is and what each of its values means — the want
+	// carries only the values, and a value's key ("next_store") is all a model
+	// had to go on. Written once in the type's YAML (metadata.description, each
+	// state's description), read here; best effort, the values stand alone.
+	var def struct {
+		Metadata struct {
+			Description string `json:"description"`
+		} `json:"metadata"`
+		State []struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+		} `json:"state"`
+	}
+	_ = s.backend("GET", "/api/v1/want-types/"+w.Metadata.Type, nil, &def)
+	meaning := map[string]string{}
+	var order []string
+	for _, st := range def.State {
+		meaning[st.Name] = fmFirstSentence(st.Description, 90)
+		order = append(order, st.Name)
+	}
+
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s (%s): %s\n", w.Metadata.Name, w.Metadata.Type, w.Status)
-	keys := make([]string, 0, len(w.State.Current))
-	for k := range w.State.Current {
-		keys = append(keys, k)
+	if about := fmFirstSentence(def.Metadata.Description, 160); about != "" {
+		fmt.Fprintf(&b, "What it is: %s\n", about)
 	}
-	sort.Strings(keys)
+	// In the order the type lists them — the author's order, not the alphabet's
+	// — then anything the type does not declare.
+	keys := make([]string, 0, len(w.State.Current))
+	seen := map[string]bool{}
+	for _, k := range order {
+		if _, ok := w.State.Current[k]; ok && !seen[k] {
+			keys, seen[k] = append(keys, k), true
+		}
+	}
+	var rest []string
+	for k := range w.State.Current {
+		if !seen[k] {
+			rest = append(rest, k)
+		}
+	}
+	sort.Strings(rest)
+	keys = append(keys, rest...)
 	// Each value once. A want commonly keeps the same answer under several
 	// keys (the reservation as current_reservation, as reservations[0], in the
 	// raw output, as the final result), and a small model handed it four times
@@ -827,8 +872,12 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 			continue
 		}
 		said[text] = true
-		fmt.Fprintf(&b, "- %s: %s\n", k, firstLine(text, 160))
-		if b.Len() > 900 {
+		if m := meaning[k]; m != "" {
+			fmt.Fprintf(&b, "- %s: %s  (%s)\n", k, firstLine(text, 160), m)
+		} else {
+			fmt.Fprintf(&b, "- %s: %s\n", k, firstLine(text, 160))
+		}
+		if b.Len() > 1500 {
 			b.WriteString("…\n")
 			break
 		}
@@ -840,6 +889,92 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		}
 	}
 	return b.String(), nil
+}
+
+// fmLookTokens is what look may hand the model, in tokens.
+//
+// Sized for the smallest window that asks: an iPhone's model has 4,096 tokens
+// (a Mac's 8,192) for the instructions and the tool schemas — about 2,000 of
+// them together — the question, this answer and the reply. A smartgolf want
+// and its type handed over whole came to 5,327 tokens there and the turn
+// failed outright.
+const fmLookTokens = 1500
+
+// fmLookFull is one want with its type's whole definition, as JSON, cut to
+// fmLookTokens by the same token budget every GET can ask for (token_budget.go):
+// its history first, then bookkeeping, display hints, the framework's shared
+// fields, how the type is made, and long values — what it is and what its
+// values mean go last. "" when it cannot be read or cut to fit.
+//
+// Secrets stay out here too: a state or label whose name says it is one is
+// dropped, as fmLookSkip drops it from the short form.
+func (s *Server) fmLookFull(name, typ string) string {
+	var typeDef map[string]any
+	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &typeDef); err != nil {
+		return ""
+	}
+	var all struct {
+		Wants []map[string]any `json:"wants"`
+	}
+	if err := s.backend("GET", "/api/v1/wants", nil, &all); err != nil {
+		return ""
+	}
+	var want map[string]any
+	for _, x := range all.Wants {
+		if md, _ := x["metadata"].(map[string]any); md != nil && md["name"] == name {
+			want = x
+		}
+	}
+	if want == nil {
+		return ""
+	}
+	fmDropSecrets(want)
+	fmDropSecrets(typeDef)
+	cut, res := budgetFit(map[string]any{"type": typeDef, "want": want}, fmLookTokens)
+	if !res.Fits {
+		return ""
+	}
+	doc := cut.(map[string]any)
+	td, _ := json.Marshal(doc["type"])
+	wj, _ := json.Marshal(doc["want"])
+	return "Type definition:\n" + string(td) + "\n\nWant:\n" + string(wj)
+}
+
+// fmDropSecrets removes, at any depth, every map entry whose key names a
+// secret (see fmLookSecret) — or, in a state definition's list, every entry
+// whose "name" does.
+func fmDropSecrets(v any) {
+	switch x := v.(type) {
+	case map[string]any:
+		for k, child := range x {
+			if fmLookSecret(k) {
+				delete(x, k)
+				continue
+			}
+			fmDropSecrets(child)
+		}
+	case []any:
+		for i, child := range x {
+			if m, ok := child.(map[string]any); ok {
+				if n, _ := m["name"].(string); n != "" && fmLookSecret(n) {
+					x[i] = map[string]any{"name": n, "omitted": "secret"}
+					continue
+				}
+			}
+			fmDropSecrets(child)
+		}
+	}
+}
+
+// fmLookSecret: a key whose name says it holds a secret.
+func fmLookSecret(key string) bool {
+	lower := strings.ToLower(key)
+	for _, secret := range []string{"key", "token", "secret", "password", "credential", "auth"} {
+		if strings.Contains(lower, secret) {
+			return true
+		}
+	}
+	return false
 }
 
 // fmLookSkip: the state every want keeps for its own running, and secrets.
@@ -857,12 +992,7 @@ func fmLookSkip(key string) bool {
 	if strings.HasPrefix(lower, "cc_") || strings.HasPrefix(lower, "webhook_") || strings.HasPrefix(lower, "fm_") {
 		return true
 	}
-	for _, secret := range []string{"key", "token", "secret", "password", "credential", "auth"} {
-		if strings.Contains(lower, secret) {
-			return true
-		}
-	}
-	return false
+	return fmLookSecret(lower)
 }
 
 // fmSay puts words in the robot's speech bubble on the board.
@@ -872,6 +1002,26 @@ func (s *Server) fmSay(words string) error {
 		return nil
 	}
 	return s.backend("PUT", "/api/v1/states/"+fmRobotWant, map[string]any{"say": words}, nil)
+}
+
+// fmFirstSentence is a description cut to its first sentence, on one line —
+// a type's YAML wraps its descriptions across lines and goes on to say more
+// than a model needs to read a value by.
+func fmFirstSentence(s string, max int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	// "e.g. 北新宿店" is not the end of a sentence; its example is the useful half.
+	guard := strings.NewReplacer("e.g. ", "e.g.\x00", "i.e. ", "i.e.\x00")
+	s = guard.Replace(s)
+	for _, end := range []string{". ", "。"} {
+		if i := strings.Index(s, end); i >= 0 {
+			s = s[:i+len(strings.TrimSpace(end))]
+		}
+	}
+	s = strings.ReplaceAll(s, "\x00", " ")
+	if r := []rune(s); len(r) > max {
+		s = string(r[:max]) + "…"
+	}
+	return s
 }
 
 func firstLine(s string, max int) string {
