@@ -133,7 +133,7 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		}
 		tools[i] = t
 	}
-	fmWriteJSON(w, map[string]any{"instructions": fmInstructions, "tools": tools})
+	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmGlossaryText(), "tools": tools})
 }
 
 func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
@@ -302,6 +302,138 @@ func fmAliasScore(said string, aliases []string) int {
 		}
 	}
 	return best
+}
+
+// ── the glossary: the board's constellations as names that go together ──────
+//
+// A constellation is a person saying "these belong together": 中野 holds the
+// city nakano and the station 中野坂上, 天気 holds the weather wants. Read as
+// a glossary, every name in one is a way to say the others — which is what a
+// small model cannot work out for itself (that 中野 is Nakano). Built from the
+// constellations as they are each time it is asked for, never stored: a
+// constellation made or changed a moment ago is in the next answer.
+
+// fmGlossary is one line per constellation: its name, then its members' names.
+func (s *Server) fmGlossary() [][]string {
+	var groups struct {
+		Groups []struct {
+			Name    string   `json:"name"`
+			Members []string `json:"members"`
+		} `json:"groups"`
+	}
+	if err := s.backend("GET", "/api/v1/constellations", nil, &groups); err != nil {
+		return nil
+	}
+	// Members are ids: a thing's (its own id, or the older catalog::value) or
+	// a want's. Named the way the board names them.
+	named := map[string]string{}
+	var things struct {
+		Things []struct {
+			ID      string `json:"id"`
+			Catalog string `json:"catalog"`
+			Value   string `json:"value"`
+		} `json:"things"`
+	}
+	if s.backend("GET", "/api/v1/things", nil, &things) == nil {
+		for _, t := range things.Things {
+			named[t.ID] = t.Value
+			named[t.Catalog+"::"+t.Value] = t.Value
+		}
+	}
+	var wants struct {
+		Wants []struct {
+			Metadata struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"metadata"`
+		} `json:"wants"`
+	}
+	if s.backend("GET", "/api/v1/wants", nil, &wants) == nil {
+		for _, w := range wants.Wants {
+			named[w.Metadata.ID] = w.Metadata.Name
+		}
+	}
+	var out [][]string
+	for _, g := range groups.Groups {
+		line := []string{g.Name}
+		for _, m := range g.Members {
+			n := named[m]
+			if n == "" {
+				if _, v, ok := strings.Cut(m, "::"); ok {
+					n = v
+				}
+			}
+			if n != "" && !containsString(line, n) {
+				line = append(line, n)
+			}
+		}
+		if len(line) > 1 {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+// fmGlossaryMax keeps the glossary from crowding the window it is meant to
+// help with (4,096 tokens on an iPhone): past it, the rest is left out.
+const fmGlossaryMax = 800
+
+// fmGlossaryText is the glossary as the instructions carry it.
+func (s *Server) fmGlossaryText() string {
+	lines := s.fmGlossary()
+	if len(lines) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("\n\nNames on this board that go together (its constellations), one group a line — a name in a line also means the others, so 「中野の天気」 is about a want named after any name in 中野's line:\n")
+	for _, l := range lines {
+		row := strings.Join(l, " = ") + "\n"
+		if b.Len()+len(row) > fmGlossaryMax {
+			break
+		}
+		b.WriteString(row)
+	}
+	return b.String()
+}
+
+// fmByGlossary picks the names a person meant through the glossary: every
+// line holding a word of what they said, and of the names, the ones the most
+// of those lines name. 「中野の天気」 reaches 中野's line (nakano) and 天気's
+// (NakanoのWeather): the want both point at wins.
+func fmByGlossary(said string, names []string, glossary [][]string) []int {
+	l := fmLoose(said)
+	var lines [][]string
+	for _, line := range glossary {
+		for _, word := range line {
+			if w := fmLoose(word); w != "" && strings.Contains(l, w) {
+				lines = append(lines, line)
+				break
+			}
+		}
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	best, out := 0, []int(nil)
+	for i, n := range names {
+		ln, score := fmLoose(n), 0
+		for _, line := range lines {
+			for _, word := range line {
+				if w := fmLoose(word); w != "" && (ln == w || strings.Contains(ln, w)) {
+					score++
+					break
+				}
+			}
+		}
+		if score == 0 || score < best {
+			continue
+		}
+		if score > best {
+			best, out = score, nil
+		}
+		out = append(out, i)
+	}
+	return out
 }
 
 // fmByAlias picks, from the types of the wants on the board, the ones the
@@ -696,6 +828,14 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 			typeOf[i] = t.typ
 		}
 		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		if len(hits) == 0 {
+			// Nor by an alias — by a name its constellation puts beside it.
+			names := make([]string, len(tiles))
+			for i, t := range tiles {
+				names[i] = t.name
+			}
+			hits = fmByGlossary(name, names, s.fmGlossary())
+		}
 		if len(hits) == 1 {
 			found = &tiles[hits[0]]
 		}
@@ -742,6 +882,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	var resp struct {
 		Wants []struct {
 			Metadata struct {
+				ID   string `json:"id"`
 				Name string `json:"name"`
 				Type string `json:"type"`
 			} `json:"metadata"`
@@ -782,6 +923,14 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 			typeOf[i] = w.Metadata.Type
 		}
 		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		if len(hits) == 0 {
+			// Nor by an alias — by a name its constellation puts beside it.
+			names := make([]string, len(resp.Wants))
+			for i, w := range resp.Wants {
+				names[i] = w.Metadata.Name
+			}
+			hits = fmByGlossary(name, names, s.fmGlossary())
+		}
 		if len(hits) == 1 {
 			found = hits[0]
 		}
@@ -799,6 +948,12 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
+	// The want it read, shown as its card under the answer: what the answer is
+	// about, at a glance — a person who asked about 国分寺 sees the card says
+	// Nakano.
+	if w.Metadata.ID != "" {
+		args[fmCardArg] = w.Metadata.ID + "\x00" + w.Metadata.Name
+	}
 
 	// Everything there is about it — the whole type definition (what it is,
 	// what each of its values means, how it is made) and the whole want — cut

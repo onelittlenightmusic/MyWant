@@ -60,3 +60,31 @@ func TestFMDropSecrets(t *testing.T) {
 		t.Errorf("plain definition lost: %v", d)
 	}
 }
+
+// The board's constellations as a glossary: 中野 reaches Nakano through its line,
+// and a name two lines point at wins over one only one does.
+func TestFMByGlossary(t *testing.T) {
+	glossary := [][]string{
+		{"中野", "nakano", "中野坂上"},
+		{"天気", "NakanoのWeather", "weather-yahoo-co-jp-web-instance"},
+		{"国分寺", "会社", "Kokubunji"},
+	}
+	names := []string{"NakanoのWeather", "weather-yahoo-co-jp-web-instance", "transit-search-instance"}
+	for said, want := range map[string][]int{
+		"中野":    {0},
+		"中野の天気": {0},
+		"天気":    {0, 1},
+		"銀座":    nil,
+	} {
+		got := fmByGlossary(said, names, glossary)
+		if len(got) != len(want) {
+			t.Errorf("%s: got %v, want %v", said, got, want)
+			continue
+		}
+		for i := range got {
+			if got[i] != want[i] {
+				t.Errorf("%s: got %v, want %v", said, got, want)
+			}
+		}
+	}
+}

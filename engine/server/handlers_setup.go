@@ -453,6 +453,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/fm/turns/{id}", s.handleFMTurnGet).Methods("GET")
 	api.HandleFunc("/fm/turns/{id}/answer", s.handleFMTurnAnswer).Methods("POST")
 	api.HandleFunc("/fm/turns/{id}/replay", s.handleFMTurnReplay).Methods("POST")
+	// What a device running the robot's model recorded about itself (fm_device_log.go).
+	api.HandleFunc("/fm/device-log", s.handleFMDeviceLogPost).Methods("POST")
+	api.HandleFunc("/fm/device-log", s.handleFMDeviceLogGet).Methods("GET")
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")
