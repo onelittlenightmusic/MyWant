@@ -59,8 +59,8 @@ type fmParam struct {
 const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
 The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). Two kinds of question, two tools:
 - WHERE something is (「荻窪はどこ？」): call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」.
-- WHAT something says or how it is (「Nakanoの天気は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」. Never point for these.
-Use board to see the names of what is on it.
+- WHAT something says or how it is (「Nakanoの天気は？」, 「スマートゴルフの予約は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather, 「スマートゴルフ」 finds the SmartGolf want), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」 or, for a reservation, the store, the room and the time it reports, e.g. 「<店>の<部屋>、<日時>に予約があります」 (or that there is none). Never point for these.
+Use board to see the names of what is on it — it only lists names, so after board, call look (or point) with the name you found; never answer from board alone.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
 A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params {"from":"中野坂上","to":"銀座"} — the station names alone.
 Greetings and remarks about what was just said need no tool.
@@ -253,10 +253,71 @@ func (s *Server) backend(method, path string, body any, out any) error {
 }
 
 type fmWantType struct {
-	Name       string `json:"name"`
-	Title      string `json:"title"`
-	Category   string `json:"category"`
-	SystemType bool   `json:"system_type"`
+	Name       string            `json:"name"`
+	Title      string            `json:"title"`
+	Category   string            `json:"category"`
+	SystemType bool              `json:"system_type"`
+	Labels     map[string]string `json:"labels"`
+}
+
+// fmAliasLabel is a want type's other names: what a person calls it rather
+// than what it was named — "スマートゴルフ,ゴルフ" for smartgolf_check_reserved.
+// A model this small cannot be relied on to turn スマートゴルフ into smartgolf,
+// so the type says it.
+const fmAliasLabel = "aliases"
+
+// fmTypeAliases maps each type to its aliases (fmAliasLabel). Empty on a
+// failure: aliases only ever help a lookup, never stop one.
+func (s *Server) fmTypeAliases() map[string][]string {
+	types, err := s.fmWantTypes()
+	if err != nil {
+		return nil
+	}
+	out := map[string][]string{}
+	for _, t := range types {
+		for _, a := range strings.Split(t.Labels[fmAliasLabel], ",") {
+			if a = strings.TrimSpace(a); a != "" {
+				out[t.Name] = append(out[t.Name], a)
+			}
+		}
+	}
+	return out
+}
+
+func fmLoose(v string) string {
+	return strings.NewReplacer(" ", "", "　", "", "-", "", "_", "").Replace(strings.ToLower(strings.TrimSpace(v)))
+}
+
+// fmAliasScore is how well what the person said names a type by its aliases:
+// the length of the longest alias it is or contains, 0 for none. Longest wins,
+// so 「スマートゴルフの空き」 picks the type called that over the one called
+// スマートゴルフ.
+func fmAliasScore(said string, aliases []string) int {
+	l, best := fmLoose(said), 0
+	for _, a := range aliases {
+		la := fmLoose(a)
+		if la != "" && strings.Contains(l, la) && len([]rune(la)) > best {
+			best = len([]rune(la))
+		}
+	}
+	return best
+}
+
+// fmByAlias picks, from the types of the wants on the board, the ones the
+// person named by an alias: all of those with the best score.
+func fmByAlias(said string, typeOf []string, aliases map[string][]string) []int {
+	best, out := 0, []int(nil)
+	for i, t := range typeOf {
+		sc := fmAliasScore(said, aliases[t])
+		if sc == 0 || sc < best {
+			continue
+		}
+		if sc > best {
+			best, out = sc, nil
+		}
+		out = append(out, i)
+	}
+	return out
 }
 
 func (s *Server) fmWantTypes() ([]fmWantType, error) {
@@ -475,6 +536,9 @@ const (
 type fmTile struct {
 	name, kind string
 	x, y       int
+	// typ: a want's type ("" for a thing); aliases: what its type is also called.
+	typ     string
+	aliases []string
 	// id: a want's id ("" for a thing) — what a chat shows its card by.
 	id string
 }
@@ -496,7 +560,12 @@ func (t fmTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.na
 // named is the tile without its cell, as board lists it: a model handed the
 // cells reads them out ("荻窪 is at (6, 0)") rather than showing the place, so
 // where a tile is comes only from point, which walks the robot there.
-func (t fmTile) named() string { return fmt.Sprintf("%s (%s)", t.name, t.kind) }
+func (t fmTile) named() string {
+	if len(t.aliases) > 0 {
+		return fmt.Sprintf("%s (%s; also called %s)", t.name, t.kind, strings.Join(t.aliases, ", "))
+	}
+	return fmt.Sprintf("%s (%s)", t.name, t.kind)
+}
 
 // fmTiles is the board: things first, then wants, each only when it has a cell.
 func (s *Server) fmTiles() ([]fmTile, error) {
@@ -524,6 +593,7 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 	if err := s.backend("GET", "/api/v1/wants", nil, &wants); err != nil {
 		return nil, err
 	}
+	aliases := s.fmTypeAliases()
 	var tiles []fmTile
 	for _, t := range things.Things {
 		if t.Labels[fmCanvasOn] != "true" {
@@ -543,6 +613,8 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 		}
 		if tile, ok := fmTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
 			tile.id = w.Metadata.ID
+			tile.typ = w.Metadata.Type
+			tile.aliases = aliases[w.Metadata.Type]
 			tiles = append(tiles, tile)
 		}
 	}
@@ -614,6 +686,20 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 			if t.name == near[0] {
 				found = &tiles[i]
 			}
+		}
+	}
+	if found == nil && len(near) == 0 {
+		// Not by its name — by what its type is also called (fmAliasLabel).
+		typeOf := make([]string, len(tiles))
+		for i, t := range tiles {
+			typeOf[i] = t.typ
+		}
+		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		if len(hits) == 1 {
+			found = &tiles[hits[0]]
+		}
+		for _, i := range hits {
+			near = append(near, tiles[i].name)
 		}
 	}
 	if found == nil {
@@ -688,6 +774,20 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 			}
 		}
 	}
+	if found < 0 && len(near) == 0 {
+		// Not by its name — by what its type is also called (fmAliasLabel).
+		typeOf := make([]string, len(resp.Wants))
+		for i, w := range resp.Wants {
+			typeOf[i] = w.Metadata.Type
+		}
+		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		if len(hits) == 1 {
+			found = hits[0]
+		}
+		for _, i := range hits {
+			near = append(near, resp.Wants[i].Metadata.Name)
+		}
+	}
 	if found < 0 {
 		if len(near) > fmNearMatches {
 			near = near[:fmNearMatches]
@@ -705,6 +805,11 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	// Each value once. A want commonly keeps the same answer under several
+	// keys (the reservation as current_reservation, as reservations[0], in the
+	// raw output, as the final result), and a small model handed it four times
+	// over loses the thread before it reaches the end.
+	said := map[string]bool{}
 	for _, k := range keys {
 		if fmLookSkip(k) {
 			continue
@@ -718,6 +823,10 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		if text == "" || text == "[]" || text == "{}" || text == "null" || text == "0" || text == "false" {
 			continue
 		}
+		if said[text] || said["["+text+"]"] {
+			continue
+		}
+		said[text] = true
 		fmt.Fprintf(&b, "- %s: %s\n", k, firstLine(text, 160))
 		if b.Len() > 900 {
 			b.WriteString("…\n")
@@ -726,7 +835,9 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	}
 	if fr := fmt.Sprint(w.State.FinalResult); w.State.FinalResult != nil && fr != "" && fr != "map[]" {
 		raw, _ := json.Marshal(w.State.FinalResult)
-		fmt.Fprintf(&b, "- final result: %s\n", firstLine(string(raw), 200))
+		if !said[string(raw)] && !said["["+string(raw)+"]"] {
+			fmt.Fprintf(&b, "- final result: %s\n", firstLine(string(raw), 200))
+		}
 	}
 	return b.String(), nil
 }
@@ -734,10 +845,15 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 // fmLookSkip: the state every want keeps for its own running, and secrets.
 func fmLookSkip(key string) bool {
 	switch key {
-	case "achieved", "achieving_percentage", "action_by_agent", "completed", "say":
+	case "achieved", "achieving_percentage", "action_by_agent", "completed", "say", "skill_path":
 		return true
 	}
 	lower := strings.ToLower(key)
+	// The same moment twice (a machine form beside the readable one), and the
+	// script's raw output beside the fields made from it.
+	if strings.HasSuffix(lower, "_rfc3339") || strings.Contains(lower, "raw_output") {
+		return true
+	}
 	if strings.HasPrefix(lower, "cc_") || strings.HasPrefix(lower, "webhook_") || strings.HasPrefix(lower, "fm_") {
 		return true
 	}
