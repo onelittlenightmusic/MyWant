@@ -656,7 +656,41 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	if err := s.backend("POST", "/api/v1/wants", want, nil); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Deployed %q (%s).", name, typ), nil
+	// Walk there, as for one already on the board, and show its card. Left
+	// where it stood, the robot said 「ここに『荻窪→中野坂上』があります」 from
+	// the station it had been asked about a question earlier. The new want is
+	// placed beside the person when it is added (CanvasNearHook), which is a
+	// moment after the POST returns: wait for it to be there with its cell.
+	for i := 0; i < 20; i++ {
+		if s.fmWantOnBoard(name) {
+			pointed := map[string]string{"name": name}
+			if walked, err := s.fmPoint(pointed); err == nil {
+				if c, ok := pointed[fmCardArg]; ok {
+					args[fmCardArg] = c
+				}
+				return fmt.Sprintf("Deployed %q (%s), next to the person. %s", name, typ, walked), nil
+			}
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return fmt.Sprintf("Deployed %q (%s), next to the person. The robot has not walked to it: do not say it is here.", name, typ), nil
+}
+
+// fmWantOnBoard: a want of this exact name is listed with a cell.
+func (s *Server) fmWantOnBoard(name string) bool {
+	wants, err := s.fmWantList()
+	if err != nil {
+		return false
+	}
+	for _, w := range wants {
+		if w.Metadata.Name == name {
+			_, x := w.Metadata.Labels[fmCanvasX]
+			_, y := w.Metadata.Labels[fmCanvasY]
+			return x && y
+		}
+	}
+	return false
 }
 
 // fmMissingParams names the type's required parameters these params leave out

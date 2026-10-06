@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -326,6 +327,65 @@ func (s *Server) fmShowStep(step fmStep, prefix string) {
 	types.RecordCCActivityDetail(robot, "tool", firstLine(summary, 120), step.Output)
 }
 
+// fmAlignPlace keeps what the robot does in step with what it says.
+//
+// An answer that says 「ここに『荻窪→中野坂上』があります」 is a gesture as
+// much as words: the person looks where the robot stands. On Fly the robot
+// said it standing on 荻窪 station — it had walked there for the question
+// before, and this turn's deploy left it where it was. So when the answer
+// says here (ここ, こちら, here) and nothing in this turn walked the robot, the
+// thing or want it names — the longest name of the board's found in the
+// answer, so 「荻窪→中野坂上」 is not taken for 荻窪 — is where it goes, as a
+// step of the turn like any other. A turn that did walk it is left alone: the
+// walk is what the model chose to show, and the answer is about that.
+func (s *Server) fmAlignPlace(turn fmTurn) *fmStep {
+	if !fmSaysHere(turn.Answer) {
+		return nil
+	}
+	for _, st := range turn.Steps {
+		if strings.Contains(st.Output, "The robot is standing on") {
+			return nil
+		}
+	}
+	tiles, err := s.fmTiles()
+	if err != nil {
+		return nil
+	}
+	named := -1
+	for i, t := range tiles {
+		n := []rune(t.name)
+		if len(n) < 2 || !strings.Contains(turn.Answer, t.name) {
+			continue
+		}
+		if named < 0 || len(n) > len([]rune(tiles[named].name)) {
+			named = i
+		}
+	}
+	if named < 0 {
+		return nil
+	}
+	robot, err := s.fmRobot()
+	if err != nil {
+		return nil
+	}
+	labels := robot.GetLabels()
+	if labels[fmCanvasX] == fmt.Sprint(tiles[named].x) && labels[fmCanvasY] == fmt.Sprint(tiles[named].y) {
+		return nil
+	}
+	step := fmStep{Tool: "point", Arguments: map[string]string{"name": tiles[named].name}}
+	s.fmRunStep(&step)
+	step.Card = fmTakeCard(step.Arguments)
+	log.Printf("[fm] turn %s said here of %q away from it: walked there", turn.ID, tiles[named].name)
+	return &step
+}
+
+var fmHereEnglish = regexp.MustCompile(`(?i)\bhere\b`)
+
+// fmSaysHere: the answer points at where the robot stands.
+func fmSaysHere(answer string) bool {
+	return strings.Contains(answer, "ここ") || strings.Contains(answer, "こちら") || fmHereEnglish.MatchString(answer)
+}
+
 // fmRunStep runs a step here and notes what came of it.
 func (s *Server) fmRunStep(step *fmStep) {
 	step.Output = s.fmRunTool(step.Tool, step.Arguments)
@@ -381,6 +441,12 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if turn.Answer = strings.TrimSpace(turn.Answer); turn.Answer != "" {
 		turn.FinishedAt = time.Now().Format(time.RFC3339)
+		if step := s.fmAlignPlace(turn); step != nil {
+			turn.Steps = append(turn.Steps, *step)
+			if !turn.Quiet {
+				s.fmShowStep(*step, "")
+			}
+		}
 		turn.Cards = s.fmAnswerCards(turn)
 		if !turn.Quiet {
 			s.fmAnswered(turn.Answer, turn.Cards)
@@ -418,6 +484,13 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if turn.Answer != "" {
+		if step := s.fmAlignPlace(turn); step != nil {
+			turn.Steps = append(turn.Steps, *step)
+			_, _ = s.fmUpdateTurn(turn.ID, func(t *fmTurn) error { t.Steps = append(t.Steps, *step); return nil })
+			if !turn.Quiet {
+				s.fmShowStep(*step, "")
+			}
+		}
 		turn.Cards = s.fmAnswerCards(turn)
 		cards := turn.Cards
 		_, _ = s.fmUpdateTurn(turn.ID, func(t *fmTurn) error { t.Cards = cards; return nil })
