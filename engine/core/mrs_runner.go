@@ -46,6 +46,9 @@ type MRSRunOptions struct {
 	CacheTTL time.Duration
 	// MaxProcs is how many resident processes may run for this script. 0 → 1.
 	MaxProcs int
+	// Isolated keeps the script out of the shared agent service (mrs_shared.go):
+	// it gets an interpreter of its own, spawned or resident as above.
+	Isolated bool
 }
 
 // RunMRSScript executes a skill and returns its final JSON object.
@@ -64,7 +67,13 @@ func RunMRSScript(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 		result map[string]any
 		err    error
 	)
-	if opt.Serve && !mrsServeUnsupported(scriptPath) {
+	if !opt.Isolated && mrsSharedEnabled() {
+		result, err = runMRSShared(ctx, scriptPath, opt)
+		if err != nil && mrsShouldFallBackToSpawn(err) {
+			// The service could not be reached; nothing ran.
+			result, err = runMRSSpawn(ctx, scriptPath, opt)
+		}
+	} else if opt.Serve && !mrsServeUnsupported(scriptPath) {
 		result, err = runMRSResident(ctx, scriptPath, opt)
 		if err != nil && mrsShouldFallBackToSpawn(err) {
 			// The script does not speak the resident protocol (or the process
@@ -350,9 +359,12 @@ func (p *residentProc) request(ctx context.Context, opt MRSRunOptions) (map[stri
 	}
 }
 
-// StopAllMRSResidents kills every resident interpreter. Called on shutdown so
-// no orphaned python3 survives the server.
+// StopAllMRSResidents kills every resident interpreter, the shared agent
+// service among them. Called on shutdown so no orphaned python3 survives the
+// server.
 func StopAllMRSResidents() {
+	mrsShared.stop()
+
 	mrsPoolMu.Lock()
 	pools := make([]*residentPool, 0, len(mrsPools))
 	for _, p := range mrsPools {

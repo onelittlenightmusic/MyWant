@@ -52,6 +52,11 @@ type MRSScriptDef struct {
 	// rather than carried in want state, which is what `skill_required_params`
 	// does for the older skill_path wants; both are honoured.
 	RequiredParams []string `yaml:"required_params"`
+	// Isolated keeps the script out of the shared MRS agent service, which
+	// runs every other plugin in one interpreter (mrs_shared.go): for a script
+	// that cannot share one — one that changes the process for good, or has a
+	// module beside it named like another plugin's.
+	Isolated bool `yaml:"isolated"`
 }
 
 // MRSStateUpdate declares a state field that the plugin agent writes, along with
@@ -377,6 +382,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		Serve:    def.Script.Serve,
 		CacheTTL: time.Duration(def.Script.CacheTTLMs) * time.Millisecond,
 		MaxProcs: def.Script.MaxProcs,
+		Isolated: def.Script.Isolated,
 	}
 	switch strings.ToLower(def.Metadata.Type) {
 	case "do":

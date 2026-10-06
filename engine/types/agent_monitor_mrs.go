@@ -221,6 +221,7 @@ func runMRSSkillWithArgs(ctx context.Context, scriptPath string, args []string, 
 //	skill_serve         bool — keep one interpreter alive (script must support it)
 //	skill_cache_ttl_ms  int  — reuse a result for a repeat call with equal args
 //	skill_max_procs     int  — resident processes for this script (0 → 1)
+//	skill_isolated      bool — an interpreter of its own, not the shared service
 func runMRSSkillForWant(ctx context.Context, want *Want, scriptPath string, args []string, onProgress func(int, string)) (map[string]any, error) {
 	return RunMRSScript(ctx, scriptPath, MRSRunOptions{
 		Args:       args,
@@ -228,5 +229,6 @@ func runMRSSkillForWant(ctx context.Context, want *Want, scriptPath string, args
 		Serve:      GetCurrent(want, "skill_serve", false),
 		CacheTTL:   time.Duration(GetCurrent(want, "skill_cache_ttl_ms", 0)) * time.Millisecond,
 		MaxProcs:   GetCurrent(want, "skill_max_procs", 0),
+		Isolated:   GetCurrent(want, "skill_isolated", false),
 	})
 }
