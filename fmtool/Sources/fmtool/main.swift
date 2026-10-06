@@ -35,6 +35,15 @@ answer, say that it could not, and never fill the gap from your own knowledge \
 of the world. Keep answers short.
 """
 
+// MARK: - Started by a browser
+
+// Chrome starts a native messaging host with the extension's origin as its one
+// argument. Then this is the Mac's model for a page in that browser, and
+// nothing below — the CLI, the robot want's own agent — applies. NativeHost.swift.
+if NativeHost.launchedByBrowser(Array(CommandLine.arguments.dropFirst())) {
+    await NativeHost.run()
+}
+
 // MARK: - CLI arguments
 
 var arguments = Array(CommandLine.arguments.dropFirst())
