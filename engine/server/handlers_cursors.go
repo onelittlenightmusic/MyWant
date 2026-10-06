@@ -385,6 +385,11 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		EffectNonce int64   `json:"effectNonce,omitempty"`
 		Message     string  `json:"message,omitempty"`
 		MessageAt   int64   `json:"messageAt,omitempty"`
+		// RobotAnswered: the browser saying this answers the robot's part
+		// itself, with the model it has (the extension's fmtool) — so a message
+		// addressed to @robot is said in the room as ever but not handed to the
+		// server's robot as well, which would answer it a second time.
+		RobotAnswered bool `json:"robotAnswered,omitempty"`
 		// Seq, if the client sends one, orders that client's own PUTs for
 		// this character — see cursorSeq's own comment. Zero (the default
 		// for a caller that omits it) means "no ordering information",
@@ -576,7 +581,9 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		s.appendToCharacterChat(characterID, body.Message)
 		// ...and if it was addressed to the robot, the robot hears it. Said in
 		// the room either way — see forwardToRobotIfAddressed.
-		s.forwardToRobotIfAddressed(characterID, body.Message)
+		if !body.RobotAnswered {
+			s.forwardToRobotIfAddressed(characterID, body.Message)
+		}
 	}
 
 	go broadcastSSE("cursor", snapshotCursors())
