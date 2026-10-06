@@ -2,6 +2,7 @@ package server
 
 import (
 	_ "embed"
+	"time"
 
 	"github.com/google/uuid"
 	"log"
@@ -129,6 +130,10 @@ type ThingEntry struct {
 	ID      string `yaml:"id"      json:"id"`
 	Catalog string `yaml:"catalog" json:"catalog"`
 	Value   string `yaml:"value"   json:"value"`
+	// CreatedAt: when it was added, RFC 3339. Things added before it was kept
+	// have none — their place in the file, which is the order they were added
+	// in, still says which came after which (ThingFull.AddedOrder).
+	CreatedAt string `yaml:"createdAt,omitempty" json:"createdAt,omitempty"`
 }
 
 // thingFile is the on-disk YAML schema. Version 1 was the bare catalog map and
@@ -357,7 +362,7 @@ func (m *ThingStore) Add(catalog, value string) (ThingEntry, error) {
 			return e, nil
 		}
 	}
-	entry := ThingEntry{ID: newThingID(), Catalog: catalog, Value: value}
+	entry := ThingEntry{ID: newThingID(), Catalog: catalog, Value: value, CreatedAt: time.Now().Format(time.RFC3339)}
 	return entry, m.saveEntries(append(entries, entry))
 }
 

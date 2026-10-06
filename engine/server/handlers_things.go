@@ -48,6 +48,12 @@ type ThingFull struct {
 	Subtype string `json:"subtype"`
 	Value   string `json:"value"`
 
+	// AddedOrder is the thing's place among all things in the order they were
+	// added (the store appends): 0 the first. CreatedAt is when, for one added
+	// since that was kept. Together they sort newest first.
+	AddedOrder int    `json:"addedOrder"`
+	CreatedAt  string `json:"createdAt,omitempty"`
+
 	Icon  string `json:"icon"`
 	Color string `json:"color"`
 	// Background is the subtype's picture name, if it has one — see
@@ -95,7 +101,7 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 	labels := overlayThingMotion(s.thingLabels.All())
 
 	out := []ThingFull{}
-	for _, e := range s.thingStore.Entries() {
+	for order, e := range s.thingStore.Entries() {
 		if e.Value == "" {
 			continue
 		}
@@ -110,6 +116,8 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 			Catalog:     e.Catalog,
 			Subtype:     subtype,
 			Value:       e.Value,
+			AddedOrder:  order,
+			CreatedAt:   e.CreatedAt,
 			Icon:        info.Icon,
 			Color:       info.Color,
 			Background:  info.Background,

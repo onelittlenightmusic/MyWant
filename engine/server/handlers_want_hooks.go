@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -628,4 +629,25 @@ func (h *CanvasCoordinateHook) Run(want *mywant.Want, allWants []*mywant.Want, n
 			}
 		}
 	}
+}
+
+// ── Built-in hook: when it was made ──────────────────────────────────────────
+
+// wantLabelCreatedAt is when a want was made, RFC 3339 — a label, as the
+// canvas's own facts about a want are, since a want's metadata is want-spec's
+// and has no field for it. Lists that show the newest first read it (the
+// phone's keyboard); a want made before it was kept has none.
+const wantLabelCreatedAt = "mywant.io/created-at"
+
+// CreatedAtHook stamps a new want with the time it was made, unless whoever
+// made it said (an import, a copy keeping its original's).
+type CreatedAtHook struct{}
+
+func (h *CreatedAtHook) Name() string { return "created-at" }
+
+func (h *CreatedAtHook) Run(want *mywant.Want, _ []*mywant.Want, _ []*mywant.Want) error {
+	if want.GetLabel(wantLabelCreatedAt) == "" {
+		want.SetLabel(wantLabelCreatedAt, time.Now().Format(time.RFC3339))
+	}
+	return nil
 }

@@ -365,6 +365,7 @@ func New(config Config) *Server {
 		exposableFieldsCache:  exposableFieldsCache,
 		importableFieldsCache: importableFieldsCache,
 		wantCreationHooks: []WantCreationHook{
+			&CreatedAtHook{},
 			&OrderKeyHook{},
 			&WantTypeDefaultsHook{builder: globalBuilder},
 			&CanvasTileSizeHook{},
