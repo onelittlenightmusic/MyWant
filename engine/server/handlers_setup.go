@@ -47,6 +47,7 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/notifications/read", s.markWantNotificationsRead).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
 	wants.HandleFunc("/{id}", s.updateWant).Methods("PUT")
+	wants.HandleFunc("/{id}", s.patchWant).Methods("PATCH")
 	wants.HandleFunc("/{id}", s.deleteWant).Methods("DELETE")
 	wants.HandleFunc("/{id}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/status", s.getWantStatus).Methods("GET")

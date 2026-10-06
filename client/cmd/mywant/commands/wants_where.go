@@ -156,14 +156,12 @@ Nothing is changed except where the robot is standing and what it is saying.`,
 			return
 		}
 
-		for key, value := range map[string]string{
+		if err := c.SetWantLabels(robotWantName, map[string]string{
 			canvasXLabel: strconv.Itoa(place.x),
 			canvasYLabel: strconv.Itoa(place.y),
-		} {
-			if err := c.AddWantLabel(robotWantName, key, value); err != nil {
-				fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)
-				os.Exit(1)
-			}
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)
+			os.Exit(1)
 		}
 
 		words, _ := cmd.Flags().GetString("say")

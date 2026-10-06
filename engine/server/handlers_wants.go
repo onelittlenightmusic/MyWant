@@ -664,13 +664,18 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.commitWantUpdate(w, r, "PUT", wantID, updatedWant)
+}
+
+// commitWantUpdate is what PUT and PATCH do once the new want is settled:
+// store it, record its SubType params as the creation hook does (so editing a
+// want also feeds the suggestions), and tell everyone watching.
+func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method, wantID string, updatedWant *mywant.Want) {
 	if s.globalBuilder != nil {
 		s.globalBuilder.UpdateWant(updatedWant)
 		s.globalBuilder.TriggerSave()
 	}
 
-	// Record memo entries for SubType params (same as creation hook) so that
-	// editing an existing want also updates suggestion history.
 	for _, hook := range s.wantCreationHooks {
 		if hook.Name() == "memo" {
 			_ = hook.Run(updatedWant, nil, nil)
@@ -678,10 +683,120 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.globalBuilder.LogAPIOperation("PUT", "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
+	s.globalBuilder.LogAPIOperation(method, "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	s.JSONResponse(w, http.StatusOK, updatedWant)
 	go broadcastSSE("want_changed", []string{wantID})
 	s.ScheduleKataAnnounce()
+}
+
+// patchWant changes some of a want's labels and params and leaves the rest:
+// a JSON merge patch (RFC 7396), where null takes a key away —
+//
+//	PATCH /api/v1/wants/{id}
+//	{"metadata": {"labels": {"mywant.io/archived": null}},
+//	 "spec": {"params": {"to": "銀座"}}}
+//
+// PUT replaces the whole want, so a client that only meant to take the archive
+// label off had to send everything back — and the label could not go through
+// DELETE …/labels/{key} either, its "/" ending the path segment. Only labels
+// and params: what else a want carries (requires, using, exposes…) is its
+// structure, which PUT is for.
+func (s *Server) patchWant(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	var foundWant *mywant.Want
+	if s.globalBuilder != nil {
+		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			foundWant = want
+		}
+	}
+	if foundWant == nil {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
+		return
+	}
+
+	labelsPatch, paramsPatch, err := decodeWantPatch(r)
+	if err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid patch", err.Error())
+		return
+	}
+
+	foundLabels := foundWant.GetLabels()
+	labels := maps.Clone(foundLabels)
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	for k, v := range labelsPatch {
+		if v == nil {
+			delete(labels, k)
+		} else {
+			labels[k] = *v
+		}
+	}
+	spec := foundWant.GetSpec()
+	if spec == nil {
+		spec = &mywant.WantSpec{}
+	}
+	if len(paramsPatch) > 0 && spec.Params == nil {
+		spec.Params = map[string]any{}
+	}
+	for k, v := range paramsPatch {
+		if v == nil {
+			delete(spec.Params, k)
+		} else {
+			spec.Params[k] = v
+		}
+	}
+
+	// Game mode locks canvas tile positions, as for PUT.
+	if s.config.InteractionMode == "game" &&
+		(foundLabels[canvasLabelX] != labels[canvasLabelX] || foundLabels[canvasLabelY] != labels[canvasLabelY]) {
+		s.JSONError(w, r, http.StatusConflict, "Tile movement is disabled in game mode", "")
+		return
+	}
+
+	updatedWant := &mywant.Want{Metadata: foundWant.GetMetadata(), Spec: *spec}
+	updatedWant.Metadata.Labels = labels
+	s.commitWantUpdate(w, r, "PATCH", wantID, updatedWant)
+}
+
+// decodeWantPatch reads a want's merge patch: label values are strings or
+// null, param values anything or null. Any other field is refused rather than
+// dropped, so a client that meant to change it hears that it did not.
+func decodeWantPatch(r *http.Request) (labels map[string]*string, params map[string]any, err error) {
+	var body map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return nil, nil, err
+	}
+	for top, raw := range body {
+		var section map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &section); err != nil {
+			return nil, nil, fmt.Errorf("%s: %v", top, err)
+		}
+		for field, value := range section {
+			switch top + "." + field {
+			case "metadata.labels":
+				if err := json.Unmarshal(value, &labels); err != nil {
+					return nil, nil, fmt.Errorf("metadata.labels: values are strings, or null to remove one: %v", err)
+				}
+			case "spec.params":
+				var raw map[string]json.RawMessage
+				if err := json.Unmarshal(value, &raw); err != nil {
+					return nil, nil, fmt.Errorf("spec.params: %v", err)
+				}
+				params = make(map[string]any, len(raw))
+				for k, v := range raw {
+					var val any
+					if err := json.Unmarshal(v, &val); err != nil {
+						return nil, nil, fmt.Errorf("spec.params.%s: %v", k, err)
+					}
+					params[k] = val // nil for null: removed
+				}
+			default:
+				return nil, nil, fmt.Errorf("%s.%s cannot be patched: only metadata.labels and spec.params (PUT replaces the rest)", top, field)
+			}
+		}
+	}
+	return labels, params, nil
 }
 
 func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {

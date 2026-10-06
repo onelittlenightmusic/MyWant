@@ -63,6 +63,7 @@ The board holds things (named values: stations, cities, places, albums) and want
 Pointing is showing, and showing is good: when the answer is on the board and seeing it helps — the want you just read, the place it is about — you may also point to it, so the person sees it while you say it. Point to the same name you looked at. Never point instead of answering: the words come from look.
 Use board to see the names of what is on it — it only lists names, so after board, call look (or point) with the name you found; never answer from board alone.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
+An archived want is put away, off the board. When a tool says one is archived, make nothing new: ask the person whether to restore it, e.g. 「アーカイブした「新宿御苑前→銀座」があります。復元しますか？」, and if they say yes, call restore_want with its name.
 A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params {"from":"中野坂上","to":"銀座"} — the station names alone.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
@@ -107,6 +108,14 @@ var fmTools = []fmTool{
 			{Name: "name", Description: "A short name for the want, lowercase with hyphens", Required: false},
 		},
 		run: (*Server).fmDeployWant,
+	},
+	{
+		Name:        "restore_want",
+		Description: "Bring an archived want back onto the board — only after the person said yes to restoring it.",
+		Arguments: []fmParam{
+			{Name: "name", Description: "The archived want's name, as the tool that found it gave it", Required: true},
+		},
+		run: (*Server).fmRestoreWant,
 	},
 }
 
@@ -591,7 +600,24 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// reason to make it twice: the robot goes to the one there is, and says so.
 	// 「中野坂上から銀座の乗り換え」 asked again walks to the route already
 	// found rather than finding it again beside it.
-	if existing, err := s.fmFindWant(typ, params); err == nil && existing != "" {
+	// What the type cannot run without, asked for before anything is made: a
+	// small model often puts the question in the name (「新宿→横浜」) and
+	// sends {} — which made a route with neither end, and an answer that said
+	// it had searched.
+	if missing, example := s.fmMissingParams(typ, params); len(missing) > 0 {
+		return "", fmt.Errorf("%s needs %s in params, e.g. %s — nothing was made; call deploy_want again with them", typ, strings.Join(missing, " and "), example)
+	}
+	wants, err := s.fmWantList()
+	if err != nil {
+		return "", err
+	}
+	existing, archived := fmFindWant(wants, typ, params)
+	if existing != "" && archived {
+		// Put away, not gone: asked again, it is offered back rather than made
+		// a second time beside the one in the archive.
+		return fmt.Sprintf("%q (%s) with these parameters exists but is archived — put away, off the board. Nothing new was made. %s", existing, typ, fmAskRestore(existing)), nil
+	}
+	if existing != "" {
 		pointed := map[string]string{"name": existing}
 		if _, err := s.fmPoint(pointed); err == nil {
 			if c, ok := pointed[fmCardArg]; ok {
@@ -605,6 +631,10 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	if name == "" {
 		name = fmt.Sprintf("%s-%d", strings.ReplaceAll(typ, " ", "-"), time.Now().Unix()%100000)
 	}
+	// The name is the model's choice, and it often takes the type's own
+	// ("transit_search") — which an archived want, out of sight, may hold. A
+	// name taken is no reason to fail what was asked: another is found.
+	name = fmFreeName(wants, name)
 	want := map[string]any{
 		"metadata": map[string]any{
 			"name": name,
@@ -621,23 +651,69 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	return fmt.Sprintf("Deployed %q (%s).", name, typ), nil
 }
 
+// fmMissingParams names the type's required parameters these params leave out
+// or empty, with the params written out as the type's examples would fill them.
+func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []string, example string) {
+	var def struct {
+		Parameters []struct {
+			Name     string `json:"name"`
+			Required bool   `json:"required"`
+			Default  any    `json:"default"`
+			Example  any    `json:"example"`
+		} `json:"parameters"`
+	}
+	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &def); err != nil {
+		return nil, ""
+	}
+	ex := map[string]any{}
+	for _, p := range def.Parameters {
+		if !p.Required {
+			continue
+		}
+		if p.Example != nil {
+			ex[p.Name] = p.Example
+		}
+		if v, ok := params[p.Name]; ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != "" {
+			continue
+		}
+		if p.Default != nil && fmt.Sprint(p.Default) != "" {
+			continue // the type fills it
+		}
+		missing = append(missing, p.Name)
+	}
+	raw, _ := json.Marshal(ex)
+	return missing, string(raw)
+}
+
+// fmWant is a want as the robot's tools see it.
+type fmWant struct {
+	Metadata struct {
+		ID     string            `json:"id"`
+		Name   string            `json:"name"`
+		Type   string            `json:"type"`
+		Labels map[string]string `json:"labels"`
+	} `json:"metadata"`
+	Spec struct {
+		Params map[string]any `json:"params"`
+	} `json:"spec"`
+}
+
+func (w fmWant) archived() bool { return w.Metadata.Labels[fmArchived] == "true" }
+
+func (s *Server) fmWantList() ([]fmWant, error) {
+	var resp struct {
+		Wants []fmWant `json:"wants"`
+	}
+	if err := s.backend("GET", "/api/v1/wants", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Wants, nil
+}
+
 // fmFindWant names a want of this type whose parameters already say what
-// these say (every non-empty one equal, as text), or "" when there is none.
-func (s *Server) fmFindWant(typ string, params map[string]any) (string, error) {
-	var wants struct {
-		Wants []struct {
-			Metadata struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			} `json:"metadata"`
-			Spec struct {
-				Params map[string]any `json:"params"`
-			} `json:"spec"`
-		} `json:"wants"`
-	}
-	if err := s.backend("GET", "/api/v1/wants", nil, &wants); err != nil {
-		return "", err
-	}
+// these say (every non-empty one equal, as text), or "" when there is none —
+// one on the board before one in the archive.
+func fmFindWant(wants []fmWant, typ string, params map[string]any) (name string, archived bool) {
 	text := func(v any) string { return strings.TrimSpace(fmt.Sprint(v)) }
 	asked := 0
 	for _, v := range params {
@@ -646,9 +722,9 @@ func (s *Server) fmFindWant(typ string, params map[string]any) (string, error) {
 		}
 	}
 	if asked == 0 {
-		return "", nil
+		return "", false
 	}
-	for _, w := range wants.Wants {
+	for _, w := range wants {
 		if w.Metadata.Type != typ || w.Metadata.Name == fmRobotWant {
 			continue
 		}
@@ -662,11 +738,84 @@ func (s *Server) fmFindWant(typ string, params map[string]any) (string, error) {
 				break
 			}
 		}
-		if same {
-			return w.Metadata.Name, nil
+		if !same {
+			continue
+		}
+		if !w.archived() {
+			return w.Metadata.Name, false
+		}
+		if name == "" {
+			name, archived = w.Metadata.Name, true
 		}
 	}
-	return "", nil
+	return name, archived
+}
+
+// fmFreeName is name, or name-2, name-3… — the first no want has.
+func fmFreeName(wants []fmWant, name string) string {
+	taken := map[string]bool{}
+	for _, w := range wants {
+		taken[w.Metadata.Name] = true
+	}
+	if !taken[name] {
+		return name
+	}
+	for i := 2; ; i++ {
+		if n := fmt.Sprintf("%s-%d", name, i); !taken[n] {
+			return n
+		}
+	}
+}
+
+// fmAskRestore is what a tool that found an archived want tells the model.
+func fmAskRestore(name string) string {
+	return fmt.Sprintf("Ask the person whether to restore it; if they say yes, call restore_want with name %q.", name)
+}
+
+// fmArchivedNamed is the archived want called name (or loosely so), if any.
+func (s *Server) fmArchivedNamed(name string) (fmWant, bool) {
+	wants, err := s.fmWantList()
+	if err != nil {
+		return fmWant{}, false
+	}
+	for _, w := range wants {
+		if w.archived() && (w.Metadata.Name == name || fmLooseName(w.Metadata.Name) == fmLooseName(name)) {
+			return w, true
+		}
+	}
+	return fmWant{}, false
+}
+
+func fmLooseName(v string) string {
+	return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(v))
+}
+
+// fmRestoreWant takes an archived want out of the archive — the label off,
+// through PATCH as the GUI's restore does — and walks the robot to it.
+func (s *Server) fmRestoreWant(args map[string]string) (string, error) {
+	name := strings.TrimSpace(args["name"])
+	if name == "" {
+		return "", fmt.Errorf("name is required")
+	}
+	w, ok := s.fmArchivedNamed(name)
+	if !ok {
+		return "", fmt.Errorf("no archived want named %q", name)
+	}
+	patch := map[string]any{"metadata": map[string]any{"labels": map[string]any{fmArchived: nil}}}
+	if err := s.backend("PATCH", "/api/v1/wants/"+w.Metadata.ID, patch, nil); err != nil {
+		return "", fmt.Errorf("could not restore %q: %v", w.Metadata.Name, err)
+	}
+	out := fmt.Sprintf("Restored %q (%s); it is back on the board.", w.Metadata.Name, w.Metadata.Type)
+	pointed := map[string]string{"name": w.Metadata.Name}
+	if walked, err := s.fmPoint(pointed); err == nil {
+		if c, ok := pointed[fmCardArg]; ok {
+			args[fmCardArg] = c
+		}
+		out += " " + walked
+	} else {
+		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+	}
+	return out, nil
 }
 
 const (
@@ -674,6 +823,7 @@ const (
 	fmCanvasOn    = "mywant.io/canvas"
 	fmCanvasX     = "mywant.io/canvas-x"
 	fmCanvasY     = "mywant.io/canvas-y"
+	fmArchived    = "mywant.io/archived"
 	fmBoardLimit  = 50
 	fmNearMatches = 6
 )
@@ -765,7 +915,8 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 		}
 	}
 	for _, w := range wants.Wants {
-		if w.Metadata.Name == fmRobotWant {
+		// Archived: put away, off the board — as the GUI draws it.
+		if w.Metadata.Name == fmRobotWant || w.Metadata.Labels[fmArchived] == "true" {
 			continue
 		}
 		if tile, ok := fmTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
@@ -868,6 +1019,9 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		}
 	}
 	if found == nil {
+		if w, ok := s.fmArchivedNamed(name); ok {
+			return fmt.Sprintf("%q (%s) is archived — put away, off the board, so there is nowhere to walk to. %s", w.Metadata.Name, w.Metadata.Type, fmAskRestore(w.Metadata.Name)), nil
+		}
 		if len(near) > fmNearMatches {
 			near = near[:fmNearMatches]
 		}
@@ -876,11 +1030,12 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		}
 		return "", fmt.Errorf("%q is not on the board", name)
 	}
-	for key, v := range map[string]int{fmCanvasX: found.x, fmCanvasY: found.y} {
-		body := map[string]string{"key": key, "value": fmt.Sprint(v)}
-		if err := s.backend("POST", "/api/v1/wants/"+fmRobotWant+"/labels", body, nil); err != nil {
-			return "", fmt.Errorf("could not walk the robot there: %v", err)
-		}
+	// x and y in one step: two would leave the robot a moment at one of them.
+	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
+		fmCanvasX: fmt.Sprint(found.x), fmCanvasY: fmt.Sprint(found.y),
+	}}}
+	if err := s.backend("PATCH", "/api/v1/wants/"+fmRobotWant, walk, nil); err != nil {
+		return "", fmt.Errorf("could not walk the robot there: %v", err)
 	}
 	if found.id != "" {
 		args[fmCardArg] = fmCardValue(found.cardKind, found.id, found.name)
@@ -906,9 +1061,10 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	var resp struct {
 		Wants []struct {
 			Metadata struct {
-				ID   string `json:"id"`
-				Name string `json:"name"`
-				Type string `json:"type"`
+				ID     string            `json:"id"`
+				Name   string            `json:"name"`
+				Type   string            `json:"type"`
+				Labels map[string]string `json:"labels"`
 			} `json:"metadata"`
 			Status string `json:"status"`
 			State  struct {
@@ -920,9 +1076,12 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	if err := s.backend("GET", "/api/v1/wants", nil, &resp); err != nil {
 		return "", err
 	}
-	loose := func(v string) string {
-		return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(v))
-	}
+	// The wants on the board before the archived ones: a name both have is the
+	// one in sight.
+	sort.SliceStable(resp.Wants, func(i, j int) bool {
+		return resp.Wants[i].Metadata.Labels[fmArchived] != "true" && resp.Wants[j].Metadata.Labels[fmArchived] == "true"
+	})
+	loose := fmLooseName
 	found, near := -1, []string{}
 	for i, w := range resp.Wants {
 		if w.Metadata.Name == name || loose(w.Metadata.Name) == loose(name) {
@@ -972,10 +1131,15 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
-	// The want it read, shown as its card under the answer: what the answer is
-	// about, at a glance — a person who asked about 国分寺 sees the card says
-	// Nakano.
-	if w.Metadata.ID != "" {
+	// Archived: what it holds is still read, but it is not on the board — no
+	// card to open — and the person is asked whether to bring it back.
+	note := ""
+	if w.Metadata.Labels[fmArchived] == "true" {
+		note = fmt.Sprintf("%q is archived — put away, off the board. %s\n", w.Metadata.Name, fmAskRestore(w.Metadata.Name))
+	} else if w.Metadata.ID != "" {
+		// The want it read, shown as its card under the answer: what the answer
+		// is about, at a glance — a person who asked about 国分寺 sees the card
+		// says Nakano.
 		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	}
 
@@ -984,7 +1148,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// to what the smallest model can take (fmLookFull). A want that cannot be
 	// cut to fit falls back to the short form below.
 	if full := s.fmLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
-		return full, nil
+		return note + full, nil
 	}
 	// What the type says it is and what each of its values means — the want
 	// carries only the values, and a value's key ("next_store") is all a model
@@ -1008,6 +1172,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	}
 
 	var b strings.Builder
+	b.WriteString(note)
 	fmt.Fprintf(&b, "%s (%s): %s\n", w.Metadata.Name, w.Metadata.Type, w.Status)
 	if about := fmFirstSentence(def.Metadata.Description, 160); about != "" {
 		fmt.Fprintf(&b, "What it is: %s\n", about)

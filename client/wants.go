@@ -249,6 +249,36 @@ func (c *Client) ImportWants(yamlData []byte) (*ImportWantsResponse, error) {
 	return &result, nil
 }
 
+// WantPatch is a merge patch of a want's labels and params (PATCH
+// /api/v1/wants/{id}): each key set to its value, or taken away when nil.
+type WantPatch struct {
+	Labels map[string]*string
+	Params map[string]any
+}
+
+// PatchWant changes the labels and params a patch names and leaves the rest of
+// the want as it is. A param set to nil is removed.
+func (c *Client) PatchWant(wantID string, p WantPatch) error {
+	body := map[string]any{}
+	if len(p.Labels) > 0 {
+		body["metadata"] = map[string]any{"labels": p.Labels}
+	}
+	if len(p.Params) > 0 {
+		body["spec"] = map[string]any{"params": p.Params}
+	}
+	return c.Request("PATCH", "/api/v1/wants/"+wantID, body, nil)
+}
+
+// SetWantLabels sets several labels on a want at once — a tile's x and y in
+// one step rather than two, so it never stands at one with the other unset.
+func (c *Client) SetWantLabels(wantID string, labels map[string]string) error {
+	p := WantPatch{Labels: make(map[string]*string, len(labels))}
+	for k, v := range labels {
+		p.Labels[k] = &v
+	}
+	return c.PatchWant(wantID, p)
+}
+
 // AddWantLabel attaches (or replaces) one label on a want.
 //
 // The canvas keeps a tile's position in labels, so this is also how a want is

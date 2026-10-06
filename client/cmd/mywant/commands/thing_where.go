@@ -263,14 +263,12 @@ both of which change anyway, whenever it speaks or follows somebody.`,
 		}
 
 		api := client.NewClient(viper.GetString("server"))
-		for key, value := range map[string]string{
+		if err := api.SetWantLabels(robotWantName, map[string]string{
 			canvasXLabel: strconv.Itoa(place.x),
 			canvasYLabel: strconv.Itoa(place.y),
-		} {
-			if err := api.AddWantLabel(robotWantName, key, value); err != nil {
-				fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)
-				os.Exit(1)
-			}
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "Error moving the robot: %v\n", err)
+			os.Exit(1)
 		}
 
 		words, _ := cmd.Flags().GetString("say")
