@@ -326,6 +326,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	}
 
 	recordRobotAnswer(want, answer, "fm", picture)
+	attachFMTurnCards(want, answer)
 	want.SetCurrent("last_response_raw", answer)
 	// pending_command is not set here: whatever is waiting was written the
 	// moment it came up — by the broker when the agent reached for something
@@ -531,4 +532,45 @@ func splitPendingCommand(sentence string) (command, args string) {
 		}
 	}
 	return command, args
+}
+
+// attachFMTurnCards puts under the answer just recorded the cards its turn
+// settled: the wants and things its tools went to — or found archived — as
+// the phone's answers carry them.
+//
+// The Mac's model opens its turn quiet (fmtool posts {"chat": false}): the
+// robot want already writes the question, the tool and the answer into the
+// chat, so the server does not write them again. Which left this answer
+// without the cards the server settled when the turn was closed — the chat
+// showed the words alone. The turn is the latest of the robot's own with the
+// same answer.
+func attachFMTurnCards(want *Want, answer string) {
+	turns := GetCurrent(want, "fm_turns", []any{})
+	var cards []any
+	for i := len(turns) - 1; i >= 0 && i >= len(turns)-3; i-- {
+		t, ok := turns[i].(map[string]any)
+		if !ok || t["by"] != "robot" || strings.TrimSpace(fmt.Sprint(t["answer"])) != answer {
+			continue
+		}
+		cards, _ = t["cards"].([]any)
+		break
+	}
+	if len(cards) == 0 {
+		return
+	}
+	responses := GetCurrent(want, "cc_responses", []any{})
+	if len(responses) == 0 {
+		return
+	}
+	last, ok := responses[len(responses)-1].(map[string]any)
+	if !ok || last["text"] != answer {
+		return
+	}
+	entry := make(map[string]any, len(last)+1)
+	for k, v := range last {
+		entry[k] = v
+	}
+	entry["cards"] = cards
+	responses = append(append([]any(nil), responses[:len(responses)-1]...), entry)
+	want.SetCurrent("cc_responses", responses)
 }

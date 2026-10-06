@@ -8,9 +8,12 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -44,7 +47,7 @@ type fmTool struct {
 
 // fmParam is one argument. Every argument is a string: the device builds its
 // schema from these, and one kind keeps that side trivial. A structured value
-// (a want's params) travels as JSON text.
+// (a want's params) travels as name=value pairs (fmParseParams).
 type fmParam struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -64,7 +67,7 @@ Pointing is showing, and showing is good: when the answer is on the board and se
 Use board to see the names of what is on it — it only lists names, so after board, call look (or point) with the name you found; never answer from board alone.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
 An archived want is put away, off the board. When a tool says one is archived, make nothing new: ask the person whether to restore it, e.g. 「アーカイブした「新宿御苑前→銀座」があります。復元しますか？」, and if they say yes, call restore_want with its name.
-A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params {"from":"中野坂上","to":"銀座"} — the station names alone.
+A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params from=中野坂上, to=銀座 — the station names alone; from is the place before から.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
 
@@ -104,7 +107,7 @@ var fmTools = []fmTool{
 		Description: "Put a new want on the board, next to the person — or, if one of that type with the same parameters is already there, walk to it instead.",
 		Arguments: []fmParam{
 			{Name: "type", Description: "The type of the want", Required: true},
-			{Name: "params", Description: `The parameters as a JSON object, e.g. {"content":"Tea"}. Use {} when there are none.`, Required: true},
+			{Name: "params", Description: "The parameters as name=value pairs separated by commas, e.g. from=新宿, to=渋谷 — no quotes, no braces. Empty when there are none.", Required: true},
 			{Name: "name", Description: "A short name for the want, lowercase with hyphens", Required: false},
 		},
 		run: (*Server).fmDeployWant,
@@ -565,7 +568,7 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s\n", name, firstLine(resp.Metadata.Description, 200))
 	if len(resp.Parameters) == 0 {
-		b.WriteString("No parameters; deploy with {}.\n")
+		b.WriteString("No parameters; deploy with empty params.\n")
 	}
 	for i, p := range resp.Parameters {
 		if i == 10 {
@@ -590,11 +593,9 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	params := map[string]any{}
-	if raw := strings.TrimSpace(args["params"]); raw != "" {
-		if err := json.Unmarshal([]byte(raw), &params); err != nil {
-			return "", fmt.Errorf("params is not a JSON object: %v", err)
-		}
+	params, err := fmParseParams(args["params"])
+	if err != nil {
+		return "", err
 	}
 	// Already on the board — the same type asked the same thing — is not a
 	// reason to make it twice: the robot goes to the one there is, and says so.
@@ -614,7 +615,14 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	existing, archived := fmFindWant(wants, typ, params)
 	if existing != "" && archived {
 		// Put away, not gone: asked again, it is offered back rather than made
-		// a second time beside the one in the archive.
+		// a second time beside the one in the archive — its card under the
+		// question, so the person sees what would come back (its status says
+		// archived).
+		for _, w := range wants {
+			if w.Metadata.Name == existing {
+				args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+			}
+		}
 		return fmt.Sprintf("%q (%s) with these parameters exists but is archived — put away, off the board. Nothing new was made. %s", existing, typ, fmAskRestore(existing)), nil
 	}
 	if existing != "" {
@@ -681,8 +689,78 @@ func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []s
 		}
 		missing = append(missing, p.Name)
 	}
-	raw, _ := json.Marshal(ex)
-	return missing, string(raw)
+	return missing, fmPairs(ex)
+}
+
+// fmPairs writes params the way deploy_want takes them: from=新宿, to=渋谷.
+func fmPairs(params map[string]any) string {
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = fmt.Sprintf("%s=%v", k, params[k])
+	}
+	return strings.Join(parts, ", ")
+}
+
+// fmParseParams reads deploy_want's params: name=value pairs, separated by
+// commas (or 、, ;, new lines), name and value split at the first = or :.
+//
+// Not JSON, though JSON is still read: every argument reaches the model as a
+// string, and a model writing a JSON object inside one has to escape each of
+// its quotes. The Mac's did not — its {"from":" ended the string there, and it
+// sent {"from": three times over and gave up. Pairs need no quotes at all.
+func fmParseParams(raw string) (map[string]any, error) {
+	raw = strings.TrimSpace(raw)
+	params := map[string]any{}
+	if raw == "" || raw == "{}" {
+		return params, nil
+	}
+	if strings.HasPrefix(raw, "{") {
+		if err := json.Unmarshal([]byte(raw), &params); err == nil {
+			return params, nil
+		}
+		// Cut off, as above: the pairs say the same thing without quotes.
+		inner := strings.Trim(raw, "{} ")
+		if !strings.ContainsAny(inner, "=:") || strings.HasSuffix(strings.TrimSpace(inner), ":") {
+			return nil, fmt.Errorf("params %q is cut off; write name=value pairs instead, e.g. from=新宿, to=渋谷", raw)
+		}
+		raw = inner
+	}
+	for _, part := range fmPairSep.Split(raw, -1) {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		i := strings.IndexAny(part, "=:＝：")
+		if i <= 0 {
+			return nil, fmt.Errorf("params %q: %q is not name=value; write e.g. from=新宿, to=渋谷", raw, part)
+		}
+		_, size := utf8.DecodeRuneInString(part[i:])
+		name := strings.Trim(strings.TrimSpace(part[:i]), `"' `)
+		value := strings.Trim(strings.TrimSpace(part[i+size:]), `"' 「」`)
+		if name == "" {
+			return nil, fmt.Errorf("params %q: %q has no name", raw, part)
+		}
+		params[name] = fmParamValue(value)
+	}
+	return params, nil
+}
+
+var fmPairSep = regexp.MustCompile(`[,、;\n]`)
+
+// fmParamValue: a number or true/false as one, anything else as text.
+func fmParamValue(v string) any {
+	if f, err := strconv.ParseFloat(v, 64); err == nil {
+		return f
+	}
+	if b, err := strconv.ParseBool(v); err == nil && (v == "true" || v == "false") {
+		return b
+	}
+	return v
 }
 
 // fmWant is a want as the robot's tools see it.
@@ -1020,6 +1098,7 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 	}
 	if found == nil {
 		if w, ok := s.fmArchivedNamed(name); ok {
+			args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
 			return fmt.Sprintf("%q (%s) is archived — put away, off the board, so there is nowhere to walk to. %s", w.Metadata.Name, w.Metadata.Type, fmAskRestore(w.Metadata.Name)), nil
 		}
 		if len(near) > fmNearMatches {
@@ -1131,16 +1210,16 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
-	// Archived: what it holds is still read, but it is not on the board — no
-	// card to open — and the person is asked whether to bring it back.
+	// The want it read, shown as its card under the answer: what the answer
+	// is about, at a glance — a person who asked about 国分寺 sees the card
+	// says Nakano. Archived, it still has its card (its status says so), what
+	// it holds is still read, and the person is asked whether to bring it back.
+	if w.Metadata.ID != "" {
+		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+	}
 	note := ""
 	if w.Metadata.Labels[fmArchived] == "true" {
 		note = fmt.Sprintf("%q is archived — put away, off the board. %s\n", w.Metadata.Name, fmAskRestore(w.Metadata.Name))
-	} else if w.Metadata.ID != "" {
-		// The want it read, shown as its card under the answer: what the answer
-		// is about, at a glance — a person who asked about 国分寺 sees the card
-		// says Nakano.
-		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	}
 
 	// Everything there is about it — the whole type definition (what it is,

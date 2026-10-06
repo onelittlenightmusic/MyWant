@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -62,10 +63,14 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 		map[string]string{"mywant.io/archived": "true", "mywant.io/canvas-x": "3", "mywant.io/canvas-y": "4"},
 		map[string]any{"service_time": 0.2})
 
-	// The same thing asked again: not made twice, offered back.
-	out, err := s.fmDeployWant(map[string]string{
+	// The same thing asked again: not made twice, offered back — with its card.
+	deployArgs := map[string]string{
 		"type": "queue", "params": fmParams(t, map[string]any{"service_time": 0.2}),
-	})
+	}
+	out, err := s.fmDeployWant(deployArgs)
+	if card := fmTakeCard(deployArgs); card == nil || card.ID != id {
+		t.Errorf("deploy card = %+v, want the archived want's (%s)", card, id)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +83,12 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 		}
 	}
 
-	// Off the board: point has nowhere to walk, and says why.
-	out, err = s.fmPoint(map[string]string{"name": "old-route"})
+	// Off the board: point has nowhere to walk, and says why — the card still shown.
+	pointArgs := map[string]string{"name": "old-route"}
+	out, err = s.fmPoint(pointArgs)
+	if card := fmTakeCard(pointArgs); card == nil || card.ID != id {
+		t.Errorf("point card = %+v, want the archived want's (%s)", card, id)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,6 +126,35 @@ func TestFMDeployRefusesMissingRequiredParams(t *testing.T) {
 	for _, w := range s.globalBuilder.GetAllWantStates() {
 		if w.Metadata.Name == "bg" {
 			t.Errorf("a want was made without its required parameter")
+		}
+	}
+}
+
+func TestFMParseParams(t *testing.T) {
+	for _, c := range []struct {
+		raw  string
+		want string // fmt of the map, or "error"
+	}{
+		{"from=新宿, to=横浜", "map[from:新宿 to:横浜]"},
+		{"from: 新宿、to: 横浜", "map[from:新宿 to:横浜]"},
+		{`{"from":"新宿","to":"横浜"}`, "map[from:新宿 to:横浜]"},
+		{"to=銀座, time=09:30", "map[time:09:30 to:銀座]"},
+		{"service_time=0.5", "map[service_time:0.5]"},
+		{"", "map[]"},
+		{"{}", "map[]"},
+		// What the Mac's model sent: the JSON cut off at its first quote.
+		{`{"from":`, "error"},
+		{"新宿→横浜", "error"},
+	} {
+		got, err := fmParseParams(c.raw)
+		if c.want == "error" {
+			if err == nil {
+				t.Errorf("%q: want an error, got %v", c.raw, got)
+			}
+			continue
+		}
+		if err != nil || fmt.Sprint(got) != c.want {
+			t.Errorf("%q: got %v, %v; want %s", c.raw, got, err, c.want)
 		}
 	}
 }

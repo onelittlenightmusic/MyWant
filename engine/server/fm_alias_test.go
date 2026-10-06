@@ -99,6 +99,8 @@ func TestFMCardSummary(t *testing.T) {
 		{"晴れ 20°C", "晴れ 20°C"},
 		{[]any{}, ""},
 		{[]any{1, 2, 3}, "3 件"},
+		{[]any{map[string]any{"from": "新宿", "to": "品川"}}, "from: 新宿 · to: 品川"},
+		{[]any{map[string]any{"from": "新宿"}, map[string]any{"from": "品川"}}, "from: 新宿（ほか 1 件）"},
 		{map[string]any{"store": "北新宿店", "datetime": "2026-10-04 16:00", "datetime_rfc3339": "x", "nested": map[string]any{}}, "datetime: 2026-10-04 16:00 · store: 北新宿店"},
 	} {
 		if got := fmCardSummary(c.in); got != c.want {

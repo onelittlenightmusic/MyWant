@@ -257,6 +257,16 @@ func fmCardSummary(v any) string {
 		if len(x) == 0 {
 			return ""
 		}
+		// A list of records (a route's legs, a day's reservations): the first
+		// one says what the list is; the count says how much more there is.
+		// "1 件" alone said nothing at all.
+		if _, isRecord := x[0].(map[string]any); isRecord {
+			first := fmCardSummary(x[0])
+			if len(x) == 1 {
+				return first
+			}
+			return cut(fmt.Sprintf("%s（ほか %d 件）", first, len(x)-1))
+		}
 		return fmt.Sprintf("%d 件", len(x))
 	case map[string]any:
 		keys := make([]string, 0, len(x))
