@@ -1,6 +1,10 @@
 package server
 
-import "testing"
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 // A want found by what its type is also called, the longest alias winning.
 func TestFMByAliasPicksTheLongestAlias(t *testing.T) {
@@ -106,5 +110,59 @@ func TestFMCardSummary(t *testing.T) {
 		if got := fmCardSummary(c.in); got != c.want {
 			t.Errorf("%v: got %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// What a type tells the robot: its hint, then its examples as 「request」 → what to do.
+func TestFMTypeHintCarriesTheHintAndTheExamples(t *testing.T) {
+	got := fmTypeHint(map[string]string{
+		fmHintLabel:            "A route: deploy_want\n  transit_search at once.",
+		fmQALabel + "戸塚への乗り換え": "deploy_want transit_search with params to=戸塚",
+		fmQALabel:              "nothing asked",
+		"type-icon":            "TrainFront",
+	})
+	want := "A route: deploy_want transit_search at once.\n  e.g. 「戸塚への乗り換え」 → deploy_want transit_search with params to=戸塚"
+	if got != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	if got := fmTypeHint(map[string]string{fmQALabel + "b": "y", fmQALabel + "a": "x"}); got != "e.g. 「a」 → x\n  e.g. 「b」 → y" {
+		t.Errorf("examples alone: %q", got)
+	}
+	if got := fmTypeHint(nil); got != "" {
+		t.Errorf("nothing said: %q", got)
+	}
+}
+
+func TestFMClockReadsTheWaysATimeIsWritten(t *testing.T) {
+	for in, want := range map[any]string{
+		"09:40": "09:40", "9:40": "09:40", "9：40": "09:40", "9時40分": "09:40",
+		"9時": "09:00", "9時半": "09:30", "午後3時": "15:00", "0940": "09:40",
+		float64(940): "09:40", "21:05": "21:05",
+	} {
+		if got, err := fmClock(in); err != nil || got != want {
+			t.Errorf("fmClock(%v) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, bad := range []any{"朝", "25:00", "9:75"} {
+		if got, err := fmClock(bad); err == nil {
+			t.Errorf("fmClock(%v) = %q, want an error", bad, got)
+		}
+	}
+}
+
+func TestFMNearestStationIsTheFirstHeartRailsGives(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("x") != "139.684020" || r.URL.Query().Get("y") != "35.696134" {
+			t.Errorf("query = %s", r.URL.RawQuery)
+		}
+		w.Write([]byte(`{"response":{"station":[{"name":"中野坂上"},{"name":"新中野"}]}}`))
+	}))
+	defer srv.Close()
+	old := fmNearestStationURL
+	fmNearestStationURL = srv.URL + "/api/json?method=getStations"
+	defer func() { fmNearestStationURL = old }()
+
+	if got, err := fmNearestStation(35.69613427769067, 139.6840197085415); err != nil || got != "中野坂上" {
+		t.Errorf("fmNearestStation = %q, %v", got, err)
 	}
 }

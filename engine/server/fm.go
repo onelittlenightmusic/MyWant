@@ -67,7 +67,7 @@ Pointing is showing, and showing is good: when the answer is on the board and se
 Use board to see the names of what is on it — it only lists names, so after board, call look (or point) with the name you found; never answer from board alone.
 To add a want, choose its type, read its parameters with describe_type, then deploy_want. A want already there with the same parameters is not made twice: deploy_want walks you to it instead — then say so, e.g. 「もうあります。ここです」.
 An archived want is put away, off the board. When a tool says one is archived, make nothing new: ask the person whether to restore it, e.g. 「アーカイブした「新宿御苑前→銀座」があります。復元しますか？」, and if they say yes, call restore_want with its name.
-A route between two stations (「中野坂上から銀座の乗り換え」「AからBへの行き方」): deploy_want transit_search with params from=中野坂上, to=銀座 — the station names alone; from is the place before から.
+Some types say how their questions are handled (the lines after these, and in describe_type): do as the type says.
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
 
@@ -145,7 +145,7 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		}
 		tools[i] = t
 	}
-	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmGlossaryText(), "tools": tools})
+	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmGlossaryText(), "tools": tools})
 }
 
 func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
@@ -308,6 +308,74 @@ func (s *Server) fmTypeAliases() map[string][]string {
 		}
 	}
 	return out
+}
+
+// fmHintLabel is a want type's word to the robot: how a question for it is
+// handled, in the type's own YAML rather than in this file — transit_search's
+// "a route: deploy at once, the stations need not be on the board, a time goes
+// in as time=09:40, arrive_type=到着". The type knows its questions; the robot
+// only reads what it says.
+const fmHintLabel = "robot-hint"
+
+// fmQALabel prefixes a want type's worked examples for the robot, one label
+// each: the request after the slash, what should be done or said for it as the
+// value — "robot-qa/9時40分までに戸塚に移動できる乗り換え": "deploy_want
+// transit_search with params to=戸塚, time=09:40, arrive_type=到着". A small
+// model follows an example more surely than a rule.
+const fmQALabel = "robot-qa/"
+
+// fmHintsMax keeps the hints, with the glossary, inside the phone's window.
+const fmHintsMax = 2000
+
+// fmTypeHint is what a type tells the robot, as the instructions and
+// describe_type carry it: its hint, then its examples, each 「request」 → what
+// to do. Empty when it says nothing.
+func fmTypeHint(labels map[string]string) string {
+	var b strings.Builder
+	b.WriteString(strings.Join(strings.Fields(labels[fmHintLabel]), " "))
+	// Labels are a map: in the requests' order, so the text is the same each time.
+	var asks []string
+	for k := range labels {
+		if strings.HasPrefix(k, fmQALabel) {
+			asks = append(asks, k)
+		}
+	}
+	sort.Strings(asks)
+	for _, k := range asks {
+		q, a := strings.TrimSpace(strings.TrimPrefix(k, fmQALabel)), strings.Join(strings.Fields(labels[k]), " ")
+		if q == "" || a == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString("\n  ")
+		}
+		fmt.Fprintf(&b, "e.g. 「%s」 → %s", strings.Trim(q, "「」"), a)
+	}
+	return b.String()
+}
+
+// fmHintsText is every type's hint as the instructions carry it.
+func (s *Server) fmHintsText() string {
+	types, err := s.fmWantTypes()
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	for _, t := range types {
+		h := fmTypeHint(t.Labels)
+		if h == "" {
+			continue
+		}
+		row := fmt.Sprintf("- %s: %s\n", t.Name, h)
+		if b.Len()+len(row) > fmHintsMax {
+			break
+		}
+		b.WriteString(row)
+	}
+	if b.Len() == 0 {
+		return ""
+	}
+	return "\n\nWhat some types say about their questions:\n" + b.String()
 }
 
 func fmLoose(v string) string {
@@ -552,7 +620,8 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 	}
 	var resp struct {
 		Metadata struct {
-			Description string `json:"description"`
+			Description string            `json:"description"`
+			Labels      map[string]string `json:"labels"`
 		} `json:"metadata"`
 		Parameters []struct {
 			Name        string `json:"name"`
@@ -567,6 +636,9 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s\n", name, firstLine(resp.Metadata.Description, 200))
+	if h := fmTypeHint(resp.Metadata.Labels); h != "" {
+		fmt.Fprintf(&b, "How: %s\n", h)
+	}
 	if len(resp.Parameters) == 0 {
 		b.WriteString("No parameters; deploy with empty params.\n")
 	}
@@ -605,6 +677,10 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// small model often puts the question in the name (「新宿→横浜」) and
 	// sends {} — which made a route with neither end, and an answer that said
 	// it had searched.
+	filled, err := s.fmFitParams(typ, params)
+	if err != nil {
+		return "", err
+	}
 	if missing, example := s.fmMissingParams(typ, params); len(missing) > 0 {
 		return "", fmt.Errorf("%s needs %s in params, e.g. %s — nothing was made; call deploy_want again with them", typ, strings.Join(missing, " and "), example)
 	}
@@ -668,13 +744,13 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 				if c, ok := pointed[fmCardArg]; ok {
 					args[fmCardArg] = c
 				}
-				return fmt.Sprintf("Deployed %q (%s), next to the person. %s", name, typ, walked), nil
+				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s", name, typ, filled, walked), nil
 			}
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Sprintf("Deployed %q (%s), next to the person. The robot has not walked to it: do not say it is here.", name, typ), nil
+	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here.", name, typ, filled), nil
 }
 
 // fmWantOnBoard: a want of this exact name is listed with a cell.
@@ -724,6 +800,180 @@ func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []s
 		missing = append(missing, p.Name)
 	}
 	return missing, fmPairs(ex)
+}
+
+// fmHereLabel names a want type's parameter that, left out, is where the
+// person is — transit_search's from: 「戸塚への乗り換え」 starts here.
+const fmHereLabel = "here-param"
+
+// fmFitParams makes params what the type takes, by what each parameter is
+// rather than by the type: a time (subType time) as HH:MM however it was
+// written, a value outside a parameter's choices sent back with them, and the
+// type's here-param, left out, filled with where the person is. Says what it
+// filled, for the robot to tell.
+func (s *Server) fmFitParams(typ string, params map[string]any) (string, error) {
+	var def struct {
+		Metadata struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"metadata"`
+		Parameters []struct {
+			Name       string `json:"name"`
+			SubType    string `json:"subType"`
+			Validation struct {
+				Enum []any `json:"enum"`
+			} `json:"validation"`
+		} `json:"parameters"`
+	}
+	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &def); err != nil {
+		return "", nil
+	}
+	said := func(name string) bool {
+		v, ok := params[name]
+		return ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != ""
+	}
+	filled := ""
+	for _, p := range def.Parameters {
+		if !said(p.Name) {
+			if p.Name == def.Metadata.Labels[fmHereLabel] {
+				here, err := s.fmHere(p.SubType)
+				if err != nil {
+					return "", fmt.Errorf("%s was left out and where the person is is not known (%v): ask the person — nothing was made", p.Name, err)
+				}
+				params[p.Name] = here
+				filled = fmt.Sprintf(" (%s=%s: where the person is, as none was said)", p.Name, here)
+			}
+			continue
+		}
+		if p.SubType == "time" {
+			hhmm, err := fmClock(params[p.Name])
+			if err != nil {
+				return "", fmt.Errorf("%s %v — nothing was made", p.Name, err)
+			}
+			params[p.Name] = hhmm
+		}
+		if len(p.Validation.Enum) > 0 {
+			v, ok := fmt.Sprint(params[p.Name]), false
+			var choices []string
+			for _, c := range p.Validation.Enum {
+				choices = append(choices, fmt.Sprint(c))
+				ok = ok || fmt.Sprint(c) == v
+			}
+			if !ok {
+				return "", fmt.Errorf("%s=%s is not one of %s — nothing was made; call deploy_want again with one of them", p.Name, v, strings.Join(choices, ", "))
+			}
+		}
+	}
+	return filled, nil
+}
+
+var (
+	fmClockColon = regexp.MustCompile(`^(\d{1,2})[:：.](\d{2})$`)
+	fmClockJa    = regexp.MustCompile(`(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分|(半))?`)
+	fmClockPM    = regexp.MustCompile(`午後|夜|夕方|(?i:pm)`)
+)
+
+// fmClock reads a time of day as a person or a model writes it — 09:40, 9:40,
+// 9時40分, 9時半, 午後3時, 0940 (which params read as the number 940) — as HH:MM.
+func fmClock(v any) (string, error) {
+	raw := strings.TrimSpace(fmt.Sprint(v))
+	if f, ok := v.(float64); ok {
+		raw = fmt.Sprintf("%04d", int(f))
+	}
+	h, m := -1, 0
+	switch {
+	case fmClockColon.MatchString(raw):
+		p := fmClockColon.FindStringSubmatch(raw)
+		h, _ = strconv.Atoi(p[1])
+		m, _ = strconv.Atoi(p[2])
+	case fmClockJa.MatchString(raw):
+		p := fmClockJa.FindStringSubmatch(raw)
+		h, _ = strconv.Atoi(p[1])
+		if p[2] != "" {
+			m, _ = strconv.Atoi(p[2])
+		} else if p[3] != "" {
+			m = 30
+		}
+		if fmClockPM.MatchString(raw) && h < 12 {
+			h += 12
+		}
+	case len(raw) == 4:
+		if n, err := strconv.Atoi(raw); err == nil {
+			h, m = n/100, n%100
+		}
+	}
+	if h < 0 || h > 23 || m > 59 {
+		return "", fmt.Errorf("%q is not a time of day; write it as HH:MM, e.g. 09:40", raw)
+	}
+	return fmt.Sprintf("%02d:%02d", h, m), nil
+}
+
+// fmNearestStationURL is HeartRails Express's nearest stations — what
+// mywant-nearest-plugin reads for stations in Japan. A variable for the tests.
+var fmNearestStationURL = "https://express.heartrails.com/api/json?method=getStations"
+
+// fmHere is where the person is, as a parameter of this subType takes it: a
+// station is the one nearest them, anything else their coordinates. Read from
+// the location want that last heard from a device.
+func (s *Server) fmHere(subType string) (string, error) {
+	var resp struct {
+		Wants []struct {
+			Metadata struct {
+				Type   string            `json:"type"`
+				Labels map[string]string `json:"labels"`
+			} `json:"metadata"`
+			State struct {
+				Current map[string]any `json:"current"`
+			} `json:"state"`
+		} `json:"wants"`
+	}
+	if err := s.backend("GET", "/api/v1/wants", nil, &resp); err != nil {
+		return "", err
+	}
+	var lat, lng float64
+	latest, found := "", false
+	for _, w := range resp.Wants {
+		if w.Metadata.Type != "location" || w.Metadata.Labels[fmArchived] == "true" {
+			continue
+		}
+		la, ok1 := w.State.Current["lat"].(float64)
+		ln, ok2 := w.State.Current["lng"].(float64)
+		// RFC 3339 in UTC: the later sorts after.
+		at, _ := w.State.Current["webhook_received_at"].(string)
+		if ok1 && ok2 && (!found || at > latest) {
+			lat, lng, latest, found = la, ln, at, true
+		}
+	}
+	if !found {
+		return "", fmt.Errorf("no location want knows where the person is")
+	}
+	if subType != "station" {
+		return fmt.Sprintf("%.6f,%.6f", lat, lng), nil
+	}
+	return fmNearestStation(lat, lng)
+}
+
+func fmNearestStation(lat, lng float64) (string, error) {
+	u := fmt.Sprintf("%s&x=%.6f&y=%.6f", fmNearestStationURL, lng, lat)
+	res, err := (&http.Client{Timeout: 5 * time.Second}).Get(u)
+	if err != nil {
+		return "", fmt.Errorf("nearest station: %w", err)
+	}
+	defer res.Body.Close()
+	var body struct {
+		Response struct {
+			Station []struct {
+				Name string `json:"name"`
+			} `json:"station"`
+		} `json:"response"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		return "", fmt.Errorf("nearest station: %w", err)
+	}
+	// Nearest first, as HeartRails sorts them.
+	if len(body.Response.Station) == 0 || body.Response.Station[0].Name == "" {
+		return "", fmt.Errorf("no station near %.4f,%.4f", lat, lng)
+	}
+	return body.Response.Station[0].Name, nil
 }
 
 // fmPairs writes params the way deploy_want takes them: from=新宿, to=渋谷.
@@ -1141,7 +1391,9 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		if len(near) > 0 {
 			return "", fmt.Errorf("%q is not on the board by that name; did you mean: %s", name, strings.Join(near, ", "))
 		}
-		return "", fmt.Errorf("%q is not on the board", name)
+		// Not on the board is no answer by itself: 「戸塚への乗り換え」 stopped
+		// here and read out another want instead.
+		return "", fmt.Errorf("%q is not on the board — a want's parameter need not be: if it was asked for, deploy_want with it", name)
 	}
 	// x and y in one step: two would leave the robot a moment at one of them.
 	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
