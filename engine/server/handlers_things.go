@@ -379,3 +379,89 @@ func (s *Server) putThings(w http.ResponseWriter, r *http.Request) {
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "memo updated"})
 }
+
+// sharedThingResult is one thing made from what was shared, as /things/share
+// answers it: what it was read as, and what became of it.
+type sharedThingResult struct {
+	sharedThing
+	ID      string `json:"id,omitempty"`
+	Catalog string `json:"catalog,omitempty"`
+	Icon    string `json:"icon,omitempty"`
+	Color   string `json:"color,omitempty"`
+	Pinned  bool   `json:"pinned"`
+	Error   string `json:"error,omitempty"`
+}
+
+type sharedContentRequest struct {
+	URLs  []string `json:"urls"`
+	Texts []string `json:"texts"`
+	// Pin: put each thing on the board (mywant.io/canvas = "true", as the
+	// GUI's pin does). Absent means yes — what is shared is wanted in sight.
+	Pin *bool `json:"pin"`
+}
+
+var sharedContentClient = &http.Client{Timeout: peekTimeout}
+
+// POST /api/v1/things/classify   body: {urls, texts}
+//
+// What /things/share would make, without making it: each link and text read
+// as a thing of the subtype it is (thing_classify.go).
+func (s *Server) classifySharedContent(w http.ResponseWriter, r *http.Request) {
+	var body sharedContentRequest
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	types := DataTypeDefinitions()
+	things := classifyShared(r.Context(), sharedContentClient, body.URLs, body.Texts)
+	out := make([]sharedThingResult, 0, len(things))
+	for _, t := range things {
+		info := types[t.Subtype]
+		out = append(out, sharedThingResult{sharedThing: t, Catalog: subtypeToKey(t.Subtype), Icon: info.Icon, Color: info.Color})
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
+}
+
+// POST /api/v1/things/share   body: {urls, texts, pin?}
+//
+// What another app shared, made into things: each link and text read as the
+// subtype it is (thing_classify.go), added — or found, when the catalog
+// already holds it — and pinned on the board with no cell of its own, for the
+// board to place. One thing failing does not stop the rest; its error is
+// said in its entry.
+func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
+	var body sharedContentRequest
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	pin := body.Pin == nil || *body.Pin
+	types := DataTypeDefinitions()
+	things := classifyShared(r.Context(), sharedContentClient, body.URLs, body.Texts)
+	if len(things) == 0 {
+		s.JSONError(w, r, http.StatusBadRequest, "nothing to make a thing of", "no link or text was shared")
+		return
+	}
+	out := make([]sharedThingResult, 0, len(things))
+	for _, t := range things {
+		info := types[t.Subtype]
+		res := sharedThingResult{sharedThing: t, Catalog: subtypeToKey(t.Subtype), Icon: info.Icon, Color: info.Color}
+		entry, err := s.thingStore.Add(res.Catalog, t.Value)
+		if err != nil {
+			res.Error = err.Error()
+			out = append(out, res)
+			continue
+		}
+		res.ID = entry.ID
+		if pin {
+			if err := s.thingLabels.Set(entry.ID, thingCanvasPinLabel, "true"); err != nil {
+				res.Error = err.Error()
+			} else {
+				res.Pinned = true
+			}
+		}
+		go broadcastSSE("thing_changed", entry.ID)
+		out = append(out, res)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
+}
