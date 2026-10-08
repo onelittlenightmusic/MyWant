@@ -18,7 +18,10 @@ want_type: { key: want_types, icon: Zap,           color: "#a855f7" }
 
 # ── String subtypes ────────────────────────────────────────────────────────────
 image:     { key: images,     icon: Image,        color: "#a855f7", base_type: string }
-image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string }
+# A picture's card is drawn over the picture where it already is — the link
+# itself, or the og:image of its page (a Google Photos share link). Only its URL
+# is kept, as a label on the thing (picturesOf); never a copy.
+image_url: { key: image_urls, icon: Image,        color: "#a855f7", base_type: string, background: "@picture-url" }
 # A page's card is drawn over the screenshot the Web Inspector took of it,
 # written onto this thing as a label when the page was captured (see
 # labelThingWithScreenshot).

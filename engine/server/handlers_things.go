@@ -442,8 +442,9 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "nothing to make a thing of", "no link or text was shared")
 		return
 	}
+	pictures := picturesOf(r.Context(), sharedContentClient, things)
 	out := make([]sharedThingResult, 0, len(things))
-	for _, t := range things {
+	for i, t := range things {
 		info := types[t.Subtype]
 		res := sharedThingResult{sharedThing: t, Catalog: subtypeToKey(t.Subtype), Icon: info.Icon, Color: info.Color}
 		entry, err := s.thingStore.Add(res.Catalog, t.Value)
@@ -453,6 +454,13 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		res.ID = entry.ID
+		// A picture is drawn where it already is (picturesOf): the thing
+		// keeps its URL as a label, never a copy.
+		if pictures[i] != "" {
+			if err := s.thingLabels.Set(entry.ID, thingPictureLabel, pictures[i]); err != nil {
+				res.Error = err.Error()
+			}
+		}
 		if pin {
 			if err := s.thingLabels.Set(entry.ID, thingCanvasPinLabel, "true"); err != nil {
 				res.Error = err.Error()

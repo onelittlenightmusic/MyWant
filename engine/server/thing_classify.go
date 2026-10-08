@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"html"
 	"io"
@@ -101,7 +102,9 @@ const (
 	peekParallel = 8
 	peekTimeout  = 6 * time.Second
 	peekBudget   = 15 * time.Second
-	peekLimit    = 512 << 10
+	// A page's head is read up to its </head>, and no further than this: a
+	// Google Photos share page puts its og: tags after a megabyte of script.
+	peekLimit = 4 << 20
 	// Sites serve their og: tags to a browser; this reads as Safari on an iPhone.
 	peekUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
 )
@@ -178,20 +181,10 @@ func refineLink(ctx context.Context, client *http.Client, u *url.URL, t sharedTh
 // peekLink fetches the page behind a link, only as far as its head: where it
 // ended up and, when it says, what it is.
 func peekLink(ctx context.Context, client *http.Client, u *url.URL) (final *url.URL, subtype string, ok bool) {
-	ctx, cancel := context.WithTimeout(ctx, peekTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
+	final, ct, head, ok := fetchHead(ctx, client, u)
+	if !ok {
 		return nil, "", false
 	}
-	req.Header.Set("User-Agent", peekUserAgent)
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", false
-	}
-	defer resp.Body.Close()
-	final = resp.Request.URL
-	ct := strings.ToLower(resp.Header.Get("Content-Type"))
 	switch {
 	case strings.HasPrefix(ct, "image/"):
 		return final, "image_url", true
@@ -199,29 +192,136 @@ func peekLink(ctx context.Context, client *http.Client, u *url.URL) (final *url.
 		return final, "song", true
 	case strings.HasPrefix(ct, "video/"):
 		return final, "movie", true
-	case resp.StatusCode >= 300 || !strings.Contains(ct, "html"):
-		return final, "", true
 	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, peekLimit))
-	page := string(body)
-	if i := strings.Index(strings.ToLower(page), "</head>"); i >= 0 {
-		page = page[:i]
-	}
-	return final, ogTypeSubtype(ogType(page)), true
+	return final, ogTypeSubtype(ogProperty(head, "og:type")), true
 }
 
-var ogTypeRe = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)<meta[^>]+property=["']og:type["'][^>]*content=["']([^"']+)["']`),
-	regexp.MustCompile(`(?i)<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:type["']`),
+// fetchHead fetches a link as a browser would and reads no further than its
+// page's head: where it ended up, what it is served as, and the head of an
+// HTML page that answered (empty otherwise).
+func fetchHead(ctx context.Context, client *http.Client, u *url.URL) (final *url.URL, contentType, head string, ok bool) {
+	ctx, cancel := context.WithTimeout(ctx, peekTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, "", "", false
+	}
+	req.Header.Set("User-Agent", peekUserAgent)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", "", false
+	}
+	defer resp.Body.Close()
+	final = resp.Request.URL
+	contentType = strings.ToLower(resp.Header.Get("Content-Type"))
+	if resp.StatusCode >= 300 || !strings.Contains(contentType, "html") {
+		return final, contentType, "", true
+	}
+	return final, contentType, readHead(io.LimitReader(resp.Body, peekLimit)), true
 }
 
-func ogType(page string) string {
-	for _, re := range ogTypeRe {
-		if m := re.FindStringSubmatch(page); m != nil {
+// readHead reads a page as far as its </head> and stops there.
+func readHead(r io.Reader) string {
+	var page []byte
+	buf := make([]byte, 64<<10)
+	for {
+		n, err := r.Read(buf)
+		if n > 0 {
+			// The end tag may straddle two reads: look back a little.
+			from := max(len(page)-len("</head>"), 0)
+			page = append(page, buf[:n]...)
+			if i := bytes.Index(bytes.ToLower(page[from:]), []byte("</head>")); i >= 0 {
+				return string(page[:from+i])
+			}
+		}
+		if err != nil {
+			return string(page)
+		}
+	}
+}
+
+// ogProperty is the content of a page's <meta property="…">, either attribute
+// order, or "".
+func ogProperty(head, property string) string {
+	p := regexp.QuoteMeta(property)
+	for _, re := range []*regexp.Regexp{
+		regexp.MustCompile(`(?i)<meta[^>]+property=["']` + p + `["'][^>]*content=["']([^"']+)["']`),
+		regexp.MustCompile(`(?i)<meta[^>]+content=["']([^"']+)["'][^>]*property=["']` + p + `["']`),
+	} {
+		if m := re.FindStringSubmatch(head); m != nil {
 			return strings.TrimSpace(html.UnescapeString(m[1]))
 		}
 	}
 	return ""
+}
+
+// ── pictures ─────────────────────────────────────────────────────────────────
+
+// thingPictureLabel is the label an image_url thing keeps its picture's URL
+// in, which its card is drawn over (datatypes.yaml: background "@picture-url").
+const thingPictureLabel = "picture-url"
+
+// pictureOf is where an image_url link's picture is, without keeping it: the
+// link itself when it is an image, else the og:image its page names — a
+// Google Photos share page names the photo on Google's own host. The thing
+// stays the shared link; nothing is downloaded but the page's head. "" when
+// the page names no picture.
+func pictureOf(ctx context.Context, client *http.Client, link string) string {
+	u := webURL(link)
+	if u == nil {
+		return ""
+	}
+	if isImageLink(u) {
+		return link
+	}
+	_, ct, head, ok := fetchHead(ctx, client, u)
+	if !ok {
+		return ""
+	}
+	if strings.HasPrefix(ct, "image/") {
+		return link
+	}
+	if pic := webURL(ogProperty(head, "og:image")); pic != nil {
+		return wholePicture(pic)
+	}
+	return ""
+}
+
+// googleSizeRe is the size a Google photo host is asked for, at the end of
+// its path: "=w600-h315-p-k" is a 600×315 crop, the shape of a link preview.
+var googleSizeRe = regexp.MustCompile(`=[a-z0-9-]+$`)
+
+// wholePicture: a picture on Google's photo hosts asked for whole rather than
+// cropped to a link preview's shape — a card shows the photo, not a banner.
+func wholePicture(u *url.URL) string {
+	if isImageLink(u) && strings.HasSuffix(strings.ToLower(u.Hostname()), ".googleusercontent.com") {
+		u.Path = googleSizeRe.ReplaceAllString(u.Path, "") + "=w1200"
+	}
+	return u.String()
+}
+
+// picturesOf is pictureOf for each image_url thing among things, side by side
+// and within peekBudget; "" for every other thing.
+func picturesOf(ctx context.Context, client *http.Client, things []sharedThing) []string {
+	ctx, cancel := context.WithTimeout(ctx, peekBudget)
+	defer cancel()
+	out := make([]string, len(things))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, peekParallel)
+	for i, t := range things {
+		if t.Subtype != "image_url" {
+			continue
+		}
+		wg.Add(1)
+		go func(i int, link string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			out[i] = pictureOf(ctx, client, link)
+		}(i, t.Value)
+	}
+	wg.Wait()
+	return out
 }
 
 // ogTypeSubtype is the subtype for what a page says it is in its og:type.

@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -152,6 +154,21 @@ func TestShareContentMakesAndPinsThings(t *testing.T) {
 		thingStore:  &ThingStore{path: filepath.Join(dir, "memo.yaml")},
 		thingLabels: &ThingLabelStore{mwlabels.NewFileStore(filepath.Join(dir, "memo-labels.yaml"))},
 	}
+	// Each Google Photos page names its photo on Google's host; nothing else
+	// is reached.
+	saved := sharedContentClient
+	defer func() { sharedContentClient = saved }()
+	sharedContentClient = &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Host != "photos.app.goo.gl" {
+			return nil, fmt.Errorf("reached %s", r.URL)
+		}
+		// As Google's page is: the og: tags after a megabyte of script, and
+		// the picture cropped to a link preview's shape.
+		page := `<html><head><script>` + strings.Repeat("x", 1<<20) + `</script>` +
+			`<meta property="og:image" content="https://lh3.googleusercontent.com/pw/` + strings.TrimPrefix(r.URL.Path, "/") + `=w600-h315-p-k"></head>`
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"text/html"}},
+			Body: io.NopCloser(strings.NewReader(page)), Request: r}, nil
+	})}
 	share := func() []sharedThingResult {
 		body := `{"texts":["https://photos.app.goo.gl/one https://photos.app.goo.gl/two"],"urls":["https://open.spotify.com/track/x"]}`
 		rec := httptest.NewRecorder()
@@ -179,6 +196,12 @@ func TestShareContentMakesAndPinsThings(t *testing.T) {
 			t.Errorf("[%d] pin label = %q", i, got)
 		}
 	}
+	// The photos are drawn where Google keeps them; the song has no picture.
+	for i, want := range []string{"", "https://lh3.googleusercontent.com/pw/one=w1200", "https://lh3.googleusercontent.com/pw/two=w1200"} {
+		if got := s.thingLabels.Get(first[i].ID)[thingPictureLabel]; got != want {
+			t.Errorf("[%d] picture = %q, want %q", i, got, want)
+		}
+	}
 	if first[1].Catalog != "image_urls" || first[0].Icon != "Music2" {
 		t.Errorf("catalog/icon: %+v", first)
 	}
@@ -191,3 +214,7 @@ func TestShareContentMakesAndPinsThings(t *testing.T) {
 		}
 	}
 }
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
