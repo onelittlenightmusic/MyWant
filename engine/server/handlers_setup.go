@@ -276,6 +276,10 @@ func (s *Server) setupRoutes() {
 		// its name changing, which is the whole reason it has one.
 		things.HandleFunc("", s.createThing).Methods("POST", "OPTIONS")
 		things.HandleFunc("/subtypes", s.getThingSubtypes).Methods("GET", "OPTIONS")
+		// What another app shared, read as things of the subtype each is
+		// (thing_classify.go): classify only says, share makes and pins them.
+		things.HandleFunc("/classify", s.classifySharedContent).Methods("POST", "OPTIONS")
+		things.HandleFunc("/share", s.shareContent).Methods("POST", "OPTIONS")
 		things.HandleFunc("/events", s.getThingEvents).Methods("GET", "OPTIONS")
 		// Every name in force, from every character — derived from the ledger.
 		things.HandleFunc("/definitions", s.getThingDefinitions).Methods("GET", "OPTIONS")
