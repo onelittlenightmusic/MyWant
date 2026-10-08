@@ -57,6 +57,10 @@ func classifyShared(ctx context.Context, client *http.Client, links, texts []str
 
 	var out []sharedThing
 	if len(urls) > 0 {
+		// However many links there are, the answer comes within peekBudget:
+		// a link whose page is not read by then stays what the rules made it.
+		ctx, cancel := context.WithTimeout(ctx, peekBudget)
+		defer cancel()
 		out = make([]sharedThing, len(urls))
 		var wg sync.WaitGroup
 		sem := make(chan struct{}, peekParallel)
@@ -96,6 +100,7 @@ func classifyShared(ctx context.Context, client *http.Client, links, texts []str
 const (
 	peekParallel = 8
 	peekTimeout  = 6 * time.Second
+	peekBudget   = 15 * time.Second
 	peekLimit    = 512 << 10
 	// Sites serve their og: tags to a browser; this reads as Safari on an iPhone.
 	peekUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
