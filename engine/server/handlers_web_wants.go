@@ -1265,6 +1265,12 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 	case res := <-resultCh:
 		s.JSONResponse(w, http.StatusOK, res)
 	case <-time.After(time.Duration(timeoutMs) * time.Millisecond):
+		// Nobody is waiting for it any more, so nobody should run it: a claim
+		// left in the queue was handed to the next browser that polled, long
+		// after its caller had given up. A gauge polled every minute then
+		// piled up behind a slow or absent browser, and every other errand
+		// (smartgolf's) waited behind the pile until it timed out too.
+		browserRunQueue.dequeueWhere(func(c browserRunClaim) bool { return c.RequestID == requestID })
 		browserRunPendingMu.Lock()
 		delete(browserRunPending, requestID)
 		// No browser took it, so there is no tab to send anyone to.
