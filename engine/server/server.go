@@ -392,6 +392,9 @@ func (s *Server) Start() error {
 
 	mywant.SetGlobalMemoReader(s.thingStore)
 
+	// The robot's questions about a want's answers' photos (answer_photos.go).
+	s.registerAnswerPhotos()
+
 	// Register ThingHook here (after New) so it can reference s.thingStore and s.globalBuilder.
 	s.wantCreationHooks = append(s.wantCreationHooks, &ThingHook{
 		memo:    s.thingStore,

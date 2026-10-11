@@ -203,6 +203,9 @@ type fmReply struct {
 	// own, because the model paraphrasing them is the first thing to go wrong.
 	Goal  string `json:"goal"`
 	Error string `json:"error"`
+	// None: asked about one photo among several (askPictureOrNone), the
+	// agent found the photo does not answer the question.
+	None bool `json:"none"`
 }
 
 // binaryStamp identifies the build on disk: when it was written, and how big
@@ -325,6 +328,15 @@ func (s *fmServer) ask(prompt, root string, timeout time.Duration) (fmReply, err
 func (s *fmServer) askPicture(prompt, root string, timeout time.Duration, image string, lines []string) (fmReply, error) {
 	return s.request(prompt, root, timeout, map[string]any{
 		"picture": map[string]any{"image": image, "lines": lines},
+	})
+}
+
+// askPictureOrNone is askPicture for one photo of several: the agent may
+// answer that this photo does not answer the question (reply.None), so the
+// next can be asked. Not kept in the conversation unless it answered.
+func (s *fmServer) askPictureOrNone(prompt, root string, timeout time.Duration, image string, lines []string) (fmReply, error) {
+	return s.request(prompt, root, timeout, map[string]any{
+		"picture": map[string]any{"image": image, "lines": lines, "allowNone": true},
 	})
 }
 

@@ -268,6 +268,10 @@ func (s *Server) setupRoutes() {
 
 	// Things API (the values a user has named, per subtype). /memo stays
 	// registered as the pre-rename alias so an older client keeps working.
+	// The capture target: the tile whose constellation /things/share's
+	// `capture` adds to (capture_target.go).
+	api.HandleFunc("/capture-target", s.getCaptureTarget).Methods("GET", "OPTIONS")
+	api.HandleFunc("/capture-target", s.putCaptureTarget).Methods("PUT")
 	for _, prefix := range []string{"/things", "/memo"} {
 		things := api.PathPrefix(prefix).Subrouter()
 		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")

@@ -142,6 +142,9 @@ private struct ServeRequest: Decodable {
 struct PictureInput: Decodable, Sendable {
     let image: String
     let lines: [String]?
+    /// One photo of several: the answer may be that this photo does not
+    /// answer the question (`none`), so the caller can ask the next.
+    let allowNone: Bool?
 }
 
 /// What a plain session is told: answer the question as asked, in the form
@@ -210,6 +213,17 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
             continue
         }
 
+        if let picture = request.picture, picture.allowNone == true {
+            // One of several: an answer is kept like any other, a "not in this
+            // photo" is not — the caller asks the next photo.
+            if let text = await answerFromPicture(question: prompt, image: picture.image, lines: picture.lines ?? [], allowNone: true) {
+                await box.remember(prompt: prompt, answer: text)
+                writeLine(["id": id, "text": text, "calls": 0])
+            } else {
+                writeLine(["id": id, "text": "", "none": true, "calls": 0])
+            }
+            continue
+        }
         if let picture = request.picture {
             let text = await answerFromPicture(question: prompt, image: picture.image, lines: picture.lines ?? [])
                 ?? "写真から答えを見つけられませんでした。"

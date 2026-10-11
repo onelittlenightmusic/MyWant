@@ -388,8 +388,14 @@ type sharedThingResult struct {
 	Catalog string `json:"catalog,omitempty"`
 	Icon    string `json:"icon,omitempty"`
 	Color   string `json:"color,omitempty"`
+	// Picture: the image the thing wears (its picture-url), so the device
+	// that shared it can read it itself — the words and the file's metadata —
+	// and keep the reading on the thing (picture-read), sparing the server.
+	Picture string `json:"picture,omitempty"`
 	Pinned  bool   `json:"pinned"`
-	Error   string `json:"error,omitempty"`
+	// Captured: added to the capture target's constellation (`capture`).
+	Captured bool   `json:"captured,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 type sharedContentRequest struct {
@@ -398,6 +404,10 @@ type sharedContentRequest struct {
 	// Pin: put each thing on the board (mywant.io/canvas = "true", as the
 	// GUI's pin does). Absent means yes — what is shared is wanted in sight.
 	Pin *bool `json:"pin"`
+	// Capture: also add each thing to the capture target's constellation
+	// (capture_target.go). With no target, the things are still made and
+	// pinned, and the answer says there was nowhere to capture them.
+	Capture bool `json:"capture"`
 }
 
 var sharedContentClient = &http.Client{Timeout: peekTimeout}
@@ -422,13 +432,17 @@ func (s *Server) classifySharedContent(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
 }
 
-// POST /api/v1/things/share   body: {urls, texts, pin?}
+// POST /api/v1/things/share   body: {urls, texts, pin?, capture?}
 //
 // What another app shared, made into things: each link and text read as the
 // subtype it is (thing_classify.go), added — or found, when the catalog
 // already holds it — and pinned on the board with no cell of its own, for the
 // board to place. One thing failing does not stop the rest; its error is
 // said in its entry.
+//
+// With `capture`, each is also added to the capture target's constellation —
+// the answer carries `capture: {target}` then, or `captureError` when there
+// is no target to capture into.
 func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 	var body sharedContentRequest
 	if err := DecodeRequest(r, &body); err != nil {
@@ -441,6 +455,10 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 	if len(things) == 0 {
 		s.JSONError(w, r, http.StatusBadRequest, "nothing to make a thing of", "no link or text was shared")
 		return
+	}
+	var target *CaptureTarget
+	if body.Capture {
+		target = captureTargets.Get()
 	}
 	pictures := picturesOf(r.Context(), sharedContentClient, things)
 	out := make([]sharedThingResult, 0, len(things))
@@ -460,6 +478,7 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			if err := s.thingLabels.Set(entry.ID, thingPictureLabel, pictures[i]); err != nil {
 				res.Error = err.Error()
 			}
+			res.Picture = pictures[i]
 		}
 		if pin {
 			if err := s.thingLabels.Set(entry.ID, thingCanvasPinLabel, "true"); err != nil {
@@ -468,8 +487,20 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 				res.Pinned = true
 			}
 		}
+		if target != nil {
+			s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
+			res.Captured = true
+		}
 		go broadcastSSE("thing_changed", entry.ID)
 		out = append(out, res)
 	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
+	reply := map[string]any{"things": out}
+	if body.Capture {
+		if target != nil {
+			reply["capture"] = target
+		} else {
+			reply["captureError"] = "no capture target"
+		}
+	}
+	s.JSONResponse(w, http.StatusOK, reply)
 }

@@ -36,9 +36,18 @@ private let pictureInstructions = """
     question.
     """
 
+/// The choice that says this photo does not answer the question — offered
+/// only when several photos are asked in turn.
+private let notInPhoto = "（この写真にはない）"
+private let noneInstruction = "The first lines may say what the photo is joined to and what its file says about itself (taken_at, camera, place, size). If this photo does not show what the question asks for, pick （この写真にはない）."
+
 /// The recognised cell that answers `question`, or nil when there is nothing
 /// to choose from or the model could not answer.
-func answerFromPicture(question: String, image: String, lines: [String]) async -> String? {
+///
+/// With `allowNone`, one of the choices is that this photo does not answer
+/// the question at all — asked of each of several photos in turn — and nil is
+/// that answer.
+func answerFromPicture(question: String, image: String, lines: [String], allowNone: Bool = false) async -> String? {
     guard #available(macOS 27.0, *) else { return nil }
 
     var seen = Set<String>()
@@ -49,8 +58,9 @@ func answerFromPicture(question: String, image: String, lines: [String]) async -
     guard !cells.isEmpty else { return nil }
 
     do {
-        let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "Cell", anyOf: cells), dependencies: [])
-        let session = LanguageModelSession(instructions: pictureInstructions)
+        let choices = allowNone ? cells + [notInPhoto] : cells
+        let schema = try GenerationSchema(root: DynamicGenerationSchema(name: "Cell", anyOf: choices), dependencies: [])
+        let session = LanguageModelSession(instructions: allowNone ? pictureInstructions + " " + noneInstruction : pictureInstructions)
         let text = lines.joined(separator: "\n")
         let url = URL(fileURLWithPath: image)
         let prompt = Prompt {
@@ -61,7 +71,7 @@ func answerFromPicture(question: String, image: String, lines: [String]) async -
         let response = try await session.respond(to: prompt, schema: schema)
         let picked = try response.content.value(String.self)
         printErr("[picture] \(question) → \(picked)")
-        return picked
+        return picked == notInPhoto ? nil : picked
     } catch {
         printErr("[picture] could not answer from the picture: \(error.localizedDescription)")
         return nil

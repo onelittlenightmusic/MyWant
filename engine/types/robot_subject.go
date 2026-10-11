@@ -124,7 +124,12 @@ func onlyOne(candidates []*Want, list string) *Want {
 // robotPicture is a photo a request is about, ready to be shown to whoever
 // answers: saved to a file, with the words already read out of it.
 type robotPicture struct {
-	Want     *Want
+	// The picture want — nil for a photo joined to a want's answer, which is
+	// a thing (answer_photos.go).
+	Want *Want
+	// What the photo is called, and (for an answer's photo) which answer.
+	Name     string
+	About    string
 	Question string // what the person said, without the position line
 	Image    string // a temporary file; remove with close
 	Lines    []string
@@ -172,7 +177,7 @@ func prepareRobotPicture(ctx context.Context, robot *Want, request string) *robo
 	question, _ := splitRobotRequest(request)
 	robot.StoreLog("[ROBOT] the question is about picture %s", subject.Metadata.Name)
 	RecordCCActivity(robot, CCActivityNote, "写真 "+subject.Metadata.Name+" について")
-	return &robotPicture{Want: subject, Question: question, Image: file, Lines: lines}
+	return &robotPicture{Want: subject, Name: subject.Metadata.Name, Question: question, Image: file, Lines: lines}
 }
 
 // claudePicturePrompt is the request as Claude receives it when it is about a
@@ -201,7 +206,7 @@ func recordRobotAnswer(want *Want, answer, subtype string, about *robotPicture) 
 		"timestamp": time.Now().Format(time.RFC3339),
 		"subtype":   subtype,
 	}
-	if about != nil {
+	if about != nil && about.Want != nil {
 		id := fmt.Sprintf("ans-%d", time.Now().UnixNano())
 		StoreStateMulti(about.Want, map[string]any{
 			"webhook_payload": map[string]any{

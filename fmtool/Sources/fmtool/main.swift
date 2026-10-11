@@ -52,6 +52,7 @@ var evalCount: Int?
 var forceRescue = false
 var serveMode = false
 var ocrPath: String?
+var readPath: String?
 var promptParts: [String] = []
 
 var argIndex = 0
@@ -76,6 +77,11 @@ while argIndex < arguments.count {
         argIndex += 1
         guard argIndex < arguments.count else { printErr("--ocr requires an image path"); exit(1) }
         ocrPath = arguments[argIndex]
+    case "--read":
+        // Read a photo — its words and its file's metadata — and exit. See Read.swift.
+        argIndex += 1
+        guard argIndex < arguments.count else { printErr("--read requires an image path"); exit(1) }
+        readPath = arguments[argIndex]
     case "--serve":
         // Stay alive and keep one session, answering questions off stdin. See
         // Serve.swift.
@@ -90,6 +96,9 @@ while argIndex < arguments.count {
 // neither, and a caller that only wants the words should not wait on either.
 if let ocrPath {
     await runOCR(path: ocrPath)
+}
+if let readPath {
+    await runRead(path: readPath)
 }
 
 let availability = SystemLanguageModel.default.availability
@@ -283,7 +292,7 @@ if serveMode {
 } else {
     let prompt = promptParts.joined(separator: " ")
     guard !prompt.isEmpty else {
-        printErr("usage: fmtool [--root <path>] [--eval <n>] [--serve] [--ocr <image>] <prompt>")
+        printErr("usage: fmtool [--root <path>] [--eval <n>] [--serve] [--ocr <image>] [--read <image>] <prompt>")
         exit(1)
     }
     do {

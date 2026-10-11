@@ -233,6 +233,30 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	var err error
 	if picture != nil {
 		reply, err = server.askPicture(picture.Question, root, timeout, picture.Image, picture.Lines)
+	} else if photos := prepareAnswerPhotos(ctx, want, request); len(photos) > 0 {
+		// A want's answers' photos (answer_photos.go): each already read,
+		// asked one at a time, newest answer first, until one answers. None
+		// answering, the question goes the ordinary way — it may not have been
+		// about the photos at all.
+		defer closePictures(photos)
+		answered := false
+		for _, p := range photos {
+			RecordCCActivity(want, CCActivityNote, truncateRunes("写真 "+p.About+" を見ています", 90))
+			r, e := server.askPictureOrNone(p.Question, root, timeout, p.Image, p.Lines)
+			if e != nil || r.None || strings.TrimSpace(r.Text) == "" {
+				continue
+			}
+			reply, err = r, nil
+			reply.Text = strings.TrimSpace(r.Text)
+			if p.About != "" {
+				reply.Text = fmt.Sprintf("%s（%s の写真より）", reply.Text, p.About)
+			}
+			answered = true
+			break
+		}
+		if !answered {
+			reply, err = server.ask(request, root, timeout)
+		}
 	} else {
 		reply, err = server.ask(request, root, timeout)
 	}
