@@ -416,7 +416,7 @@ func (s *Server) snapshotAuraLabels(wantID, kind, name string) []string {
 	}
 	if len(written) > 0 {
 		mywant.InfoLog("[aura] %s: marked %s %q with %v\n", want.Metadata.Name, kind, name, written)
-		go broadcastSSE("thing_changed", id)
+		boardThingsChanged(id)
 	}
 	return written
 }

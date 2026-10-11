@@ -344,7 +344,7 @@ var goingRule = intersectionRule{
 			next = "false"
 		}
 		_ = ctx.s.thingLabels.Set(m.id, thingMovingLabel, next)
-		go broadcastSSE("thing_changed", m.id)
+		boardThingsChanged(m.id)
 	},
 }
 
@@ -380,6 +380,6 @@ var trashRule = intersectionRule{
 		_ = ctx.s.thingLabels.Set(m.id, thingMovingLabel, "false")
 		// It left the board rather than moved on it, so this is the catalog
 		// event, not the position one.
-		go broadcastSSE("thing_changed", m.id)
+		boardThingsChanged(m.id)
 	},
 }

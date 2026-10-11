@@ -305,7 +305,7 @@ func (s *Server) createThing(w http.ResponseWriter, r *http.Request) {
 	// the only listeners that could learn it before were ones that happened to
 	// ask again — see the world-switch broadcast below, which was the sole
 	// thing_changed until now.
-	go broadcastSSE("thing_changed", entry.ID)
+	boardThingsChanged(entry.ID)
 	s.JSONResponse(w, http.StatusOK, entry)
 }
 
@@ -355,7 +355,7 @@ func (s *Server) deleteThing(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to delete thing", err.Error())
 		return
 	}
-	go broadcastSSE("thing_changed", id)
+	boardThingsChanged(id)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "thing deleted", "id": id})
 }
 
@@ -491,7 +491,7 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
 			res.Captured = true
 		}
-		go broadcastSSE("thing_changed", entry.ID)
+		boardThingsChanged(entry.ID)
 		out = append(out, res)
 	}
 	reply := map[string]any{"things": out}

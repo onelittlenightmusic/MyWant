@@ -432,7 +432,7 @@ func (s *Server) openWorld(w http.ResponseWriter, r *http.Request) {
 	// Said out loud because a client that already has the old world's things in
 	// hand has no other way to learn they are no longer the truth — nothing
 	// about a thing changed, the question changed.
-	go broadcastSSE("thing_changed", name)
+	boardAllChanged()
 
 	// And where everyone was standing on this board. Merged rather than
 	// applied wholesale, so a world that never recorded a position leaves the

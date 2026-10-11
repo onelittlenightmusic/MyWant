@@ -395,6 +395,10 @@ func (s *Server) Start() error {
 	// The robot's questions about a want's answers' photos (answer_photos.go).
 	s.registerAnswerPhotos()
 
+	// One event for what changed on the board, wants and things together
+	// (board_changed.go).
+	s.attachBoardChanges()
+
 	// Register ThingHook here (after New) so it can reference s.thingStore and s.globalBuilder.
 	s.wantCreationHooks = append(s.wantCreationHooks, &ThingHook{
 		memo:    s.thingStore,

@@ -200,7 +200,7 @@ func (s *Server) thingMotionTick() {
 	// Coming to rest is a different event: the moving flag changed, which is a
 	// fact about the thing rather than about where it is.
 	for _, id := range rested {
-		go broadcastSSE("thing_changed", id)
+		boardThingsChanged(id)
 	}
 }
 

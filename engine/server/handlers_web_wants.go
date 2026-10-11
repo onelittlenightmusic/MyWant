@@ -367,7 +367,7 @@ func (s *Server) labelThingWithScreenshot(pageURL, servedPath string) {
 			continue
 		}
 		if err := s.thingLabels.Set(e.ID, "screenshot-url", servedPath); err == nil {
-			go broadcastSSE("thing_changed", e.ID)
+			boardThingsChanged(e.ID)
 		}
 		return
 	}

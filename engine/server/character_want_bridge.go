@@ -106,5 +106,5 @@ func (s *Server) moveCharacterWant(characterID string, x, y float64) {
 	want.SetLabels(map[string]string{canvasLabelX: nx, canvasLabelY: ny})
 	s.globalBuilder.UpdateWant(want)
 	s.globalBuilder.TriggerSave()
-	go broadcastSSE("want_changed", []string{want.Metadata.ID})
+	boardWantsChanged(want.Metadata.ID)
 }

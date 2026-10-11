@@ -596,7 +596,7 @@ func (s *Server) setThingLabel(w http.ResponseWriter, r *http.Request) {
 	}
 	// A label is how a value gets pinned to the canvas, which is a change to
 	// what the city knows about it — the same kind of news as being named.
-	go broadcastSSE("thing_changed", body.ValueID)
+	boardThingsChanged(body.ValueID)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label set"})
 }
 
@@ -616,6 +616,6 @@ func (s *Server) removeThingLabel(w http.ResponseWriter, r *http.Request) {
 	}
 	// The same news as setting one: taking a thing out of the archive, or
 	// unpinning it back to the board's own rule, is a label going away.
-	go broadcastSSE("thing_changed", body.ValueID)
+	boardThingsChanged(body.ValueID)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label removed"})
 }

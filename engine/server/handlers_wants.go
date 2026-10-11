@@ -244,7 +244,7 @@ func (s *Server) createWant(w http.ResponseWriter, r *http.Request) {
 	}
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants", strings.Join(wantNames, ", "), "success", http.StatusCreated, "", fmt.Sprintf("Created %d want(s)", len(runtimeWants)))
 	s.notifyWantCreated(runtimeWants)
-	go broadcastSSE("want_changed", wantIDs)
+	boardWantsChanged(wantIDs...)
 	s.ScheduleKataAnnounce()
 
 	s.JSONResponse(w, http.StatusCreated, map[string]any{
@@ -685,7 +685,7 @@ func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method
 
 	s.globalBuilder.LogAPIOperation(method, "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	s.JSONResponse(w, http.StatusOK, updatedWant)
-	go broadcastSSE("want_changed", []string{wantID})
+	boardWantsChanged(wantID)
 	s.ScheduleKataAnnounce()
 }
 
@@ -811,7 +811,7 @@ func (s *Server) deleteWant(w http.ResponseWriter, r *http.Request) {
 		if want, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			want.SetStatus(mywant.WantStatusDeleting)
 			s.globalBuilder.DeleteWantsAsyncWithTracking([]string{wantID})
-			go broadcastSSE("want_changed", []string{wantID})
+			boardWantsChanged(wantID)
 			s.ScheduleKataAnnounce()
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -832,7 +832,7 @@ func (s *Server) deleteWants(w http.ResponseWriter, r *http.Request) {
 			s.JSONError(w, r, http.StatusInternalServerError, "Batch deletion failed", err.Error())
 			return
 		}
-		go broadcastSSE("want_changed", wantIDs)
+		boardWantsChanged(wantIDs...)
 		s.ScheduleKataAnnounce()
 		s.JSONResponse(w, http.StatusAccepted, map[string]any{
 			"message": "Batch deletion queued",
