@@ -394,6 +394,11 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}/display", s.setCharacterDisplay).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/labels", s.setCharacterLabel).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/labels/{key}", s.removeCharacterLabel).Methods("DELETE", "OPTIONS")
+	// What the character chose from a keyboard's suggestions (mywant-input,
+	// the iPhone keyboard) — see handlers_character_picks.go.
+	characters.HandleFunc("/{id}/picks", s.listCharacterPicks).Methods("GET", "OPTIONS")
+	characters.HandleFunc("/{id}/picks", s.addCharacterPicks).Methods("POST", "OPTIONS")
+	characters.HandleFunc("/{id}/picks", s.clearCharacterPicks).Methods("DELETE", "OPTIONS")
 
 	// Web Want endpoints — create and launch custom web want types
 	webWants := api.PathPrefix("/web-wants").Subrouter()
