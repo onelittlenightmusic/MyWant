@@ -392,6 +392,7 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}/card-aura-mark", s.getCardAuraMark).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/design", s.setCharacterDesign).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/display", s.setCharacterDisplay).Methods("PUT", "OPTIONS")
+	characters.HandleFunc("/{id}/avatar-image", s.setCharacterAvatarImage).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}/labels", s.setCharacterLabel).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/labels/{key}", s.removeCharacterLabel).Methods("DELETE", "OPTIONS")
 	// What the character chose from a keyboard's suggestions (mywant-input,

@@ -95,6 +95,14 @@ type Character struct {
 	// frontend's, it grows there, and an id this server has never heard of
 	// draws the default circle rather than nothing (see characterShapePath).
 	Shape string `yaml:"shape,omitempty" json:"shape,omitempty"`
+	// AvatarImage is the character's own picture, drawn in place of the Avatar
+	// emoji wherever a face is drawn (the emoji stays, for what cannot draw a
+	// picture). A small square image as a data: URL (data:image/jpeg;base64,…)
+	// rather than a file the server serves: it travels with the character, so
+	// a page behind the GUI's password, the extension on another site and the
+	// iPhone app all draw it without fetching anything. Owned by
+	// SetAvatarImage (PUT /characters/{id}/avatar-image); empty = the emoji.
+	AvatarImage string `yaml:"avatarImage,omitempty" json:"avatarImage,omitempty"`
 }
 
 // CharacterDisplay carries one person's look-and-feel choices.
@@ -382,7 +390,8 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			updated.MoveSpeed = c.MoveSpeed
 			updated.Speed = c.Speed
 			updated.Display = c.Display
-			updated.Labels = c.Labels // owned by SetLabel / DeleteLabel
+			updated.Labels = c.Labels           // owned by SetLabel / DeleteLabel
+			updated.AvatarImage = c.AvatarImage // owned by SetAvatarImage
 			m.store.Characters[i] = updated
 			m.save()
 			return true
@@ -687,6 +696,22 @@ func (m *characterManager) SetLabel(characterID, key, value string) (*Character,
 	})
 }
 
+// SetAvatarImage sets (or, with "", clears) a character's picture.
+func (m *characterManager) SetAvatarImage(characterID, image string) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].AvatarImage = image
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
 // DeleteLabel removes one label from a character.
 func (m *characterManager) DeleteLabel(characterID, key string) (*Character, bool) {
 	return m.editLabels(characterID, func(l map[string]string) map[string]string {
@@ -805,6 +830,9 @@ func UpdateCharacter(id string, c Character) bool { return GetCharacterManager()
 func DeleteCharacter(id string) bool              { return GetCharacterManager().Delete(id) }
 func SetCharacterLabel(id, key, value string) (*Character, bool) {
 	return GetCharacterManager().SetLabel(id, key, value)
+}
+func SetCharacterAvatarImage(id, image string) (*Character, bool) {
+	return GetCharacterManager().SetAvatarImage(id, image)
 }
 func DeleteCharacterLabel(id, key string) (*Character, bool) {
 	return GetCharacterManager().DeleteLabel(id, key)

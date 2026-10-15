@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	mywant "mywant/engine/core"
@@ -536,6 +537,49 @@ func (s *Server) setCharacterDisplay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, ok := mywant.SetCharacterDisplay(id, req)
+	if !ok {
+		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
+		return
+	}
+	go broadcastSSE("character_changed", id)
+	s.JSONResponse(w, http.StatusOK, c)
+}
+
+// maxAvatarImage is the most a character's picture may weigh, as its data:
+// URL. The GUI sends a 160px square JPEG, about 10KB; this leaves room for a
+// sharper one while keeping a character list that carries every picture small.
+const maxAvatarImage = 256 << 10
+
+// setCharacterAvatarImage sets a character's picture, or clears it.
+// PUT /api/v1/characters/{id}/avatar-image   body: {"image": "data:image/jpeg;base64,…"}
+// — "" clears it, and the character is drawn with its emoji again.
+func (s *Server) setCharacterAvatarImage(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		Image string `json:"image"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "Invalid request body", err.Error())
+		return
+	}
+	if req.Image != "" {
+		ok := false
+		for _, t := range []string{"png", "jpeg", "webp", "gif"} {
+			if strings.HasPrefix(req.Image, "data:image/"+t+";base64,") {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			s.JSONError(w, r, http.StatusBadRequest, "image must be a data:image/(png|jpeg|webp|gif);base64 URL", "")
+			return
+		}
+		if len(req.Image) > maxAvatarImage {
+			s.JSONError(w, r, http.StatusRequestEntityTooLarge, "image too large", strconv.Itoa(len(req.Image))+" bytes, at most "+strconv.Itoa(maxAvatarImage))
+			return
+		}
+	}
+	c, ok := mywant.SetCharacterAvatarImage(id, req.Image)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
