@@ -8,6 +8,15 @@ import (
 )
 
 func TestNearestAnswer(t *testing.T) {
+	// A photo's times carry no zone and are read in the server's own
+	// (Fly sets TZ to the person's); the reservations here say +09:00.
+	jst, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Skip("no zoneinfo")
+	}
+	local := time.Local
+	time.Local = jst
+	t.Cleanup(func() { time.Local = local })
 	res := func(at string) mywant.ResultHistoryEntry {
 		return mywant.ResultHistoryEntry{ID: at, Timestamp: time.Date(2026, 10, 1, 0, 0, 0, 0, time.Local),
 			Result: map[string]any{"datetime_rfc3339": at}}
