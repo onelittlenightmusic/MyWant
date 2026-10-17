@@ -239,26 +239,15 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 		// answering, the question goes the ordinary way — it may not have been
 		// about the photos at all.
 		defer closePictures(photos)
-		answered := false
-		for _, p := range photos {
-			RecordCCActivity(want, CCActivityNote, truncateRunes("写真 "+p.About+" を見ています", 90))
-			r, e := server.askPictureOrNone(p.Question, root, timeout, p.Image, p.Lines)
-			if e != nil || r.None || strings.TrimSpace(r.Text) == "" {
-				continue
-			}
-			reply, err = r, nil
-			reply.Text = strings.TrimSpace(r.Text)
-			if p.About != "" {
-				reply.Text = fmt.Sprintf("%s（%s の写真より）", reply.Text, p.About)
-			}
-			answered = true
-			break
-		}
+		var answered bool
+		reply, answered = askAnswerPhotos(server, root, timeout, photos, func(about string) {
+			RecordCCActivity(want, CCActivityNote, truncateRunes("写真 "+about+" を見ています", 90))
+		})
 		if !answered {
-			reply, err = server.ask(request, root, timeout)
+			reply, err = server.ask(withAnswerReferent(want, request), root, timeout)
 		}
 	} else {
-		reply, err = server.ask(request, root, timeout)
+		reply, err = server.ask(withAnswerReferent(want, request), root, timeout)
 	}
 	server.watch(nil)
 	server.broker(nil)

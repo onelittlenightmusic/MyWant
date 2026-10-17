@@ -130,6 +130,22 @@ func (s *Server) fmUpdateTurn(id string, change func(*fmTurn) error) (fmTurn, er
 	return fmTurn{}, fmt.Errorf("no turn %q", id)
 }
 
+// fmTurnQuestion is what a turn was asked, or "".
+func (s *Server) fmTurnQuestion(id string) string {
+	fmTurnsMu.Lock()
+	defer fmTurnsMu.Unlock()
+	robot, err := s.fmRobot()
+	if err != nil {
+		return ""
+	}
+	for _, t := range fmLoadTurns(robot) {
+		if t.ID == id {
+			return t.Question
+		}
+	}
+	return ""
+}
+
 func (s *Server) fmAddTurn(turn fmTurn) error {
 	fmTurnsMu.Lock()
 	defer fmTurnsMu.Unlock()

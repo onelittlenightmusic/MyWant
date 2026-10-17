@@ -47,6 +47,12 @@ func (s *Server) registerAnswerPhotos() {
 		_ = s.thingLabels.Set(id, thingPictureReadLabel, string(data))
 		_ = s.thingLabels.Set(id, thingPictureReadFromLabel, imageURL)
 	}
+	types.AnswerReferentNote = func(question string) string {
+		if ref := s.resolveAnswerReferent(question, time.Now()); ref != nil {
+			return ref.text()
+		}
+		return ""
+	}
 }
 
 func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
@@ -55,26 +61,15 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 		return nil
 	}
 
-	// The want the question names — the longest name found in it wins, so
-	// "スマートゴルフ" is not taken for some want merely called "ゴルフ".
-	aliases := s.fmTypeAliases()
-	var want *mywant.Want
-	best := 0
-	for _, w := range s.globalBuilder.GetWants() {
-		terms := []string{w.Metadata.Name, w.Metadata.Type}
-		terms = append(terms, aliases[w.Metadata.Type]...)
-		for _, t := range terms {
-			if t = strings.ToLower(strings.TrimSpace(t)); t != "" && len([]rune(t)) > best && strings.Contains(q, t) {
-				want, best = w, len([]rune(t))
-			}
-		}
-	}
-	if want == nil {
+	// The wants the question names (wantsNamedIn) — and, when it names a time
+	// too (「今朝のゴルフ」), only their answers from then (answer_referent.go).
+	wants, title := s.wantsNamedIn(q)
+	if len(wants) == 0 {
 		return nil
 	}
-	title := want.Metadata.Name
-	if a := aliases[want.Metadata.Type]; len(a) > 0 {
-		title = a[0]
+	var only map[string]bool
+	if ref := s.resolveAnswerReferent(q, time.Now()); ref != nil {
+		only = ref.answerIDs()
 	}
 
 	// Who is in which constellation, from the thing labels (an answer is kept
@@ -103,17 +98,26 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 		created[e.ID] = e.CreatedAt
 	}
 
-	wantID := want.Metadata.ID
-	history := want.BuildHistory().ResultHistory
+	// Newest answer first, across every want named.
+	type answerOf struct {
+		wantID string
+		e      mywant.ResultHistoryEntry
+	}
+	var answers []answerOf
+	for _, w := range wants {
+		for _, e := range w.BuildHistory().ResultHistory {
+			answers = append(answers, answerOf{w.Metadata.ID, e})
+		}
+	}
+	sort.SliceStable(answers, func(i, j int) bool { return answers[i].e.Timestamp.After(answers[j].e.Timestamp) })
 	seen := map[string]bool{}
 	var out []types.AnswerPhoto
-	for i := len(history) - 1; i >= 0; i-- {
-		e := history[i]
-		key := e.ID
-		if key == "" {
-			key = e.Timestamp.Format(time.RFC3339Nano)
+	for _, a := range answers {
+		e := a.e
+		answer := a.wantID + answerSep + answerKey(e)
+		if only != nil && !only[answer] {
+			continue
 		}
-		answer := wantID + answerSep + key
 		var photos []string
 		for _, c := range constellationsOf[answer] {
 			for _, m := range membersOf[c] {
@@ -147,14 +151,7 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 // answerWhen is the time an answer is about, as a person reads it: a
 // reservation's own time when it says one, else when it was answered.
 func answerWhen(e mywant.ResultHistoryEntry) string {
-	if r, ok := e.Result.(map[string]any); ok {
-		if v, ok := r["datetime_rfc3339"].(string); ok {
-			if t, err := time.Parse(time.RFC3339, v); err == nil {
-				return t.In(time.Local).Format("1/2 15:04")
-			}
-		}
-	}
-	return e.Timestamp.In(time.Local).Format("1/2 15:04")
+	return answerTime(e).Format("1/2 15:04")
 }
 
 func containsAnyWord(s string, words []string) bool {

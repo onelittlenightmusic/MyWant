@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -110,6 +112,136 @@ func prepareAnswerPhotos(ctx context.Context, robot *Want, request string) []*ro
 	if len(photos) == 0 {
 		return nil
 	}
+	out := prepareFoundPhotos(ctx, robot, question, photos)
+	if len(out) > 0 {
+		robot.StoreLog("[ROBOT] the question is about %d photo(s) joined to answers", len(out))
+		RecordCCActivity(robot, CCActivityNote, fmt.Sprintf("写真 %d 枚を見ます", len(out)))
+	}
+	return out
+}
+
+// askAnswerPhotos asks about each photo in turn, newest answer first, until
+// one answers; the answer says which answer's photo it came from. ok=false
+// when none did — the question may not have been about the photos at all.
+func askAnswerPhotos(server *fmServer, root string, timeout time.Duration, photos []*robotPicture, looking func(about string)) (fmReply, bool) {
+	for _, p := range photos {
+		if looking != nil {
+			looking(p.About)
+		}
+		// A score card's total is read off it, not asked for: the model,
+		// handed the card's words, once answered 87（+15） and once 7 — a
+		// stray cell — for the same photo and question.
+		if total := scoreCardTotal(p.Question, p.Lines); total != "" {
+			text := total
+			if p.About != "" {
+				text = fmt.Sprintf("%s（%s の写真より）", total, p.About)
+			}
+			return fmReply{Text: text}, true
+		}
+		r, err := server.askPictureOrNone(p.Question, root, timeout, p.Image, p.Lines)
+		if err != nil || r.None || strings.TrimSpace(r.Text) == "" {
+			continue
+		}
+		r.Text = strings.TrimSpace(r.Text)
+		if p.About != "" {
+			r.Text = fmt.Sprintf("%s（%s の写真より）", r.Text, p.About)
+		}
+		return r, true
+	}
+	return fmReply{}, false
+}
+
+// scoreWords are how a question asks for a score.
+var scoreWords = []string{"スコア", "score", "打数", "成績"}
+
+// scoreCardTotalRe is a score card's total as the recogniser reads it: the
+// strokes and, in brackets, against par — 87（+15）, 71（-1）, 72（E）.
+var scoreCardTotalRe = regexp.MustCompile(`(\d{2,3})\s*[（(]\s*([+＋\-－−]\s*\d{1,2}|E|±0)\s*[）)]`)
+
+// scoreCardTotal is the total on a score card a question asks the score of,
+// or "" when the question is not after a score or the words hold no total —
+// then the model is asked, as for any other photo. The last total read wins:
+// a card lists the player's line after the course's.
+func scoreCardTotal(question string, lines []string) string {
+	if !containsAny(strings.ToLower(question), scoreWords...) {
+		return ""
+	}
+	total := ""
+	for _, l := range lines {
+		if m := scoreCardTotalRe.FindAllStringSubmatch(l, -1); len(m) > 0 {
+			last := m[len(m)-1]
+			sign := strings.NewReplacer("＋", "+", "－", "-", "−", "-", " ", "").Replace(last[2])
+			total = last[1] + "（" + sign + "）"
+		}
+	}
+	return total
+}
+
+// AnswerFromPhotos answers a question from a want's answers' photos — read
+// and asked as the robot on this machine asks (askAnswerPhotos) — for an
+// answerer that cannot be shown a photo itself: the model on a phone or in a
+// browser, which reaches the board only through its tools (the server's
+// look). ok=false when no reading has a score and this machine has no model
+// to ask, or no photo answers.
+func AnswerFromPhotos(ctx context.Context, robot *Want, question string, photos []AnswerPhoto) (string, bool) {
+	// A score is read off a card already read — by this machine before, or by
+	// the phone that shared it (its PhotoReader) — with no model at all, so a
+	// server without one (Fly) answers it too.
+	for _, p := range photos {
+		if p.Read == nil {
+			continue
+		}
+		if total := scoreCardTotal(question, readingLines(p)); total != "" {
+			if p.About != "" {
+				total = fmt.Sprintf("%s（%s の写真より）", total, p.About)
+			}
+			return total, true
+		}
+	}
+	binary, ok := fmToolPath()
+	if !ok || len(photos) == 0 {
+		return "", false
+	}
+	ready := prepareFoundPhotos(ctx, robot, question, photos)
+	defer closePictures(ready)
+	if len(ready) == 0 {
+		return "", false
+	}
+	root, _ := os.UserHomeDir()
+	reply, answered := askAnswerPhotos(fmServerFor(binary), root, fmDefaultTimeoutSeconds*time.Second, ready, nil)
+	return reply.Text, answered
+}
+
+// AnswerReferentNote says, for a question that names a time of a want's
+// answers (「今朝のゴルフ」), which answers it means — or "" when it names
+// none. Set by the server (answer_referent.go).
+var AnswerReferentNote func(question string) string
+
+// withAnswerReferent is a request with what it refers to written after it,
+// so the answer is about this morning's answer and not the want as it stands.
+func withAnswerReferent(robot *Want, request string) string {
+	if AnswerReferentNote == nil {
+		return request
+	}
+	question, _ := splitRobotRequest(request)
+	note := AnswerReferentNote(question)
+	if note == "" {
+		return request
+	}
+	robot.StoreLog("[ROBOT] the question refers to answers from a time: %s", firstLineOf(note))
+	return request + "\n\n(" + strings.TrimSpace(note) + ")"
+}
+
+func firstLineOf(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// prepareFoundPhotos downloads each photo and reads it (once; kept on the
+// thing after).
+func prepareFoundPhotos(ctx context.Context, robot *Want, question string, photos []AnswerPhoto) []*robotPicture {
 	if len(photos) > maxAnswerPhotos {
 		photos = photos[:maxAnswerPhotos]
 	}
@@ -139,10 +271,6 @@ func prepareAnswerPhotos(ctx context.Context, robot *Want, request string) []*ro
 			}
 		}
 		out = append(out, &robotPicture{Name: p.Name, About: p.About, Question: question, Image: file, Lines: readingLines(p)})
-	}
-	if len(out) > 0 {
-		robot.StoreLog("[ROBOT] the question is about %d photo(s) joined to answers", len(out))
-		RecordCCActivity(robot, CCActivityNote, fmt.Sprintf("写真 %d 枚を見ます", len(out)))
 	}
 	return out
 }

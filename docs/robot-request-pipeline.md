@@ -114,6 +114,27 @@ picture want が取り込み時に OCR で読んだ文字（`text`）と一緒�
 チャットの返答に `picture_id` / `answer_id` を付けます。GUI はその返答に「いいね / 違う」を出し、
 評価は同じ `answers` に入ります（`ChatThread.tsx`）。
 
+### 0.6 いつの答えについて聞かれているか — 「今朝のゴルフ」
+
+「今朝のゴルフのスコアは？」は2段の質問です。**どの答えか**（今朝＝09:00 の予約。いま want が
+出している 13:00 ではない）と、**その何を聞いているか**（スコア）。後者には既存の扱いがある
+（スコア・写真なら答えに結ばれた写真を読む `answer_photos.go`、それ以外は答えそのもの）ので、
+前者だけを mywant が先に決めます（`engine/server/answer_referent.go`）。モデルには決めさせません。
+
+1. 質問の時間の語を窓にする（`referentTime`）: 今朝 4–12時、昨日の夜、おととい、午後、this morning…。
+   「朝」「夜」単独は「朝の」「昨日の夜」のように時間として使われたときだけ（朝日・夜景は違う）
+2. 質問が名指す want（名前・型・型の別名。最長一致で、同じ語の want は全部 — 乗り換えは複数ある）
+3. その want たちの答えのうち、窓に入るもの（答えの時刻は予約ならその予約の時刻、ほかは答えた時刻）
+
+使われる場所:
+
+| 経路 | どう効くか |
+|---|---|
+| サーバのロボット（`fm` provider） | 写真の質問は `findAnswerPhotos` がその答えの写真だけを見る。それ以外は依頼文の後ろに「この答えのこと」を書き足す（`withAnswerReferent`） |
+| ブラウザ・iPhone のモデル（`/fm/manifest` 経由） | ターン中の `look` が質問を受け取り、名指された want なら**その時間の答え**を返す。写真の質問ならこの Mac のモデルで写真を読んで答えを渡す（`types.AnswerFromPhotos`）。モデルがない（Fly）なら写真から読めた文字を渡す |
+
+窓に答えがなければ「その時間の答えはない」と言わせる。いまの答えで代わりに答えない。
+
 ### 1. robot want — いつ送るかを決める
 
 `robot` want は coding want と同じ3エージェント構成で、`provider` パラメータで答え手を選びます
@@ -393,6 +414,7 @@ fmtool には自分から mywant を導く手がかりがないので、サー�
 | プロバイダ選択 | `engine/types/agent_claude_code.go` |
 | 端末内モデル呼び出し・同意 | `engine/types/agent_fm.go` |
 | 何について聞かれているか・写真の受け渡し・答えの記録 | `engine/types/robot_subject.go` |
+| いつの答えか（今朝のゴルフ） | `engine/server/answer_referent.go` ↔ `engine/types/answer_photos.go` |
 | 写真の OCR・`answers` | `engine/types/picture_types.go` ↔ `fmtool/Sources/fmtool/{OCR,Picture}.swift` |
 | 実行の門番 | `engine/types/fm_broker.go` ↔ `fmtool/Sources/fmtool/Broker.swift` |
 | 常駐プロセス管理 | `engine/types/fm_server.go` |

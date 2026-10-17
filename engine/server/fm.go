@@ -171,16 +171,25 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	if req.Arguments == nil {
 		req.Arguments = map[string]string{}
 	}
+	if req.Turn != "" && req.Tool == "look" {
+		// What the person asked, for look to see which of a want's answers
+		// it is about (fmLookReferent) — taken out again before the step is
+		// kept.
+		if q := s.fmTurnQuestion(req.Turn); q != "" {
+			req.Arguments[fmQuestionArg] = q
+		}
+	}
 	step := fmStep{Tool: req.Tool, Arguments: req.Arguments}
 	if req.Turn == "" {
 		// Outside a turn it is only run: nobody asked the robot anything, so
 		// its chat has nothing to show.
 		out := s.fmRunTool(req.Tool, req.Arguments)
-		fmWriteJSON(w, map[string]any{"output": out, "card": fmTakeCard(req.Arguments)})
+		fmWriteJSON(w, map[string]any{"output": out, "card": fmTakeCard(req.Arguments), "unread_photos": fmTakeUnread(req.Arguments)})
 		return
 	}
 	s.fmRunStep(&step)
 	step.Card = fmTakeCard(step.Arguments)
+	unread := fmTakeUnread(step.Arguments)
 	turn, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
 		t.Steps = append(t.Steps, step)
 		return nil
@@ -190,7 +199,7 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	} else if !turn.Quiet {
 		s.fmShowStep(step, "")
 	}
-	fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card})
+	fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card, "unread_photos": unread})
 }
 
 // fmTakeCard takes out of a step's arguments the want its tool brought the
@@ -1208,6 +1217,34 @@ type fmTile struct {
 // back as the call's card — what the chat shows under the robot's words.
 const fmCardArg = "_card"
 
+// fmUnreadArg carries the photos look needed and could not read (a server
+// with no recogniser — Fly); handleFMCall hands them back as the call's
+// unread_photos, for the asker to read on its own device and call again.
+const fmUnreadArg = "_unread"
+
+// fmUnreadPhoto is a photo to read: its thing, and the image as the server
+// knows it — kept beside the reading (picture-read-from) to say what was read.
+type fmUnreadPhoto struct {
+	ID    string `json:"id"`
+	Image string `json:"image"`
+}
+
+// fmTakeUnread takes out of a step's arguments the photos look could not read.
+func fmTakeUnread(args map[string]string) []fmUnreadPhoto {
+	raw, ok := args[fmUnreadArg]
+	if !ok {
+		return nil
+	}
+	delete(args, fmUnreadArg)
+	var list []fmUnreadPhoto
+	_ = json.Unmarshal([]byte(raw), &list)
+	return list
+}
+
+// fmQuestionArg carries what the person asked to look, within a turn
+// (handleFMCall); look takes it out before anything is kept.
+const fmQuestionArg = "_question"
+
 // fmCard is a want a step brought the robot to.
 type fmCard struct {
 	Kind string `json:"kind"`
@@ -1419,10 +1456,15 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 // buffers, and never a value whose name says it is a secret: what this
 // returns is read by a model and may be read out.
 func (s *Server) fmLook(args map[string]string) (string, error) {
+	question := args[fmQuestionArg]
+	delete(args, fmQuestionArg)
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
 		return "", fmt.Errorf("name is required")
 	}
+	// Asked about a time of a want's answers (「今朝のゴルフのスコアは？」):
+	// those answers, not the want as it stands (fmLookReferent).
+	ref := s.resolveAnswerReferent(question, time.Now())
 	var resp struct {
 		Wants []struct {
 			Metadata struct {
@@ -1484,6 +1526,21 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		}
 		for _, i := range hits {
 			near = append(near, resp.Wants[i].Metadata.Name)
+		}
+	}
+	if ref != nil {
+		// The want looked at is one the question named — or, not found by
+		// that name alone, the name is one of theirs (several transit wants).
+		hit := found >= 0 && ref.covers(resp.Wants[found].Metadata.ID)
+		if found < 0 {
+			for _, n := range near {
+				for _, w := range ref.Wants {
+					hit = hit || w.Metadata.Name == n
+				}
+			}
+		}
+		if hit {
+			return s.fmLookReferent(ref, question, args), nil
 		}
 	}
 	if found < 0 {
