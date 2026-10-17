@@ -2,6 +2,7 @@ package mywant
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -64,7 +65,8 @@ func (s *SchedulerWant) Progress() {
 			continue // No need to create a scheduler agent for targets
 		}
 
-		if len(want.Spec.When) == 0 {
+		when := scheduleOf(want)
+		if len(when) == 0 {
 			continue // No schedule specified for this Want
 		}
 
@@ -94,7 +96,7 @@ func (s *SchedulerWant) Progress() {
 
 		// Create a new SchedulerAgent for this Want
 		agent, err := NewSchedulerAgent(
-			want.Spec.When,
+			when,
 			want.Metadata.ID,
 			want.Metadata.Name,
 			s.builder,
@@ -144,4 +146,24 @@ func RegisterSchedulerWantTypes(builder *ChainBuilder) {
 		schedulerWant.SetChainBuilder(builder)
 		return schedulerWant
 	})
+}
+
+// defaultEveryLabel is a want type's label for how often its wants run again
+// when their own spec says nothing (spec.when) — "1h", "30m", "1d". A want that
+// is achieved on its first answer (smartgolf's reservation check) stops its
+// monitor there; the schedule restarts it, so it answers again an hour later.
+const defaultEveryLabel = "default-every"
+
+// scheduleOf is a want's schedule: its own spec.when, else its type's
+// default-every.
+func scheduleOf(want *Want) []WhenSpec {
+	if len(want.Spec.When) > 0 {
+		return want.Spec.When
+	}
+	if def := want.WantTypeDefinition; def != nil {
+		if every := strings.TrimSpace(def.Metadata.Labels[defaultEveryLabel]); every != "" {
+			return []WhenSpec{{Every: every}}
+		}
+	}
+	return nil
 }
