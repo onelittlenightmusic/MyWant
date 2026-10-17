@@ -115,6 +115,12 @@ func (h *boardChangeHub) flush() {
 		h.mu.Unlock()
 	}
 
+	// A photo joined to an answer, or given its words, is read into fields
+	// (photo_fields.go) — in the background, when this server can.
+	if s != nil && (len(things) > 0 || all) {
+		s.readPhotoFieldsSoon()
+	}
+
 	change := boardChange{Wants: boardSortedIDs(wants), Things: boardSortedIDs(things), All: all}
 	if !change.All && len(change.Wants) == 0 && len(change.Things) == 0 {
 		return

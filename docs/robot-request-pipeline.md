@@ -135,6 +135,25 @@ picture want が取り込み時に OCR で読んだ文字（`text`）と一緒�
 
 窓に答えがなければ「その時間の答えはない」と言わせる。いまの答えで代わりに答えない。
 
+### 0.7 写真の読み — 保存時に OCR、紐づけ時にフィールドへ
+
+写真の質問は、質問されたときに写真を読むのではなく、**前もって読んでおいたラベル**から答えます。
+
+1. **写真が thing として保存されたとき — OCR**（`thing_picture_text.go`）。文字とファイルの情報を
+   写真 thing のラベル `picture-text` / `picture-taken-at` … に書く。読むのは Mac のサーバ（fmtool）か、
+   共有した iPhone アプリ（`PhotoReader`）。
+2. **want の答えと constellation で紐づいたとき — 解釈**（`photo_fields.go`）。want の型の
+   `photo-fields` ラベル（1行1フィールド: `名前 | 質問での呼び方 | 読み方`）に従ってモデルが
+   `picture-text` を読み、写真 thing のラベル `photo-score` / `photo-course` … に書く。
+   本文にない値は捨てる（作り話を残さない）。モデルのない Fly では
+   `GET /api/v1/things/photo-fields/pending` にプロンプトごと並び、iPhone アプリのモデルが答えて
+   `POST /api/v1/things/photo-fields` で返す。
+3. **質問されたとき**: 質問の語（スコア・コース・いつ）でフィールドを選び、そのラベルの値で答える。
+   モデルは使わない。
+
+写真 thing の型は写真（`image_url`）のまま。どの型の読み方で読んだかは `photo-read-as`、
+何から読んだか（規則・本文・読み手の版）は `photo-fields-from` に残し、どれかが変われば読み直す。
+
 ### 1. robot want — いつ送るかを決める
 
 `robot` want は coding want と同じ3エージェント構成で、`provider` パラメータで答え手を選びます

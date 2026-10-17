@@ -59,7 +59,7 @@ func (c *captureTargetStore) Get() *CaptureTarget {
 		return nil
 	}
 	var t CaptureTarget
-	if yaml.Unmarshal(data, &t) != nil || t.ID == "" || t.Constellation == "" {
+	if yaml.Unmarshal(data, &t) != nil || t.ID == "" || (t.Constellation == "" && t.Kind != "want") {
 		return nil
 	}
 	return &t
@@ -93,7 +93,9 @@ func (s *Server) getCaptureTarget(w http.ResponseWriter, r *http.Request) {
 // PUT /api/v1/capture-target   body: {target: {id, kind?, constellation, label?} | null}
 //
 // The constellation is expected to exist already — the board makes it, with
-// the tile in it, before aiming the net — and is not made here.
+// the tile in it, before aiming the net — and is not made here. A whole want
+// (kind want) is aimed at with no constellation: what is caught into it waits
+// to be proposed one of the want's answers (capture_proposal.go).
 func (s *Server) putCaptureTarget(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Target *CaptureTarget `json:"target"`
@@ -106,13 +108,17 @@ func (s *Server) putCaptureTarget(w http.ResponseWriter, r *http.Request) {
 	if t != nil {
 		t.ID = strings.TrimSpace(t.ID)
 		t.Constellation = strings.TrimSpace(t.Constellation)
-		if t.ID == "" || t.Constellation == "" {
+		// A whole want needs no constellation: what is caught into it is
+		// proposed one of its answers once read (capture_proposal.go).
+		if t.ID == "" || (t.Constellation == "" && t.Kind != "want") {
 			s.JSONError(w, r, http.StatusBadRequest, "invalid capture target", "id and constellation are required")
 			return
 		}
-		if err := validateConstellationName(t.Constellation); err != nil {
-			s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
-			return
+		if t.Constellation != "" {
+			if err := validateConstellationName(t.Constellation); err != nil {
+				s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
+				return
+			}
 		}
 		if t.Kind != "want" {
 			t.Kind = "thing"

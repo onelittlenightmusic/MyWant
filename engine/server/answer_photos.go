@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"sort"
 	"strings"
 	"time"
@@ -27,12 +26,20 @@ import (
 // photoQuestionWords are how a question says it is after what a photo shows.
 var photoQuestionWords = []string{"写真", "画像", "スコア", "score", "photo", "picture", "打数", "成績", "結果"}
 
-// Labels a photo's reading is kept under, on its thing, with the image it was
-// read from (a new image is read again).
+// Where a photo's reading is kept on its thing (thing_picture_text.go): the
+// image it was read from (a new image is read again), and the one blob
+// readings were kept as before they had fields of their own.
 const (
 	thingPictureReadLabel     = "picture-read"
 	thingPictureReadFromLabel = "picture-read-from"
 )
+
+// photoReadingLabel is a want type's rules for reading the photos joined to
+// its answers — what in such a photo answers what: smartgolf's "the score is
+// the 87（+15） at the end of the Player 1 row; the HOLE and PAR rows are hole
+// numbers and pars, not scores". The model reads the photo's words by them;
+// nothing here knows what a score card looks like.
+const photoReadingLabel = "photo-reading"
 
 // answerSep joins a want id and an answer's key into the answer's id.
 const answerSep = "/result/"
@@ -40,12 +47,7 @@ const answerSep = "/result/"
 func (s *Server) registerAnswerPhotos() {
 	types.AnswerPhotoFinder = s.findAnswerPhotos
 	types.AnswerPhotoReadSaver = func(id, imageURL string, read types.PhotoReading) {
-		data, err := json.Marshal(read)
-		if err != nil {
-			return
-		}
-		_ = s.thingLabels.Set(id, thingPictureReadLabel, string(data))
-		_ = s.thingLabels.Set(id, thingPictureReadFromLabel, imageURL)
+		s.keepPhotoReading(id, imageURL, "mywant", read)
 	}
 	types.AnswerReferentNote = func(question string) string {
 		if ref := s.resolveAnswerReferent(question, time.Now()); ref != nil {
@@ -57,7 +59,7 @@ func (s *Server) registerAnswerPhotos() {
 
 func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 	q := strings.ToLower(question)
-	if !containsAnyWord(q, photoQuestionWords) || s.globalBuilder == nil || s.thingLabels == nil {
+	if s.globalBuilder == nil || s.thingLabels == nil {
 		return nil
 	}
 
@@ -67,9 +69,32 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 	if len(wants) == 0 {
 		return nil
 	}
+	// Only a question after what a photo shows: a photo word, or a field the
+	// named wants' photos are read into (photo_fields.go) — 「ゴルフのコースは？」.
+	specs := s.photoTypeSpecs()
+	asked := containsAnyWord(q, photoQuestionWords)
+	for _, w := range wants {
+		asked = asked || types.PhotoFieldAsked(q, specs[w.Metadata.Type].Fields) != ""
+	}
+	if !asked {
+		return nil
+	}
 	var only map[string]bool
 	if ref := s.resolveAnswerReferent(q, time.Now()); ref != nil {
 		only = ref.answerIDs()
+	}
+	// How each type's photos are read, as its YAML says (photoReadingLabel).
+	rules := map[string]string{}
+	if wts, err := s.fmWantTypes(); err == nil {
+		for _, t := range wts {
+			if r := strings.Join(strings.Fields(t.Labels[photoReadingLabel]), " "); r != "" {
+				rules[t.Name] = r
+			}
+		}
+	}
+	typeOf := map[string]string{}
+	for _, w := range wants {
+		typeOf[w.Metadata.ID] = w.Metadata.Type
 	}
 
 	// Who is in which constellation, from the thing labels (an answer is kept
@@ -135,12 +160,14 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 		sort.SliceStable(photos, func(a, b int) bool { return created[photos[a]] > created[photos[b]] })
 		about := answerWhen(e) + " " + title
 		for _, id := range photos {
-			p := types.AnswerPhoto{ID: id, Name: values[id], About: strings.TrimSpace(about), ImageURL: all[id][thingPictureLabel]}
+			typ := typeOf[a.wantID]
+			p := types.AnswerPhoto{ID: id, Name: values[id], About: strings.TrimSpace(about), ImageURL: all[id][thingPictureLabel], Rules: rules[typ]}
+			if spec, ok := specs[typ]; ok {
+				p.FieldSpec = spec.Fields
+				p.Fields = photoFieldsOf(all[id], typ, spec)
+			}
 			if all[id][thingPictureReadFromLabel] == p.ImageURL {
-				var r types.PhotoReading
-				if json.Unmarshal([]byte(all[id][thingPictureReadLabel]), &r) == nil {
-					p.Read = &r
-				}
+				p.Read = photoReadingOf(all[id])
 			}
 			out = append(out, p)
 		}

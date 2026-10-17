@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"time"
 
@@ -41,6 +40,15 @@ type AnswerPhoto struct {
 	ImageURL string
 	// What was read from it before, when it was read from this same image.
 	Read *PhotoReading
+	// How to read it: the want type's photo-reading rules — what in such a
+	// photo answers what ("the score is the 87（+15） at the end of the Player
+	// row"). Handed to the model with the photo and its words.
+	Rules string
+	// The fields the photo was read into by its want's type (photo_fields.go)
+	// — score, course — and the type's spec of them, so a question is
+	// answered from the field it asks for.
+	Fields    map[string]string
+	FieldSpec []PhotoField
 }
 
 // PhotoReading is what `fmtool --read` found in a photo.
@@ -81,6 +89,28 @@ func readPhoto(ctx context.Context, fmtool, file string) (PhotoReading, error) {
 	return r, nil
 }
 
+// CanReadPhotos says whether this machine can read photos itself — it has the
+// recogniser (fmtool, on a Mac).
+func CanReadPhotos() bool {
+	_, ok := fmToolPath()
+	return ok
+}
+
+// ReadPhoto reads a photo at a URL on this machine: downloaded, then the
+// words in it and its file's own facts (readPhoto).
+func ReadPhoto(ctx context.Context, imageURL string) (PhotoReading, error) {
+	fmtool, ok := fmToolPath()
+	if !ok {
+		return PhotoReading{}, fmt.Errorf("this machine cannot read photos")
+	}
+	file, err := downloadPicture(ctx, imageURL)
+	if err != nil {
+		return PhotoReading{}, err
+	}
+	defer os.Remove(file)
+	return readPhoto(ctx, fmtool, file)
+}
+
 // readingLines is a reading as the lines handed to the answerer: what the
 // file says about itself first (so "when was it taken" has its answer among
 // them), then the words in the picture.
@@ -112,6 +142,11 @@ func prepareAnswerPhotos(ctx context.Context, robot *Want, request string) []*ro
 	if len(photos) == 0 {
 		return nil
 	}
+	// Read into fields when it was joined: nothing to download or ask.
+	if v, ok := AnswerFromPhotoFields(question, photos); ok {
+		robot.StoreLog("[ROBOT] answered from a photo's fields: %s", v)
+		return []*robotPicture{{Question: question, Answer: v}}
+	}
 	out := prepareFoundPhotos(ctx, robot, question, photos)
 	if len(out) > 0 {
 		robot.StoreLog("[ROBOT] the question is about %d photo(s) joined to answers", len(out))
@@ -125,20 +160,26 @@ func prepareAnswerPhotos(ctx context.Context, robot *Want, request string) []*ro
 // when none did — the question may not have been about the photos at all.
 func askAnswerPhotos(server *fmServer, root string, timeout time.Duration, photos []*robotPicture, looking func(about string)) (fmReply, bool) {
 	for _, p := range photos {
+		if p.Answer != "" {
+			return fmReply{Text: p.Answer}, true
+		}
 		if looking != nil {
 			looking(p.About)
 		}
-		// A score card's total is read off it, not asked for: the model,
-		// handed the card's words, once answered 87（+15） and once 7 — a
-		// stray cell — for the same photo and question.
-		if total := scoreCardTotal(p.Question, p.Lines); total != "" {
-			text := total
-			if p.About != "" {
-				text = fmt.Sprintf("%s（%s の写真より）", total, p.About)
+		// A type that says how its photos are read: the model reads the words
+		// by those rules (readByRules). Otherwise it looks at the photo and
+		// picks one of the words in it.
+		if p.Rules != "" {
+			if answer, ok := readByRules(server, root, timeout, p); ok {
+				r := fmReply{Text: answer}
+				if p.About != "" {
+					r.Text = fmt.Sprintf("%s（%s の写真より）", answer, p.About)
+				}
+				return r, true
 			}
-			return fmReply{Text: text}, true
+			continue
 		}
-		r, err := server.askPictureOrNone(p.Question, root, timeout, p.Image, p.Lines)
+		r, err := server.askPictureOrNone(p.prompt(), root, timeout, p.Image, p.Lines)
 		if err != nil || r.None || strings.TrimSpace(r.Text) == "" {
 			continue
 		}
@@ -151,52 +192,41 @@ func askAnswerPhotos(server *fmServer, root string, timeout time.Duration, photo
 	return fmReply{}, false
 }
 
-// scoreWords are how a question asks for a score.
-var scoreWords = []string{"スコア", "score", "打数", "成績"}
+// photoNotHere is how the model says a photo does not answer the question.
+const photoNotHere = "（この写真にはない）"
 
-// scoreCardTotalRe is a score card's total as the recogniser reads it: the
-// strokes and, in brackets, against par — 87（+15）, 71（-1）, 72（E）.
-var scoreCardTotalRe = regexp.MustCompile(`(\d{2,3})\s*[（(]\s*([+＋\-－−]\s*\d{1,2}|E|±0)\s*[）)]`)
-
-// scoreCardTotal is the total on a score card a question asks the score of,
-// or "" when the question is not after a score or the words hold no total —
-// then the model is asked, as for any other photo. The last total read wins:
-// a card lists the player's line after the course's.
-func scoreCardTotal(question string, lines []string) string {
-	if !containsAny(strings.ToLower(question), scoreWords...) {
-		return ""
+// readByRules asks the model a question of a photo's words, read by its
+// type's rules — the words and the rules alone, no photo: asked with the photo
+// and choosing among its cells, the model took a hole number (7) for a score
+// card's total (87（+15）) every time, rules or not, where the rules read in
+// words were followed. The answer is kept only if it is in the words — what
+// was read, not what the model made up.
+func readByRules(server *fmServer, root string, timeout time.Duration, p *robotPicture) (string, bool) {
+	text := strings.Join(p.Lines, "\n")
+	prompt := "Text read from a photo, line by line; cells on a line are separated by |:\n" + text +
+		"\n\nHow to read this photo: " + p.Rules +
+		"\n\nQuestion: " + p.Question +
+		"\n\nAnswer with the value only, copied exactly as it is written in the text above, nothing else. If the text does not answer the question, answer " + photoNotHere + "."
+	r, err := server.askPlain(prompt, root, timeout)
+	if err != nil {
+		return "", false
 	}
-	total := ""
-	for _, l := range lines {
-		if m := scoreCardTotalRe.FindAllStringSubmatch(l, -1); len(m) > 0 {
-			last := m[len(m)-1]
-			sign := strings.NewReplacer("＋", "+", "－", "-", "−", "-", " ", "").Replace(last[2])
-			total = last[1] + "（" + sign + "）"
-		}
+	answer := strings.Trim(strings.TrimSpace(r.Text), "「」\"'`。. ")
+	if answer == "" || answer == photoNotHere || !strings.Contains(text, answer) {
+		return "", false
 	}
-	return total
+	return answer, true
 }
 
 // AnswerFromPhotos answers a question from a want's answers' photos — read
 // and asked as the robot on this machine asks (askAnswerPhotos) — for an
 // answerer that cannot be shown a photo itself: the model on a phone or in a
 // browser, which reaches the board only through its tools (the server's
-// look). ok=false when no reading has a score and this machine has no model
-// to ask, or no photo answers.
+// look). ok=false when this machine has no model to ask, or no photo answers.
 func AnswerFromPhotos(ctx context.Context, robot *Want, question string, photos []AnswerPhoto) (string, bool) {
-	// A score is read off a card already read — by this machine before, or by
-	// the phone that shared it (its PhotoReader) — with no model at all, so a
-	// server without one (Fly) answers it too.
-	for _, p := range photos {
-		if p.Read == nil {
-			continue
-		}
-		if total := scoreCardTotal(question, readingLines(p)); total != "" {
-			if p.About != "" {
-				total = fmt.Sprintf("%s（%s の写真より）", total, p.About)
-			}
-			return total, true
-		}
+	// Read into fields when it was joined: answered from them, no model.
+	if v, ok := AnswerFromPhotoFields(question, photos); ok {
+		return v, true
 	}
 	binary, ok := fmToolPath()
 	if !ok || len(photos) == 0 {
@@ -270,7 +300,7 @@ func prepareFoundPhotos(ctx context.Context, robot *Want, question string, photo
 				}
 			}
 		}
-		out = append(out, &robotPicture{Name: p.Name, About: p.About, Question: question, Image: file, Lines: readingLines(p)})
+		out = append(out, &robotPicture{Name: p.Name, About: p.About, Question: question, Rules: p.Rules, Image: file, Lines: readingLines(p)})
 	}
 	return out
 }

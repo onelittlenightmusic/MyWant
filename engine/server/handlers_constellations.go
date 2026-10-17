@@ -597,6 +597,10 @@ func (s *Server) setThingLabel(w http.ResponseWriter, r *http.Request) {
 	// A label is how a value gets pinned to the canvas, which is a change to
 	// what the city knows about it — the same kind of news as being named.
 	boardThingsChanged(body.ValueID)
+	// A thing given a picture has its words read (thing_picture_text.go).
+	if body.Key == thingPictureLabel {
+		s.readThingPictureSoon(body.ValueID, body.Value)
+	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label set"})
 }
 

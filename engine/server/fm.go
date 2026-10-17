@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	types "mywant/engine/types"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -1227,6 +1229,9 @@ const fmUnreadArg = "_unread"
 type fmUnreadPhoto struct {
 	ID    string `json:"id"`
 	Image string `json:"image"`
+	// Read: its words are read already, and only reading them into fields
+	// waits (photo_fields.go) — nothing to read off the image again.
+	Read bool `json:"read,omitempty"`
 }
 
 // fmTakeUnread takes out of a step's arguments the photos look could not read.
@@ -1553,6 +1558,20 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
+	// Asked after what its answers' photos show, with no time named
+	// (「ゴルフの最新スコアは？」): the newest photo's field (photo_fields.go).
+	if ref == nil && question != "" {
+		if v, ok := types.AnswerFromPhotoFields(question, s.findAnswerPhotos(question)); ok {
+			if w.Metadata.ID != "" {
+				args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+			}
+			out := fmt.Sprintf("Answer, read from the photo joined to %s's latest answer that has one: %s\n", w.Metadata.Name, v)
+			if fmJapanese(question) {
+				out += fmt.Sprintf("Reply in Japanese, with exactly this: 「%s」\n", v)
+			}
+			return out, nil
+		}
+	}
 	// The want it read, shown as its card under the answer: what the answer
 	// is about, at a glance — a person who asked about 国分寺 sees the card
 	// says Nakano. Archived, it still has its card (its status says so), what

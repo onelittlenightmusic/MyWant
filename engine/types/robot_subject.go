@@ -131,8 +131,19 @@ type robotPicture struct {
 	Name     string
 	About    string
 	Question string // what the person said, without the position line
+	Rules    string // how to read such a photo (AnswerPhoto.Rules)
+	Answer   string // already answered from the photo's fields: nothing to ask
 	Image    string // a temporary file; remove with close
 	Lines    []string
+}
+
+// prompt is the question as the model is asked it about the photo: with the
+// rules for reading such a photo after it, when its type has any.
+func (p *robotPicture) prompt() string {
+	if p.Rules == "" {
+		return p.Question
+	}
+	return p.Question + "\n\nHow to read this photo: " + p.Rules
 }
 
 func (p *robotPicture) close() {

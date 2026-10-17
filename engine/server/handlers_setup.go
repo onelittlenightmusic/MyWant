@@ -272,6 +272,9 @@ func (s *Server) setupRoutes() {
 	// `capture` adds to (capture_target.go).
 	api.HandleFunc("/capture-target", s.getCaptureTarget).Methods("GET", "OPTIONS")
 	api.HandleFunc("/capture-target", s.putCaptureTarget).Methods("PUT")
+	// What a capture into a whole want is proposed to join, and the answer.
+	api.HandleFunc("/capture/proposals", s.getCaptureProposals).Methods("GET", "OPTIONS")
+	api.HandleFunc("/capture/proposals/{thing}", s.answerCaptureProposal).Methods("POST", "OPTIONS")
 	for _, prefix := range []string{"/things", "/memo"} {
 		things := api.PathPrefix(prefix).Subrouter()
 		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")
@@ -296,6 +299,10 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
 		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
 		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
+		// A photo's words read into fields by the type it is joined to
+		// (photo_fields.go): what waits to be read, and a reading handed back.
+		things.HandleFunc("/photo-fields/pending", s.getPhotoFieldsPending).Methods("GET", "OPTIONS")
+		things.HandleFunc("/photo-fields", s.postPhotoFields).Methods("POST", "OPTIONS")
 		// A thing's neighbours: constellation co-members and the wants naming it.
 		// Registered before "/{id}" so the literal "/relations" segment is not
 		// mistaken for part of a thing id.

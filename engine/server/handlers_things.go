@@ -479,6 +479,8 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 				res.Error = err.Error()
 			}
 			res.Picture = pictures[i]
+			// Its words read now, as it is saved (thing_picture_text.go).
+			s.readThingPictureSoon(entry.ID, pictures[i])
 		}
 		if pin {
 			if err := s.thingLabels.Set(entry.ID, thingCanvasPinLabel, "true"); err != nil {
@@ -488,7 +490,12 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if target != nil {
-			s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
+			if target.Constellation == "" {
+				// Into a whole want: read, then proposed one of its answers.
+				s.captureIntoWant(entry.ID, target.ID)
+			} else {
+				s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
+			}
 			res.Captured = true
 		}
 		boardThingsChanged(entry.ID)

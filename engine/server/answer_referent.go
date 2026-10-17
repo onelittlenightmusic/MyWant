@@ -321,12 +321,16 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 	}
 	var b strings.Builder
 	b.WriteString(ref.text())
-	if len(ref.Answers) == 0 || !containsAnyWord(strings.ToLower(question), photoQuestionWords) {
+	if len(ref.Answers) == 0 {
 		return b.String()
 	}
+	// Asked after what a photo shows (findAnswerPhotos decides): answered from
+	// the photo's fields, else read here, else handed to the asker.
 	photos := s.findAnswerPhotos(question)
 	if len(photos) == 0 {
-		b.WriteString("No photo is joined to these answers, so what a photo would show is not known — say so.\n")
+		if containsAnyWord(strings.ToLower(question), photoQuestionWords) {
+			b.WriteString("No photo is joined to these answers, so what a photo would show is not known — say so.\n")
+		}
 		return b.String()
 	}
 	robot, _ := s.fmRobot()
@@ -345,8 +349,13 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 	// PhotoReader) to read and ask again.
 	var unread []fmUnreadPhoto
 	for _, p := range photos {
-		if p.Read == nil && p.ImageURL != "" {
+		switch {
+		case p.Read == nil && p.ImageURL != "":
 			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL})
+		case len(p.FieldSpec) > 0 && len(p.Fields) == 0:
+			// Its words read, not yet read into fields: the asker's model can
+			// (GET /things/photo-fields/pending).
+			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL, Read: true})
 		}
 	}
 	if len(unread) > 0 {
@@ -374,6 +383,9 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 		words = true
 	}
 	if words {
+		if photos[0].Rules != "" {
+			fmt.Fprintf(&b, "How to read these photos: %s\n", photos[0].Rules)
+		}
 		b.WriteString("Answer the question from these words only.\n")
 	} else {
 		b.WriteString("No photo of these has been read, so what it shows is not known yet — say so.\n")
