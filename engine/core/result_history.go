@@ -108,6 +108,9 @@ func (n *Want) recordResultHistory() {
 	n.resultRecordedAtRevision = rev
 	n.resultRecordedOnce = true
 
+	// The answers its run read as having come before (result_history_backfill.go).
+	n.backfillResultHistory()
+
 	val, ok := resolveNestedStateField(n, field)
 	if !ok || isEmptyAnswer(val) {
 		// No answer right now — a check that found nothing, or a want reset by
