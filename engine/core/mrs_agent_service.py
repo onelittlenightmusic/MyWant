@@ -167,8 +167,36 @@ def _code(path):
         return code
 
 
+_modules_seen = {}  # module name → (file, mtime) when it was first seen loaded
+_stdlib = tuple({os.path.realpath(p) + os.sep for p in (sys.prefix, sys.base_prefix, sys.exec_prefix)})
+
+
+def _forget_changed_modules():
+    """Drop the plugin modules whose file changed since they were imported, so
+    the script imports them afresh — as a spawn would have. A custom updated in
+    place (mrs_browser, which every browser plugin imports) used to stay the
+    old one until the service restarted: browser_run() without the keyword
+    the new plugins pass. The interpreter's own modules are never looked at."""
+    with _compile_lock:
+        for name, mod in list(sys.modules.items()):
+            f = getattr(mod, "__file__", None)
+            if not f or os.path.realpath(f).startswith(_stdlib):
+                continue
+            try:
+                mtime = os.stat(f).st_mtime
+            except OSError:
+                mtime = None  # gone: a custom removed or moved
+            seen = _modules_seen.get(name)
+            if seen is None or seen[0] != f:
+                _modules_seen[name] = (f, mtime)
+            elif seen[1] != mtime:
+                sys.modules.pop(name, None)
+                _modules_seen.pop(name, None)
+
+
 def run(path, args, send_progress):
     """Run one script as a spawn would. Returns (exit code, result, stderr)."""
+    _forget_changed_modules()
     out = _Output(send_progress)
     err = io.StringIO()
     _local.argv = [path] + [str(a) for a in args]
@@ -192,6 +220,7 @@ def run(path, args, send_progress):
         code = 1
     finally:
         _local.argv = _local.stdout = _local.stderr = None
+        _forget_changed_modules()  # what it imported, as it is now
     return code, out.result, err.getvalue()
 
 
