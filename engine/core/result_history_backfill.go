@@ -46,7 +46,8 @@ func (n *Want) backfillResultHistory() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	entries := h.ResultHistoryRing.Snapshot(0)
-	have := map[string]bool{}
+	// Let go by hand: not brought back (result_history_crud.go).
+	have := n.forgottenAnswers()
 	for _, e := range entries {
 		if t, ok := answerAt(e.Result, at); ok {
 			have[t.Format(time.RFC3339)] = true
@@ -84,6 +85,7 @@ func (n *Want) backfillResultHistory() {
 	for _, e := range entries {
 		h.ResultHistoryRing.Append(e)
 	}
+	n.resultHistoryChanged()
 }
 
 // orderAnswers puts answers in the order of what they are about — an item's

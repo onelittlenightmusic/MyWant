@@ -65,6 +65,7 @@ func (n *Want) pruneResultHistory() {
 	for _, e := range kept {
 		h.ResultHistoryRing.Append(e)
 	}
+	n.resultHistoryChanged()
 }
 
 func truthyAnswerField(v any) bool {

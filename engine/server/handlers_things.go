@@ -6,7 +6,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 
@@ -499,22 +498,10 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if target != nil {
-			switch {
-			case target.Constellation == "" && target.Kind == "want":
-				// Into a whole want: read, then proposed one of its answers.
-				s.captureIntoWant(entry.ID, target.ID)
-			case target.Constellation == "":
-				// Into a thing or an answer: joined, named when first asked.
-				if p := s.captureIntoTile(entry.ID, target); p != nil {
-					proposals = append(proposals, *p)
-				}
-			default:
-				s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
+			if p := s.captureThing(entry.ID, target, body.Ask); p != nil {
+				proposals = append(proposals, *p)
 			}
 			res.Captured = true
-			if body.Ask {
-				_ = s.thingLabels.Set(entry.ID, captureAskedUntilLabel, time.Now().Add(captureAskWait).UTC().Format(time.RFC3339))
-			}
 		}
 		boardThingsChanged(entry.ID)
 		out = append(out, res)

@@ -43,6 +43,14 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/manifest.webmanifest", s.handleWantManifest).Methods("GET")
 	// Per-want alerts (see handlers_notifications.go).
 	wants.HandleFunc("/{id}/notify", s.notifyWant).Methods("POST", "OPTIONS")
+	// Its answers, read and edited by hand (handlers_result_history.go).
+	wants.HandleFunc("/{id}/results", s.listResultHistory).Methods("GET")
+	wants.HandleFunc("/{id}/results", s.addResultHistory).Methods("POST")
+	wants.HandleFunc("/{id}/results", s.handleOptions).Methods("OPTIONS")
+	wants.HandleFunc("/{id}/results/{key}", s.getResultHistory).Methods("GET")
+	wants.HandleFunc("/{id}/results/{key}", s.updateResultHistory).Methods("PUT")
+	wants.HandleFunc("/{id}/results/{key}", s.deleteResultHistory).Methods("DELETE")
+	wants.HandleFunc("/{id}/results/{key}", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/notifications", s.getWantNotifications).Methods("GET", "OPTIONS")
 	wants.HandleFunc("/{id}/notifications/read", s.markWantNotificationsRead).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}", s.getWant).Methods("GET")
@@ -275,6 +283,7 @@ func (s *Server) setupRoutes() {
 	// What a capture into a whole want is proposed to join, and the answer.
 	api.HandleFunc("/capture/proposals", s.getCaptureProposals).Methods("GET", "OPTIONS")
 	api.HandleFunc("/capture/proposals/{thing}", s.answerCaptureProposal).Methods("POST", "OPTIONS")
+	api.HandleFunc("/capture/things/{thing}", s.captureExistingThing).Methods("POST", "OPTIONS")
 	for _, prefix := range []string{"/things", "/memo"} {
 		things := api.PathPrefix(prefix).Subrouter()
 		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")

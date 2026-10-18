@@ -128,6 +128,10 @@ func (n *Want) recordResultHistory() {
 		// found no reservation, whatever its result field still carries.
 		return
 	}
+	if n.forgottenAnswers()[forgottenResultKey(val)] {
+		// Let go by hand (result_history_crud.go): found again, still not kept.
+		return
+	}
 	now := time.Now()
 	entry := ResultHistoryEntry{
 		ID:        "out-" + strings.TrimPrefix(GenerateUUID(), "want-"),
@@ -139,6 +143,9 @@ func (n *Want) recordResultHistory() {
 		Fields:    fields,
 	}
 	appended, prev := n.getHistoryManager().AddResultEntry(entry)
+	if appended {
+		n.resultHistoryChanged()
+	}
 	if !appended || OnWantOutput == nil {
 		return
 	}

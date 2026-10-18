@@ -70,6 +70,67 @@ type captureProposal struct {
 	AskedUntil string `json:"askedUntil,omitempty"`
 }
 
+// captureThing captures a thing into the target — the one way a capture is
+// made, whether the thing was just shared (/things/share) or is on the board
+// already (POST /capture/things/{thing}): into a whole want, read and then
+// proposed one of its answers; into a thing or an answer, joined in the
+// constellation it is in, else proposed it; into a named constellation,
+// added. A proposal made at once is returned. With `ask`, the sender asks
+// about the proposals itself, and the board leaves them alone a while.
+func (s *Server) captureThing(thingID string, target *CaptureTarget, ask bool) *captureProposal {
+	if ask {
+		_ = s.thingLabels.Set(thingID, captureAskedUntilLabel, time.Now().Add(captureAskWait).UTC().Format(time.RFC3339))
+	}
+	switch {
+	case target.Constellation == "" && target.Kind == "want":
+		s.captureIntoWant(thingID, target.ID)
+		// A photo already read — on the board before it was caught — is read
+		// by the want's type now, and proposed (photo_fields.go).
+		s.readPhotoFieldsSoon()
+	case target.Constellation == "":
+		return s.captureIntoTile(thingID, target)
+	default:
+		s.setConstellationMembership("thing", target.Constellation, thingID, true)
+	}
+	return nil
+}
+
+// POST /api/v1/capture/things/{thing}  {ask?: bool}
+// — a thing on the board already, caught into the capture target as one just
+// shared would be (captureThing). Answers what became of it: `proposal` when
+// one is asked at once, `waiting` when it is being read to be proposed.
+func (s *Server) captureExistingThing(w http.ResponseWriter, r *http.Request) {
+	thing := mux.Vars(r)["thing"]
+	var body struct {
+		Ask bool `json:"ask"`
+	}
+	_ = DecodeRequest(r, &body)
+	target := captureTargets.Get()
+	if target == nil {
+		s.JSONError(w, r, http.StatusConflict, "no capture target", "aim the net first")
+		return
+	}
+	if target.ID == thing {
+		s.JSONError(w, r, http.StatusBadRequest, "the target itself", thing)
+		return
+	}
+	p := s.captureThing(thing, target, body.Ask)
+	boardThingsChanged(thing)
+	reply := map[string]any{"target": target}
+	switch {
+	case p != nil:
+		reply["proposal"] = p
+	case target.Constellation == "" && target.Kind == "want":
+		reply["waiting"] = true
+	default:
+		reply["constellation"] = target.Constellation
+		if target.Constellation == "" {
+			reply["constellation"] = s.constellationOf(target.ID)
+		}
+	}
+	s.JSONResponse(w, http.StatusOK, reply)
+}
+
 // captureIntoWant marks a thing captured into a want: read, and proposed.
 func (s *Server) captureIntoWant(thingID, wantID string) {
 	_ = s.thingLabels.Set(thingID, capturePendingLabel, wantID)

@@ -130,6 +130,20 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 		t.Errorf("asked by the sender: proposals = %+v", props)
 	}
 
+	// A thing on the board already, caught: the same as one just shared — the
+	// target named in no constellation yet, its tile is proposed.
+	rec = httptest.NewRecorder()
+	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
+		strings.NewReader(`{"target":{"id":"want-1/result/d","constellation":"","label":"10/14"}}`)))
+	_ = json.Unmarshal(share("v")["things"], &things)
+	old := things[0].ID
+	_ = s.thingLabels.Remove(old, captureProposalLabel)
+	rec = httptest.NewRecorder()
+	s.captureExistingThing(rec, mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/api/v1/capture/things/"+old, strings.NewReader(`{}`)), map[string]string{"thing": old}))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"proposal"`) {
+		t.Errorf("existing thing: HTTP %d %s", rec.Code, rec.Body)
+	}
+
 	// Waited for, by thing: answered at once when one is there, empty when
 	// the wait is up for a thing with none.
 	rec = httptest.NewRecorder()

@@ -1,6 +1,8 @@
 package server
 
 import (
+	mywant "mywant/engine/core"
+
 	"sort"
 	"sync"
 	"time"
@@ -53,6 +55,8 @@ func (s *Server) attachBoardChanges() {
 	boardChanges.mu.Lock()
 	boardChanges.server = s
 	boardChanges.mu.Unlock()
+	// A want's answers changed — its cards' pages, its balls: the want changed.
+	mywant.OnResultHistoryChanged = func(w *mywant.Want) { boardWantsChanged(w.GetMetadata().ID) }
 }
 
 // boardWantsChanged says these wants changed (created, updated, deleted).

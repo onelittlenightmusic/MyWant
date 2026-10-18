@@ -90,16 +90,27 @@ func CalculateWantHash(w *Want) string {
 		}
 	}
 
+	// Its answers, by name and what each is about: a page of its card or a
+	// ball beside its tile added or let go is a change to the want a page must
+	// read again. Not LastSeen — an answer merely found again changes nothing
+	// shown.
+	var answers []string
+	for _, e := range w.ResultHistoryEntries() {
+		answers = append(answers, ResultHistoryKey(e)+"|"+e.About)
+	}
+
 	hashData := struct {
 		Metadata Metadata       `json:"metadata"`
 		Spec     WantSpec       `json:"spec"`
 		Status   WantStatus     `json:"status"`
 		State    map[string]any `json:"state"`
+		Answers  []string       `json:"answers,omitempty"`
 	}{
 		Metadata: w.GetMetadata(),
 		Spec:     *w.GetSpec(),
 		Status:   w.GetStatus(),
 		State:    state,
+		Answers:  answers,
 	}
 
 	jsonData, err := json.Marshal(hashData)
