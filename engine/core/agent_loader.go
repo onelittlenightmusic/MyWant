@@ -469,6 +469,7 @@ func mrsStateUpdatesToDefs(updates []MRSStateUpdate) []StateDef {
 // mrsApplyStateUpdates extracts values from the script JSON output and writes them
 // directly to want state. Falls back to writing mrs_raw_output when no updates declared.
 func mrsApplyStateUpdates(want *Want, raw map[string]any, updates []MRSStateUpdate) {
+	applyLabelUpdates(want, raw, "MRS")
 	if len(updates) == 0 {
 		// Legacy fallback: write full output to mrs_raw_output
 		want.StoreState("mrs_raw_output", raw)

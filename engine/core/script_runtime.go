@@ -36,7 +36,8 @@ type scriptOutput struct {
 	Directions     []any          `json:"directions"`
 	CurrentUpdates map[string]any `json:"current_updates"`
 	ShouldStop     bool           `json:"should_stop"`
-	JSONData       map[string]any `json:"json_data"` // structured data for onFetchData JSON path extraction
+	JSONData       map[string]any `json:"json_data"`     // structured data for onFetchData JSON path extraction
+	LabelUpdates   map[string]any `json:"label_updates"` // tile-* labels the script sets (see applyLabelUpdates)
 }
 
 // writeStateFiles writes goal/current/plan state to a temp directory and returns the file paths.
@@ -97,7 +98,11 @@ func parseScriptOutput(stdout []byte) (*scriptOutput, error) {
 // - result        → plan state
 // - current_updates → current state (only for current-labeled fields)
 // - json_data     → triggers onFetchData JSON path extraction for current-labeled state fields
+// - label_updates → tile-* labels (applyLabelUpdates)
 func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
+	if out.LabelUpdates != nil {
+		applyLabelUpdates(want, map[string]any{"label_updates": out.LabelUpdates}, agentLabel)
+	}
 	if out.Directions != nil {
 		want.SetPlan("directions", out.Directions)
 		want.StoreLog("[%s] directions updated: %v", agentLabel, out.Directions)

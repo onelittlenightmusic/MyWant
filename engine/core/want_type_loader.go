@@ -79,6 +79,7 @@ type WantTypeLoader struct {
 	predefinedState []StateDef                // Common state fields merged into every want type
 	userCustomNames map[string]bool           // types loaded from ~/.mywant/custom-types/ (user-deletable)
 	origins         map[string]WantTypeOrigin // provenance by type name, see want_type_origin.go
+	voiceScripts    map[string]string         // voice script path by type name, see want_voice.go
 }
 
 // PredefinedStateFile is the special YAML file containing common state fields
@@ -103,7 +104,26 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		validCategories: make(map[string]bool),
 		userCustomNames: make(map[string]bool),
 		origins:         make(map[string]WantTypeOrigin),
+		voiceScripts:    make(map[string]string),
 	}
+}
+
+// setVoiceScript records the voice script a type was loaded with (see
+// want_voice.go), or forgets one it no longer has. Must be called with mu held.
+func (w *WantTypeLoader) setVoiceScript(name, script string) {
+	if script == "" {
+		delete(w.voiceScripts, name)
+		return
+	}
+	w.voiceScripts[name] = script
+}
+
+// GetVoiceScript returns the path of a type's voice script, or "" when it has
+// none and speaks from the default lines.
+func (w *WantTypeLoader) GetVoiceScript(name string) string {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	return w.voiceScripts[name]
 }
 
 // indexGlobalParams adds ParameterDefs with DefaultGlobalParameterFrom to the index.
@@ -246,6 +266,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
+		w.setVoiceScript(def.Metadata.Name, voiceScriptOnDisk(filePath, false))
 		w.indexGlobalParams(def)
 
 		// Index by category
@@ -333,6 +354,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(path)
+		w.setVoiceScript(def.Metadata.Name, voiceScriptEmbedded(fsys, path))
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
@@ -408,6 +430,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = resolver.forCustomFile(dir, path, data)
+		w.setVoiceScript(def.Metadata.Name, voiceScriptOnDisk(path, true))
 		w.userCustomNames[def.Metadata.Name] = true
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
@@ -675,6 +698,7 @@ func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.warnFinalizeGates(def)
 	w.definitions[def.Metadata.Name] = def
 	w.origins[def.Metadata.Name] = WantTypeOrigin{Kind: WantTypeOriginAPI, Version: def.Metadata.Version}
+	w.setVoiceScript(def.Metadata.Name, "")
 	w.indexGlobalParams(def)
 }
 

@@ -587,6 +587,31 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 }
 
+// getWantVoice answers what a want says when someone stands on its tile:
+// {"say": "…"}, or {"say": null} when it has nothing to say. See
+// core/want_voice.go — the line is the want type's to decide.
+func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	if s.globalBuilder == nil {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
+		return
+	}
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
+		return
+	}
+	script := ""
+	if s.wantTypeLoader != nil {
+		script = s.wantTypeLoader.GetVoiceScript(want.GetMetadata().Type)
+	}
+	var say any
+	if line := mywant.WantVoice(r.Context(), want, script); line != "" {
+		say = line
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"say": say})
+}
+
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	var foundWant *mywant.Want

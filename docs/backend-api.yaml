@@ -226,6 +226,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/wants/{id}/voice:
+    get:
+      summary: Get what a want says
+      description: |
+        What the want says when someone stands on its tile: its type's voice
+        script (voice.py), or the default lines once it has some experience.
+        Cached until the want changes.
+      operationId: getWantVoice
+      tags:
+        - Wants
+      parameters:
+        - $ref: '#/components/parameters/WantId'
+      responses:
+        '200':
+          description: The line, or null for nothing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  say:
+                    type: string
+                    nullable: true
+        '404':
+          description: Want not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # Agent Management
   /api/v1/agents:
     post:

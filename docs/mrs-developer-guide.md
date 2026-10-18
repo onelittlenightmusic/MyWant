@@ -140,6 +140,33 @@ python3 main.py '{"room": "Room01", "date": "2026-04-12"}'
 }
 ```
 
+### タイルの見た目を変える（`label_updates`）
+出力に `label_updates` を入れると、want のラベルに書き込まれます。書けるのは `tile-` で始まるラベルだけです（配置や持ち主のラベルは書けません）。値は文字列か、カンマでつながれる配列。空文字か `null` で消えます。
+```json
+{"routes": [...], "label_updates": {"tile-effect-colors": ["#9ACD32", "#F15A22"]}}
+```
+例：transit_search は乗る路線の色を `tile-effect-colors` に書き、型のラベル `tile-effect: tie` と合わせて、タイルがその色のネクタイを締めます。
+
+### 盤面のセリフ（`voice.py`）
+カーソルマンが want のタイルに乗ると、want が一言しゃべります。何を言うかは want type が決めます（want ごとには変えられません）。
+
+| 置き場所 | ファイル |
+|---|---|
+| custom の plugin | want type の YAML と同じディレクトリの `voice.py` |
+| bundled の型 | `<type>.voice.py`（例：`want_types/system/checklist.voice.py`、`weather.voice.py`） |
+
+入力は `main.py` と同じく JSON 文字列1つ。出力は `say` だけが読まれます。
+```python
+want = json.loads(sys.argv[1])
+# {"name", "type", "experience", "last_answer", "state": {...}, "params": {...}}
+print(json.dumps({"say": "あと2個残ってるよ"}, ensure_ascii=False))
+```
+- `say` は文字列、交代で言う候補の配列、何も言わないときは `null`
+- `experience` は want が持っている答えの数（最大20）
+- 状態を読むだけのスクリプトにする。結果は want が変わるまでキャッシュされ、失敗やタイムアウト（3秒）は沈黙になる
+- `voice.py` がない型は、経験が5以上になると共通の決まり文句を言う（`engine/core/want_voice.go`）
+- 取得は `GET /api/v1/wants/{id}/voice` → `{"say": "…" | null}`
+
 ---
 
 ## 6. チェックリスト
