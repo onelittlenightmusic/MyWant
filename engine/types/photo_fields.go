@@ -153,15 +153,34 @@ func photoFieldAnswer(question string, p AnswerPhoto) (string, bool) {
 // AnswerFromPhotoFields is the answer to a question from the first photo
 // whose fields have it, newest answer first, saying which answer's photo.
 func AnswerFromPhotoFields(question string, photos []AnswerPhoto) (string, bool) {
+	v, _, ok := AnswerFromPhotoFieldsOf(question, photos)
+	return v, ok
+}
+
+// AnswerFromPhotoFieldsOf is AnswerFromPhotoFields and the photo (its thing
+// id) the answer was read off — the evidence, which the robot goes to.
+func AnswerFromPhotoFieldsOf(question string, photos []AnswerPhoto) (string, string, bool) {
 	for _, p := range photos {
 		if v, ok := photoFieldAnswer(question, p); ok {
 			if p.About != "" {
 				v = fmt.Sprintf("%s（%s の写真より）", v, p.About)
 			}
-			return v, true
+			return v, p.ID, true
 		}
 	}
-	return "", false
+	return "", "", false
+}
+
+// AnswerEvidence, when set, is told what an answer was read off — a photo
+// thing, a want, one of a want's answers (`<want id>/result/<key>`) — so the
+// robot goes and stands beside it (the server's answer_evidence.go).
+var AnswerEvidence func(id string)
+
+// showAnswerEvidence tells AnswerEvidence, when there is one to tell.
+func showAnswerEvidence(id string) {
+	if AnswerEvidence != nil && id != "" {
+		AnswerEvidence(id)
+	}
 }
 
 // foldWidth writes full-width ASCII (！ to ～, and the ideographic space) as

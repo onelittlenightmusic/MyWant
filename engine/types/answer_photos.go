@@ -143,8 +143,9 @@ func prepareAnswerPhotos(ctx context.Context, robot *Want, request string) []*ro
 		return nil
 	}
 	// Read into fields when it was joined: nothing to download or ask.
-	if v, ok := AnswerFromPhotoFields(question, photos); ok {
+	if v, id, ok := AnswerFromPhotoFieldsOf(question, photos); ok {
 		robot.StoreLog("[ROBOT] answered from a photo's fields: %s", v)
+		showAnswerEvidence(id)
 		return []*robotPicture{{Question: question, Answer: v}}
 	}
 	out := prepareFoundPhotos(ctx, robot, question, photos)
@@ -225,7 +226,8 @@ func readByRules(server *fmServer, root string, timeout time.Duration, p *robotP
 // look). ok=false when this machine has no model to ask, or no photo answers.
 func AnswerFromPhotos(ctx context.Context, robot *Want, question string, photos []AnswerPhoto) (string, bool) {
 	// Read into fields when it was joined: answered from them, no model.
-	if v, ok := AnswerFromPhotoFields(question, photos); ok {
+	if v, id, ok := AnswerFromPhotoFieldsOf(question, photos); ok {
+		showAnswerEvidence(id)
 		return v, true
 	}
 	binary, ok := fmToolPath()

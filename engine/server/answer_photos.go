@@ -49,6 +49,8 @@ func (s *Server) registerAnswerPhotos() {
 	types.AnswerPhotoReadSaver = func(id, imageURL string, read types.PhotoReading) {
 		s.keepPhotoReading(id, imageURL, "mywant", read)
 	}
+	// What an answer was read off: the robot goes and stands on it.
+	types.AnswerEvidence = func(id string) { go s.walkRobotToEvidence(id) }
 	types.AnswerReferentNote = func(question string) string {
 		if ref := s.resolveAnswerReferent(question, time.Now()); ref != nil {
 			return ref.text()

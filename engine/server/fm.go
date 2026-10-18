@@ -1437,11 +1437,7 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		// here and read out another want instead.
 		return "", fmt.Errorf("%q is not on the board — a want's parameter need not be: if it was asked for, deploy_want with it", name)
 	}
-	// x and y in one step: two would leave the robot a moment at one of them.
-	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
-		fmCanvasX: fmt.Sprint(found.x), fmCanvasY: fmt.Sprint(found.y),
-	}}}
-	if err := s.backend("PATCH", "/api/v1/wants/"+fmRobotWant, walk, nil); err != nil {
+	if err := s.fmWalkRobot(found.x, found.y); err != nil {
 		return "", fmt.Errorf("could not walk the robot there: %v", err)
 	}
 	if found.id != "" {
@@ -1452,6 +1448,16 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("The robot is standing on %s and saying: %s", found, words), nil
+}
+
+// fmWalkRobot stands the robot on a cell — how point shows where something is,
+// and how an answer shows what it was read off (answer_evidence.go).
+func (s *Server) fmWalkRobot(x, y int) error {
+	// x and y in one step: two would leave the robot a moment at one of them.
+	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
+		fmCanvasX: fmt.Sprint(x), fmCanvasY: fmt.Sprint(y),
+	}}}
+	return s.backend("PATCH", "/api/v1/wants/"+fmRobotWant, walk, nil)
 }
 
 // fmLook reads one want: its status and the state it has gathered, short.
@@ -1561,7 +1567,8 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// Asked after what its answers' photos show, with no time named
 	// (「ゴルフの最新スコアは？」): the newest photo's field (photo_fields.go).
 	if ref == nil && question != "" {
-		if v, ok := types.AnswerFromPhotoFields(question, s.findAnswerPhotos(question)); ok {
+		if v, photo, ok := types.AnswerFromPhotoFieldsOf(question, s.findAnswerPhotos(question)); ok {
+			s.walkRobotToEvidence(photo) // the card it was read off
 			if w.Metadata.ID != "" {
 				args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
 			}
@@ -1578,6 +1585,10 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// it holds is still read, and the person is asked whether to bring it back.
 	if w.Metadata.ID != "" {
 		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+		// What the answer is read off: the robot stands on the want.
+		if question != "" {
+			s.walkRobotToEvidence(w.Metadata.ID)
+		}
 	}
 	note := ""
 	if w.Metadata.Labels[fmArchived] == "true" {

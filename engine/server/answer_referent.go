@@ -313,11 +313,16 @@ func fmJapanese(q string) bool {
 // machine answers them (types.AnswerFromPhotos), else the words read from
 // them for the asker's own model to read.
 func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[string]string) string {
+	// The robot goes to what the answer is read off: the want whose answer
+	// it is — and, answered from a photo's field, on to the photo
+	// (types.AnswerEvidence, below).
 	if len(ref.Answers) > 0 {
 		a := ref.Answers[0]
 		args[fmCardArg] = fmCardValue("want", a.Want.Metadata.ID, a.Want.Metadata.Name)
+		s.walkRobotToEvidence(a.ID)
 	} else if len(ref.Wants) > 0 {
 		args[fmCardArg] = fmCardValue("want", ref.Wants[0].Metadata.ID, ref.Wants[0].Metadata.Name)
+		s.walkRobotToEvidence(ref.Wants[0].Metadata.ID)
 	}
 	var b strings.Builder
 	b.WriteString(ref.text())
