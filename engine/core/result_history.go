@@ -108,8 +108,10 @@ func (n *Want) recordResultHistory() {
 	n.resultRecordedAtRevision = rev
 	n.resultRecordedOnce = true
 
-	// The answers its run read as having come before (result_history_backfill.go).
+	// The answers its run read as having come before (result_history_backfill.go),
+	// and none its type would not keep (result_history_keep.go).
 	n.backfillResultHistory()
+	n.pruneResultHistory()
 
 	val, ok := resolveNestedStateField(n, field)
 	if !ok || isEmptyAnswer(val) {
@@ -121,6 +123,11 @@ func (n *Want) recordResultHistory() {
 	}
 
 	fields := n.answerFields(field)
+	if !n.keepsAnswer(fields) {
+		// Not an answer by its type's own account (history-if): a check that
+		// found no reservation, whatever its result field still carries.
+		return
+	}
 	now := time.Now()
 	entry := ResultHistoryEntry{
 		ID:        "out-" + strings.TrimPrefix(GenerateUUID(), "want-"),
