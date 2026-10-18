@@ -177,6 +177,7 @@ runner があるとき、スクリプトはエンジンではなく runner の�
 | ネットワーク | あり。エンジンの API は `$MYWANT_URL` | なし |
 | 環境変数 | `config.yaml` の `environments`、`MYWANT_URL`、`MYWANT_PLUGIN_DATA` | `PATH`・`HOME` など最低限 |
 
+- want type の YAML に書くインラインのスクリプト（`inlineAgents` の `script:`／`scriptFile:`、shell・python・ansible・rego）も同じく runner で、プロファイル main で動きます。`plugin-data` は `plugin-data/<want type>/`。runner のイメージにあるのは `bash`・`jq`・`python3` で、`ansible-playbook`・`opa` はありません。
 - `state.yaml`、`config.yaml`、`secrets/` は見えません。plugin が残すファイル（トークンなど）は `$MYWANT_PLUGIN_DATA` に置き、変数がないとき（runner なし）は今まで通りの場所に置きます（例：mywant-spotify-plugin）。
 - `~` と `/tmp` は書けますが、呼び出しごとに消えます。
 - 手元：`mywant runner start`（Docker が要る）／`stop`／`status`。runner の場所は `~/.mywant/runner.json` か `MYWANT_RUNNER`。

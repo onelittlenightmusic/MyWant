@@ -2,12 +2,9 @@ package mywant
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"time"
 )
 
 // regoRuntime evaluates OPA Rego policies as think-agent ticks.
@@ -33,58 +30,40 @@ func (r *regoRuntime) ExecuteThink(want *Want, script string) error {
 		return nil
 	}
 
-	tmpDir, err := os.MkdirTemp("", "rego-runtime-*")
+	inputBytes, err := json.Marshal(map[string]any{"goal": goalAll, "current": currentAll})
 	if err != nil {
-		return scriptErr(want, "REGO-THINK", fmt.Sprintf("failed to create temp dir: %v", err))
+		return scriptErr(want, "REGO-THINK", fmt.Sprintf("failed to marshal input: %v", err))
 	}
-	defer os.RemoveAll(tmpDir)
-
-	// Write policy file.
-	policyPath := filepath.Join(tmpDir, "policy.rego")
-	if err := os.WriteFile(policyPath, []byte(script), 0600); err != nil {
-		return scriptErr(want, "REGO-THINK", fmt.Sprintf("failed to write policy: %v", err))
-	}
-
-	// Build OPA input.
-	input := map[string]any{
-		"goal":    goalAll,
-		"current": currentAll,
-	}
-	inputBytes, _ := json.Marshal(input)
-	inputPath := filepath.Join(tmpDir, "input.json")
-	if err := os.WriteFile(inputPath, inputBytes, 0600); err != nil {
-		return scriptErr(want, "REGO-THINK", fmt.Sprintf("failed to write input: %v", err))
+	eval := func(query string) (*inlineResult, error) {
+		return runInline(inlineRun{
+			Want: want,
+			Argv: []string{"opa", "eval", "--format", "raw",
+				"--data", "policy.rego", "--input", "input.json", query},
+			Files:   map[string][]byte{"policy.rego": []byte(script), "input.json": inputBytes},
+			Timeout: 30 * time.Second,
+		})
 	}
 
 	// Evaluate `directions` rule.
 	want.StoreLog("[REGO-THINK] evaluating policy")
-	ctx := context.Background()
-	cmd := exec.CommandContext(ctx, "opa", "eval",
-		"--format", "raw",
-		"--data", policyPath,
-		"--input", inputPath,
-		"data.directions",
-	)
-	cmd.Env = os.Environ()
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
+	res, err := eval("data.directions")
+	if err != nil {
+		return scriptErr(want, "REGO-THINK", fmt.Sprintf("opa eval failed: %v", err))
+	}
+	if res.ExitCode != 0 {
 		// `opa eval` exits non-zero when the query has no result (undefined).
 		// Treat undefined as empty directions rather than an error.
-		if stdout.Len() == 0 {
+		if len(res.Stdout) == 0 {
 			want.SetPlan("directions", []any{})
 			want.SetCurrent("think_input_hash", inputHash)
 			return nil
 		}
-		return scriptErr(want, "REGO-THINK", fmt.Sprintf("opa eval failed: %v\nstderr:\n%s", err, stderr.String()))
+		return scriptErr(want, "REGO-THINK", fmt.Sprintf("opa eval failed: exit status %d\nstderr:\n%s", res.ExitCode, res.Stderr))
 	}
 
 	// Parse result — OPA `--format raw` returns the value directly.
 	// directions can be a set (printed as array) or array.
-	raw := bytes.TrimSpace(stdout.Bytes())
+	raw := bytes.TrimSpace(res.Stdout)
 	var directions []any
 	if err := json.Unmarshal(raw, &directions); err != nil {
 		// Could be a single value or empty — try wrapping.
@@ -96,16 +75,9 @@ func (r *regoRuntime) ExecuteThink(want *Want, script string) error {
 	}
 
 	// Also evaluate optional `result` rule.
-	resultCmd := exec.CommandContext(ctx, "opa", "eval",
-		"--format", "raw",
-		"--data", policyPath,
-		"--input", inputPath,
-		"data.result",
-	)
-	resultCmd.Env = os.Environ()
-	if resultOut, err := resultCmd.Output(); err == nil && len(bytes.TrimSpace(resultOut)) > 0 {
+	if res, err := eval("data.result"); err == nil && res.ExitCode == 0 && len(bytes.TrimSpace(res.Stdout)) > 0 {
 		var result any
-		if json.Unmarshal(bytes.TrimSpace(resultOut), &result) == nil {
+		if json.Unmarshal(bytes.TrimSpace(res.Stdout), &result) == nil {
 			want.SetPlan("result", result)
 		}
 	}

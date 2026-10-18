@@ -32,7 +32,8 @@ FROM alpine:3.20
 # tzdata: correct time handling for time-based wants (reminders).
 # git: POST /api/v1/customs clones the requested package onto this filesystem.
 # python3: script-backed agents shipped by customs run as "main.py".
-RUN apk add --no-cache ca-certificates git python3 su-exec tzdata \
+# bash, jq: what inline `runtime: shell` scripts are run with and read state by.
+RUN apk add --no-cache bash ca-certificates git jq python3 su-exec tzdata \
     && adduser -D -u 10001 app
 
 COPY --from=builder /out/mywant /usr/local/bin/mywant

@@ -35,6 +35,7 @@ import http.server
 import io
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -267,8 +268,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         try:
             req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
             params = req.get("params") or {}
-            script = params["script"]
-            args = params.get("args") or []
+            if _runner is not None and "command" in params:
+                script, args = None, None  # an inline script (_run_command)
+            else:
+                script = params["script"]
+                args = params.get("args") or []
         except (ValueError, KeyError, TypeError) as e:
             self.send_error(400, str(e))
             return
@@ -377,11 +381,11 @@ def _plugin_of(script, mywant):
 
 def _sees(profile, script, mywant, expose):
     """What a call may see, as [(path, writable)]. A path is kept as the engine
-    names it; where it is a link, its target is bound and the link remade."""
-    here = os.path.dirname(os.path.abspath(script))
+    names it; where it is a link, its target is bound and the link remade. An
+    inline script (no script path) has no directory of its own."""
+    paths = [(os.path.dirname(os.path.abspath(script)), False)] if script else []
     if profile == "voice":
-        return [(here, False)]
-    paths = [(here, False)]
+        return paths
     for root in ("custom-types", "customs"):
         top = os.path.join(mywant, root)
         if os.path.isdir(top):
@@ -513,8 +517,6 @@ class _Runner:
                 os._exit(1)  # the call was given up on
 
         try:
-            script = params["script"]
-            args = params.get("args") or []
             env = self._shut_in(params)
             os.environ.clear()
             os.environ.update(env)
@@ -522,7 +524,10 @@ class _Runner:
             send({"status": "failed", "error": f"sandbox: {e}"})
             out.close()
             return
-        _answer(run(script, args, send), send)
+        if "command" in params:
+            send(_run_command(params, env))
+        else:
+            _answer(run(params["script"], params.get("args") or [], send), send)
         out.close()
 
     def _shut_in(self, params):
@@ -530,13 +535,17 @@ class _Runner:
         profile = params.get("profile") or "main"
         if profile not in ("main", "voice"):
             raise ValueError(f"unknown profile {profile!r}")
-        script = os.path.abspath(params["script"])
+        script = os.path.abspath(params["script"]) if "command" not in params else None
+        if script:
+            plugin = _plugin_of(script, self.mywant)
+        else:  # an inline script: its want type's name
+            plugin = re.sub(r"[^A-Za-z0-9_.-]", "_", str(params.get("plugin") or "inline")).lstrip(".") or "inline"
         uid, gid = self.run_as()
         timeout = int(float(params.get("timeout") or 120)) + 1
 
         data = None
         if profile == "main":
-            data = os.path.join(self.mywant, "plugin-data", _plugin_of(script, self.mywant))
+            data = os.path.join(self.mywant, "plugin-data", plugin)
             for d in (os.path.dirname(data), data):
                 if not os.path.isdir(d):
                     os.makedirs(d, exist_ok=True)
@@ -555,7 +564,7 @@ class _Runner:
             os.setgid(gid)
             os.setuid(uid)
             _Libc().no_new_privs()
-        os.chdir(os.path.dirname(script))
+        os.chdir(os.path.dirname(script) if script else (data or "/"))
 
         env = {
             "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
@@ -616,6 +625,48 @@ class _Runner:
         os.rmdir(stage)
         libc.mount("tmpfs", "/tmp", "tmpfs", MS_NOSUID | MS_NODEV, "size=16m,mode=1777")
         libc.mount(None, "/", None, MS_BIND | MS_REMOUNT | MS_RDONLY)
+
+
+def _run_command(params, env):
+    """An inline script: its files written to a directory of its own, its
+    command run there, what it printed and left read back. A command that
+    fails still completes — its exit code and stderr are the engine's to read."""
+    import shutil
+    import subprocess
+    import tempfile
+    files = params.get("files") or {}
+    work = tempfile.mkdtemp(prefix="mywant-inline-")
+    try:
+        for name, body in files.items():
+            with open(os.path.join(work, os.path.basename(name)), "w", encoding="utf-8") as f:
+                f.write(body)
+        argv = [os.path.join(work, a) if a in files else a for a in params["command"]]
+        env = dict(env)
+        for k, name in (params.get("file_env") or {}).items():
+            env[k] = os.path.join(work, os.path.basename(name))
+        try:
+            p = subprocess.run(argv, cwd=work, env=env, stdin=subprocess.DEVNULL,
+                               capture_output=True, timeout=float(params.get("timeout") or 120),
+                               preexec_fn=_die_with_parent)
+        except FileNotFoundError:
+            return {"status": "failed", "error": f"{argv[0]}: not found in the runner"}
+        except subprocess.TimeoutExpired:
+            return {"status": "failed", "error": "script timed out in the runner"}
+        outputs = {}
+        for name in params.get("outputs") or []:
+            try:
+                with open(os.path.join(work, os.path.basename(name)), encoding="utf-8") as f:
+                    outputs[name] = f.read()
+            except OSError:
+                pass
+        return {"status": "completed", "state_updates": {
+            "exit_code": p.returncode,
+            "stdout": p.stdout.decode("utf-8", "replace"),
+            "stderr": p.stderr.decode("utf-8", "replace"),
+            "outputs": outputs,
+        }}
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def _hung_up(conn):

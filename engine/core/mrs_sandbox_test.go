@@ -291,6 +291,22 @@ print(json.dumps({
 		t.Errorf("main ran as uid %v, want ~/.mywant's owner", main["uid"])
 	}
 
+	// An inline script is shut in as main is, keeping files in its want type's
+	// plugin-data.
+	inline, err := runInline(inlineRun{
+		Want: &Want{Metadata: Metadata{Type: "probe_type"}},
+		Argv: []string{"/bin/sh", "-c", `cat "$HOME/.mywant/state.yaml" || echo hidden; echo x > "$MYWANT_PLUGIN_DATA/x" && echo kept; id -u`},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(inline.Stdout); got != "hidden\nkept\n1000\n" {
+		t.Errorf("inline printed %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(mywant, "plugin-data", "probe_type", "x")); err != nil {
+		t.Error(err)
+	}
+
 	voice, err := mrsRun(t, script, MRSRunOptions{Profile: MRSProfileVoice})
 	if err != nil {
 		t.Fatal(err)

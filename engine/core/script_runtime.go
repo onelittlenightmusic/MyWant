@@ -3,8 +3,6 @@ package mywant
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -40,48 +38,32 @@ type scriptOutput struct {
 	LabelUpdates   map[string]any `json:"label_updates"` // tile-* labels the script sets (see applyLabelUpdates)
 }
 
-// writeStateFiles writes goal/current/plan state to a temp directory and returns the file paths.
-// The caller is responsible for removing the tmpDir.
-func writeStateFiles(want *Want, tmpDir string) (goalPath, currentPath, planPath, inputPath string, err error) {
+// stateFiles is goal/current/plan state as the files a script reads:
+// goal.json, current.json, plan.json, and all three in input.json.
+func stateFiles(want *Want) (map[string][]byte, error) {
 	goalAll := want.GetAllGoal()
 	currentAll := want.GetAllCurrent()
 	planAll := want.GetAllPlan()
 
-	combined := scriptInput{Goal: goalAll, Current: currentAll, Plan: planAll}
-
+	combined, err := json.Marshal(scriptInput{Goal: goalAll, Current: currentAll, Plan: planAll})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal state: %w", err)
+	}
 	goalBytes, _ := json.Marshal(goalAll)
 	currentBytes, _ := json.Marshal(currentAll)
 	planBytes, _ := json.Marshal(planAll)
-	combinedBytes, merr := json.Marshal(combined)
-	if merr != nil {
-		return "", "", "", "", fmt.Errorf("failed to marshal state: %w", merr)
-	}
-
-	goalPath = filepath.Join(tmpDir, "goal.json")
-	currentPath = filepath.Join(tmpDir, "current.json")
-	planPath = filepath.Join(tmpDir, "plan.json")
-	inputPath = filepath.Join(tmpDir, "input.json")
-
-	files := map[string][]byte{
-		goalPath: goalBytes, currentPath: currentBytes,
-		planPath: planBytes, inputPath: combinedBytes,
-	}
-	for path, data := range files {
-		if werr := os.WriteFile(path, data, 0600); werr != nil {
-			return "", "", "", "", fmt.Errorf("failed to write %s: %w", path, werr)
-		}
-	}
-	return goalPath, currentPath, planPath, inputPath, nil
+	return map[string][]byte{
+		"goal.json": goalBytes, "current.json": currentBytes,
+		"plan.json": planBytes, "input.json": combined,
+	}, nil
 }
 
-// stateEnv builds the MYWANT_* environment variable slice from file paths.
-func stateEnv(goalPath, currentPath, planPath, inputPath string) []string {
-	return []string{
-		"MYWANT_GOAL_FILE=" + goalPath,
-		"MYWANT_CURRENT_FILE=" + currentPath,
-		"MYWANT_PLAN_FILE=" + planPath,
-		"MYWANT_INPUT_FILE=" + inputPath,
-	}
+// stateFileEnv names the MYWANT_* variable that points at each state file.
+var stateFileEnv = map[string]string{
+	"MYWANT_GOAL_FILE":    "goal.json",
+	"MYWANT_CURRENT_FILE": "current.json",
+	"MYWANT_PLAN_FILE":    "plan.json",
+	"MYWANT_INPUT_FILE":   "input.json",
 }
 
 // parseScriptOutput unmarshals JSON stdout into scriptOutput.
