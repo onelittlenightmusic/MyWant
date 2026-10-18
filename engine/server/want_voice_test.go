@@ -14,6 +14,7 @@ func TestGetWantVoice(t *testing.T) {
 	// Spawn the script per call: the shared agent service would outlive the
 	// test and hold its output open.
 	t.Setenv("MYWANT_MRS_SHARED", "0")
+	t.Setenv("MYWANT_RUNNER", "off")
 	s := patchTestServer(t)
 	if s.wantTypeLoader.GetVoiceScript("checklist") == "" {
 		t.Fatal("checklist.voice.py was not found beside checklist.yaml")

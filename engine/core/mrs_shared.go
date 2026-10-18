@@ -187,10 +187,35 @@ func runMRSShared(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 	if err != nil {
 		return nil, errMRSSpawnInstead
 	}
+	params := map[string]any{"script": scriptPath, "args": opt.Args}
+	result, err := postMRSExecute(ctx, base, filepath.Base(filepath.Dir(scriptPath)), params, opt)
+	switch {
+	case errors.Is(err, errMRSUnreachable):
+		// Never reached it: nothing ran, so spawning is safe.
+		mrsShared.stop()
+		return nil, errMRSSpawnInstead
+	case errors.Is(err, errMRSTransport):
+		mrsShared.stop()
+	}
+	return result, err
+}
+
+var (
+	// errMRSUnreachable: the service refused the connection, so nothing ran.
+	errMRSUnreachable = errors.New("mrs agent service unreachable")
+	// errMRSTransport: the service went away during the call. The script may
+	// have done part of its work, so it is not run again.
+	errMRSTransport = errors.New("mrs agent service connection lost")
+)
+
+// postMRSExecute sends one call to an agent service at base (the engine's own
+// shared service, or the runner) and reads its answer: progress objects, then
+// one ExecuteResponse.
+func postMRSExecute(ctx context.Context, base, agentName string, params map[string]any, opt MRSRunOptions) (map[string]any, error) {
 	body, err := json.Marshal(ExecuteRequest{
-		AgentName: filepath.Base(filepath.Dir(scriptPath)),
+		AgentName: agentName,
 		Operation: "mrs",
-		Params:    map[string]any{"script": scriptPath, "args": opt.Args},
+		Params:    params,
 	})
 	if err != nil {
 		return nil, err
@@ -206,12 +231,9 @@ func runMRSShared(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 			return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
 		}
 		if errors.Is(err, syscall.ECONNREFUSED) {
-			// Never reached it: nothing ran, so spawning is safe.
-			mrsShared.stop()
-			return nil, errMRSSpawnInstead
+			return nil, fmt.Errorf("%w: %v", errMRSUnreachable, err)
 		}
-		mrsShared.stop()
-		return nil, fmt.Errorf("mrs agent service: %w", err)
+		return nil, fmt.Errorf("%w: %v", errMRSTransport, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -226,10 +248,7 @@ func runMRSShared(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 			if ctx.Err() != nil {
 				return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
 			}
-			// The service went away mid-call. The script may have done part of
-			// its work, so it is not run again here.
-			mrsShared.stop()
-			return nil, fmt.Errorf("mrs agent service ended before answering: %w", err)
+			return nil, fmt.Errorf("%w: ended before answering: %v", errMRSTransport, err)
 		}
 		if pct, ok := obj["_progress"]; ok {
 			if opt.OnProgress != nil {

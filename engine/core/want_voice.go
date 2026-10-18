@@ -70,7 +70,12 @@ func voiceScriptOnDisk(yamlPath string, allowPlain bool) string {
 
 // voiceScriptEmbedded finds a bundled type's voice script in the binary and
 // writes it out where python3 can read it — named by its content, so a new
-// build writes a new file and an unchanged one reuses the old.
+// build writes a new file and an unchanged one reuses the old. Under ~/.mywant,
+// not the temp directory, because the runner sees ~/.mywant and not our /tmp;
+// each script in a directory of its own, because a voice call sees only its
+// script's directory.
+var voiceScriptDir = func() string { return filepath.Join(MyWantHomeDir(), "cache", "voice") }
+
 func voiceScriptEmbedded(fsys fs.FS, yamlPath string) string {
 	named := strings.TrimSuffix(yamlPath, filepath.Ext(yamlPath)) + voiceScriptSuffix
 	data, err := fs.ReadFile(fsys, named)
@@ -78,8 +83,13 @@ func voiceScriptEmbedded(fsys fs.FS, yamlPath string) string {
 		return ""
 	}
 	sum := sha256.Sum256(data)
-	out := filepath.Join(os.TempDir(), "mywant-voice-"+hex.EncodeToString(sum[:])[:12]+".py")
+	dir := filepath.Join(voiceScriptDir(), hex.EncodeToString(sum[:])[:12])
+	out := filepath.Join(dir, filepath.Base(named))
 	if !fileExists(out) {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			ErrorLog("[VOICE] cannot make %s: %v", dir, err)
+			return ""
+		}
 		if err := os.WriteFile(out, data, 0o644); err != nil {
 			ErrorLog("[VOICE] cannot write %s: %v", out, err)
 			return ""
@@ -171,7 +181,7 @@ func voiceLines(v any) []string {
 
 // runVoiceScript is how a script is run — a variable so tests need no python3.
 var runVoiceScript = func(ctx context.Context, script string, input []byte) (map[string]any, error) {
-	return RunMRSScript(ctx, script, MRSRunOptions{Args: []string{string(input)}})
+	return RunMRSScript(ctx, script, MRSRunOptions{Args: []string{string(input)}, Profile: MRSProfileVoice})
 }
 
 type voiceCacheEntry struct {

@@ -31,6 +31,7 @@ func mrsNeedPython(t *testing.T) {
 		t.Skip("python3 not available")
 	}
 	t.Setenv("MYWANT_MRS_SHARED", "1")
+	t.Setenv("MYWANT_RUNNER", "off") // not whatever runner this machine has
 	t.Cleanup(mrsShared.stop)
 }
 

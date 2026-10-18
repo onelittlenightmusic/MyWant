@@ -49,6 +49,10 @@ type MRSRunOptions struct {
 	// Isolated keeps the script out of the shared agent service (mrs_shared.go):
 	// it gets an interpreter of its own, spawned or resident as above.
 	Isolated bool
+	// Profile is what a runner shuts the call in with (mrs_sandbox.go):
+	// MRSProfileMain when empty, MRSProfileVoice for a voice script. Serve and
+	// Isolated mean nothing there — every runner call is a fork of its own.
+	Profile string
 }
 
 // RunMRSScript executes a skill and returns its final JSON object.
@@ -67,7 +71,11 @@ func RunMRSScript(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 		result map[string]any
 		err    error
 	)
-	if !opt.Isolated && mrsSharedEnabled() {
+	if base := MRSRunnerURL(); base != "" {
+		result, err = runMRSRunner(ctx, base, scriptPath, opt)
+	} else if mrsSandboxRequired() {
+		return nil, errMRSNoRunner
+	} else if mrsWarnUnsandboxed(); !opt.Isolated && mrsSharedEnabled() {
 		result, err = runMRSShared(ctx, scriptPath, opt)
 		if err != nil && mrsShouldFallBackToSpawn(err) {
 			// The service could not be reached; nothing ran.

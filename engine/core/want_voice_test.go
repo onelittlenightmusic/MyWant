@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -154,6 +155,9 @@ func TestVoiceScriptDiscovery(t *testing.T) {
 		t.Errorf("<type>.voice.py comes first, got %q", got)
 	}
 
+	savedDir := voiceScriptDir
+	defer func() { voiceScriptDir = savedDir }()
+	voiceScriptDir = func() string { return filepath.Join(dir, "cache") }
 	fsys := fstest.MapFS{
 		"want_types/system/checklist.yaml":     {Data: []byte("wantType: {}")},
 		"want_types/system/checklist.voice.py": {Data: []byte("print('{\"say\": \"hi\"}')")},
@@ -162,6 +166,9 @@ func TestVoiceScriptDiscovery(t *testing.T) {
 	out := voiceScriptEmbedded(fsys, "want_types/system/checklist.yaml")
 	if out == "" {
 		t.Fatal("bundled script not found")
+	}
+	if filepath.Base(out) != "checklist.voice.py" || !strings.HasPrefix(out, filepath.Join(dir, "cache")+string(filepath.Separator)) {
+		t.Errorf("written to %s", out)
 	}
 	if data, err := os.ReadFile(out); err != nil || string(data) != "print('{\"say\": \"hi\"}')" {
 		t.Errorf("written out as %q (%v)", data, err)

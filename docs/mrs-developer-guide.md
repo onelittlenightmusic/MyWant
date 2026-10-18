@@ -167,6 +167,21 @@ print(json.dumps({"say": "あと2個残ってるよ"}, ensure_ascii=False))
 - `voice.py` がない型は、経験が5以上になると共通の決まり文句を言う（`engine/core/want_voice.go`）
 - 取得は `GET /api/v1/wants/{id}/voice` → `{"say": "…" | null}`
 
+### サンドボックス（`mywant runner`）
+runner があるとき、スクリプトはエンジンではなく runner のコンテナで、1回ずつ閉じ込めて動きます（`engine/core/mrs_sandbox.go`）。
+
+| | `main.py` など（プロファイル main） | `voice.py`（プロファイル voice） |
+|---|---|---|
+| 読める | `custom-types/`、`customs/`（と、そのリンク先） | 自分のディレクトリだけ |
+| 書ける | `$MYWANT_PLUGIN_DATA`（`~/.mywant/plugin-data/<plugin>/`） | 残るところはない |
+| ネットワーク | あり。エンジンの API は `$MYWANT_URL` | なし |
+| 環境変数 | `config.yaml` の `environments`、`MYWANT_URL`、`MYWANT_PLUGIN_DATA` | `PATH`・`HOME` など最低限 |
+
+- `state.yaml`、`config.yaml`、`secrets/` は見えません。plugin が残すファイル（トークンなど）は `$MYWANT_PLUGIN_DATA` に置き、変数がないとき（runner なし）は今まで通りの場所に置きます（例：mywant-spotify-plugin）。
+- `~` と `/tmp` は書けますが、呼び出しごとに消えます。
+- 手元：`mywant runner start`（Docker が要る）／`stop`／`status`。runner の場所は `~/.mywant/runner.json` か `MYWANT_RUNNER`。
+- runner がないと、スクリプトは今まで通りエンジンの中で動きます（ログに1回警告）。`MYWANT_SANDBOX=required` なら断ります（fly はこちら）。
+
 ---
 
 ## 6. チェックリスト
