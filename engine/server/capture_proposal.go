@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +41,15 @@ const (
 	captureProposalLabel = "capture-proposal"
 	// A want type's field its photos are matched to answers by.
 	photoMatchLabel = "photo-match"
+	// On a captured thing: until when whatever captured it asks about it
+	// itself (the extension's copy offer, waiting for the proposal) — the
+	// board leaves it alone till then (RFC3339).
+	captureAskedUntilLabel = "capture-asked-until"
 )
+
+// captureAskWait is how long a sender that asks about its captures itself
+// keeps the board from asking — a photo is read, then proposed, meanwhile.
+const captureAskWait = 5 * time.Minute
 
 // captureProposal is what the board asks about one capture.
 type captureProposal struct {
@@ -56,6 +65,9 @@ type captureProposal struct {
 	Existing      bool   `json:"existing"`
 	// Why this answer: the capture's own time, as read.
 	By string `json:"by,omitempty"`
+	// Until when whatever captured it asks about it itself (RFC3339): the
+	// board waits till then.
+	AskedUntil string `json:"askedUntil,omitempty"`
 }
 
 // captureIntoWant marks a thing captured into a want: read, and proposed.
@@ -65,6 +77,52 @@ func (s *Server) captureIntoWant(thingID, wantID string) {
 	if s.thingLabels.All()[thingID][thingPictureLabel] == "" {
 		s.proposeCapture(thingID)
 	}
+}
+
+// captureIntoTile joins a capture to the thing or answer the net is aimed at
+// with no constellation named: into the one the tile is in already, at once;
+// else the board asks, offering a name after the tile — so a constellation is
+// named when the first thing is caught into it, not when the net is aimed.
+// The proposal is answered, for one waiting: whatever captured it asks the
+// name then and there (the extension's copy offer, the phone), else the
+// board does.
+func (s *Server) captureIntoTile(thingID string, t *CaptureTarget) *captureProposal {
+	if name := s.constellationOf(t.ID); name != "" {
+		s.setConstellationMembership("thing", name, thingID, true)
+		return nil
+	}
+	name := t.Name
+	if name == "" {
+		name = t.Label
+	}
+	p := captureProposal{
+		Thing: thingID, ThingLabel: s.thingValue(thingID),
+		Answer: t.ID, AnswerLabel: t.Label,
+		Constellation: strings.ReplaceAll(name, "/", "."),
+	}
+	if i := strings.Index(t.ID, answerSep); i >= 0 {
+		p.Want = t.ID[:i]
+	}
+	raw, _ := json.Marshal(p)
+	_ = s.thingLabels.Set(thingID, captureProposalLabel, string(raw))
+	boardThingsChanged(thingID)
+	go broadcastSSE("capture_proposals_changed", map[string]any{"thing": thingID})
+	return &p
+}
+
+// constellationOf is a constellation the tile is in (the first, by name), or "".
+func (s *Server) constellationOf(id string) string {
+	var names []string
+	for k, v := range s.thingLabels.All()[id] {
+		if v == "true" && strings.HasPrefix(k, constellationLabelPrefix) {
+			names = append(names, strings.TrimPrefix(k, constellationLabelPrefix))
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	sort.Strings(names)
+	return names[0]
 }
 
 // proposeCaptures proposes every capture waiting whose reading is done: read
@@ -136,11 +194,8 @@ func (s *Server) proposeCapture(thingID string) {
 		By: by,
 	}
 	// The constellation the answer is in already, else one named after it.
-	for k, v := range s.thingLabels.All()[answer] {
-		if v == "true" && strings.HasPrefix(k, constellationLabelPrefix) {
-			p.Constellation, p.Existing = strings.TrimPrefix(k, constellationLabelPrefix), true
-			break
-		}
+	if name := s.constellationOf(answer); name != "" {
+		p.Constellation, p.Existing = name, true
 	}
 	if p.Constellation == "" {
 		title := want.Metadata.Name
@@ -260,6 +315,7 @@ func (s *Server) captureProposals() []captureProposal {
 	for _, labels := range s.thingLabels.All() {
 		var p captureProposal
 		if raw := labels[captureProposalLabel]; raw != "" && json.Unmarshal([]byte(raw), &p) == nil {
+			p.AskedUntil = labels[captureAskedUntilLabel]
 			out = append(out, p)
 		}
 	}
@@ -267,14 +323,63 @@ func (s *Server) captureProposals() []captureProposal {
 	return out
 }
 
-// GET /api/v1/capture/proposals
+// GET /api/v1/capture/proposals[?things=a,b&wait=25] — each with askedUntil
+// when its sender is asking about it itself.
+//
+// With `things`, only theirs; with `wait` too (seconds, at most
+// captureProposalMaxWait), answered once one of them is proposed — a photo
+// being read meanwhile — or when the wait is up, with none. The one wait
+// every sender shares: the extension's copy offer, the phone's card and its
+// action button ask this and show what comes back.
 func (s *Server) getCaptureProposals(w http.ResponseWriter, r *http.Request) {
-	list := s.captureProposals()
-	if list == nil {
-		list = []captureProposal{}
+	var only map[string]bool
+	if raw := strings.TrimSpace(r.URL.Query().Get("things")); raw != "" {
+		only = map[string]bool{}
+		for _, id := range strings.Split(raw, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				only[id] = true
+			}
+		}
+	}
+	pick := func() []captureProposal {
+		out := []captureProposal{}
+		for _, p := range s.captureProposals() {
+			if only == nil || only[p.Thing] {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	list := pick()
+	if wait, err := strconv.Atoi(r.URL.Query().Get("wait")); err == nil && wait > 0 && only != nil && len(list) == 0 {
+		d := time.Duration(wait) * time.Second
+		if d > captureProposalMaxWait {
+			d = captureProposalMaxWait
+		}
+		deadline := time.NewTimer(d)
+		defer deadline.Stop()
+		tick := time.NewTicker(500 * time.Millisecond)
+		defer tick.Stop()
+	waiting:
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-deadline.C:
+				break waiting
+			case <-tick.C:
+				if list = pick(); len(list) > 0 {
+					break waiting
+				}
+			}
+		}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"proposals": list})
 }
+
+// captureProposalMaxWait bounds one wait for proposals; a sender waiting
+// longer asks again.
+const captureProposalMaxWait = 60 * time.Second
 
 // POST /api/v1/capture/proposals/{thing}  {accept: bool, constellation?: string}
 // — yes joins the answer and the capture in the constellation (the one
@@ -309,6 +414,7 @@ func (s *Server) answerCaptureProposal(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.thingLabels.Remove(thing, captureProposalLabel)
 	_ = s.thingLabels.Remove(thing, capturePendingLabel)
+	_ = s.thingLabels.Remove(thing, captureAskedUntilLabel)
 	boardThingsChanged(thing)
 	go broadcastSSE("capture_proposals_changed", map[string]any{"thing": thing})
 	reply := map[string]any{"accepted": body.Accept}

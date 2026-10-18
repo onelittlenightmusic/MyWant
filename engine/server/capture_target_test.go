@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
+
 	mwlabels "mywant/engine/labels"
 )
 
@@ -27,10 +29,14 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 		return nil, fmt.Errorf("reached %s", r.URL)
 	})}
 
-	share := func() map[string]json.RawMessage {
+	share := func(track ...string) map[string]json.RawMessage {
+		url := "https://open.spotify.com/track/x"
+		if len(track) > 0 {
+			url = "https://open.spotify.com/track/" + track[0]
+		}
 		rec := httptest.NewRecorder()
 		s.shareContent(rec, httptest.NewRequest(http.MethodPost, "/api/v1/things/share",
-			strings.NewReader(`{"urls":["https://open.spotify.com/track/x"],"capture":true}`)))
+			strings.NewReader(`{"urls":["`+url+`"],"capture":true}`)))
 		if rec.Code != http.StatusOK {
 			t.Fatalf("HTTP %d: %s", rec.Code, rec.Body)
 		}
@@ -66,6 +72,70 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 	}
 	if v := s.thingLabels.Get(things[0].ID)[constellationKey("SmartGolf 10.11")]; v != "true" {
 		t.Errorf("membership label = %q", v)
+	}
+
+	// Aimed with no name, as the board aims now: the first capture is asked
+	// about, named then; once the tile has its constellation, the next go
+	// straight in.
+	rec = httptest.NewRecorder()
+	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
+		strings.NewReader(`{"target":{"id":"want-1/result/b","constellation":"","label":"10/12 08:00 北新宿店"}}`)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT unnamed HTTP %d: %s", rec.Code, rec.Body)
+	}
+	asked := share("y")
+	_ = json.Unmarshal(asked["things"], &things)
+	first := things[0].ID
+	var waiting []captureProposal
+	_ = json.Unmarshal(asked["proposals"], &waiting)
+	if len(waiting) != 1 || waiting[0].Thing != first {
+		t.Errorf("reply's proposals = %s", asked["proposals"])
+	}
+	props := s.captureProposals()
+	if len(props) != 1 || props[0].Thing != first || props[0].Answer != "want-1/result/b" || props[0].Constellation != "10.12 08:00 北新宿店" || props[0].Want != "want-1" {
+		t.Fatalf("proposals = %+v", props)
+	}
+	rec = httptest.NewRecorder()
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodPost, "/api/v1/capture/proposals/"+first,
+		strings.NewReader(`{"accept":true,"constellation":"朝のラウンド"}`)), map[string]string{"thing": first})
+	s.answerCaptureProposal(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("answer HTTP %d: %s", rec.Code, rec.Body)
+	}
+	for _, id := range []string{first, "want-1/result/b"} {
+		if v := s.thingLabels.Get(id)[constellationKey("朝のラウンド")]; v != "true" {
+			t.Errorf("%s not joined: %q", id, v)
+		}
+	}
+	_ = json.Unmarshal(share("z")["things"], &things)
+	if things[0].ID == first {
+		t.Fatal("the second capture is the same thing")
+	}
+	if len(s.captureProposals()) != 0 {
+		t.Errorf("asked again once named: %+v", s.captureProposals())
+	}
+	if v := s.thingLabels.Get(things[0].ID)[constellationKey("朝のラウンド")]; v != "true" {
+		t.Errorf("second capture not joined: %q", v)
+	}
+
+	// A sender that asks itself: the proposal says until when, so the board
+	// waits.
+	rec = httptest.NewRecorder()
+	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
+		strings.NewReader(`{"target":{"id":"want-1/result/c","constellation":"","label":"10/13"}}`)))
+	rec = httptest.NewRecorder()
+	s.shareContent(rec, httptest.NewRequest(http.MethodPost, "/api/v1/things/share",
+		strings.NewReader(`{"urls":["https://open.spotify.com/track/w"],"capture":true,"ask":true}`)))
+	if props := s.captureProposals(); len(props) != 1 || props[0].AskedUntil == "" {
+		t.Errorf("asked by the sender: proposals = %+v", props)
+	}
+
+	// Waited for, by thing: answered at once when one is there, empty when
+	// the wait is up for a thing with none.
+	rec = httptest.NewRecorder()
+	s.getCaptureProposals(rec, httptest.NewRequest(http.MethodGet, "/api/v1/capture/proposals?things=nope&wait=1", nil))
+	if !strings.Contains(rec.Body.String(), `"proposals":[]`) {
+		t.Errorf("waited for none: %s", rec.Body)
 	}
 
 	// Put down: gone.

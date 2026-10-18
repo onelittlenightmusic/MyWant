@@ -14,9 +14,9 @@ import (
 // (`<want id>/result/<key>`) — whose constellation what gets captured goes
 // into.
 //
-// The board names it (the Y slot's capture skill), making the constellation
-// then, holding the tile alone, so the group has its name before anything is
-// caught into it. Everything that takes something in from outside — the
+// The board aims it (the Y slot's capture skill) and names nothing: the
+// constellation is named when the first thing is caught into it, as the
+// board asks to join the two (capture_proposal.go). Everything that takes something in from outside — the
 // browser extension's copy offer, the phone's share sheet and clipboard offer
 // — then captures with /things/share's `capture`: the thing is pinned AND
 // added to this constellation.
@@ -28,6 +28,9 @@ type CaptureTarget struct {
 	Kind          string `json:"kind"          yaml:"kind"`
 	Constellation string `json:"constellation" yaml:"constellation"`
 	Label         string `json:"label"         yaml:"label"`
+	// Name is what to offer a constellation of the tile as, when it is named
+	// at the first capture — else Label.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 }
 
 // captureTargetStore persists the target to ~/.mywant/capture-target.yaml.
@@ -59,7 +62,7 @@ func (c *captureTargetStore) Get() *CaptureTarget {
 		return nil
 	}
 	var t CaptureTarget
-	if yaml.Unmarshal(data, &t) != nil || t.ID == "" || (t.Constellation == "" && t.Kind != "want") {
+	if yaml.Unmarshal(data, &t) != nil || t.ID == "" {
 		return nil
 	}
 	return &t
@@ -92,10 +95,11 @@ func (s *Server) getCaptureTarget(w http.ResponseWriter, r *http.Request) {
 
 // PUT /api/v1/capture-target   body: {target: {id, kind?, constellation, label?} | null}
 //
-// The constellation is expected to exist already — the board makes it, with
-// the tile in it, before aiming the net — and is not made here. A whole want
-// (kind want) is aimed at with no constellation: what is caught into it waits
-// to be proposed one of the want's answers (capture_proposal.go).
+// A constellation given is expected to exist already, and is not made here.
+// Aimed with none — as the board aims — what is caught waits to be joined:
+// into a whole want, proposed one of its answers once read; into a thing or
+// an answer, proposed that tile, in a constellation named then
+// (capture_proposal.go).
 func (s *Server) putCaptureTarget(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Target *CaptureTarget `json:"target"`
@@ -108,10 +112,8 @@ func (s *Server) putCaptureTarget(w http.ResponseWriter, r *http.Request) {
 	if t != nil {
 		t.ID = strings.TrimSpace(t.ID)
 		t.Constellation = strings.TrimSpace(t.Constellation)
-		// A whole want needs no constellation: what is caught into it is
-		// proposed one of its answers once read (capture_proposal.go).
-		if t.ID == "" || (t.Constellation == "" && t.Kind != "want") {
-			s.JSONError(w, r, http.StatusBadRequest, "invalid capture target", "id and constellation are required")
+		if t.ID == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "invalid capture target", "id is required")
 			return
 		}
 		if t.Constellation != "" {

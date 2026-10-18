@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -408,6 +409,10 @@ type sharedContentRequest struct {
 	// (capture_target.go). With no target, the things are still made and
 	// pinned, and the answer says there was nowhere to capture them.
 	Capture bool `json:"capture"`
+	// Ask: the sender asks about what it captured itself — waits for the
+	// proposals (GET /capture/proposals) and answers them — so the board
+	// leaves them alone for a while (captureAskWait).
+	Ask bool `json:"ask"`
 }
 
 var sharedContentClient = &http.Client{Timeout: peekTimeout}
@@ -442,7 +447,10 @@ func (s *Server) classifySharedContent(w http.ResponseWriter, r *http.Request) {
 //
 // With `capture`, each is also added to the capture target's constellation —
 // the answer carries `capture: {target}` then, or `captureError` when there
-// is no target to capture into.
+// is no target to capture into. A target not in a constellation yet names
+// one now: the answer's `proposals` are the captures waiting for that name,
+// for the sender to ask and answer (POST /capture/proposals/{thing}) —
+// else the board asks.
 func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 	var body sharedContentRequest
 	if err := DecodeRequest(r, &body); err != nil {
@@ -462,6 +470,7 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 	}
 	pictures := picturesOf(r.Context(), sharedContentClient, things)
 	out := make([]sharedThingResult, 0, len(things))
+	proposals := []captureProposal{}
 	for i, t := range things {
 		info := types[t.Subtype]
 		res := sharedThingResult{sharedThing: t, Catalog: subtypeToKey(t.Subtype), Icon: info.Icon, Color: info.Color}
@@ -490,13 +499,22 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if target != nil {
-			if target.Constellation == "" {
+			switch {
+			case target.Constellation == "" && target.Kind == "want":
 				// Into a whole want: read, then proposed one of its answers.
 				s.captureIntoWant(entry.ID, target.ID)
-			} else {
+			case target.Constellation == "":
+				// Into a thing or an answer: joined, named when first asked.
+				if p := s.captureIntoTile(entry.ID, target); p != nil {
+					proposals = append(proposals, *p)
+				}
+			default:
 				s.setConstellationMembership("thing", target.Constellation, entry.ID, true)
 			}
 			res.Captured = true
+			if body.Ask {
+				_ = s.thingLabels.Set(entry.ID, captureAskedUntilLabel, time.Now().Add(captureAskWait).UTC().Format(time.RFC3339))
+			}
 		}
 		boardThingsChanged(entry.ID)
 		out = append(out, res)
@@ -505,6 +523,7 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 	if body.Capture {
 		if target != nil {
 			reply["capture"] = target
+			reply["proposals"] = proposals
 		} else {
 			reply["captureError"] = "no capture target"
 		}
