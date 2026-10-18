@@ -18,16 +18,19 @@ func (n *Want) setResolvedParam(key string, value any) {
 // getRawParamLocked returns the effective raw value for key: the resolved
 // value if this param was a {fromGlobalParam: key} reference, otherwise
 // whatever is in Spec.Params. Caller must hold metadataMutex (read or write).
+//
+// A resolved value counts only while the param is still a reference. A param
+// edited from {fromGlobalParam: here} to a literal 中野坂上 keeps its old
+// resolved value in memory until a restart of the server, and reading that
+// first ran a route from where the reference last pointed — 国分寺 → 国分寺 —
+// whatever the card said.
 func (n *Want) getRawParamLocked(key string) (any, bool) {
-	if n.resolvedParams != nil {
+	value, exists := n.Spec.Params[key]
+	if n.resolvedParams != nil && (!exists || globalParamRefKey(value) != "") {
 		if v, ok := n.resolvedParams[key]; ok {
 			return n.convertParamLocked(key, v), true
 		}
 	}
-	if n.Spec.Params == nil {
-		return nil, false
-	}
-	value, exists := n.Spec.Params[key]
 	if !exists {
 		return nil, false
 	}
