@@ -30,7 +30,7 @@ func TestDefaultVoiceLines(t *testing.T) {
 		n    int
 		want string // one of the lines, "" for none
 	}{
-		{0, ""}, {4, ""}, {5, "だんだん慣れてきたよ"}, {9, "だんだん慣れてきたよ"},
+		{0, "はじめての仕事だ"}, {4, "まだ4回だけ、覚えてる途中"}, {5, "だんだん慣れてきたよ"}, {9, "だんだん慣れてきたよ"},
 		{12, "12回こなしたよ"}, {15, "いい感じに回ってる"}, {20, "ベテランです"},
 	}
 	for _, c := range cases {
@@ -51,15 +51,59 @@ func TestDefaultVoiceLines(t *testing.T) {
 	}
 }
 
-// Without a script a want speaks once it has done enough, says the same thing
-// until it answers again, and seasoned wants do not all say the same line.
+// Where a want stands comes before how much it has done: waiting, failed or
+// put away it says that; reaching it talks about its experience; finished
+// early on it says so; deleting it says nothing.
+func TestDefaultVoiceFor(t *testing.T) {
+	cases := []struct {
+		status     WantStatus
+		experience int
+		want       string // one of the lines, "" for none
+	}{
+		{WantStatusIdle, 20, "準備してるよ"},
+		{WantStatusWaitingUserAction, 20, "あなたの返事を待ってるよ"},
+		{WantStatusFailed, 0, "うまくいかなかった…"},
+		{WantStatusArchived, 3, "しまわれてます"},
+		{WantStatusReaching, 0, "はじめての仕事だ"},
+		{WantStatusReaching, 20, "ベテランです"},
+		{WantStatusAchieved, 2, "できたよ"},
+		{WantStatusAchieved, 20, "ベテランです"},
+		{WantStatusReachingWithWarning, 12, warningVoice},
+		{WantStatusReachingWithWarning, 12, "調子いいよ"},
+		{WantStatusAchievedWithWarning, 0, "できたよ"},
+		{WantStatusDeleting, 20, ""},
+	}
+	for _, c := range cases {
+		lines := defaultVoiceFor(c.status, c.experience)
+		if c.want == "" {
+			if len(lines) != 0 {
+				t.Errorf("%s/%d: nothing to say, got %v", c.status, c.experience, lines)
+			}
+			continue
+		}
+		found := false
+		for _, l := range lines {
+			found = found || l == c.want
+		}
+		if !found {
+			t.Errorf("%s/%d: %q not among %v", c.status, c.experience, c.want, lines)
+		}
+	}
+	if len(statusVoice[WantStatusReaching]) != 0 {
+		t.Error("reaching is left to experience")
+	}
+}
+
+// Without a script every want says something, the same thing until it changes,
+// and seasoned wants do not all say the same line.
 func TestWantVoiceDefault(t *testing.T) {
 	base := time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC)
-	if got := WantVoice(context.Background(), voiceWant(t, "quiet", 3, base), ""); got != "" {
-		t.Errorf("three answers is no experience yet, got %q", got)
+	if got := WantVoice(context.Background(), voiceWant(t, "new", 0, base), ""); got == "" {
+		t.Error("a want that has done nothing yet still says something")
 	}
 
 	w := voiceWant(t, "steady", 20, base)
+	w.SetStatus(WantStatusReaching)
 	first := WantVoice(context.Background(), w, "")
 	if first == "" {
 		t.Fatal("a want with twenty answers says something")
@@ -70,7 +114,9 @@ func TestWantVoiceDefault(t *testing.T) {
 
 	said := map[string]bool{}
 	for i := 0; i < 12; i++ {
-		said[WantVoice(context.Background(), voiceWant(t, fmt.Sprintf("v%d", i), 20, base), "")] = true
+		v := voiceWant(t, fmt.Sprintf("v%d", i), 20, base)
+		v.SetStatus(WantStatusReaching)
+		said[WantVoice(context.Background(), v, "")] = true
 	}
 	if len(said) < 2 {
 		t.Errorf("twelve seasoned wants all said %v", said)

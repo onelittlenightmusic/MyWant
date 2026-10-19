@@ -21,7 +21,8 @@ package mywant
 //	{"say": ["a", "b"]}                 lines to take turns with
 //	{"say": null}                       nothing to say right now
 //
-// A type with no script speaks from defaultVoice once it has some experience.
+// A type with no script speaks from defaultVoiceFor: where it stands, then
+// how much it has done.
 // Either way the line is worked out here, on the server, so every surface that
 // draws the want (the board, the extension, the phone) says the same thing.
 
@@ -117,10 +118,9 @@ func voiceInput(w *Want) map[string]any {
 }
 
 // defaultVoice is what a want with no voice of its own says, by how much it
-// has done: the lines of the highest threshold it has reached. It starts at
-// five — a want that has done a thing twice has no feelings about it yet —
-// and stops at twenty, because the engine keeps twenty answers
-// (resultHistoryDepth) and so twenty is "a lot".
+// has done: the lines of the highest threshold it has reached. Twenty is the
+// top because the engine keeps twenty answers (resultHistoryDepth) and so
+// twenty is "a lot"; below five it is still learning, and says so.
 var defaultVoice = []struct {
 	at    int
 	lines []string
@@ -129,6 +129,62 @@ var defaultVoice = []struct {
 	{15, []string{"もう目をつぶってもできる", "いい感じに回ってる"}},
 	{10, []string{"%d回こなしたよ", "今日も任せて", "調子いいよ"}},
 	{5, []string{"だんだん慣れてきたよ", "ちょっとずつ分かってきた"}},
+	{1, []string{"まだ%d回だけ、覚えてる途中", "少しずつ慣れてきた"}},
+	{0, []string{"はじめての仕事だ", "はじめまして、やってみるね"}},
+}
+
+// statusVoice is what a want says about where it stands, before anything about
+// how much it has done: a want waiting for you or one that failed has that to
+// say first. Quiet words, never a call — the board is somewhere to come back
+// to, not something that shouts. A status not here (reaching, achieved past
+// its first time) leaves it to experience; deleting says nothing.
+var statusVoice = map[WantStatus][]string{
+	WantStatusIdle:              {"準備してるよ", "これから始めるね"},
+	WantStatusInitializing:      {"準備してるよ", "これから始めるね"},
+	WantStatusPrepareAgent:      {"準備してるよ", "これから始めるね"},
+	WantStatusWaitingUserAction: {"あなたの返事を待ってるよ", "急がなくていいよ"},
+	WantStatusSuspended:         {"ひと休み中", "また呼んでね"},
+	WantStatusFailed:            {"うまくいかなかった…", "もう一回やらせて"},
+	WantStatusConfigError:       {"設定を見てもらえる？"},
+	WantStatusModuleError:       {"調子が悪いみたい"},
+	WantStatusCancelled:         {"別のに替わったよ"},
+	WantStatusTerminated:        {"おしまい"},
+	WantStatusArchived:          {"しまわれてます"},
+}
+
+// achievedVoice is what a want that has finished says while it has little
+// experience to speak of; past that it talks like any seasoned want.
+var achievedVoice = []string{"できたよ", "おわった、ひと休み"}
+
+// warningVoice is mixed into what a want says when it got where it is with
+// something logged against it (reaching/achieved with a warning).
+const warningVoice = "…ちょっと気になることがある"
+
+// defaultVoiceFor is what w says with no script: its status first, then how
+// much it has done.
+func defaultVoiceFor(status WantStatus, experience int) []string {
+	warned := false
+	switch status {
+	case WantStatusReachingWithWarning:
+		status, warned = WantStatusReaching, true
+	case WantStatusAchievedWithWarning:
+		status, warned = WantStatusAchieved, true
+	}
+	var lines []string
+	switch {
+	case status == WantStatusDeleting:
+		return nil
+	case statusVoice[status] != nil:
+		lines = statusVoice[status]
+	case status == WantStatusAchieved && experience < 5:
+		lines = achievedVoice
+	default:
+		lines = defaultVoiceLines(experience)
+	}
+	if warned {
+		lines = append(append([]string{}, lines...), warningVoice)
+	}
+	return lines
 }
 
 func defaultVoiceLines(experience int) []string {
@@ -209,7 +265,7 @@ func WantVoice(ctx context.Context, w *Want, script string) string {
 func computeVoice(ctx context.Context, w *Want, script string) string {
 	var lines []string
 	if script == "" {
-		lines = defaultVoiceLines(len(w.ResultHistoryEntries()))
+		lines = defaultVoiceFor(w.GetStatus(), len(w.ResultHistoryEntries()))
 	} else {
 		input, err := json.Marshal(voiceInput(w))
 		if err != nil {

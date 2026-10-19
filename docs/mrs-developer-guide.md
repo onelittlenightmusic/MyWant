@@ -164,7 +164,7 @@ print(json.dumps({"say": "あと2個残ってるよ"}, ensure_ascii=False))
 - `say` は文字列、交代で言う候補の配列、何も言わないときは `null`
 - `experience` は want が持っている答えの数（最大20）
 - 状態を読むだけのスクリプトにする。結果は want が変わるまでキャッシュされ、失敗やタイムアウト（3秒）は沈黙になる
-- `voice.py` がない型は、経験が5以上になると共通の決まり文句を言う（`engine/core/want_voice.go`）
+- `voice.py` がない型も必ず何か言う。まず状態（返事待ち・失敗・ひと休み中など）、reaching と終わったあとは経験の回数で決まる（`engine/core/want_voice.go` の `defaultVoiceFor`）
 - 取得は `GET /api/v1/wants/{id}/voice` → `{"say": "…" | null}`
 
 ### サンドボックス（`mywant runner`）
