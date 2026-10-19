@@ -40,7 +40,10 @@ type fmTool struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	Arguments   []fmParam `json:"arguments"`
-	run         func(s *Server, args map[string]string) (string, error)
+	// Writes: the call changes the board. A device that shows the board
+	// (the iPhone app's web view) says "reflecting…" until it reads it back.
+	Writes bool `json:"writes,omitempty"`
+	run    func(s *Server, args map[string]string) (string, error)
 	// replays: run again when a turn is played again (fm_turns.go) — the
 	// steps that show something. Not the ones that make something, which a
 	// second run would make twice, nor the ones that only read.
@@ -112,7 +115,8 @@ var fmTools = []fmTool{
 			{Name: "params", Description: "The parameters as name=value pairs separated by commas, e.g. from=新宿, to=渋谷 — no quotes, no braces. Empty when there are none.", Required: true},
 			{Name: "name", Description: "A short name for the want, lowercase with hyphens", Required: false},
 		},
-		run: (*Server).fmDeployWant,
+		run:    (*Server).fmDeployWant,
+		Writes: true,
 	},
 	{
 		Name:        "restore_want",
@@ -120,7 +124,8 @@ var fmTools = []fmTool{
 		Arguments: []fmParam{
 			{Name: "name", Description: "The archived want's name, as the tool that found it gave it", Required: true},
 		},
-		run: (*Server).fmRestoreWant,
+		run:    (*Server).fmRestoreWant,
+		Writes: true,
 	},
 }
 
