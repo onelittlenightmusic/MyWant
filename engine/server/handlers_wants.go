@@ -336,6 +336,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	allWants := make([]wantAPIResponse, 0, len(wantsByID))
+	params := s.parameterCorrelationIndex()
 	for _, want := range wantsByID {
 		if shouldHideSystemWant(want, includeSystemWants) {
 			continue
@@ -349,7 +350,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		if series != "" && want.Metadata.Series != series {
 			continue
 		}
-		resp := s.buildWantAPIResponse(want, false)
+		resp := s.buildWantAPIResponseWith(want, false, params)
 		if extra := kataLabels[want.Metadata.ID]; len(extra) > 0 {
 			// The response's map is already its own copy (see buildWantAPIResponse);
 			// merged into a fresh one all the same, so the kata labels never leak
@@ -458,6 +459,14 @@ type wantAPIResponse struct {
 // into current/goal/plan buckets. Unlabeled explicit state fields (including system-reserved
 // fields like final_result) fall into the current bucket.
 func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity bool) wantAPIResponse {
+	return s.buildWantAPIResponseWith(want, includeConnectivity, nil)
+}
+
+// buildWantAPIResponseWith is buildWantAPIResponse with the parameter
+// correlations of every want already worked out (parameterCorrelationIndex) —
+// what a list passes, so it works them out once rather than once per want.
+// nil works out this want's alone.
+func (s *Server) buildWantAPIResponseWith(want *mywant.Want, includeConnectivity bool, params map[string][]enrichedCorrelationEntry) wantAPIResponse {
 	// One snapshot of the metadata, copied under the want's lock. The response
 	// used to carry want.Metadata itself, so its labels map was the live want's
 	// own and was read again, unlocked, when the response was encoded.
@@ -534,7 +543,11 @@ func (s *Server) buildWantAPIResponse(want *mywant.Want, includeConnectivity boo
 	// from the label store and the live thing usage, and carried in the same
 	// list under their own Kind.
 	enrichedCorr = append(enrichedCorr, s.constellationCorrelationEntries(want)...)
-	enrichedCorr = append(enrichedCorr, s.parameterCorrelationEntries(want)...)
+	if params != nil {
+		enrichedCorr = append(enrichedCorr, params[md.ID]...)
+	} else {
+		enrichedCorr = append(enrichedCorr, s.parameterCorrelationEntries(want)...)
+	}
 	meta := apiMetadata{Metadata: md, Correlation: enrichedCorr}
 
 	resp := wantAPIResponse{

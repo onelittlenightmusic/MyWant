@@ -103,9 +103,16 @@ func loadUserDataTypes() {
 
 // ThingStore persists user-entered values to ~/.mywant/thing.yaml.
 // Thread-safe; reads and writes are serialised via a mutex.
+//
+// What was last read or written is kept beside the file's stamp (fileStamp),
+// so the many readers per request — every want in a list asks what its
+// parameters stand for — parse the file once, not once each.
 type ThingStore struct {
 	path string
 	mu   sync.Mutex
+
+	cached []ThingEntry
+	stamp  fileStamp
 }
 
 // thingData is the catalog VIEW of the store: catalog key → values, most
@@ -157,10 +164,29 @@ func (m *ThingStore) SetPath(p string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.path = p
+	m.stamp = fileStamp{}
 }
 
 // loadEntries reads the store as it is stored: a list of identified things.
+// A copy each time: callers edit what they get and save it back.
 func (m *ThingStore) loadEntries() ([]ThingEntry, error) {
+	if m.stamp.matches(m.path) {
+		return append([]ThingEntry(nil), m.cached...), nil
+	}
+	// Stamped before reading, so a write landing in between makes the next
+	// read see a different stamp and read again.
+	stamp := stampOf(m.path)
+	entries, err := m.readEntries()
+	if err != nil {
+		m.stamp = fileStamp{}
+		return nil, err
+	}
+	m.cached, m.stamp = entries, stamp
+	return append([]ThingEntry(nil), entries...), nil
+}
+
+// readEntries parses the file as it is on disk.
+func (m *ThingStore) readEntries() ([]ThingEntry, error) {
 	bytes, err := os.ReadFile(m.path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -200,7 +226,12 @@ func (m *ThingStore) saveEntries(entries []ThingEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(m.path, bytes, 0o644)
+	m.stamp = fileStamp{}
+	if err := os.WriteFile(m.path, bytes, 0o644); err != nil {
+		return err
+	}
+	m.cached, m.stamp = append([]ThingEntry(nil), entries...), stampOf(m.path)
+	return nil
 }
 
 // save takes the catalog view and writes it back, keeping the id of anything
@@ -237,6 +268,7 @@ func (m *ThingStore) saveLegacy(data thingData) error {
 	if err != nil {
 		return err
 	}
+	m.stamp = fileStamp{}
 	return os.WriteFile(m.path, bytes, 0o644)
 }
 

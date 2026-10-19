@@ -222,22 +222,31 @@ func (s *Server) parameterCorrelationEntries(want *mywant.Want) []enrichedCorrel
 	if want == nil || want.Metadata.ID == "" {
 		return nil
 	}
-	wid := want.Metadata.ID
+	return s.parameterCorrelationIndex()[want.Metadata.ID]
+}
+
+// parameterCorrelationIndex is parameterCorrelationEntries for every want at
+// once, by want id. Working out which wants name which things walks every
+// want, so a list asks once and looks each want up here — asked per want, a
+// list of n wants walked them n times over.
+func (s *Server) parameterCorrelationIndex() map[string][]enrichedCorrelationEntry {
 	uuidByPair := s.thingUUIDByPair()
-	var out []enrichedCorrelationEntry
+	out := map[string][]enrichedCorrelationEntry{}
 	for _, u := range s.deriveThingUsage() {
+		// The canvas needs the thing's UUID; u.ID is the "catalog::value"
+		// pair. Fall back to the pair for a named value with no thing
+		// record — the overlay can still show it, it just can't be jumped to.
+		target := uuidByPair[u.ID]
+		if target == "" {
+			target = u.ID
+		}
+		seen := map[string]bool{}
 		for _, id := range u.WantIDs {
-			if id != wid {
+			if seen[id] {
 				continue
 			}
-			// The canvas needs the thing's UUID; u.ID is the "catalog::value"
-			// pair. Fall back to the pair for a named value with no thing
-			// record — the overlay can still show it, it just can't be jumped to.
-			target := uuidByPair[u.ID]
-			if target == "" {
-				target = u.ID
-			}
-			out = append(out, enrichedCorrelationEntry{
+			seen[id] = true
+			out[id] = append(out[id], enrichedCorrelationEntry{
 				Kind:       "parameter",
 				TargetKind: "thing",
 				TargetID:   target,
@@ -245,7 +254,6 @@ func (s *Server) parameterCorrelationEntries(want *mywant.Want) []enrichedCorrel
 				Rate:       parameterRelationRate,
 				DataType:   u.Subtype,
 			})
-			break
 		}
 	}
 	return out

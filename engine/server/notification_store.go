@@ -52,9 +52,17 @@ type NotificationEntry struct {
 // NotificationStore appends notices to ~/.mywant/notifications.yaml.
 // Mirrors ThingEventStore: load-modify-save under a mutex, newest last on disk,
 // readers reverse for most-recent-first. Thread-safe.
+//
+// The log runs to maxNotifications entries — hundreds of KB of YAML — and the
+// board asks for its unread counts on every poll, so what was last read or
+// written is kept beside the file's stamp (fileStamp) and parsed again only
+// when the file changes.
 type NotificationStore struct {
 	path string
 	mu   sync.Mutex
+
+	cached []NotificationEntry
+	stamp  fileStamp
 }
 
 func newNotificationStore() *NotificationStore {
@@ -62,14 +70,20 @@ func newNotificationStore() *NotificationStore {
 	return &NotificationStore{path: filepath.Join(home, ".mywant", "notifications.yaml")}
 }
 
+// load is the log, oldest first — a copy, since callers edit it and save it back.
 func (n *NotificationStore) load() []NotificationEntry {
-	bytes, err := os.ReadFile(n.path)
-	if err != nil {
-		return nil
+	if !n.stamp.matches(n.path) {
+		stamp := stampOf(n.path) // before reading: a write in between reads again next time
+		bytes, err := os.ReadFile(n.path)
+		if err != nil {
+			n.cached, n.stamp = nil, fileStamp{}
+			return nil
+		}
+		var entries []NotificationEntry
+		_ = yaml.Unmarshal(bytes, &entries)
+		n.cached, n.stamp = entries, stamp
 	}
-	var entries []NotificationEntry
-	_ = yaml.Unmarshal(bytes, &entries)
-	return entries
+	return append([]NotificationEntry(nil), n.cached...)
 }
 
 func (n *NotificationStore) save(entries []NotificationEntry) error {
@@ -80,7 +94,12 @@ func (n *NotificationStore) save(entries []NotificationEntry) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(n.path, bytes, 0o644)
+	n.stamp = fileStamp{}
+	if err := os.WriteFile(n.path, bytes, 0o644); err != nil {
+		return err
+	}
+	n.cached, n.stamp = append([]NotificationEntry(nil), entries...), stampOf(n.path)
+	return nil
 }
 
 // Record appends one notice, stamping id and time if unset.
