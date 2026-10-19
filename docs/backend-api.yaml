@@ -231,7 +231,8 @@ paths:
       summary: Get what a want says
       description: |
         What the want says when someone stands on its tile: its type's voice
-        script (voice.py), or the default lines once it has some experience.
+        script (voice.py), or the default lines by its status and experience.
+        With it, the line's mood — what the board plays as it comes up.
         Cached until the want changes.
       operationId: getWantVoice
       tags:
@@ -249,6 +250,10 @@ paths:
                   say:
                     type: string
                     nullable: true
+                  mood:
+                    type: string
+                    enum: [joy, eager, calm, waiting, sad, worried]
+                    description: Absent when say is null
         '404':
           description: Want not found
           content:

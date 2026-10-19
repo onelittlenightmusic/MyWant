@@ -155,17 +155,18 @@ python3 main.py '{"room": "Room01", "date": "2026-04-12"}'
 | custom の plugin | want type の YAML と同じディレクトリの `voice.py` |
 | bundled の型 | `<type>.voice.py`（例：`want_types/system/checklist.voice.py`、`weather.voice.py`） |
 
-入力は `main.py` と同じく JSON 文字列1つ。出力は `say` だけが読まれます。
+入力は `main.py` と同じく JSON 文字列1つ。出力は `say` と `mood` が読まれます。
 ```python
 want = json.loads(sys.argv[1])
 # {"name", "type", "experience", "last_answer", "state": {...}, "params": {...}}
 print(json.dumps({"say": "あと2個残ってるよ"}, ensure_ascii=False))
 ```
 - `say` は文字列、交代で言う候補の配列、何も言わないときは `null`
+- `mood` は任意で、セリフの感情（`joy` / `eager` / `calm` / `waiting` / `sad` / `worried`）。盤面は乗ったときにその音を鳴らす。省くか知らない値なら、セリフの言葉から決まる（`moodOf`）
 - `experience` は want が持っている答えの数（最大20）
 - 状態を読むだけのスクリプトにする。結果は want が変わるまでキャッシュされ、失敗やタイムアウト（3秒）は沈黙になる
 - `voice.py` がない型も必ず何か言う。まず状態（返事待ち・失敗・ひと休み中など）、reaching と終わったあとは経験の回数で決まる（`engine/core/want_voice.go` の `defaultVoiceFor`）
-- 取得は `GET /api/v1/wants/{id}/voice` → `{"say": "…" | null}`
+- 取得は `GET /api/v1/wants/{id}/voice` → `{"say": "…", "mood": "joy"}` か `{"say": null}`
 
 ### サンドボックス（`mywant runner`）
 runner があるとき、スクリプトはエンジンではなく runner のコンテナで、1回ずつ閉じ込めて動きます（`engine/core/mrs_sandbox.go`）。

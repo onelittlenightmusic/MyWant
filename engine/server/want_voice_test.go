@@ -8,8 +8,8 @@ import (
 )
 
 // A checklist says how many are left — from its type's voice script, which the
-// loader found beside checklist.yaml — and a want with no script and no
-// experience says nothing.
+// loader found beside checklist.yaml — with the mood its words have, and a
+// want with no script still says something.
 func TestGetWantVoice(t *testing.T) {
 	// Spawn the script per call: the shared agent service would outlive the
 	// test and hold its output open.
@@ -28,17 +28,18 @@ func TestGetWantVoice(t *testing.T) {
 		t.Fatalf("create: %d %s", w.Code, w.Body.String())
 	}
 
-	say := func(id string) any {
+	body := func(id string) map[string]any {
 		r := patchTestDo(t, s, "GET", "/api/v1/wants/"+id+"/voice", nil)
 		if r.Code != http.StatusOK {
 			t.Fatalf("voice: %d %s", r.Code, r.Body.String())
 		}
-		var body map[string]any
-		if err := json.Unmarshal(r.Body.Bytes(), &body); err != nil {
+		var out map[string]any
+		if err := json.Unmarshal(r.Body.Bytes(), &out); err != nil {
 			t.Fatal(err)
 		}
-		return body["say"]
+		return out
 	}
+	say := func(id string) any { return body(id)["say"] }
 
 	var id string
 	for i := 0; i < 150 && id == ""; i++ {
@@ -64,12 +65,12 @@ func TestGetWantVoice(t *testing.T) {
 		t.Errorf("checklist says %v", got)
 	}
 	want.StoreState("items", []any{map[string]any{"id": "a", "text": "牛乳", "done": true}})
-	if got := say(id); got != "全部終わった！" {
+	if got := body(id); got["say"] != "全部終わった！" || got["mood"] != "joy" {
 		t.Errorf("after ticking the rest, checklist says %v", got)
 	}
 
-	if got := say(patchTestWant(t, s)); got != nil {
-		t.Errorf("a new queue has no voice yet, got %v", got)
+	if got := body(patchTestWant(t, s)); got["say"] == nil || got["mood"] == nil {
+		t.Errorf("a new queue says something too, got %v", got)
 	}
 	if r := patchTestDo(t, s, "GET", "/api/v1/wants/nope/voice", nil); r.Code != http.StatusNotFound {
 		t.Errorf("unknown want: %d", r.Code)

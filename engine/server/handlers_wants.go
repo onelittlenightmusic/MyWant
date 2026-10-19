@@ -588,8 +588,9 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 }
 
 // getWantVoice answers what a want says when someone stands on its tile:
-// {"say": "…"}, or {"say": null} when it has nothing to say. See
-// core/want_voice.go — the line is the want type's to decide.
+// {"say": "…", "mood": "joy"}, or {"say": null} when it has nothing to say.
+// See core/want_voice.go — the line is the want type's to decide, and its mood
+// is what the board plays as it comes up.
 func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	if s.globalBuilder == nil {
@@ -605,11 +606,12 @@ func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	if s.wantTypeLoader != nil {
 		script = s.wantTypeLoader.GetVoiceScript(want.GetMetadata().Type)
 	}
-	var say any
-	if line := mywant.WantVoice(r.Context(), want, script); line != "" {
-		say = line
+	line := mywant.WantVoice(r.Context(), want, script)
+	if line.Say == "" {
+		s.JSONResponse(w, http.StatusOK, map[string]any{"say": nil})
+		return
 	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"say": say})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"say": line.Say, "mood": line.Mood})
 }
 
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {

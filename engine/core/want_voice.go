@@ -20,6 +20,8 @@ package mywant
 //	{"say": "あと2個残ってるよ"}        one line
 //	{"say": ["a", "b"]}                 lines to take turns with
 //	{"say": null}                       nothing to say right now
+//	{"say": "…", "mood": "sad"}         and how it feels (else read from
+//	                                    the words — see moodOf)
 //
 // A type with no script speaks from defaultVoiceFor: where it stands, then
 // how much it has done.
@@ -240,48 +242,110 @@ var runVoiceScript = func(ctx context.Context, script string, input []byte) (map
 	return RunMRSScript(ctx, script, MRSRunOptions{Args: []string{string(input)}, Profile: MRSProfileVoice})
 }
 
+// A mood is the kind of feeling a line has — what the board plays as the
+// line comes up, so the same word sounds the same wherever it is said.
+const (
+	MoodJoy     = "joy"     // できた、ありがとう、いい天気！
+	MoodEager   = "eager"   // はじめて、やってみる、任せて
+	MoodCalm    = "calm"    // 準備してる、ひと休み — anything not below
+	MoodWaiting = "waiting" // 待ってるよ、急がなくていい
+	MoodSad     = "sad"     // うまくいかなかった、おしまい
+	MoodWorried = "worried" // 気になる、調子が悪い、気をつけて
+)
+
+// moodWords sorts a line by its words: the first mood with a word in the line
+// is its mood, so the stronger feelings are looked for first — "雪だ！足元に
+// 気をつけて" is a worry before it is a cheer. A line with none is calm.
+var moodWords = []struct {
+	mood  string
+	words []string
+}{
+	{MoodWorried, []string{"気になる", "調子が悪い", "見てもらえる", "こわい", "気をつけ", "忘れないで", "見えない", "溶け"}},
+	{MoodSad, []string{"うまくいかなかった", "おしまい", "替わった", "見えなかった", "寒い", "さむい"}},
+	{MoodWaiting, []string{"待って", "急がなく", "呼んで"}},
+	{MoodJoy, []string{"できた", "終わった", "おわった", "ありがとう", "元気", "ベテラン", "調子いい", "いい感じ", "いい天気", "ぽかぽか", "目をつぶって", "こなした", "！"}},
+	{MoodEager, []string{"はじめ", "やってみる", "やらせて", "任せて", "聞いて", "これから", "覚えて", "慣れて", "分かってきた"}},
+}
+
+// moodOf is the mood of a line, by its words.
+func moodOf(line string) string {
+	for _, m := range moodWords {
+		for _, w := range m.words {
+			if strings.Contains(line, w) {
+				return m.mood
+			}
+		}
+	}
+	return MoodCalm
+}
+
+// knownMood is whether m is one of the moods the board can play.
+func knownMood(m string) bool {
+	switch m {
+	case MoodJoy, MoodEager, MoodCalm, MoodWaiting, MoodSad, MoodWorried:
+		return true
+	}
+	return false
+}
+
+// VoiceLine is what a want says and how it feels about it.
+type VoiceLine struct {
+	Say  string
+	Mood string
+}
+
 type voiceCacheEntry struct {
 	hash string
-	say  string
+	line VoiceLine
 }
 
 // voiceCache remembers each want's line until the want changes: standing on a
 // tile again, or another page asking, does not run the script again.
 var voiceCache sync.Map // want ID → voiceCacheEntry
 
-// WantVoice is what w says now, or "" for nothing. script is its type's voice
-// script ("" when the type has none — see WantTypeLoader.GetVoiceScript).
-func WantVoice(ctx context.Context, w *Want, script string) string {
+// WantVoice is what w says now (Say "" for nothing). script is its type's
+// voice script ("" when the type has none — see WantTypeLoader.GetVoiceScript).
+func WantVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	id := w.GetMetadata().ID
 	hash := CalculateWantHash(w) + "|" + script
 	if e, ok := voiceCache.Load(id); ok && e.(voiceCacheEntry).hash == hash {
-		return e.(voiceCacheEntry).say
+		return e.(voiceCacheEntry).line
 	}
-	say := computeVoice(ctx, w, script)
-	voiceCache.Store(id, voiceCacheEntry{hash: hash, say: say})
-	return say
+	line := computeVoice(ctx, w, script)
+	voiceCache.Store(id, voiceCacheEntry{hash: hash, line: line})
+	return line
 }
 
-func computeVoice(ctx context.Context, w *Want, script string) string {
+// computeVoice picks the line, and its mood: the script's "mood" when it gave
+// one the board knows, or else the line's own words (moodOf).
+func computeVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	var lines []string
+	mood := ""
 	if script == "" {
 		lines = defaultVoiceFor(w.GetStatus(), len(w.ResultHistoryEntries()))
 	} else {
 		input, err := json.Marshal(voiceInput(w))
 		if err != nil {
-			return ""
+			return VoiceLine{}
 		}
 		ctx, cancel := context.WithTimeout(ctx, voiceTimeout)
 		defer cancel()
 		out, err := runVoiceScript(ctx, script, input)
 		if err != nil {
 			ErrorLog("[VOICE] %s (%s): %v", w.GetMetadata().Name, script, err)
-			return ""
+			return VoiceLine{}
 		}
 		lines = voiceLines(out["say"])
+		if m, ok := out["mood"].(string); ok && knownMood(m) {
+			mood = m
+		}
 	}
 	if len(lines) == 0 {
-		return ""
+		return VoiceLine{}
 	}
-	return lines[voiceSeed(w)%uint32(len(lines))]
+	say := lines[voiceSeed(w)%uint32(len(lines))]
+	if mood == "" {
+		mood = moodOf(say)
+	}
+	return VoiceLine{Say: say, Mood: mood}
 }
