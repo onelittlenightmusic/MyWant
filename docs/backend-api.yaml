@@ -81,6 +81,17 @@ paths:
       operationId: listWants
       tags:
         - Wants
+      parameters:
+        - name: history
+          in: query
+          description: >
+            How much of each want's history to carry. By default a list carries
+            the answers (resultHistory) alone and marks each want
+            `history_scope: results`; `all` carries the state, parameter, log
+            and agent histories as well.
+          schema:
+            type: string
+            enum: [results, all]
       responses:
         '200':
           description: All wants in memory dump format
@@ -98,6 +109,17 @@ paths:
         - Wants
       parameters:
         - $ref: '#/components/parameters/WantId'
+        - name: history
+          in: query
+          description: >
+            `results` carries the want's answers (resultHistory) alone and marks
+            it `history_scope: results` — what the board's poll asks for. By
+            default the want carries every history. Each history keeps its
+            newest entries within a size budget (state 64KB; parameter, log and
+            agent 32KB each), and always its newest; answers are not cut.
+          schema:
+            type: string
+            enum: [results, all]
       responses:
         '200':
           description: Want details

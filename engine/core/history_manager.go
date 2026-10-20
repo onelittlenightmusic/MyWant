@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 )
@@ -31,18 +32,98 @@ func NewHistoryManager() *HistoryManager {
 	}
 }
 
-// GetHistory returns a snapshot of all histories
+// History budgets, in bytes of the entries as JSON (roughly — see approxSize).
+//
+// The rings cap how many entries they keep, not how big one is. A state entry
+// holds whatever was written within its second, and a robot's holds every
+// response it has given — 36KB a snapshot. That was written into state.yaml on
+// every change and sent with the want each time it was asked for, and no one
+// reads two hundred of them. So each history keeps its newest entries while
+// they fit its budget, and always its newest one.
+//
+// The answers (resultHistory) are not cut: they are what the board pages
+// through, notices name them by id, and the ring already keeps only twenty
+// distinct ones.
+const (
+	stateHistoryBudget     = 64 << 10
+	parameterHistoryBudget = 32 << 10
+	logHistoryBudget       = 32 << 10
+	agentHistoryBudget     = 32 << 10
+)
+
+// GetHistory returns a snapshot of all histories, each cut to its budget.
 func (h *HistoryManager) GetHistory() WantHistory {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
+	stateSize := func(e StateHistoryEntry) int { return approxSize(e.StateValue) + 64 }
 	return WantHistory{
-		StateHistory:     h.StateHistoryRing.Snapshot(0),
-		ParameterHistory: h.ParameterHistoryRing.Snapshot(0),
-		LogHistory:       h.LogHistoryRing.Snapshot(0),
-		AgentHistory:     h.AgentHistoryRing.Snapshot(0),
-		ResultHistory:    h.ResultHistoryRing.Snapshot(0),
+		StateHistory:     newestWithin(h.StateHistoryRing.Snapshot(0), stateHistoryBudget, stateSize),
+		ParameterHistory: newestWithin(h.ParameterHistoryRing.Snapshot(0), parameterHistoryBudget, stateSize),
+		LogHistory: newestWithin(h.LogHistoryRing.Snapshot(0), logHistoryBudget,
+			func(e LogHistoryEntry) int { return len(e.Logs) + 48 }),
+		AgentHistory: newestWithin(h.AgentHistoryRing.Snapshot(0), agentHistoryBudget,
+			func(e AgentExecution) int { return approxSize(e) }),
+		ResultHistory: h.ResultHistoryRing.Snapshot(0),
 	}
+}
+
+// newestWithin is the newest entries (oldest first, as given) whose sizes add
+// up to no more than budget — and the newest one even when it alone is over.
+func newestWithin[T any](entries []T, budget int, size func(T) int) []T {
+	total := 0
+	for i := len(entries) - 1; i >= 0; i-- {
+		total += size(entries[i])
+		if total > budget && i < len(entries)-1 {
+			return entries[i+1:]
+		}
+	}
+	return entries
+}
+
+// approxSize is about how many bytes v takes as JSON. The shapes state is
+// made of are walked without encoding them, since this runs each time a
+// history is read; anything else is encoded.
+func approxSize(v any) int {
+	switch x := v.(type) {
+	case nil:
+		return 4
+	case string:
+		return len(x) + 2
+	case bool:
+		return 5
+	case int, int64, float64, float32, int32, uint, uint64:
+		return 8
+	case map[string]any:
+		n := 2
+		for k, e := range x {
+			n += len(k) + 4 + approxSize(e)
+		}
+		return n
+	case []any:
+		n := 2
+		for _, e := range x {
+			n += approxSize(e) + 1
+		}
+		return n
+	case []map[string]any:
+		n := 2
+		for _, e := range x {
+			n += approxSize(e) + 1
+		}
+		return n
+	case []string:
+		n := 2
+		for _, e := range x {
+			n += len(e) + 3
+		}
+		return n
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return 0
+	}
+	return len(b)
 }
 
 // AddStateEntry adds an entry to state history, merging with the last entry if it's very recent

@@ -326,6 +326,12 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 		}
 		rawHashes = append(rawHashes, mywant.CalculateWantHash(want))
 	}
+	// A list carries its wants' answers only unless it asks for every history
+	// (see historyScopeOf); the two are different bodies, so not one ETag.
+	scope := historyScopeOf(r, historyResults)
+	if scope == historyAll {
+		rawHashes = append(rawHashes, "history="+historyAll)
+	}
 	collectionHash := computeCollectionHash(rawHashes)
 	w.Header().Set("ETag", `"`+collectionHash+`"`)
 
@@ -351,6 +357,7 @@ func (s *Server) listWants(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		resp := s.buildWantAPIResponseWith(want, false, params)
+		resp.keepHistory(scope)
 		if extra := kataLabels[want.Metadata.ID]; len(extra) > 0 {
 			// The response's map is already its own copy (see buildWantAPIResponse);
 			// merged into a fresh one all the same, so the kata labels never leak
@@ -442,13 +449,16 @@ type apiMetadata struct {
 
 // wantAPIResponse is the API-level representation of a Want with hierarchical state.
 type wantAPIResponse struct {
-	Metadata             apiMetadata                 `json:"metadata"`
-	Spec                 mywant.WantSpec             `json:"spec"`
-	Status               mywant.WantStatus           `json:"status,omitempty"`
-	State                hierarchicalState           `json:"state"`
-	StateTimestamps      map[string]time.Time        `json:"state_timestamps,omitempty"`
-	HiddenState          map[string]any              `json:"hidden_state,omitempty"`
-	History              mywant.WantHistory          `json:"history"`
+	Metadata        apiMetadata          `json:"metadata"`
+	Spec            mywant.WantSpec      `json:"spec"`
+	Status          mywant.WantStatus    `json:"status,omitempty"`
+	State           hierarchicalState    `json:"state"`
+	StateTimestamps map[string]time.Time `json:"state_timestamps,omitempty"`
+	HiddenState     map[string]any       `json:"hidden_state,omitempty"`
+	History         mywant.WantHistory   `json:"history"`
+	// HistoryScope is "results" when History carries the answers alone — see
+	// historyScopeOf. Absent when it is all of it.
+	HistoryScope         string                      `json:"history_scope,omitempty"`
 	ConnectivityMetadata mywant.ConnectivityMetadata `json:"connectivity_metadata,omitempty"`
 	Hash                 string                      `json:"hash,omitempty"`
 	ExposableFields      []ExposableFieldInfo        `json:"exposable_fields,omitempty"`
@@ -575,12 +585,50 @@ func (s *Server) buildWantAPIResponseWith(want *mywant.Want, includeConnectivity
 	return resp
 }
 
+// History scopes — how much of a want's history a response carries.
+//
+// The board reads only a want's answers (resultHistory): its cards turn pages
+// through them, its tiles and answer balls show them. The state, log, agent and
+// parameter histories are what the details panel opens, and they are most of a
+// want's weight — a robot's eight state snapshots ran to 290KB, sent again each
+// time the board loaded. So a list carries answers only unless it asks for
+// all, and a single want carries all unless it asks for answers only (the
+// board's poll does).
+const (
+	historyAll     = "all"
+	historyResults = "results"
+)
+
+// historyScopeOf is the scope ?history= asks for, or def when it names none.
+func historyScopeOf(r *http.Request, def string) string {
+	switch r.URL.Query().Get("history") {
+	case historyAll:
+		return historyAll
+	case historyResults:
+		return historyResults
+	}
+	return def
+}
+
+// keepHistory cuts the response's history down to scope. The hash is left as
+// it is: it names the want, not the body, so a client that keeps both kinds
+// keeps an ETag for each.
+func (resp *wantAPIResponse) keepHistory(scope string) {
+	if scope != historyResults {
+		return
+	}
+	resp.History = mywant.WantHistory{ResultHistory: resp.History.ResultHistory}
+	resp.HistoryScope = historyResults
+}
+
 func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
+	scope := historyScopeOf(r, historyAll)
 
 	serveWantResponse := func(want *mywant.Want) {
 		resp := s.buildWantAPIResponse(want, includeConnectivity)
+		resp.keepHistory(scope)
 		w.Header().Set("ETag", `"`+resp.Hash+`"`)
 		ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
 		if ifNoneMatch != "" && ifNoneMatch == resp.Hash {
