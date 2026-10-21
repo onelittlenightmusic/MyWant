@@ -17,6 +17,9 @@ wantType:
       # A temperature would be one half of a sentence; the sky is the whole of
       # what a glance at this tile is asking.
       tile-icon: output
+      # And it dresses for the weather: an umbrella up over it while it reads
+      # rain, storm or snow, a sun while it reads sunny, nothing otherwise.
+      tile-effect: weather
       riffable: source
       user-control: 'true'
       full-screen-display: 'true'
