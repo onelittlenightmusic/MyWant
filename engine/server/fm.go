@@ -178,10 +178,11 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	if req.Arguments == nil {
 		req.Arguments = map[string]string{}
 	}
-	if req.Turn != "" && req.Tool == "look" {
+	if req.Turn != "" && fmHearsQuestion(req.Tool) {
 		// What the person asked, for look to see which of a want's answers
-		// it is about (fmLookReferent) — taken out again before the step is
-		// kept.
+		// it is about (fmLookReferent) and for deploy_want to set each
+		// parameter from the words that mark it (fmMarkedParams) — taken out
+		// again before the step is kept.
 		if q := s.fmTurnQuestion(req.Turn); q != "" {
 			req.Arguments[fmQuestionArg] = q
 		}
@@ -677,6 +678,8 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 }
 
 func (s *Server) fmDeployWant(args map[string]string) (string, error) {
+	question := args[fmQuestionArg]
+	delete(args, fmQuestionArg)
 	typ, err := s.fmResolveType(args["type"])
 	if err != nil {
 		return "", err
@@ -693,7 +696,7 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// small model often puts the question in the name (「新宿→横浜」) and
 	// sends {} — which made a route with neither end, and an answer that said
 	// it had searched.
-	filled, err := s.fmFitParams(typ, params)
+	filled, err := s.fmFitParams(typ, params, question)
 	if err != nil {
 		return "", err
 	}
@@ -822,12 +825,109 @@ func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []s
 // person is — transit_search's from: 「戸塚への乗り換え」 starts here.
 const fmHereLabel = "here-param"
 
+// fmMarkerLabel prefixes a want type's words for one parameter: what follows
+// a value in a request to say it is that parameter — transit_search's
+// "param-marker/from": "から,発" and "param-marker/to": "まで,へ". A request
+// says which end is which in those words; the model does not always keep it.
+// On 2026-10-22 「銀座から中野坂上の乗り換え」 went to the phone's model,
+// which deployed from=中野坂上, to=銀座 — the stations of the type's own worked
+// example, in its order.
+const fmMarkerLabel = "param-marker/"
+
+// fmMarkedParams sets each marked parameter to the value the question marks
+// for it: of the values sent, the one the question has just before one of
+// the parameter's words (a character between allowed — 「銀座駅から」).
+// Where that value was sent under another marked parameter, the two change
+// places, so the ends the model swapped are put back rather than both made
+// the same. Only marked parameters are read and moved: 「9時40分までに」 is a
+// time, not where to.
+// Values only, never words of its own: what the model sent is what is
+// placed, by what the person said. Says what it put right, for the robot to
+// tell; "" when nothing was.
+func fmMarkedParams(labels map[string]string, params map[string]any, question string) string {
+	if strings.TrimSpace(question) == "" {
+		return ""
+	}
+	var names []string
+	for k := range labels {
+		if strings.HasPrefix(k, fmMarkerLabel) {
+			names = append(names, strings.TrimPrefix(k, fmMarkerLabel))
+		}
+	}
+	sort.Strings(names)
+	var fixed []string
+	for _, name := range names {
+		var markers []string
+		for _, m := range strings.Split(labels[fmMarkerLabel+name], ",") {
+			if m = strings.TrimSpace(m); m != "" {
+				markers = append(markers, m)
+			}
+		}
+		marked := ""
+		for _, other := range names {
+			v, ok := params[other]
+			if !ok {
+				continue
+			}
+			sv := strings.TrimSpace(fmt.Sprint(v))
+			if sv == "" || sv == marked || !fmMarks(question, sv, markers) {
+				continue
+			}
+			if marked != "" {
+				marked = "" // two values marked alike: the question does not say which
+				break
+			}
+			marked = sv
+		}
+		if marked == "" || strings.TrimSpace(fmt.Sprint(params[name])) == marked {
+			continue
+		}
+		old, had := params[name]
+		for _, other := range names {
+			if v, ok := params[other]; ok && other != name && strings.TrimSpace(fmt.Sprint(v)) == marked {
+				if had {
+					params[other] = old
+				} else {
+					delete(params, other)
+				}
+			}
+		}
+		params[name] = marked
+		fixed = append(fixed, fmt.Sprintf("%s=%s", name, marked))
+	}
+	if len(fixed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" (%s, as the person said it: %s)", strings.Join(fixed, ", "), fmPairs(params))
+}
+
+// fmMarks: the question has v just before one of the markers, with at most
+// one character between.
+func fmMarks(question, v string, markers []string) bool {
+	for i := 0; ; {
+		at := strings.Index(question[i:], v)
+		if at < 0 {
+			return false
+		}
+		rest := question[i+at+len(v):]
+		for _, m := range markers {
+			if strings.HasPrefix(rest, m) {
+				return true
+			}
+			if _, n := utf8.DecodeRuneInString(rest); n > 0 && strings.HasPrefix(rest[n:], m) {
+				return true
+			}
+		}
+		i += at + len(v)
+	}
+}
+
 // fmFitParams makes params what the type takes, by what each parameter is
 // rather than by the type: a time (subType time) as HH:MM however it was
 // written, a value outside a parameter's choices sent back with them, and the
 // type's here-param, left out, filled with where the person is. Says what it
 // filled, for the robot to tell.
-func (s *Server) fmFitParams(typ string, params map[string]any) (string, error) {
+func (s *Server) fmFitParams(typ string, params map[string]any, question string) (string, error) {
 	var def struct {
 		Metadata struct {
 			Labels map[string]string `json:"labels"`
@@ -847,7 +947,7 @@ func (s *Server) fmFitParams(typ string, params map[string]any) (string, error) 
 		v, ok := params[name]
 		return ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != ""
 	}
-	filled := ""
+	filled := fmMarkedParams(def.Metadata.Labels, params, question)
 	for _, p := range def.Parameters {
 		if !said(p.Name) {
 			if p.Name == def.Metadata.Labels[fmHereLabel] {
@@ -856,7 +956,7 @@ func (s *Server) fmFitParams(typ string, params map[string]any) (string, error) 
 					return "", fmt.Errorf("%s was left out and where the person is is not known (%v): ask the person — nothing was made", p.Name, err)
 				}
 				params[p.Name] = here
-				filled = fmt.Sprintf(" (%s=%s: where the person is, as none was said)", p.Name, here)
+				filled += fmt.Sprintf(" (%s=%s: where the person is, as none was said)", p.Name, here)
 			}
 			continue
 		}
@@ -1251,9 +1351,14 @@ func fmTakeUnread(args map[string]string) []fmUnreadPhoto {
 	return list
 }
 
-// fmQuestionArg carries what the person asked to look, within a turn
-// (handleFMCall); look takes it out before anything is kept.
+// fmQuestionArg carries what the person asked to look and deploy_want,
+// within a turn (handleFMCall); each takes it out before anything is kept.
 const fmQuestionArg = "_question"
+
+// fmHearsQuestion: the tool is handed what the person asked (fmQuestionArg).
+func fmHearsQuestion(tool string) bool {
+	return tool == "look" || tool == "deploy_want"
+}
 
 // fmCard is a want a step brought the robot to.
 type fmCard struct {

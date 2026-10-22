@@ -445,6 +445,9 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 			turn.Steps[i].Arguments = map[string]string{}
 		}
 		if !turn.Steps[i].Done {
+			if fmHearsQuestion(turn.Steps[i].Tool) {
+				turn.Steps[i].Arguments[fmQuestionArg] = turn.Question
+			}
 			s.fmRunStep(&turn.Steps[i])
 		}
 		// The want the step brought the robot to, as its card (see fmTakeCard).
