@@ -142,6 +142,12 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			// Metadata struct under metadataMutex, and an unlocked read racing
 			// that write is the same class of bug GetSpec() above already avoids.
 			want.Metadata.OrderKey = runtimeWant.want.GetMetadata().OrderKey // Sync order key
+			// And its labels: a label added or removed through the queue
+			// (QueueWantAddLabel — a want's art, a constellation's colour) is
+			// applied to the live want only, and without this the configured
+			// copy written here kept the old ones, so a restart undid it.
+			// GetLabels copies under the metadata lock.
+			want.Metadata.Labels = runtimeWant.want.GetLabels()
 
 			// Deep copy: this snapshot is about to be marshalled, and a
 			// shallow one shares its nested maps with the live want — see
