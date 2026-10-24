@@ -412,6 +412,7 @@ func (s *Server) Start() error {
 	// each: the blocked-cell snapshot is built once per tick and shared by
 	// everything moving through it. See thing_motion.go.
 	s.startThingMotion()
+	s.startBattles()
 
 	// Register config.yaml field updaters so built-in want types can update and
 	// persist server config without an HTTP round-trip to their own server.

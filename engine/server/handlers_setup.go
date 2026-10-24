@@ -66,6 +66,8 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/chat/interrupt", s.interruptWantChat).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/chat/session", s.clearWantChatSession).Methods("DELETE", "OPTIONS")
 	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
+	// This want attacks that one (battle.go): the 攻撃 skill, a turret's aim.
+	wants.HandleFunc("/{id}/attack", s.setWantAttack).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
 	wants.HandleFunc("/{id}/start", s.startWant).Methods("POST")

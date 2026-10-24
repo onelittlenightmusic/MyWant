@@ -1,0 +1,46 @@
+wantType:
+  metadata:
+    name: boss
+    title: Boss
+    description: >-
+      The last enemy of a room defense, when it has one: an enemy of its own
+      kind — its own face on the board, a crown of a hat — that takes far
+      more to bring down and wears down what it reaches faster. Otherwise an
+      enemy like the rest (enemy): its tile's place is where it is, its hp
+      what is left of it, its connection what it goes for.
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "Flame"
+      tile-effect: hat
+      tile-effect-colors: "black,gold"
+      category-icon: "Gamepad2"
+      category-bg-light: "linear-gradient(160deg, #c084fc 0%, #312e81 100%)"
+      category-bg-dark: "linear-gradient(160deg, #581c87 0%, #0f0a2e 100%)"
+  parameters:
+  - name: max_hp
+    description: How many hits it takes
+    type: float64
+    default: 30
+    required: false
+  state:
+  - name: hp
+    description: What is left of it
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: target
+    description: The name of the want it is going for
+    type: string
+    label: current
+    volatile: true
+  - name: frozen
+    description: Held where it is by a freeze — not moving, not wearing anything down
+    type: bool
+    label: current

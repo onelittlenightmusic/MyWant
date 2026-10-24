@@ -41,6 +41,21 @@ predefined:
       label: current
       persistent: true
       initialValue: null
+    # What is left of this want in a battle (room_defense): worn down by
+    # the enemies that reach its tile, suspended at nothing, and gone again
+    # once the battle is over. Predefined because what a room holds is any
+    # want at all, and a want deciding how to fight reads it on each of them
+    # as it reads any field. Absent outside a battle.
+    - name: hp
+      description: What is left of this want in a battle under way
+      type: float64
+      label: current
+      persistent: true
+    - name: max_hp
+      description: What this want started the battle with
+      type: float64
+      label: current
+      persistent: true
     - name: desired_dispatch
       description: Dispatch requests proposed by a thinker child
       type: object

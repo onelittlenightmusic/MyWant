@@ -1,0 +1,147 @@
+wantType:
+  metadata:
+    name: room_defense
+    title: Room Defense
+    description: >-
+      A battle in a room of the board. Enemies come in at the entrance one
+      after another and go for the room's want tiles; one worn down to
+      nothing (its hp field) is suspended — resumed by hand afterwards. Turrets (turret wants) and the
+      ones standing in the room fight them off. Each enemy is a want tile of
+      its own (enemy), with where it is and what is left of it as
+      its fields. Achieved when every enemy is defeated; lost when nothing is
+      left standing. It waits (ready) until someone stands on it — a button —
+      and standing on it again once it is over starts the next one.
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      # Started by standing on it, the way a button is pressed (and again,
+      # once it is over, for the next one).
+      form-type: button
+      type-icon: "Swords"
+      category-icon: "Gamepad2"
+      category-bg-light: "linear-gradient(160deg, #fecaca 0%, #fde68a 100%)"
+      category-bg-dark: "linear-gradient(160deg, #7f1d1d 0%, #78350f 100%)"
+  parameters:
+  - name: room_x
+    description: The room's left edge, in board cells
+    type: int
+    required: true
+  - name: room_y
+    description: The room's top edge, in board cells
+    type: int
+    required: true
+  - name: room_w
+    description: The room's width, in cells
+    type: int
+    default: 8
+    required: false
+  - name: room_h
+    description: The room's height, in cells
+    type: int
+    default: 6
+    required: false
+  - name: spawn_x
+    description: Where enemies come in (a cell — the room's door, usually)
+    type: int
+    required: true
+  - name: spawn_y
+    description: Where enemies come in
+    type: int
+    required: true
+  - name: enemies
+    description: How many enemies come in all
+    type: int
+    default: 5
+    required: false
+  - name: spawn_every
+    description: Seconds between one enemy and the next
+    type: float64
+    default: 4
+    required: false
+  - name: enemy_hp
+    description: How many hits an enemy takes
+    type: float64
+    default: 3
+    required: false
+  - name: enemy_damage
+    description: How much an enemy wears down what it is at, per second
+    type: float64
+    default: 1
+    required: false
+  - name: enemy_speed
+    description: Cells per second an enemy moves
+    type: float64
+    default: 0.6
+    required: false
+  - name: boss
+    description: The last enemy is a boss — a face of its own, far harder to bring down
+    type: bool
+    default: true
+    required: false
+  - name: boss_hp
+    description: How many hits the boss takes
+    type: float64
+    default: 30
+    required: false
+  - name: boss_damage
+    description: How much the boss wears down what it is at, per second
+    type: float64
+    default: 3
+    required: false
+  - name: target_hp
+    description: How much a want tile in the room takes before it is suspended
+    type: float64
+    default: 10
+    required: false
+  - name: characters
+    description: Who is standing on it (filled by footsteps, as a button's is) — the one who starts it
+    type: array
+    subType: character_ids
+    required: false
+  state:
+  - name: characters
+    description: Who is standing on it — someone getting on starts the battle
+    type: array
+    label: current
+    persistent: true
+  - name: phase
+    description: ready (waiting for someone to stand on it), fighting, cleared (every enemy defeated) or lost (nothing left standing)
+    type: string
+    label: current
+    persistent: true
+  - name: spawned
+    description: Enemies come in so far
+    type: int
+    label: current
+    persistent: true
+  - name: defeated
+    description: Enemies defeated so far
+    type: int
+    label: current
+    persistent: true
+  - name: targets
+    description: The names of the wants the room holds and is defended — each with its own hp field while the battle lasts
+    type: array
+    label: current
+    volatile: true
+  - name: suspended
+    description: The wants this battle suspended — to resume by hand
+    type: array
+    label: current
+    persistent: true
+  examples:
+  - title: Five enemies through the door at (12, 4)
+    description: A room 8×6 from (10, 2), enemies coming in at its door
+    want:
+      metadata:
+        name: defend-the-study
+        type: room_defense
+      spec:
+        params:
+          room_x: 10
+          room_y: 2
+          room_w: 8
+          room_h: 6
+          spawn_x: 12
+          spawn_y: 8
