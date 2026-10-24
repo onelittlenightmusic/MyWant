@@ -497,7 +497,7 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) deleteConstellation(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
 	// Its art goes with it: nothing else will ever point at the file.
-	s.removeConstellationArtFile(s.anyConstellationArt(name))
+	s.removeArtFile(s.anyConstellationArt(name))
 	// The ?kind= is accepted and ignored. Deleting a constellation means the
 	// name stops existing, and a name that had a want and a thing in it would
 	// otherwise half-survive whichever kind the caller happened to send.

@@ -315,11 +315,8 @@ func (s *Server) setupRoutes() {
 		// (photo_fields.go): what waits to be read, and a reading handed back.
 		things.HandleFunc("/photo-fields/pending", s.getPhotoFieldsPending).Methods("GET", "OPTIONS")
 		things.HandleFunc("/photo-fields", s.postPhotoFields).Methods("POST", "OPTIONS")
-		// A thing's art, drawn on the phone (thing_art.go): the picture, a
-		// drawing kept, and one taken away.
+		// A thing's first art, still served (thing_art.go); art is art.go's now.
 		things.HandleFunc("/art/{id}", s.serveThingArt).Methods("GET")
-		things.HandleFunc("/art/{id}", s.uploadThingArt).Methods("POST", "OPTIONS")
-		things.HandleFunc("/art/{id}", s.deleteThingArt).Methods("DELETE")
 		// A thing's neighbours: constellation co-members and the wants naming it.
 		// Registered before "/{id}" so the literal "/relations" segment is not
 		// mistaken for part of a thing id.
@@ -339,11 +336,16 @@ func (s *Server) setupRoutes() {
 		sub.HandleFunc("", s.createConstellation).Methods("POST", "OPTIONS")
 		sub.HandleFunc("/{name}", s.updateConstellation).Methods("PUT", "OPTIONS")
 		sub.HandleFunc("/{name}", s.deleteConstellation).Methods("DELETE", "OPTIONS")
-		// Its art (constellation_art.go): the picture, a drawing kept, and one taken away.
+		// Its first art, still served (constellation_art.go); art is art.go's now.
 		sub.HandleFunc("/art/{file}", s.serveConstellationArt).Methods("GET")
-		sub.HandleFunc("/{name}/art", s.uploadConstellationArt).Methods("POST", "OPTIONS")
-		sub.HandleFunc("/{name}/art", s.deleteConstellationArt).Methods("DELETE")
 	}
+
+	// Art: a picture on the board's floor under a thing, a want or a
+	// constellation (art.go).
+	api.HandleFunc("/art/files/{file}", s.serveArtFile).Methods("GET")
+	api.HandleFunc("/art/{kind}/{id}", s.putArt).Methods("POST", "OPTIONS")
+	api.HandleFunc("/art/{kind}/{id}/scale", s.scaleArt).Methods("POST", "OPTIONS")
+	api.HandleFunc("/art/{kind}/{id}", s.deleteArt).Methods("DELETE")
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")
