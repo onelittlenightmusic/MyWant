@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -44,6 +43,12 @@ const (
 	freezeWantType = "freeze"
 	// The field saying an enemy is held by a freeze.
 	frozenField = "frozen"
+	// The field saying an enemy has been brought down (fallLinger).
+	defeatedField = "defeated"
+	// How long an enemy brought down stays on the board. Deleted in the tick
+	// it fell, its tile was gone before the board heard of the hit that did
+	// it — the one hit worth seeing land, and hearing, was never shown.
+	fallLinger = 900 * time.Millisecond
 	// The last to come in, when the battle has one: an enemy of its own kind
 	// (its own face on the board), harder to bring down and harder-hitting.
 	bossWantType = "boss"
@@ -59,27 +64,17 @@ const (
 	// The field a battle wears down — on an enemy, and on what it attacks.
 	hpField    = "hp"
 	maxHPField = "max_hp"
-	// The last effect a want's connections had — an attack's hit, a mend, a
-	// freeze — kept on the want that made it, as its connections are, for
-	// whoever draws the board to show it landing (predefined.yaml).
-	impactField = "impact"
-	// What an impact was, by the kind of connection that made it.
-	impactAttack = "attack"
-	impactMend   = "mend"
-	impactFreeze = "freeze"
+	// What a battle's connections just did, kept on the want that acted
+	// (core's RecordImpact).
+	impactAttack = mywant.ImpactAttack
+	impactMend   = mywant.ImpactMend
+	impactFreeze = mywant.ImpactFreeze
 )
-
-// impactSeq numbers impacts, so the same kind on the same wants again is
-// still a change of the field — another hit to show.
-var impactSeq atomic.Int64
 
 // impact records that `from`'s connections just had their effect: of what
 // kind, and on which wants.
 func impact(from *mywant.Want, kind string, on ...string) {
-	if len(on) == 0 {
-		return
-	}
-	from.StoreState(impactField, map[string]any{"kind": kind, "to": on, "n": impactSeq.Add(1)})
+	from.RecordImpact(kind, on, nil)
 }
 
 // battleStoodOn remembers, per battle, whether someone was standing on it at
@@ -98,6 +93,9 @@ type battleRun struct {
 var (
 	battlesMu sync.Mutex
 	battles   = map[string]*battleRun{} // room_defense want id → its run
+	// Enemies brought down, and when: out of the battle at once, off the
+	// board a moment later (fallLinger).
+	fallen = map[string]time.Time{}
 
 )
 
@@ -162,6 +160,34 @@ func (s *Server) battleTick() {
 
 	battlesMu.Lock()
 	defer battlesMu.Unlock()
+	// The fallen are out of every battle; gone from the board once they have
+	// been seen to fall.
+	var cleared []string
+	seen := map[string]bool{}
+	for owner, list := range enemiesOf {
+		standing := list[:0:0]
+		for _, e := range list {
+			seen[e.Metadata.ID] = true
+			at, down := fallen[e.Metadata.ID]
+			if !down {
+				standing = append(standing, e)
+				continue
+			}
+			if time.Since(at) >= fallLinger {
+				cleared = append(cleared, e.Metadata.ID)
+				delete(fallen, e.Metadata.ID)
+			}
+		}
+		enemiesOf[owner] = standing
+	}
+	for id := range fallen {
+		if !seen[id] {
+			delete(fallen, id) // gone some other way: a reset, its battle over
+		}
+	}
+	if len(cleared) > 0 {
+		_ = s.globalBuilder.QueueWantDelete(cleared)
+	}
 	// A reset stood on puts its battle back as it was.
 	for _, r := range resets {
 		on := len(mywant.GetCurrent(r, "characters", []string{})) > 0
@@ -429,7 +455,7 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 		setHP(e, left)
 		go broadcastSSE("battle_shot", map[string]any{"from": t.Metadata.ID, "to": eid, "battle": id})
 		if left <= 0 {
-			_ = s.globalBuilder.QueueWantDelete([]string{eid})
+			fell(e)
 			delete(enemies, eid)
 			defeated++
 			d.SetCurrent("defeated", defeated)
@@ -467,7 +493,7 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 		impact(f, impactAttack, enemies[eid].Metadata.Name)
 		go broadcastSSE("battle_shot", map[string]any{"from": f.Metadata.ID, "to": eid, "battle": id})
 		if left <= 0 {
-			_ = s.globalBuilder.QueueWantDelete([]string{eid})
+			fell(enemies[eid])
 			delete(enemies, eid)
 			defeated++
 			d.SetCurrent("defeated", defeated)
@@ -499,6 +525,14 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 		log.Printf("[BATTLE] %s: %s (%d defeated, suspended %v)", d.Metadata.Name, phase, defeated, suspended)
 		go broadcastSSE("battle_over", map[string]any{"battle": id, "phase": phase})
 	}
+}
+
+// fell brings an enemy down: out of the battle now (battleTick passes it
+// over), its connection let go, and off the board after fallLinger.
+func fell(e *mywant.Want) {
+	fallen[e.Metadata.ID] = time.Now()
+	setAttack(e, nil)
+	e.StoreState(defeatedField, true)
 }
 
 // stepToward is the next cell from `from` toward `to`: along the longer way
@@ -878,8 +912,8 @@ func clearBattleFields(w *mywant.Want) {
 	if _, ok := w.GetStateFloat64(maxHPField, 0); ok {
 		w.DeleteState(maxHPField)
 	}
-	if v, _ := w.GetCurrent(impactField); v != nil {
-		w.DeleteState(impactField)
+	if v, _ := w.GetCurrent(mywant.ImpactField); v != nil {
+		w.DeleteState(mywant.ImpactField)
 	}
 }
 

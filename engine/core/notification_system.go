@@ -185,6 +185,11 @@ func (h *globalParamExposeHandler) OnEvent(ctx context.Context, event WantEvent)
 		return EventResponse{}
 	}
 	SetGlobalParameter(h.paramKey, sce.StateValue) //nolint:errcheck
+	// Handed on: the wants reading it get a new value — shown landing on
+	// them (RecordImpact), from this want, which made it.
+	if !reflectDeepEqualSafe(sce.PreviousValue, sce.StateValue) {
+		h.want.RecordImpact(ImpactFeed, globalParamReaders(h.paramKey), sce.StateValue)
+	}
 	return EventResponse{Handled: true}
 }
 
@@ -611,3 +616,7 @@ func GetSubscriptions() map[string][]StateSubscription {
 	}
 	return result
 }
+
+// reflectDeepEqualSafe is reflect.DeepEqual, for an event's previous and new
+// values (either may be nil).
+func reflectDeepEqualSafe(a, b any) bool { return reflect.DeepEqual(a, b) }
