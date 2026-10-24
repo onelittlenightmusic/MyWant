@@ -622,6 +622,9 @@ func (s *Server) deleteCursor(w http.ResponseWriter, r *http.Request) {
 	delete(cursors, characterID)
 	delete(cursorHolder, characterID)
 	delete(deviceLastPos, characterID)
+	// Where they were left too: a cursor taken off the board is not one to
+	// go on listing as standing where it last was.
+	delete(lastCursorPos, characterID)
 	cursorsMu.Unlock()
 	// Nobody is riding somebody who has left the board.
 	s.dropRidersOf(characterID)
