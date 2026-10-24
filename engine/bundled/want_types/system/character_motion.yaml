@@ -63,14 +63,14 @@ wantType:
     persistent: false
     initialValue: 0
     label: current
-
+    volatile: true
   - name: y
     description: Mirror of the character's last resolved y position, for observability only
     type: float
     persistent: false
     initialValue: 0
     label: current
-
+    volatile: true
   - name: achieving_percentage
     description: Progress indicator — a character is never finished being able to move
     type: int

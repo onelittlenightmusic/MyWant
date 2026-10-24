@@ -461,6 +461,7 @@ func (n *Want) SetStatus(status WantStatus) {
 	n.Status = status
 	if oldStatus != status {
 		bumpStateEpoch() // Status is persisted alongside state
+		n.changed()
 	}
 
 	// Emit StatusChange event (Group B - synchronous control)
@@ -1206,6 +1207,9 @@ func (n *Want) StoreState(key string, value any) {
 		Timestamp:      now,
 	}
 	sendStateNotifications(notification)
+	if !n.isVolatileState(key) {
+		n.changed()
+	}
 }
 
 // GetStateUpdatedAt returns the time when the given state key was last updated.
@@ -1229,7 +1233,9 @@ func (n *Want) GetStateTimestamps() map[string]time.Time {
 
 // DeleteState removes a key from the want's state map.
 func (n *Want) DeleteState(key string) {
-	n.State.Delete(key)
+	if _, had := n.State.LoadAndDelete(key); had && !n.isVolatileState(key) {
+		n.changed()
+	}
 }
 
 // MergeState safely merges new state updates into pending state changes for batch processing
@@ -2125,7 +2131,8 @@ func (w *Want) GetMetadata() Metadata {
 // that already holds metadataMutex must not call these — the RWMutex is not
 // reentrant — and touches the map directly inside its own critical section.
 func (n *Want) labelSet() labels.Guarded {
-	return labels.Guard(&n.metadataMutex, &n.Metadata.Labels, bumpStateEpoch)
+	// Told while the metadata lock is held: OnWantChanged only records the id.
+	return labels.Guard(&n.metadataMutex, &n.Metadata.Labels, func() { bumpStateEpoch(); n.changed() })
 }
 
 // GetLabels returns a copy of the want's labels.

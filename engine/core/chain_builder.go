@@ -1470,6 +1470,7 @@ func (cb *ChainBuilder) FindWantByName(wantName string) (*Want, bool) {
 
 // UpdateWant updates an existing want's configuration (params, labels, using fields, etc.) Automatically triggers reconciliation to process topology changes Works in both backend API and batch modes
 func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
+	defer wantChangedByID(wantConfig.Metadata.ID)
 	cb.reconcileMutex.Lock()
 	defer cb.reconcileMutex.Unlock()
 
@@ -1579,6 +1580,7 @@ func (cb *ChainBuilder) orphanCleanupPhase() {
 // deleteWantByID removes a want from runtime and signals its goroutines to stop.
 // Cascade-deletes child wants that have an OwnerReference pointing to this want.
 func (cb *ChainBuilder) deleteWantByID(wantID string) {
+	defer wantChangedByID(wantID)
 	// O(1) lookup since cb.wants is keyed by ID
 	if rw, exists := cb.wants[wantID]; exists {
 		// Call OnDelete() if the want implements OnDeletable interface
@@ -1901,6 +1903,7 @@ func (cb *ChainBuilder) addRuntimeWantOnly(want *Want) {
 
 // addDynamicWantUnsafe adds a want to the builder and configuration without triggering reconciliation
 func (cb *ChainBuilder) addDynamicWantUnsafe(want *Want) error {
+	defer wantChangedByID(want.Metadata.ID)
 	// Check runtime wants by ID
 	for _, rw := range cb.wants {
 		if rw.want.Metadata.ID == want.Metadata.ID {

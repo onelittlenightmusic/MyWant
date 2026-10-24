@@ -57,6 +57,9 @@ func (s *Server) attachBoardChanges() {
 	boardChanges.mu.Unlock()
 	// A want's answers changed — its cards' pages, its balls: the want changed.
 	mywant.OnResultHistoryChanged = func(w *mywant.Want) { boardWantsChanged(w.GetMetadata().ID) }
+	// Any want changing — from a handler or from inside the engine (see
+	// mywant.OnWantChanged): the want changed.
+	mywant.OnWantChanged = func(id string) { boardWantsChanged(id) }
 }
 
 // boardWantsChanged says these wants changed (created, updated, deleted).
