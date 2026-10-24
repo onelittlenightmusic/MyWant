@@ -63,6 +63,10 @@ type fmTurn struct {
 	// Cards: the wants the answer is about, as every client shows them under
 	// it — settled with the answer (fmAnswerCards).
 	Cards []fmCard `json:"cards,omitempty"`
+	// Choices: the answer is a question with these replies (「スコアを確認しますか？」
+	// → はい / いいえ), which every chat offers beside its input. Given by
+	// the client, or read from the answer (fmReplyChoices).
+	Choices []string `json:"choices,omitempty"`
 }
 
 const (
@@ -179,7 +183,7 @@ func (s *Server) fmAsked(question string) {
 // The wants the turn's steps brought the robot to go with it, as cards: the
 // chat shows each under the answer, so what the answer is about is there at a
 // glance (and a press away), as on the phone.
-func (s *Server) fmAnswered(answer string, cards []fmCard) {
+func (s *Server) fmAnswered(answer string, cards []fmCard, choices []string) {
 	robot, err := s.fmRobot()
 	if err != nil || answer == "" {
 		return
@@ -189,6 +193,9 @@ func (s *Server) fmAnswered(answer string, cards []fmCard) {
 	}
 	if len(cards) > 0 {
 		entry["cards"] = cards
+	}
+	if len(choices) > 0 {
+		entry["choices"] = choices
 	}
 	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
 	responses = append(responses, entry)
@@ -467,8 +474,11 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		turn.Cards = s.fmAnswerCards(turn)
+		if len(turn.Choices) == 0 {
+			turn.Choices = fmReplyChoices(turn.Answer)
+		}
 		if !turn.Quiet {
-			s.fmAnswered(turn.Answer, turn.Cards)
+			s.fmAnswered(turn.Answer, turn.Cards, turn.Choices)
 		}
 	}
 	if err := s.fmAddTurn(turn); err != nil {
@@ -479,11 +489,12 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, turn)
 }
 
-// POST /api/v1/fm/turns/{id}/answer  {answer} or {error}
+// POST /api/v1/fm/turns/{id}/answer  {answer, choices?} or {error}
 func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Answer string `json:"answer"`
-		Error  string `json:"error"`
+		Answer  string   `json:"answer"`
+		Error   string   `json:"error"`
+		Choices []string `json:"choices"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -495,6 +506,10 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		}
 		t.Answer = strings.TrimSpace(req.Answer)
 		t.Error = strings.TrimSpace(req.Error)
+		t.Choices = req.Choices
+		if len(t.Choices) == 0 {
+			t.Choices = fmReplyChoices(t.Answer)
+		}
 		t.FinishedAt = time.Now().Format(time.RFC3339)
 		return nil
 	})
@@ -514,7 +529,7 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		cards := turn.Cards
 		_, _ = s.fmUpdateTurn(turn.ID, func(t *fmTurn) error { t.Cards = cards; return nil })
 		if !turn.Quiet {
-			s.fmAnswered(turn.Answer, turn.Cards)
+			s.fmAnswered(turn.Answer, turn.Cards, turn.Choices)
 		}
 	}
 	if turn.Error != "" && !turn.Quiet {
@@ -577,4 +592,33 @@ func (s *Server) handleFMTurnReplay(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("[fm] turn %s replayed (%d steps)", turn.ID, len(replayed))
 	fmWriteJSON(w, map[string]any{"turn": turn, "replayed": replayed})
+}
+
+// fmYesNo is what a yes-or-no question is answered with.
+var fmYesNo = []string{"はい", "いいえ"}
+
+// fmAskWords make a question one that is not answered yes or no
+// (「どこに置きますか？」).
+var fmAskWords = []string{"どこ", "何", "なに", "なん", "いつ", "誰", "だれ", "どれ", "どう", "どの", "どちら", "どっち", "いくつ", "いくら", "なぜ",
+	"what", "where", "when", "who", "which", "how", "why"}
+
+// fmReplyChoices: the replies an answer that asks something takes — はい /
+// いいえ when its last sentence is a question asking yes or no
+// (「アーカイブした「新宿御苑前→銀座」があります。復元しますか？」), none otherwise.
+func fmReplyChoices(answer string) []string {
+	a := strings.TrimSpace(answer)
+	if !strings.HasSuffix(a, "？") && !strings.HasSuffix(a, "?") {
+		return nil
+	}
+	last := strings.TrimRight(a, "？?")
+	if i := strings.LastIndexAny(last, "。！!？?\n"); i >= 0 {
+		last = last[i:]
+	}
+	lower := strings.ToLower(last)
+	for _, w := range fmAskWords {
+		if strings.Contains(lower, w) {
+			return nil
+		}
+	}
+	return fmYesNo
 }
