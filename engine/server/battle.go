@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -58,7 +59,28 @@ const (
 	// The field a battle wears down — on an enemy, and on what it attacks.
 	hpField    = "hp"
 	maxHPField = "max_hp"
+	// The last effect a want's connections had — an attack's hit, a mend, a
+	// freeze — kept on the want that made it, as its connections are, for
+	// whoever draws the board to show it landing (predefined.yaml).
+	impactField = "impact"
+	// What an impact was, by the kind of connection that made it.
+	impactAttack = "attack"
+	impactMend   = "mend"
+	impactFreeze = "freeze"
 )
+
+// impactSeq numbers impacts, so the same kind on the same wants again is
+// still a change of the field — another hit to show.
+var impactSeq atomic.Int64
+
+// impact records that `from`'s connections just had their effect: of what
+// kind, and on which wants.
+func impact(from *mywant.Want, kind string, on ...string) {
+	if len(on) == 0 {
+		return
+	}
+	from.StoreState(impactField, map[string]any{"kind": kind, "to": on, "n": impactSeq.Add(1)})
+}
 
 // battleStoodOn remembers, per battle, whether someone was standing on it at
 // the last tick: getting on is what starts one.
@@ -358,6 +380,7 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 			}
 			left := hpOf(target, maxTarget) - hit
 			setHP(target, left)
+			impact(e, impactAttack, target.Metadata.Name)
 			if left <= 0 {
 				s.knockOut(d, target)
 				delete(targets, best)
@@ -398,6 +421,9 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 			// A freeze holds what it hits, for a while; it may wear it a little.
 			run.frozenTil[eid] = now.Add(time.Duration(t.GetFloatParam("duration", 2.5) * float64(time.Second)))
 			e.StoreState(frozenField, true)
+			impact(t, impactFreeze, e.Metadata.Name)
+		} else {
+			impact(t, impactAttack, e.Metadata.Name)
 		}
 		left := hpOf(e, d.GetFloatParam("enemy_hp", 3)) - t.GetFloatParam("damage", defaultDamageOf(t))
 		setHP(e, left)
@@ -438,6 +464,7 @@ func (s *Server) battleStep(d *mywant.Want, all, turrets, fighters, enemyWants [
 		run.lastFired[f.Metadata.ID] = now
 		left := hpOf(enemies[eid], d.GetFloatParam("enemy_hp", 3)) - characterHit
 		setHP(enemies[eid], left)
+		impact(f, impactAttack, enemies[eid].Metadata.Name)
 		go broadcastSSE("battle_shot", map[string]any{"from": f.Metadata.ID, "to": eid, "battle": id})
 		if left <= 0 {
 			_ = s.globalBuilder.QueueWantDelete([]string{eid})
@@ -736,6 +763,7 @@ func mendTick(heals, all []*mywant.Want) {
 				}
 			}
 		}
+		impact(h, impactMend, names...)
 		if !sameStrings(mywant.GetCurrent(h, "healing", []string{}), names) {
 			h.SetCurrent("healing", names)
 		}
@@ -849,6 +877,9 @@ func clearBattleFields(w *mywant.Want) {
 	}
 	if _, ok := w.GetStateFloat64(maxHPField, 0); ok {
 		w.DeleteState(maxHPField)
+	}
+	if v, _ := w.GetCurrent(impactField); v != nil {
+		w.DeleteState(impactField)
 	}
 }
 

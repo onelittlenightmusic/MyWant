@@ -56,6 +56,20 @@ predefined:
       type: float64
       label: current
       persistent: true
+    # The last effect this want's connections had on the wants they reach —
+    # an attack landing, a mend, a freeze: {kind: attack|mend|freeze,
+    # to: [<want name>...], n: <seq>}. Kept on the want that acts, as its
+    # connections (stateSubscriptions) are, and set by whatever applies the
+    # effect (the battle), for whoever draws the board to show it landing on
+    # each want in `to` — a burst on the tile, a sound. `n` makes each one a
+    # change, even the same kind on the same wants again.
+    - name: impact
+      description: The last effect this want's connections had, and on which wants
+      type: object
+      label: current
+      # Kept through a restart: a want whose connections change (UpdateWant)
+      # restarts, and reset there an impact set the same moment was never seen.
+      persistent: true
     - name: desired_dispatch
       description: Dispatch requests proposed by a thinker child
       type: object

@@ -87,6 +87,14 @@ func (s *Server) adoptLegacyThingsInto(name string) {
 	if err != nil {
 		return
 	}
+	// Once, for the install that is moving to worlds — not for every world
+	// opened afterwards. The originals are kept (above), so a world created
+	// later and open at a restart had them copied in all over again: a battle
+	// world came up holding someone's stations and concerts. A world that
+	// already has things of its own means the move was made.
+	if existing, _ := filepath.Glob(filepath.Join(worldThingsDir(dir), "*.yaml")); len(existing) > 0 {
+		return
+	}
 	pairs := [2][2]string{
 		{thingPath("thing.yaml"), worldThingsPath(dir, name)},
 		{thingPath("thing-labels.yaml"), worldThingLabelsPath(dir, name)},
