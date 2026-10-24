@@ -25,6 +25,12 @@ package mywant
 //
 // A type with no script speaks from defaultVoiceFor: where it stands, then
 // how much it has done.
+//
+// The same script says the want's news — a new answer, or getting there — in
+// the notice and the push it raises (WantNewsVoice): its input then carries
+// "event", {"kind": "output", "result": <the answer>} or {"kind": "achieved"},
+// where standing on the tile carries none. A script that says nothing to it
+// leaves the notice as it was, the answer itself.
 // Either way the line is worked out here, on the server, so every surface that
 // draws the want (the board, the extension, the phone) says the same thing.
 
@@ -85,9 +91,28 @@ func voiceScriptEmbedded(fsys fs.FS, yamlPath string) string {
 	if err != nil {
 		return ""
 	}
+	return cacheVoiceScript(filepath.Base(named), data)
+}
+
+// voiceScriptBundled is a bundled type's script read from the repo (a server
+// run there loads engine/bundled from disk), written out as an embedded one
+// is: the runner does not see the repo.
+func voiceScriptBundled(yamlPath string) string {
+	named := voiceScriptOnDisk(yamlPath, false)
+	if named == "" {
+		return ""
+	}
+	data, err := os.ReadFile(named)
+	if err != nil {
+		return ""
+	}
+	return cacheVoiceScript(filepath.Base(named), data)
+}
+
+func cacheVoiceScript(name string, data []byte) string {
 	sum := sha256.Sum256(data)
 	dir := filepath.Join(voiceScriptDir(), hex.EncodeToString(sum[:])[:12])
-	out := filepath.Join(dir, filepath.Base(named))
+	out := filepath.Join(dir, name)
 	if !fileExists(out) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			ErrorLog("[VOICE] cannot make %s: %v", dir, err)
@@ -101,8 +126,21 @@ func voiceScriptEmbedded(fsys fs.FS, yamlPath string) string {
 	return out
 }
 
-// voiceInput is what a script is handed.
-func voiceInput(w *Want) map[string]any {
+// What happened, for a script saying a want's news rather than what it says
+// to the one standing on it.
+const (
+	VoiceEventOutput   = "output"   // a new answer; Result is it
+	VoiceEventAchieved = "achieved" // it got where it was going
+)
+
+// VoiceEvent is a want's news, handed to its voice script.
+type VoiceEvent struct {
+	Kind   string
+	Result any
+}
+
+// voiceInput is what a script is handed; ev is nil standing on the tile.
+func voiceInput(w *Want, ev *VoiceEvent) map[string]any {
 	entries := w.ResultHistoryEntries()
 	var last any
 	if len(entries) > 0 {
@@ -116,7 +154,19 @@ func voiceInput(w *Want) map[string]any {
 		"last_answer": last,
 		"state":       w.GetAllState(),
 		"params":      w.GetSpec().Params,
+		"event":       voiceEventInput(ev),
 	}
+}
+
+func voiceEventInput(ev *VoiceEvent) any {
+	if ev == nil {
+		return nil
+	}
+	out := map[string]any{"kind": ev.Kind}
+	if ev.Result != nil {
+		out["result"] = ev.Result
+	}
+	return out
 }
 
 // defaultVoice is what a want with no voice of its own says, by how much it
@@ -267,6 +317,9 @@ var moodWords = []struct {
 	{MoodEager, []string{"はじめ", "やってみる", "やらせて", "任せて", "聞いて", "これから", "覚えて", "慣れて", "分かってきた"}},
 }
 
+// MoodOf is the mood of a line said elsewhere — a notice — by its words.
+func MoodOf(line string) string { return moodOf(line) }
+
 // moodOf is the mood of a line, by its words.
 func moodOf(line string) string {
 	for _, m := range moodWords {
@@ -324,22 +377,47 @@ func computeVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	if script == "" {
 		lines = defaultVoiceFor(w.GetStatus(), len(w.ResultHistoryEntries()))
 	} else {
-		input, err := json.Marshal(voiceInput(w))
-		if err != nil {
-			return VoiceLine{}
-		}
-		ctx, cancel := context.WithTimeout(ctx, voiceTimeout)
-		defer cancel()
-		out, err := runVoiceScript(ctx, script, input)
-		if err != nil {
-			ErrorLog("[VOICE] %s (%s): %v", w.GetMetadata().Name, script, err)
-			return VoiceLine{}
-		}
-		lines = voiceLines(out["say"])
-		if m, ok := out["mood"].(string); ok && knownMood(m) {
-			mood = m
-		}
+		lines, mood = scriptVoice(ctx, w, script, nil)
 	}
+	return pickVoice(w, lines, mood)
+}
+
+// WantNewsVoice is w's news said in its own voice, for the notice and the push
+// it raises — Say "" when its type has no script, or the script has nothing to
+// say to it, and the notice says the news plainly. Never cached: news happens
+// once.
+func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) VoiceLine {
+	if script == "" {
+		return VoiceLine{}
+	}
+	lines, mood := scriptVoice(ctx, w, script, &ev)
+	return pickVoice(w, lines, mood)
+}
+
+// scriptVoice runs a type's voice script: its lines, and its mood when it gave
+// one the board knows.
+func scriptVoice(ctx context.Context, w *Want, script string, ev *VoiceEvent) ([]string, string) {
+	input, err := json.Marshal(voiceInput(w, ev))
+	if err != nil {
+		return nil, ""
+	}
+	ctx, cancel := context.WithTimeout(ctx, voiceTimeout)
+	defer cancel()
+	out, err := runVoiceScript(ctx, script, input)
+	if err != nil {
+		ErrorLog("[VOICE] %s (%s): %v", w.GetMetadata().Name, script, err)
+		return nil, ""
+	}
+	mood := ""
+	if m, ok := out["mood"].(string); ok && knownMood(m) {
+		mood = m
+	}
+	return voiceLines(out["say"]), mood
+}
+
+// pickVoice picks one of lines (voiceSeed), with its mood — given, or read
+// from its words (moodOf).
+func pickVoice(w *Want, lines []string, mood string) VoiceLine {
 	if len(lines) == 0 {
 		return VoiceLine{}
 	}

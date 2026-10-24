@@ -652,6 +652,10 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 // {"say": "…", "mood": "joy"}, or {"say": null} when it has nothing to say.
 // See core/want_voice.go — the line is the want type's to decide, and its mood
 // is what the board plays as it comes up.
+//
+// A want with news not yet heard — an unread alert, the "!" over its tile —
+// says that first, with "news": true: the one who walked over to see what it
+// was is told, not greeted. Hearing it is reading it; the board marks it read.
 func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	if s.globalBuilder == nil {
@@ -662,6 +666,16 @@ func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	if !found {
 		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
+	}
+	if s.notifications != nil {
+		if e := s.notifications.LatestUnreadAlert(wantID); e != nil && e.Message != "" {
+			mood := e.Mood
+			if mood == "" {
+				mood = mywant.MoodOf(e.Message)
+			}
+			s.JSONResponse(w, http.StatusOK, map[string]any{"say": e.Message, "mood": mood, "news": true})
+			return
+		}
 	}
 	script := ""
 	if s.wantTypeLoader != nil {

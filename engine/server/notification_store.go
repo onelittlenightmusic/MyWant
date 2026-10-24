@@ -26,6 +26,10 @@ type NotificationEntry struct {
 	At      string `json:"at"      yaml:"at"`      // RFC3339 timestamp
 	Message string `json:"message" yaml:"message"` // exactly what the bubble said
 
+	// Mood is how a want's alert feels, when its type's voice said it
+	// (mywant.WantNewsVoice): the same moods the tile's own line has.
+	Mood string `json:"mood,omitempty" yaml:"mood,omitempty"`
+
 	// Where the bubble pointed, when it pointed at something (same
 	// data-robot-target vocabulary the robot commands use).
 	TargetType string `json:"targetType,omitempty" yaml:"targetType,omitempty"`
@@ -198,6 +202,20 @@ func (n *NotificationStore) ForWant(id string, limit int) (entries []Notificatio
 		}
 	}
 	return entries, unread
+}
+
+// LatestUnreadAlert is the newest alert on one want not yet read, or nil.
+func (n *NotificationStore) LatestUnreadAlert(id string) *NotificationEntry {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	all := n.load()
+	for i := len(all) - 1; i >= 0; i-- {
+		e := all[i]
+		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID == id && !e.Read {
+			return &e
+		}
+	}
+	return nil
 }
 
 // MarkWantRead flags every unread "alert" notice for one want as read and

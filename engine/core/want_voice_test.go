@@ -179,6 +179,56 @@ func TestWantVoiceScript(t *testing.T) {
 	}
 }
 
+// News is said by the same script, told what happened; a type with no script,
+// or a script with nothing to say to it, leaves the news to be said plainly.
+func TestWantNewsVoice(t *testing.T) {
+	saved := runVoiceScript
+	defer func() { runVoiceScript = saved }()
+
+	runs := 0
+	runVoiceScript = func(_ context.Context, script string, input []byte) (map[string]any, error) {
+		runs++
+		var got map[string]any
+		if err := json.Unmarshal(input, &got); err != nil {
+			t.Fatalf("input is not JSON: %v", err)
+		}
+		ev, _ := got["event"].(map[string]any)
+		if script == "quiet.py" || ev == nil {
+			return map[string]any{"say": nil}, nil
+		}
+		switch ev["kind"] {
+		case VoiceEventOutput:
+			return map[string]any{"say": fmt.Sprintf("%vだったよ", ev["result"])}, nil
+		case VoiceEventAchieved:
+			return map[string]any{"say": "できた！", "mood": MoodJoy}, nil
+		}
+		return nil, nil
+	}
+
+	w := voiceWant(t, "news", 2, time.Now())
+	if line := WantNewsVoice(context.Background(), w, "voice.py", VoiceEvent{Kind: VoiceEventOutput, Result: "晴れ"}); line.Say != "晴れだったよ" {
+		t.Errorf("output: %+v", line)
+	}
+	if line := WantNewsVoice(context.Background(), w, "voice.py", VoiceEvent{Kind: VoiceEventAchieved}); line.Say != "できた！" || line.Mood != MoodJoy {
+		t.Errorf("achieved: %+v", line)
+	}
+	WantNewsVoice(context.Background(), w, "voice.py", VoiceEvent{Kind: VoiceEventAchieved})
+	if runs != 3 {
+		t.Errorf("news is never cached: %d runs", runs)
+	}
+	if line := WantNewsVoice(context.Background(), w, "quiet.py", VoiceEvent{Kind: VoiceEventOutput, Result: "x"}); line.Say != "" {
+		t.Errorf("a script with nothing to say: %+v", line)
+	}
+	before := runs
+	if line := WantNewsVoice(context.Background(), w, "", VoiceEvent{Kind: VoiceEventOutput, Result: "x"}); line.Say != "" || runs != before {
+		t.Errorf("no script: %+v (runs %d)", line, runs-before)
+	}
+	// Standing on the tile is told nothing happened.
+	if say := WantVoice(context.Background(), voiceWant(t, "standing", 0, time.Now()), "voice.py").Say; say != "" {
+		t.Errorf("standing carried an event: %q", say)
+	}
+}
+
 // Every default line has the mood its words say, and the stronger feeling is
 // heard first.
 func TestMoodOf(t *testing.T) {
@@ -317,7 +367,11 @@ func TestWeatherVoiceScript(t *testing.T) {
 		t.Fatal(err)
 	}
 	run := func(state map[string]any) any {
-		in, _ := json.Marshal(map[string]any{"state": state})
+		input := map[string]any{"state": state}
+		if a, ok := state["_answer"]; ok {
+			input["event"] = map[string]any{"kind": VoiceEventOutput, "result": a}
+		}
+		in, _ := json.Marshal(input)
 		out, err := exec.Command("python3", script, string(in)).Output()
 		if err != nil {
 			t.Fatalf("script failed: %v", err)
@@ -335,8 +389,12 @@ func TestWeatherVoiceScript(t *testing.T) {
 	if got != "[いい天気！21°でぽかぽかあったかいよ 21°でぽかぽかあったかいよ、朝晩は冷えるよ（最低12°）]" {
 		t.Errorf("a warm clear day: %v", got)
 	}
-	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "rain"})); got != "[傘を忘れないでね3°でさむい…ぶるぶる]" {
+	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "rain"})); got != "[傘を忘れないでね、3°でさむい…ぶるぶる]" {
 		t.Errorf("a cold rainy day: %v", got)
+	}
+	// A new answer is read as the news, over what the state still says.
+	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "sunny", "_answer": "快晴 26°C"})); got != "[いい天気！26°で今日は暑いね]" {
+		t.Errorf("the news: %v", got)
 	}
 	if got := run(map[string]any{"weather_text": "", "error": "timeout"}); fmt.Sprint(got) != "[今日は空が見えなかった]" {
 		t.Errorf("a failed fetch: %v", got)

@@ -299,9 +299,11 @@ func (s *Server) RegisterAchievementCallback() {
 		// Achieving is how a weather fetch or a reservation check ENDS, so saying
 		// both badged the tile twice for every fetch.
 		if s.notifications != nil && w.Metadata.Name != "" && w.Spec.FinalResultField == "" {
-			msg := fmt.Sprintf("「%s」が達成されました", w.Metadata.Name)
+			msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventAchieved},
+				fmt.Sprintf("「%s」が達成されました", w.Metadata.Name))
 			_ = s.notifications.Record(NotificationEntry{
 				Message:    msg,
+				Mood:       mood,
 				Kind:       "alert",
 				TargetType: "want",
 				TargetID:   w.Metadata.ID,

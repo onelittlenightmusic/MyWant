@@ -266,7 +266,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		w.warnFinalizeGates(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
-		w.setVoiceScript(def.Metadata.Name, voiceScriptOnDisk(filePath, false))
+		w.setVoiceScript(def.Metadata.Name, voiceScriptBundled(filePath))
 		w.indexGlobalParams(def)
 
 		// Index by category

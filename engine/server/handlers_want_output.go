@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -34,10 +35,11 @@ func (s *Server) RegisterOutputCallback() {
 		if s.notifications == nil || w == nil || w.Metadata.ID == "" {
 			return
 		}
-		msg := outputMessage(out)
+		msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
 		entry := out
 		if err := s.notifications.Record(NotificationEntry{
 			Message:    msg,
+			Mood:       mood,
 			Kind:       "alert",
 			TargetType: "want",
 			TargetID:   w.Metadata.ID,
@@ -52,6 +54,21 @@ func (s *Server) RegisterOutputCallback() {
 		}
 		s.sendWantPush(w.Metadata.ID, title, msg, "/w/"+w.Metadata.ID)
 	}
+}
+
+// newsVoice is a want's news said in its own voice (mywant.WantNewsVoice) —
+// what its type's voice script says to it, and how it feels — or plain, as
+// given, when the type has no script or the script has nothing to say. For
+// the notice and the push alike: the news is told as the tile would tell it.
+func (s *Server) newsVoice(w *mywant.Want, ev mywant.VoiceEvent, plain string) (string, string) {
+	script := ""
+	if s.wantTypeLoader != nil {
+		script = s.wantTypeLoader.GetVoiceScript(w.GetMetadata().Type)
+	}
+	if line := mywant.WantNewsVoice(context.Background(), w, script, ev); line.Say != "" {
+		return line.Say, line.Mood
+	}
+	return plain, ""
 }
 
 // outputMessage says an answer in one line, for the places that can only show
