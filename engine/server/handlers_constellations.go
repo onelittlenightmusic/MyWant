@@ -81,6 +81,9 @@ type constellationDTO struct {
 	// "thing", "want", or "mixed" — derived from the members.
 	Kind    string   `json:"kind"`
 	Color   string   `json:"color,omitempty"`
+	// Art is the URL of a picture drawn for it (constellation_art.go), laid
+	// on the board's floor under it — carried by its members as the colour is.
+	Art     string   `json:"art,omitempty"`
 	Members []string `json:"members"`
 	// Which kind each member is, keyed by the same ids as Members. The list
 	// stays a list of ids so that every caller that only asks "is this id in
@@ -92,6 +95,7 @@ type constellationDTO struct {
 func (s *Server) collectThingConstellations() []constellationDTO {
 	byName := map[string][]string{}
 	colorByName := map[string]string{}
+	artByName := map[string]string{}
 	for valueID, labels := range s.thingLabels.All() {
 		for key, val := range labels {
 			if name := constellationNameFromKey(key); name != "" {
@@ -100,15 +104,19 @@ func (s *Server) collectThingConstellations() []constellationDTO {
 			if name := constellationColorNameFromKey(key); name != "" && val != "" {
 				colorByName[name] = val
 			}
+			if name := constellationArtNameFromKey(key); name != "" && val != "" {
+				artByName[name] = val
+			}
 		}
 	}
-	return constellationsFromMap(byName, colorByName, "thing")
+	return constellationsFromMap(byName, colorByName, artByName, "thing")
 }
 
 // collectWantConstellations aggregates constellation/* labels across all live wants.
 func (s *Server) collectWantConstellations() []constellationDTO {
 	byName := map[string][]string{}
 	colorByName := map[string]string{}
+	artByName := map[string]string{}
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
 			// GetLabels, not Metadata.Labels: a label change is applied to the
@@ -121,13 +129,16 @@ func (s *Server) collectWantConstellations() []constellationDTO {
 				if name := constellationColorNameFromKey(key); name != "" && val != "" {
 					colorByName[name] = val
 				}
+				if name := constellationArtNameFromKey(key); name != "" && val != "" {
+					artByName[name] = val
+				}
 			}
 		}
 	}
-	return constellationsFromMap(byName, colorByName, "want")
+	return constellationsFromMap(byName, colorByName, artByName, "want")
 }
 
-func constellationsFromMap(byName map[string][]string, colorByName map[string]string, kind string) []constellationDTO {
+func constellationsFromMap(byName map[string][]string, colorByName, artByName map[string]string, kind string) []constellationDTO {
 	out := make([]constellationDTO, 0, len(byName))
 	for name, members := range byName {
 		sort.Strings(members)
@@ -137,7 +148,7 @@ func constellationsFromMap(byName map[string][]string, colorByName map[string]st
 		}
 		out = append(out, constellationDTO{
 			ID: name, Name: name, Kind: kind,
-			Color: colorByName[name], Members: members, MemberKinds: kinds,
+			Color: colorByName[name], Art: artByName[name], Members: members, MemberKinds: kinds,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -180,6 +191,9 @@ func (s *Server) collectAllConstellations() []constellationDTO {
 		// constellation that only just gained a member of that kind looks like.
 		if existing.Color == "" {
 			existing.Color = g.Color
+		}
+		if existing.Art == "" {
+			existing.Art = g.Art
 		}
 	}
 	sort.Strings(order)
@@ -228,47 +242,62 @@ func (s *Server) memberKindOf(id string) string {
 // stays true through membership changes.
 func (s *Server) setConstellationMembership(kind, name, member string, add bool) {
 	key := constellationKey(name)
-	colorKey := constellationColorKey(name)
+	// What a constellation looks like rides on every member: a member joining
+	// takes it, one leaving drops it.
+	looks := []string{constellationColorKey(name), constellationArtKey(name)}
 	if kind == "want" {
 		if s.globalBuilder == nil {
 			return
 		}
 		if add {
 			_ = s.globalBuilder.QueueWantAddLabel(member, key, "true")
-			if c := s.constellationColor(kind, name); c != "" {
-				_ = s.globalBuilder.QueueWantAddLabel(member, colorKey, c)
+			for _, k := range looks {
+				if v := s.constellationLabel(kind, k); v != "" {
+					_ = s.globalBuilder.QueueWantAddLabel(member, k, v)
+				}
 			}
 		} else {
 			_ = s.globalBuilder.QueueWantRemoveLabel(member, key)
 			_ = s.globalBuilder.QueueWantRemoveLabel(member, legacyConstellationKey(name))
-			_ = s.globalBuilder.QueueWantRemoveLabel(member, colorKey)
+			for _, k := range looks {
+				_ = s.globalBuilder.QueueWantRemoveLabel(member, k)
+			}
 		}
 		return
 	}
 	// thing
 	if add {
 		_ = s.thingLabels.Set(member, key, "true")
-		if c := s.constellationColor(kind, name); c != "" {
-			_ = s.thingLabels.Set(member, colorKey, c)
+		for _, k := range looks {
+			if v := s.constellationLabel(kind, k); v != "" {
+				_ = s.thingLabels.Set(member, k, v)
+			}
 		}
 	} else {
 		_ = s.thingLabels.Remove(member, key)
 		_ = s.thingLabels.Remove(member, legacyConstellationKey(name))
-		_ = s.thingLabels.Remove(member, colorKey)
+		for _, k := range looks {
+			_ = s.thingLabels.Remove(member, k)
+		}
 	}
 }
 
 // constellationColor returns the colour currently recorded for a constellation
 // (any one member carrying the label answers for the whole), or "" if none.
 func (s *Server) constellationColor(kind, name string) string {
-	colorKey := constellationColorKey(name)
+	return s.constellationLabel(kind, constellationColorKey(name))
+}
+
+// constellationLabel is the value a constellation's members of one kind
+// carry under key (its colour, its art), or "" if none does.
+func (s *Server) constellationLabel(kind, key string) string {
 	if kind == "want" {
 		if s.globalBuilder != nil {
 			for _, want := range s.globalBuilder.GetAllWantStates() {
 				// A copy under the lock — see collectWantConstellations. Joining a
 				// group queues the membership label and then reads the colour
 				// here, while the reconcile loop is writing that same map.
-				if c, ok := want.GetLabels()[colorKey]; ok && c != "" {
+				if c, ok := want.GetLabels()[key]; ok && c != "" {
 					return c
 				}
 			}
@@ -276,7 +305,7 @@ func (s *Server) constellationColor(kind, name string) string {
 		return ""
 	}
 	for _, labels := range s.thingLabels.All() {
-		if c, ok := labels[colorKey]; ok && c != "" {
+		if c, ok := labels[key]; ok && c != "" {
 			return c
 		}
 	}
@@ -286,23 +315,28 @@ func (s *Server) constellationColor(kind, name string) string {
 // setConstellationColor writes (or, with color=="", clears) the colour label on
 // every current member of the constellation.
 func (s *Server) setConstellationColor(kind, name, color string) {
-	colorKey := constellationColorKey(name)
+	s.setConstellationLabel(kind, name, constellationColorKey(name), color)
+}
+
+// setConstellationLabel writes (or, with value=="", clears) key on every
+// current member of the constellation of one kind.
+func (s *Server) setConstellationLabel(kind, name, key, value string) {
 	for _, m := range s.membersOfConstellation(kind, name) {
 		if kind == "want" {
 			if s.globalBuilder == nil {
 				continue
 			}
-			if color != "" {
-				_ = s.globalBuilder.QueueWantAddLabel(m, colorKey, color)
+			if value != "" {
+				_ = s.globalBuilder.QueueWantAddLabel(m, key, value)
 			} else {
-				_ = s.globalBuilder.QueueWantRemoveLabel(m, colorKey)
+				_ = s.globalBuilder.QueueWantRemoveLabel(m, key)
 			}
 			continue
 		}
-		if color != "" {
-			_ = s.thingLabels.Set(m, colorKey, color)
+		if value != "" {
+			_ = s.thingLabels.Set(m, key, value)
 		} else {
-			_ = s.thingLabels.Remove(m, colorKey)
+			_ = s.thingLabels.Remove(m, key)
 		}
 	}
 }
@@ -408,6 +442,7 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	// The colour, captured before any membership move so a rename can carry it
 	// over even when the client did not restate it.
 	carriedColor := s.anyConstellationColor(oldName)
+	carriedArt := s.anyConstellationArt(oldName)
 
 	// Current members of the old group — of both kinds, or reconciling a mixed
 	// constellation would silently drop everything of the kind not named.
@@ -450,6 +485,10 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	} else if newName != oldName && carriedColor != "" {
 		s.setConstellationColorEverywhere(newName, carriedColor)
 	}
+	// Its art goes with it to the new name, as its colour does.
+	if newName != oldName && carriedArt != "" {
+		s.setConstellationArtEverywhere(newName, carriedArt)
+	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group updated", "name": newName})
 }
@@ -457,6 +496,8 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/constellations/{name}?kind=memo|want
 func (s *Server) deleteConstellation(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	// Its art goes with it: nothing else will ever point at the file.
+	s.removeConstellationArtFile(s.anyConstellationArt(name))
 	// The ?kind= is accepted and ignored. Deleting a constellation means the
 	// name stops existing, and a name that had a want and a thing in it would
 	// otherwise half-survive whichever kind the caller happened to send.

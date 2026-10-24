@@ -315,6 +315,11 @@ func (s *Server) setupRoutes() {
 		// (photo_fields.go): what waits to be read, and a reading handed back.
 		things.HandleFunc("/photo-fields/pending", s.getPhotoFieldsPending).Methods("GET", "OPTIONS")
 		things.HandleFunc("/photo-fields", s.postPhotoFields).Methods("POST", "OPTIONS")
+		// A thing's art, drawn on the phone (thing_art.go): the picture, a
+		// drawing kept, and one taken away.
+		things.HandleFunc("/art/{id}", s.serveThingArt).Methods("GET")
+		things.HandleFunc("/art/{id}", s.uploadThingArt).Methods("POST", "OPTIONS")
+		things.HandleFunc("/art/{id}", s.deleteThingArt).Methods("DELETE")
 		// A thing's neighbours: constellation co-members and the wants naming it.
 		// Registered before "/{id}" so the literal "/relations" segment is not
 		// mistaken for part of a thing id.
@@ -334,6 +339,10 @@ func (s *Server) setupRoutes() {
 		sub.HandleFunc("", s.createConstellation).Methods("POST", "OPTIONS")
 		sub.HandleFunc("/{name}", s.updateConstellation).Methods("PUT", "OPTIONS")
 		sub.HandleFunc("/{name}", s.deleteConstellation).Methods("DELETE", "OPTIONS")
+		// Its art (constellation_art.go): the picture, a drawing kept, and one taken away.
+		sub.HandleFunc("/art/{file}", s.serveConstellationArt).Methods("GET")
+		sub.HandleFunc("/{name}/art", s.uploadConstellationArt).Methods("POST", "OPTIONS")
+		sub.HandleFunc("/{name}/art", s.deleteConstellationArt).Methods("DELETE")
 	}
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
