@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -41,12 +42,24 @@ var subjectTypes = map[string]bool{"picture": true}
 const robotContextMarker = "\n\n(context:"
 
 // splitRobotRequest separates what the person said from the position line the
-// server appended to it.
+// server appended to it — and from whom it was said to: a leading "@robot"
+// (how a chat in the browser addresses it) is the address, not part of the
+// question. Left in, "robot" was read as a want the question names (the robot
+// want's own name), longer than ゴルフ and so taken for the subject, and
+// 「@robot 最新のゴルフのスコアは？」 found no photos the same question asked
+// on the iPhone, which sends the words alone, did.
 func splitRobotRequest(request string) (question, context string) {
 	if i := strings.Index(request, robotContextMarker); i >= 0 {
-		return strings.TrimSpace(request[:i]), request[i:]
+		return stripAddress(request[:i]), request[i:]
 	}
-	return strings.TrimSpace(request), ""
+	return stripAddress(request), ""
+}
+
+// robotAddress is a leading mention, or several: "@robot ", "@robot @chap ".
+var robotAddress = regexp.MustCompile(`^(?:@\S+\s+)+`)
+
+func stripAddress(s string) string {
+	return strings.TrimSpace(robotAddress.ReplaceAllString(strings.TrimSpace(s), ""))
 }
 
 // pointingWords are how a person says "the one I am at".

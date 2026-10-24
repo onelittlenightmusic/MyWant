@@ -56,3 +56,21 @@ func TestResolveRobotSubjectTwoPhotosUnderfoot(t *testing.T) {
 		t.Fatalf("two photos beside and a これ should be nobody's guess, got %s", got.Metadata.Name)
 	}
 }
+
+// A chat in the browser says "@robot …": the address is not the question —
+// left in, "robot" was taken for the want the question names, and a question
+// about the golf scores found no photos.
+func TestSplitRobotRequestDropsTheAddress(t *testing.T) {
+	cases := map[string]string{
+		"@robot 最新のゴルフのスコアは？":                      "最新のゴルフのスコアは？",
+		"@robot @chap 中野の天気は":                      "中野の天気は",
+		"最新のゴルフのスコアは？":                             "最新のゴルフのスコアは？",
+		"メールは me@example.com に":                    "メールは me@example.com に",
+		"@robot これは？" + robotContextMarker + " x)": "これは？",
+	}
+	for in, want := range cases {
+		if got, _ := splitRobotRequest(in); got != want {
+			t.Errorf("splitRobotRequest(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

@@ -175,17 +175,24 @@ func referentTime(q string, now time.Time) (phrase string, from, to time.Time, o
 }
 
 // wantsNamedIn are the wants a question names — by name, type, or one of the
-// type's aliases; the longest term found wins, so "スマートゴルフ" is not taken
-// for some want merely called "ゴルフ", and every want that term names is
-// returned (several transit wants share 乗り換え). title is what the question
-// called them, for saying so.
+// type's aliases — every one of them, the want named by the longest term
+// first: a question is a few words, and a want in it with nothing to say is
+// only looked at and passed over. Keeping only the longest term's had let one
+// want crowd another out (「スマートゴルフ」 named, a want merely called ゴルフ
+// went; 「robot」 in a question, the golf want went). title is what the
+// question called the first, for saying so — 「スマートゴルフ」, not ゴルフ.
 func (s *Server) wantsNamedIn(q string) (wants []*mywant.Want, title string) {
 	if s.globalBuilder == nil {
 		return nil, ""
 	}
 	q = strings.ToLower(q)
 	aliases := s.fmTypeAliases()
-	best := 0
+	// Each want named, by the longest of its terms the question holds.
+	type named struct {
+		w   *mywant.Want
+		hit int
+	}
+	var found []named
 	for _, w := range s.globalBuilder.GetWants() {
 		terms := []string{w.Metadata.Name, w.Metadata.Type}
 		terms = append(terms, aliases[w.Metadata.Type]...)
@@ -195,13 +202,13 @@ func (s *Server) wantsNamedIn(q string) (wants []*mywant.Want, title string) {
 				hit = len([]rune(t))
 			}
 		}
-		switch {
-		case hit == 0 || hit < best:
-		case hit > best:
-			wants, best = []*mywant.Want{w}, hit
-		default:
-			wants = append(wants, w)
+		if hit > 0 {
+			found = append(found, named{w, hit})
 		}
+	}
+	sort.SliceStable(found, func(i, j int) bool { return found[i].hit > found[j].hit })
+	for _, f := range found {
+		wants = append(wants, f.w)
 	}
 	if len(wants) == 0 {
 		return nil, ""
@@ -278,7 +285,10 @@ func answerTime(e mywant.ResultHistoryEntry) time.Time {
 
 // text is the referent as the robot is told it: which answers the
 // question means, each with what it said — said plainly to be the ones meant,
-// not the want's answer now.
+// not the want's answer now. As many answers, newest first, as fit what look
+// may hand the model (fmLookTokens) — every want the question named can bring
+// its own, and the smallest model asking has 4,096 tokens for everything —
+// and always the newest; the rest are counted, not listed.
 func (r *answerReferent) text() string {
 	var b strings.Builder
 	if len(r.Answers) == 0 {
@@ -287,12 +297,13 @@ func (r *answerReferent) text() string {
 	}
 	fmt.Fprintf(&b, "The question asks about %s's answers from %s (%s) — these, not what it says now:\n", r.Title, r.Phrase, r.window())
 	for i, a := range r.Answers {
-		if i == 3 {
+		raw, _ := json.Marshal(a.Entry.Result)
+		line := fmt.Sprintf("- %s %s: %s\n", a.When.Format("1/2 15:04"), a.Want.Metadata.Name, firstLine(string(raw), 300))
+		if i > 0 && estimateTokens([]byte(b.String()+line)) > fmLookTokens {
 			fmt.Fprintf(&b, "(and %d more)\n", len(r.Answers)-i)
 			break
 		}
-		raw, _ := json.Marshal(a.Entry.Result)
-		fmt.Fprintf(&b, "- %s %s: %s\n", a.When.Format("1/2 15:04"), a.Want.Metadata.Name, firstLine(string(raw), 300))
+		b.WriteString(line)
 	}
 	return b.String()
 }
