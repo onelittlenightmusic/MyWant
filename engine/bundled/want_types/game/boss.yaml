@@ -24,7 +24,22 @@ wantType:
     type: float64
     default: 30
     required: false
+  - name: damage
+    description: What one of its blows takes off what it goes for (given it by its battle — enemy_damage, a boss's boss_damage)
+    type: float64
+    default: 1
+    required: false
+  - name: interval
+    description: Seconds between its blows
+    type: float64
+    default: 1
+    required: false
   state:
+  - name: strike
+    description: The last blow it sent — {damage, seq} — every interval while it goes for something and is not held; the battle lands each new one when it is next to it
+    type: object
+    label: current
+    volatile: true
   - name: hp
     description: What is left of it
     type: float64
@@ -43,6 +58,10 @@ wantType:
   - name: frozen
     description: Held where it is by a freeze — not moving, not wearing anything down
     type: bool
+    label: current
+  - name: frozen_until
+    description: Until when a freeze holds it (RFC 3339)
+    type: string
     label: current
   - name: defeated
     description: Brought down — left on the board a moment, for the hit that did it to be seen landing, then gone

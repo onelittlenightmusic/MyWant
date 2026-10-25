@@ -9,6 +9,10 @@ wantType:
       to more mends each less, never more in all. Connected to nothing, it
       is a button: while someone stands on it (or a thing is pushed onto it),
       it mends every hurt want near it. Drawn on the board as a green line.
+      It is the heal that says how much and when: every interval seconds,
+      while it has something to mend, it sends one pulse (its `pulse`
+      field, exposed as "<its name>.heal") with each one's share in `to` —
+      amount × interval in all — and each one mended takes its share itself.
     version: '1.0'
     category: game
     pattern: independent
@@ -29,6 +33,11 @@ wantType:
     type: float64
     default: 2
     required: false
+  - name: interval
+    description: Seconds between its pulses — each gives amount × interval
+    type: float64
+    default: 1
+    required: false
   - name: characters
     description: Who is standing on it (filled by footsteps, as a button's is)
     type: array
@@ -38,7 +47,27 @@ wantType:
     description: The things pushed onto it (filled as a button's is)
     type: array
     required: false
+  - name: max_hp
+    description: How much it can take, standing in a room's battle
+    type: float64
+    default: 10
+    required: false
   state:
+  - name: hp
+    description: What is left of it — its own, taken from the blows and mends sent to it; at 0 it stops itself. Kept across a restart; whole again when its battle begins a new round
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: round
+    description: The round of its battle it last made itself whole for
+    type: int
+    label: current
+    persistent: true
   - name: characters
     description: Who is standing on it — while anyone is, it mends
     type: array
@@ -49,6 +78,11 @@ wantType:
     type: array
     label: current
     persistent: true
+  - name: pulse
+    description: The last pulse it sent — {to (each one's share), amount, seq}. A new seq is one more pulse; each one in `to` takes its share itself.
+    type: object
+    label: current
+    volatile: true
   - name: healing
     description: The names of the wants it is mending now
     type: array

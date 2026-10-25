@@ -42,7 +42,32 @@ wantType:
     type: string
     default: nearest
     required: false
+  - name: max_hp
+    description: How much it can take, standing in a room's battle
+    type: float64
+    default: 10
+    required: false
   state:
+  - name: hp
+    description: What is left of it — its own, taken from the blows and mends sent to it; at 0 it stops itself. Kept across a restart; whole again when its battle begins a new round
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: round
+    description: The round of its battle it last made itself whole for
+    type: int
+    label: current
+    persistent: true
+  - name: strike
+    description: The last shot it sent — {damage, seq} — every interval while it is aimed at something; the battle lands each new one on what it is aimed at
+    type: object
+    label: current
+    volatile: true
   - name: shots
     description: Hits it has made
     type: int

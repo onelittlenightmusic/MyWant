@@ -1,0 +1,60 @@
+wantType:
+  metadata:
+    name: treasure
+    title: Treasure
+    description: >-
+      What a room holds to be defended — a want with something written on it
+      (its content, as a note's) and an hp of its own. A battle's enemies go
+      for it; the blows they send it come off its hp, what heals it mends
+      it, never past its max_hp, and at 0 it stops itself (suspended) until
+      it is resumed — or its battle is put back. It takes all of this itself,
+      in its own turns: nothing else writes its hp.
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: "Gem"
+      category-icon: "Gamepad2"
+      form-style: book
+      category-bg-light: "linear-gradient(160deg, #fde68a 0%, #fbcfe8 100%)"
+      category-bg-dark: "linear-gradient(160deg, #78350f 0%, #831843 100%)"
+  parameters:
+  - name: max_hp
+    description: How much it can take
+    type: float64
+    default: 10
+    required: false
+  state:
+  - name: content
+    description: What is written on it
+    type: string
+    label: current
+    persistent: true
+    initialValue: ''
+  - name: hp
+    description: What is left of it — its own, taken from the blows and mends sent to it. Kept across a restart; whole again when its battle begins a new round
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: round
+    description: The round of its battle it last made itself whole for
+    type: int
+    label: current
+    persistent: true
+  - name: characters
+    description: Character IDs currently standing on this want's tile (kept in sync by footsteps)
+    type: array
+    label: current
+    persistent: true
+  examples:
+  - title: A treasure
+    description: Something for a room's battle to defend
+    want:
+      metadata:
+        name: ledger
+        type: treasure

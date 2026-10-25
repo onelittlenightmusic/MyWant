@@ -65,7 +65,7 @@ wantType:
     default: 3
     required: false
   - name: enemy_damage
-    description: How much an enemy wears down what it is at, per second
+    description: What one blow of an enemy takes off what it is at — given each enemy as its own damage, one blow a second
     type: float64
     default: 1
     required: false
@@ -85,7 +85,7 @@ wantType:
     default: 30
     required: false
   - name: boss_damage
-    description: How much the boss wears down what it is at, per second
+    description: What one blow of the boss takes off what it is at — given it as its own damage, one blow a second
     type: float64
     default: 3
     required: false
@@ -100,6 +100,11 @@ wantType:
     subType: character_ids
     required: false
   state:
+  - name: round
+    description: Which round of the battle this is — one more each time it begins or is put back; exposed as "<its name>.round", and each want in the room made whole again when it changes
+    type: int
+    label: current
+    persistent: true
   - name: characters
     description: Who is standing on it — someone getting on starts the battle
     type: array
