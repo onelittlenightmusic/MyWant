@@ -57,6 +57,31 @@ agent:
     label: current
     persistent: true
     onFetchData: last_spawn
+  - name: ranking
+    type: array
+    label: current
+    persistent: true
+    onFetchData: ranking
+  - name: last_score
+    type: object
+    label: current
+    persistent: true
+    onFetchData: last_score
+  - name: started_at
+    type: int
+    label: current
+    persistent: true
+    onFetchData: started_at
+  - name: defenders_at_start
+    type: int
+    label: current
+    persistent: true
+    onFetchData: defenders_at_start
+  - name: started_by
+    type: array
+    label: current
+    persistent: true
+    onFetchData: started_by
   - name: achieved
     type: bool
     label: current

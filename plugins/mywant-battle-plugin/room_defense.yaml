@@ -91,6 +91,31 @@ wantType:
     type: float64
     default: 10
     required: false
+  - name: score_per_survivor
+    description: Score for each want in the room still standing when the battle is over
+    type: float64
+    default: 1000
+    required: false
+  - name: score_per_defeat
+    description: Score for each enemy brought down
+    type: float64
+    default: 100
+    required: false
+  - name: score_par_seconds
+    description: A battle held to the end scores for each second it was over before this
+    type: float64
+    default: 120
+    required: false
+  - name: score_per_second
+    description: Score for each second under score_par_seconds (a battle held to the end only)
+    type: float64
+    default: 10
+    required: false
+  - name: ranking_size
+    description: How many battles its ranking keeps
+    type: int
+    default: 10
+    required: false
   - name: characters
     description: Who is standing on it (filled by footsteps, as a button's is) — the one who starts it
     type: array
@@ -132,6 +157,33 @@ wantType:
     volatile: true
   - name: suspended
     description: The wants this battle suspended — to resume by hand
+    type: array
+    label: current
+    persistent: true
+  - name: ranking
+    description: 'Its best battles, highest score first (ranking_size of them): each {score, result
+      (cleared or lost), survivors, of (how many it had to hold), defeated, seconds, round, by (who began
+      it), at (UTC, ISO 8601)}'
+    type: array
+    label: current
+    persistent: true
+  - name: last_score
+    description: The last battle's entry, as in ranking — whether or not it made it
+    type: object
+    label: current
+    persistent: true
+  - name: started_at
+    description: When the battle under way began (ms), for its score
+    type: int
+    label: current
+    persistent: true
+  - name: defenders_at_start
+    description: How many wants it had to hold when the battle began
+    type: int
+    label: current
+    persistent: true
+  - name: started_by
+    description: Who began the battle under way
     type: array
     label: current
     persistent: true

@@ -16,6 +16,7 @@ want's own: shots, blows, steps, mends, a hit taken.
 """
 
 import math
+import time
 
 from mywant import MyWantError, current
 
@@ -168,6 +169,11 @@ if on and not me.state.get("stood_on") and phase != "fighting":
         me.set("targets", [])
         me.set("last_spawn", 0)
         me.set("say", "")
+        # For its score when it is over: when it began, how many it had to
+        # hold, and who began it.
+        me.set("started_at", t)
+        me.set("defenders_at_start", len(holds))
+        me.set("started_by", list(me.state.get("characters") or []))
 me.set("stood_on", on)
 me.set("round", rnd)
 
@@ -350,13 +356,36 @@ for f in fighters:
 # Over: every enemy in and down, or nothing left to defend.
 if spawned >= total and not enemies:
     phase = "cleared"
-    me.set("say", f"守りきった！ {defeated} 体倒しました")
 elif not targets and spawned > 0:
     phase = "lost"
-    me.set("say", f"全部やられた… {defeated} 体倒しました。want を再開してもう一度")
 if phase != "fighting":
     for w in shooters:
         aim(w, None)
+    # Its score, and its place among the battles before it — kept in its own
+    # state, which outlives a restart.
+    cleared = phase == "cleared"
+    survivors = len(targets)
+    began = int(me.state.get("started_at") or t)
+    seconds = round((t - began) / 1000, 1)
+    entry = {
+        "score": b.score_of(cleared, survivors, defeated, seconds, me.params),
+        "result": phase,
+        "survivors": survivors,
+        "of": int(me.state.get("defenders_at_start") or survivors),
+        "defeated": defeated,
+        "seconds": seconds,
+        "round": rnd,
+        "by": list(me.state.get("started_by") or []),
+        # UTC, said so: the script may run where the clock is set to any zone.
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    ranking, place = b.ranked(me.state.get("ranking"), entry, int(me.params.get("ranking_size", 10)))
+    me.set("last_score", entry)
+    me.set("ranking", ranking)
+    head = f"守りきった！ {defeated} 体倒しました" if cleared \
+        else f"全部やられた… {defeated} 体倒しました。want を再開してもう一度"
+    rank = f"{place} 位" if place else "ランク外"
+    me.set("say", f"{head} — スコア {entry['score']}（{survivors}/{entry['of']} 生存・{seconds:g} 秒）{rank}")
 
 me.set("phase", phase)
 me.set("spawned", spawned)

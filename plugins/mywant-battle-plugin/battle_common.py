@@ -156,6 +156,33 @@ def step_toward(frm: tuple, to: tuple, blocked, reach: float = 1.5, margin: int 
     return None
 
 
+# ── the score ────────────────────────────────────────────────────────────────
+
+def score_of(cleared: bool, survivors: int, defeated: int, seconds: float, params: dict) -> int:
+    """A battle's score, once it is over: each want in the room still standing,
+    each enemy brought down, and — only for one held to the end — each second
+    it was over before its par."""
+    per_survivor = float(params.get("score_per_survivor", 1000))
+    per_defeat = float(params.get("score_per_defeat", 100))
+    par = float(params.get("score_par_seconds", 120))
+    per_second = float(params.get("score_per_second", 10))
+    score = survivors * per_survivor + defeated * per_defeat
+    if cleared:
+        score += max(0.0, par - seconds) * per_second
+    return int(round(score))
+
+
+def ranked(ranking, entry: dict, size: int) -> tuple:
+    """The ranking with `entry` in its place — highest score first, the
+    quicker of two the same — kept to `size`; and entry's place (1 is the top),
+    or 0 when it did not make it."""
+    rows = [r for r in (ranking or []) if isinstance(r, dict)] + [entry]
+    rows.sort(key=lambda r: (-int(r.get("score", 0)), float(r.get("seconds", 0))))
+    rows = rows[:max(size, 1)]
+    place = next((i + 1 for i, r in enumerate(rows) if r is entry), 0)
+    return rows, place
+
+
 # ── acts ─────────────────────────────────────────────────────────────────────
 
 def send(me, field: str, interval: float, body: dict, to, impact_kind: str = "", on=()):
