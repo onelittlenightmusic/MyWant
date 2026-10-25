@@ -407,7 +407,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
-					want.StoreLog("[MRS-DO:%s] failed: %v", finalName, err)
+					want.StoreLog("[MRS-DO:%s] failed: %s", finalName, callFailure(want, err))
 					return nil
 				}
 				mrsApplyStateUpdates(want, raw, stateUpdates)
@@ -442,7 +442,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
-					want.StoreLog("[MRS-MONITOR:%s] failed: %v", finalName, err)
+					want.StoreLog("[MRS-MONITOR:%s] failed: %s", finalName, callFailure(want, err))
 					return false, nil
 				}
 				mrsApplyStateUpdates(want, raw, stateUpdates)

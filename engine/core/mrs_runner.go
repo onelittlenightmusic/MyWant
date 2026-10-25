@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -377,8 +378,21 @@ func (p *residentProc) request(ctx context.Context, opt MRSRunOptions) (map[stri
 		}
 		return a.obj, nil
 	case <-ctx.Done():
-		return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
+		return nil, callEnded("skill", ctx)
 	}
+}
+
+// callEnded says why a call's context ended before it answered. Its own
+// timeout (an agent's timeout_seconds) running out is one reason; the want it
+// runs for stopping — restarted by a config change, suspended, deleted — and
+// taking its agents with it is the other, and the far more common one. Both
+// used to read "timed out", which sent a look at a restart burst off hunting
+// for something slow.
+func callEnded(what string, ctx context.Context) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("%s timed out: %w", what, ctx.Err())
+	}
+	return fmt.Errorf("%s cancelled (its want stopped or restarted): %w", what, ctx.Err())
 }
 
 // StopAllMRSResidents kills every resident interpreter, the shared agent

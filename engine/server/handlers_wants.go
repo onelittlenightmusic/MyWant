@@ -773,6 +773,9 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 // store it, record its SubType params as the creation hook does (so editing a
 // want also feeds the suggestions), and tell everyone watching.
 func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method, wantID string, updatedWant *mywant.Want) {
+	// This change's ID: on its API log entry, and on the line of the restart
+	// it causes (core/request_id.go).
+	requestID := mywant.NewRequestID("q")
 	if s.globalBuilder != nil {
 		// With its state as it is now. The body is a want's metadata and
 		// spec only, and applying the change puts the config copy's state in
@@ -782,6 +785,7 @@ func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method
 		if live, _, found := s.globalBuilder.FindWantByID(wantID); found {
 			mywant.StoreStateMulti(updatedWant, live.GetAllStateDeep())
 		}
+		updatedWant.SetChangeBy(requestID)
 		s.globalBuilder.UpdateWant(updatedWant)
 		s.globalBuilder.TriggerSave()
 	}
@@ -793,7 +797,7 @@ func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method
 		}
 	}
 
-	s.globalBuilder.LogAPIOperation(method, "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
+	s.globalBuilder.LogAPIRequest(requestID, method, "/api/v1/wants/{id}", wantID, "success", http.StatusOK, "", fmt.Sprintf("Updated want: %s", updatedWant.Metadata.Name))
 	s.JSONResponse(w, http.StatusOK, updatedWant)
 	boardWantsChanged(wantID)
 	s.ScheduleKataAnnounce()

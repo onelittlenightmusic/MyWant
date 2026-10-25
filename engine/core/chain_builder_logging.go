@@ -4,7 +4,13 @@ import "time"
 
 // LogAPIOperation logs an API operation (POST, PUT, DELETE, etc.)
 func (cb *ChainBuilder) LogAPIOperation(method, endpoint, resource, status string, statusCode int, errorMsg, details string) {
+	cb.LogAPIRequest("", method, endpoint, resource, status, statusCode, errorMsg, details)
+}
+
+// LogAPIRequest is LogAPIOperation for a request with an ID (request_id.go).
+func (cb *ChainBuilder) LogAPIRequest(requestID, method, endpoint, resource, status string, statusCode int, errorMsg, details string) {
 	entry := APILogEntry{
+		RequestID:  requestID,
 		Timestamp:  time.Now(),
 		Method:     method,
 		Endpoint:   endpoint,

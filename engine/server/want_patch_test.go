@@ -3,8 +3,11 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -113,4 +116,50 @@ func TestPatchWantRefusesOtherFields(t *testing.T) {
 	if w := patchTestDo(t, s, "PATCH", "/api/v1/wants/no-such-want", map[string]any{}); w.Code != http.StatusNotFound {
 		t.Errorf("unknown want: %d, want 404", w.Code)
 	}
+}
+
+// A PATCH's ID is on its API log entry, and the restart line it causes
+// names it.
+func TestPatchRestartNamesTheRequest(t *testing.T) {
+	s := patchTestServer(t)
+	id := patchTestWant(t, s)
+	var buf syncBuffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	defer log.SetOutput(prev)
+	if w := patchTestDo(t, s, "PATCH", "/api/v1/wants/"+id, map[string]any{
+		"spec": map[string]any{"params": map[string]any{"service_time": 0.2}},
+	}); w.Code != http.StatusOK {
+		t.Fatalf("patch: %d %s", w.Code, w.Body.String())
+	}
+	logs := s.globalBuilder.GetAPILogs()
+	req := logs[len(logs)-1]
+	if req.Method != "PATCH" || req.RequestID == "" {
+		t.Fatalf("API log entry: %+v", req)
+	}
+	line := "[patch-me] [RESTART] Want 'patch-me' restarting execution (by " + req.RequestID + ")"
+	for i := 0; i < 150; i++ {
+		if strings.Contains(buf.String(), line) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("no %q in:\n%s", line, buf.String())
+}
+
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }

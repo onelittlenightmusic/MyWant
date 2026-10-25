@@ -87,6 +87,9 @@ type APILogEntry struct {
 	StatusCode int       `json:"statusCode"` // HTTP status code
 	ErrorMsg   string    `json:"errorMsg,omitempty"`
 	Details    string    `json:"details,omitempty"`
+	// The ID a want's config change got (request_id.go): the restart it
+	// causes names it.
+	RequestID string `json:"requestId,omitempty"`
 }
 
 // WantOperation represents a unified operation request (add, delete, suspend, resume, etc.)
@@ -1040,8 +1043,10 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					if runtimeWant.want.Status == WantStatusConfigError {
 						runtimeWant.want.ClearConfigError()
 					} else {
-						// Reset status to Idle so want can be re-executed
-						runtimeWant.want.RestartWant()
+						// Reset status to Idle so want can be re-executed — naming the
+						// request the change came with, if any (request_id.go).
+						runtimeWant.want.RestartWantBy(updatedConfigWant.ChangeBy())
+						updatedConfigWant.SetChangeBy("") // named once; a later change brings its own
 					}
 				}
 			}
@@ -1589,6 +1594,7 @@ func (cb *ChainBuilder) deleteWantByID(wantID string) {
 		}
 
 		// Stop background agents before closing the stop channel
+		rw.want.noteStop("deleted")
 		if err := rw.want.StopAllBackgroundAgents(); err != nil {
 			log.Printf("[DELETE-WANT] Failed to stop background agents for '%s': %v\n", rw.want.Metadata.Name, err)
 		}

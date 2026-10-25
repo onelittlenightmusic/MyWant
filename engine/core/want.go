@@ -277,6 +277,12 @@ type Want struct {
 	// value "done":    agent completed successfully and must not run again (permanent until Init).
 	agentRunGuard sync.Map `json:"-" yaml:"-"`
 
+	// Tracing (request_id.go): the request a config came in with, the one
+	// the pending restart is for, and why the agents last stopped.
+	changeBy   string
+	restartBy  atomic.Pointer[string]
+	stopReason atomic.Pointer[string]
+
 	// Background agents for long-running operations
 	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
 	backgroundMutex  sync.RWMutex               `json:"-" yaml:"-"`
@@ -507,7 +513,19 @@ func (n *Want) SetStatus(status WantStatus) {
 // This triggers the reconcile loop to re-run the want
 // Used for scheduled restarts and other re-execution scenarios
 func (n *Want) RestartWant() {
-	n.StoreLog("[RESTART] Want '%s' restarting execution\n", n.Metadata.Name)
+	n.RestartWantBy("")
+}
+
+// RestartWantBy is RestartWant for a request (request_id.go): its line, and a
+// call the restart cuts short, name it. "" when the engine restarts it of its
+// own accord.
+func (n *Want) RestartWantBy(requestID string) {
+	by := requestID
+	if by == "" {
+		by = "engine"
+	}
+	n.restartBy.Store(&by)
+	n.StoreLog("[RESTART] Want '%s' restarting execution (by %s)\n", n.Metadata.Name, by)
 	n.SetStatus(WantStatusIdle)
 }
 
@@ -552,7 +570,7 @@ func (n *Want) prepareForRestart() {
 				}
 				if len(resetState) > 0 {
 					n.storeStateMulti(resetState)
-					InfoLog("[RESTART] Reset %d state field(s) to initialValues for '%s'\n", len(resetState), n.Metadata.Name)
+					InfoLog("[RESET] Reset %d state field(s) to initialValues for '%s'\n", len(resetState), n.Metadata.Name)
 				}
 			}
 		}
@@ -1753,6 +1771,7 @@ func (n *Want) OnProcessEnd(finalState map[string]any) {
 	// Stop all running agents (synchronous DoAgents)
 	n.StopAllAgents()
 	// Stop all background agents (ThinkAgent, MonitorAgent, PollAgent)
+	n.noteStop("process end")
 	if err := n.StopAllBackgroundAgents(); err != nil {
 		n.StoreLog("ERROR: Failed to stop background agents on process end: %v", err)
 	}
@@ -1787,6 +1806,7 @@ func (n *Want) OnProcessFail(errorState map[string]any, err error) {
 	// Stop all running agents (synchronous DoAgents)
 	n.StopAllAgents()
 	// Stop all background agents (ThinkAgent, MonitorAgent, PollAgent)
+	n.noteStop("process fail")
 	if err := n.StopAllBackgroundAgents(); err != nil {
 		n.StoreLog("ERROR: Failed to stop background agents on process fail: %v", err)
 	}

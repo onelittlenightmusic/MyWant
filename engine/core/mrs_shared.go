@@ -231,7 +231,7 @@ func postMRSExecute(ctx context.Context, base, agentName string, params map[stri
 	resp, err := mrsSharedClient.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
+			return nil, callEnded("skill", ctx)
 		}
 		if errors.Is(err, syscall.ECONNREFUSED) {
 			return nil, fmt.Errorf("%w: %v", errMRSUnreachable, err)
@@ -249,7 +249,7 @@ func postMRSExecute(ctx context.Context, base, agentName string, params map[stri
 		var obj map[string]any
 		if err := dec.Decode(&obj); err != nil {
 			if ctx.Err() != nil {
-				return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
+				return nil, callEnded("skill", ctx)
 			}
 			return nil, fmt.Errorf("%w: ended before answering: %v", errMRSTransport, err)
 		}

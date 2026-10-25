@@ -124,7 +124,7 @@ func runInlineHere(ctx context.Context, r inlineRun) (*inlineResult, error) {
 			return nil, err
 		}
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("script timed out: %w", ctx.Err())
+			return nil, callEnded("script", ctx)
 		}
 		res.ExitCode = exit.ExitCode()
 	}

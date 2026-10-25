@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"reflect"
+	"strings"
 )
 
 // want_loop.go — StartProgressionLoop helpers: control signal handling,
@@ -11,6 +12,11 @@ import (
 // stopAgents stops all background agents and logs any error with the given label.
 // Used throughout the progression loop to DRY up the repeated stop+log pattern.
 func (n *Want) stopAgents(label string) {
+	reason := strings.TrimPrefix(label, "on ")
+	if strings.Contains(label, "restart") {
+		reason = "restart"
+	}
+	n.noteStop(reason)
 	if err := n.StopAllBackgroundAgents(); err != nil {
 		n.StoreLog("ERROR: Failed to stop background agents %s: %v", label, err)
 	}
