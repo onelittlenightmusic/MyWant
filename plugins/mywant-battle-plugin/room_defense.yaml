@@ -15,6 +15,9 @@ wantType:
       form-type: button
       type-icon: Swords
       category-icon: Gamepad2
+      # Its relations are the battle's wiring, not roads to look at (the
+      # board's relation_road label).
+      relation_road: 'false'
       category-bg-light: 'linear-gradient(160deg, #fecaca 0%, #fde68a 100%)'
       category-bg-dark: 'linear-gradient(160deg, #7f1d1d 0%, #78350f 100%)'
   parameters:
