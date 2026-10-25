@@ -1,0 +1,69 @@
+agent:
+  metadata:
+    name: battle_room_agent
+    capability: battle_room
+    type: monitor
+  script:
+    path: ./room.py
+    timeout_seconds: 20
+  state_updates:
+  - name: phase
+    type: string
+    label: current
+    persistent: true
+    onFetchData: phase
+  - name: round
+    type: int
+    label: current
+    persistent: true
+    onFetchData: round
+  - name: spawned
+    type: int
+    label: current
+    persistent: true
+    onFetchData: spawned
+  - name: defeated
+    type: bool
+    label: current
+    persistent: true
+    onFetchData: defeated
+  - name: targets
+    type: array
+    label: current
+    persistent: false
+    onFetchData: targets
+  - name: say
+    type: string
+    label: current
+    persistent: false
+    onFetchData: say
+  - name: stood_on
+    type: bool
+    label: current
+    persistent: true
+    onFetchData: stood_on
+  - name: reset_stood_on
+    type: object
+    label: current
+    persistent: true
+    onFetchData: reset_stood_on
+  - name: fallen
+    type: object
+    label: current
+    persistent: true
+    onFetchData: fallen
+  - name: last_spawn
+    type: int
+    label: current
+    persistent: true
+    onFetchData: last_spawn
+  - name: achieved
+    type: bool
+    label: current
+    persistent: true
+    onFetchData: achieved
+  - name: failed
+    type: array
+    label: current
+    persistent: false
+    onFetchData: failed

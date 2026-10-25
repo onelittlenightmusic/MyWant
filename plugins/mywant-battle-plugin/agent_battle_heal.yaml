@@ -1,0 +1,49 @@
+agent:
+  metadata:
+    name: battle_heal_agent
+    capability: battle_heal
+    type: monitor
+  script:
+    path: ./heal.py
+    timeout_seconds: 20
+  state_updates:
+  - name: hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: hp
+  - name: max_hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: max_hp
+  - name: round
+    type: int
+    label: current
+    persistent: true
+    onFetchData: round
+  - name: inbox
+    type: object
+    label: current
+    persistent: true
+    onFetchData: inbox
+  - name: pulse
+    type: object
+    label: current
+    persistent: true
+    onFetchData: pulse
+  - name: pulse_clock
+    type: object
+    label: current
+    persistent: true
+    onFetchData: pulse_clock
+  - name: healing
+    type: array
+    label: current
+    persistent: true
+    onFetchData: healing
+  - name: impact
+    type: object
+    label: current
+    persistent: false
+    onFetchData: impact

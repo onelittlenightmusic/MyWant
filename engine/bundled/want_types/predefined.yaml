@@ -41,28 +41,12 @@ predefined:
       label: current
       persistent: true
       initialValue: null
-    # What is left of this want in a battle (room_defense): worn down by
-    # the enemies that reach its tile, suspended at nothing, and gone again
-    # once the battle is over. Predefined because what a room holds is any
-    # want at all, and a want deciding how to fight reads it on each of them
-    # as it reads any field. Absent outside a battle.
-    - name: hp
-      description: What is left of this want in a battle under way
-      type: float64
-      label: current
-      persistent: true
-    - name: max_hp
-      description: What this want started the battle with
-      type: float64
-      label: current
-      persistent: true
-    # The last effect this want's connections had on the wants they reach —
-    # an attack landing, a mend, a freeze: {kind: attack|mend|freeze,
-    # to: [<want name>...], n: <seq>}. Kept on the want that acts, as its
-    # connections (stateSubscriptions) are, and set by whatever applies the
-    # effect (the battle), for whoever draws the board to show it landing on
-    # each want in `to` — a burst on the tile, a sound. `n` makes each one a
-    # change, even the same kind on the same wants again.
+    # The last effect this want had on the wants it reaches — a value handed
+    # on, or whatever a plugin's want does (a battle's attack, mend, freeze):
+    # {kind, to: [<want name>...], n: <seq>, value?}. Kept on the want that
+    # acts, for whoever draws the board to show it landing on each want in
+    # `to` — a burst on the tile, a sound. `n` makes each one a change, even
+    # the same kind on the same wants again.
     - name: impact
       description: The last effect this want's connections had, and on which wants
       type: object

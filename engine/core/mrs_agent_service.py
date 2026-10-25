@@ -144,7 +144,10 @@ class _Output(io.TextIOBase):
                 self._buf = text
                 return
             self._buf = text[end:]
-            if isinstance(obj, dict) and "_progress" in obj:
+            # Progress, and what a script says about its own want (stop
+            # itself, move its own tile): sent back as they come, never the
+            # result.
+            if isinstance(obj, dict) and ("_progress" in obj or "_control" in obj or "_tile" in obj):
                 self._send_progress(obj)
             elif isinstance(obj, dict):
                 self.result = obj
@@ -196,7 +199,21 @@ def _forget_changed_modules():
                 _modules_seen.pop(name, None)
 
 
-def run(path, args, send_progress):
+def _sdk_enter(context, out):
+    """The want this call runs for, as the SDK's current() (client-py:
+    mywant/plugin.py) — per thread, as argv and stdout are. None when the
+    call is for no want, or the SDK is not on the path."""
+    if not context:
+        return None
+    try:
+        from mywant import plugin as _plugin
+    except ImportError:
+        return None
+    _plugin._enter(context, out=out)
+    return _plugin
+
+
+def run(path, args, send_progress, context=None):
     """Run one script as a spawn would. Returns (exit code, result, stderr)."""
     _forget_changed_modules()
     out = _Output(send_progress)
@@ -204,11 +221,16 @@ def run(path, args, send_progress):
     _local.argv = [path] + [str(a) for a in args]
     _local.stdout = out
     _local.stderr = err
+    sdk = None
     code = 0
     try:
+        # Compiled first: that puts the script's own directory on the path,
+        # where a plugin may carry the SDK itself (a runner has none of its own).
+        compiled = _code(path)
+        sdk = _sdk_enter(context, out)
         # Not runpy: it swaps sys.modules["__main__"] and argv[0] for the
         # whole process, which calls running side by side would tangle.
-        exec(_code(path), {"__name__": "__main__", "__file__": path, "__builtins__": builtins})
+        exec(compiled, {"__name__": "__main__", "__file__": path, "__builtins__": builtins})
     except SystemExit as e:
         if e.code is None:
             code = 0
@@ -222,6 +244,8 @@ def run(path, args, send_progress):
         code = 1
     finally:
         _local.argv = _local.stdout = _local.stderr = None
+        if sdk is not None:
+            sdk._leave()
         _forget_changed_modules()  # what it imported, as it is now
     return code, out.result, err.getvalue()
 
@@ -295,7 +319,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if _runner is not None:
             _runner.execute(params, send, self.connection)
             return
-        _answer(run(script, args, send), send)
+        _answer(run(script, args, send, params.get("context")), send)
 
     def _reply(self, obj):
         body = json.dumps(obj).encode()
@@ -527,7 +551,7 @@ class _Runner:
         if "command" in params:
             send(_run_command(params, env))
         else:
-            _answer(run(params["script"], params.get("args") or [], send), send)
+            _answer(run(params["script"], params.get("args") or [], send, params.get("context")), send)
         out.close()
 
     def _shut_in(self, params):

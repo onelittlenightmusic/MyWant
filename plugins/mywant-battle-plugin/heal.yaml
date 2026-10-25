@@ -1,0 +1,113 @@
+wantType:
+  metadata:
+    name: heal
+    title: Heal
+    description: 'A want tile that mends what a battle wore off (hp), up to what it started with. Connected
+      to wants (the 接続 skill, tied from it), it mends those by itself — its amount shared among them,
+      so connecting it to more mends each less, never more in all. Connected to nothing, it is a button:
+      while someone stands on it (or a thing is pushed onto it), it mends every hurt want near it. Drawn
+      on the board as a green line. It is the heal that says how much and when: every interval seconds,
+      while it has something to mend, it sends one pulse (its `pulse` field, exposed as "<its name>.heal")
+      with each one''s share in `to` — amount × interval in all — and each one mended takes its share
+      itself.'
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      form-type: button
+      type-icon: HeartPulse
+      category-icon: Gamepad2
+      category-bg-light: 'linear-gradient(160deg, #bbf7d0 0%, #fde68a 100%)'
+      category-bg-dark: 'linear-gradient(160deg, #14532d 0%, #78350f 100%)'
+  parameters:
+  - name: range
+    description: How far it reaches, in cells
+    type: float64
+    default: 2
+    required: false
+  - name: amount
+    description: How much hp it gives back each second — in all, shared among what it is connected to
+    type: float64
+    default: 2
+    required: false
+  - name: interval
+    description: Seconds between its pulses — each gives amount × interval
+    type: float64
+    default: 1
+    required: false
+  - name: characters
+    description: Who is standing on it (filled by footsteps, as a button's is)
+    type: array
+    subType: character_ids
+    required: false
+  - name: things
+    description: The things pushed onto it (filled as a button's is)
+    type: array
+    required: false
+  - name: max_hp
+    description: How much it can take, standing in a room's battle
+    type: float64
+    default: 10
+    required: false
+  - name: mend
+    description: The wants it is connected to and mends (the 接続 skill)
+    type: array
+    required: false
+  state:
+  - name: hp
+    description: What is left of it — its own, taken from the blows and mends sent to it; at 0 it stops
+      itself. Kept across a restart; whole again when its battle begins a new round
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: round
+    description: The round of its battle it last made itself whole for
+    type: int
+    label: current
+    persistent: true
+  - name: characters
+    description: Who is standing on it — while anyone is, it mends
+    type: array
+    label: current
+    persistent: true
+  - name: things
+    description: The things on it — while any is, it mends
+    type: array
+    label: current
+    persistent: true
+  - name: pulse
+    description: The last pulse it sent — {to (each one's share), amount, seq}. A new seq is one more
+      pulse; each one in `to` takes its share itself.
+    type: object
+    label: current
+    volatile: true
+    persistent: true
+  - name: healing
+    description: The names of the wants it is mending now
+    type: array
+    label: current
+    volatile: true
+    persistent: true
+  - name: skill_poll_interval_ms
+    description: How often its turn comes, in ms (its agent polls at this)
+    type: int
+    label: goal
+    persistent: true
+    initialValue: 1000
+  - name: inbox
+    description: inbox — its own, kept by its script (battle plugin)
+    type: object
+    label: current
+    persistent: true
+  - name: pulse_clock
+    description: pulse_clock — its own, kept by its script (battle plugin)
+    type: object
+    label: current
+    persistent: true
+  requires:
+  - battle_heal

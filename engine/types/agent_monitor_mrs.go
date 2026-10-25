@@ -230,5 +230,9 @@ func runMRSSkillForWant(ctx context.Context, want *Want, scriptPath string, args
 		CacheTTL:   time.Duration(GetCurrent(want, "skill_cache_ttl_ms", 0)) * time.Millisecond,
 		MaxProcs:   GetCurrent(want, "skill_max_procs", 0),
 		Isolated:   GetCurrent(want, "skill_isolated", false),
+		// The SDK's current() is this want; what the script says about its
+		// own want is done to it (core/mrs_sdk.go).
+		Context:     MRSWantContext(want),
+		OnDirective: func(obj map[string]any) { MRSApplyDirective(want, obj) },
 	})
 }

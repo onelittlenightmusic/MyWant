@@ -1,0 +1,49 @@
+agent:
+  metadata:
+    name: battle_turret_agent
+    capability: battle_turret
+    type: monitor
+  script:
+    path: ./turret.py
+    timeout_seconds: 20
+  state_updates:
+  - name: hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: hp
+  - name: max_hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: max_hp
+  - name: round
+    type: int
+    label: current
+    persistent: true
+    onFetchData: round
+  - name: inbox
+    type: object
+    label: current
+    persistent: true
+    onFetchData: inbox
+  - name: strike
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike
+  - name: strike_clock
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike_clock
+  - name: shots
+    type: int
+    label: current
+    persistent: true
+    onFetchData: shots
+  - name: impact
+    type: object
+    label: current
+    persistent: false
+    onFetchData: impact

@@ -5,16 +5,13 @@ import (
 	"sync/atomic"
 )
 
-// What a want's connections just did to the wants they reach, kept on the
-// want that acted (predefined.yaml's `impact`), for whoever draws the board
-// to show it landing on each of them: an attack's hit, a mend, a freeze (a
-// battle), or a value it handed on (feed).
+// What a want just did to the wants it reaches, kept on the want that acted
+// (predefined.yaml's `impact`), for whoever draws the board to show it
+// landing on each of them: a value it handed on (feed), or any kind a
+// plugin's want writes itself (the battle plugin's attack, mend, freeze).
 const (
-	ImpactField  = "impact"
-	ImpactAttack = "attack"
-	ImpactMend   = "mend"
-	ImpactFreeze = "freeze"
-	ImpactFeed   = "feed"
+	ImpactField = "impact"
+	ImpactFeed  = "feed"
 )
 
 // impactSeq numbers impacts, so the same kind on the same wants again is

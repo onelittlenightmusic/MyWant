@@ -41,22 +41,7 @@ wantType:
     required: false
     default: ""
 
-  - name: attack_damage
-    description: What one hit of the 攻撃 skill takes off the enemy it is locked on to
-    type: float64
-    default: 1
-    required: false
-  - name: attack_interval
-    description: Seconds between the 攻撃 skill's hits
-    type: float64
-    default: 1
-    required: false
   state:
-  - name: strike
-    description: The 攻撃 skill's last hit — {damage, seq} — sent every attack_interval while locked on to an enemy; the battle lands each new one while the enemy is in reach
-    type: object
-    label: current
-    volatile: true
   - name: character_id
     description: The character this resolves motion for
     type: string

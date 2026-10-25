@@ -774,6 +774,14 @@ func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 // want also feeds the suggestions), and tell everyone watching.
 func (s *Server) commitWantUpdate(w http.ResponseWriter, r *http.Request, method, wantID string, updatedWant *mywant.Want) {
 	if s.globalBuilder != nil {
+		// With its state as it is now. The body is a want's metadata and
+		// spec only, and applying the change puts the config copy's state in
+		// place of the running want's — so without this, changing a want's
+		// imports (the Wiring tab, a plugin's wiring) emptied its state, a
+		// note's text and all.
+		if live, _, found := s.globalBuilder.FindWantByID(wantID); found {
+			mywant.StoreStateMulti(updatedWant, live.GetAllStateDeep())
+		}
 		s.globalBuilder.UpdateWant(updatedWant)
 		s.globalBuilder.TriggerSave()
 	}

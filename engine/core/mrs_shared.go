@@ -105,7 +105,7 @@ func (s *mrsSharedService) start() error {
 			env = append(env, kv)
 		}
 	}
-	cmd.Env = env
+	cmd.Env = mrsPythonEnv(env)
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -188,6 +188,9 @@ func runMRSShared(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 		return nil, errMRSSpawnInstead
 	}
 	params := map[string]any{"script": scriptPath, "args": opt.Args}
+	if opt.Context != nil {
+		params["context"] = opt.Context
+	}
 	result, err := postMRSExecute(ctx, base, filepath.Base(filepath.Dir(scriptPath)), params, opt)
 	switch {
 	case errors.Is(err, errMRSUnreachable):
@@ -249,6 +252,9 @@ func postMRSExecute(ctx context.Context, base, agentName string, params map[stri
 				return nil, fmt.Errorf("skill timed out: %w", ctx.Err())
 			}
 			return nil, fmt.Errorf("%w: ended before answering: %v", errMRSTransport, err)
+		}
+		if mrsDirective(obj, opt) {
+			continue
 		}
 		if pct, ok := obj["_progress"]; ok {
 			if opt.OnProgress != nil {

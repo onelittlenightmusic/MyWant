@@ -401,6 +401,10 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				want.StoreLog("[MRS-DO:%s] executing %s args=%v", finalName, finalPath, args)
 				opt := runOpts
 				opt.Args = args
+				// The SDK's current() is this want, and what the script
+				// says about its own want is done to it (mrs_sdk.go).
+				opt.Context = MRSWantContext(want)
+				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
 					want.StoreLog("[MRS-DO:%s] failed: %v", finalName, err)
@@ -432,6 +436,10 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				want.StoreLog("[MRS-MONITOR:%s] executing %s args=%v", finalName, finalPath, args)
 				opt := runOpts
 				opt.Args = args
+				// The SDK's current() is this want, and what the script
+				// says about its own want is done to it (mrs_sdk.go).
+				opt.Context = MRSWantContext(want)
+				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
 					want.StoreLog("[MRS-MONITOR:%s] failed: %v", finalName, err)

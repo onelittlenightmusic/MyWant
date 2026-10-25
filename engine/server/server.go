@@ -412,7 +412,6 @@ func (s *Server) Start() error {
 	// each: the blocked-cell snapshot is built once per tick and shared by
 	// everything moving through it. See thing_motion.go.
 	s.startThingMotion()
-	s.startBattles()
 
 	// Register config.yaml field updaters so built-in want types can update and
 	// persist server config without an HTTP round-trip to their own server.
@@ -569,6 +568,9 @@ func (s *Server) Start() error {
 	}
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
+	// Plugin scripts run beside the server: they reach it on its own port
+	// (the Python SDK's current().server — core/mrs_sdk.go).
+	mywant.PluginServerURL = fmt.Sprintf("http://127.0.0.1:%d", s.config.Port)
 
 	s.httpServer = &http.Server{
 		Addr:    addr,

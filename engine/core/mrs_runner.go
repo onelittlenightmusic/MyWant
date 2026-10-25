@@ -34,6 +34,14 @@ import (
 type MRSRunOptions struct {
 	// Args are the CLI arguments passed to the script (usually a single JSON string).
 	Args []string
+	// Context is the want the call runs for, handed to the script's SDK
+	// (client-py: mywant.current()): want_id, want_name, state, params,
+	// labels, and server {url}. Nil for a call made for no want.
+	Context map[string]any
+	// OnDirective receives what a script says about its own want — a line
+	// carrying "_control" (stop itself) or "_tile" (move its own tile) — if
+	// non-nil. Never part of the result.
+	OnDirective func(obj map[string]any)
 	// OnProgress receives {"_progress": n, "_message": "..."} lines, if non-nil.
 	OnProgress func(pct int, msg string)
 	// Serve asks for the resident process rather than a fresh spawn. The runner
@@ -109,7 +117,7 @@ func RunMRSScript(ctx context.Context, scriptPath string, opt MRSRunOptions) (ma
 func runMRSSpawn(ctx context.Context, scriptPath string, opt MRSRunOptions) (map[string]any, error) {
 	cmdArgs := append([]string{scriptPath}, opt.Args...)
 	cmd := exec.CommandContext(ctx, "python3", cmdArgs...)
-	cmd.Env = os.Environ()
+	cmd.Env = append(mrsPythonEnv(os.Environ()), mrsContextEnv(opt.Context)...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -128,6 +136,9 @@ func runMRSSpawn(ctx context.Context, scriptPath string, opt MRSRunOptions) (map
 		var obj map[string]any
 		if err := decoder.Decode(&obj); err != nil {
 			break // unrecoverable parse error; check stderr below
+		}
+		if mrsDirective(obj, opt) {
+			continue
 		}
 		if pct, ok := obj["_progress"]; ok {
 			if opt.OnProgress != nil {
@@ -267,7 +278,7 @@ func (p *residentProc) ensureStarted() error {
 		return nil
 	}
 	cmd := exec.Command("python3", p.scriptPath)
-	cmd.Env = append(os.Environ(), "MYWANT_MRS_SERVE=1")
+	cmd.Env = append(mrsPythonEnv(os.Environ()), "MYWANT_MRS_SERVE=1")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -340,6 +351,9 @@ func (p *residentProc) request(ctx context.Context, opt MRSRunOptions) (map[stri
 			}
 			if int64(mrsFloat(rawID)) != id {
 				continue // a late reply to an abandoned request
+			}
+			if mrsDirective(obj, opt) {
+				continue
 			}
 			if pct, ok := obj["_progress"]; ok {
 				if opt.OnProgress != nil {

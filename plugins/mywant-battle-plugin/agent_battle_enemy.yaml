@@ -1,0 +1,64 @@
+agent:
+  metadata:
+    name: battle_enemy_agent
+    capability: battle_enemy
+    type: monitor
+  script:
+    path: ./enemy.py
+    timeout_seconds: 20
+  state_updates:
+  - name: hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: hp
+  - name: max_hp
+    type: float64
+    label: current
+    persistent: true
+    onFetchData: max_hp
+  - name: strike
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike
+  - name: strike_clock
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike_clock
+  - name: inbox
+    type: object
+    label: current
+    persistent: true
+    onFetchData: inbox
+  - name: frozen
+    type: bool
+    label: current
+    persistent: true
+    onFetchData: frozen
+  - name: frozen_until
+    type: int
+    label: current
+    persistent: true
+    onFetchData: frozen_until
+  - name: defeated
+    type: bool
+    label: current
+    persistent: true
+    onFetchData: defeated
+  - name: target
+    type: string
+    label: current
+    persistent: true
+    onFetchData: target
+  - name: last_step
+    type: int
+    label: current
+    persistent: true
+    onFetchData: last_step
+  - name: impact
+    type: object
+    label: current
+    persistent: false
+    onFetchData: impact

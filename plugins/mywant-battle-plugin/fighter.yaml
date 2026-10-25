@@ -1,0 +1,56 @@
+wantType:
+  metadata:
+    name: fighter
+    title: Fighter
+    description: 'One character''s 攻撃 skill, as a want of its own: locked on to an enemy (its target,
+      set by the skill), while its character stands near enough, one hit every attack_interval seconds
+      — exposed as "<its name>.attack" for the enemy to take. Made by a battle for each character.'
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: Sword
+      category-icon: Gamepad2
+  parameters:
+  - name: character_id
+    description: Whose skill it is
+    type: string
+    required: true
+  - name: target
+    description: The enemy it is locked on to
+    type: string
+    required: false
+  - name: attack_damage
+    description: What one hit takes off
+    type: float64
+    default: 1
+    required: false
+  - name: attack_interval
+    description: Seconds between hits
+    type: float64
+    default: 1
+    required: false
+  - name: reach
+    description: How near its character must stand, in cells
+    type: float64
+    default: 6
+    required: false
+  state:
+  - name: skill_poll_interval_ms
+    description: How often its turn comes, in ms
+    type: int
+    label: goal
+    persistent: true
+    initialValue: 1000
+  - name: strike
+    description: Its last hit — {to, damage, seq}
+    type: object
+    label: current
+    persistent: true
+  - name: strike_clock
+    description: When it last hit, and its number
+    type: object
+    label: current
+    persistent: true
+  requires:
+  - battle_fighter

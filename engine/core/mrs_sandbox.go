@@ -119,6 +119,17 @@ func runMRSRunner(ctx context.Context, base, scriptPath string, opt MRSRunOption
 	if profile == MRSProfileMain {
 		params["env"] = mrsRunnerEnv()
 	}
+	if opt.Context != nil {
+		// The want this call runs for, for the script's SDK — without this
+		// server's own address, which is this machine's and not the runner's:
+		// there the SDK reaches the server by the MYWANT_URL the runner sets.
+		c := make(map[string]any, len(opt.Context))
+		for k, v := range opt.Context {
+			c[k] = v
+		}
+		delete(c, "server")
+		params["context"] = c
+	}
 	result, err := postMRSExecute(ctx, base, filepath.Base(filepath.Dir(scriptPath)), params, opt)
 	if errors.Is(err, errMRSUnreachable) {
 		return nil, fmt.Errorf("runner at %s is not answering: %w", base, err)
@@ -172,5 +183,7 @@ func ServeRunner(o RunnerOptions) error {
 			env = append(env, kv)
 		}
 	}
-	return syscall.Exec(python, append([]string{"python3", script}, o.RunnerArgs()...), env)
+	// The SDK on the path from the start: a call's own environment is shut
+	// down to a few variables, but the interpreter's path is set by then.
+	return syscall.Exec(python, append([]string{"python3", script}, o.RunnerArgs()...), mrsPythonEnv(env))
 }

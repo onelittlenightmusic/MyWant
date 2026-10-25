@@ -1,0 +1,24 @@
+agent:
+  metadata:
+    name: battle_fighter_agent
+    capability: battle_fighter
+    type: monitor
+  script:
+    path: ./fighter.py
+    timeout_seconds: 20
+  state_updates:
+  - name: strike
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike
+  - name: strike_clock
+    type: object
+    label: current
+    persistent: true
+    onFetchData: strike_clock
+  - name: impact
+    type: object
+    label: current
+    persistent: false
+    onFetchData: impact

@@ -1,0 +1,103 @@
+wantType:
+  metadata:
+    name: enemy
+    title: Enemy
+    description: 'One enemy of a room defense — a want tile of its own: where it is is its tile''s place,
+      what is left of it its hp, and what it goes for its connection (a subscription to that want''s hp,
+      drawn on the board as an attack). Made by its room_defense want (named on its label mywant.io/enemy-of);
+      gone when defeated.'
+    version: '1.0'
+    category: game
+    pattern: independent
+    labels:
+      type-icon: Skull
+      category-icon: Gamepad2
+      category-bg-light: 'linear-gradient(160deg, #fecaca 0%, #fde68a 100%)'
+      category-bg-dark: 'linear-gradient(160deg, #7f1d1d 0%, #78350f 100%)'
+  parameters:
+  - name: max_hp
+    description: How many hits it takes
+    type: float64
+    default: 3
+    required: false
+  - name: damage
+    description: What one of its blows takes off what it goes for (given it by its battle — enemy_damage,
+      a boss's boss_damage)
+    type: float64
+    default: 1
+    required: false
+  - name: interval
+    description: Seconds between its blows
+    type: float64
+    default: 1
+    required: false
+  - name: target
+    description: What it goes for (its room says)
+    type: string
+    required: false
+  - name: speed
+    description: Cells it walks a second
+    type: float64
+    required: false
+  state:
+  - name: strike
+    description: The last blow it sent — {damage, seq} — every interval while it goes for something and
+      is not held; the battle lands each new one when it is next to it
+    type: object
+    label: current
+    volatile: true
+    persistent: true
+  - name: hp
+    description: What is left of it
+    type: float64
+    label: current
+    persistent: true
+  - name: max_hp
+    description: What it started with
+    type: float64
+    label: current
+    persistent: true
+  - name: target
+    description: The name of the want it is going for
+    type: string
+    label: current
+    volatile: true
+    persistent: true
+  - name: frozen
+    description: Held where it is by a freeze — not moving, not wearing anything down
+    type: bool
+    label: current
+    persistent: true
+  - name: frozen_until
+    description: Until when a freeze holds it (RFC 3339)
+    type: string
+    label: current
+  - name: defeated
+    description: Brought down — left on the board a moment, for the hit that did it to be seen landing,
+      then gone
+    type: bool
+    label: current
+    persistent: true
+  - name: skill_poll_interval_ms
+    description: How often its turn comes, in ms (its agent polls at this)
+    type: int
+    label: goal
+    persistent: true
+    initialValue: 1000
+  - name: strike_clock
+    description: strike_clock — its own, kept by its script (battle plugin)
+    type: object
+    label: current
+    persistent: true
+  - name: inbox
+    description: inbox — its own, kept by its script (battle plugin)
+    type: object
+    label: current
+    persistent: true
+  - name: last_step
+    description: last_step — its own, kept by its script (battle plugin)
+    type: int
+    label: current
+    persistent: true
+  requires:
+  - battle_enemy

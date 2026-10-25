@@ -2,20 +2,18 @@ wantType:
   metadata:
     name: battle_reset
     title: Battle Reset
-    description: >-
-      A want tile that puts a room defense back as it was: stood on — a
-      button — every want its battles suspended in the room is resumed,
-      what was worn is whole again, the enemies leave the board, and the
-      battle is ready to begin again.
+    description: 'A want tile that puts a room defense back as it was: stood on — a button — every want
+      its battles suspended in the room is resumed, what was worn is whole again, the enemies leave the
+      board, and the battle is ready to begin again.'
     version: '1.0'
     category: game
     pattern: independent
     labels:
       form-type: button
-      type-icon: "RotateCcw"
-      category-icon: "Gamepad2"
-      category-bg-light: "linear-gradient(160deg, #e2e8f0 0%, #fde68a 100%)"
-      category-bg-dark: "linear-gradient(160deg, #334155 0%, #78350f 100%)"
+      type-icon: RotateCcw
+      category-icon: Gamepad2
+      category-bg-light: 'linear-gradient(160deg, #e2e8f0 0%, #fde68a 100%)'
+      category-bg-dark: 'linear-gradient(160deg, #334155 0%, #78350f 100%)'
   parameters:
   - name: battle
     description: The room_defense want it puts back, by name

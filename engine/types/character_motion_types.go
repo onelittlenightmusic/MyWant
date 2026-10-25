@@ -17,9 +17,6 @@ func init() {
 // zero, and nothing about a paused clock needs to survive one.
 type CharacterMotionLocals struct {
 	lastTickAt time.Time
-	// The 攻撃 skill's hits: one in its `strike` every `attack_interval`
-	// seconds while it is connected to an enemy (see battle_send.go).
-	hit sendClock
 }
 
 // CharacterMotionWant is what actually moves a character.
@@ -69,7 +66,6 @@ func (w *CharacterMotionWant) Initialize() {
 	// unchanging value there would just be log noise on every tick that has
 	// nothing to say.
 	w.SetCurrent("achieving_percentage", 50)
-	w.GetLocals().hit.start(&w.Want, strikeField)
 }
 
 // Progress moves the character at most once every CharacterMotionInterval,
@@ -79,11 +75,6 @@ func (w *CharacterMotionWant) Initialize() {
 // tick unpaced would move a character several times too fast.
 func (w *CharacterMotionWant) Progress() {
 	locals := w.GetLocals()
-	// Locked on to an enemy (the 攻撃 skill): its hits are its own.
-	if on := aimedAt(&w.Want); on != "" {
-		locals.hit.send(&w.Want, strikeField, w.GetFloatParam("attack_interval", 1),
-			map[string]any{"damage": w.GetFloatParam("attack_damage", 1)}, []string{on}, ImpactAttack, []string{on})
-	}
 	now := time.Now()
 	if !locals.lastTickAt.IsZero() && now.Sub(locals.lastTickAt) < CharacterMotionInterval {
 		return

@@ -7,8 +7,8 @@ package mywant
 // want again.
 //
 // One hook at the source rather than a call beside each change: a change made
-// from inside the engine — a want moving another's label, a battle wearing a
-// want's hp down — had no handler there to say it, and a page saw it only on
+// from inside the engine — a want moving another's label, a plugin's script
+// writing a want's state — had no handler there to say it, and a page saw it only on
 // its slow catch-up poll. Volatile state (see the state's `volatile`) is left
 // out, as it is of the want's hash: it changes too often to be news.
 var OnWantChanged func(id string)

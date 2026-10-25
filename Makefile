@@ -59,7 +59,16 @@ install-playwright-browsers:
 	@cd mcp/playwright-app && npx playwright install chromium
 	@echo "✅ Playwright browsers installed"
 
-release: build-cli
+# The Python SDK (client-py/) is embedded in the engine for plugin scripts
+# (engine/core/mrs_sdk.go): a copy, kept in step here.
+pysdk:
+	@mkdir -p engine/core/pysdk/mywant
+	@cp client-py/mywant/*.py engine/core/pysdk/mywant/
+	@# …and into plugins that carry their own, for a runner that has none
+	@for p in plugins/*/; do [ -d "$$p/mywant" ] && cp client-py/mywant/*.py "$$p/mywant/"; done; true
+	@echo "✅ Python SDK copied into engine/core/pysdk and plugins/*/mywant"
+
+release: pysdk build-cli
 	@echo "🚀 Release build complete: bin/mywant"
 
 # Build the mywant library
