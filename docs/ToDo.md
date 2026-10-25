@@ -9,6 +9,13 @@
   - **ピンチアウト固有の中心ずれ（根本原因判明）**: `scrollLeft < 0` の計算値をブラウザが 0 にクランプするため、キャンバスがビューポートより小さくなる縮小時にフォーカル点が失われ、強制的にキャンバス中央に引き寄せられる。ピンチインはキャンバスが拡大するだけなので `scrollLeft > 0` を常に維持でき正確。
   - 修正案: スケールの下限を「キャンバスがちょうどビューポートに収まるサイズ」（`vw/canvasW` と `vh/canvasH` の大きいほう）に動的に設定し、キャンバスがビューポートより小さくなるのを防ぐ。`clampScale` の `MIN_SCALE` を固定値から動的計算に変更する。
 
+- **`mywant types reload` でサーバーが落ちる（`fatal error: concurrent map writes`）**
+  - 落ちる場所: `engine/core/want_agent.go` の `ExecuteAgents`。want ごとの `resolvedAgents` をロックなしで作り直している。
+  - reload でエージェント登録の世代（`Generation()`）が変わると、全 want が次の周回で作り直しに入り、同じ want の `ExecuteAgents` が2つ同時に走ると書き込みがぶつかる。
+  - 同時に走る理由は未確認。ログに「background agent with ID "monitor-…" already exists」が出ているので、再起動で古い実行ループが終わる前に新しいループが始まっている疑い。
+  - 再現: バトル中（want が頻繁に再起動している状態）に `mywant types reload`。2026-10-25 に発生、サーバーログに同じクラッシュがそれ以前にも1回ある。
+  - 回避: 型を変えたらサーバーを再起動する。
+
 ---
 
 - とにかく最初にやりたいことをwantに記載しておき、そのタイミングではwantを実現できなかったとしても、reachingのままwaitしておき、achievementが増えてunlockされるcapabilityが増えてくると、自然とwantが実行できるようになる、というゲームの感じをこのmywantで実現したい。
