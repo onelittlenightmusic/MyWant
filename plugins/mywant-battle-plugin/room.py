@@ -183,6 +183,45 @@ heals = [w for w in room if b.meta(w).get("type") == "heal"]
 defenders = [w for w in room if b.meta(w).get("type") in b.DEFENDABLE_TYPES]
 fighters = [w for w in wants if b.meta(w).get("type") == b.FIGHTER_TYPE]
 
+# A fighter for every character, a tile standing in the room near its middle,
+# where the way in is in reach — tied to enemies on the board (Y), it fights
+# them; the 攻撃 skill locks one on too. One still hidden, as they were first
+# made, is stood there once.
+taken_cells = b.occupied_cells(wants) | b.blocked_cells(wants)
+
+
+def near_middle():
+    """The free cell in the room nearest its middle — taken once given."""
+    mx, my = rx + (rw - 1) / 2, ry + (rh - 1) / 2
+    free = [(x, y) for x in range(rx + 1, rx + rw - 1) for y in range(ry + 1, ry + rh - 1)
+            if (x, y) not in taken_cells]
+    if not free:
+        return None
+    cell = min(free, key=lambda c: (abs(c[0] - mx) + abs(c[1] - my), c[1], c[0]))
+    taken_cells.add(cell)
+    return cell
+
+
+have = {b.params_of(f).get("character_id") for f in fighters}
+for w in wants:
+    if b.meta(w).get("type") != "character_motion":
+        continue
+    cid = b.params_of(w).get("character_id")
+    if cid and cid not in have:
+        cell = near_middle()
+        labels = {b.CANVAS_X: str(cell[0]), b.CANVAS_Y: str(cell[1])} if cell else {"mywant.io/canvas-hidden": "true"}
+        srv.create_want({
+            "metadata": {"name": f"fighter-{cid}", "type": b.FIGHTER_TYPE, "labels": labels},
+            "spec": {"params": {"character_id": cid},
+                     "exposes": [{"currentState": "strike", "as": b.action_key(f"fighter-{cid}", "attack")}]},
+        })
+for f in fighters:
+    if (b.meta(f).get("labels") or {}).get("mywant.io/canvas-hidden") == "true":
+        cell = near_middle()
+        if cell:
+            srv.patch_want(b.meta(f)["id"], labels={
+                b.CANVAS_X: str(cell[0]), b.CANVAS_Y: str(cell[1]), "mywant.io/canvas-hidden": None})
+
 if phase != "fighting":
     # Not under way: its turrets aimed at nothing, its enemies off the board.
     for w in shooters:
@@ -197,20 +236,6 @@ if phase != "fighting":
 
 # ── a battle under way ───────────────────────────────────────────────────────
 
-# A fighter for every character, so the 攻撃 skill has one to lock on with.
-have = {b.params_of(f).get("character_id") for f in fighters}
-for w in wants:
-    if b.meta(w).get("type") != "character_motion":
-        continue
-    cid = b.params_of(w).get("character_id")
-    if cid and cid not in have:
-        srv.create_want({
-            "metadata": {"name": f"fighter-{cid}", "type": b.FIGHTER_TYPE,
-                         "labels": {"mywant.io/canvas-hidden": "true"}},
-            "spec": {"params": {"character_id": cid},
-                     "exposes": [{"currentState": "strike", "as": b.action_key(f"fighter-{cid}", "attack")}]},
-        })
-
 # What acts says so, each under its own key.
 for w in shooters + heals:
     act = "heal" if b.meta(w).get("type") == "heal" else "attack"
@@ -222,7 +247,16 @@ for w in shooters + heals:
 live = lambda keys: [k for k in keys if gs.get(k) is not None]
 blows = live([b.action_key(b.meta(e)["name"], "attack") for e in enemies]
              + [b.action_key(b.meta(h)["name"], "heal") for h in heals])
-shots = live([b.action_key(b.meta(w)["name"], "attack") for w in shooters + fighters])
+shots = live([b.action_key(b.meta(w)["name"], "attack") for w in shooters])
+
+
+def fighters_on(e):
+    """The fighters tied to enemy e: by a constellation (Y on the board, or the
+    capture net — b.tied), or locked on to it by its character's 攻撃 skill."""
+    em = b.meta(e)
+    return live([b.action_key(b.meta(f)["name"], "attack") for f in fighters
+                 if b.tied(b.meta(f)["id"], b.meta(f).get("labels"), em["id"], em.get("labels"))
+                 or b.params_of(f).get("target") == em.get("name")])
 
 
 def wire(w, keys, also=None):
@@ -242,7 +276,7 @@ round_also = {rkey: b.ROUND_IMPORT} if gs.get(rkey) is not None else {}
 for w in defenders:
     wire(w, blows, round_also)
 for e in enemies:
-    wire(e, shots)
+    wire(e, shots + fighters_on(e))
 
 targets = {b.meta(w)["name"]: w for w in defenders if running(w)}
 names = sorted(targets)

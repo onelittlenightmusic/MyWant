@@ -77,6 +77,28 @@ def cell_of(w_or_labels) -> Optional[tuple]:
         return None
 
 
+CONSTELLATION = "constellation/"
+CONSTELLATION_CAPTURE = "constellation-capture/"
+
+
+def tied(f_id: str, f_labels: dict, e_id: str, e_labels: dict) -> bool:
+    """Whether a fighter is tied to an enemy by a constellation they are both
+    in. An order (tied one after another) ties every fighter in it to every
+    enemy in it; a capture ties only to the tile it was caught into — an enemy
+    the net was aimed at is hit by each fighter caught after, a fighter it was
+    aimed at hits each enemy caught after (the engine's
+    constellation_capture.go)."""
+    f_labels, e_labels = f_labels or {}, e_labels or {}
+    for k, v in f_labels.items():
+        if not k.startswith(CONSTELLATION) or v != "true" or e_labels.get(k) != "true":
+            continue
+        name = k[len(CONSTELLATION):]
+        hub = f_labels.get(CONSTELLATION_CAPTURE + name) or e_labels.get(CONSTELLATION_CAPTURE + name)
+        if not hub or hub in (f_id, e_id):
+            return True
+    return False
+
+
 def dist(a: tuple, b: tuple) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 

@@ -2,9 +2,12 @@ wantType:
   metadata:
     name: fighter
     title: Fighter
-    description: 'One character''s 攻撃 skill, as a want of its own: locked on to an enemy (its target,
-      set by the skill), while its character stands near enough, one hit every attack_interval seconds
-      — exposed as "<its name>.attack" for the enemy to take. Made by a battle for each character.'
+    description: 'A character''s sword, a tile standing near the middle of its room. It fights the
+      enemies it is tied to — in a constellation with it (Y on the board ties them, before they are
+      near too: it waits for them), or locked on by its character''s 攻撃 skill (its target) — the
+      nearest within reach of its tile, one hit every attack_interval seconds, exposed as "<its
+      name>.attack"; its room has only the enemies tied to it import that. Made by a battle for each
+      character.'
     version: '1.0'
     category: game
     pattern: independent
@@ -17,7 +20,7 @@ wantType:
     type: string
     required: true
   - name: target
-    description: The enemy it is locked on to
+    description: The enemy its character locked on to with the 攻撃 skill (a constellation with an enemy ties it as well)
     type: string
     required: false
   - name: attack_damage
