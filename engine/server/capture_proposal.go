@@ -90,7 +90,7 @@ func (s *Server) captureThing(thingID string, target *CaptureTarget, ask bool) *
 	case target.Constellation == "":
 		return s.captureIntoTile(thingID, target)
 	default:
-		s.setConstellationMembership("thing", target.Constellation, thingID, true)
+		s.captureInto(target.Constellation, target.ID, thingID)
 	}
 	return nil
 }
@@ -149,7 +149,7 @@ func (s *Server) captureIntoWant(thingID, wantID string) {
 // board does.
 func (s *Server) captureIntoTile(thingID string, t *CaptureTarget) *captureProposal {
 	if name := s.constellationOf(t.ID); name != "" {
-		s.setConstellationMembership("thing", name, thingID, true)
+		s.captureInto(name, t.ID, thingID)
 		return nil
 	}
 	name := t.Name
@@ -470,7 +470,7 @@ func (s *Server) answerCaptureProposal(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.setConstellationMembership("thing", name, p.Answer, true)
-		s.setConstellationMembership("thing", name, thing, true)
+		s.captureInto(name, p.Answer, thing)
 		boardThingsChanged(p.Answer)
 	}
 	_ = s.thingLabels.Remove(thing, captureProposalLabel)
