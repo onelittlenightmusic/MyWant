@@ -90,6 +90,7 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	}
 
 	want.SetCurrent("mrs_raw_output", raw)
+	clearMRSError(want)
 	// Return false so the PollingAgent stays alive and fires on the next ticker tick.
 	// Concurrent-execution protection is already provided by TryStartAgentRun inside
 	// PollingAgent.runPoll, and context-cancellation SIGKILL is handled above.
@@ -147,7 +148,16 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 	}
 
 	want.SetCurrent("mrs_raw_output", raw)
+	clearMRSError(want)
 	return nil
+}
+
+// clearMRSError takes back what a failed run said once a run goes through —
+// the runner back, the script mended — so the want no longer shows it.
+func clearMRSError(want *Want) {
+	if e := GetCurrent(want, StateFieldError, ""); e != "" {
+		want.SetCurrent(StateFieldError, "")
+	}
 }
 
 // mrsBuildArgs builds CLI argument list from want state.

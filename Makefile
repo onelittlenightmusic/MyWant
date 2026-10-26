@@ -249,8 +249,13 @@ reload-want-type:
 install: release
 	@echo "📦 Installing mywant to $(INSTALL_DIR)..."
 	@mkdir -p $(INSTALL_DIR)
-	@cp bin/mywant $(INSTALL_DIR)/mywant
-	@codesign --sign - --force $(INSTALL_DIR)/mywant 2>/dev/null || true
+	@# Signed beside it and moved into place, never the running file written
+	@# over or signed where it stands: macOS keeps a file's old signature once
+	@# it has run it, and kills what launchd starts from it
+	@# (OS_REASON_CODESIGNING).
+	@cp bin/mywant $(INSTALL_DIR)/mywant.new
+	@codesign --sign - --force $(INSTALL_DIR)/mywant.new 2>/dev/null || true
+	@mv -f $(INSTALL_DIR)/mywant.new $(INSTALL_DIR)/mywant
 	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
 
 # ── The on-device agent (fmtool/) ─────────────────────────────────────────────

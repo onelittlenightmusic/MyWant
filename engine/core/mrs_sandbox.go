@@ -132,9 +132,18 @@ func runMRSRunner(ctx context.Context, base, scriptPath string, opt MRSRunOption
 	}
 	result, err := postMRSExecute(ctx, base, filepath.Base(filepath.Dir(scriptPath)), params, opt)
 	if errors.Is(err, errMRSUnreachable) {
-		return nil, fmt.Errorf("runner at %s is not answering: %w", base, err)
+		return nil, runnerNotAnswering(base, err)
 	}
 	return result, err
+}
+
+// runnerNotAnswering says so, and what brings plugin scripts back: the runner
+// is the user's to start (Docker Desktop, then mywant runner start), or to
+// give up for the engine's own unsandboxed run (mywant runner stop). The
+// want the call was for shows it as its error.
+func runnerNotAnswering(base string, err error) error {
+	return fmt.Errorf("runner at %s is not answering — start Docker Desktop, then run `mywant runner start` "+
+		"(or `mywant runner stop` to run plugin scripts in the engine, unsandboxed): %w", base, err)
 }
 
 // RunnerOptions is how `mywant runner serve` starts the runner.

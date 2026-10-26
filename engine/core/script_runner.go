@@ -170,7 +170,7 @@ func runInlineRunner(ctx context.Context, base string, r inlineRun) (*inlineResu
 	}
 	result, err := postMRSExecute(ctx, base, "inline:"+typeName, params, MRSRunOptions{})
 	if errors.Is(err, errMRSUnreachable) {
-		return nil, fmt.Errorf("runner at %s is not answering: %w", base, err)
+		return nil, runnerNotAnswering(base, err)
 	}
 	if err != nil {
 		return nil, err

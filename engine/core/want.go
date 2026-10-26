@@ -38,6 +38,7 @@ const (
 	StateFieldAchievingPercent = "achieving_percentage" // Progress percentage of want execution (0-100)
 	StateFieldCompleted        = "completed"            // Whether the want has reached achieved status
 	StateFieldAchieved         = "achieved"             // Boolean flag set true when want reaches achieved status
+	StateFieldError            = "error"                // What the want's agents could not do (a skill that failed, a runner not answering); "" once they can
 )
 
 // SystemReservedStateFields returns the list of state fields automatically managed by the framework.
@@ -48,6 +49,7 @@ func SystemReservedStateFields() []string {
 		StateFieldAchievingPercent,
 		StateFieldCompleted,
 		StateFieldAchieved,
+		StateFieldError,
 		"agent_result",
 		"desired_dispatch",
 	}

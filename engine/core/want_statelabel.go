@@ -36,6 +36,12 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 		}
 		n.StateLabels[s.Name] = label
 	}
+	// What the want's agents could not do is every want's to show, its type
+	// declaring it or not: a plugin's want whose runner is down says so, and
+	// how to bring it back, where it is looked at.
+	if _, ok := n.StateLabels[StateFieldError]; !ok {
+		n.StateLabels[StateFieldError] = LabelCurrent
+	}
 }
 
 func (n *Want) SetGoal(key string, value any) {
