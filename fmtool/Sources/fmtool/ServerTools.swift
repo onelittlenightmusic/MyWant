@@ -55,12 +55,20 @@ enum ServerTools {
     /// agent falls back to the tools it carries itself.
     static func fetch(_ target: ServerTarget = .fromEnvironment) async -> ServerManifest? {
         do {
-            let (data, _) = try await request("api/v1/fm/manifest", method: "GET", body: nil, target: target)
+            let (data, _) = try await request("api/v1/fm/manifest", method: "GET", body: nil, target: target,
+                                              query: modelLocale.map { [URLQueryItem(name: "locale", value: $0)] } ?? [])
             return try JSONDecoder().decode(ServerManifest.self, from: data)
         } catch {
             printErr("[fmtool] no tools from the server (\(error.localizedDescription))")
             return nil
         }
+    }
+
+    /// This Mac's locale, when its model speaks it — the server then tells
+    /// the robot to answer in that language (fmLocaleText), which instructions
+    /// written in English do not get from a model set to Japanese otherwise.
+    static var modelLocale: String? {
+        SystemLanguageModel.default.supportsLocale(Locale.current) ? Locale.current.identifier : nil
     }
 
     static func call(tool: String, arguments: [String: String], turn: String?,
@@ -98,8 +106,10 @@ enum ServerTools {
     }
 
     private static func request(_ path: String, method: String, body: Data?,
-                                target: ServerTarget) async throws -> (Data, HTTPURLResponse) {
-        var req = URLRequest(url: target.baseURL.appending(path: path))
+                                target: ServerTarget, query: [URLQueryItem] = []) async throws -> (Data, HTTPURLResponse) {
+        var url = target.baseURL.appending(path: path)
+        if !query.isEmpty { url.append(queryItems: query) }
+        var req = URLRequest(url: url)
         req.httpMethod = method
         req.timeoutInterval = 20
         if let authorization = target.authorization {

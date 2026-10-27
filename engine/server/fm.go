@@ -152,7 +152,37 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		}
 		tools[i] = t
 	}
-	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmGlossaryText(), "tools": tools})
+	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmGlossaryText() + fmLocaleText(r.URL.Query().Get("locale")), "tools": tools})
+}
+
+// fmLanguages names the languages an on-device model may be set to, for the
+// line that tells it which one to answer in.
+var fmLanguages = map[string]string{
+	"ja": "Japanese", "en": "English", "zh": "Chinese", "ko": "Korean",
+	"fr": "French", "de": "German", "es": "Spanish", "it": "Italian",
+	"pt": "Portuguese", "nl": "Dutch", "sv": "Swedish", "da": "Danish",
+	"nb": "Norwegian", "tr": "Turkish", "vi": "Vietnamese",
+}
+
+// fmLocaleText is the line that says which language to answer in, for the
+// device's locale (ja_JP, en-US) — sent only when the device's model speaks
+// it. The instructions are in English, and a model set to Japanese read them
+// and answered in English, "the language the person used" notwithstanding;
+// naming the language outright is what keeps it. Nothing for no locale.
+func fmLocaleText(locale string) string {
+	if locale == "" {
+		return ""
+	}
+	code := locale
+	if i := strings.IndexAny(locale, "_-"); i >= 0 {
+		code = locale[:i]
+	}
+	code = strings.ToLower(code)
+	name, ok := fmLanguages[code]
+	if !ok {
+		name = "the language of the locale " + locale
+	}
+	return fmt.Sprintf("\n\nThe person's locale is %s: answer in %s, though these instructions are in English.", locale, name)
 }
 
 func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {

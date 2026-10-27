@@ -2,6 +2,7 @@ package server
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -21,5 +22,20 @@ func TestFMReplyChoices(t *testing.T) {
 		if got := fmReplyChoices(c.answer); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("fmReplyChoices(%q) = %v, want %v", c.answer, got, c.want)
 		}
+	}
+}
+
+func TestFMLocaleText(t *testing.T) {
+	if got := fmLocaleText(""); got != "" {
+		t.Errorf("no locale: %q", got)
+	}
+	if got := fmLocaleText("ja_JP"); !strings.Contains(got, "answer in Japanese") || !strings.Contains(got, "ja_JP") {
+		t.Errorf("ja_JP: %q", got)
+	}
+	if got := fmLocaleText("en-US"); !strings.Contains(got, "answer in English") {
+		t.Errorf("en-US: %q", got)
+	}
+	if got := fmLocaleText("xx"); !strings.Contains(got, "locale xx") {
+		t.Errorf("xx: %q", got)
 	}
 }

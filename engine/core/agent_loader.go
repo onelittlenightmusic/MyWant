@@ -407,9 +407,12 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
-					want.StoreLog("[MRS-DO:%s] failed: %s", finalName, callFailure(want, err))
+					failure := callFailure(want, err)
+					want.StoreLog("[MRS-DO:%s] failed: %s", finalName, failure)
+					want.SetCurrent(StateFieldError, failure)
 					return nil
 				}
+				clearAgentError(want)
 				mrsApplyStateUpdates(want, raw, stateUpdates)
 				return nil
 			},
@@ -442,9 +445,12 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 				opt.OnDirective = func(obj map[string]any) { MRSApplyDirective(want, obj) }
 				raw, err := RunMRSScript(skillCtx, finalPath, opt)
 				if err != nil {
-					want.StoreLog("[MRS-MONITOR:%s] failed: %s", finalName, callFailure(want, err))
+					failure := callFailure(want, err)
+					want.StoreLog("[MRS-MONITOR:%s] failed: %s", finalName, failure)
+					want.SetCurrent(StateFieldError, failure)
 					return false, nil
 				}
+				clearAgentError(want)
 				mrsApplyStateUpdates(want, raw, stateUpdates)
 				return false, nil
 			},
@@ -453,6 +459,15 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 	log.Printf("[AGENT] Registered MRS plugin agent '%s' (capability=%s type=%s script=%s)",
 		agentName, capName, def.Metadata.Type, scriptPath)
 	return nil
+}
+
+// clearAgentError takes back what a failed run of a plugin's script said once
+// a run goes through — the runner back, the script mended — so the want no
+// longer shows it.
+func clearAgentError(want *Want) {
+	if e := GetCurrent(want, StateFieldError, ""); e != "" {
+		want.SetCurrent(StateFieldError, "")
+	}
 }
 
 // mrsStateUpdatesToDefs converts MRSStateUpdate declarations to StateDef entries
