@@ -250,13 +250,9 @@ blows = live([b.action_key(b.meta(e)["name"], "attack") for e in enemies]
 shots = live([b.action_key(b.meta(w)["name"], "attack") for w in shooters])
 
 
-def fighters_on(e):
-    """The fighters tied to enemy e: by a constellation (Y on the board, or the
-    capture net — b.tied), or locked on to it by its character's 攻撃 skill."""
-    em = b.meta(e)
-    return live([b.action_key(b.meta(f)["name"], "attack") for f in fighters
-                 if b.tied(b.meta(f)["id"], b.meta(f).get("labels"), em["id"], em.get("labels"))
-                 or b.params_of(f).get("target") == em.get("name")])
+# Every fighter, as every turret: which enemy a blow is for is the blow's own
+# `to` (fighter.py picks — what it is tied to first), and only that one takes it.
+blades = live([b.action_key(b.meta(f)["name"], "attack") for f in fighters])
 
 
 def wire(w, keys, also=None):
@@ -276,7 +272,7 @@ round_also = {rkey: b.ROUND_IMPORT} if gs.get(rkey) is not None else {}
 for w in defenders:
     wire(w, blows, round_also)
 for e in enemies:
-    wire(e, shots + fighters_on(e))
+    wire(e, shots + blades)
 
 targets = {b.meta(w)["name"]: w for w in defenders if running(w)}
 names = sorted(targets)
@@ -319,7 +315,10 @@ if due:
         else:
             me.set("say", "ボスが現れた！")
         srv.create_want({
-            "metadata": {"id": f"enemy-{me.id}-{n}", "name": name, "type": "boss" if boss else "enemy",
+            # The round in its id: an enemy of an earlier round is another
+            # want, and what was tied to that one (a capture, a constellation)
+            # is not this one's.
+            "metadata": {"id": f"enemy-{me.id}-r{rnd}-{n}", "name": name, "type": "boss" if boss else "enemy",
                          "labels": labels},
             "spec": {
                 "params": {

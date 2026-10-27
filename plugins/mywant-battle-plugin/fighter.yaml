@@ -2,12 +2,12 @@ wantType:
   metadata:
     name: fighter
     title: Fighter
-    description: 'A character''s sword, a tile standing near the middle of its room. It fights the
-      enemies it is tied to — in a constellation with it (Y on the board ties them, before they are
-      near too: it waits for them), or locked on by its character''s 攻撃 skill (its target) — the
-      nearest within reach of its tile, one hit every attack_interval seconds, exposed as "<its
-      name>.attack"; its room has only the enemies tied to it import that. Made by a battle for each
-      character.'
+    description: 'A character''s sword, a tile standing near the middle of its room. It fights any
+      enemy within reach of its tile, as a turret does — first the ones it is told to: tied to it (a
+      constellation with it, a capture''s hub) or locked on by its character''s 攻撃 skill (its
+      target) — the nearest, one hit every attack_interval seconds, exposed as "<its name>.attack";
+      its room has every enemy import that, and only the one a hit names takes it. Made by a battle
+      for each character.'
     version: '1.0'
     category: game
     pattern: independent

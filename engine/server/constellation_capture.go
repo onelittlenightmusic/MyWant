@@ -45,3 +45,30 @@ func (s *Server) captureInto(name, tile, thingID string) {
 		s.setConstellationCaptureEverywhere(name, tile)
 	}
 }
+
+// Where a capture's hub was last seen ("x,y" in board cells) — so its ring and
+// lines stay on the board after the hub itself is gone (an enemy fallen). The
+// board writes it as the hub leaves; it rides on the members as the capture
+// does.
+const constellationCaptureAtPrefix = "constellation-capture-at/"
+
+func constellationCaptureAtKey(name string) string { return constellationCaptureAtPrefix + name }
+
+func constellationCaptureAtNameFromKey(key string) string {
+	if name, ok := strings.CutPrefix(key, constellationCaptureAtPrefix); ok {
+		return name
+	}
+	return ""
+}
+
+func (s *Server) anyConstellationCaptureAt(name string) string {
+	if t := s.constellationLabel("thing", constellationCaptureAtKey(name)); t != "" {
+		return t
+	}
+	return s.constellationLabel("want", constellationCaptureAtKey(name))
+}
+
+func (s *Server) setConstellationCaptureAtEverywhere(name, at string) {
+	s.setConstellationLabel("thing", name, constellationCaptureAtKey(name), at)
+	s.setConstellationLabel("want", name, constellationCaptureAtKey(name), at)
+}

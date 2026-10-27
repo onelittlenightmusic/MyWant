@@ -87,8 +87,11 @@ type constellationDTO struct {
 	// Capture is the tile a capture constellation was caught into — drawn from
 	// it out to each member; "" is an order, drawn as a chain
 	// (constellation_capture.go).
-	Capture string   `json:"capture,omitempty"`
-	Members []string `json:"members"`
+	Capture string `json:"capture,omitempty"`
+	// CaptureAt is where its hub was last seen, "x,y" — its ring stays there
+	// when the hub is gone.
+	CaptureAt string   `json:"captureAt,omitempty"`
+	Members   []string `json:"members"`
 	// Which kind each member is, keyed by the same ids as Members. The list
 	// stays a list of ids so that every caller that only asks "is this id in
 	// here" keeps working unchanged.
@@ -101,6 +104,7 @@ func (s *Server) collectThingConstellations() []constellationDTO {
 	colorByName := map[string]string{}
 	artByName := map[string]string{}
 	captureByName := map[string]string{}
+	captureAtByName := map[string]string{}
 	for valueID, labels := range s.thingLabels.All() {
 		for key, val := range labels {
 			if name := constellationNameFromKey(key); name != "" {
@@ -115,9 +119,12 @@ func (s *Server) collectThingConstellations() []constellationDTO {
 			if name := constellationCaptureNameFromKey(key); name != "" && val != "" {
 				captureByName[name] = val
 			}
+			if name := constellationCaptureAtNameFromKey(key); name != "" && val != "" {
+				captureAtByName[name] = val
+			}
 		}
 	}
-	return constellationsFromMap(byName, colorByName, artByName, captureByName, "thing")
+	return constellationsFromMap(byName, colorByName, artByName, captureByName, captureAtByName, "thing")
 }
 
 // collectWantConstellations aggregates constellation/* labels across all live wants.
@@ -126,6 +133,7 @@ func (s *Server) collectWantConstellations() []constellationDTO {
 	colorByName := map[string]string{}
 	artByName := map[string]string{}
 	captureByName := map[string]string{}
+	captureAtByName := map[string]string{}
 	if s.globalBuilder != nil {
 		for _, want := range s.globalBuilder.GetAllWantStates() {
 			// GetLabels, not Metadata.Labels: a label change is applied to the
@@ -144,13 +152,16 @@ func (s *Server) collectWantConstellations() []constellationDTO {
 				if name := constellationCaptureNameFromKey(key); name != "" && val != "" {
 					captureByName[name] = val
 				}
+				if name := constellationCaptureAtNameFromKey(key); name != "" && val != "" {
+					captureAtByName[name] = val
+				}
 			}
 		}
 	}
-	return constellationsFromMap(byName, colorByName, artByName, captureByName, "want")
+	return constellationsFromMap(byName, colorByName, artByName, captureByName, captureAtByName, "want")
 }
 
-func constellationsFromMap(byName map[string][]string, colorByName, artByName, captureByName map[string]string, kind string) []constellationDTO {
+func constellationsFromMap(byName map[string][]string, colorByName, artByName, captureByName, captureAtByName map[string]string, kind string) []constellationDTO {
 	out := make([]constellationDTO, 0, len(byName))
 	for name, members := range byName {
 		sort.Strings(members)
@@ -160,7 +171,7 @@ func constellationsFromMap(byName map[string][]string, colorByName, artByName, c
 		}
 		out = append(out, constellationDTO{
 			ID: name, Name: name, Kind: kind,
-			Color: colorByName[name], Art: artByName[name], Capture: captureByName[name],
+			Color: colorByName[name], Art: artByName[name], Capture: captureByName[name], CaptureAt: captureAtByName[name],
 			Members: members, MemberKinds: kinds,
 		})
 	}
@@ -211,6 +222,9 @@ func (s *Server) collectAllConstellations() []constellationDTO {
 		if existing.Capture == "" {
 			existing.Capture = g.Capture
 		}
+		if existing.CaptureAt == "" {
+			existing.CaptureAt = g.CaptureAt
+		}
 	}
 	sort.Strings(order)
 	out := make([]constellationDTO, 0, len(order))
@@ -260,7 +274,7 @@ func (s *Server) setConstellationMembership(kind, name, member string, add bool)
 	key := constellationKey(name)
 	// What a constellation looks like rides on every member: a member joining
 	// takes it, one leaving drops it.
-	looks := []string{constellationColorKey(name), constellationArtKey(name), constellationCaptureKey(name)}
+	looks := []string{constellationColorKey(name), constellationArtKey(name), constellationCaptureKey(name), constellationCaptureAtKey(name)}
 	if kind == "want" {
 		if s.globalBuilder == nil {
 			return
@@ -453,6 +467,8 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		Color   *string   `json:"color"`
 		// The tile it is a capture into; "" makes it an order.
 		Capture *string `json:"capture"`
+		// Where its hub was last seen, "x,y"; "" forgets it.
+		CaptureAt *string `json:"captureAt"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -479,6 +495,7 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	carriedColor := s.anyConstellationColor(oldName)
 	carriedArt := s.anyConstellationArt(oldName)
 	carriedCapture := s.anyConstellationCapture(oldName)
+	carriedCaptureAt := s.anyConstellationCaptureAt(oldName)
 
 	// Current members of the old group — of both kinds, or reconciling a mixed
 	// constellation would silently drop everything of the kind not named.
@@ -530,6 +547,11 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		s.setConstellationCaptureEverywhere(newName, *body.Capture)
 	} else if newName != oldName && carriedCapture != "" {
 		s.setConstellationCaptureEverywhere(newName, carriedCapture)
+	}
+	if body.CaptureAt != nil {
+		s.setConstellationCaptureAtEverywhere(newName, *body.CaptureAt)
+	} else if newName != oldName && carriedCaptureAt != "" {
+		s.setConstellationCaptureAtEverywhere(newName, carriedCaptureAt)
 	}
 
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group updated", "name": newName})

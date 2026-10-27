@@ -89,6 +89,14 @@ def tied(f_id: str, f_labels: dict, e_id: str, e_labels: dict) -> bool:
     aimed at hits each enemy caught after (the engine's
     constellation_capture.go)."""
     f_labels, e_labels = f_labels or {}, e_labels or {}
+    # The enemy a fighter's capture is into is its, whether or not the enemy
+    # carries the constellation itself: the hub is not a member (Here and the
+    # carried ring move the hub without making it one), and the room labels
+    # its enemies afresh.
+    for k, v in f_labels.items():
+        if k.startswith(CONSTELLATION_CAPTURE) and v == e_id \
+                and f_labels.get(CONSTELLATION + k[len(CONSTELLATION_CAPTURE):]) == "true":
+            return True
     for k, v in f_labels.items():
         if not k.startswith(CONSTELLATION) or v != "true" or e_labels.get(k) != "true":
             continue
