@@ -2,11 +2,10 @@
 
 A fighter is a tile in its room, a character's sword stood where it guards.
 It goes for any enemy within `reach` of where it stands, as a turret does —
-but first for the ones it is told to: those tied to it (a constellation with
-it, a capture's hub — b.tied), and the one its character locked on to with
-the 攻撃 skill (its `target` param). Of those in reach, the nearest; none of
-them in reach, the nearest of the rest: one hit every `attack_interval` seconds, its
-`attack_damage`. Its room imports its hits into every enemy (room.py); only
+but first for the hub of a capture it is in (b.hubs), and for the one its
+character locked on to with the 攻撃 skill (its `target` param). Of those in
+reach, the nearest; none of them in reach, the nearest of the rest: one hit
+every `attack_interval` seconds, its `attack_damage`. Its room imports its hits into every enemy (room.py); only
 the one a hit names takes it.
 
 A fighter still hidden (as the room first made them, before they stood in it)
@@ -20,6 +19,7 @@ me = current()
 b.start(me, "strike")
 
 locked = me.params.get("target") or ""
+first = b.hubs(me.labels)
 
 # Where it strikes from: its tile, or — hidden — its character.
 at = None
@@ -42,7 +42,7 @@ if at is not None:
         c = b.cell_of(e)
         if c is None or b.dist(at, c) > reach:
             continue
-        mine = m.get("name") == locked or b.tied(me.id, me.labels, m.get("id"), m.get("labels"))
+        mine = m.get("name") == locked or m.get("id") in first
         (told if mine else rest).append((b.dist(at, c), m.get("name")))
     if told or rest:
         on = min(told or rest)[1]

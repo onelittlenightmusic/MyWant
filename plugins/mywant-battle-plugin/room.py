@@ -184,9 +184,9 @@ defenders = [w for w in room if b.meta(w).get("type") in b.DEFENDABLE_TYPES]
 fighters = [w for w in wants if b.meta(w).get("type") == b.FIGHTER_TYPE]
 
 # A fighter for every character, a tile standing in the room near its middle,
-# where the way in is in reach — tied to enemies on the board (Y), it fights
-# them; the 攻撃 skill locks one on too. One still hidden, as they were first
-# made, is stood there once.
+# where the way in is in reach — it fights what comes near, a capture's hub it
+# is in first, or the one the 攻撃 skill locks on. One still hidden, as they
+# were first made, is stood there once.
 taken_cells = b.occupied_cells(wants) | b.blocked_cells(wants)
 
 
@@ -251,7 +251,7 @@ shots = live([b.action_key(b.meta(w)["name"], "attack") for w in shooters])
 
 
 # Every fighter, as every turret: which enemy a blow is for is the blow's own
-# `to` (fighter.py picks — what it is tied to first), and only that one takes it.
+# `to` (fighter.py picks — its hub first), and only that one takes it.
 blades = live([b.action_key(b.meta(f)["name"], "attack") for f in fighters])
 
 
@@ -316,7 +316,7 @@ if due:
             me.set("say", "ボスが現れた！")
         srv.create_want({
             # The round in its id: an enemy of an earlier round is another
-            # want, and what was tied to that one (a capture, a constellation)
+            # want, and what was aimed at that one (a capture's hub)
             # is not this one's.
             "metadata": {"id": f"enemy-{me.id}-r{rnd}-{n}", "name": name, "type": "boss" if boss else "enemy",
                          "labels": labels},

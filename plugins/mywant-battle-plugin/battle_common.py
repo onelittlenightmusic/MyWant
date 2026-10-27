@@ -81,30 +81,15 @@ CONSTELLATION = "constellation/"
 CONSTELLATION_CAPTURE = "constellation-capture/"
 
 
-def tied(f_id: str, f_labels: dict, e_id: str, e_labels: dict) -> bool:
-    """Whether a fighter is tied to an enemy by a constellation they are both
-    in. An order (tied one after another) ties every fighter in it to every
-    enemy in it; a capture ties only to the tile it was caught into — an enemy
-    the net was aimed at is hit by each fighter caught after, a fighter it was
-    aimed at hits each enemy caught after (the engine's
-    constellation_capture.go)."""
-    f_labels, e_labels = f_labels or {}, e_labels or {}
-    # The enemy a fighter's capture is into is its, whether or not the enemy
-    # carries the constellation itself: the hub is not a member (Here and the
-    # carried ring move the hub without making it one), and the room labels
-    # its enemies afresh.
-    for k, v in f_labels.items():
-        if k.startswith(CONSTELLATION_CAPTURE) and v == e_id \
-                and f_labels.get(CONSTELLATION + k[len(CONSTELLATION_CAPTURE):]) == "true":
-            return True
-    for k, v in f_labels.items():
-        if not k.startswith(CONSTELLATION) or v != "true" or e_labels.get(k) != "true":
-            continue
-        name = k[len(CONSTELLATION):]
-        hub = f_labels.get(CONSTELLATION_CAPTURE + name) or e_labels.get(CONSTELLATION_CAPTURE + name)
-        if not hub or hub in (f_id, e_id):
-            return True
-    return False
+def hubs(labels: dict) -> set:
+    """The hubs of the captures a fighter is in: the tiles their nets were
+    aimed at (constellation-capture/<name>, which every member carries — the
+    engine's constellation_capture.go). Only an order of preference: it goes
+    for these first, and the hub itself is nothing to the fighter otherwise."""
+    labels = labels or {}
+    return {v for k, v in labels.items()
+            if k.startswith(CONSTELLATION_CAPTURE) and v
+            and labels.get(CONSTELLATION + k[len(CONSTELLATION_CAPTURE):]) == "true"}
 
 
 def dist(a: tuple, b: tuple) -> float:

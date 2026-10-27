@@ -3,9 +3,8 @@ wantType:
     name: fighter
     title: Fighter
     description: 'A character''s sword, a tile standing near the middle of its room. It fights any
-      enemy within reach of its tile, as a turret does — first the ones it is told to: tied to it (a
-      constellation with it, a capture''s hub) or locked on by its character''s 攻撃 skill (its
-      target) — the nearest, one hit every attack_interval seconds, exposed as "<its name>.attack";
+      enemy within reach of its tile, as a turret does — first the hub of a capture it is in, or the
+      one its character''s 攻撃 skill locked on (its target) — the nearest, one hit every attack_interval seconds, exposed as "<its name>.attack";
       its room has every enemy import that, and only the one a hit names takes it. Made by a battle
       for each character.'
     version: '1.0'
