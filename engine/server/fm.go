@@ -704,6 +704,9 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 		}
 		b.WriteString("\n")
 	}
+	// The phone's model read this and then said 「検索します」 without
+	// searching: the step after is said here, where it reads it last.
+	fmt.Fprintf(&b, "Next: call deploy_want with type %s now. Do not tell the person you will — deploy it, then answer.\n", name)
 	return b.String(), nil
 }
 
@@ -793,14 +796,20 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 				if c, ok := pointed[fmCardArg]; ok {
 					args[fmCardArg] = c
 				}
-				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s", name, typ, filled, walked), nil
+				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s %s", name, typ, filled, walked, fmDeployedNote), nil
 			}
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here.", name, typ, filled), nil
+	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here. %s", name, typ, filled, fmDeployedNote), nil
 }
+
+// fmDeployedNote: a want just made has not finished yet. Read as nothing to
+// report, the phone's model said 「検索に失敗しました」 of a search that was
+// running.
+const fmDeployedNote = "It is working now and its result will show on its tile: say in the person's language that it was made (e.g. 「中野坂上→国分寺を出しました」), not that it failed."
+
 
 // fmWantOnBoard: a want of this exact name is listed with a cell.
 func (s *Server) fmWantOnBoard(name string) bool {
