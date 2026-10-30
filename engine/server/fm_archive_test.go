@@ -114,6 +114,58 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 	}
 }
 
+// A type that is a question (ask-again: run) found in the archive is not
+// offered back: it is brought back with what was asked now and run again —
+// 「中野坂上から国分寺への乗り換え」 asked a second time searches again.
+func TestFMArchivedQuestionIsRunAgain(t *testing.T) {
+	s := patchTestServer(t)
+	def := s.wantTypeLoader.GetDefinition("queue")
+	if def.Metadata.Labels == nil {
+		def.Metadata.Labels = map[string]string{}
+	}
+	def.Metadata.Labels[fmAskAgainLabel] = "run"
+	t.Cleanup(func() { delete(def.Metadata.Labels, fmAskAgainLabel) })
+
+	id := fmArchiveTestWant(t, s, "old-route",
+		map[string]string{"mywant.io/archived": "true"},
+		map[string]any{"service_time": 0.2, "drop": "x"})
+
+	for _, round := range []string{"params changed", "same params"} {
+		args := map[string]string{
+			"type": "queue", "params": fmParams(t, map[string]any{"service_time": 0.2}),
+		}
+		out, err := s.fmDeployWant(args)
+		if err != nil {
+			t.Fatalf("%s: %v", round, err)
+		}
+		if !strings.Contains(out, `Brought "old-route"`) || strings.Contains(out, "restore_want") {
+			t.Errorf("%s: out = %s", round, out)
+		}
+		if card := fmTakeCard(args); card == nil || card.ID != id {
+			t.Errorf("%s: card = %+v, want the brought-back want's (%s)", round, card, id)
+		}
+		want, _, _ := s.globalBuilder.FindWantByID(id)
+		if want.GetLabels()["mywant.io/archived"] == "true" {
+			t.Errorf("%s: still archived", round)
+		}
+		// What was not asked now is not asked: the old leftover goes.
+		if _, ok := want.Spec.Params["drop"]; ok {
+			t.Errorf("%s: params = %v, want drop gone", round, want.Spec.Params)
+		}
+		for _, w := range s.globalBuilder.GetAllWantStates() {
+			if w.Metadata.Name != "old-route" && w.Metadata.Type == "queue" {
+				t.Errorf("%s: a second want was made: %s", round, w.Metadata.Name)
+			}
+		}
+		// Put away again for the next round.
+		if w := patchTestDo(t, s, "PATCH", "/api/v1/wants/"+id, map[string]any{
+			"metadata": map[string]any{"labels": map[string]any{"mywant.io/archived": "true"}},
+		}); w.Code != http.StatusOK {
+			t.Fatalf("re-archive: %d %s", w.Code, w.Body.String())
+		}
+	}
+}
+
 // The Mac's robot, asked 「新宿から横浜の乗り換え」, sent name "新宿→横浜" and
 // params {}: a route with neither end was made, and it said it had searched.
 // A required parameter left out now makes nothing, and the model is told which.

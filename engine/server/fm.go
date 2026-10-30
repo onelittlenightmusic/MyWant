@@ -741,6 +741,16 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 		return "", err
 	}
 	existing, archived := fmFindWant(wants, typ, params)
+	if existing != "" && archived && s.fmTypeLabel(typ, fmAskAgainLabel) == "run" {
+		// A question put away and asked again — 「中野坂上から国分寺への乗り換
+		// え」 a second time — is asked again: the one in the archive is brought
+		// back and run with what was asked now, not offered back to be agreed to.
+		for _, w := range wants {
+			if w.Metadata.Name == existing {
+				return s.fmRunAgain(w, params, filled, args)
+			}
+		}
+	}
 	if existing != "" && archived {
 		// Put away, not gone: asked again, it is offered back rather than made
 		// a second time beside the one in the archive — its card under the
@@ -1282,6 +1292,76 @@ func fmFreeName(wants []fmWant, name string) string {
 			return n
 		}
 	}
+}
+
+// fmAskAgainLabel names what a want type does when deploy_want finds one of
+// it with the same parameters in the archive. "run": a question, asked again —
+// it is restored and run with the parameters asked now. Left out: the person
+// is asked whether to restore it.
+const fmAskAgainLabel = "ask-again"
+
+// fmTypeLabel is one of a want type's labels, "" when it has none or the type
+// cannot be read.
+func (s *Server) fmTypeLabel(typ, key string) string {
+	var def struct {
+		Metadata struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"metadata"`
+	}
+	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &def); err != nil {
+		return ""
+	}
+	return def.Metadata.Labels[key]
+}
+
+// fmRunAgain brings an archived want back with the parameters asked now —
+// those it had and was not asked for taken off, so a route last searched for
+// 11:00 is searched for now — runs it, and walks the robot to it. A change of
+// parameters runs it by itself; the same ones are run by a restart.
+func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args map[string]string) (string, error) {
+	text := func(v any) string { return strings.TrimSpace(fmt.Sprint(v)) }
+	patchParams := map[string]any{}
+	changed := false
+	for k, v := range w.Spec.Params {
+		if a, ok := params[k]; !ok || a == nil || text(a) == "" {
+			if v != nil && text(v) != "" {
+				patchParams[k] = nil
+				changed = true
+			}
+		}
+	}
+	for k, v := range params {
+		if v == nil || text(v) == "" {
+			continue
+		}
+		patchParams[k] = v
+		if got, ok := w.Spec.Params[k]; !ok || text(got) != text(v) {
+			changed = true
+		}
+	}
+	patch := map[string]any{
+		"metadata": map[string]any{"labels": map[string]any{fmArchived: nil}},
+		"spec":     map[string]any{"params": patchParams},
+	}
+	if err := s.backend("PATCH", "/api/v1/wants/"+w.Metadata.ID, patch, nil); err != nil {
+		return "", fmt.Errorf("could not bring back %q: %v", w.Metadata.Name, err)
+	}
+	if !changed {
+		if err := s.backend("POST", "/api/v1/wants/"+w.Metadata.ID+"/restart", nil, nil); err != nil {
+			return "", fmt.Errorf("brought back %q but could not run it: %v", w.Metadata.Name, err)
+		}
+	}
+	out := fmt.Sprintf("Brought %q (%s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, filled)
+	pointed := map[string]string{"name": w.Metadata.Name}
+	if walked, err := s.fmPoint(pointed); err == nil {
+		if c, ok := pointed[fmCardArg]; ok {
+			args[fmCardArg] = c
+		}
+		out += " " + walked
+	} else {
+		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+	}
+	return out + " " + fmDeployedNote, nil
 }
 
 // fmAskRestore is what a tool that found an archived want tells the model.
