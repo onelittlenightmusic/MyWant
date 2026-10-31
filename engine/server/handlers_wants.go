@@ -656,8 +656,13 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 // A want with news not yet heard — an unread alert, the "!" over its tile —
 // says that first, with "news": true: the one who walked over to see what it
 // was is told, not greeted. Hearing it is reading it; the board marks it read.
+//
+// ?lang= is the language the one standing there reads the board in: the line's
+// translation when one has been made (translate.go), else the line as it is —
+// never waited for. The mood is the line's own, read from its Japanese.
 func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
+	lang := r.URL.Query().Get("lang")
 	if s.globalBuilder == nil {
 		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
 		return
@@ -673,7 +678,7 @@ func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 			if mood == "" {
 				mood = mywant.MoodOf(e.Message)
 			}
-			s.JSONResponse(w, http.StatusOK, map[string]any{"say": e.Message, "mood": mood, "news": true})
+			s.JSONResponse(w, http.StatusOK, map[string]any{"say": translatedOrHeard(e.Message, lang), "mood": mood, "news": true})
 			return
 		}
 	}
@@ -686,7 +691,7 @@ func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 		s.JSONResponse(w, http.StatusOK, map[string]any{"say": nil})
 		return
 	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"say": line.Say, "mood": line.Mood})
+	s.JSONResponse(w, http.StatusOK, map[string]any{"say": translatedOrHeard(line.Say, lang), "mood": line.Mood})
 }
 
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {

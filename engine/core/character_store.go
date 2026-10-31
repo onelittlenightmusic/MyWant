@@ -127,6 +127,10 @@ type CharacterDisplay struct {
 	CardOpacity *float64 `yaml:"cardOpacity,omitempty" json:"card_opacity,omitempty"`
 	// Icon family for category/type icons ("lucide", "heroicons-solid", …).
 	IconFont string `yaml:"iconFont,omitempty" json:"icon_font,omitempty"`
+	// The language this person reads the board in: "ja" (default) or "en".
+	// What a want says is written in Japanese; a line said in another
+	// language is its translation, made ahead (server/translate.go).
+	Language string `yaml:"language,omitempty" json:"language,omitempty"`
 	// LegacyCanvasDesign is the canvas skin id from before Ext; it lives at
 	// ext.canvas.design now. Read from old files and old clients, moved by
 	// moveToExt, never written again.

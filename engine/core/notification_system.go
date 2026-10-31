@@ -402,6 +402,13 @@ func findWantByName(wantName string) *Want {
 func sendStateNotifications(notification StateNotification) {
 	// Emit state change through unified subscription system
 	emitStateChangeEvent(notification)
+	// A line written for the want to say (its `say`): heard, to be made
+	// ready in the other languages people read the board in (lines_said.go).
+	if notification.StateKey == "say" {
+		if line, ok := notification.StateValue.(string); ok {
+			linesSaid([]string{line})
+		}
+	}
 	sendOwnerChildNotifications(notification)
 	// Restart children that import the changed state key from this parent.
 	// Uses the same restartDependentChildren infrastructure as sendParameterNotifications.

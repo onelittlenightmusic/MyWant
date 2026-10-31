@@ -380,6 +380,9 @@ func computeVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	} else {
 		lines, mood = scriptVoice(ctx, w, script, nil)
 	}
+	// Every line it could say, not only the one picked: the next answer picks
+	// another, and that one is ready too.
+	voiceLinesSaid(lines)
 	return pickVoice(w, lines, mood)
 }
 
@@ -392,6 +395,7 @@ func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) V
 		return VoiceLine{}
 	}
 	lines, mood := scriptVoice(ctx, w, script, &ev)
+	voiceLinesSaid(lines)
 	return pickVoice(w, lines, mood)
 }
 

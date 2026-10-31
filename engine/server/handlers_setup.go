@@ -342,6 +342,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/art/{kind}/{id}", s.putArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}/scale", s.scaleArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}", s.deleteArt).Methods("DELETE")
+	s.setupTranslation(api)
 
 	// Global Parameters endpoint (loaded from ~/.mywant/parameters.yaml)
 	api.HandleFunc("/global-parameters", s.getGlobalParameters).Methods("GET", "OPTIONS")
