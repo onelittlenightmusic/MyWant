@@ -353,6 +353,29 @@ func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply
 	return s.request(prompt, root, timeout, map[string]any{"plain": true})
 }
 
+// AskPlain asks this machine's model one prompt on its own — no tools, no
+// conversation — and hands back its words. warm lets it range wider (random
+// sampling, a higher temperature): asked for "another one", a model sampling
+// the likeliest words gave back the same words shuffled. ok=false when there
+// is no model here (Fly: Linux) — a device with one answers instead — or it
+// could not be asked.
+func AskPlain(prompt string, warm bool) (string, bool) {
+	binary, ok := fmToolPath()
+	if !ok {
+		return "", false
+	}
+	root, _ := os.UserHomeDir()
+	extra := map[string]any{"plain": true}
+	if warm {
+		extra["warm"] = true
+	}
+	r, err := fmServerFor(binary).request(prompt, root, fmDefaultTimeoutSeconds*time.Second, extra)
+	if err != nil || r.Error != "" {
+		return "", false
+	}
+	return r.Text, true
+}
+
 // request does the talking, starting or restarting the agent as needed. Two
 // attempts: a process that died between questions is not an error anybody asked
 // about, it is one to recover from.

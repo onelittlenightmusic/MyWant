@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import AppKit
 
 /// fmtool as a browser's native messaging host: the Mac's model, asked from a
 /// page in Chrome.
@@ -21,6 +22,16 @@ import FoundationModels
 ///   {"type":"ask","id":n,"server":url,
 ///    "authorization":"Basic …","question":q} → {"type":"answer","id":n,"text":…,"cards":[…]}
 ///   {"type":"reset","server":url}            → {"type":"reset","id":n}
+///   {"type":"generate","ask":a,"warm":b}     → {"type":"generate","id":n,"text":…}
+///   {"type":"draw","prompt":p}               → {"type":"draw","id":n,"image":"data:image/png;base64,…"}
+///                                              | {…,"cancelled":true} | {…,"error":…}
+///
+/// generate and draw are the picture under something on the board (the GUI's
+/// 作る, lib/art): the words it is drawn from, asked as the page's server puts
+/// the request (engine/server/art_words.go), and the drawing — Image Playground
+/// in a window of this process's own (Drawing.swift), the picture the person
+/// chose there handed back. What to draw is the server's and the page's; this
+/// has the Mac's models, as the iPhone app does for the same page.
 ///
 /// One conversation per server, kept while the extension keeps the port: 「は
 /// い」 to 「復元しますか？」 is answered with the question it answers.
@@ -29,11 +40,41 @@ enum NativeHost {
         args.first?.hasPrefix("chrome-extension://") == true
     }
 
-    static func run() async -> Never {
+    /// Reads off stdin on a thread of its own, the main thread left to AppKit:
+    /// a drawing (`draw`, Drawing.swift) is Apple's Image Playground in a
+    /// window, and a window needs the main thread's run loop turning — read
+    /// there, stdin held it, waiting for the next message.
+    ///
+    /// Messages are answered in the order they come, one at a time, as they
+    /// always were — but for a drawing, which is answered when the person is
+    /// done in its window, minutes later perhaps: a `status`, or the robot's
+    /// question, is not held up behind it.
+    @MainActor static func run() -> Never {
         let host = Conversations()
-        while let message = readMessage() {
-            write(await host.handle(message))
+        let (inOrder, next) = AsyncStream.makeStream(of: Data.self)
+        Task {
+            for await message in inOrder { write(await host.handle(message)) }
         }
+        Thread.detachNewThread {
+            while let message = readMessage() {
+                let parsed = (try? JSONSerialization.jsonObject(with: message)) as? [String: Any] ?? [:]
+                if parsed["type"] as? String == "draw" {
+                    let id = parsed["id"] as? Int ?? 0
+                    let prompt = parsed["prompt"] as? String ?? ""
+                    Task { @MainActor in
+                        var reply = await Drawing.draw(prompt: prompt)
+                        reply["type"] = "draw"
+                        reply["id"] = id
+                        write((try? JSONSerialization.data(withJSONObject: reply)) ?? Data("{}".utf8))
+                    }
+                } else {
+                    next.yield(message)
+                }
+            }
+            exit(0)
+        }
+        NSApplication.shared.setActivationPolicy(.accessory)
+        NSApplication.shared.run()
         exit(0)
     }
 
@@ -49,9 +90,16 @@ enum NativeHost {
         return body
     }
 
+    /// One message out, whole: the answers in order and a drawing's answer
+    /// come from different tasks, and two writes interleaved are a broken
+    /// connection.
+    private static let writing = NSLock()
+
     private static func write(_ body: Data) {
         var length = UInt32(body.count)
         let header = Data(bytes: &length, count: 4)
+        writing.lock()
+        defer { writing.unlock() }
         FileHandle.standardOutput.write(header + body)
     }
 }
@@ -78,12 +126,16 @@ private actor Conversations {
         let id = message["id"] ?? 0
         switch message["type"] as? String ?? "" {
         case "status":
+            // draws: Image Playground can be shown here (Drawing.swift).
+            let draws = await MainActor.run { Drawing.available }
             switch SystemLanguageModel.default.availability {
             case .available:
-                return ["type": "status", "id": id, "available": true]
+                return ["type": "status", "id": id, "available": true, "draws": draws]
             case .unavailable(let reason):
-                return ["type": "status", "id": id, "available": false, "reason": "\(reason)"]
+                return ["type": "status", "id": id, "available": false, "draws": draws, "reason": "\(reason)"]
             }
+        case "generate":
+            return await generate(message, id: id)
         case "reset":
             if let target = Self.target(message) { conversations[Self.key(target)] = nil }
             return ["type": "reset", "id": id]
@@ -91,6 +143,25 @@ private actor Conversations {
             return await ask(message, id: id)
         default:
             return ["type": "error", "id": id, "error": "unknown message type"]
+        }
+    }
+
+    /// One prompt on its own, the model alone — no tools, no conversation: the
+    /// words a picture is drawn from, asked as the page's server put the
+    /// request (engine/server/art_words.go). What to ask is the server's; this
+    /// only has the model.
+    private func generate(_ message: [String: Any], id: Any) async -> [String: Any] {
+        guard case .available = SystemLanguageModel.default.availability else {
+            return ["type": "generate", "id": id, "error": "この Mac の Apple FM は使えません"]
+        }
+        let ask = (message["ask"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !ask.isEmpty else { return ["type": "generate", "id": id, "error": "ask is required"] }
+        do {
+            let session = LanguageModelSession(instructions: plainInstructions)
+            let said = try await session.respond(to: ask, options: generationOptions(warm: message["warm"] as? Bool == true))
+            return ["type": "generate", "id": id, "text": said.content]
+        } catch {
+            return ["type": "generate", "id": id, "error": "\(error.localizedDescription)"]
         }
     }
 

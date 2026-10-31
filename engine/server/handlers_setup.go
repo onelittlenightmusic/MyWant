@@ -341,6 +341,8 @@ func (s *Server) setupRoutes() {
 	// Art: a picture on the board's floor under a thing, a want or a
 	// constellation (art.go).
 	api.HandleFunc("/art/files/{file}", s.serveArtFile).Methods("GET")
+	// Before /art/{kind}/{id} would take it: the words a picture is drawn from.
+	api.HandleFunc("/art/describe", s.describeArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}", s.putArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}/scale", s.scaleArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}", s.deleteArt).Methods("DELETE")

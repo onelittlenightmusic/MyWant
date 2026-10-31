@@ -133,6 +133,9 @@ private struct ServeRequest: Decodable {
     /// wanted here is the one thing this model has that the caller does not —
     /// language — and none of its initiative.
     let plain: Bool?
+    /// A plain request let range wider (random sampling, warmer): asked for
+    /// "another one", the likeliest words came back the same words shuffled.
+    let warm: Bool?
     /// A question about one photo: the photo, and the words already read out
     /// of it. Answered from those alone (Picture.swift), not by the tools —
     /// the caller has already decided what the question is about.
@@ -147,9 +150,15 @@ struct PictureInput: Decodable, Sendable {
     let allowNone: Bool?
 }
 
+/// How a plain answer is sampled: the likeliest words, or — warm — let range
+/// wider, for "another one".
+func generationOptions(warm: Bool) -> GenerationOptions {
+    warm ? GenerationOptions(samplingMode: .random(probabilityThreshold: 0.95), temperature: 1.3) : GenerationOptions()
+}
+
 /// What a plain session is told: answer the question as asked, in the form
 /// asked, and nothing else.
-private let plainInstructions = """
+let plainInstructions = """
     You turn a request into exactly the line you are asked for.
     Follow the answer format in the prompt exactly. Add no explanation, no     greeting and no commentary. If the prompt offers a list to choose from,     choose only from that list.
     """
@@ -240,7 +249,7 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
             // no transcript to fill, so the answer is about this prompt only.
             let session = LanguageModelSession(instructions: plainInstructions)
             do {
-                let response = try await session.respond(to: prompt)
+                let response = try await session.respond(to: prompt, options: generationOptions(warm: request.warm == true))
                 writeLine(["id": id, "text": response.content, "calls": 0])
             } catch {
                 writeLine(["id": id, "error": "\(error.localizedDescription)"])

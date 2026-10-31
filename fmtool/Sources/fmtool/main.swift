@@ -41,7 +41,7 @@ of the world. Keep answers short.
 // argument. Then this is the Mac's model for a page in that browser, and
 // nothing below — the CLI, the robot want's own agent — applies. NativeHost.swift.
 if NativeHost.launchedByBrowser(Array(CommandLine.arguments.dropFirst())) {
-    await NativeHost.run()
+    NativeHost.run()
 }
 
 // MARK: - CLI arguments
