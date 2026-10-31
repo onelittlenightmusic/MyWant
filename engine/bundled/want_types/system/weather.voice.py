@@ -21,15 +21,15 @@ FEEL = [
     (10, "ちょっと肌寒いかも"),
     (5, "寒いね、上着がいるよ"),
 ]
-FREEZING = "さむい…ぶるぶる"
+FREEZING = "さむい… ぶるぶる"
 
 # What the sky makes it say (weather_condition, see weather_types.go).
 SKY = {
     "sunny": "いい天気！",
     "cloudy": "今日はくもりだよ",
     "rain": "傘を忘れないでね",
-    "snow": "雪だ！足元に気をつけて",
-    "storm": "雷が鳴ってる…こわい",
+    "snow": "雪だ！ 足元に気をつけて",
+    "storm": "雷が鳴ってる… こわい",
     "fog": "霧で前が見えないよ",
 }
 
@@ -57,9 +57,10 @@ def lines(state: dict, answer=None) -> list:
     if temp is None:
         return [sky] if sky else []
     now = f"{temp:.0f}°で{feel(temp)}"
-    # A sky that ends on its own mark runs straight on; one that does not
-    # takes a comma, or it reads as one word ("傘を忘れないでね12°で…").
-    joined = f"{sky}{now}" if sky and sky[-1] in "！？。…" else f"{sky}、{now}"
+    # A sky that ends on its own mark is a sentence of its own, a space after
+    # it so the bubble breaks there; one that does not takes a comma, or it
+    # reads as one word ("傘を忘れないでね12°で…").
+    joined = f"{sky} {now}" if sky and sky[-1] in "！？。…" else f"{sky}、{now}"
     out = [joined if sky else now]
     high, low = number(HIGH, text), number(LOW, text)
     if high is not None and low is not None and high - low >= 10:

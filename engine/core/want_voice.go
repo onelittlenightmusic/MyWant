@@ -47,6 +47,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 // voiceScriptFile is the script a custom package keeps at the top of its
@@ -421,9 +422,46 @@ func pickVoice(w *Want, lines []string, mood string) VoiceLine {
 	if len(lines) == 0 {
 		return VoiceLine{}
 	}
-	say := lines[voiceSeed(w)%uint32(len(lines))]
+	say := SpaceSentences(lines[voiceSeed(w)%uint32(len(lines))])
 	if mood == "" {
 		mood = moodOf(say)
 	}
 	return VoiceLine{Say: say, Mood: mood}
+}
+
+// sentenceEnd is a mark a sentence ends on; sentenceClose, what may follow one
+// before the next sentence starts — more marks, a closing bracket, a space.
+const (
+	sentenceEnd   = "。！？!?…"
+	sentenceClose = "。！？!?…、，,」』）)】]\"'〜ー"
+)
+
+// SpaceSentences puts a space between sentences run together — after 。！？
+// or …, before the next one starts — so a bubble breaks its line there:
+// 「雪だ！足元に気をつけて」 is said 「雪だ！ 足元に気をつけて」. Japanese has no
+// spaces, and the bubble, narrow, broke wherever the width ran out, the last
+// word of one sentence on the next line with the start of the other. Every
+// line a want says goes through it (pickVoice), whoever wrote it — the
+// engine's own, or a type's voice script.
+func SpaceSentences(line string) string {
+	rs := []rune(line)
+	var b strings.Builder
+	// A mark before anything is said (「…ちょっと気になる」) ends no sentence.
+	said := false
+	for i, r := range rs {
+		b.WriteRune(r)
+		if !strings.ContainsRune(sentenceEnd, r) {
+			said = said || !unicode.IsSpace(r)
+			continue
+		}
+		if !said || i+1 >= len(rs) {
+			continue
+		}
+		next := rs[i+1]
+		if unicode.IsSpace(next) || strings.ContainsRune(sentenceClose, next) {
+			continue
+		}
+		b.WriteRune(' ')
+	}
+	return b.String()
 }

@@ -416,7 +416,7 @@ if phase != "fighting":
     me.set("last_score", entry)
     me.set("ranking", ranking)
     head = f"守りきった！ {defeated} 体倒しました" if cleared \
-        else f"全部やられた… {defeated} 体倒しました。want を再開してもう一度"
+        else f"全部やられた… {defeated} 体倒しました。 want を再開してもう一度"
     rank = f"{place} 位" if place else "ランク外"
     me.set("say", f"{head} — スコア {entry['score']}（{survivors}/{entry['of']} 生存・{seconds:g} 秒）{rank}")
 

@@ -386,14 +386,14 @@ func TestWeatherVoiceScript(t *testing.T) {
 		"weather_text":      "快晴 21°C (湿度 73%) (最高 23° / 最低 12°)",
 		"weather_condition": "sunny",
 	}))
-	if got != "[いい天気！21°でぽかぽかあったかいよ 21°でぽかぽかあったかいよ、朝晩は冷えるよ（最低12°）]" {
+	if got != "[いい天気！ 21°でぽかぽかあったかいよ 21°でぽかぽかあったかいよ、朝晩は冷えるよ（最低12°）]" {
 		t.Errorf("a warm clear day: %v", got)
 	}
-	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "rain"})); got != "[傘を忘れないでね、3°でさむい…ぶるぶる]" {
+	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "rain"})); got != "[傘を忘れないでね、3°でさむい… ぶるぶる]" {
 		t.Errorf("a cold rainy day: %v", got)
 	}
 	// A new answer is read as the news, over what the state still says.
-	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "sunny", "_answer": "快晴 26°C"})); got != "[いい天気！26°で今日は暑いね]" {
+	if got := fmt.Sprint(run(map[string]any{"weather_text": "雨 3°C", "weather_condition": "sunny", "_answer": "快晴 26°C"})); got != "[いい天気！ 26°で今日は暑いね]" {
 		t.Errorf("the news: %v", got)
 	}
 	if got := run(map[string]any{"weather_text": "", "error": "timeout"}); fmt.Sprint(got) != "[今日は空が見えなかった]" {
@@ -401,5 +401,25 @@ func TestWeatherVoiceScript(t *testing.T) {
 	}
 	if got := run(map[string]any{}); got != nil {
 		t.Errorf("not fetched yet says nothing: %v", got)
+	}
+}
+
+func TestSpaceSentences(t *testing.T) {
+	for in, want := range map[string]string{
+		"雪だ！足元に気をつけて":    "雪だ！ 足元に気をつけて",
+		"倒しました。want を再開": "倒しました。 want を再開",
+		"雷が鳴ってる…こわい":     "雷が鳴ってる… こわい",
+		"守りきった！ 3 体":     "守りきった！ 3 体",
+		"えっ！？本当":         "えっ！？ 本当",
+		"「できた！」と言った":     "「できた！」と言った",
+		"……ちょっと気になる":     "……ちょっと気になる",
+		"できたよ":           "できたよ",
+		"終わった。":          "終わった。",
+		"Done!Next":      "Done! Next",
+		"v1.2 です":        "v1.2 です",
+	} {
+		if got := SpaceSentences(in); got != want {
+			t.Errorf("SpaceSentences(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
