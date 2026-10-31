@@ -99,6 +99,15 @@ func fmToolPath() (string, bool) {
 	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
 		return candidate, true
 	}
+	// Inside the Mac app (mywant-input's MyWant.app), which carries fmtool as
+	// a helper for Chrome — one install for the pad, the browser's model and
+	// this server's.
+	for _, apps := range []string{filepath.Join(home, "Applications"), "/Applications"} {
+		inApp := filepath.Join(apps, "MyWant.app", "Contents", "Helpers", fmToolDefaultBinary)
+		if info, err := os.Stat(inApp); err == nil && !info.IsDir() {
+			return inApp, true
+		}
+	}
 	return "", false
 }
 
