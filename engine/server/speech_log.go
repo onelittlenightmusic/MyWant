@@ -50,17 +50,24 @@ func recordSpeech(characterID, text, source string) {
 	if characterID == "" || text == "" {
 		return
 	}
+	at := time.Now().UnixMilli()
 	speechMu.Lock()
 	speechLog = append(speechLog, SpeechEntry{
 		CharacterID: characterID,
 		Text:        text,
-		At:          time.Now().UnixMilli(),
+		At:          at,
 		Source:      source,
 	})
 	if len(speechLog) > speechLogMax {
 		speechLog = speechLog[len(speechLog)-speechLogMax:]
 	}
 	speechMu.Unlock()
+	// Said to every page as it is said (moments.go), at the same `at` as the
+	// record — what a page that reads both tells one from the other by. Each
+	// tab used to ask for what was new every second.
+	m := speechMoment("character", characterID, text, "")
+	m.At = at
+	moments.add(m)
 }
 
 // listSpeech handles GET /api/v1/speech — the recent conversation, oldest

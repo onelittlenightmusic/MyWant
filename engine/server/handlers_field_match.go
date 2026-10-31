@@ -276,6 +276,9 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 		ParamChange  *ParamChange  `json:"param_change,omitempty"`
 		ExposeAction *ExposeAction `json:"expose_action,omitempty"`
 		ImportAction *ImportAction `json:"import_action,omitempty"`
+		// The character who made the connection, when the page says: ♥ over
+		// them too (moments.go).
+		CharacterID string `json:"character_id"`
 	}
 	if err := DecodeRequest(r, &req); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
@@ -351,6 +354,7 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 			result["param_name"] = req.ParamChange.ParamName
 			result["value"] = ref
 		}
+		connectedMoments(req.SourceID, req.SourceThing, req.TargetID, req.CharacterID)
 		s.JSONResponse(w, http.StatusOK, result)
 		return
 	}
@@ -453,6 +457,7 @@ func (s *Server) applyFieldMatchRecommendation(w http.ResponseWriter, r *http.Re
 
 	s.globalBuilder.LogAPIOperation("POST", "/api/v1/wants/field-match-recommendations/apply", req.TargetID, "success", http.StatusOK, "",
 		fmt.Sprintf("apply recommendation (source=%s → target=%s): %v", req.SourceID, req.TargetID, result))
+	connectedMoments(req.SourceID, req.SourceThing, req.TargetID, req.CharacterID)
 	s.JSONResponse(w, http.StatusOK, result)
 }
 

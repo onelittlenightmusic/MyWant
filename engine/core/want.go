@@ -470,6 +470,7 @@ func (n *Want) SetStatus(status WantStatus) {
 	if oldStatus != status {
 		bumpStateEpoch() // Status is persisted alongside state
 		n.changed()
+		n.wantMoment(MomentStatusKey, status, oldStatus)
 	}
 
 	// Emit StatusChange event (Group B - synchronous control)
@@ -1227,7 +1228,8 @@ func (n *Want) StoreState(key string, value any) {
 		Timestamp:      now,
 	}
 	sendStateNotifications(notification)
-	if !n.isVolatileState(key) {
+	n.wantMoment(key, value, previousValue)
+	if !n.isVolatileState(key) && !momentOnlyKeys[key] {
 		n.changed()
 	}
 }
@@ -1415,6 +1417,7 @@ func (n *Want) storeStateMulti(updates map[string]any) {
 
 	for _, notification := range notifications {
 		sendStateNotifications(notification)
+		n.wantMoment(notification.StateKey, notification.StateValue, notification.PreviousValue)
 	}
 }
 
