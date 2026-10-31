@@ -1,11 +1,8 @@
 package types
 
 import (
-	"context"
 	"fmt"
-	"os"
 	"strings"
-	"time"
 )
 
 // A photo's words read into fields, by the rules of the want it is joined to.
@@ -54,9 +51,9 @@ func ParsePhotoFields(spec string) []PhotoField {
 
 // PhotoFieldsPrompt is what the model is asked to read a photo's words into
 // fields by: the words, what the photo is (the type's photo-reading), and each
-// field's rule — answered one field a line, "name: value". The same prompt the
-// iPhone app asks its own model (the server hands it over), so a photo read on
-// the phone is read the same way.
+// field's rule — answered one field a line, "name: value". The same prompt
+// whichever model reads it, a device's or the server's (server/model_jobs.go),
+// so a photo is read the same way wherever it is read.
 func PhotoFieldsPrompt(about string, fields []PhotoField, lines []string) string {
 	var b strings.Builder
 	b.WriteString("Text read from a photo, line by line; cells on a line are separated by |:\n")
@@ -106,22 +103,6 @@ func ParsePhotoFieldsAnswer(answer string, fields []PhotoField, lines []string) 
 		out[name] = value
 	}
 	return out
-}
-
-// InterpretPhoto reads a photo's words into its fields with this machine's
-// model. ok=false when there is no model here (Fly) — the iPhone app reads it
-// then — or it could not be asked.
-func InterpretPhoto(ctx context.Context, about string, fields []PhotoField, lines []string) (map[string]string, bool) {
-	binary, ok := fmToolPath()
-	if !ok || len(fields) == 0 || len(lines) == 0 {
-		return nil, false
-	}
-	root, _ := os.UserHomeDir()
-	r, err := fmServerFor(binary).askPlain(PhotoFieldsPrompt(about, fields, lines), root, fmDefaultTimeoutSeconds*time.Second)
-	if err != nil {
-		return nil, false
-	}
-	return ParsePhotoFieldsAnswer(r.Text, fields, lines), true
 }
 
 // PhotoFieldAsked is the field a question asks for — the one whose words it

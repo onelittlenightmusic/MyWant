@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"log"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -25,13 +24,12 @@ import (
 // ゴルフのスコアは？" from photo-score, with no model and the same answer every
 // time.
 //
-// Who reads: this server, when it has a model (fmtool on a Mac) — every time
-// things change, any photo joined and not yet read by its rules is read, in
-// the background. A server without one (Fly) lists them instead
-// (GET /api/v1/things/photo-fields/pending) with the very prompt to ask, and
-// the iPhone app asks its own model and hands the answer back
-// (POST /api/v1/things/photo-fields), which is checked here as if it were
-// this server's own.
+// Who reads: whoever has a model, by model work's order (model_jobs.go) — a
+// device that can (the iPhone app, a Mac's Chrome with fmtool), else this
+// server's own (fmtool on a Mac). Every time things change, any photo joined
+// and not yet read by its rules is read, in the background: the prompt is
+// written here and the answer checked here, whoever ran the model — only
+// values in the photo's words are kept.
 
 const (
 	// A want type's fields for the photos joined to its answers, one a line:
@@ -209,12 +207,17 @@ func (s *Server) keepPhotoFields(p photoToRead, values map[string]string) {
 // photoFieldsReading keeps one reading pass at a time.
 var photoFieldsReading sync.Mutex
 
+// photoFieldsDeviceWait is how long a device has to answer one photo: work in
+// the background, nobody waiting on it.
+const photoFieldsDeviceWait = time.Minute
+
 // readPhotoFieldsSoon reads, in the background, every photo waiting to be
-// read into fields — when this server has a model; else they wait for the
-// phone.
+// read into fields — when there is a model to read with, a device's or this
+// server's; else they wait for one (a device arriving asks again,
+// pendingBrowserAction).
 func (s *Server) readPhotoFieldsSoon() {
-	if !types.CanReadPhotos() {
-		// Read by a phone, if at all; what is read is proposed.
+	if !serverHasModel() && !modelDeviceCan(modelOpGenerate, "", time.Now()) {
+		// Nobody to read them yet; what is read already is proposed.
 		s.proposeCaptures()
 		return
 	}
@@ -224,58 +227,35 @@ func (s *Server) readPhotoFieldsSoon() {
 		}
 		defer photoFieldsReading.Unlock()
 		for _, p := range s.photosToRead() {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			values, ok := types.InterpretPhoto(ctx, p.spec.About, p.spec.Fields, p.lines)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+			text, by, err := generateText(ctx, p.Prompt, false, photoFieldsDeviceWait)
 			cancel()
-			if !ok {
-				log.Printf("[things] could not read the photo %s as %s", p.ID, p.Type)
+			if err != nil {
+				log.Printf("[things] could not read the photo %s as %s: %v", p.ID, p.Type, err)
 				continue
 			}
-			s.keepPhotoFields(p, values)
+			// The words or the rules may have changed while it was being read:
+			// an answer to an old prompt is not this photo's any more.
+			if !s.stillToRead(p) {
+				continue
+			}
+			s.keepPhotoFields(p, types.ParsePhotoFieldsAnswer(text, p.spec.Fields, p.lines))
+			log.Printf("[things] the photo %s was read by the %s's model", p.ID, by)
 		}
 		// Captures into a want, read: which answer they go with.
 		s.proposeCaptures()
 	}()
 }
 
-// GET /api/v1/things/photo-fields/pending — the photos waiting to be read
-// into fields, each with the prompt to ask a model.
-func (s *Server) getPhotoFieldsPending(w http.ResponseWriter, r *http.Request) {
-	list := s.photosToRead()
-	if list == nil {
-		list = []photoToRead{}
-	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"photos": list})
-}
-
-// POST /api/v1/things/photo-fields  {id, type, fingerprint, answer}
-// — a model's answer to a pending photo's prompt, from the phone. Checked as
-// this server's own would be: only values in the photo's words are kept.
-func (s *Server) postPhotoFields(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		ID          string `json:"id"`
-		Type        string `json:"type"`
-		Fingerprint string `json:"fingerprint"`
-		Answer      string `json:"answer"`
-	}
-	if err := DecodeRequest(r, &body); err != nil {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
-		return
-	}
-	for _, p := range s.photosToRead() {
-		if p.ID != body.ID || p.Type != body.Type {
-			continue
+// stillToRead says whether p is still waiting to be read as it was when its
+// prompt was written.
+func (s *Server) stillToRead(p photoToRead) bool {
+	for _, q := range s.photosToRead() {
+		if q.ID == p.ID {
+			return q.Type == p.Type && q.Fingerprint == p.Fingerprint
 		}
-		if p.Fingerprint != body.Fingerprint {
-			s.JSONError(w, r, http.StatusConflict, "the photo changed", "its words or its type's rules changed since the prompt was handed out")
-			return
-		}
-		values := types.ParsePhotoFieldsAnswer(body.Answer, p.spec.Fields, p.lines)
-		s.keepPhotoFields(p, values)
-		s.JSONResponse(w, http.StatusOK, map[string]any{"fields": values})
-		return
 	}
-	s.JSONError(w, r, http.StatusNotFound, "no such photo waiting", body.ID)
+	return false
 }
 
 // photoFieldsOf is a photo's fields as read by a type, or nil.

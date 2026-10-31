@@ -369,12 +369,13 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 		case p.Read == nil && p.ImageURL != "":
 			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL})
 		case len(p.FieldSpec) > 0 && len(p.Fields) == 0:
-			// Its words read, not yet read into fields: the asker's model can
-			// (GET /things/photo-fields/pending).
+			// Its words read, not yet read into fields: queued as model work
+			// (photo_fields.go), which the asker's device can take at once.
 			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL, Read: true})
 		}
 	}
 	if len(unread) > 0 {
+		s.readPhotoFieldsSoon()
 		raw, _ := json.Marshal(unread)
 		args[fmUnreadArg] = string(raw)
 	}

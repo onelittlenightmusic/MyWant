@@ -309,10 +309,6 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
 		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
 		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
-		// A photo's words read into fields by the type it is joined to
-		// (photo_fields.go): what waits to be read, and a reading handed back.
-		things.HandleFunc("/photo-fields/pending", s.getPhotoFieldsPending).Methods("GET", "OPTIONS")
-		things.HandleFunc("/photo-fields", s.postPhotoFields).Methods("POST", "OPTIONS")
 		// A thing's first art, still served (thing_art.go); art is art.go's now.
 		things.HandleFunc("/art/{id}", s.serveThingArt).Methods("GET")
 		// A thing's neighbours: constellation co-members and the wants naming it.
@@ -442,6 +438,8 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/open", s.openInBrowser).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run", s.browserRun).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run-result", s.browserRunResultHandler).Methods("POST", "OPTIONS")
+	// A device's answer to a model job it took (model_jobs.go).
+	webWants.HandleFunc("/model-result", s.modelResultHandler).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/ca-cert", s.serveCACert).Methods("GET", "OPTIONS")
 	// Whether the page a browser is on is already saved (see lookupWebWant).
 	webWants.HandleFunc("/lookup", s.lookupWebWant).Methods("GET", "OPTIONS")

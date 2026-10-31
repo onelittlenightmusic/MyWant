@@ -1290,9 +1290,12 @@ func (s *Server) browserRun(w http.ResponseWriter, r *http.Request) {
 // separate poll functions) with one polled endpoint,
 // dispatched by Kind.
 type pendingActionResponse struct {
-	Kind       string           `json:"kind"` // "nav_launch" | "browser_run" | "" when nothing is pending
+	Kind       string           `json:"kind"` // "nav_launch" | "browser_run" | "model" | "" when nothing is pending
 	NavLaunch  *navLaunchClaim  `json:"nav_launch,omitempty"`
 	BrowserRun *browserRunClaim `json:"browser_run,omitempty"`
+	// Model: a job for the poller's model (model_jobs.go) — handed only to a
+	// poller that said it can do it (?can=).
+	Model *modelClaim `json:"model,omitempty"`
 }
 
 // pendingBrowserAction is GET /api/v1/web-wants/pending-action — polled by
@@ -1322,7 +1325,27 @@ func (s *Server) pollerIsHomeBrowser(r *http.Request) bool {
 }
 
 func (s *Server) pendingBrowserAction(w http.ResponseWriter, r *http.Request) {
-	s.JSONResponse(w, http.StatusOK, nextPendingAction(r.URL.Query().Get("device"), s.pollerIsHomeBrowser(r)))
+	device := r.URL.Query().Get("device")
+	// Model work first, home or not (model_jobs.go): it opens nothing, and
+	// someone may be waiting on its answer.
+	can := parseModelCan(r.URL.Query().Get("can"))
+	if noteModelDevice(device, can, time.Now()) {
+		// A device that can has come (the phone's app opened, Chrome started):
+		// photos left unread for want of one are read now.
+		go s.readPhotoFieldsSoon()
+	}
+	if claim, ok := takeModelWork(device, can); ok {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{Kind: "model", Model: &claim})
+		return
+	}
+	// only=model: a poller asking for model work alone (the phone's app,
+	// between its errands) — not to be handed a tab or a web errand it was not
+	// asking for and would drop.
+	if r.URL.Query().Get("only") == "model" {
+		s.JSONResponse(w, http.StatusOK, pendingActionResponse{})
+		return
+	}
+	s.JSONResponse(w, http.StatusOK, nextPendingAction(device, s.pollerIsHomeBrowser(r)))
 }
 
 // nextPendingAction picks what a poller gets: first a tab its own browser
