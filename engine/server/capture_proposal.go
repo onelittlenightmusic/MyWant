@@ -73,7 +73,8 @@ type captureProposal struct {
 // captureThing captures a thing into the target — the one way a capture is
 // made, whether the thing was just shared (/things/share) or is on the board
 // already (POST /capture/things/{thing}): into a whole want, read and then
-// proposed one of its answers; into a thing or an answer, joined in the
+// proposed one of its answers (added as well to a constellation the net
+// names); into a thing or an answer, joined in the
 // constellation it is in, else proposed it; into a named constellation,
 // added. A proposal made at once is returned. With `ask`, the sender asks
 // about the proposals itself, and the board leaves them alone a while.
@@ -82,7 +83,14 @@ func (s *Server) captureThing(thingID string, target *CaptureTarget, ask bool) *
 		_ = s.thingLabels.Set(thingID, captureAskedUntilLabel, time.Now().Add(captureAskWait).UTC().Format(time.RFC3339))
 	}
 	switch {
-	case target.Constellation == "" && target.Kind == "want":
+	case target.Kind == "want":
+		// Into a whole want, its answers are always searched: the capture is
+		// read and proposed the one it belongs with, whether or not the net
+		// also names a constellation (a net moved here keeps the one it was
+		// carrying) — that only adds it there as well, at once.
+		if target.Constellation != "" {
+			s.captureInto(target.Constellation, target.ID, thingID)
+		}
 		s.captureIntoWant(thingID, target.ID)
 		// A photo already read — on the board before it was caught — is read
 		// by the want's type now, and proposed (photo_fields.go).
@@ -120,7 +128,7 @@ func (s *Server) captureExistingThing(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case p != nil:
 		reply["proposal"] = p
-	case target.Constellation == "" && target.Kind == "want":
+	case target.Kind == "want":
 		reply["waiting"] = true
 	default:
 		reply["constellation"] = target.Constellation
