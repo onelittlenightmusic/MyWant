@@ -439,6 +439,8 @@ func (s *Server) setupRoutes() {
 	webWants.HandleFunc("/pending-action", s.pendingBrowserAction).Methods("GET", "OPTIONS")
 	// Open a URL in a new tab via the extension, with no web want behind it.
 	webWants.HandleFunc("/open", s.openInBrowser).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/guides", s.keepWebGuide).Methods("POST", "OPTIONS")
+	webWants.HandleFunc("/guides/{id}", s.getWebGuide).Methods("GET", "OPTIONS")
 	webWants.HandleFunc("/browser-run", s.browserRun).Methods("POST", "OPTIONS")
 	webWants.HandleFunc("/browser-run-result", s.browserRunResultHandler).Methods("POST", "OPTIONS")
 	// A device's answer to a model job it took (model_jobs.go).
