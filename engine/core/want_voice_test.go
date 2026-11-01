@@ -274,7 +274,12 @@ func TestVoiceLines(t *testing.T) {
 }
 
 func TestVoiceScriptDiscovery(t *testing.T) {
-	dir := t.TempDir()
+	// Found where it really is (realScriptPath): the temp dir itself may sit
+	// behind a link (/var → /private/var on macOS).
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	write := func(name string) string {
 		p := filepath.Join(dir, name)
 		if err := os.WriteFile(p, []byte("print('{}')"), 0o644); err != nil {
@@ -296,6 +301,16 @@ func TestVoiceScriptDiscovery(t *testing.T) {
 	named := write("transit_search.voice.py")
 	if got := voiceScriptOnDisk(yaml, true); got != named {
 		t.Errorf("<type>.voice.py comes first, got %q", got)
+	}
+	// A custom package is a link (custom-types/<plugin> → customs/<plugin>):
+	// its script is named by where it really is, which a voice sandbox, seeing
+	// only that directory, can open.
+	linked := filepath.Join(t.TempDir(), "plugin")
+	if err := os.Symlink(dir, linked); err != nil {
+		t.Fatal(err)
+	}
+	if got := voiceScriptOnDisk(filepath.Join(linked, "transit_search.yaml"), true); got != named {
+		t.Errorf("through a linked package, got %q, want %q", got, named)
 	}
 
 	savedDir := voiceScriptDir

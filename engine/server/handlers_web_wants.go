@@ -34,6 +34,13 @@ type WebWantElement struct {
 	// saver could not take a screenshot (the bookmarklet).
 	Rect  *WebWantRect `json:"rect,omitempty"`
 	Image string       `json:"image,omitempty"`
+	// Say: what the robot says over it when someone is brought to it (a link
+	// to one thing on a page, POST /web-wants/open) — what to do there.
+	Say string `json:"say,omitempty"`
+	// SayKey: the moment it is on that way (the type's voice.py names its
+	// line by it), and Title its short name in the way's progress.
+	SayKey string `json:"say_key,omitempty"`
+	Title  string `json:"title,omitempty"`
 }
 
 // WebWantRect is an element's box in document CSS pixels.
@@ -975,6 +982,16 @@ func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
 		URL string `json:"url"`
 		// Device is the browser that asked (see navLaunchClaim.Device).
 		Device string `json:"device,omitempty"`
+		// Where on the page to bring the person, when the link is to one
+		// thing on it (a booking page's 18:00 in Room02): the steps that get
+		// there (browser_run's), then the thing itself, lit and focused.
+		Steps    []json.RawMessage `json:"steps,omitempty"`
+		Elements []WebWantElement  `json:"elements,omitempty"`
+		// Then: the pages the way goes on to in the same tab, each with what
+		// to show there once the tab is on it ({url_contains, elements}).
+		Then []json.RawMessage `json:"then,omitempty"`
+		// Title: what the way is for, at the head of its progress.
+		Title string `json:"title,omitempty"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -986,7 +1003,7 @@ func (s *Server) openInBrowser(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "url must be http(s)", body.URL)
 		return
 	}
-	enqueueNavLaunch(navLaunchClaim{TargetURL: body.URL, Device: body.Device})
+	enqueueNavLaunch(navLaunchClaim{TargetURL: body.URL, Steps: body.Steps, Elements: body.Elements, Then: body.Then, Title: body.Title, Device: body.Device})
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"ok":      true,
 		"url":     body.URL,
@@ -1011,6 +1028,13 @@ type navLaunchClaim struct {
 	FieldValues map[string]string `json:"field_values,omitempty"`
 	// With FieldValues: fill them in but press nothing (see launchWebWant).
 	FillOnly bool `json:"fill_only,omitempty"`
+	// Steps are run in the tab before Elements are lit (openInBrowser): the
+	// way to the thing a link is about, as browser_run's steps.
+	Steps []json.RawMessage `json:"steps,omitempty"`
+	// Then: the pages after, in the same tab (openInBrowser).
+	Then []json.RawMessage `json:"then,omitempty"`
+	// Title: what the way is for (openInBrowser), over its progress.
+	Title string `json:"title,omitempty"`
 	// Device, when set, is the browser a person clicked in to ask for this
 	// tab, and only that browser's extension is handed it — the home browser
 	// (pollerIsHomeBrowser) is for work nobody is watching, and a tab asked

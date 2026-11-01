@@ -78,6 +78,7 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/recipe-analysis", s.analyzeWantForRecipe).Methods("GET")
 	wants.HandleFunc("/{id}/recipe-analysis", s.handleOptions).Methods("OPTIONS")
 	wants.HandleFunc("/{id}/voice", s.getWantVoice).Methods("GET")
+	wants.HandleFunc("/{id}/voice/guide", s.getWantGuideVoice).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/labels", s.addLabelToWant).Methods("POST")
 	wants.HandleFunc("/{id}/labels/{key}", s.removeLabelFromWant).Methods("DELETE")
 	wants.HandleFunc("/{id}/labels", s.handleOptions).Methods("OPTIONS")

@@ -31,6 +31,12 @@ package mywant
 // "event", {"kind": "output", "result": <the answer>} or {"kind": "achieved"},
 // where standing on the tile carries none. A script that says nothing to it
 // leaves the notice as it was, the answer itself.
+// And it says the way somewhere, when someone is shown it (WantGuideVoice):
+// its input then carries "event", {"kind": "guide", "guide": {...}} — the
+// guide's facts and the moments it needs a line for — and it answers with one
+// line per moment, {"say": {"<moment>": "…"}}. The words are the script's; the
+// guide (a booking card's "take me to 18:00 in Room02") only says what is
+// going on. They are said like any other line, so they are translated too.
 // Either way the line is worked out here, on the server, so every surface that
 // draws the want (the board, the extension, the phone) says the same thing.
 
@@ -67,15 +73,25 @@ const voiceTimeout = 3 * time.Second
 func voiceScriptOnDisk(yamlPath string, allowPlain bool) string {
 	named := strings.TrimSuffix(yamlPath, filepath.Ext(yamlPath)) + voiceScriptSuffix
 	if fileExists(named) {
-		return named
+		return realScriptPath(named)
 	}
 	if allowPlain {
 		plain := filepath.Join(filepath.Dir(yamlPath), voiceScriptFile)
 		if fileExists(plain) {
-			return plain
+			return realScriptPath(plain)
 		}
 	}
 	return ""
+}
+
+// realScriptPath is where a script really is: a custom package is a link
+// (custom-types/<plugin> → customs/<plugin>), and a voice script's sandbox sees
+// only its own directory — bound as named, a link points at nothing inside it.
+func realScriptPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
 }
 
 // voiceScriptEmbedded finds a bundled type's voice script in the binary and
@@ -138,6 +154,8 @@ const (
 type VoiceEvent struct {
 	Kind   string
 	Result any
+	// Guide: what a "guide" event is showing the way to (WantGuideVoice).
+	Guide any
 }
 
 // voiceInput is what a script is handed; ev is nil standing on the tile.
@@ -166,6 +184,9 @@ func voiceEventInput(ev *VoiceEvent) any {
 	out := map[string]any{"kind": ev.Kind}
 	if ev.Result != nil {
 		out["result"] = ev.Result
+	}
+	if ev.Guide != nil {
+		out["guide"] = ev.Guide
 	}
 	return out
 }
@@ -390,6 +411,38 @@ func computeVoice(ctx context.Context, w *Want, script string) VoiceLine {
 // it raises — Say "" when its type has no script, or the script has nothing to
 // say to it, and the notice says the news plainly. Never cached: news happens
 // once.
+// WantGuideVoice is what the type's voice says along a way it shows someone
+// (a "guide" event): one line per moment, keyed as the script keyed them. Said
+// like any line, so each is put to translation (voiceLinesSaid). Nothing
+// without a script, or for a script that has nothing to say about it.
+func WantGuideVoice(ctx context.Context, w *Want, script string, guide any) map[string]string {
+	if script == "" {
+		return nil
+	}
+	input, err := json.Marshal(voiceInput(w, &VoiceEvent{Kind: "guide", Guide: guide}))
+	if err != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, voiceTimeout)
+	defer cancel()
+	out, err := runVoiceScript(ctx, script, input)
+	if err != nil {
+		ErrorLog("[VOICE] %s guide (%s): %v", w.GetMetadata().Name, script, err)
+		return nil
+	}
+	said, _ := out["say"].(map[string]any)
+	lines := map[string]string{}
+	var all []string
+	for k, v := range said {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			lines[k] = SpaceSentences(strings.TrimSpace(s))
+			all = append(all, lines[k])
+		}
+	}
+	voiceLinesSaid(all)
+	return lines
+}
+
 func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) VoiceLine {
 	if script == "" {
 		return VoiceLine{}

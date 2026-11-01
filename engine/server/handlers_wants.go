@@ -694,6 +694,40 @@ func (s *Server) getWantVoice(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"say": translatedOrHeard(line.Say, lang), "mood": line.Mood})
 }
 
+// getWantGuideVoice is POST /api/v1/wants/{id}/voice/guide {guide, lang}:
+// the lines the want's voice says along a way it is showing someone (see
+// mywant.WantGuideVoice) — {"say": {"<moment>": "…"}}, each in lang when its
+// translation has been made, else as it was said (never waited for).
+func (s *Server) getWantGuideVoice(w http.ResponseWriter, r *http.Request) {
+	wantID := mux.Vars(r)["id"]
+	var body struct {
+		Guide any    `json:"guide"`
+		Lang  string `json:"lang"`
+	}
+	if err := DecodeRequest(r, &body); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	if s.globalBuilder == nil {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
+		return
+	}
+	want, _, found := s.globalBuilder.FindWantByID(wantID)
+	if !found {
+		s.JSONError(w, r, http.StatusNotFound, "Want not found", "")
+		return
+	}
+	script := ""
+	if s.wantTypeLoader != nil {
+		script = s.wantTypeLoader.GetVoiceScript(want.GetMetadata().Type)
+	}
+	say := map[string]string{}
+	for k, line := range mywant.WantGuideVoice(r.Context(), want, script, body.Guide) {
+		say[k] = translatedOrHeard(line, body.Lang)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"say": say})
+}
+
 func (s *Server) updateWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	var foundWant *mywant.Want
