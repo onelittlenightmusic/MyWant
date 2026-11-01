@@ -29,12 +29,37 @@ import (
 // be, only a model to ask: the same picture is asked for the same way
 // wherever 作る is pressed, and changing how is a change here.
 //
-//	POST /api/v1/art/describe  {value, subtype, instead?, context?}
+//	POST /api/v1/art/describe  {value, subtype, instead?, context?, language?}
 //	  → {ask, warm, suffix, limit, fallback, prompt?}
 
 // artIconStyle is said after every description: a picture laid on the floor
-// under a ball is small, and reads as an icon or not at all.
+// under a ball is small, and reads as an icon or not at all. In the language
+// the words are in (artLanguages).
 const artIconStyle = "simple flat icon, plain background"
+
+// artLanguage is how the words are asked for and finished in one language:
+// the person's (their character's display language), so the words they see
+// and may change before it is drawn are words they read.
+type artLanguage struct {
+	name  string // as the model is told it
+	words string // how long, as the model is told it
+	style string // artIconStyle in it
+	sep   string
+}
+
+var artLanguages = map[string]artLanguage{
+	"en": {name: "English", words: "at most 12 words", style: artIconStyle, sep: ", "},
+	"ja": {name: "Japanese", words: "at most 40 characters", style: "シンプルなフラットアイコン、無地の背景", sep: "、"},
+}
+
+// artLanguageOf is lang's, else English's — an unknown or unset one is drawn
+// from the words Image Playground reads best.
+func artLanguageOf(lang string) artLanguage {
+	if l, ok := artLanguages[lang]; ok {
+		return l
+	}
+	return artLanguages["en"]
+}
 
 // artWordsLimit is how much of the model's description is kept, in characters
 // — 12 words asked for, and a model running on past them is cut here.
@@ -54,6 +79,8 @@ type artWordsRequest struct {
 	// Context: a little of what it holds (a note's text, say), for the
 	// picture to be about that and not only its name.
 	Context string `json:"context,omitempty"`
+	// Language: the one the words are in — the person's ("ja", "en").
+	Language string `json:"language,omitempty"`
 }
 
 type artWordsRecipe struct {
@@ -73,9 +100,10 @@ func artWordsRecipeFor(req artWordsRequest) artWordsRecipe {
 	if what == "" {
 		what = "thing"
 	}
-	ask := fmt.Sprintf("Describe in English, in at most 12 words, what a small icon-like picture of "+
+	lang := artLanguageOf(req.Language)
+	ask := fmt.Sprintf("Describe in %s, in %s, what a small icon-like picture of "+
 		"this %s should show: %q. If it is a known landmark, station or place, name it and its most "+
-		"recognisable look. Answer with the description only.", what, req.Value)
+		"recognisable look. Answer with the description only.", lang.name, lang.words, what, req.Value)
 	if c := strings.TrimSpace(req.Context); c != "" {
 		if r := []rune(c); len(r) > artContextLimit {
 			c = string(r[:artContextLimit])
@@ -85,9 +113,9 @@ func artWordsRecipeFor(req artWordsRequest) artWordsRecipe {
 	return artWordsRecipe{
 		Ask:      ask,
 		Warm:     strings.TrimSpace(req.Instead) != "",
-		Suffix:   ", " + artIconStyle,
+		Suffix:   lang.sep + lang.style,
 		Limit:    artWordsLimit,
-		Fallback: req.Value + ", " + artIconStyle,
+		Fallback: req.Value + lang.sep + lang.style,
 	}
 }
 
@@ -101,6 +129,8 @@ func (r artWordsRecipe) compose(said string) string {
 	if rs := []rune(said); len(rs) > r.Limit {
 		said = string(rs[:r.Limit])
 	}
+	// The style follows as more of the same sentence: no full stop before it.
+	said = strings.TrimRight(said, "。．.、, ")
 	return said + r.Suffix
 }
 
