@@ -765,15 +765,25 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	}
 	if existing != "" {
 		pointed := map[string]string{"name": existing}
+		for _, w := range wants {
+			if w.Metadata.Name == existing {
+				pointed["id"] = w.Metadata.ID
+			}
+		}
 		if _, err := s.fmPoint(pointed); err == nil {
 			if c, ok := pointed[fmCardArg]; ok {
 				args[fmCardArg] = c
 			}
-			return fmt.Sprintf("%q (%s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ), nil
+			return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ, fmParamsText(params)), nil
 		}
-		return fmt.Sprintf("%q (%s) with these parameters is already on the board. Nothing new was made.", existing, typ), nil
+		return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board. Nothing new was made.", existing, typ, fmParamsText(params)), nil
 	}
 	name := strings.TrimSpace(args["name"])
+	// The type's own naming (robot-name, e.g. "{from}→{to}") over the model's:
+	// a route named after where it goes (「戸塚」) is the station's name too.
+	if named := fmNameFrom(s.fmTypeLabel(typ, fmNameLabel), params); named != "" {
+		name = named
+	}
 	if name == "" {
 		name = fmt.Sprintf("%s-%d", strings.ReplaceAll(typ, " ", "-"), time.Now().Unix()%100000)
 	}
@@ -1300,6 +1310,55 @@ func fmFreeName(wants []fmWant, name string) string {
 // is asked whether to restore it.
 const fmAskAgainLabel = "ask-again"
 
+// fmNameLabel: how a want of a type is named when the robot makes one —
+// "{from}→{to}", its parameters in braces.
+const fmNameLabel = "robot-name"
+
+// fmNameFrom fills a robot-name template from params; "" when there is none
+// or a parameter it names was not given.
+func fmNameFrom(template string, params map[string]any) string {
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return ""
+	}
+	out, missing := template, false
+	for _, m := range regexp.MustCompile(`\{([^}]+)\}`).FindAllStringSubmatch(template, -1) {
+		v, ok := params[m[1]]
+		text := ""
+		if ok && v != nil {
+			text = strings.TrimSpace(fmt.Sprint(v))
+		}
+		if text == "" {
+			missing = true
+			break
+		}
+		out = strings.ReplaceAll(out, m[0], text)
+	}
+	if missing {
+		return ""
+	}
+	return out
+}
+
+// fmParamsText is a want's parameters as the model is told them: "from=中野坂上, to=戸塚".
+func fmParamsText(params map[string]any) string {
+	keys := make([]string, 0, len(params))
+	for k, v := range params {
+		if v != nil && strings.TrimSpace(fmt.Sprint(v)) != "" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + strings.TrimSpace(fmt.Sprint(params[k]))
+	}
+	if len(parts) == 0 {
+		return "no parameters"
+	}
+	return strings.Join(parts, ", ")
+}
+
 // fmTypeLabel is one of a want type's labels, "" when it has none or the type
 // cannot be read.
 func (s *Server) fmTypeLabel(typ, key string) string {
@@ -1351,8 +1410,8 @@ func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args
 			return "", fmt.Errorf("brought back %q but could not run it: %v", w.Metadata.Name, err)
 		}
 	}
-	out := fmt.Sprintf("Brought %q (%s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, filled)
-	pointed := map[string]string{"name": w.Metadata.Name}
+	out := fmt.Sprintf("Brought %q (%s, %s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, fmParamsText(params), filled)
+	pointed := map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID}
 	if walked, err := s.fmPoint(pointed); err == nil {
 		if c, ok := pointed[fmCardArg]; ok {
 			args[fmCardArg] = c
@@ -1613,7 +1672,21 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 	}
 	var found *fmTile
 	var near []string
+	// By its id when the caller knows which one it means (a want just brought
+	// back or found by its parameters): a route named 「戸塚」 and the station
+	// 戸塚 share a name, and by name the robot walked to the station.
+	if id := strings.TrimSpace(args["id"]); id != "" {
+		for i, t := range tiles {
+			if t.id == id {
+				found = &tiles[i]
+				break
+			}
+		}
+	}
 	for i, t := range tiles {
+		if found != nil {
+			break
+		}
 		if t.name == name || loose(t.name) == loose(name) {
 			found = &tiles[i]
 			break
