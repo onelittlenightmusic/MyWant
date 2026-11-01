@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from mywant import fill_goto, fill_template  # noqa: E402
+from mywant import fill_goto, fill_template, goto_template  # noqa: E402
 
 
 class FillTemplateTest(unittest.TestCase):
@@ -23,6 +23,15 @@ class FillGotoTest(unittest.TestCase):
                 json.dump({"_comment": "n", "elements": [{"selector": "[value=\"{{v}}\"]", "say_key": "arrived"}]}, f)
             self.assertEqual(fill_goto({"v": "T"}, template=path),
                              {"elements": [{"selector": "[value=\"T\"]", "say_key": "arrived"}]})
+
+
+class GotoTemplateTest(unittest.TestCase):
+    def test_the_template_as_it_is_without_notes(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "goto.json")
+            with open(path, "w") as f:
+                json.dump({"_comment": "n", "elements": [{"selector": "[value=\"{{v}}\"]"}]}, f)
+            self.assertEqual(goto_template(template=path), {"elements": [{"selector": "[value=\"{{v}}\"]"}]})
 
 
 if __name__ == "__main__":

@@ -72,3 +72,8 @@ require (
 )
 
 replace mywant/engine => ../engine
+
+// Temporary: yaml.v3 v3.0.1 with the emitter event-queue fix (yaml/go-yaml#432).
+// Move to go.yaml.in/yaml/v4 once it is stable with that fix, and drop this —
+// see engine/third_party/yaml.v3/PATCHED.md.
+replace gopkg.in/yaml.v3 => ../engine/third_party/yaml.v3

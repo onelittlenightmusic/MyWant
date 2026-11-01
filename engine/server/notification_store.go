@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"sync"
@@ -94,12 +95,39 @@ func (n *NotificationStore) save(entries []NotificationEntry) error {
 	if err := os.MkdirAll(filepath.Dir(n.path), 0o755); err != nil {
 		return err
 	}
-	bytes, err := yaml.Marshal(entries)
+	// One notice at a time into a file beside it, renamed over it: the log
+	// runs to megabytes (an alert carries its answer, Output), and a reader
+	// must never see half of it. The pieces end to end are the same list.
+	tmp := n.path + ".tmp"
+	f, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
+	w := bufio.NewWriter(f)
+	if len(entries) == 0 {
+		w.WriteString("[]\n")
+	}
+	for i := range entries {
+		piece, err := yaml.Marshal(entries[i : i+1])
+		if err != nil {
+			f.Close()
+			os.Remove(tmp)
+			return err
+		}
+		w.Write(piece)
+	}
+	if err := w.Flush(); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
 	n.stamp = fileStamp{}
-	if err := os.WriteFile(n.path, bytes, 0o644); err != nil {
+	if err := os.Rename(tmp, n.path); err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	n.cached, n.stamp = append([]NotificationEntry(nil), entries...), stampOf(n.path)

@@ -15,6 +15,8 @@ WORKDIR /src
 # local `replace mywant/engine => ../engine`, so engine's go.mod/go.sum must be
 # present before `go mod download` runs in client.
 COPY engine/go.mod engine/go.sum ./engine/
+# yaml.v3, patched (engine/third_party/yaml.v3/PATCHED.md), is a local replace too.
+COPY engine/third_party/ ./engine/third_party/
 COPY client/go.mod client/go.sum ./client/
 RUN cd client && go mod download
 

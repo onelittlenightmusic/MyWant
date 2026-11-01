@@ -24,6 +24,13 @@ Keys starting with "_" are notes and are left out.
 
     slot["goto"] = fill_goto({"room": room, "value": iso})
 
+An answer that is a list of many places keeps the template once instead — the
+want's `goto_template` state (goto_template()), each place only its values
+(`goto_values`) — so its history does not hold the same way a hundred times:
+
+    result["goto_template"] = goto_template()
+    slot["goto_values"] = {"room": room, "value": iso}
+
 The GUI opens an answer's `url` with its `goto` through the MyWant extension
 (POST /web-wants/open): the steps run, the robot says each line, and the
 CursorMan is left on the first element.
@@ -56,16 +63,33 @@ def fill_template(template: Any, values: Dict[str, Any]) -> Any:
 _cache: Dict[str, Any] = {}
 
 
+def _template_path(template: Optional[str], depth: int) -> str:
+    if template is not None:
+        return template
+    caller = inspect.stack()[depth].filename
+    return os.path.join(os.path.dirname(os.path.abspath(caller)), TEMPLATE_FILE)
+
+
+def _load(path: str) -> Any:
+    if path not in _cache:
+        with open(path, encoding="utf-8") as f:
+            _cache[path] = json.load(f)
+    return _cache[path]
+
+
+def goto_template(template: Optional[str] = None) -> Dict[str, Any]:
+    """The plugin's goto.json as it is, its notes left out — to keep once on
+    the want (a state field, `goto_template`) while each answer carries only
+    its own values (`goto_values`): a list of many places then holds the way's
+    shape once, not once per place. The GUI fills it when one is opened
+    (lib/webGuide)."""
+    return fill_template(_load(_template_path(template, 2)), {})
+
+
 def fill_goto(values: Dict[str, Any], template: Optional[str] = None) -> Dict[str, Any]:
     """The plugin's `goto.json`, filled with one answer's values.
 
     `template` is the template's path; by default goto.json beside the script
     that calls this. Read once per process.
     """
-    if template is None:
-        caller = inspect.stack()[1].filename
-        template = os.path.join(os.path.dirname(os.path.abspath(caller)), TEMPLATE_FILE)
-    if template not in _cache:
-        with open(template, encoding="utf-8") as f:
-            _cache[template] = json.load(f)
-    return fill_template(_cache[template], values)
+    return fill_template(_load(_template_path(template, 2)), values)

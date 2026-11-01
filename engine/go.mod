@@ -59,3 +59,8 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 )
+
+// Temporary: yaml.v3 v3.0.1 with the emitter event-queue fix (yaml/go-yaml#432).
+// Move to go.yaml.in/yaml/v4 once it is stable with that fix, and drop this —
+// see engine/third_party/yaml.v3/PATCHED.md.
+replace gopkg.in/yaml.v3 => ./third_party/yaml.v3

@@ -1,6 +1,7 @@
 package mywant
 
 import (
+	"bufio"
 	"crypto/md5"
 	"fmt"
 	"io"
@@ -90,8 +91,6 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		return
 	}
 
-	updatedWants := make([]*Want, 0)
-
 	// Snapshotted rather than ranged over live: cb.wants is a plain map, mutated
 	// under wantsMu by want creation/deletion elsewhere while this runs on its
 	// own ticker with no lock of its own — reading it directly here (both the
@@ -122,6 +121,37 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	cb.reconcileMutex.RLock()
 	configSnapshot := append([]*Want(nil), cb.config...)
 	cb.reconcileMutex.RUnlock()
+
+	// Written one want at a time: each want's deep copy is built, marshalled
+	// and let go before the next, instead of every want's copy held at once
+	// for one yaml.Marshal of the list. Each want is a one-item sequence, so
+	// the pieces end to end are the same text as the whole list marshalled —
+	// state.yaml reads back as before. (The burst that took fly's backend
+	// down on 2026-11-01 was mostly yaml.v3's emitter keeping every event of
+	// the document; that is fixed in the patched copy, engine/third_party/
+	// yaml.v3.) Into a file beside it, renamed over it when the text has
+	// changed: whoever reads state.yaml never sees half of one.
+	tmpPath := cb.memoryPath + ".tmp"
+	f, err := os.Create(tmpPath)
+	if err != nil {
+		return
+	}
+	hash := md5.New()
+	w := bufio.NewWriter(io.MultiWriter(f, hash))
+	written := 0
+	encode := func(want *Want) bool {
+		data, err := yaml.Marshal([]*Want{want})
+		if err != nil {
+			return false
+		}
+		w.Write(data)
+		written++
+		return true
+	}
+	abandon := func() {
+		f.Close()
+		os.Remove(tmpPath)
+	}
 
 	// First, add all wants from config and update with current stats
 	// Deduplicate by ID to prevent state.yaml bloat from accumulated duplicates
@@ -157,7 +187,10 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.History = runtimeWant.want.BuildHistory()  // Include history in stats writes
 			want.ResultHistory = want.History.ResultHistory // ...and persist the answers (result_history.go)
 		}
-		updatedWants = append(updatedWants, want)
+		if !encode(want) {
+			abandon()
+			return
+		}
 	}
 
 	// Then, add any runtime wants that might not be in config (e.g., dynamically created and completed)
@@ -178,18 +211,22 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			}
 			wantConfig.ResultHistory = wantConfig.History.ResultHistory // see above
 			wantConfig.storeStateMulti(stateCopy)
-			updatedWants = append(updatedWants, wantConfig)
+			if !encode(wantConfig) {
+				abandon()
+				return
+			}
 		}
 	}
-
-	// Write updated config to memory file
-	data, err := yaml.Marshal(updatedWants)
-	if err != nil {
+	if written == 0 {
+		w.WriteString("[]\n") // what yaml.Marshal writes for an empty list
+	}
+	if err := w.Flush(); err != nil {
+		abandon()
 		return
 	}
 
 	// Calculate hash of stats data for change detection
-	statsHash := fmt.Sprintf("%x", md5.Sum(data))
+	statsHash := fmt.Sprintf("%x", hash.Sum(nil))
 
 	// Record the epoch on both paths — a change that produced identical bytes
 	// (a value written back to itself) must not make us rebuild next tick too.
@@ -198,14 +235,22 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 
 	// Skip write if stats haven't changed
 	if statsHash == cb.lastStatsHash {
+		abandon()
+		return
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return
+	}
+	if err := os.Rename(tmpPath, cb.memoryPath); err != nil {
+		os.Remove(tmpPath)
 		return
 	}
 
-	os.WriteFile(cb.memoryPath, data, 0644)
-
-	// Update stats hash and config hash to prevent stats updates from triggering reconciliation
+	// Update stats hash and config hash to prevent stats updates from triggering reconciliation.
+	// The file is exactly what was hashed, so its hash is the same.
 	cb.lastStatsHash = statsHash
-	cb.lastConfigHash, _ = cb.calculateFileHash(cb.memoryPath)
+	cb.lastConfigHash = statsHash
 }
 
 // GetAllWantStates returns a map of all current want objects across all executions.
