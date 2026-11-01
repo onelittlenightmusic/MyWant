@@ -13,11 +13,15 @@ import (
 )
 
 // reloadUserCustomTypesAndSync reloads user custom types in the loader and syncs
-// new definitions into the global builder so deployed wants can use them immediately.
+// new definitions into the global builder so deployed wants can use them immediately —
+// new wants and the ones already running alike.
 func (s *Server) reloadUserCustomTypesAndSync() (loaded int, warnings []string) {
 	loaded, warnings = s.wantTypeLoader.ReloadUserCustomTypes()
 	for _, def := range s.wantTypeLoader.GetAll() {
 		s.globalBuilder.StoreWantTypeDefinition(def)
+		// ...and to the wants of the type already running, or a field the new
+		// version adds stays nobody's until a restart.
+		s.globalBuilder.RefreshWantTypeDefinition(def)
 	}
 	return
 }

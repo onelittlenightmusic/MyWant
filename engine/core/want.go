@@ -344,8 +344,9 @@ type Want struct {
 	// every EndProgressCycle. Most want types (all the static scenery on a
 	// canvas) declare none, and they were walking their whole state list every
 	// 20ms to discover that.
-	fetchFromDefs     []StateDef `json:"-" yaml:"-"`
-	fetchFromResolved bool       `json:"-" yaml:"-"`
+	fetchFromDefs     []StateDef          `json:"-" yaml:"-"`
+	fetchFromResolved bool                `json:"-" yaml:"-"`
+	fetchFromFor      *WantTypeDefinition // the definition fetchFromDefs was filtered from (a refresh swaps it — want_type_refresh.go)
 
 	// Agents resolved from Spec.Requires, valid while the registry generation
 	// they were resolved at still holds.
@@ -793,17 +794,20 @@ func (n *Want) EndProgressCycle() {
 // computed once. A nil definition or one with no such fields yields an empty
 // slice, which lets the caller skip the block entirely.
 func (n *Want) fetchFromStateDefs() []StateDef {
-	if n.fetchFromResolved {
+	def := n.WantTypeDefinition
+	if n.fetchFromResolved && n.fetchFromFor == def {
 		return n.fetchFromDefs
 	}
-	if n.WantTypeDefinition != nil {
-		for _, sd := range n.WantTypeDefinition.State {
+	n.fetchFromDefs = nil
+	if def != nil {
+		for _, sd := range def.State {
 			if sd.FetchFrom != "" && sd.OnFetchData != "" {
 				n.fetchFromDefs = append(n.fetchFromDefs, sd)
 			}
 		}
 	}
 	n.fetchFromResolved = true
+	n.fetchFromFor = def
 	return n.fetchFromDefs
 }
 
