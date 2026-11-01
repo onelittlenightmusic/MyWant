@@ -351,8 +351,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 # Forking a warm interpreter costs 1.5–3ms where starting python3 costs 33ms
 # (fly, 2026-10-18). What a child imports dies with it; what the zygote imported
 # first (_WARM) the children share.
+#
+# A call that asks for residency (`resident`, a want's skill_serve) is not a
+# child that dies with its answer: the child is shut in once and then kept,
+# taking that script's next calls one at a time — what it imported, and the
+# shutting in, paid once. Shut in exactly as a one-off child is; one per
+# script, profile and environment (and the plugin's directory as it is: a
+# custom installed again is a new one); let go when idle (_RESIDENT_IDLE) or
+# old (_RESIDENT_LIFE), never more than _RESIDENT_MAX. On fly a spotify want
+# polling every second through one-off children was most of the Machine's CPU
+# (2026-11-02), as starting python3 every 300ms had been before the runner.
 
 _runner = None
+
+_RESIDENT_IDLE = 300      # seconds unused before a resident is let go
+_RESIDENT_LIFE = 1800     # seconds a resident serves at most, leaks and all
+_RESIDENT_MAX = 6         # residents at once; the least recently used goes
+_RESIDENT_CPU = 3600      # its CPU limit: a resident adds up its calls'
 
 _WARM = ("json", "re", "datetime", "pathlib", "urllib.request", "urllib.parse",
          "http.client", "ssl", "hashlib", "base64", "subprocess", "colorsys",
@@ -422,6 +437,16 @@ def _sees(profile, script, mywant, expose):
     return paths
 
 
+class _Resident:
+    """A kept child of the zygote, and the socket its calls go over."""
+
+    def __init__(self, pid, sock):
+        self.pid = pid
+        self.sock = sock
+        self.busy = False
+        self.born = self.used = time.monotonic()
+
+
 class _Runner:
     def __init__(self, jail, expose, api_url):
         self.jail = jail
@@ -431,6 +456,8 @@ class _Runner:
         self.mywant = os.path.join(self.home, ".mywant")
         self._lock = threading.Lock()
         self._sock = None
+        self._residents = {}  # key → _Resident
+        self._res_lock = threading.Lock()
 
     # ── the zygote ──
 
@@ -469,7 +496,11 @@ class _Runner:
                 sock.close()
                 signal.signal(signal.SIGCHLD, signal.SIG_DFL)  # its own subprocesses
                 _die_with_parent()
-                self._child(json.loads(msg), fds[0])
+                call = json.loads(msg)
+                if call.get("resident"):
+                    self._resident_child(call, fds[0])
+                else:
+                    self._child(call, fds[0])
                 os._exit(0)
             os.close(fds[0])
             sock.sendall(pid.to_bytes(8, "big"))
@@ -483,6 +514,9 @@ class _Runner:
         import select
         import signal
         import socket
+        if params.get("resident") and "command" not in params and self._execute_resident(params, send, conn):
+            return
+        params = {k: v for k, v in params.items() if k != "resident"}
         rfd, wfd = os.pipe()
         try:
             msg = json.dumps(params).encode()
@@ -523,6 +557,160 @@ class _Runner:
         if not answered:
             send({"status": "failed", "error": "skill ended without answering (killed by a limit?)"})
 
+    # ── residents: the server's side ──
+
+    def _resident_key(self, params):
+        script = os.path.abspath(params["script"])
+        try:
+            st = os.stat(os.path.realpath(os.path.dirname(script)))
+            where = (st.st_dev, st.st_ino)
+        except OSError:
+            where = None
+        return json.dumps([script, params.get("profile") or "main", params.get("env") or {}, where],
+                          sort_keys=True)
+
+    def _resident_for(self, key, params):
+        """The resident for key, started if there is none — and whether it was:
+        a new one runs the call it was started with. None when it is busy."""
+        import socket
+        now = time.monotonic()
+        with self._res_lock:
+            for k, r in list(self._residents.items()):
+                if not r.busy and (now - r.used > _RESIDENT_IDLE or now - r.born > _RESIDENT_LIFE):
+                    self._drop(k)
+            r = self._residents.get(key)
+            if r is not None:
+                if r.busy:
+                    return None, False
+                r.busy = True
+                return r, False
+            while len(self._residents) >= _RESIDENT_MAX:
+                idle = [k for k, x in self._residents.items() if not x.busy]
+                if not idle:
+                    return None, False
+                self._drop(min(idle, key=lambda k: self._residents[k].used))
+            ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+            msg = json.dumps(params).encode()
+            try:
+                with self._lock:
+                    socket.send_fds(self._sock, [len(msg).to_bytes(8, "big")], [theirs.fileno()])
+                    self._sock.sendall(msg)
+                    pid = int.from_bytes(_recv_exact(self._sock, 8), "big")
+            finally:
+                theirs.close()
+            r = _Resident(pid, ours)
+            r.busy = True
+            self._residents[key] = r
+            return r, True
+
+    def _drop(self, key):
+        import signal
+        r = self._residents.pop(key, None)
+        if r is not None:
+            _kill(r.pid, signal.SIGKILL)
+            try:
+                r.sock.close()
+            except OSError:
+                pass
+
+    def _execute_resident(self, params, send, conn):
+        """The call on the script's resident. False when it could not be given
+        one and nothing was sent — the caller runs it as a one-off instead."""
+        import select
+        key = self._resident_key(params)
+        r, started = self._resident_for(key, params)
+        if r is None:
+            return False
+        sent_any = False
+        try:
+            if not started:
+                msg = json.dumps(params).encode()
+                try:
+                    r.sock.sendall(len(msg).to_bytes(8, "big") + msg)
+                except OSError:
+                    with self._res_lock:
+                        self._drop(key)
+                    return False
+            deadline = time.monotonic() + float(params.get("timeout") or 120) + 2
+            buf = b""
+            while True:
+                left = deadline - time.monotonic()
+                ready = select.select([r.sock, conn], [], [], max(left, 0))[0] if left > 0 else []
+                if not ready:
+                    with self._res_lock:
+                        self._drop(key)
+                    send({"status": "failed", "error": "skill timed out in the runner"})
+                    return True
+                if conn in ready and _hung_up(conn):
+                    with self._res_lock:
+                        self._drop(key)  # what it would still do, nobody is waiting for
+                    return True
+                if r.sock not in ready:
+                    continue
+                chunk = r.sock.recv(65536)
+                if not chunk:
+                    # Gone (a limit, a crash): never run here what it may have half done.
+                    with self._res_lock:
+                        self._drop(key)
+                    if not sent_any:
+                        return False
+                    send({"status": "failed", "error": "skill ended without answering (killed by a limit?)"})
+                    return True
+                buf += chunk
+                while b"\n" in buf:
+                    line, buf = buf.split(b"\n", 1)
+                    if not line.strip():
+                        continue
+                    obj = json.loads(line)
+                    if obj.get("_end"):
+                        return True
+                    sent_any = True
+                    if not send(obj):
+                        with self._res_lock:
+                            self._drop(key)
+                        return True
+        finally:
+            r.busy = False
+            r.used = time.monotonic()
+
+    # ── residents: the child ──
+
+    def _resident_child(self, params, fd):
+        import socket
+        sock = socket.socket(fileno=fd)
+        # Flushed by hand: a socket's text file is not line-buffered, whatever
+        # buffering says.
+        w = sock.makefile("w", encoding="utf-8")
+        sys.stdout = _ThreadStream("stdout")
+        sys.stderr = _ThreadStream("stderr")
+        sys.stdin = io.StringIO("")
+        sys.argv = _ThreadArgv()
+
+        def send(obj):
+            try:
+                w.write(json.dumps(obj, ensure_ascii=False) + "\n")
+                w.flush()
+            except OSError:
+                os._exit(1)  # the server let it go
+
+        try:
+            env = self._shut_in(params, cpu=_RESIDENT_CPU)
+            os.environ.clear()
+            os.environ.update(env)
+        except BaseException as e:  # never run what could not be shut in
+            send({"status": "failed", "error": f"sandbox: {e}"})
+            send({"_end": True})
+            return
+        call = params
+        while True:
+            _answer(run(call["script"], call.get("args") or [], send, call.get("context")), send)
+            send({"_end": True})
+            try:
+                head = _recv_exact(sock, 8)
+                call = json.loads(_recv_exact(sock, int.from_bytes(head, "big")))
+            except (OSError, ValueError):
+                return
+
     # ── the child ──
 
     def _child(self, params, wfd):
@@ -554,7 +742,7 @@ class _Runner:
             _answer(run(params["script"], params.get("args") or [], send, params.get("context")), send)
         out.close()
 
-    def _shut_in(self, params):
+    def _shut_in(self, params, cpu=None):
         import resource
         profile = params.get("profile") or "main"
         if profile not in ("main", "voice"):
@@ -581,7 +769,8 @@ class _Runner:
                 sees.append((data, True))
             self._mount(profile, sees)
 
-        resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
+        limit = cpu or timeout
+        resource.setrlimit(resource.RLIMIT_CPU, (limit, limit))
         resource.setrlimit(resource.RLIMIT_FSIZE, (64 << 20, 64 << 20))
         if self.jail:
             os.setgroups([])

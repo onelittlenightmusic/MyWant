@@ -254,6 +254,7 @@ func (n *Want) startPersistentAgent(agent Agent) error {
 		if ms := GetGoal[int](n, "skill_poll_interval_ms", 0); ms > 0 {
 			pollInterval = time.Duration(ms) * time.Millisecond
 		}
+		pollInterval = atLeastMinPoll(pollInterval)
 		pa := NewPollingAgent(bgID, pollInterval, agentName, string(agentType), a.Monitor)
 		pa.execID = execID
 		bgAgent = pa

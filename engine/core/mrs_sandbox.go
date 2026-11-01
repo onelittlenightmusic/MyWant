@@ -119,6 +119,12 @@ func runMRSRunner(ctx context.Context, base, scriptPath string, opt MRSRunOption
 	if profile == MRSProfileMain {
 		params["env"] = mrsRunnerEnv()
 	}
+	if opt.Serve {
+		// The runner keeps the script's child, shut in once, for its next
+		// calls (mrs_agent_service.py's residents) — a fresh child every tick
+		// of a one-second monitor was most of a small Machine's CPU.
+		params["resident"] = true
+	}
 	if opt.Context != nil {
 		// The want this call runs for, for the script's SDK — without this
 		// server's own address, which is this machine's and not the runner's:

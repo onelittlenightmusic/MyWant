@@ -222,6 +222,58 @@ print(json.dumps({
 	}
 }
 
+// A call asking for residency (skill_serve) goes to the script's kept child:
+// one process for its calls, each still run whole with its own args, its
+// environment the scrubbed one; past its deadline it is killed, and the next
+// call gets a new one.
+func TestMRSRunner_ResidentKeepsOneChild(t *testing.T) {
+	mrsNeedPython(t)
+	home := mrsSandboxHome(t)
+	t.Setenv("ENGINE_ONLY_SECRET", "s3cret")
+	mrsStartRunner(t, RunnerOptions{Host: "127.0.0.1", NoJail: true, APIURL: "http://api.inside:8080"})
+
+	script := mrsTestScript(t, filepath.Join(home, ".mywant", "custom-types", "demo"), `import json, os, sys, time
+if sys.argv[1] == "slow":
+    time.sleep(30)
+print(json.dumps({"_progress": 10, "_message": "go"}), flush=True)
+print(json.dumps({"pid": os.getpid(), "arg": sys.argv[1], "secret": os.environ.get("ENGINE_ONLY_SECRET"), "key": os.environ.get("PLUGIN_KEY")}))
+`)
+	serve := func(arg string) (map[string]any, error) {
+		return mrsRun(t, script, MRSRunOptions{Args: []string{arg}, Serve: true})
+	}
+	var progress int
+	a, err := mrsRun(t, script, MRSRunOptions{Args: []string{"a"}, Serve: true, OnProgress: func(p int, _ string) { progress = p }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := serve("b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a["pid"] != b["pid"] {
+		t.Errorf("two resident calls ran in %v and %v", a["pid"], b["pid"])
+	}
+	if a["arg"] != "a" || b["arg"] != "b" || progress != 10 {
+		t.Errorf("a=%v b=%v progress=%d", a, b, progress)
+	}
+	if b["secret"] != nil || b["key"] != "from-config" {
+		t.Errorf("environment: %v", b)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := RunMRSScript(ctx, script, MRSRunOptions{Args: []string{"slow"}, Serve: true}); err == nil {
+		t.Error("a resident call past its deadline answered")
+	}
+	c, err := serve("c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c["pid"] == a["pid"] || c["arg"] != "c" {
+		t.Errorf("after a timeout: %v (was %v)", c, a["pid"])
+	}
+}
+
 // The jail itself: Linux, as root (the runner's container). Run with
 // `sudo -E go test ./core -run Jail` on a Linux machine.
 func TestMRSRunner_Jail(t *testing.T) {
