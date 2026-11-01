@@ -12,6 +12,7 @@ Two halves:
 
 from .client import Client, MyWantError
 from .plugin import Want, current
+from .guide import fill_goto, fill_template
 
-__all__ = ["Client", "MyWantError", "Want", "current"]
+__all__ = ["Client", "MyWantError", "Want", "current", "fill_goto", "fill_template"]
 __version__ = "0.1.0"
