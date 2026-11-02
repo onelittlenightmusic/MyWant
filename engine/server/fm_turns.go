@@ -134,6 +134,61 @@ func (s *Server) fmUpdateTurn(id string, change func(*fmTurn) error) (fmTurn, er
 	return fmTurn{}, fmt.Errorf("no turn %q", id)
 }
 
+// fmRepeatTools are the tools whose same call twice in a turn can only give
+// the same answer: a type's description, a want made (the second finds the
+// first), the robot walked to where it stands. A look or the board can
+// change between two calls (a want's answer coming in), so they run again.
+var fmRepeatTools = map[string]bool{"describe_type": true, "deploy_want": true, "point": true}
+
+// fmRepeatedStep is the earlier step of this turn that made the same call
+// (tool and arguments alike, the type's name in any case), or nil.
+func (s *Server) fmRepeatedStep(id, tool string, args map[string]string) *fmStep {
+	if !fmRepeatTools[tool] {
+		return nil
+	}
+	fmTurnsMu.Lock()
+	defer fmTurnsMu.Unlock()
+	robot, err := s.fmRobot()
+	if err != nil {
+		return nil
+	}
+	for _, t := range fmLoadTurns(robot) {
+		if t.ID != id {
+			continue
+		}
+		for i := range t.Steps {
+			st := t.Steps[i]
+			if st.Tool == tool && st.Done && fmSameArgs(st.Arguments, args) && !strings.HasPrefix(st.Output, "Error:") {
+				return &st
+			}
+		}
+	}
+	return nil
+}
+
+func fmSameArgs(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		w, ok := b[k]
+		if !ok || !strings.EqualFold(strings.TrimSpace(v), strings.TrimSpace(w)) {
+			return false
+		}
+	}
+	return true
+}
+
+// fmRepeatOutput is what the model hears for a call it already made.
+func fmRepeatOutput(prev fmStep) string {
+	first := prev.Output
+	if i := strings.IndexAny(first, "\n"); i > 0 {
+		first = first[:i]
+	}
+	return "Already done in this turn; calling it again changes nothing. What it gave: " + first +
+		" — Call no more tools. Answer the person now, in one short sentence, from what this turn already found."
+}
+
 // fmTurnQuestion is what a turn was asked, or "".
 func (s *Server) fmTurnQuestion(id string) string {
 	fmTurnsMu.Lock()

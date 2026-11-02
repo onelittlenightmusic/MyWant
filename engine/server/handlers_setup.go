@@ -496,6 +496,9 @@ func (s *Server) setupRoutes() {
 	// The robot for an on-device model on another device — see fm.go.
 	api.HandleFunc("/fm/manifest", s.handleFMManifest).Methods("GET")
 	api.HandleFunc("/fm/call", s.handleFMCall).Methods("POST")
+	api.HandleFunc("/fm/brief", s.handleFMBrief).Methods("POST")
+	api.HandleFunc("/fm/type-brief", s.handleFMTypeBrief).Methods("POST")
+	api.HandleFunc("/fm/act", s.handleFMAct).Methods("POST")
 	api.HandleFunc("/fm/turns", s.handleFMTurnPost).Methods("POST")
 	api.HandleFunc("/fm/turns", s.handleFMTurnList).Methods("GET")
 	api.HandleFunc("/fm/turns/{id}", s.handleFMTurnGet).Methods("GET")

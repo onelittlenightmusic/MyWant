@@ -208,6 +208,19 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	if req.Arguments == nil {
 		req.Arguments = map[string]string{}
 	}
+	if req.Turn != "" {
+		if prev := s.fmRepeatedStep(req.Turn, req.Tool, req.Arguments); prev != nil {
+			// The same call again in one turn: not run again, and the model
+			// told so — what it got the first time, and to answer now. A small
+			// model went round describe_type / deploy_want five times after
+			// the want was made, ~40s a round on a phone (fly, 2026-11-02:
+			// 新宿→国分寺 took four minutes for a six-second search).
+			step := fmStep{Tool: req.Tool, Arguments: req.Arguments, Output: fmRepeatOutput(*prev), Card: prev.Card, Done: true, At: time.Now().Format(time.RFC3339)}
+			_, _ = s.fmUpdateTurn(req.Turn, func(t *fmTurn) error { t.Steps = append(t.Steps, step); return nil })
+			fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card})
+			return
+		}
+	}
 	if req.Turn != "" && fmHearsQuestion(req.Tool) {
 		// What the person asked, for look to see which of a want's answers
 		// it is about (fmLookReferent) and for deploy_want to set each
@@ -741,7 +754,10 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 		return "", err
 	}
 	existing, archived := fmFindWant(wants, typ, params)
-	if existing != "" && archived && s.fmTypeLabel(typ, fmAskAgainLabel) == "run" {
+	// A question asked again — in the archive or still on the board — is
+	// asked again: run now, not answered from when it was last asked (a
+	// route an hour old gives an hour-old train).
+	if existing != "" && s.fmTypeLabel(typ, fmAskAgainLabel) == "run" {
 		// A question put away and asked again — 「中野坂上から国分寺への乗り換
 		// え」 a second time — is asked again: the one in the archive is brought
 		// back and run with what was asked now, not offered back to be agreed to.
@@ -1411,6 +1427,9 @@ func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args
 		}
 	}
 	out := fmt.Sprintf("Brought %q (%s, %s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, fmParamsText(params), filled)
+	if !w.archived() {
+		out = fmt.Sprintf("Ran %q (%s, %s)%s, already on the board, again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, fmParamsText(params), filled)
+	}
 	pointed := map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID}
 	if walked, err := s.fmPoint(pointed); err == nil {
 		if c, ok := pointed[fmCardArg]; ok {
@@ -1532,6 +1551,10 @@ func fmTakeUnread(args map[string]string) []fmUnreadPhoto {
 // fmQuestionArg carries what the person asked to look and deploy_want,
 // within a turn (handleFMCall); each takes it out before anything is kept.
 const fmQuestionArg = "_question"
+
+// fmShortArg asks look for its short form (the values and what they mean),
+// never the whole type and want.
+const fmShortArg = "_short"
 
 // fmHearsQuestion: the tool is handed what the person asked (fmQuestionArg).
 func fmHearsQuestion(tool string) bool {
@@ -1901,8 +1924,13 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// what each of its values means, how it is made) and the whole want — cut
 	// to what the smallest model can take (fmLookFull). A want that cannot be
 	// cut to fit falls back to the short form below.
-	if full := s.fmLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
-		return note + full, nil
+	// The plan's look (fm_plan.go) asks for the short form only: what it
+	// reads goes into a prompt with the rest of the turn, cut at its length,
+	// and the type's definition first left the values themselves past the cut.
+	if args[fmShortArg] != "true" {
+		if full := s.fmLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
+			return note + full, nil
+		}
 	}
 	// What the type says it is and what each of its values means — the want
 	// carries only the values, and a value's key ("next_store") is all a model
