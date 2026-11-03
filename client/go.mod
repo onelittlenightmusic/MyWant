@@ -3,7 +3,7 @@ module mywant/client
 go 1.26.2
 
 require (
-	github.com/onelittlenightmusic/want-spec v0.1.27
+	github.com/onelittlenightmusic/want-spec v0.1.28-0.20261103120524-b439e7dd3d2a
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
@@ -77,4 +77,3 @@ replace mywant/engine => ../engine
 // Move to go.yaml.in/yaml/v4 once it is stable with that fix, and drop this —
 // see engine/third_party/yaml.v3/PATCHED.md.
 replace gopkg.in/yaml.v3 => ../engine/third_party/yaml.v3
-replace github.com/onelittlenightmusic/want-spec => ../engine/third_party/want-spec

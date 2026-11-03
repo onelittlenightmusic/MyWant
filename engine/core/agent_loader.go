@@ -27,6 +27,8 @@ type MRSAgentMetadata struct {
 	Name       string `yaml:"name"`       // agent name (defaults to capability if empty)
 	Capability string `yaml:"capability"` // registered capability name (referenced in wantType.requires)
 	Type       string `yaml:"type"`       // "monitor" | "do"
+	// Labels are its labels: key/value pairs to find and group it by.
+	Labels map[string]string `yaml:"labels"`
 }
 
 // MRSScriptDef describes the Python script executed by the agent.
@@ -85,6 +87,8 @@ type AgentYAML struct {
 		Uses         []string `yaml:"uses"`
 		Type         string   `yaml:"type"`
 		Runtime      string   `yaml:"runtime"`
+		// Labels are its labels: key/value pairs to find and group it by.
+		Labels map[string]string `yaml:"labels"`
 	} `yaml:"agents"`
 }
 
@@ -230,6 +234,7 @@ func (r *AgentRegistry) loadAgentFile(filename string) error {
 			Name:         agentDef.Name,
 			Capabilities: agentDef.Capabilities,
 			Runtime:      AgentRuntime(agentDef.Runtime),
+			Labels:       agentDef.Labels,
 		}
 
 		if baseAgent.Runtime == "" {
@@ -389,7 +394,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
 		r.RegisterCapability(Cap(capName))
 		r.RegisterAgent(&DoAgent{
-			BaseAgent: *NewBaseAgent(agentName, []string{capName}, DoAgentType),
+			BaseAgent: mrsBaseAgent(agentName, capName, DoAgentType, def.Metadata.Labels),
 			Action: func(ctx context.Context, want *Want) error {
 				if MRSCheckRequiredParams(want, requiredParams...) {
 					return nil // not ready; the want stays as it is
@@ -421,7 +426,7 @@ func (r *AgentRegistry) RegisterMRSAgentFromYAML(yamlData []byte, yamlPath strin
 		finalPath, finalTimeout, finalName := scriptPath, timeoutSec, agentName
 		r.RegisterCapability(Cap(capName))
 		r.RegisterAgent(&MonitorAgent{
-			BaseAgent: *NewBaseAgent(agentName, []string{capName}, MonitorAgentType),
+			BaseAgent: mrsBaseAgent(agentName, capName, MonitorAgentType, def.Metadata.Labels),
 			Monitor: func(ctx context.Context, want *Want) (bool, error) {
 				// The same three questions the generic agent asks, in the same
 				// order: is this want ready, what do the placeholders resolve
@@ -597,6 +602,7 @@ func (r *AgentRegistry) LoadAgentsFromFS(fsys fs.FS, fsRoot string) error {
 				Name:         agentDef.Name,
 				Capabilities: agentDef.Capabilities,
 				Runtime:      AgentRuntime(agentDef.Runtime),
+				Labels:       agentDef.Labels,
 			}
 			if baseAgent.Runtime == "" {
 				baseAgent.Runtime = LocalGoRuntime
@@ -628,4 +634,11 @@ func (r *AgentRegistry) LoadAgentsFromFS(fsys fs.FS, fsRoot string) error {
 		}
 		return nil
 	})
+}
+
+// mrsBaseAgent is an MRS plugin agent's BaseAgent, with its metadata's labels.
+func mrsBaseAgent(name, capName string, t AgentType, labels map[string]string) BaseAgent {
+	b := *NewBaseAgent(name, []string{capName}, t)
+	b.Labels = labels
+	return b
 }

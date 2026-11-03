@@ -748,7 +748,7 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 	agents := s.agentRegistry.GetAllAgents()
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
-		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
+		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities(), "labels": a.GetLabels()}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }
@@ -756,7 +756,7 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	if agent, ok := s.agentRegistry.GetAgent(vars["name"]); ok {
-		s.JSONResponse(w, http.StatusOK, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities()})
+		s.JSONResponse(w, http.StatusOK, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities(), "labels": agent.GetLabels()})
 		return
 	}
 	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
@@ -809,7 +809,7 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	}
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
-		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
+		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities(), "labels": a.GetLabels()}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }

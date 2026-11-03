@@ -29,7 +29,8 @@ package server
 //	  message: …                 # when failed: why
 //
 //	POST   /api/v1/acts                a plan to carry out → the Act, Pending
-//	GET    /api/v1/acts                the acts, newest first (?limit=)
+//	GET    /api/v1/acts                the acts, newest first (?limit=,
+//	                                   ?labelSelector=k=v,…)
 //	GET    /api/v1/acts/{name}         one, as far as it has got;
 //	                                   ?wait=<seconds> holds the answer until
 //	                                   it is done (or the seconds are up)
@@ -104,7 +105,7 @@ func (s *Server) handleActCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	doc.APIVersion, doc.Kind = ws.ResourceAPIVersion, ws.ActKind
-	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("act-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
+	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("act-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339), Labels: doc.Metadata.Labels}
 	doc.Status = ws.ActStatus{Phase: ws.ActPending, Steps: []ws.RobotStep{}, Cards: []*ws.RobotCard{}}
 	a := &actEntry{doc: doc, done: make(chan struct{})}
 	lockRobotRes()
@@ -162,10 +163,16 @@ func (s *Server) runAct(a *actEntry, plan ws.PlanSpec) {
 // GET /api/v1/acts
 func (s *Server) handleActList(w http.ResponseWriter, r *http.Request) {
 	limit := listLimit(r, actsKept)
+	sel, ok := listSelector(w, r)
+	if !ok {
+		return
+	}
 	lockRobotRes()
 	out := ws.ActList{Acts: make([]ws.Act, 0, limit)}
 	for i := len(robotRes.acts) - 1; i >= 0 && len(out.Acts) < limit; i-- {
-		out.Acts = append(out.Acts, robotRes.acts[i].snapshotLocked())
+		if sel.Matches(robotRes.acts[i].doc.Metadata.Labels) {
+			out.Acts = append(out.Acts, robotRes.acts[i].snapshotLocked())
+		}
 	}
 	robotRes.mu.Unlock()
 	writeDoc(w, r, http.StatusOK, &out)

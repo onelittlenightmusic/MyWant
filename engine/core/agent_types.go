@@ -52,6 +52,8 @@ type Capability struct {
 	Description       string             `yaml:"description,omitempty"`
 	StateAccess       []StateAccessField `yaml:"stateAccess,omitempty"`
 	ParentStateAccess []StateAccessField `yaml:"parentStateAccess,omitempty"`
+	// Labels are its labels: key/value pairs to find and group it by.
+	Labels map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 // Agent defines the interface for all agent implementations.
@@ -61,6 +63,7 @@ type Agent interface {
 	GetName() string
 	GetType() AgentType
 	GetRuntime() AgentRuntime
+	GetLabels() map[string]string
 }
 
 // BaseAgent provides common functionality for all agent types.
@@ -69,6 +72,8 @@ type BaseAgent struct {
 	Capabilities []string     `yaml:"capabilities"`
 	Type         AgentType    `yaml:"type"`
 	Runtime      AgentRuntime `yaml:"runtime"`
+	// Labels are its labels: key/value pairs to find and group it by.
+	Labels map[string]string `yaml:"labels,omitempty"`
 
 	// Execution configuration (local, webhook, rpc)
 	ExecutionConfig ExecutionConfig `yaml:"execution" json:"execution"`
@@ -95,6 +100,10 @@ func (a *BaseAgent) GetName() string {
 
 func (a *BaseAgent) GetType() AgentType {
 	return a.Type
+}
+
+func (a *BaseAgent) GetLabels() map[string]string {
+	return a.Labels
 }
 
 func (a *BaseAgent) GetRuntime() AgentRuntime {

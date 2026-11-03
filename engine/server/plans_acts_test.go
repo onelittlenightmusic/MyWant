@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -166,5 +167,48 @@ func TestRobotResourcesPruned(t *testing.T) {
 	}
 	if len(robotRes.plans) != 2 || len(robotRes.acts) != 1 {
 		t.Errorf("kept: %d plans, %d acts", len(robotRes.plans), len(robotRes.acts))
+	}
+}
+
+// Labels posted are kept (the server gives only the name and the time), read
+// back after a restart, and a list is narrowed by ?labelSelector.
+func TestPlansLabelled(t *testing.T) {
+	home := t.TempDir()
+	useRobotResHome(home)
+	s := &Server{}
+	r := mux.NewRouter()
+	r.HandleFunc("/plans", s.handlePlanCreate).Methods("POST")
+	r.HandleFunc("/plans", s.handlePlanList).Methods("GET")
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+		return rec
+	}
+	rec := do("POST", "/plans", "metadata:\n  name: mine\n  labels: {device: iphone, source: fmtool}\nspec: {question: a, action: none}\n")
+	var p ws.Plan
+	_ = json.Unmarshal(rec.Body.Bytes(), &p)
+	if p.Metadata.Name == "mine" || p.Metadata.Labels["device"] != "iphone" || p.Metadata.Labels["source"] != "fmtool" {
+		t.Errorf("named by the server, labels kept: %+v", p.Metadata)
+	}
+	do("POST", "/plans", `{"metadata":{"labels":{"device":"mac"}},"spec":{"question":"b","action":"none"}}`)
+	do("POST", "/plans", `{"spec":{"question":"c","action":"none"}}`)
+
+	useRobotResHome(home) // the server started again
+	count := func(sel string) int {
+		rec := do("GET", "/plans?labelSelector="+url.QueryEscape(sel), "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%q: %d %s", sel, rec.Code, rec.Body)
+		}
+		var list ws.PlanList
+		_ = json.Unmarshal(rec.Body.Bytes(), &list)
+		return len(list.Plans)
+	}
+	for sel, want := range map[string]int{"": 3, "device": 2, "device=iphone": 1, "device!=iphone": 2, "device=iphone,source=fmtool": 1, "source=x": 0} {
+		if got := count(sel); got != want {
+			t.Errorf("%q: %d plans, want %d", sel, got, want)
+		}
+	}
+	if rec := do("GET", "/plans?labelSelector="+url.QueryEscape("=x"), ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("a bad selector: %d", rec.Code)
 	}
 }

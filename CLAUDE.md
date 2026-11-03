@@ -73,8 +73,9 @@ make release                                        # Build CLI only
 ./bin/mywant state global get|set|delete|clear         # moved here from `thing`
 
 # Robot plans / acts (want-spec Plan / Act; kept in ~/.mywant/plans, acts)
-./bin/mywant plans list|get|create -f|delete
-./bin/mywant acts  list|get|create -f|delete|wait <name>|run -f plan.yaml
+./bin/mywant plans list [-l k=v]|get|create -f [--label k=v]|delete
+./bin/mywant acts  list [-l k=v]|get|create -f|delete|wait <name>|run -f plan.yaml
+# Labels: every object type has them (want-spec) — plans/acts, recipes, agents, capabilities, constellations too
 
 # System
 ./bin/mywant types/agents/capabilities list
