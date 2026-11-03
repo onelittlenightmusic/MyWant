@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: MyWant Plan Schema
+  description: |
+    OpenAPI specification for a MyWant Plan — what is to be done about a
+    question, declared and nothing done yet. A small on-device model works it
+    out with the server's help and posts it; an Act (act-spec.yaml) that
+    names it carries it out. Kept by the backend:
+
+      POST   /api/v1/plans          Plan (YAML or JSON) → Plan, named by the server
+      GET    /api/v1/plans          PlanList, newest first (?limit=)
+      GET    /api/v1/plans/{name}   Plan
+      DELETE /api/v1/plans/{name}
+      POST   /api/v1/plans/brief    help to decide (changes nothing)
+      POST   /api/v1/plans/params   help to fill a type's parameters (changes nothing)
+
+    Answered as JSON, or YAML with ?format=yaml. In target, capability and
+    type, "-" is the decision's own word for nothing chosen, kept as empty.
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+paths: {}
+
+components:
+  schemas:
+    Plan:
+      type: object
+      required:
+        - spec
+      properties:
+        apiVersion:
+          type: string
+          example: "mywant.io/v1"
+        kind:
+          type: string
+          enum: ["Plan"]
+        metadata:
+          $ref: '#/components/schemas/ResourceMeta'
+        spec:
+          $ref: '#/components/schemas/PlanSpec'
+      additionalProperties: false
+
+    ResourceMeta:
+      type: object
+      description: Given by the server; ignored when posted.
+      properties:
+        name:
+          type: string
+          description: What it is kept by — plan-<unix nanoseconds>, act-<…>.
+          example: "plan-1762168737000000000"
+        createdAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+
+    PlanSpec:
+      type: object
+      required:
+        - action
+      properties:
+        question:
+          type: string
+          example: "最新のゴルフのスコアは？"
+        action:
+          type: string
+          enum: ["existing", "new", "none"]
+          description: |
+            existing — a want already on the board answers (pointed at, or a
+            capability of it used); new — a want of type is made with params;
+            none — nothing on the board, the answer is words alone.
+        target:
+          type: string
+          description: For existing — the want the plan is about.
+          example: "smartgolf-check-reserved-instance"
+        capability:
+          type: string
+          description: |
+            For existing — what is asked of target: one of its type's
+            capabilities, or the standard restart. Empty: only pointed at.
+          example: "rounds"
+        type:
+          type: string
+          description: For new — the want type to make.
+        params:
+          type: object
+          description: For new — its parameters.
+          additionalProperties:
+            type: string
+      additionalProperties: false
+
+    PlanList:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/Plan'

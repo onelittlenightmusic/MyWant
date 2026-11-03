@@ -64,3 +64,4 @@ require (
 // Move to go.yaml.in/yaml/v4 once it is stable with that fix, and drop this —
 // see engine/third_party/yaml.v3/PATCHED.md.
 replace gopkg.in/yaml.v3 => ./third_party/yaml.v3
+replace github.com/onelittlenightmusic/want-spec => ./third_party/want-spec

@@ -1,6 +1,8 @@
 package server
 
 import (
+	ws "github.com/onelittlenightmusic/want-spec"
+
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -35,8 +37,8 @@ import (
 // the tool schemas and the whole talk; the board dumped raw would fill it.
 
 type robotTool struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
+	Name        string       `json:"name"`
+	Description string       `json:"description"`
 	Arguments   []robotParam `json:"arguments"`
 	// Writes: the call changes the board. A device that shows the board
 	// (the iPhone app's web view) says "reflecting…" until it reads it back.
@@ -105,7 +107,7 @@ var robotTools = []robotTool{
 			{Name: "want", Description: "For one every want has (restart): the want's name, e.g. smartgolf. Empty for want#capability.", Required: false},
 		},
 		Writes: true,
-		run: (*Server).useCapability,
+		run:    (*Server).useCapability,
 	},
 	{
 		Name:        "describe_type",
@@ -1508,7 +1510,7 @@ func (s *Server) robotRestoreWant(args map[string]string) (string, error) {
 }
 
 const (
-	robotWantName   = "robot"
+	robotWantName    = "robot"
 	robotCanvasOn    = "mywant.io/canvas"
 	robotCanvasX     = "mywant.io/canvas-x"
 	robotCanvasY     = "mywant.io/canvas-y"
@@ -1575,21 +1577,14 @@ func robotHearsQuestion(tool string) bool {
 	return tool == "look" || tool == "deploy_want" || tool == "use_capability"
 }
 
-// robotCard is a want a step brought the robot to.
-type robotCard struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	// What the card says, filled when the answer is settled (robotAnswerCards):
-	// the same for every client that shows it — the GUI's chat, guiex, the
-	// phone's chat, answer window and Live Activity — which each draw it their
-	// own way.
-	Type    string `json:"type,omitempty"`
-	Status  string `json:"status,omitempty"`
-	Summary string `json:"summary,omitempty"`
-}
+// robotCard is a want a step brought the robot to — want-spec's RobotCard.
+// What the card says (Type, Status, Summary) is filled when the answer is
+// settled (robotAnswerCards): the same for every client that shows it.
+type robotCard = ws.RobotCard
 
-func (t robotTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
+func (t robotTile) String() string {
+	return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y)
+}
 
 // named is the tile without its cell, as board lists it: a model handed the
 // cells reads them out ("荻窪 is at (6, 0)") rather than showing the place, so

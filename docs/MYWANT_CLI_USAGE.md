@@ -410,6 +410,33 @@ Thing と want をひとまとまりとして名付けたもの（星座）。�
 > **Note:** 以前の `mywant memo get` / `memo clear`（現 `thing`）は**グローバル状態**を操作していました。
 > グローバル状態は `mywant state global` に移動し、`memo` は memo API を扱うようになりました。
 
+### Plans / Acts（`mywant plans` / `mywant acts`）
+
+robot の Plan（質問に対して何をするかの宣言）と Act（Plan を実行したもの。Kubernetes の Job のように `Pending → Running → Succeeded | Failed` と進む）。型は want-spec の `Plan` / `Act`。サーバーは `~/.mywant/plans/`・`~/.mywant/acts/` に1件1ファイルで保存し、再起動しても残る（それぞれ最新500件・30日まで。未完了の Act と、残っている Act が指す Plan は消さない。再起動で止まった Act は `Failed` になる）。`-f` は YAML / JSON のどちらでもよく、`-` で標準入力。
+
+```bash
+./bin/mywant plans list                      # NAME / ACTION / TARGET / QUESTION / AGE
+./bin/mywant plans get plan-1762… -o yaml    # -o yaml|json
+./bin/mywant plans create -f plan.yaml
+./bin/mywant plans delete plan-1762…
+./bin/mywant acts list                       # NAME / PHASE / PLAN / STEPS / AGE
+./bin/mywant acts get act-1762… -o json
+./bin/mywant acts create -f act.yaml         # spec.plan に Plan の名前
+./bin/mywant acts wait act-1762… [--timeout 5m]   # 完了まで待って status を表示（Failed なら終了コード1）
+./bin/mywant acts run -f plan.yaml [--locale ja_JP]  # Plan を作り、Act を作り、完了まで待つ
+./bin/mywant acts delete act-1762…
+```
+
+```yaml
+apiVersion: mywant.io/v1
+kind: Plan
+spec:
+  question: 最新のゴルフのスコアは？
+  action: existing          # existing | new | none
+  target: smartgolf-check-reserved-instance
+  capability: rounds
+```
+
 ### Global State
 
 Wants can persist key-value pairs via `StoreGlobalState`.

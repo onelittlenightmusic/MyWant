@@ -1,0 +1,13 @@
+title: WhenSpec
+description: "Scheduling specification defining when a want should execute. Wraps every (interval) and at (time-of-day) into a single composable object, compatible with the want spec's when: field."
+type: object
+properties:
+  every:
+    type: string
+    description: "Execution interval (e.g., 5m, 1h, 1 day)"
+  at:
+    type: string
+    description: "Optional time-of-day anchor (e.g., 09:00, 7am)"
+  fromGlobalParam:
+    type: string
+    description: "Reference to a named global parameter containing a WhenSpec"

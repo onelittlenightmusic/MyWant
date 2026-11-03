@@ -29,51 +29,23 @@ package server
 //	DELETE /api/v1/plans/{name}   let go
 //	POST   /api/v1/plans/brief    help to decide: the choices and their prompt
 //	POST   /api/v1/plans/params   help to fill a type's parameters
+//
+// The document is want-spec's Plan (types_plan.go, spec/plan-spec.yaml);
+// where it is kept, robot_resources.go.
 
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	ws "github.com/onelittlenightmusic/want-spec"
 	"gopkg.in/yaml.v3"
 )
-
-const (
-	resourceAPIVersion = "mywant.io/v1"
-	plansKept          = 200
-)
-
-type resourceMeta struct {
-	Name      string `json:"name" yaml:"name"`
-	CreatedAt string `json:"createdAt" yaml:"createdAt"`
-}
-
-// planSpec is what is to be done about a question.
-type planSpec struct {
-	Question   string            `json:"question" yaml:"question"`
-	Action     string            `json:"action" yaml:"action"` // existing | new | none
-	Target     string            `json:"target,omitempty" yaml:"target,omitempty"`
-	Capability string            `json:"capability,omitempty" yaml:"capability,omitempty"`
-	Type       string            `json:"type,omitempty" yaml:"type,omitempty"`
-	Params     map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
-}
-
-type planDoc struct {
-	APIVersion string       `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string       `json:"kind" yaml:"kind"`
-	Metadata   resourceMeta `json:"metadata" yaml:"metadata"`
-	Spec       planSpec     `json:"spec" yaml:"spec"`
-}
-
-var planStore struct {
-	mu   sync.Mutex
-	list []*planDoc // oldest first
-}
 
 // readDoc reads a posted document, YAML or JSON (JSON is YAML).
 func readDoc(r *http.Request, into any) error {
@@ -112,10 +84,10 @@ func listLimit(r *http.Request, max int) int {
 	return max
 }
 
-func planNamed(name string) (*planDoc, bool) {
-	planStore.mu.Lock()
-	defer planStore.mu.Unlock()
-	for _, p := range planStore.list {
+func planNamed(name string) (*ws.Plan, bool) {
+	lockRobotRes()
+	defer robotRes.mu.Unlock()
+	for _, p := range robotRes.plans {
 		if p.Metadata.Name == name {
 			return p, true
 		}
@@ -125,36 +97,33 @@ func planNamed(name string) (*planDoc, bool) {
 
 // POST /api/v1/plans
 func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
-	var doc planDoc
+	var doc ws.Plan
 	if err := readDoc(r, &doc); err != nil {
 		http.Error(w, "bad plan: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if doc.Kind != "" && doc.Kind != "Plan" {
-		http.Error(w, "kind must be Plan", http.StatusBadRequest)
+	if err := doc.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	switch doc.Spec.Action {
-	case "existing", "new", "none":
-	default:
-		http.Error(w, "spec.action must be existing, new or none", http.StatusBadRequest)
-		return
-	}
-	// "-" is the decision's own word for nothing chosen.
-	for _, f := range []*string{&doc.Spec.Target, &doc.Spec.Capability, &doc.Spec.Type} {
-		if strings.TrimSpace(*f) == planNone {
-			*f = ""
-		}
-	}
+	doc.Spec.Normalize()
 	now := time.Now()
-	doc.APIVersion, doc.Kind = resourceAPIVersion, "Plan"
-	doc.Metadata = resourceMeta{Name: fmt.Sprintf("plan-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
-	planStore.mu.Lock()
-	planStore.list = append(planStore.list, &doc)
-	if len(planStore.list) > plansKept {
-		planStore.list = planStore.list[len(planStore.list)-plansKept:]
+	doc.APIVersion, doc.Kind = ws.ResourceAPIVersion, ws.PlanKind
+	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("plan-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
+
+	lockRobotRes()
+	dir := robotRes.plansDir
+	robotRes.mu.Unlock()
+	// Written before it is listed, so one deleted at once is not written back.
+	if err := dir.Save(doc.Metadata.Name, &doc); err != nil {
+		log.Printf("[WARN] plans: %v", err)
 	}
-	planStore.mu.Unlock()
+	lockRobotRes()
+	robotRes.plans = append(robotRes.plans, &doc)
+	plans, acts := pruneRobotResLocked(now)
+	robotRes.mu.Unlock()
+	removeRobotRes(plans, acts)
+
 	w.Header().Set("Location", "/api/v1/plans/"+doc.Metadata.Name)
 	writeDoc(w, r, http.StatusCreated, &doc)
 }
@@ -162,13 +131,13 @@ func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/plans
 func (s *Server) handlePlanList(w http.ResponseWriter, r *http.Request) {
 	limit := listLimit(r, plansKept)
-	planStore.mu.Lock()
-	out := make([]*planDoc, 0, limit)
-	for i := len(planStore.list) - 1; i >= 0 && len(out) < limit; i-- {
-		out = append(out, planStore.list[i])
+	lockRobotRes()
+	out := ws.PlanList{Plans: make([]ws.Plan, 0, limit)}
+	for i := len(robotRes.plans) - 1; i >= 0 && len(out.Plans) < limit; i-- {
+		out.Plans = append(out.Plans, *robotRes.plans[i])
 	}
-	planStore.mu.Unlock()
-	writeDoc(w, r, http.StatusOK, map[string]any{"plans": out})
+	robotRes.mu.Unlock()
+	writeDoc(w, r, http.StatusOK, &out)
 }
 
 // GET /api/v1/plans/{name}
@@ -183,14 +152,16 @@ func (s *Server) handlePlanGet(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/plans/{name}
 func (s *Server) handlePlanDelete(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	planStore.mu.Lock()
-	defer planStore.mu.Unlock()
-	for i, p := range planStore.list {
+	lockRobotRes()
+	for i, p := range robotRes.plans {
 		if p.Metadata.Name == name {
-			planStore.list = append(planStore.list[:i], planStore.list[i+1:]...)
+			robotRes.plans = append(robotRes.plans[:i], robotRes.plans[i+1:]...)
+			robotRes.mu.Unlock()
+			removeRobotRes([]string{name}, nil)
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
+	robotRes.mu.Unlock()
 	http.Error(w, "no plan "+name, http.StatusNotFound)
 }
