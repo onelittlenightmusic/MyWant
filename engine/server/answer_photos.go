@@ -85,6 +85,18 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 	if ref := s.resolveAnswerReferent(q, time.Now()); ref != nil {
 		only = ref.answerIDs()
 	}
+	return s.answerPhotosOf(wants, title, only)
+}
+
+// answerPhotosOf is the photos joined to these wants' answers (only those
+// answers, when only is set), the newest answer's first — each with what was
+// read off it, and how its type reads such a photo. title names the wants for
+// a person ("スマートゴルフ").
+func (s *Server) answerPhotosOf(wants []*mywant.Want, title string, only map[string]bool) []types.AnswerPhoto {
+	if s.thingLabels == nil {
+		return nil
+	}
+	specs := s.photoTypeSpecs()
 	// How each type's photos are read, as its YAML says (photoReadingLabel).
 	rules := map[string]string{}
 	if wts, err := s.fmWantTypes(); err == nil {

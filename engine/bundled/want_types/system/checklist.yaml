@@ -9,6 +9,8 @@ wantType:
     labels:
       user-control: "true"
       type-icon: ListChecks
+      # What a person calls it (the robot finds it by these — fm.go's fmAliasLabel).
+      aliases: "チェックリスト,やること,やることリスト,タスク,ToDo,todo"
       # Same flush pressure-plate tile as a note, but its cover is a notepad's:
       # it flips UP off the top edge rather than swinging open to the right.
       form-type: button

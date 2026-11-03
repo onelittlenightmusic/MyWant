@@ -67,6 +67,14 @@ type ResultHistoryEntry struct {
 	// The rest of the answer — the fields the type publishes or keeps, as they
 	// stood when this answer arrived. See answerFields.
 	Fields map[string]any `json:"fields,omitempty" yaml:"fields,omitempty"`
+	// This answer is the want's answer now: the live state is this entry. At
+	// most one entry is; none is while the want has no answer (nothing found,
+	// a type's history-if false, a result let go by hand). Set where answers
+	// are kept (recordResultHistory), so a reader need not work it out from
+	// final_result — which a result never written empty leaves holding an
+	// answer the want no longer has. Always in the JSON, false too, so a
+	// reader can tell "none is current" from a server that does not say.
+	Current bool `json:"current" yaml:"current,omitempty"`
 }
 
 // OnWantOutput, when set, hears every NEW answer a want arrives at — one whose
@@ -118,7 +126,9 @@ func (n *Want) recordResultHistory() {
 		// No answer right now — a check that found nothing, or a want reset by
 		// a restart. Deliberately not recorded: "nothing" is not an answer
 		// worth a card, and the point of this history is that the answers from
-		// before are still there to read when the present one is empty.
+		// before are still there to read when the present one is empty. None
+		// of them is the answer now.
+		n.markCurrentAnswer(false)
 		return
 	}
 
@@ -126,10 +136,12 @@ func (n *Want) recordResultHistory() {
 	if !n.keepsAnswer(fields) {
 		// Not an answer by its type's own account (history-if): a check that
 		// found no reservation, whatever its result field still carries.
+		n.markCurrentAnswer(false)
 		return
 	}
 	if n.forgottenAnswers()[forgottenResultKey(val)] {
 		// Let go by hand (result_history_crud.go): found again, still not kept.
+		n.markCurrentAnswer(false)
 		return
 	}
 	now := time.Now()
@@ -143,7 +155,9 @@ func (n *Want) recordResultHistory() {
 		Fields:    fields,
 	}
 	appended, prev := n.getHistoryManager().AddResultEntry(entry)
-	if appended {
+	// Appended or seen again, it is the last entry, and the answer now.
+	marked := n.markCurrentAnswer(true)
+	if appended || marked {
 		n.resultHistoryChanged()
 	}
 	if !appended || OnWantOutput == nil {
@@ -153,6 +167,36 @@ func (n *Want) recordResultHistory() {
 		return
 	}
 	go OnWantOutput(n, entry)
+}
+
+// markCurrentAnswer says which kept answer is the want's answer now: the last
+// one (last) or none. Reports whether that changed; it does not announce it —
+// the caller does, once.
+func (n *Want) markCurrentAnswer(last bool) bool {
+	h := n.getHistoryManager()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	entries := h.ResultHistoryRing.Snapshot(0)
+	changed := false
+	for i := range entries {
+		want := last && i == len(entries)-1
+		if entries[i].Current != want {
+			entries[i].Current = want
+			changed = true
+		}
+	}
+	if !changed {
+		return false
+	}
+	h.ResultHistoryRing.Clear()
+	for _, e := range entries {
+		h.ResultHistoryRing.Append(e)
+	}
+	if !last {
+		// Told here: the callers that clear return at once.
+		defer n.resultHistoryChanged()
+	}
+	return true
 }
 
 // outputType is the kind of thing an answer is.

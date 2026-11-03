@@ -159,10 +159,21 @@ func (p *PollingAgent) BeginProgressCycle() {
 	}
 }
 
-// EndProgressCycle dumps agent state changes to the want.
+// EndProgressCycle dumps agent state changes to the want, and closes the
+// want's cycle the poll opened — as ThinkingAgent's does.
+//
+// What a poll wrote (an MRS skill's mrs_raw_output) becomes the want's fields
+// only in the want's EndProgressCycle: the fetchFrom expansion, the final
+// result, the answers kept (and those read from a history-from list). Left to
+// the want's own loop, a poll that lands after the loop has gone quiet — an
+// achieved monitor want run again by hand, its old output still in place, so
+// it is achieved again at once — was never expanded: the run's output sat in
+// mrs_raw_output while the fields (checked_at, past_reservations, …) kept the
+// previous run's, until the next scheduled run.
 func (p *PollingAgent) EndProgressCycle() {
 	if p.want != nil {
 		// Use the agent name or a generic "MonitorAgent" for history tracking
 		p.want.DumpStateForAgent(p.name)
+		p.want.EndProgressCycle()
 	}
 }

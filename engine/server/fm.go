@@ -14,8 +14,6 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	types "mywant/engine/types"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -100,6 +98,16 @@ var fmTools = []fmTool{
 		run: (*Server).fmLook,
 	},
 	{
+		Name:        "use_capability",
+		Description: "Ask a want for one of its capabilities listed in your instructions: what every want can do (restart: run it again for what it finds now), or what one can look up beyond what it shows (e.g. the latest golf score from a golf want's photos).",
+		Arguments: []fmParam{
+			{Name: "capability", Description: "The capability, exactly as listed: restart, or want#capability", Required: true},
+			{Name: "want", Description: "For one every want has (restart): the want's name, e.g. smartgolf. Empty for want#capability.", Required: false},
+		},
+		Writes: true,
+		run: (*Server).fmUseCapability,
+	},
+	{
 		Name:        "describe_type",
 		Description: "Describe one want type and the parameters it takes. Use before deploy_want.",
 		Arguments: []fmParam{
@@ -141,18 +149,25 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	tools := make([]fmTool, len(fmTools))
-	for i, t := range fmTools {
+	// The board's capabilities as they are now (fm_capability.go); with none,
+	// there is nothing to use and the tool is not offered.
+	caps := s.fmCapabilityChoices()
+	tools := make([]fmTool, 0, len(fmTools))
+	for _, t := range fmTools {
 		t.Arguments = append([]fmParam(nil), t.Arguments...)
 		for j, a := range t.Arguments {
 			if a.Name == "type" && t.Name == "deploy_want" {
 				a.Choices = types
 				t.Arguments[j] = a
 			}
+			if a.Name == "capability" && t.Name == "use_capability" {
+				a.Choices = caps
+				t.Arguments[j] = a
+			}
 		}
-		tools[i] = t
+		tools = append(tools, t)
 	}
-	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmGlossaryText() + fmLocaleText(r.URL.Query().Get("locale")), "tools": tools})
+	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmCapabilitiesText() + s.fmGlossaryText() + fmLocaleText(r.URL.Query().Get("locale")), "tools": tools})
 }
 
 // fmLanguages names the languages an on-device model may be set to, for the
@@ -845,7 +860,6 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 // report, the phone's model said 「検索に失敗しました」 of a search that was
 // running.
 const fmDeployedNote = "It is working now and its result will show on its tile: say in the person's language that it was made (e.g. 「中野坂上→国分寺を出しました」), not that it failed."
-
 
 // fmWantOnBoard: a want of this exact name is listed with a cell.
 func (s *Server) fmWantOnBoard(name string) bool {
@@ -1558,7 +1572,7 @@ const fmShortArg = "_short"
 
 // fmHearsQuestion: the tool is handed what the person asked (fmQuestionArg).
 func fmHearsQuestion(tool string) bool {
-	return tool == "look" || tool == "deploy_want"
+	return tool == "look" || tool == "deploy_want" || tool == "use_capability"
 }
 
 // fmCard is a want a step brought the robot to.
@@ -1889,21 +1903,6 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		return "", fmt.Errorf("no want named %q; use board to see the names", name)
 	}
 	w := resp.Wants[found]
-	// Asked after what its answers' photos show, with no time named
-	// (「ゴルフの最新スコアは？」): the newest photo's field (photo_fields.go).
-	if ref == nil && question != "" {
-		if v, photo, ok := types.AnswerFromPhotoFieldsOf(question, s.findAnswerPhotos(question)); ok {
-			s.walkRobotToEvidence(photo) // the card it was read off
-			if w.Metadata.ID != "" {
-				args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
-			}
-			out := fmt.Sprintf("Answer, read from the photo joined to %s's latest answer that has one: %s\n", w.Metadata.Name, v)
-			if fmJapanese(question) {
-				out += fmt.Sprintf("Reply in Japanese, with exactly this: 「%s」\n", v)
-			}
-			return out, nil
-		}
-	}
 	// The want it read, shown as its card under the answer: what the answer
 	// is about, at a glance — a person who asked about 国分寺 sees the card
 	// says Nakano. Archived, it still has its card (its status says so), what

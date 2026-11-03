@@ -50,11 +50,17 @@ type fmBriefResponse struct {
 	Prompt string   `json:"prompt"`
 	Refs   []string `json:"refs"`
 	Types  []string `json:"types"`
+	// What may be asked of the want chosen as ref (fm_capability.go): the
+	// standard capabilities and those of the candidates' types, by name; the
+	// first, "-", is just to show it.
+	Capabilities []string `json:"capabilities"`
 }
 
 type fmCandidate struct {
 	name, line string
 	score      int
+	// A want (not a thing): it has the standard capabilities.
+	want bool
 }
 
 // POST /api/v1/fm/brief
@@ -86,19 +92,57 @@ func (s *Server) fmBrief(question, locale string) (fmBriefResponse, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", question)
 	b.WriteString("You answer with the board: show a want or thing already there that answers it, or make a want that will. Decide which:\n")
-	b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not.\n")
+	b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not. When the question asks a want for something it can do or look up (below, and on its line), choose it as ref and that as capability; just to show it, capability -.\n")
 	b.WriteString("- new: nothing below answers it, and a type can make a want that will — choose the type.\n")
 	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n\n")
+	// A candidate's type's own capabilities, on its line.
+	ownCaps := map[string][]string{}
+	var capNames []string
+	seenCap := map[string]bool{}
+	isCand := map[string]bool{}
+	for _, c := range cands {
+		if c.want {
+			isCand[c.name] = true
+		}
+	}
+	for _, c := range s.fmCapabilities() {
+		name := c.want.Metadata.Name
+		if !isCand[name] {
+			continue
+		}
+		ownCaps[name] = append(ownCaps[name], c.def.Name+" — "+firstLine(c.def.Description, 100))
+		if !seenCap[c.def.Name] {
+			seenCap[c.def.Name] = true
+			capNames = append(capNames, c.def.Name)
+		}
+	}
 	if len(cands) == 0 {
 		b.WriteString("Nothing on the board seems to be about this question.\n")
 	} else {
 		b.WriteString("On the board, and put away (archived), what may be about it:\n")
 		for _, c := range cands {
-			b.WriteString(c.line + "\n")
+			line := c.line
+			if own := ownCaps[c.name]; c.want && len(own) > 0 {
+				line += "; it can also look up (capability): " + strings.Join(own, "; ")
+			}
+			b.WriteString(line + "\n")
 		}
 	}
 	if typesText != "" {
 		b.WriteString("\nTypes that could make a want for it:\n" + typesText)
+	}
+	// What may be asked of a want (fm_capability.go): the standard
+	// capabilities once, for every want; a type's own on its wants' lines
+	// (above). Not one line per want and capability: the decision's prompt is
+	// read by a small model, and every want is not asked to run again.
+	caps := []string{fmPlanNone}
+	b.WriteString("\nWhat any want above can do (capability):\n")
+	for _, c := range fmStdCaps {
+		fmt.Fprintf(&b, "- %s: %s\n", c.Name, firstLine(c.Description, 160))
+		caps = append(caps, c.Name)
+	}
+	for _, n := range capNames {
+		caps = append(caps, n)
 	}
 	b.WriteString("\nSet the fields you do not use to " + fmPlanNone + ".")
 
@@ -111,9 +155,10 @@ func (s *Server) fmBrief(question, locale string) (fmBriefResponse, error) {
 		}
 	}
 	return fmBriefResponse{
-		Prompt: b.String() + fmLocaleText(locale),
-		Refs:   refs,
-		Types:  append([]string{fmPlanNone}, allTypes...),
+		Prompt:       b.String() + fmLocaleText(locale),
+		Refs:         refs,
+		Types:        append([]string{fmPlanNone}, allTypes...),
+		Capabilities: caps,
 	}, nil
 }
 
@@ -150,6 +195,9 @@ func (s *Server) fmCandidates(question string) ([]fmCandidate, error) {
 		}
 		asked := 0
 		for _, v := range params {
+			if fmEmptyParam(v) {
+				continue // a checklist's items: [] was not asked of it
+			}
 			t := fmLoose(fmt.Sprint(v))
 			if t == "" {
 				continue
@@ -195,7 +243,7 @@ func (s *Server) fmCandidates(question string) ([]fmCandidate, error) {
 		if p := paramsOf[t.name]; t.cardKind == "want" && len(p) > 0 {
 			line += " (" + fmParamsText(p) + ")"
 		}
-		out = append(out, fmCandidate{name: t.name, line: line, score: rank(sc, t.typ)})
+		out = append(out, fmCandidate{name: t.name, line: line, score: rank(sc, t.typ), want: t.cardKind == "want"})
 	}
 	for _, w := range wants {
 		if !w.archived() || w.Metadata.Name == fmRobotWant {
@@ -354,6 +402,8 @@ type fmActRequest struct {
 	Ref      string            `json:"ref"`
 	Type     string            `json:"type"`
 	Params   map[string]string `json:"params"`
+	// For existing: what is asked of the want (fm_capability.go), or "-".
+	Capability string `json:"capability"`
 }
 
 // POST /api/v1/fm/act
@@ -411,6 +461,15 @@ func (s *Server) fmAct(req fmActRequest) []fmStep {
 		name := strings.TrimSpace(req.Ref)
 		if name == "" || name == fmPlanNone {
 			return nil
+		}
+		if c := strings.TrimSpace(req.Capability); c != "" && c != fmPlanNone {
+			// A capability of the want (fm_capability.go): done here, what it
+			// found handed to the answer.
+			return []fmStep{run("use_capability", map[string]string{"capability": c, "want": name})}
+		}
+		if strings.Contains(name, fmCapSep) {
+			// One chosen as want#capability (the tool loop's spelling).
+			return []fmStep{run("use_capability", map[string]string{"capability": name})}
 		}
 		var steps []fmStep
 		if _, archived := s.fmArchivedNamed(name); archived {
@@ -503,8 +562,13 @@ func fmPlanFact(st fmStep) string {
 		return fmt.Sprintf("[shown] %q, already on the board — the robot is standing on it.", st.Card.Name)
 	}
 	out := fmPlanCell.ReplaceAllString(st.Output, "")
-	if len([]rune(out)) > 1200 {
-		out = string([]rune(out)[:1200]) + " …"
+	// A capability's data is the answer's whole source: more of it is kept.
+	max := 1200
+	if st.Tool == "use_capability" {
+		max = 4000
+	}
+	if len([]rune(out)) > max {
+		out = string([]rune(out)[:max]) + " …"
 	}
 	return fmt.Sprintf("[%s] %s", st.Tool, out)
 }
@@ -515,6 +579,9 @@ func fmAnswerPrompt(req fmActRequest, facts []string) string {
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", req.Question)
 	if req.Kind == "none" {
 		b.WriteString("Reply to what they said, briefly and kindly, as a person would. Only if they ask what you can do: you show what is on the board and make wants that find things out.\n")
+		// Nothing follows this reply: a promise to look ("ちょっと待って、すぐ
+		// 見つけます") is left hanging, and the person waits for nothing.
+		b.WriteString("Nothing was looked up or done for it, and nothing will be after this reply: never say you will look, check, find or get back to them, or ask them to wait. If they asked about something on the board, say you did not find it on the board.\n")
 	} else if len(facts) == 0 {
 		b.WriteString("Nothing on the board was found or made for it: say so, and that you could not find or make one for it.\n")
 	} else {
@@ -526,4 +593,19 @@ func fmAnswerPrompt(req fmActRequest, facts []string) string {
 	}
 	b.WriteString("One or two short sentences, spoken to the person.")
 	return b.String()
+}
+
+// fmEmptyParam: a parameter left empty — nothing, "", an empty list or map.
+func fmEmptyParam(v any) bool {
+	switch t := v.(type) {
+	case nil:
+		return true
+	case string:
+		return strings.TrimSpace(t) == ""
+	case []any:
+		return len(t) == 0
+	case map[string]any:
+		return len(t) == 0
+	}
+	return false
 }

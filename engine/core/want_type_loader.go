@@ -18,6 +18,10 @@ import (
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition = want_spec.WantTypeDefinition
 
+// WantCapabilityDef is one thing a want of a type can answer beyond its result
+// (the robot's use_capability — server/fm_capability.go).
+type WantCapabilityDef = want_spec.WantCapabilityDef
+
 // WantTypeMetadata contains want type identity and classification
 type WantTypeMetadata = want_spec.WantTypeMetadata
 

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -9,7 +8,6 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
-	types "mywant/engine/types"
 )
 
 // What a question means by "this morning's golf" — the first stage of
@@ -340,72 +338,7 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 	if len(ref.Answers) == 0 {
 		return b.String()
 	}
-	// Asked after what a photo shows (findAnswerPhotos decides): answered from
-	// the photo's fields, else read here, else handed to the asker.
-	photos := s.findAnswerPhotos(question)
-	if len(photos) == 0 {
-		if containsAnyWord(strings.ToLower(question), photoQuestionWords) {
-			b.WriteString("No photo is joined to these answers, so what a photo would show is not known — say so.\n")
-		}
-		return b.String()
-	}
-	robot, _ := s.fmRobot()
-	if answer, ok := types.AnswerFromPhotos(context.Background(), robot, question, photos); ok {
-		fmt.Fprintf(&b, "Answer, read from the photo joined to it: %s\n", answer)
-		if fmJapanese(question) {
-			fmt.Fprintf(&b, "Reply in Japanese, with exactly this: 「%sの%s：%s」\n", ref.Phrase, ref.Title, answer)
-		} else {
-			b.WriteString("Tell the person this answer, in the language they asked in.\n")
-		}
-		return b.String()
-	}
-	// No model here to ask (a server without one): what was read from the
-	// photos, for the asker's model to find the answer in — and the photos
-	// nobody has read yet, for a device that can read them (the iPhone app's
-	// PhotoReader) to read and ask again.
-	var unread []fmUnreadPhoto
-	for _, p := range photos {
-		switch {
-		case p.Read == nil && p.ImageURL != "":
-			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL})
-		case len(p.FieldSpec) > 0 && len(p.Fields) == 0:
-			// Its words read, not yet read into fields: queued as model work
-			// (photo_fields.go), which the asker's device can take at once.
-			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL, Read: true})
-		}
-	}
-	if len(unread) > 0 {
-		s.readPhotoFieldsSoon()
-		raw, _ := json.Marshal(unread)
-		args[fmUnreadArg] = string(raw)
-	}
-	words := false
-	for i, p := range photos {
-		if i == 2 {
-			break
-		}
-		lines := []string{}
-		if p.Read != nil {
-			lines = p.Read.Lines
-		}
-		if len(lines) == 0 {
-			fmt.Fprintf(&b, "Photo %s (joined to %s): not read yet.\n", p.Name, p.About)
-			continue
-		}
-		text := strings.Join(lines, "\n")
-		if len([]rune(text)) > 600 {
-			text = string([]rune(text)[:600]) + "…"
-		}
-		fmt.Fprintf(&b, "Photo %s (joined to %s), the words read from it:\n%s\n", p.Name, p.About, text)
-		words = true
-	}
-	if words {
-		if photos[0].Rules != "" {
-			fmt.Fprintf(&b, "How to read these photos: %s\n", photos[0].Rules)
-		}
-		b.WriteString("Answer the question from these words only.\n")
-	} else {
-		b.WriteString("No photo of these has been read, so what it shows is not known yet — say so.\n")
-	}
+	// What a photo of them shows is a capability of the want's type now
+	// (fm_capability.go): use_capability, not look.
 	return b.String()
 }
