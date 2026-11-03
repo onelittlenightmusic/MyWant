@@ -359,12 +359,9 @@ wants:
 
 ## OpenAPI Specification
 
-The Recipe API follows the OpenAPI specification. See the spec directory for:
-- Complete API endpoint definitions
-- Request/response schemas
-- Error codes and descriptions
-
-Location: `spec/openapi.yaml` (if present)
+A recipe's definition is want-spec's `spec/recipe-spec.yaml`
+(https://github.com/onelittlenightmusic/want-spec), embedded in the server:
+`GET /api/v1/spec/recipe-spec.yaml`.
 
 ## Testing Recipes
 

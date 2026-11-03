@@ -136,7 +136,7 @@ curl -X POST http://localhost:8080/api/v1/wants \
 curl http://localhost:8080/api/v1/wants/{want_id}/status
 ```
 
-The full API is described in [docs/backend-api.yaml](docs/backend-api.yaml).
+Every object's definition (wants, want types, things, recipes, agents and capabilities, constellations, plans and acts) is [want-spec](https://github.com/onelittlenightmusic/want-spec)'s, embedded in the server: `GET /api/v1/spec` lists its spec files, and `GET /api/v1/spec/<file>` gives one (YAML, or JSON with `Accept: application/json`).
 
 ## Writing Want Types and Agents
 

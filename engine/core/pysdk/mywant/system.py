@@ -23,9 +23,11 @@ class System:
         """Change only these keys."""
         return self._c.request("PATCH", "/api/v1/config", dict(changes))
 
-    def spec(self) -> str:
-        """The OpenAPI spec, as YAML."""
-        return self._c.request("GET", "/api/v1/spec", text=True)
+    def spec(self, name: str | None = None) -> str:
+        """The definitions, want-spec's, as YAML: with no name, the index of
+        its spec files; with one ("plan-spec.yaml", "schemas/Want.yaml"), that file."""
+        path = "/api/v1/spec" if not name else "/api/v1/spec/" + name.lstrip("/")
+        return self._c.request("GET", path, text=True)
 
     def stop(self) -> None:
         self._c.request("POST", "/api/v1/system/stop")

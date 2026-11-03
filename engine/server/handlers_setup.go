@@ -241,7 +241,9 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/datatypes", s.getDataTypes).Methods("GET", "OPTIONS")
 
 	// OpenAPI Spec
-	api.HandleFunc("/spec", s.getSpec).Methods("GET")
+	// The definitions, want-spec's (handlers_spec.go).
+	api.HandleFunc("/spec", s.getSpecIndex).Methods("GET")
+	api.HandleFunc("/spec/{file:.+}", s.getSpecFile).Methods("GET")
 
 	// System controls
 	api.HandleFunc("/system/stop", s.stopServer).Methods("POST", "OPTIONS")

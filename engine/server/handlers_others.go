@@ -1197,36 +1197,6 @@ func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
-// OpenAPI Spec
-func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
-	specPaths := []string{"openapi.yaml", "../openapi.yaml", "../../openapi.yaml"}
-	var data []byte
-	var err error
-
-	for _, path := range specPaths {
-		data, err = os.ReadFile(path)
-		if err == nil {
-			break
-		}
-	}
-
-	if err != nil {
-		s.JSONError(w, r, http.StatusNotFound, "OpenAPI specification not found", err.Error())
-		return
-	}
-
-	if strings.Contains(r.Header.Get("Accept"), "application/json") {
-		var body any
-		if err := yaml.Unmarshal(data, &body); err != nil {
-			s.JSONError(w, r, http.StatusInternalServerError, "Failed to parse specification", err.Error())
-			return
-		}
-		s.JSONResponse(w, http.StatusOK, body)
-	} else {
-		w.Header().Set("Content-Type", "application/yaml")
-		w.Write(data)
-	}
-}
 
 // Screenshots
 func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
