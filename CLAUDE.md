@@ -68,8 +68,7 @@ make release                                        # Build CLI only
 ./bin/mywant --context local custom list               # act on this machine
 
 # Things (the values you have named) / worlds / global state
-./bin/mywant thing list|get|create|update|delete|label|export|import|events|stats
-./bin/mywant const list|get|create|update|delete|export|import   # constellations
+./bin/mywant thing list|get|add|remove|events|stats|labels|label|groups
 ./bin/mywant world list|open|save|export|import        # named snapshots of all wants
 ./bin/mywant state global get|set|delete|clear         # moved here from `thing`
 
@@ -99,16 +98,7 @@ builder.AddDynamicNode(Want{...}) / AddDynamicNodes([]Want{})  // Auto-connects 
 
 ## File Organization
 
-`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client + HTTP client library) • `client/cmd/mywant/` (CLI entrypoint) • `engine/core/pysdk/mywant/` (Python SDK code) • `client-py/` (its packaging, tests, README) • `fmtool/` (on-device agent, Swift/macOS — `make fmtool`) • `docs/` • `web/` (React frontend + embedded assets)
-
-## Python SDK
-
-The `mywant` package — `Client()` with one object per resource (`.wants`, `.things`, `.constellations`, …) and `current()` for plugin scripts. Standard library only.
-
-- **Code lives in `engine/core/pysdk/mywant/`, one module per resource.** The engine embeds it (`engine/core/mrs_sdk.go`) and puts it on every plugin script's PYTHONPATH; `client-py/pyproject.toml` packages the same directory (`package-dir`). No copies — don't add one to a plugin.
-- Tests: `cd client-py && python3 -m unittest discover -s tests`
-- **Publish to TestPyPI:** bump `version` in `client-py/pyproject.toml` and `__version__` in `engine/core/pysdk/mywant/__init__.py`, commit, push, then `git tag pysdk-v<version> && git push origin pysdk-v<version>`. `.github/workflows/pysdk.yml` runs the tests, builds a wheel and uploads it (secret `TEST_PYPI_API_TOKEN`). Wheel only — an sdist can't reach the engine directory. Check: `curl -s https://test.pypi.org/pypi/mywant/<version>/json`.
-- If the token has to be set again: `pbpaste | gh secret set TEST_PYPI_API_TOKEN -R onelittlenightmusic/MyWant` (gh's prompt doesn't work through `!`).
+`yaml/config/` (configs) • `yaml/recipes/` (templates) • `yaml/agents/` (agent definitions) • `engine/core/` (core library) • `engine/types/` (*_types.go) • `engine/server/` (HTTP API) • `engine/worker/` (agent service) • `engine/demos/` (demo programs) • `client/` (CLI client + HTTP client library) • `client/cmd/mywant/` (CLI entrypoint) • `fmtool/` (on-device agent, Swift/macOS — `make fmtool`) • `docs/` • `web/` (React frontend + embedded assets)
 
 ## Coding Rules
 
