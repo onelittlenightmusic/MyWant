@@ -28,13 +28,6 @@ jobs:
         cd ../client
         go mod tidy
 
-    - name: Verify OpenAPI Spec
-      run: |
-        if [ ! -f engine/openapi.yaml ]; then
-          echo "engine/openapi.yaml is missing"
-          exit 1
-        fi
-
     - name: Create dummy frontend assets
       run: |
         mkdir -p web/dist

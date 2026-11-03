@@ -12,6 +12,7 @@ package server
 //	metadata:
 //	  name: plan-1730…            (given by the server)
 //	  createdAt: 2026-11-03T…
+//	  labels: {device: iphone}    (kept as posted)
 //	spec:
 //	  question: 最新のゴルフのスコアは？
 //	  action: existing             # existing | new | none
@@ -24,7 +25,8 @@ package server
 // JSON; read back as JSON, or YAML with ?format=yaml.
 //
 //	POST   /api/v1/plans          a plan declared → the Plan, named
-//	GET    /api/v1/plans          the plans, newest first (?limit=)
+//	GET    /api/v1/plans          the plans, newest first (?limit=,
+//	                              ?labelSelector=k=v,k2!=v2,k3)
 //	GET    /api/v1/plans/{name}   one
 //	DELETE /api/v1/plans/{name}   let go
 //	POST   /api/v1/plans/brief    help to decide: the choices and their prompt
@@ -84,6 +86,17 @@ func listLimit(r *http.Request, max int) int {
 	return max
 }
 
+// listSelector is ?labelSelector=k=v,… (kubectl's -l); a bad one is
+// answered 400 and ok is false.
+func listSelector(w http.ResponseWriter, r *http.Request) (ws.LabelSelector, bool) {
+	sel, err := ws.ParseLabelSelector(r.URL.Query().Get("labelSelector"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, false
+	}
+	return sel, true
+}
+
 func planNamed(name string) (*ws.Plan, bool) {
 	lockRobotRes()
 	defer robotRes.mu.Unlock()
@@ -109,7 +122,7 @@ func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
 	doc.Spec.Normalize()
 	now := time.Now()
 	doc.APIVersion, doc.Kind = ws.ResourceAPIVersion, ws.PlanKind
-	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("plan-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
+	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("plan-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339), Labels: doc.Metadata.Labels}
 
 	lockRobotRes()
 	dir := robotRes.plansDir
@@ -131,10 +144,16 @@ func (s *Server) handlePlanCreate(w http.ResponseWriter, r *http.Request) {
 // GET /api/v1/plans
 func (s *Server) handlePlanList(w http.ResponseWriter, r *http.Request) {
 	limit := listLimit(r, plansKept)
+	sel, ok := listSelector(w, r)
+	if !ok {
+		return
+	}
 	lockRobotRes()
 	out := ws.PlanList{Plans: make([]ws.Plan, 0, limit)}
 	for i := len(robotRes.plans) - 1; i >= 0 && len(out.Plans) < limit; i-- {
-		out.Plans = append(out.Plans, *robotRes.plans[i])
+		if sel.Matches(robotRes.plans[i].Metadata.Labels) {
+			out.Plans = append(out.Plans, *robotRes.plans[i])
+		}
 	}
 	robotRes.mu.Unlock()
 	writeDoc(w, r, http.StatusOK, &out)

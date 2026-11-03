@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -35,9 +36,9 @@ question, declared and nothing done yet. An act carries one out.
     params: {}                # new: its parameters
 
 Examples:
-  mywant plans list
+  mywant plans list -l device=iphone
   mywant plans get plan-1762… -o yaml
-  mywant plans create -f plan.yaml
+  mywant plans create -f plan.yaml --label device=iphone
   mywant plans delete plan-1762…`,
 }
 
@@ -55,7 +56,7 @@ Kubernetes Job — Pending → Running → Succeeded | Failed, each tool run a s
     locale: ja_JP
 
 Examples:
-  mywant acts list
+  mywant acts list -l device=iphone
   mywant acts get act-1762… -o yaml
   mywant acts create -f act.yaml
   mywant acts wait act-1762…
@@ -148,7 +149,8 @@ var plansListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		limit, _ := cmd.Flags().GetInt("limit")
-		plans, err := memoClient().ListPlans(limit)
+		selector, _ := cmd.Flags().GetString("selector")
+		plans, err := memoClient().ListPlans(limit, selector)
 		if err != nil {
 			exitErr("listing plans", err)
 		}
@@ -161,7 +163,7 @@ var plansListCmd = &cobra.Command{
 			return
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tACTION\tTARGET\tQUESTION\tAGE")
+		fmt.Fprintln(w, "NAME\tACTION\tTARGET\tQUESTION\tAGE\tLABELS")
 		for _, p := range plans {
 			target := p.Spec.Target
 			if p.Spec.Action == ws.PlanActionNew {
@@ -170,7 +172,7 @@ var plansListCmd = &cobra.Command{
 			if p.Spec.Capability != "" {
 				target += "#" + p.Spec.Capability
 			}
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", p.Metadata.Name, p.Spec.Action, orDash(target), clip(p.Spec.Question, 40), age(p.Metadata.CreatedAt))
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", p.Metadata.Name, p.Spec.Action, orDash(target), clip(p.Spec.Question, 40), age(p.Metadata.CreatedAt), labelsText(p.Metadata.Labels))
 		}
 		w.Flush()
 	},
@@ -189,12 +191,13 @@ var plansGetCmd = &cobra.Command{
 	},
 }
 
-// createPlanFrom reads a plan from -f and posts it.
-func createPlanFrom(path string) *ws.Plan {
+// createPlanFrom reads a plan from -f, lays the --label ones on it, and posts it.
+func createPlanFrom(path string, labels map[string]string) *ws.Plan {
 	var p ws.Plan
 	if err := readDocFile(path, &p); err != nil {
 		exitErr("reading plan", err)
 	}
+	p.Metadata.Labels = withLabels(p.Metadata.Labels, labels)
 	if err := p.Validate(); err != nil {
 		exitErr("reading plan", err)
 	}
@@ -211,7 +214,7 @@ var plansCreateCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		file, _ := cmd.Flags().GetString("file")
-		p := createPlanFrom(file)
+		p := createPlanFrom(file, flagLabels(cmd))
 		if listOutput(cmd) {
 			printDoc(cmd, p)
 			return
@@ -243,7 +246,8 @@ var actsListCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		limit, _ := cmd.Flags().GetInt("limit")
-		acts, err := memoClient().ListActs(limit)
+		selector, _ := cmd.Flags().GetString("selector")
+		acts, err := memoClient().ListActs(limit, selector)
 		if err != nil {
 			exitErr("listing acts", err)
 		}
@@ -256,9 +260,9 @@ var actsListCmd = &cobra.Command{
 			return
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tPHASE\tPLAN\tSTEPS\tAGE")
+		fmt.Fprintln(w, "NAME\tPHASE\tPLAN\tSTEPS\tAGE\tLABELS")
 		for _, a := range acts {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n", a.Metadata.Name, a.Status.Phase, a.Spec.Plan, len(a.Status.Steps), age(a.Metadata.CreatedAt))
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n", a.Metadata.Name, a.Status.Phase, a.Spec.Plan, len(a.Status.Steps), age(a.Metadata.CreatedAt), labelsText(a.Metadata.Labels))
 		}
 		w.Flush()
 	},
@@ -287,6 +291,7 @@ var actsCreateCmd = &cobra.Command{
 		if err := readDocFile(file, &a); err != nil {
 			exitErr("reading act", err)
 		}
+		a.Metadata.Labels = withLabels(a.Metadata.Labels, flagLabels(cmd))
 		if err := a.Validate(); err != nil {
 			exitErr("reading act", err)
 		}
@@ -360,9 +365,13 @@ var actsRunCmd = &cobra.Command{
 		file, _ := cmd.Flags().GetString("file")
 		locale, _ := cmd.Flags().GetString("locale")
 		turn, _ := cmd.Flags().GetString("turn")
-		p := createPlanFrom(file)
+		labels := flagLabels(cmd)
+		p := createPlanFrom(file, labels)
 		fmt.Fprintf(os.Stderr, "plan/%s created\n", p.Metadata.Name)
-		a, err := memoClient().CreateAct(&ws.Act{Spec: ws.ActSpec{Plan: p.Metadata.Name, Locale: locale, Turn: turn}})
+		a, err := memoClient().CreateAct(&ws.Act{
+			Metadata: ws.ResourceMeta{Labels: labels},
+			Spec:     ws.ActSpec{Plan: p.Metadata.Name, Locale: locale, Turn: turn},
+		})
 		if err != nil {
 			exitErr("creating act", err)
 		}
@@ -388,6 +397,7 @@ var actsDeleteCmd = &cobra.Command{
 func init() {
 	for _, c := range []*cobra.Command{plansListCmd, actsListCmd} {
 		c.Flags().Int("limit", 0, "At most this many (default: all the server keeps)")
+		c.Flags().StringP("selector", "l", "", "Label selector: k=v,k2!=v2,k3")
 		c.Flags().StringP("output", "o", "", "yaml or json: the documents, not the table")
 	}
 	for _, c := range []*cobra.Command{plansGetCmd, actsGetCmd} {
@@ -395,6 +405,7 @@ func init() {
 	}
 	for _, c := range []*cobra.Command{plansCreateCmd, actsCreateCmd, actsRunCmd} {
 		c.Flags().StringP("file", "f", "", "YAML or JSON file, - for stdin")
+		c.Flags().StringArray("label", nil, "A label k=v to put on it (repeatable; on run, on the plan and the act)")
 		c.Flags().StringP("output", "o", "", "yaml or json: print the document made")
 	}
 	actsWaitCmd.Flags().StringP("output", "o", "", "yaml or json: print the whole act")
@@ -406,4 +417,46 @@ func init() {
 
 	PlansCmd.AddCommand(plansListCmd, plansGetCmd, plansCreateCmd, plansDeleteCmd)
 	ActsCmd.AddCommand(actsListCmd, actsGetCmd, actsCreateCmd, actsWaitCmd, actsRunCmd, actsDeleteCmd)
+}
+
+// flagLabels is --label k=v …; a bad one ends the command.
+func flagLabels(cmd *cobra.Command) map[string]string {
+	pairs, _ := cmd.Flags().GetStringArray("label")
+	labels, err := ws.ParseLabels(pairs)
+	if err != nil {
+		exitErr("reading --label", err)
+	}
+	return labels
+}
+
+// withLabels lays extra over labels (extra wins).
+func withLabels(labels, extra map[string]string) map[string]string {
+	if len(extra) == 0 {
+		return labels
+	}
+	out := make(map[string]string, len(labels)+len(extra))
+	for k, v := range labels {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
+}
+
+// labelsText is labels as kubectl --show-labels writes them: k=v,k2=v2.
+func labelsText(labels map[string]string) string {
+	if len(labels) == 0 {
+		return "-"
+	}
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k + "=" + labels[k]
+	}
+	return strings.Join(parts, ",")
 }

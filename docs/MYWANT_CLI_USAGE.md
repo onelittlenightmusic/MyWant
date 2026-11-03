@@ -402,6 +402,7 @@ Thing と want をひとまとまりとして名付けたもの（星座）。�
 ./bin/mywant const create スマートゴルフ --hub want-1234 --member thg-5678
 ./bin/mywant const update 中央線 --name 中央快速線 --color '#f97316'
 ./bin/mywant const update 中央線 --member stations::新宿 --member stations::荻窪   # メンバーを置き換え
+./bin/mywant const update 中央線 --label line=jr --label area=tokyo   # 星座そのもののラベル（置き換え。--clear-labels で消す）
 ./bin/mywant const delete 中央線 丸の内線
 ./bin/mywant const export -o constellations.yaml
 ./bin/mywant const import -f constellations.yaml
@@ -415,27 +416,34 @@ Thing と want をひとまとまりとして名付けたもの（星座）。�
 robot の Plan（質問に対して何をするかの宣言）と Act（Plan を実行したもの。Kubernetes の Job のように `Pending → Running → Succeeded | Failed` と進む）。型は want-spec の `Plan` / `Act`。サーバーは `~/.mywant/plans/`・`~/.mywant/acts/` に1件1ファイルで保存し、再起動しても残る（それぞれ最新500件・30日まで。未完了の Act と、残っている Act が指す Plan は消さない。再起動で止まった Act は `Failed` になる）。`-f` は YAML / JSON のどちらでもよく、`-` で標準入力。
 
 ```bash
-./bin/mywant plans list                      # NAME / ACTION / TARGET / QUESTION / AGE
+./bin/mywant plans list                      # NAME / ACTION / TARGET / QUESTION / AGE / LABELS
+./bin/mywant plans list -l device=iphone,source   # ラベルセレクタ（k=v, k!=v, k）
 ./bin/mywant plans get plan-1762… -o yaml    # -o yaml|json
-./bin/mywant plans create -f plan.yaml
+./bin/mywant plans create -f plan.yaml [--label device=iphone]
 ./bin/mywant plans delete plan-1762…
-./bin/mywant acts list                       # NAME / PHASE / PLAN / STEPS / AGE
+./bin/mywant acts list [-l k=v]              # NAME / PHASE / PLAN / STEPS / AGE / LABELS
 ./bin/mywant acts get act-1762… -o json
 ./bin/mywant acts create -f act.yaml         # spec.plan に Plan の名前
 ./bin/mywant acts wait act-1762… [--timeout 5m]   # 完了まで待って status を表示（Failed なら終了コード1）
-./bin/mywant acts run -f plan.yaml [--locale ja_JP]  # Plan を作り、Act を作り、完了まで待つ
+./bin/mywant acts run -f plan.yaml [--locale ja_JP] [--label k=v]  # Plan を作り、Act を作り、完了まで待つ（ラベルは両方に付く）
 ./bin/mywant acts delete act-1762…
 ```
 
 ```yaml
 apiVersion: mywant.io/v1
 kind: Plan
+metadata:
+  labels: {device: iphone}   # 送ったまま残る（name と createdAt はサーバーが付ける）
 spec:
   question: 最新のゴルフのスコアは？
   action: existing          # existing | new | none
   target: smartgolf-check-reserved-instance
   capability: rounds
 ```
+
+### Labels（すべてのオブジェクト型）
+
+Want・WantType・CharacterSkill・Thing に加えて、Plan / Act（`metadata.labels`）、レシピ（`recipe.metadata.labels`）、Capability・Agent（`capability-*.yaml` / `agent-*.yaml` の各項目、MRS エージェントの `metadata.labels`）、星座（`labels`）にもラベルを付けられる（型は want-spec）。星座のラベルは星座そのもののもので、色と同じくメンバーに `constellation-labels/<name>` として載る。`mywant agents list` / `get` にもラベルが出る。
 
 ### Global State
 

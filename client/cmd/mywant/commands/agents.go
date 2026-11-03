@@ -52,14 +52,15 @@ var listAgentsCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "Name\tType\tCapabilities")
+		fmt.Fprintln(w, "Name\tType\tCapabilities\tLabels")
 
 		if agents, ok := resp["agents"]; ok {
 			for _, agent := range agents {
-				fmt.Fprintf(w, "%s\t%s\t%s\n",
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 					agent.Name,
 					agent.Type,
 					strings.Join(agent.Capabilities, ", "),
+					labelsText(agent.Labels),
 				)
 			}
 		}
@@ -84,6 +85,7 @@ var getAgentCmd = &cobra.Command{
 		fmt.Printf("Name: %s\n", agent.Name)
 		fmt.Printf("Type: %s\n", agent.Type)
 		fmt.Printf("Capabilities: %s\n", strings.Join(agent.Capabilities, ", "))
+		fmt.Printf("Labels: %s\n", labelsText(agent.Labels))
 	},
 }
 

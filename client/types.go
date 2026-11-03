@@ -175,13 +175,15 @@ type SaveRecipeResponse struct {
 }
 
 type Agent struct {
-	Name         string   `json:"name"`
-	Type         string   `json:"type"`
-	Capabilities []string `json:"capabilities"`
+	Name         string            `json:"name"`
+	Type         string            `json:"type"`
+	Capabilities []string          `json:"capabilities"`
+	Labels       map[string]string `json:"labels,omitempty"`
 }
 
 type Capability struct {
-	Name string `json:"name"`
+	Name   string            `json:"name"`
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 type WantType struct {

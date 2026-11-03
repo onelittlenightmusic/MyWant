@@ -44,6 +44,8 @@ type Constellation struct {
 	CaptureAt   string            `json:"captureAt,omitempty" yaml:"captureAt,omitempty"`
 	Members     []string          `json:"members" yaml:"members"`
 	MemberKinds map[string]string `json:"memberKinds,omitempty" yaml:"memberKinds,omitempty"`
+	// Labels are the constellation's own (not its members').
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // ThingDefinition is a name given to a value, and who gave it.
@@ -335,6 +337,8 @@ type ConstellationChange struct {
 	Color   *string   `json:"color,omitempty"`
 	// Capture: the hub's tile id — a capture into it; "" makes it an order.
 	Capture *string `json:"capture,omitempty"`
+	// Labels replace its own labels when given; an empty map clears them.
+	Labels *map[string]string `json:"labels,omitempty"`
 }
 
 // CreateConstellation makes a constellation of things or wants.

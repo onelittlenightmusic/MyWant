@@ -4,7 +4,6 @@ package client
 // want-spec's types.
 
 import (
-	"fmt"
 	"net/url"
 	"strconv"
 
@@ -20,10 +19,11 @@ func (c *Client) CreatePlan(p *ws.Plan) (*ws.Plan, error) {
 	return &out, nil
 }
 
-// ListPlans is the plans, newest first; limit 0 is all the server keeps.
-func (c *Client) ListPlans(limit int) ([]ws.Plan, error) {
+// ListPlans is the plans, newest first; limit 0 is all the server keeps,
+// selector ("k=v,k2!=v2,k3") narrows them by their labels.
+func (c *Client) ListPlans(limit int, selector string) ([]ws.Plan, error) {
 	var out ws.PlanList
-	if err := c.Request("GET", "/api/v1/plans"+limitQuery(limit), nil, &out); err != nil {
+	if err := c.Request("GET", "/api/v1/plans"+listQuery(limit, selector), nil, &out); err != nil {
 		return nil, err
 	}
 	return out.Plans, nil
@@ -52,10 +52,11 @@ func (c *Client) CreateAct(a *ws.Act) (*ws.Act, error) {
 	return &out, nil
 }
 
-// ListActs is the acts, newest first; limit 0 is all the server keeps.
-func (c *Client) ListActs(limit int) ([]ws.Act, error) {
+// ListActs is the acts, newest first; limit 0 is all the server keeps,
+// selector ("k=v,k2!=v2,k3") narrows them by their labels.
+func (c *Client) ListActs(limit int, selector string) ([]ws.Act, error) {
 	var out ws.ActList
-	if err := c.Request("GET", "/api/v1/acts"+limitQuery(limit), nil, &out); err != nil {
+	if err := c.Request("GET", "/api/v1/acts"+listQuery(limit, selector), nil, &out); err != nil {
 		return nil, err
 	}
 	return out.Acts, nil
@@ -80,9 +81,16 @@ func (c *Client) DeleteAct(name string) error {
 	return c.Request("DELETE", "/api/v1/acts/"+url.PathEscape(name), nil, nil)
 }
 
-func limitQuery(limit int) string {
-	if limit <= 0 {
+func listQuery(limit int, selector string) string {
+	q := url.Values{}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if selector != "" {
+		q.Set("labelSelector", selector)
+	}
+	if len(q) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("?limit=%d", limit)
+	return "?" + q.Encode()
 }

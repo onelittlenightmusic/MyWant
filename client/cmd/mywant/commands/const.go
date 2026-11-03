@@ -125,8 +125,8 @@ var constCreateCmd = &cobra.Command{
 }
 
 var constUpdateCmd = &cobra.Command{
-	Use:   "update <name> [--name n] [--member <ref>...] [--hub <ref>|--order] [--color #rrggbb]",
-	Short: "Change what is given: its name, members (replaced), hub or colour",
+	Use:   "update <name> [--name n] [--member <ref>...] [--hub <ref>|--order] [--color #rrggbb] [--label k=v...|--clear-labels]",
+	Short: "Change what is given: its name, members (replaced), hub, colour or labels (replaced)",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ch := constChange(cmd)
@@ -137,8 +137,8 @@ var constUpdateCmd = &cobra.Command{
 			empty := ""
 			ch.Capture = &empty
 		}
-		if ch.Name == nil && ch.Members == nil && ch.Color == nil && ch.Capture == nil {
-			exitErr("updating", fmt.Errorf("say --name, --member, --hub, --order or --color"))
+		if ch.Name == nil && ch.Members == nil && ch.Color == nil && ch.Capture == nil && ch.Labels == nil {
+			exitErr("updating", fmt.Errorf("say --name, --member, --hub, --order, --color, --label or --clear-labels"))
 		}
 		if err := memoClient().UpdateConstellation(args[0], ch); err != nil {
 			exitErr("updating the constellation", err)
@@ -213,6 +213,13 @@ func constChange(cmd *cobra.Command) client.ConstellationChange {
 	if color, _ := cmd.Flags().GetString("color"); color != "" {
 		ch.Color = &color
 	}
+	if labels := flagLabels(cmd); labels != nil {
+		ch.Labels = &labels
+	}
+	if clear, _ := cmd.Flags().GetBool("clear-labels"); clear {
+		none := map[string]string{}
+		ch.Labels = &none
+	}
 	return ch
 }
 
@@ -281,7 +288,9 @@ func init() {
 		c.Flags().StringArray("member", nil, "Member: a thing's name, id or catalog::value, or a want's id (repeatable)")
 		c.Flags().String("hub", "", "Its hub: the tile it is a capture into (a thing or a want)")
 		c.Flags().String("color", "", "Its colour, #rrggbb")
+		c.Flags().StringArray("label", nil, "Its own label k=v (repeatable; on update, they replace its labels)")
 	}
+	constUpdateCmd.Flags().Bool("clear-labels", false, "Clear its own labels")
 	constUpdateCmd.Flags().String("name", "", "Its new name")
 	constUpdateCmd.Flags().Bool("order", false, "No hub: an order, drawn as a chain")
 	constExportCmd.Flags().StringP("output", "o", "", "File to write (default stdout)")

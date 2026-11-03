@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
-	github.com/onelittlenightmusic/want-spec v0.1.27
+	github.com/onelittlenightmusic/want-spec v0.1.28-0.20261103120524-b439e7dd3d2a
 	github.com/stretchr/testify v1.12.1
 	github.com/tetratelabs/wazero v1.11.0
 	go.opentelemetry.io/otel v1.46.0
@@ -64,4 +64,3 @@ require (
 // Move to go.yaml.in/yaml/v4 once it is stable with that fix, and drop this —
 // see engine/third_party/yaml.v3/PATCHED.md.
 replace gopkg.in/yaml.v3 => ./third_party/yaml.v3
-replace github.com/onelittlenightmusic/want-spec => ./third_party/want-spec

@@ -724,16 +724,17 @@ func (s *Server) registerAgentYAML(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	var data struct {
-		Name         string   `json:"name"`
-		Type         string   `json:"type"`
-		Capabilities []string `json:"capabilities"`
+		Name         string            `json:"name"`
+		Type         string            `json:"type"`
+		Capabilities []string          `json:"capabilities"`
+		Labels       map[string]string `json:"labels"`
 	}
 	if err := DecodeRequest(r, &data); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
 
-	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type)}
+	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type), Labels: data.Labels}
 	var agent mywant.Agent
 	if data.Type == "do" {
 		agent = &mywant.DoAgent{BaseAgent: base}
@@ -741,14 +742,14 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		agent = &mywant.MonitorAgent{BaseAgent: base}
 	}
 	s.agentRegistry.RegisterAgent(agent)
-	s.JSONResponse(w, http.StatusCreated, map[string]any{"name": agent.GetName(), "type": agent.GetType()})
+	s.JSONResponse(w, http.StatusCreated, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities(), "labels": agent.GetLabels()})
 }
 
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 	agents := s.agentRegistry.GetAllAgents()
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
-		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
+		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities(), "labels": a.GetLabels()}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }
@@ -756,7 +757,7 @@ func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getAgent(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	if agent, ok := s.agentRegistry.GetAgent(vars["name"]); ok {
-		s.JSONResponse(w, http.StatusOK, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities()})
+		s.JSONResponse(w, http.StatusOK, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities(), "labels": agent.GetLabels()})
 		return
 	}
 	s.JSONError(w, r, http.StatusNotFound, "Not found", "")
@@ -809,7 +810,7 @@ func (s *Server) findAgentsByCapability(w http.ResponseWriter, r *http.Request) 
 	}
 	res := make([]map[string]any, len(agents))
 	for i, a := range agents {
-		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities()}
+		res[i] = map[string]any{"name": a.GetName(), "type": a.GetType(), "capabilities": a.GetCapabilities(), "labels": a.GetLabels()}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"agents": res})
 }
@@ -1196,36 +1197,6 @@ func (s *Server) deleteReactionQueue(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
-// OpenAPI Spec
-func (s *Server) getSpec(w http.ResponseWriter, r *http.Request) {
-	specPaths := []string{"openapi.yaml", "../openapi.yaml", "../../openapi.yaml"}
-	var data []byte
-	var err error
-
-	for _, path := range specPaths {
-		data, err = os.ReadFile(path)
-		if err == nil {
-			break
-		}
-	}
-
-	if err != nil {
-		s.JSONError(w, r, http.StatusNotFound, "OpenAPI specification not found", err.Error())
-		return
-	}
-
-	if strings.Contains(r.Header.Get("Accept"), "application/json") {
-		var body any
-		if err := yaml.Unmarshal(data, &body); err != nil {
-			s.JSONError(w, r, http.StatusInternalServerError, "Failed to parse specification", err.Error())
-			return
-		}
-		s.JSONResponse(w, http.StatusOK, body)
-	} else {
-		w.Header().Set("Content-Type", "application/yaml")
-		w.Write(data)
-	}
-}
 
 // Screenshots
 func (s *Server) serveReplayScreenshot(w http.ResponseWriter, r *http.Request) {
