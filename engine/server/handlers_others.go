@@ -1512,12 +1512,11 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 	// Archive ride / web-presence transitions as durable traces.
 	logPresenceTraces(priorPresence, updates)
 
-	// Device settings go to devices.yaml, which is their home — a pinned
-	// browser is a fact about this machine, not about the board you happen to
-	// be looking at. The want keeps them as a mirror (stored above with
-	// everything else) so clients reading gui_state see them; the overlay in
-	// guiStateWithConfig is what makes the file the answer.
-	mywant.GetDeviceStore().ApplyGUIUpdates(updates)
+	// Device settings are not written here any more: they have their own
+	// resource (PUT /devices/settings, handlers_devices.go) and live in
+	// devices.yaml. What a client still sends under their keys is overlaid
+	// with the file's on the way out (guiStateWithConfig), so it changes
+	// nothing.
 
 	// Append robot log entry when a new robot command arrives (visible=true, nonce present)
 	if vis, ok := updates["robot_visible"]; ok {

@@ -42,7 +42,8 @@ func (s *Server) getThingSuggestions(w http.ResponseWriter, r *http.Request) {
 // that ended up reimplemented in three different files. All of that is derived
 // from state this server already holds, so it belongs in the one GET.
 type ThingFull struct {
-	// ID is "<catalog>::<value>" — the id used everywhere a thing is referred to.
+	// ID is the thing's own id ("thg-<uuid>") — the id used everywhere a thing
+	// is referred to; it survives its catalog and its name changing.
 	ID      string `json:"id"`
 	Catalog string `json:"catalog"`
 	Subtype string `json:"subtype"`
@@ -76,6 +77,24 @@ type ThingFull struct {
 // Every remembered value, whole: name, type, who named it, where it sits, and
 // which wants are naming it.
 func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
+	s.JSONResponse(w, http.StatusOK, map[string]any{"things": s.thingFulls()})
+}
+
+// GET /api/v1/things/{id}
+// One thing, whole — as GET /things gives each.
+func (s *Server) getThing(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	for _, t := range s.thingFulls() {
+		if t.ID == id {
+			s.JSONResponse(w, http.StatusOK, t)
+			return
+		}
+	}
+	s.JSONError(w, r, http.StatusNotFound, "no such thing", id)
+}
+
+// thingFulls is every remembered value, whole, by catalog then value.
+func (s *Server) thingFulls() []ThingFull {
 	types := DataTypeDefinitions()
 
 	usageByID := map[string][]string{}
@@ -143,8 +162,7 @@ func (s *Server) getThings(w http.ResponseWriter, _ *http.Request) {
 		}
 		return out[i].Value < out[j].Value
 	})
-
-	s.JSONResponse(w, http.StatusOK, map[string]any{"things": out})
+	return out
 }
 
 // GET /api/v1/memo/subtypes
@@ -516,4 +534,175 @@ func (s *Server) shareContent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.JSONResponse(w, http.StatusOK, reply)
+}
+
+// As a want is a resource (handlers_wants.go), so is a thing: besides list,
+// create, update and delete above, one read whole (getThing), several deleted
+// at once, a label put on and taken off, and the lot written out as YAML and
+// read back in (matched by catalog and value, its labels laid on):
+//
+//	GET    /api/v1/things/{id}
+//	PUT    /api/v1/things/{id}              {catalog, value} (as PATCH)
+//	DELETE /api/v1/things?ids=a,b
+//	POST   /api/v1/things/{id}/labels       {key, value}
+//	PATCH  /api/v1/things/{id}/labels       {set?: {key: value}, remove?: [key]}
+//	DELETE /api/v1/things/{id}/labels/{key}
+//	POST   /api/v1/things/export[?ids=a,b]  YAML
+//	POST   /api/v1/things/import            YAML
+
+// exportedThing is a thing as written out and read back in.
+type exportedThing struct {
+	ID        string            `yaml:"id,omitempty" json:"id,omitempty"`
+	Catalog   string            `yaml:"catalog" json:"catalog"`
+	Value     string            `yaml:"value" json:"value"`
+	CreatedAt string            `yaml:"createdAt,omitempty" json:"createdAt,omitempty"`
+	Labels    map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+}
+
+// DELETE /api/v1/things?ids=a,b
+func (s *Server) deleteThings(w http.ResponseWriter, r *http.Request) {
+	ids := splitList(r.URL.Query().Get("ids"))
+	if len(ids) == 0 {
+		s.JSONError(w, r, http.StatusBadRequest, "ids are required", "?ids=a,b")
+		return
+	}
+	var deleted, missing []string
+	for _, id := range ids {
+		if !s.thingKnown(id) {
+			missing = append(missing, id)
+			continue
+		}
+		if err := s.thingStore.Delete(id); err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "failed to delete thing", err.Error())
+			return
+		}
+		deleted = append(deleted, id)
+	}
+	boardThingsChanged(deleted...)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"deleted": deleted, "missing": missing})
+}
+
+// POST /api/v1/things/{id}/labels  {key, value}
+func (s *Server) addLabelToThing(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct{ Key, Value string }
+	if err := DecodeRequest(r, &req); err != nil || req.Key == "" {
+		s.JSONError(w, r, http.StatusBadRequest, "key is required", "")
+		return
+	}
+	if !s.thingKnown(id) {
+		s.JSONError(w, r, http.StatusNotFound, "no such thing", id)
+		return
+	}
+	if err := s.thingLabels.Set(id, req.Key, req.Value); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to set label", err.Error())
+		return
+	}
+	// A label is how a thing gets pinned to the canvas — the same kind of news
+	// as being named.
+	boardThingsChanged(id)
+	// A thing given a picture has its words read (thing_picture_text.go).
+	if req.Key == thingPictureLabel {
+		s.readThingPictureSoon(id, req.Value)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"id": id, "key": req.Key, "value": req.Value})
+}
+
+// DELETE /api/v1/things/{id}/labels/{key}
+func (s *Server) removeLabelFromThing(w http.ResponseWriter, r *http.Request) {
+	id, key := mux.Vars(r)["id"], mux.Vars(r)["key"]
+	if !s.thingKnown(id) {
+		s.JSONError(w, r, http.StatusNotFound, "no such thing", id)
+		return
+	}
+	if err := s.thingLabels.Remove(id, key); err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to remove label", err.Error())
+		return
+	}
+	boardThingsChanged(id)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"id": id, "key": key})
+}
+
+// PATCH /api/v1/things/{id}/labels  {set?: {key: value}, remove?: [key]}
+// Several labels at once — a tile moved is its x and its y — told to the
+// board once rather than once a label.
+func (s *Server) patchThingLabels(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var req struct {
+		Set    map[string]string `json:"set"`
+		Remove []string          `json:"remove"`
+	}
+	if err := DecodeRequest(r, &req); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+		return
+	}
+	if !s.thingKnown(id) {
+		s.JSONError(w, r, http.StatusNotFound, "no such thing", id)
+		return
+	}
+	for k, v := range req.Set {
+		if err := s.thingLabels.Set(id, k, v); err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "failed to set label", err.Error())
+			return
+		}
+	}
+	for _, k := range req.Remove {
+		if err := s.thingLabels.Remove(id, k); err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "failed to remove label", err.Error())
+			return
+		}
+	}
+	boardThingsChanged(id)
+	if v, ok := req.Set[thingPictureLabel]; ok {
+		s.readThingPictureSoon(id, v)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"id": id, "labels": s.thingLabels.Get(id)})
+}
+
+// POST /api/v1/things/export[?ids=a,b]
+func (s *Server) exportThings(w http.ResponseWriter, r *http.Request) {
+	only := map[string]bool{}
+	for _, id := range splitList(r.URL.Query().Get("ids")) {
+		only[id] = true
+	}
+	labels := s.thingLabels.All()
+	out := []exportedThing{}
+	for _, e := range s.thingStore.Entries() {
+		if e.Value == "" || (len(only) > 0 && !only[e.ID]) {
+			continue
+		}
+		out = append(out, exportedThing{ID: e.ID, Catalog: e.Catalog, Value: e.Value, CreatedAt: e.CreatedAt, Labels: labels[e.ID]})
+	}
+	writeYAML(w, out)
+}
+
+// POST /api/v1/things/import
+func (s *Server) importThings(w http.ResponseWriter, r *http.Request) {
+	var in []exportedThing
+	if err := readYAML(r, &in); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid YAML", err.Error())
+		return
+	}
+	var ids []string
+	for _, t := range in {
+		if t.Catalog == "" || t.Value == "" {
+			s.JSONError(w, r, http.StatusBadRequest, "catalog and value are required", t.ID)
+			return
+		}
+		catalog := t.Catalog
+		if _, isSubtype := DataTypeDefinitions()[catalog]; isSubtype {
+			catalog = subtypeToKey(catalog)
+		}
+		entry, err := s.thingStore.Add(catalog, t.Value)
+		if err != nil {
+			s.JSONError(w, r, http.StatusInternalServerError, "failed to save thing", err.Error())
+			return
+		}
+		for k, v := range t.Labels {
+			_ = s.thingLabels.Set(entry.ID, k, v)
+		}
+		ids = append(ids, entry.ID)
+	}
+	boardThingsChanged(ids...)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"imported": ids})
 }

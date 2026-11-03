@@ -459,7 +459,7 @@ var thingLabelsCmd = &cobra.Command{
 }
 
 var thingLabelCmd = &cobra.Command{
-	Use:   "label <catalog::value> <key> [value]",
+	Use:   "label <id|catalog::value> <key> [value]",
 	Short: "Attach a label to a memo value (omit the label value to remove it)",
 	Args:  cobra.RangeArgs(2, 3),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -686,12 +686,12 @@ func init() {
 
 	memoConstellationsListCmd.Flags().Bool("json", false, "Output as JSON")
 	memoConstellationsListCmd.Flags().String("kind", "", "Only memo or want groups")
-	memoConstellationsCreateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsCreateCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
 	memoConstellationsCreateCmd.Flags().StringArray("member", nil, "Member id, repeatable")
-	memoConstellationsUpdateCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsUpdateCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
 	memoConstellationsUpdateCmd.Flags().String("name", "", "New group name")
 	memoConstellationsUpdateCmd.Flags().StringArray("member", nil, "Replacement member id, repeatable")
-	memoConstellationsDeleteCmd.Flags().String("kind", "memo", "Group kind: memo or want")
+	memoConstellationsDeleteCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
 
 	thingConstellationsCmd.AddCommand(memoConstellationsListCmd)
 	thingConstellationsCmd.AddCommand(memoConstellationsCreateCmd)

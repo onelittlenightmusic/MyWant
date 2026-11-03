@@ -76,26 +76,26 @@ func legacyConstellationKey(name string) string { return legacyConstellationLabe
 // every existing caller reads it and because "what sort of constellation is
 // this" is still a fair question.
 type constellationDTO struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   string `json:"id" yaml:"id"`
+	Name string `json:"name" yaml:"name"`
 	// "thing", "want", or "mixed" — derived from the members.
-	Kind  string `json:"kind"`
-	Color string `json:"color,omitempty"`
+	Kind  string `json:"kind" yaml:"kind"`
+	Color string `json:"color,omitempty" yaml:"color,omitempty"`
 	// Art is the URL of a picture drawn for it (constellation_art.go), laid
 	// on the board's floor under it — carried by its members as the colour is.
-	Art string `json:"art,omitempty"`
+	Art string `json:"art,omitempty" yaml:"art,omitempty"`
 	// Capture is the tile a capture constellation was caught into — drawn from
 	// it out to each member; "" is an order, drawn as a chain
 	// (constellation_capture.go).
-	Capture string `json:"capture,omitempty"`
+	Capture string `json:"capture,omitempty" yaml:"capture,omitempty"`
 	// CaptureAt is where its hub was last seen, "x,y" — its ring stays there
 	// when the hub is gone.
-	CaptureAt string   `json:"captureAt,omitempty"`
-	Members   []string `json:"members"`
+	CaptureAt string   `json:"captureAt,omitempty" yaml:"captureAt,omitempty"`
+	Members   []string `json:"members" yaml:"members"`
 	// Which kind each member is, keyed by the same ids as Members. The list
 	// stays a list of ids so that every caller that only asks "is this id in
 	// here" keeps working unchanged.
-	MemberKinds map[string]string `json:"memberKinds,omitempty"`
+	MemberKinds map[string]string `json:"memberKinds,omitempty" yaml:"memberKinds,omitempty"`
 }
 
 // collectThingConstellations aggregates constellation/* labels across all memo values.
@@ -383,17 +383,9 @@ func (s *Server) setConstellationLabel(kind, name, key, value string) {
 	}
 }
 
-// normalizeConstellationKind accepts the pre-rename name for the thing side.
-func normalizeConstellationKind(kind string) string {
-	if kind == "memo" {
-		return "thing"
-	}
-	return kind
-}
-
-// GET /api/v1/constellations?kind=thing|want ("memo" still accepted for thing)
+// GET /api/v1/constellations?kind=thing|want
 func (s *Server) getConstellations(w http.ResponseWriter, r *http.Request) {
-	kind := normalizeConstellationKind(r.URL.Query().Get("kind"))
+	kind := r.URL.Query().Get("kind")
 	var groups []constellationDTO
 	switch kind {
 	case "want":
@@ -432,7 +424,6 @@ func (s *Server) createConstellation(w http.ResponseWriter, r *http.Request) {
 	// and a thing together. It is still accepted — every existing caller sends
 	// it — and still validated when present, so a typo is an error rather than
 	// silently ignored.
-	body.Kind = normalizeConstellationKind(body.Kind)
 	if body.Kind != "" && body.Kind != "thing" && body.Kind != "want" && body.Kind != "mixed" {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing, want or mixed")
 		return
@@ -487,7 +478,6 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	}
 	// As on create, `kind` no longer decides anything — each member is written
 	// where it lives. Still validated when present so a typo is not silence.
-	body.Kind = normalizeConstellationKind(body.Kind)
 	if body.Kind != "" && body.Kind != "thing" && body.Kind != "want" && body.Kind != "mixed" {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing, want or mixed")
 		return
@@ -581,17 +571,32 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group updated", "name": newName})
 }
 
+// GET /api/v1/constellations/{name}
+// One constellation, as GET /constellations gives each.
+func (s *Server) getConstellation(w http.ResponseWriter, r *http.Request) {
+	name := mux.Vars(r)["name"]
+	for _, c := range s.collectAllConstellations() {
+		if c.Name == name {
+			s.JSONResponse(w, http.StatusOK, c)
+			return
+		}
+	}
+	s.JSONError(w, r, http.StatusNotFound, "no such constellation", name)
+}
+
 // DELETE /api/v1/constellations/{name}?kind=memo|want
 func (s *Server) deleteConstellation(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	// Its art goes with it: nothing else will ever point at the file.
-	s.removeArtFile(s.anyConstellationArt(name))
+	// Its art goes with it — once its members have let go of it (a file
+	// still worn is kept: removeArtFile).
+	art := s.anyConstellationArt(name)
 	// The ?kind= is accepted and ignored. Deleting a constellation means the
 	// name stops existing, and a name that had a want and a thing in it would
 	// otherwise half-survive whichever kind the caller happened to send.
 	for _, m := range s.allMembersOfConstellation(name) {
 		s.setConstellationMembership(s.memberKindOf(m), name, m, false)
 	}
+	s.removeArtFile(art)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group deleted"})
 }
 
@@ -718,52 +723,95 @@ func (e errConstellationName) Error() string { return string(e) }
 
 // ── Raw memo-label endpoints (general facility; groups ride on top) ──────────
 
-// GET /api/v1/memo/labels
-func (s *Server) getThingLabels(w http.ResponseWriter, _ *http.Request) {
-	s.JSONResponse(w, http.StatusOK, map[string]any{"labels": s.thingLabels.All()})
+
+
+
+// As a want is a resource (handlers_wants.go), so is a constellation: besides
+// list, create, update and delete above, one read (getConstellation), PATCH as
+// PUT (what is given changes), several deleted at once, and the lot written
+// out as YAML and read back in (made or joined by name, with its colour, art
+// and hub):
+//
+//	GET    /api/v1/constellations/{name}
+//	PATCH  /api/v1/constellations/{name}
+//	DELETE /api/v1/constellations?names=a,b
+//	POST   /api/v1/constellations/export[?names=a,b]  YAML
+//	POST   /api/v1/constellations/import              YAML
+
+// DELETE /api/v1/constellations?names=a,b
+func (s *Server) deleteConstellations(w http.ResponseWriter, r *http.Request) {
+	names := splitList(r.URL.Query().Get("names"))
+	if len(names) == 0 {
+		s.JSONError(w, r, http.StatusBadRequest, "names are required", "?names=a,b")
+		return
+	}
+	var deleted, missing []string
+	for _, name := range names {
+		members := s.allMembersOfConstellation(name)
+		if len(members) == 0 {
+			missing = append(missing, name)
+			continue
+		}
+		art := s.anyConstellationArt(name)
+		for _, m := range members {
+			s.setConstellationMembership(s.memberKindOf(m), name, m, false)
+		}
+		s.removeArtFile(art)
+		deleted = append(deleted, name)
+	}
+	boardThingsChanged()
+	s.JSONResponse(w, http.StatusOK, map[string]any{"deleted": deleted, "missing": missing})
 }
 
-// POST /api/v1/memo/labels   body: {value_id, key, value}
-func (s *Server) setThingLabel(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		ValueID string `json:"value_id"`
-		Key     string `json:"key"`
-		Value   string `json:"value"`
+// POST /api/v1/constellations/export[?names=a,b]
+func (s *Server) exportConstellations(w http.ResponseWriter, r *http.Request) {
+	only := map[string]bool{}
+	for _, n := range splitList(r.URL.Query().Get("names")) {
+		only[n] = true
 	}
-	if err := DecodeRequest(r, &body); err != nil {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
-		return
+	out := []constellationDTO{}
+	for _, c := range s.collectAllConstellations() {
+		if len(only) == 0 || only[c.Name] {
+			out = append(out, c)
+		}
 	}
-	if err := s.thingLabels.Set(body.ValueID, body.Key, body.Value); err != nil {
-		s.JSONError(w, r, http.StatusInternalServerError, "failed to set memo label", err.Error())
-		return
-	}
-	// A label is how a value gets pinned to the canvas, which is a change to
-	// what the city knows about it — the same kind of news as being named.
-	boardThingsChanged(body.ValueID)
-	// A thing given a picture has its words read (thing_picture_text.go).
-	if body.Key == thingPictureLabel {
-		s.readThingPictureSoon(body.ValueID, body.Value)
-	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label set"})
+	writeYAML(w, out)
 }
 
-// POST /api/v1/memo/labels/remove   body: {value_id, key}
-func (s *Server) removeThingLabel(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		ValueID string `json:"value_id"`
-		Key     string `json:"key"`
-	}
-	if err := DecodeRequest(r, &body); err != nil {
-		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
+// POST /api/v1/constellations/import
+func (s *Server) importConstellations(w http.ResponseWriter, r *http.Request) {
+	var in []constellationDTO
+	if err := readYAML(r, &in); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid YAML", err.Error())
 		return
 	}
-	if err := s.thingLabels.Remove(body.ValueID, body.Key); err != nil {
-		s.JSONError(w, r, http.StatusInternalServerError, "failed to remove memo label", err.Error())
-		return
+	var names []string
+	for _, c := range in {
+		name := c.Name
+		if name == "" {
+			name = c.ID
+		}
+		if err := validateConstellationName(name); err != nil {
+			s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
+			return
+		}
+		for _, m := range c.Members {
+			s.setConstellationMembership(s.memberKindOf(m), name, m, true)
+		}
+		if c.Color != "" {
+			s.setConstellationColorEverywhere(name, c.Color)
+		}
+		if c.Art != "" {
+			s.setConstellationArtEverywhere(name, c.Art)
+		}
+		if c.Capture != "" {
+			s.setConstellationCaptureEverywhere(name, c.Capture)
+		}
+		if c.CaptureAt != "" {
+			s.setConstellationCaptureAtEverywhere(name, c.CaptureAt)
+		}
+		names = append(names, name)
 	}
-	// The same news as setting one: taking a thing out of the archive, or
-	// unpinning it back to the board's own rule, is a label going away.
-	boardThingsChanged(body.ValueID)
-	s.JSONResponse(w, http.StatusOK, map[string]any{"message": "label removed"})
+	boardThingsChanged()
+	s.JSONResponse(w, http.StatusOK, map[string]any{"imported": names})
 }

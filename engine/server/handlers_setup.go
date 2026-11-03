@@ -286,13 +286,17 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/capture/proposals", s.getCaptureProposals).Methods("GET", "OPTIONS")
 	api.HandleFunc("/capture/proposals/{thing}", s.answerCaptureProposal).Methods("POST", "OPTIONS")
 	api.HandleFunc("/capture/things/{thing}", s.captureExistingThing).Methods("POST", "OPTIONS")
-	for _, prefix := range []string{"/things", "/memo"} {
-		things := api.PathPrefix(prefix).Subrouter()
+	{
+		things := api.PathPrefix("/things").Subrouter()
 		things.HandleFunc("", s.getThings).Methods("GET", "OPTIONS")
 		things.HandleFunc("", s.putThings).Methods("PUT", "OPTIONS")
 		// Identity-bearing operations. A thing's id survives its catalog and
 		// its name changing, which is the whole reason it has one.
 		things.HandleFunc("", s.createThing).Methods("POST", "OPTIONS")
+		things.HandleFunc("", s.deleteThings).Methods("DELETE")
+		// As a want's (handlers_things_constellations_crud.go).
+		things.HandleFunc("/export", s.exportThings).Methods("POST", "OPTIONS")
+		things.HandleFunc("/import", s.importThings).Methods("POST", "OPTIONS")
 		things.HandleFunc("/subtypes", s.getThingSubtypes).Methods("GET", "OPTIONS")
 		// What another app shared, read as things of the subtype each is
 		// (thing_classify.go): classify only says, share makes and pins them.
@@ -305,11 +309,6 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/usage", s.getThingUsage).Methods("GET", "OPTIONS")
 		things.HandleFunc("/stats", s.getThingStats).Methods("GET", "OPTIONS")
 		things.HandleFunc("/suggestions/{subtype}", s.getThingSuggestions).Methods("GET", "OPTIONS")
-		// Per-thing labels (general facility; constellations ride on
-		// constellation/* keys)
-		things.HandleFunc("/labels", s.getThingLabels).Methods("GET", "OPTIONS")
-		things.HandleFunc("/labels", s.setThingLabel).Methods("POST")
-		things.HandleFunc("/labels/remove", s.removeThingLabel).Methods("POST", "OPTIONS")
 		// A thing's first art, still served (thing_art.go); art is art.go's now.
 		things.HandleFunc("/art/{id}", s.serveThingArt).Methods("GET")
 		// A thing's neighbours: constellation co-members and the wants naming it.
@@ -318,18 +317,27 @@ func (s *Server) setupRoutes() {
 		things.HandleFunc("/{id}/relations", s.listThingRelations).Methods("GET", "OPTIONS")
 		// Registered last: "{id}" would otherwise swallow "/labels", "/events"
 		// and the rest, which are literal paths and not thing ids.
-		things.HandleFunc("/{id}", s.patchThing).Methods("PATCH", "OPTIONS")
+		// A thing's labels (constellations ride on constellation/* keys).
+		things.HandleFunc("/{id}/labels", s.addLabelToThing).Methods("POST", "OPTIONS")
+		things.HandleFunc("/{id}/labels", s.patchThingLabels).Methods("PATCH")
+		things.HandleFunc("/{id}/labels/{key}", s.removeLabelFromThing).Methods("DELETE", "OPTIONS")
+		things.HandleFunc("/{id}", s.getThing).Methods("GET")
+		things.HandleFunc("/{id}", s.patchThing).Methods("PATCH", "PUT", "OPTIONS")
 		things.HandleFunc("/{id}", s.deleteThing).Methods("DELETE", "OPTIONS")
 	}
 
 	// Constellations API (label-backed facade: constellation/<name> labels on
-	// memo values / wants). /groups stays registered as the pre-rename alias so
-	// an older client keeps working.
-	for _, prefix := range []string{"/constellations", "/groups"} {
-		sub := api.PathPrefix(prefix).Subrouter()
+	// things and wants).
+	{
+		sub := api.PathPrefix("/constellations").Subrouter()
 		sub.HandleFunc("", s.getConstellations).Methods("GET", "OPTIONS")
 		sub.HandleFunc("", s.createConstellation).Methods("POST", "OPTIONS")
-		sub.HandleFunc("/{name}", s.updateConstellation).Methods("PUT", "OPTIONS")
+		sub.HandleFunc("", s.deleteConstellations).Methods("DELETE")
+		// As a want's (handlers_things_constellations_crud.go).
+		sub.HandleFunc("/export", s.exportConstellations).Methods("POST", "OPTIONS")
+		sub.HandleFunc("/import", s.importConstellations).Methods("POST", "OPTIONS")
+		sub.HandleFunc("/{name}", s.getConstellation).Methods("GET")
+		sub.HandleFunc("/{name}", s.updateConstellation).Methods("PUT", "PATCH", "OPTIONS")
 		sub.HandleFunc("/{name}", s.deleteConstellation).Methods("DELETE", "OPTIONS")
 		// Its first art, still served (constellation_art.go); art is art.go's now.
 		sub.HandleFunc("/art/{file}", s.serveConstellationArt).Methods("GET")
@@ -341,6 +349,12 @@ func (s *Server) setupRoutes() {
 	// Before /art/{kind}/{id} would take it: the words a picture is drawn from.
 	api.HandleFunc("/art/describe", s.describeArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}", s.putArt).Methods("POST", "OPTIONS")
+	// The Y skills, which the GUI extension defines and puts when it starts (skills.go).
+	api.HandleFunc("/character-skills", s.listSkills).Methods("GET", "OPTIONS")
+	api.HandleFunc("/character-skills", s.createSkill).Methods("POST")
+	api.HandleFunc("/character-skills/{name}", s.getSkill).Methods("GET")
+	api.HandleFunc("/character-skills/{name}", s.putSkill).Methods("PUT", "OPTIONS")
+	api.HandleFunc("/character-skills/{name}", s.deleteSkill).Methods("DELETE")
 	api.HandleFunc("/art/{kind}/{id}/scale", s.scaleArt).Methods("POST", "OPTIONS")
 	api.HandleFunc("/art/{kind}/{id}", s.deleteArt).Methods("DELETE")
 	s.setupTranslation(api)
@@ -402,9 +416,21 @@ func (s *Server) setupRoutes() {
 	kata.HandleFunc("/{id}/labels/{key}", s.removeKataLabel).Methods("DELETE", "OPTIONS")
 
 	// Characters CRUD
+	// The connected browsers and apps, and which does what (handlers_devices.go).
+	devices := api.PathPrefix("/devices").Subrouter()
+	devices.HandleFunc("", s.listDevices).Methods("GET", "OPTIONS")
+	devices.HandleFunc("/settings", s.getDeviceSettings).Methods("GET")
+	devices.HandleFunc("/settings", s.putDeviceSettings).Methods("PUT", "OPTIONS")
+	devices.HandleFunc("/{id}", s.getDevice).Methods("GET")
+	devices.HandleFunc("/{id}", s.deleteDevice).Methods("DELETE", "OPTIONS")
+
 	characters := api.PathPrefix("/characters").Subrouter()
 	characters.HandleFunc("", s.listCharacters).Methods("GET", "OPTIONS")
 	characters.HandleFunc("", s.createCharacter).Methods("POST", "OPTIONS")
+	characters.HandleFunc("", s.deleteCharacters).Methods("DELETE")
+	// As a want's (handlers_characters.go).
+	characters.HandleFunc("/export", s.exportCharacters).Methods("POST")
+	characters.HandleFunc("/import", s.importCharacters).Methods("POST")
 	characters.HandleFunc("/prune-devices", s.pruneCharacterDevices).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}", s.getCharacter).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}", s.updateCharacter).Methods("PUT", "OPTIONS")

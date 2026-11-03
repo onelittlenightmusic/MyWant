@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // Memo is the user's catalog of remembered input values, keyed by subtype
@@ -198,30 +199,61 @@ func (c *Client) GetThingStats() (map[string]map[string]MemoStat, error) {
 	return result.Stats, nil
 }
 
-// GetThingLabels returns every label attached to memo values, keyed by value id.
+// GetThingLabels returns every thing's labels, keyed by its id (from GET /things).
 func (c *Client) GetThingLabels() (map[string]map[string]string, error) {
-	var result struct {
-		Labels map[string]map[string]string `json:"labels"`
-	}
-	if err := c.Request("GET", "/api/v1/things/labels", nil, &result); err != nil {
+	things, err := c.GetThings()
+	if err != nil {
 		return nil, err
 	}
-	return result.Labels, nil
+	out := map[string]map[string]string{}
+	for _, t := range things {
+		if len(t.Labels) > 0 {
+			out[t.ID] = t.Labels
+		}
+	}
+	return out, nil
 }
 
-// SetThingLabel attaches key=value to a memo value, identified as "<catalog>::<value>".
-func (c *Client) SetThingLabel(valueID, key, value string) error {
-	body := map[string]string{"value_id": valueID, "key": key, "value": value}
-	return c.Request("POST", "/api/v1/things/labels", body, nil)
+// ResolveThingID is the id of the thing ref names: its id ("thg-…"), or
+// "<catalog>::<value>".
+func (c *Client) ResolveThingID(ref string) (string, error) {
+	catalog, value, pair := strings.Cut(ref, "::")
+	if !pair {
+		return ref, nil
+	}
+	things, err := c.GetThings()
+	if err != nil {
+		return "", err
+	}
+	for _, t := range things {
+		if t.Catalog == catalog && t.Value == value {
+			return t.ID, nil
+		}
+	}
+	return "", fmt.Errorf("no thing %q", ref)
 }
 
-// RemoveThingLabel detaches a label key from a memo value.
-func (c *Client) RemoveThingLabel(valueID, key string) error {
-	body := map[string]string{"value_id": valueID, "key": key}
-	return c.Request("POST", "/api/v1/things/labels/remove", body, nil)
+// SetThingLabel attaches key=value to a thing (POST /things/{id}/labels); ref
+// is its id or "<catalog>::<value>".
+func (c *Client) SetThingLabel(ref, key, value string) error {
+	id, err := c.ResolveThingID(ref)
+	if err != nil {
+		return err
+	}
+	body := map[string]string{"key": key, "value": value}
+	return c.Request("POST", "/api/v1/things/"+url.PathEscape(id)+"/labels", body, nil)
 }
 
-// GetConstellations lists constellations. kind is "memo", "want", or "" for both.
+// RemoveThingLabel detaches a label key from a thing (DELETE /things/{id}/labels/{key}).
+func (c *Client) RemoveThingLabel(ref, key string) error {
+	id, err := c.ResolveThingID(ref)
+	if err != nil {
+		return err
+	}
+	return c.Request("DELETE", "/api/v1/things/"+url.PathEscape(id)+"/labels/"+url.PathEscape(key), nil, nil)
+}
+
+// GetConstellations lists constellations. kind is "thing", "want", or "" for all.
 func (c *Client) GetConstellations(kind string) ([]Constellation, error) {
 	path := "/api/v1/constellations"
 	if kind != "" {

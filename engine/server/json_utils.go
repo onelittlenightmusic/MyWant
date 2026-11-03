@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -58,4 +59,38 @@ func DecodeRequest(r *http.Request, target any) error {
 		return yaml.Unmarshal(data, target)
 	}
 	return json.Unmarshal(data, target)
+}
+
+// splitList is a comma-separated query value's parts, empty ones dropped.
+func splitList(raw string) []string {
+	var out []string
+	for _, p := range strings.Split(raw, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// writeYAML answers with v as YAML.
+func writeYAML(w http.ResponseWriter, v any) {
+	data, err := yaml.Marshal(v)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/yaml")
+	_, _ = w.Write(data)
+}
+
+// readYAML reads the request's body (YAML, or JSON — YAML's subset) into v.
+func readYAML(r *http.Request, v any) error {
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return errors.New("empty body")
+	}
+	return yaml.Unmarshal(data, v)
 }

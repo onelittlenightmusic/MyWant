@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+
+	mywant "mywant/engine/core"
 )
 
 // Art: a picture laid on the board's floor under something on it — a thing,
@@ -27,6 +29,8 @@ import (
 // a rename moves nothing; a picture chosen from somewhere is kept as its URL.
 //
 //	GET    /api/v1/art/files/{file}     a kept picture
+//	(kind: thing, want, constellation — or skill, "<character>:<skill>", a
+//	character's picture for one of its Y skills)
 //	POST   /api/v1/art/{kind}/{id}      multipart image (PNG), or JSON {url}
 //	POST   /api/v1/art/{kind}/{id}/scale  JSON {scale} — how large it lies
 //	DELETE /api/v1/art/{kind}/{id}
@@ -75,8 +79,31 @@ func (s *Server) artOf(kind, id string) (string, bool) {
 			return "", false
 		}
 		return s.anyConstellationArt(id), true
+	case "skill":
+		character, skill, ok := splitSkillArtID(id)
+		if !ok {
+			return "", false
+		}
+		c, found := mywant.GetCharacterManager().Get(character)
+		if !found {
+			return "", false
+		}
+		return c.Labels[skillArtLabel(skill)], true
 	}
 	return "", false
+}
+
+// A character's picture for one of its Y skills (the GUI's skill slot): shown
+// at the character's upper right while the skill is the one equipped. Kept on
+// the character, a label for each skill; its id here is "<character>:<skill>".
+const skillArtLabelPrefix = "mywant.io/skill-art/"
+
+func skillArtLabel(skill string) string { return skillArtLabelPrefix + skill }
+
+// splitSkillArtID is a skill art id's character and skill.
+func splitSkillArtID(id string) (character, skill string, ok bool) {
+	character, skill, ok = strings.Cut(id, ":")
+	return character, skill, ok && character != "" && skill != "" && !strings.ContainsAny(skill, "/:")
 }
 
 // setArt gives it art (url) or, with "", takes it away.
@@ -96,6 +123,14 @@ func (s *Server) setArt(kind, id, url string) error {
 	case "constellation":
 		s.setConstellationArtEverywhere(id, url)
 		boardThingsChanged(s.membersOfConstellation("thing", id)...)
+	case "skill":
+		character, skill, _ := splitSkillArtID(id)
+		if url == "" {
+			mywant.GetCharacterManager().DeleteLabel(character, skillArtLabel(skill))
+		} else {
+			mywant.GetCharacterManager().SetLabel(character, skillArtLabel(skill), url)
+		}
+		go broadcastSSE("character_changed", character)
 	}
 	return nil
 }
@@ -110,6 +145,12 @@ func (s *Server) removeArtFile(url string) {
 	}
 	if i := strings.IndexAny(url, "?#"); i >= 0 {
 		url = url[:i]
+	}
+	// Still worn by something else — a picture chosen from another's kept
+	// file is the same file: kept. Taking a skill's test picture away once
+	// deleted a constellation's floor (国分寺's, 2026-11-03).
+	if url == "" || s.artInUse(url) {
+		return
 	}
 	if file, ok := strings.CutPrefix(url, artURLPrefix); ok && artFileName.MatchString(file) {
 		os.Remove(filepath.Join(dir, file))
@@ -317,4 +358,42 @@ func (s *Server) artURLGiven(w http.ResponseWriter, r *http.Request) (string, bo
 		return "", true
 	}
 	return u, true
+}
+
+// artInUse says whether anything still wears the art file at url (its scale
+// aside): a thing, a want, a constellation (on its members) or a character's
+// skill.
+func (s *Server) artInUse(url string) bool {
+	same := func(v string) bool {
+		if i := strings.IndexAny(v, "?#"); i >= 0 {
+			v = v[:i]
+		}
+		return v == url
+	}
+	if s.thingLabels != nil {
+		for _, labels := range s.thingLabels.All() {
+			for k, v := range labels {
+				if (k == artLabel || strings.HasPrefix(k, constellationArtPrefix)) && same(v) {
+					return true
+				}
+			}
+		}
+	}
+	if s.globalBuilder != nil {
+		for _, w := range s.globalBuilder.GetWants() {
+			for k, v := range w.GetLabels() {
+				if (k == artLabel || strings.HasPrefix(k, constellationArtPrefix)) && same(v) {
+					return true
+				}
+			}
+		}
+	}
+	for _, c := range mywant.GetCharacterManager().List() {
+		for k, v := range c.Labels {
+			if strings.HasPrefix(k, skillArtLabelPrefix) && same(v) {
+				return true
+			}
+		}
+	}
+	return false
 }

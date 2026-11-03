@@ -635,3 +635,81 @@ func (s *Server) removeCharacterLabel(w http.ResponseWriter, r *http.Request) {
 	go broadcastSSE("character_changed", vars["id"])
 	s.JSONResponse(w, http.StatusOK, c)
 }
+
+// As a want is a resource (handlers_wants.go), so is a character: besides
+// list, create, read, replace and delete one above, several deleted at once,
+// and the lot written out as YAML and read back in:
+//
+//	DELETE /api/v1/characters?ids=a,b
+//	POST   /api/v1/characters/export[?ids=a,b]  YAML, as characters.yaml keeps them
+//	POST   /api/v1/characters/import            YAML: one of an id already here is
+//	                                            updated (who they are, how they like
+//	                                            the app, their labels and picture);
+//	                                            any other is added, under its id
+
+// DELETE /api/v1/characters?ids=a,b
+func (s *Server) deleteCharacters(w http.ResponseWriter, r *http.Request) {
+	ids := splitList(r.URL.Query().Get("ids"))
+	if len(ids) == 0 {
+		s.JSONError(w, r, http.StatusBadRequest, "ids are required", "?ids=a,b")
+		return
+	}
+	var deleted, missing []string
+	for _, id := range ids {
+		if !mywant.DeleteCharacter(id) {
+			missing = append(missing, id)
+			continue
+		}
+		s.removeCharacterChatWant(id)
+		deleted = append(deleted, id)
+		go broadcastSSE("character_changed", id)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"deleted": deleted, "missing": missing})
+}
+
+// POST /api/v1/characters/export[?ids=a,b]
+func (s *Server) exportCharacters(w http.ResponseWriter, r *http.Request) {
+	only := map[string]bool{}
+	for _, id := range splitList(r.URL.Query().Get("ids")) {
+		only[id] = true
+	}
+	out := []mywant.Character{}
+	for _, c := range mywant.GetCharacterManager().List() {
+		if len(only) == 0 || only[c.ID] {
+			out = append(out, c)
+		}
+	}
+	writeYAML(w, out)
+}
+
+// POST /api/v1/characters/import
+func (s *Server) importCharacters(w http.ResponseWriter, r *http.Request) {
+	var in []mywant.Character
+	if err := readYAML(r, &in); err != nil {
+		s.JSONError(w, r, http.StatusBadRequest, "invalid YAML", err.Error())
+		return
+	}
+	m := mywant.GetCharacterManager()
+	var ids []string
+	for _, c := range in {
+		if c.ID != "" {
+			if _, ok := m.Get(c.ID); ok {
+				m.Update(c.ID, c)
+				m.SetDisplay(c.ID, c.Display)
+				for k, v := range c.Labels {
+					m.SetLabel(c.ID, k, v)
+				}
+				if c.AvatarImage != "" {
+					m.SetAvatarImage(c.ID, c.AvatarImage)
+				}
+				ids = append(ids, c.ID)
+				go broadcastSSE("character_changed", c.ID)
+				continue
+			}
+		}
+		added := m.Add(c)
+		ids = append(ids, added.ID)
+		go broadcastSSE("character_changed", added.ID)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"imported": ids})
+}

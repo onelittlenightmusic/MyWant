@@ -249,10 +249,11 @@ func (s *Server) migrateAnswerConstellations() {
 		if color != "" && s.anyConstellationColor(hub) == "" {
 			s.setConstellationColorEverywhere(hub, color)
 		}
-		s.removeArtFile(s.anyConstellationArt(old))
+		art := s.anyConstellationArt(old)
 		for _, m := range s.allMembersOfConstellation(old) {
 			s.setConstellationMembership(s.memberKindOf(m), old, m, false)
 		}
+		s.removeArtFile(art)
 		moved++
 	}
 	// A want's constellation made before its hub joined it: the want joins.
