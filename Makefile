@@ -249,6 +249,19 @@ install: release
 	@mv -f $(INSTALL_DIR)/mywant.new $(INSTALL_DIR)/mywant
 	@echo "✅ Installed: $(INSTALL_DIR)/mywant"
 
+# ── The MCP server (mcp/server/) ─────────────────────────────────────────────
+#
+# Claude's way onto the board: the board robot's own tools (board_look,
+# board_use_capability, …) from the server's /api/v1/fm/manifest, beside the
+# catalogue reads. Registered once with
+#   claude mcp add --scope user mywant -- $(INSTALL_DIR)/mywant-mcp --api-url http://localhost:8080
+install-mcp:
+	@mkdir -p $(INSTALL_DIR)
+	cd mcp/server && go build -o $(INSTALL_DIR)/mywant-mcp.new .
+	@codesign --sign - --force $(INSTALL_DIR)/mywant-mcp.new 2>/dev/null || true
+	@mv -f $(INSTALL_DIR)/mywant-mcp.new $(INSTALL_DIR)/mywant-mcp
+	@echo "✅ Installed: $(INSTALL_DIR)/mywant-mcp"
+
 # ── The on-device agent (fmtool/) ─────────────────────────────────────────────
 #
 # Apple's FoundationModels runs on the machine, so this half of MyWant is Swift

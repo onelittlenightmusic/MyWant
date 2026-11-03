@@ -121,10 +121,14 @@ func main() {
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "mywant-mcp-server",
-			Version: "1.1.0",
+			Version: "1.2.0",
 		},
-		nil,
+		// How to work the board with the robot's tools (robot_tools.go).
+		&mcp.ServerOptions{Instructions: myWantServer.robotInstructions()},
 	)
+	// The board robot's own tools — board, look, use_capability, … — from the
+	// server's list, kept in step with the board (robot_tools.go).
+	myWantServer.registerRobotTools(context.Background(), server)
 
 	// Register list_want_types tool
 	mcp.AddTool(server, &mcp.Tool{

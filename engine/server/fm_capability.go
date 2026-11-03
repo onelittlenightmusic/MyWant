@@ -39,9 +39,9 @@ const (
 	// How long a capability's skill may run.
 	fmCapSkillTimeout = 90 * time.Second
 	// How much of each kind of data a prompt is given.
-	fmCapAnswers = 12
-	fmCapPhotos  = 8
-	fmCapLines   = 24
+	fmCapAnswers = 6
+	fmCapPhotos  = 4
+	fmCapLines   = 12
 )
 
 // fmStdCap is a standard capability: one every want has, done the same way
@@ -280,8 +280,13 @@ func (s *Server) fmCapAnswer(c fmCap, args map[string]string) (string, error) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s can %s.\n", w.Metadata.Name, firstLine(c.def.Description, 160))
+	// First, so a long run of data cut short never loses it.
+	b.WriteString("Answer exactly what the person asked — when, where, a score, whatever it was: only that, not everything below — from these lines only. If they do not hold it, say so; never make it up.\n")
 	if p := strings.TrimSpace(c.def.Prompt); p != "" {
-		b.WriteString("How to answer from what follows (the want type's own words): " + strings.Join(strings.Fields(p), " ") + "\n")
+		// What the data means, in the type's words — not what to say: the
+		// question decides that (「練習場所は？」 asked of a want whose
+		// capability also holds scores is answered with the place).
+		b.WriteString("How its data reads (the want type's own words): " + strings.Join(strings.Fields(p), " ") + "\n")
 	}
 	if c.def.Skill != "" {
 		out, err := s.fmRunCapabilitySkill(c, question)
@@ -300,7 +305,6 @@ func (s *Server) fmCapAnswer(c fmCap, args map[string]string) (string, error) {
 			b.WriteString("\nWhat it says now:\n" + s.fmLookFull(w.Metadata.Name, w.Metadata.Type) + "\n")
 		}
 	}
-	b.WriteString("\nAnswer the question from these lines only, as the way above says. If they do not hold the answer, say so — never make one up.\n")
 	return b.String(), nil
 }
 
