@@ -306,6 +306,8 @@ func (s *Server) setConstellationMembership(kind, name, member string, add bool)
 	} else {
 		_ = s.thingLabels.Remove(member, key)
 		_ = s.thingLabels.Remove(member, legacyConstellationKey(name))
+		// Which of the want's answers it was for goes with it (constellation_answers.go).
+		_ = s.thingLabels.Remove(member, constellationAnswerKey(name))
 		for _, k := range looks {
 			_ = s.thingLabels.Remove(member, k)
 		}
@@ -435,6 +437,15 @@ func (s *Server) createConstellation(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid kind", "kind must be thing, want or mixed")
 		return
 	}
+	// One of a want's answers among them: the rest join the want's own
+	// constellation, marked for it (constellation_answers.go).
+	if hub, ok := s.joinAnswersIn(body.Members); ok {
+		s.JSONResponse(w, http.StatusOK, constellationDTO{
+			ID: hub, Name: hub, Kind: "thing", Capture: s.anyConstellationCapture(hub),
+			Members: s.allMembersOfConstellation(hub),
+		})
+		return
+	}
 	kinds := make(map[string]string, len(body.Members))
 	for _, m := range body.Members {
 		k := s.memberKindOf(m)
@@ -501,6 +512,14 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 	// constellation would silently drop everything of the kind not named.
 	current := s.allMembersOfConstellation(oldName)
 
+	// One of a want's answers among the members asked for: they join the
+	// want's own constellation instead (constellation_answers.go).
+	if body.Members != nil {
+		if hub, ok := s.joinAnswersIn(*body.Members); ok {
+			s.JSONResponse(w, http.StatusOK, map[string]any{"message": "group updated", "name": hub})
+			return
+		}
+	}
 	if body.Members != nil {
 		want := map[string]bool{}
 		for _, m := range *body.Members {
@@ -526,8 +545,13 @@ func (s *Server) updateConstellation(w http.ResponseWriter, r *http.Request) {
 		final := *orDefaultMembers(body.Members, current)
 		for _, m := range final {
 			k := s.memberKindOf(m)
+			// The answer it is for, carried to the new name.
+			answer := s.thingLabels.All()[m][constellationAnswerKey(oldName)]
 			s.setConstellationMembership(k, oldName, m, false)
 			s.setConstellationMembership(k, newName, m, true)
+			if answer != "" {
+				_ = s.thingLabels.Set(m, constellationAnswerKey(newName), answer)
+			}
 		}
 	}
 

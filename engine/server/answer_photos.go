@@ -14,9 +14,9 @@ import (
 //
 // "ゴルフの最新スコアは？": the want is found by what the question calls it —
 // its name, its type, or one of the type's aliases ("ゴルフ" for
-// smartgolf_check_reserved). Its answers, newest first; each answer's
-// constellations (it is a member as a thing is: `<want id>/result/<key>`);
-// and in those, the things that are photos (a picture-url). One photo is a
+// smartgolf_check_reserved). Its answers, newest first; what is joined to each
+// (the want's constellation's members marked for it, constellation_answers.go);
+// and of those, the things that are photos (a picture-url). One photo is a
 // question for each in turn, newest answer first.
 //
 // Only a question that asks after what a photo shows is looked at this way —
@@ -99,25 +99,10 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 		typeOf[w.Metadata.ID] = w.Metadata.Type
 	}
 
-	// Who is in which constellation, from the thing labels (an answer is kept
-	// there as a thing is).
+	// What is joined to each answer: the want's constellation's members
+	// marked for it (constellation_answers.go).
 	all := s.thingLabels.All()
-	membersOf := map[string][]string{}
-	for id, labels := range all {
-		for k, v := range labels {
-			if v == "true" && strings.HasPrefix(k, constellationLabelPrefix) {
-				name := strings.TrimPrefix(k, constellationLabelPrefix)
-				membersOf[name] = append(membersOf[name], id)
-			}
-		}
-	}
-	constellationsOf := map[string][]string{}
-	for name, members := range membersOf {
-		sort.Strings(members)
-		for _, m := range members {
-			constellationsOf[m] = append(constellationsOf[m], name)
-		}
-	}
+	joined := s.answerMembers()
 	values := map[string]string{}
 	created := map[string]string{}
 	for _, e := range s.thingStore.Entries() {
@@ -146,17 +131,12 @@ func (s *Server) findAnswerPhotos(question string) []types.AnswerPhoto {
 			continue
 		}
 		var photos []string
-		for _, c := range constellationsOf[answer] {
-			for _, m := range membersOf[c] {
-				if m == answer || seen[m] || strings.Contains(m, answerSep) {
-					continue
-				}
-				if all[m][thingPictureLabel] == "" {
-					continue
-				}
-				seen[m] = true
-				photos = append(photos, m)
+		for _, m := range joined[answer] {
+			if seen[m] || all[m][thingPictureLabel] == "" {
+				continue
 			}
+			seen[m] = true
+			photos = append(photos, m)
 		}
 		// The newest photo of an answer first.
 		sort.SliceStable(photos, func(a, b int) bool { return created[photos[a]] > created[photos[b]] })

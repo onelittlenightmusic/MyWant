@@ -23,9 +23,10 @@ import (
 // belongs with ONE of its reservations — the one it was played on — and that
 // is known only once the card is read. So a capture into a want is saved and
 // pinned, read (its words, thing_picture_text.go; its fields by the want's
-// type, photo_fields.go), and then the server proposes: this reservation,
-// in this constellation — the one the reservation is already in, or a new
-// one named after it. The board asks (CaptureProposalBubble); yes joins the
+// type, photo_fields.go), and then the server proposes: this reservation, in
+// the want's constellation — one for all its answers, the member marked for
+// the reservation (constellation_answers.go); a new one named after the want
+// when it has none yet. The board asks (CaptureProposalBubble); yes joins the
 // two, no leaves the capture pinned on its own.
 //
 // Which answer: the one whose time is nearest before the capture's — the
@@ -83,6 +84,10 @@ func (s *Server) captureThing(thingID string, target *CaptureTarget, ask bool) *
 		_ = s.thingLabels.Set(thingID, captureAskedUntilLabel, time.Now().Add(captureAskWait).UTC().Format(time.RFC3339))
 	}
 	switch {
+	case strings.Contains(target.ID, answerSep):
+		// One of a want's answers: into the want's constellation, marked for
+		// it, whatever name the net carries (captureIntoTile).
+		return s.captureIntoTile(thingID, target)
 	case target.Kind == "want":
 		// Into a whole want, its answers are always searched: the capture is
 		// read and proposed the one it belongs with, whether or not the net
@@ -156,6 +161,45 @@ func (s *Server) captureIntoWant(thingID, wantID string) {
 // name then and there (the extension's copy offer, the phone), else the
 // board does.
 func (s *Server) captureIntoTile(thingID string, t *CaptureTarget) *captureProposal {
+	// Aimed at one of a want's answers: into the want's constellation, marked
+	// for that answer (constellation_answers.go) — at once when the want has
+	// one, else asked its name, as a new constellation is.
+	if wantID, key, ok := splitAnswerID(t.ID); ok {
+		// The want's constellation, when it has one; else the name it would
+		// have (its type's alias, its name) — or, a want this server does not
+		// know, the one the net names, else one after the tile.
+		name, existing, wantName := s.constellationCapturedInto(wantID), false, ""
+		existing = name != ""
+		if w := s.wantByID(wantID); w != nil {
+			wantName = w.Metadata.Name
+			if !existing {
+				name, _ = s.wantHub(w)
+			}
+		} else if !existing {
+			name = t.Constellation
+		}
+		// Named already — by the want, or by the net — it goes straight in.
+		if existing || t.Constellation != "" {
+			s.joinAnswer(wantID, key, thingID, name)
+			return nil
+		}
+		if name == "" {
+			name = t.Name
+		}
+		if name == "" {
+			name = t.Label
+		}
+		p := captureProposal{
+			Thing: thingID, ThingLabel: s.thingValue(thingID),
+			Want: wantID, WantName: wantName,
+			Answer: t.ID, AnswerLabel: t.Label, Constellation: strings.ReplaceAll(name, "/", "."),
+		}
+		raw, _ := json.Marshal(p)
+		_ = s.thingLabels.Set(thingID, captureProposalLabel, string(raw))
+		boardThingsChanged(thingID)
+		go broadcastSSE("capture_proposals_changed", map[string]any{"thing": thingID})
+		return &p
+	}
 	if name := s.constellationOf(t.ID); name != "" {
 		s.captureInto(name, t.ID, thingID)
 		return nil
@@ -262,17 +306,9 @@ func (s *Server) proposeCapture(thingID string) {
 		Answer: answer, AnswerLabel: answerWhen(entry) + " " + answerSummary(entry),
 		By: by,
 	}
-	// The constellation the answer is in already, else one named after it.
-	if name := s.constellationOf(answer); name != "" {
-		p.Constellation, p.Existing = name, true
-	}
-	if p.Constellation == "" {
-		title := want.Metadata.Name
-		if a := s.fmTypeAliases()[want.Metadata.Type]; len(a) > 0 {
-			title = a[0]
-		}
-		p.Constellation = strings.ReplaceAll(title+" "+answerTime(entry).Format("1.2 15:04"), "/", ".")
-	}
+	// The want's constellation — one for all its answers, the member marked
+	// for this one (constellation_answers.go) — or the name it will have.
+	p.Constellation, p.Existing = s.wantHub(want)
 	raw, _ := json.Marshal(p)
 	_ = s.thingLabels.Set(thingID, captureProposalLabel, string(raw))
 	boardThingsChanged(thingID)
@@ -477,9 +513,20 @@ func (s *Server) answerCaptureProposal(w http.ResponseWriter, r *http.Request) {
 			s.JSONError(w, r, http.StatusBadRequest, "invalid constellation name", err.Error())
 			return
 		}
-		s.setConstellationMembership("thing", name, p.Answer, true)
-		s.captureInto(name, p.Answer, thing)
-		boardThingsChanged(p.Answer)
+		if wantID, key, ok := splitAnswerID(p.Answer); ok {
+			// One of a want's answers: into the want's constellation, marked
+			// for the answer — the answer itself is not a member. The want has
+			// one: that one, whatever name was typed (a second would split it).
+			if hub := s.constellationCapturedInto(wantID); hub != "" {
+				name = hub
+			}
+			s.joinAnswer(wantID, key, thing, name)
+			boardThingsChanged(wantID)
+		} else {
+			s.setConstellationMembership("thing", name, p.Answer, true)
+			s.captureInto(name, p.Answer, thing)
+			boardThingsChanged(p.Answer)
+		}
 	}
 	_ = s.thingLabels.Remove(thing, captureProposalLabel)
 	_ = s.thingLabels.Remove(thing, capturePendingLabel)

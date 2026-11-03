@@ -73,13 +73,37 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 	if v := s.thingLabels.Get(things[0].ID)[constellationKey("SmartGolf 10.11")]; v != "true" {
 		t.Errorf("membership label = %q", v)
 	}
+	// One constellation for the want, its hub the want: the member is marked
+	// for the answer, and the answer itself is no member (constellation_answers.go).
+	if v := s.thingLabels.Get(things[0].ID)[constellationAnswerKey("SmartGolf 10.11")]; v != "a" {
+		t.Errorf("answer label = %q", v)
+	}
+	if v := s.thingLabels.Get(things[0].ID)[constellationCaptureKey("SmartGolf 10.11")]; v != "want-1" {
+		t.Errorf("hub = %q, want the want", v)
+	}
+	if v := s.thingLabels.Get("want-1/result/a")[constellationKey("SmartGolf 10.11")]; v != "" {
+		t.Errorf("the answer joined: %q", v)
+	}
+
+	// Another of the same want's answers: into the same constellation, marked
+	// for that one — not a constellation of its own, not asked.
+	rec = httptest.NewRecorder()
+	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
+		strings.NewReader(`{"target":{"id":"want-1/result/b2","constellation":"","label":"10/12"}}`)))
+	_ = json.Unmarshal(share("b2")["things"], &things)
+	if v := s.thingLabels.Get(things[0].ID)[constellationAnswerKey("SmartGolf 10.11")]; v != "b2" {
+		t.Errorf("second answer: answer label = %q", v)
+	}
+	if len(s.captureProposals()) != 0 {
+		t.Errorf("asked about a want that has its constellation: %+v", s.captureProposals())
+	}
 
 	// Aimed with no name, as the board aims now: the first capture is asked
 	// about, named then; once the tile has its constellation, the next go
 	// straight in.
 	rec = httptest.NewRecorder()
 	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
-		strings.NewReader(`{"target":{"id":"want-1/result/b","constellation":"","label":"10/12 08:00 北新宿店"}}`)))
+		strings.NewReader(`{"target":{"id":"want-2/result/b","constellation":"","label":"10/12 08:00 北新宿店"}}`)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT unnamed HTTP %d: %s", rec.Code, rec.Body)
 	}
@@ -92,7 +116,7 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 		t.Errorf("reply's proposals = %s", asked["proposals"])
 	}
 	props := s.captureProposals()
-	if len(props) != 1 || props[0].Thing != first || props[0].Answer != "want-1/result/b" || props[0].Constellation != "10.12 08:00 北新宿店" || props[0].Want != "want-1" {
+	if len(props) != 1 || props[0].Thing != first || props[0].Answer != "want-2/result/b" || props[0].Constellation != "10.12 08:00 北新宿店" || props[0].Want != "want-2" {
 		t.Fatalf("proposals = %+v", props)
 	}
 	rec = httptest.NewRecorder()
@@ -102,10 +126,14 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("answer HTTP %d: %s", rec.Code, rec.Body)
 	}
-	for _, id := range []string{first, "want-1/result/b"} {
-		if v := s.thingLabels.Get(id)[constellationKey("朝のラウンド")]; v != "true" {
-			t.Errorf("%s not joined: %q", id, v)
-		}
+	if v := s.thingLabels.Get(first)[constellationKey("朝のラウンド")]; v != "true" {
+		t.Errorf("%s not joined: %q", first, v)
+	}
+	if v := s.thingLabels.Get(first)[constellationAnswerKey("朝のラウンド")]; v != "b" {
+		t.Errorf("accepted: answer label = %q", v)
+	}
+	if v := s.thingLabels.Get("want-2/result/b")[constellationKey("朝のラウンド")]; v != "" {
+		t.Errorf("accepted: the answer joined: %q", v)
 	}
 	_ = json.Unmarshal(share("z")["things"], &things)
 	if things[0].ID == first {
@@ -122,7 +150,7 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 	// waits.
 	rec = httptest.NewRecorder()
 	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
-		strings.NewReader(`{"target":{"id":"want-1/result/c","constellation":"","label":"10/13"}}`)))
+		strings.NewReader(`{"target":{"id":"want-3/result/c","constellation":"","label":"10/13"}}`)))
 	rec = httptest.NewRecorder()
 	s.shareContent(rec, httptest.NewRequest(http.MethodPost, "/api/v1/things/share",
 		strings.NewReader(`{"urls":["https://open.spotify.com/track/w"],"capture":true,"ask":true}`)))
@@ -134,7 +162,7 @@ func TestShareContentCapturesIntoTheTarget(t *testing.T) {
 	// target named in no constellation yet, its tile is proposed.
 	rec = httptest.NewRecorder()
 	s.putCaptureTarget(rec, httptest.NewRequest(http.MethodPut, "/api/v1/capture-target",
-		strings.NewReader(`{"target":{"id":"want-1/result/d","constellation":"","label":"10/14"}}`)))
+		strings.NewReader(`{"target":{"id":"want-4/result/d","constellation":"","label":"10/14"}}`)))
 	_ = json.Unmarshal(share("v")["things"], &things)
 	old := things[0].ID
 	_ = s.thingLabels.Remove(old, captureProposalLabel)

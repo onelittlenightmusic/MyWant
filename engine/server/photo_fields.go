@@ -138,6 +138,23 @@ func (s *Server) photosToRead() []photoToRead {
 			}
 		}
 	}
+	// A member of a want's constellation, marked for one of its answers
+	// (constellation_answers.go): the want's type.
+	for id, labels := range all {
+		if labels[thingPictureLabel] == "" || typeOfPhoto[id] != "" {
+			continue
+		}
+		for k := range labels {
+			name, ok := strings.CutPrefix(k, constellationAnswerPrefix)
+			if !ok || labels[constellationKey(name)] == "" {
+				continue
+			}
+			if t := typeOfWant[labels[constellationCaptureKey(name)]]; specs[t].Fields != nil {
+				typeOfPhoto[id] = t
+				break
+			}
+		}
+	}
 	// A capture into a whole want, waiting to be read by its type and
 	// proposed (capture_proposal.go).
 	for id, labels := range all {

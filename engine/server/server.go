@@ -394,6 +394,8 @@ func (s *Server) Start() error {
 
 	// The robot's questions about a want's answers' photos (answer_photos.go).
 	s.registerAnswerPhotos()
+	// A constellation per answer, folded into its want's (constellation_answers.go).
+	s.migrateAnswerConstellationsSoon()
 
 	// One event for what changed on the board, wants and things together
 	// (board_changed.go).
