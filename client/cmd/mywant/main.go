@@ -44,6 +44,7 @@ func main() {
 	rootCmd.AddCommand(commands.WantsCmd)
 
 	rootCmd.AddCommand(commands.RecipesCmd)
+	rootCmd.AddCommand(commands.ConstCmd)
 
 	rootCmd.AddCommand(commands.AgentsCmd)
 

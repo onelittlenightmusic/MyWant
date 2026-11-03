@@ -62,6 +62,7 @@ Most commands have short versions for convenience.
 | | `end` | `e` | End session |
 | | `shell` | `sh` | Interactive shell |
 | `thing` | `things` | `t`, `memo`, `m` | Manage things (the values you have named) |
+| `const` | `constellation` | `constellations` | Manage constellations (星座) — things and wants named as one |
 | | `list` | `l` | List catalogs and their values |
 | | `get` | `g` | Show values of one catalog |
 | | `add` / `remove` | `rm` | Add or remove values |
@@ -362,30 +363,48 @@ Memo is the catalog of values the user has entered, keyed by catalog (`stations`
 (events)、使用回数 (stats)、値ごとのラベル、そしてラベルを土台にした groups を持ちます。
 
 ```bash
-# カタログ一覧と値
+# 一覧（種類ごと）と、1つの種類の値（新しい順）
 ./bin/mywant thing list
-./bin/mywant thing get stations --limit 5
+./bin/mywant thing list --catalog stations --limit 5
 
-# 値の追加・削除（PUT /api/v1/things の read-modify-write）
-./bin/mywant thing add stations 渋谷 新宿
-./bin/mywant thing remove stations 新宿      # 値を削除
-./bin/mywant thing remove stations           # カタログごと削除
+# 1つの Thing（名前・id・<catalog>::<value> のどれでも）
+./bin/mywant thing get 中野坂上
+./bin/mywant thing get stations::渋谷 -o yaml     # レコード（ラベル込み）
+
+# 作成・変更・削除
+./bin/mywant thing create stations 渋谷 新宿
+./bin/mywant thing update stations::新宿 --value 新宿三丁目
+./bin/mywant thing update 渋谷 --catalog places   # 別の種類に移す（同じ Thing のまま）
+./bin/mywant thing delete stations::渋谷 thg-5678   # まとめて削除
+./bin/mywant thing delete --catalog stations       # 種類ごと削除
+
+# ラベル（まとめて1回で）
+./bin/mywant thing label stations::渋谷 favourite=true note=駅 --remove old
+
+# YAML で書き出し・読み込み
+./bin/mywant thing export -o things.yaml
+./bin/mywant thing import -f things.yaml
 
 # どこから来た値か / どれだけ使われたか
 ./bin/mywant thing events --limit 20
 ./bin/mywant thing events --catalog cities --value Kokubunji
 ./bin/mywant thing stats
+```
 
-# 値ラベル（値の識別子は <catalog>::<value>）
-./bin/mywant thing labels
-./bin/mywant thing label cities::Kyoto favourite true
-./bin/mywant thing label cities::Kyoto favourite      # 値を省略すると削除
+### Constellations（`mywant const`）
 
-# グループ（"group/<name>" ラベルのファサード。thing と want の両方に使える）
-./bin/mywant thing groups list
-./bin/mywant thing groups create favourites --kind thing --member cities::Kyoto
-./bin/mywant thing groups update favourites --kind thing --name faves
-./bin/mywant thing groups delete faves --kind thing
+Thing と want をひとまとまりとして名付けたもの（星座）。順に結ぶ order と、1つのタイルを hub にした capture がある。動詞は `mywant thing` と同じ。
+
+```bash
+./bin/mywant const list
+./bin/mywant const get 中央線 -o yaml
+./bin/mywant const create 中央線 --member stations::新宿 --member stations::中野 --color '#fb7185'
+./bin/mywant const create スマートゴルフ --hub want-1234 --member thg-5678
+./bin/mywant const update 中央線 --name 中央快速線 --color '#f97316'
+./bin/mywant const update 中央線 --member stations::新宿 --member stations::荻窪   # メンバーを置き換え
+./bin/mywant const delete 中央線 丸の内線
+./bin/mywant const export -o constellations.yaml
+./bin/mywant const import -f constellations.yaml
 ```
 
 > **Note:** 以前の `mywant memo get` / `memo clear`（現 `thing`）は**グローバル状態**を操作していました。

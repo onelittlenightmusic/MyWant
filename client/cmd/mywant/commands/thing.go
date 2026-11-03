@@ -3,8 +3,8 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Memo is the catalog of remembered input values, grouped by subtype
@@ -35,14 +36,23 @@ A thing is not a note about something — it is the something: a station, a
 city, an occasion. Wants point at them, and kata are about them.
 
 Examples:
-  mywant thing list
-  mywant thing get destination
-  mywant thing add destination Kyoto Osaka
-  mywant thing remove destination Osaka
-  mywant thing events --catalog destination --value Kyoto
+  mywant thing list                       # every kind, and how many
+  mywant thing list --catalog stations    # one kind's values, newest first
+  mywant thing get 中野坂上                # everything about one (a name, id or catalog::value)
+  mywant thing get thg-1234 -o yaml       # its record
+  mywant thing create stations 渋谷 新宿
+  mywant thing update stations::新宿 --value 新宿三丁目
+  mywant thing update 渋谷 --catalog places
+  mywant thing delete stations::渋谷 thg-5678
+  mywant thing delete --catalog stations  # every value of a kind
+  mywant thing label 中野坂上 favourite=true note=駅 --remove old
+  mywant thing export -o things.yaml
+  mywant thing import -f things.yaml
+  mywant thing events --catalog stations --value 渋谷
   mywant thing stats
-  mywant thing label cities::Kyoto favourite true
-  mywant thing constellations list`,
+
+Constellations are "mywant const".
+`,
 }
 
 // ─── catalog ───────────────────────────────────────────────────────────────
@@ -50,9 +60,25 @@ Examples:
 var thingListCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"l"},
-	Short:   "List every subtype and its recorded values",
+	Short:   "List every kind and its values (--catalog: one kind's values)",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		// One kind's values, newest first.
+		if catalog, _ := cmd.Flags().GetString("catalog"); catalog != "" {
+			limit, _ := cmd.Flags().GetInt("limit")
+			values, err := memoValues(catalog, limit)
+			if err != nil {
+				exitErr("listing "+catalog, err)
+			}
+			if jsonOut(cmd) {
+				printJSON(values)
+				return
+			}
+			for _, v := range values {
+				fmt.Println(v)
+			}
+			return
+		}
 		things, err := memoClient().GetThings()
 		if err != nil {
 			exitErr("listing memo", err)
@@ -98,12 +124,34 @@ var thingListCmd = &cobra.Command{
 }
 
 var thingGetCmd = &cobra.Command{
-	Use:               "get <catalog|subtype>",
+	Use:               "get <name|id|catalog::value|catalog>",
 	Aliases:           []string{"g", "show"},
-	Short:             "Show the values recorded under one catalog key, newest first",
+	Short:             "Everything about one thing (-o yaml: its record); a kind's values, given a kind",
 	Args:              cobra.ExactArgs(1),
 	ValidArgsFunction: completeMemoSubtypes,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Its record, as YAML (GET /things/{id}): by id or catalog::value, or a name.
+		if out, _ := cmd.Flags().GetString("output"); out == "yaml" {
+			id, err := resolveThingRef(args[0])
+			if err != nil {
+				exitErr("finding the thing", err)
+			}
+			t, err := memoClient().GetThing(id)
+			if err != nil {
+				exitErr("reading the thing", err)
+			}
+			data, _ := yaml.Marshal(t)
+			fmt.Print(string(data))
+			return
+		}
+		// An id or catalog::value names one thing.
+		if strings.HasPrefix(args[0], "thg-") || strings.Contains(args[0], "::") {
+			if id, err := resolveThingRef(args[0]); err == nil {
+				if t, err := memoClient().GetThing(id); err == nil && showThingDetail(t.Value, jsonOut(cmd)) {
+					return
+				}
+			}
+		}
 		limit, _ := cmd.Flags().GetInt("limit")
 		values, err := memoValues(args[0], limit)
 		if err != nil {
@@ -206,150 +254,99 @@ func showThingDetail(name string, asJSON bool) bool {
 	return true
 }
 
-var thingAddCmd = &cobra.Command{
-	Use:               "add <subtype> <value>...",
-	Short:             "Add values to a subtype",
+var thingCreateCmd = &cobra.Command{
+	Use:               "create <catalog|subtype> <value>...",
+	Aliases:           []string{"add"},
+	Short:             "Create things — one for each value, of that kind",
 	Args:              cobra.MinimumNArgs(2),
 	ValidArgsFunction: completeMemoSubtypes,
 	Run: func(cmd *cobra.Command, args []string) {
-		subtype, values := args[0], args[1:]
 		c := memoClient()
-
-		memo, err := c.GetThingsByCatalog()
-		if err != nil {
-			exitErr("reading memo", err)
-		}
-		if memo == nil {
-			memo = map[string][]string{}
-		}
-
-		// One request each, so the server mints an identity per value. Writing
-		// the whole catalog back would work, but it cannot say which of the
-		// values in it is new, and a thing's id is the server's to give.
-		added := 0
-		for _, v := range values {
-			if slices.Contains(memo[subtype], v) {
-				continue
+		for _, v := range args[1:] {
+			e, err := c.CreateThing(args[0], v)
+			if err != nil {
+				exitErr("creating "+v, err)
 			}
-			if _, err := c.CreateThing(subtype, v); err != nil {
-				exitErr("saving thing", err)
-			}
-			added++
+			fmt.Printf("Created %s::%s (%s)\n", e.Catalog, e.Value, shortID(e.ID))
 		}
-		if added == 0 {
-			fmt.Println("Nothing to add; all values are already recorded.")
-			return
-		}
-		fmt.Printf("Added %d value(s) to %s.\n", added, subtype)
 	},
 }
 
-var thingRemoveCmd = &cobra.Command{
-	Use:               "remove <subtype> [value]...",
-	Aliases:           []string{"rm", "delete"},
-	Short:             "Remove values from a subtype, or the whole subtype",
-	Args:              cobra.MinimumNArgs(1),
-	ValidArgsFunction: completeMemoSubtypes,
+var thingUpdateCmd = &cobra.Command{
+	Use:   "update <name|id|catalog::value> [--value v] [--catalog c]",
+	Short: "Rename a thing or file it under another kind — the same thing, kept",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		subtype, values := args[0], args[1:]
-		c := memoClient()
-
-		memo, err := c.GetThingsByCatalog()
+		value, _ := cmd.Flags().GetString("value")
+		catalog, _ := cmd.Flags().GetString("catalog")
+		if value == "" && catalog == "" {
+			exitErr("updating", fmt.Errorf("say --value or --catalog"))
+		}
+		id, err := resolveThingRef(args[0])
 		if err != nil {
-			exitErr("reading memo", err)
+			exitErr("finding the thing", err)
 		}
-		if _, ok := memo[subtype]; !ok {
-			fmt.Fprintf(os.Stderr, "Subtype %q is not in the memo.\n", subtype)
-			os.Exit(1)
+		e, err := memoClient().PatchThing(id, catalog, value)
+		if err != nil {
+			exitErr("updating", err)
 		}
-
-		if len(values) == 0 {
-			delete(memo, subtype)
-			if err := c.PutThings(memo); err != nil {
-				exitErr("saving memo", err)
-			}
-			fmt.Printf("Removed subtype %s.\n", subtype)
-			return
-		}
-
-		kept := make([]string, 0, len(memo[subtype]))
-		removed := 0
-		for _, v := range memo[subtype] {
-			if slices.Contains(values, v) {
-				removed++
-				continue
-			}
-			kept = append(kept, v)
-		}
-		if removed == 0 {
-			fmt.Println("Nothing to remove; no value matched.")
-			return
-		}
-		memo[subtype] = kept
-		if err := c.PutThings(memo); err != nil {
-			exitErr("saving memo", err)
-		}
-		fmt.Printf("Removed %d value(s) from %s.\n", removed, subtype)
+		fmt.Printf("Updated %s: now %s::%s\n", shortID(e.ID), e.Catalog, e.Value)
 	},
 }
 
-var thingMoveCmd = &cobra.Command{
-	Use:   "move <value> <new-subtype>",
-	Short: "Change what category a thing is filed under, keeping the thing",
-	Long: `Change a thing's category without changing which thing it is.
-
-A thing's id survives the move, so everything pointing at it — where it sits on
-the canvas, which constellations it belongs to — keeps pointing. That is the
-difference between this and removing the value and adding it back, which would
-give you a different thing wearing the same name.
-
-The value may be given on its own when it is unambiguous, or as
-"catalog::value" when the same name is filed in more than one place.`,
-	Args:              cobra.ExactArgs(2),
-	ValidArgsFunction: completeMemoSubtypes,
+var thingDeleteCmd = &cobra.Command{
+	Use:     "delete <name|id|catalog::value>... | --catalog <c>",
+	Aliases: []string{"rm", "remove"},
+	Short:   "Delete things — several at once, or every value of a kind",
 	Run: func(cmd *cobra.Command, args []string) {
-		wanted, target := args[0], args[1]
 		c := memoClient()
-
-		things, err := c.GetThings()
+		catalog, _ := cmd.Flags().GetString("catalog")
+		var ids []string
+		if catalog != "" {
+			things, err := c.GetThings()
+			if err != nil {
+				exitErr("listing things", err)
+			}
+			for _, t := range things {
+				if t.Catalog == catalog || t.Subtype == catalog {
+					ids = append(ids, t.ID)
+				}
+			}
+		}
+		for _, ref := range args {
+			id, err := resolveThingRef(ref)
+			if err != nil {
+				exitErr("finding "+ref, err)
+			}
+			ids = append(ids, id)
+		}
+		if len(ids) == 0 {
+			exitErr("deleting", fmt.Errorf("nothing to delete"))
+		}
+		out, err := c.DeleteThings(ids)
 		if err != nil {
-			exitErr("reading things", err)
+			exitErr("deleting", err)
 		}
-		catalog, value, qualified := strings.Cut(wanted, "::")
-		if !qualified {
-			value = wanted
+		fmt.Printf("Deleted %d thing(s)", len(out.Deleted))
+		if len(out.Missing) > 0 {
+			fmt.Printf("; not found: %s", strings.Join(out.Missing, ", "))
 		}
-
-		var matches []client.Thing
-		for _, t := range things {
-			if t.Value != value {
-				continue
-			}
-			if qualified && t.Catalog != catalog {
-				continue
-			}
-			matches = append(matches, t)
-		}
-		switch len(matches) {
-		case 0:
-			fmt.Fprintf(os.Stderr, "No thing called %q.\n", value)
-			os.Exit(1)
-		case 1:
-		default:
-			fmt.Fprintf(os.Stderr, "%q is filed in more than one place — say which:\n", value)
-			for _, m := range matches {
-				fmt.Fprintf(os.Stderr, "  %s::%s\n", m.Catalog, m.Value)
-			}
-			os.Exit(1)
-		}
-
-		moved, err := c.PatchThing(matches[0].ID, target, "")
-		if err != nil {
-			exitErr("moving thing", err)
-		}
-		fmt.Printf("Moved %s from %s to %s (id %s, unchanged).\n",
-			moved.Value, matches[0].Catalog, moved.Catalog, moved.ID)
+		fmt.Println()
 	},
+}
+
+// resolveThingRef is the id of the thing ref names: an id ("thg-…"),
+// "<catalog>::<value>", or its name as the board shows it.
+func resolveThingRef(ref string) (string, error) {
+	c := memoClient()
+	if strings.HasPrefix(ref, "thg-") || strings.Contains(ref, "::") {
+		return c.ResolveThingID(ref)
+	}
+	place, err := findThingPlace(c, ref)
+	if err != nil {
+		return "", err
+	}
+	return place.id, nil
 }
 
 // ─── provenance ────────────────────────────────────────────────────────────
@@ -425,179 +422,110 @@ var thingStatsCmd = &cobra.Command{
 
 // ─── labels ────────────────────────────────────────────────────────────────
 
-var thingLabelsCmd = &cobra.Command{
-	Use:     "labels",
-	Short:   "List labels attached to memo values",
-	Args:    cobra.NoArgs,
-	Aliases: []string{"label-list"},
+var thingLabelCmd = &cobra.Command{
+	Use:   "label <name|id|catalog::value> [key=value]... [--remove key]...",
+	Short: "Set and remove a thing's labels — all in one request (see them with get -o yaml)",
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		labels, err := memoClient().GetThingLabels()
-		if err != nil {
-			exitErr("reading memo labels", err)
+		remove, _ := cmd.Flags().GetStringArray("remove")
+		set := map[string]string{}
+		for _, kv := range args[1:] {
+			k, v, ok := strings.Cut(kv, "=")
+			if !ok || k == "" {
+				exitErr("reading "+kv, fmt.Errorf("write key=value"))
+			}
+			set[k] = v
 		}
-
+		if len(set) == 0 && len(remove) == 0 {
+			exitErr("labelling", fmt.Errorf("say key=value or --remove key"))
+		}
+		id, err := resolveThingRef(args[0])
+		if err != nil {
+			exitErr("finding the thing", err)
+		}
+		labels, err := memoClient().PatchThingLabels(id, set, remove)
+		if err != nil {
+			exitErr("labelling", err)
+		}
 		if jsonOut(cmd) {
 			printJSON(labels)
 			return
 		}
-		if len(labels) == 0 {
-			fmt.Println("No memo labels set.")
-			return
+		keys := make([]string, 0, len(labels))
+		for k := range labels {
+			keys = append(keys, k)
 		}
-
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "VALUE\tLABELS")
-		for _, valueID := range sortedKeys(labels) {
-			pairs := make([]string, 0, len(labels[valueID]))
-			for _, key := range sortedKeys(labels[valueID]) {
-				pairs = append(pairs, key+"="+labels[valueID][key])
-			}
-			fmt.Fprintf(w, "%s\t%s\n", valueID, strings.Join(pairs, " "))
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Printf("%s=%s\n", k, labels[k])
 		}
-		w.Flush()
 	},
 }
 
-var thingLabelCmd = &cobra.Command{
-	Use:   "label <id|catalog::value> <key> [value]",
-	Short: "Attach a label to a memo value (omit the label value to remove it)",
-	Args:  cobra.RangeArgs(2, 3),
-	Run: func(cmd *cobra.Command, args []string) {
-		valueID, key := args[0], args[1]
-		c := memoClient()
+// ─── export / import ───────────────────────────────────────────────────────
 
-		if len(args) == 2 {
-			if err := c.RemoveThingLabel(valueID, key); err != nil {
-				exitErr("removing memo label", err)
+var thingExportCmd = &cobra.Command{
+	Use:   "export [name|id|catalog::value]... [-o file]",
+	Short: "Write things out as YAML — every one, or those named",
+	Run: func(cmd *cobra.Command, args []string) {
+		var ids []string
+		for _, ref := range args {
+			id, err := resolveThingRef(ref)
+			if err != nil {
+				exitErr("finding "+ref, err)
 			}
-			fmt.Printf("Removed label %s from %s.\n", key, valueID)
-			return
+			ids = append(ids, id)
 		}
-		if err := c.SetThingLabel(valueID, key, args[2]); err != nil {
-			exitErr("setting memo label", err)
-		}
-		fmt.Printf("Set %s=%s on %s.\n", key, args[2], valueID)
-	},
-}
-
-// ─── constellations ────────────────────────────────────────────────────────────────
-
-var thingConstellationsCmd = &cobra.Command{
-	Use:   "constellations",
-	Short: "Manage constellations of memo values or wants",
-	Long: `Constellations are named sets stored as "constellation/<name>" labels on memo values or wants.
-
-Examples:
-  mywant thing constellations list
-  mywant thing constellations create favourites --kind memo --member cities::Kyoto
-  mywant thing constellations delete favourites --kind memo`,
-}
-
-var memoConstellationsListCmd = &cobra.Command{
-	Use:     "list",
-	Aliases: []string{"l"},
-	Short:   "List constellations",
-	Args:    cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		kind, _ := cmd.Flags().GetString("kind")
-		constellations, err := memoClient().GetConstellations(kind)
+		data, err := memoClient().ExportThings(ids)
 		if err != nil {
-			exitErr("listing constellations", err)
+			exitErr("exporting", err)
 		}
-
-		if jsonOut(cmd) {
-			printJSON(constellations)
-			return
-		}
-		if len(constellations) == 0 {
-			fmt.Println("No constellations defined.")
-			return
-		}
-
-		// Members are stored as ids; printed as ids alone, the list says which
-		// constellations exist and nothing about what is in them. A reader
-		// asking "which constellation is 荻窪 in" cannot answer it from
-		// thg-28fb4a67-…, and neither can anything reading this for them. So
-		// the name comes first and the id stays after it, shortened: the name
-		// is what the question is about, the id is what a follow-up command
-		// takes.
-		names := map[string]string{}
-		if things, err := memoClient().GetThings(); err == nil {
-			for _, t := range things {
-				names[t.ID] = t.Value
-			}
-		}
-
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tKIND\tMEMBERS")
-		for _, g := range constellations {
-			members := make([]string, 0, len(g.Members))
-			for _, m := range g.Members {
-				if name, ok := names[m]; ok {
-					members = append(members, fmt.Sprintf("%s (%s)", name, shortID(m)))
-					continue
-				}
-				members = append(members, shortID(m))
-			}
-			fmt.Fprintf(w, "%s\t%s\t%s\n", g.Name, g.Kind, truncateList(members, 8))
-		}
-		w.Flush()
+		writeOut(cmd, data)
 	},
 }
 
-var memoConstellationsCreateCmd = &cobra.Command{
-	Use:   "create <name>",
-	Short: "Create a constellation",
-	Args:  cobra.ExactArgs(1),
+var thingImportCmd = &cobra.Command{
+	Use:   "import -f <file.yaml>",
+	Short: "Read things in from YAML — matched by kind and value, their labels laid on",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		kind, _ := cmd.Flags().GetString("kind")
-		members, _ := cmd.Flags().GetStringArray("member")
-		if err := memoClient().CreateConstellation(args[0], kind, members); err != nil {
-			exitErr("creating constellation", err)
+		ids, err := memoClient().ImportThings(readIn(cmd))
+		if err != nil {
+			exitErr("importing", err)
 		}
-		fmt.Printf("Created %s constellation %s with %d member(s).\n", kind, args[0], len(members))
+		fmt.Printf("Imported %d thing(s)\n", len(ids))
 	},
 }
 
-var memoConstellationsUpdateCmd = &cobra.Command{
-	Use:   "update <name>",
-	Short: "Rename a constellation or replace its members",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		kind, _ := cmd.Flags().GetString("kind")
-		var newName *string
-		if cmd.Flags().Changed("name") {
-			v, _ := cmd.Flags().GetString("name")
-			newName = &v
+// writeOut writes data to -o, or to stdout.
+func writeOut(cmd *cobra.Command, data []byte) {
+	if out, _ := cmd.Flags().GetString("output"); out != "" && out != "-" {
+		if err := os.WriteFile(out, data, 0o644); err != nil {
+			exitErr("writing "+out, err)
 		}
-		var members *[]string
-		if cmd.Flags().Changed("member") {
-			v, _ := cmd.Flags().GetStringArray("member")
-			members = &v
-		}
-		if newName == nil && members == nil {
-			fmt.Fprintln(os.Stderr, "Error: pass --name and/or --member")
-			os.Exit(1)
-		}
-		if err := memoClient().UpdateConstellation(args[0], kind, newName, members); err != nil {
-			exitErr("updating constellation", err)
-		}
-		fmt.Printf("Updated constellation %s.\n", args[0])
-	},
+		fmt.Printf("Wrote %s\n", out)
+		return
+	}
+	fmt.Print(string(data))
 }
 
-var memoConstellationsDeleteCmd = &cobra.Command{
-	Use:     "delete <name>",
-	Aliases: []string{"rm", "remove"},
-	Short:   "Delete a constellation (its members are kept)",
-	Args:    cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		kind, _ := cmd.Flags().GetString("kind")
-		if err := memoClient().DeleteConstellation(args[0], kind); err != nil {
-			exitErr("deleting constellation", err)
-		}
-		fmt.Printf("Deleted %s constellation %s.\n", kind, args[0])
-	},
+// readIn reads -f, or stdin with "-".
+func readIn(cmd *cobra.Command) []byte {
+	file, _ := cmd.Flags().GetString("file")
+	if file == "" {
+		exitErr("reading", fmt.Errorf("--file (-f) is required"))
+	}
+	var data []byte
+	var err error
+	if file == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(file)
+	}
+	if err != nil {
+		exitErr("reading "+file, err)
+	}
+	return data
 }
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -675,37 +603,24 @@ func dashIfEmpty(s string) string {
 
 func init() {
 	thingListCmd.Flags().Bool("json", false, "Output as JSON")
+	thingListCmd.Flags().String("catalog", "", "Only this kind's values, newest first")
+	thingListCmd.Flags().Int("limit", 0, "With --catalog: at most this many values")
 	thingGetCmd.Flags().Bool("json", false, "Output as JSON")
+	thingGetCmd.Flags().StringP("output", "o", "", "yaml: the thing's record")
 	thingGetCmd.Flags().Int("limit", 20, "Maximum number of values")
+	thingUpdateCmd.Flags().String("value", "", "Its new name")
+	thingUpdateCmd.Flags().String("catalog", "", "The kind to file it under")
+	thingDeleteCmd.Flags().String("catalog", "", "Delete every value of this kind")
+	thingLabelCmd.Flags().StringArray("remove", nil, "Label key to remove, repeatable")
+	thingLabelCmd.Flags().Bool("json", false, "Output as JSON")
+	thingExportCmd.Flags().StringP("output", "o", "", "File to write (default stdout)")
+	thingImportCmd.Flags().StringP("file", "f", "", "YAML file (- for stdin)")
 	thingEventsCmd.Flags().Bool("json", false, "Output as JSON")
 	thingEventsCmd.Flags().Int("limit", 200, "Maximum number of events")
 	thingEventsCmd.Flags().String("catalog", "", "Filter to one subtype (requires --value)")
 	thingEventsCmd.Flags().String("value", "", "Filter to one value (requires --catalog)")
 	thingStatsCmd.Flags().Bool("json", false, "Output as JSON")
-	thingLabelsCmd.Flags().Bool("json", false, "Output as JSON")
 
-	memoConstellationsListCmd.Flags().Bool("json", false, "Output as JSON")
-	memoConstellationsListCmd.Flags().String("kind", "", "Only memo or want groups")
-	memoConstellationsCreateCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
-	memoConstellationsCreateCmd.Flags().StringArray("member", nil, "Member id, repeatable")
-	memoConstellationsUpdateCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
-	memoConstellationsUpdateCmd.Flags().String("name", "", "New group name")
-	memoConstellationsUpdateCmd.Flags().StringArray("member", nil, "Replacement member id, repeatable")
-	memoConstellationsDeleteCmd.Flags().String("kind", "thing", "Constellation kind: thing or want")
-
-	thingConstellationsCmd.AddCommand(memoConstellationsListCmd)
-	thingConstellationsCmd.AddCommand(memoConstellationsCreateCmd)
-	thingConstellationsCmd.AddCommand(memoConstellationsUpdateCmd)
-	thingConstellationsCmd.AddCommand(memoConstellationsDeleteCmd)
-
-	ThingCmd.AddCommand(thingListCmd)
-	ThingCmd.AddCommand(thingGetCmd)
-	ThingCmd.AddCommand(thingAddCmd)
-	ThingCmd.AddCommand(thingMoveCmd)
-	ThingCmd.AddCommand(thingRemoveCmd)
-	ThingCmd.AddCommand(thingEventsCmd)
-	ThingCmd.AddCommand(thingStatsCmd)
-	ThingCmd.AddCommand(thingLabelsCmd)
-	ThingCmd.AddCommand(thingLabelCmd)
-	ThingCmd.AddCommand(thingConstellationsCmd)
+	ThingCmd.AddCommand(thingListCmd, thingGetCmd, thingCreateCmd, thingUpdateCmd, thingDeleteCmd,
+		thingLabelCmd, thingExportCmd, thingImportCmd, thingEventsCmd, thingStatsCmd)
 }

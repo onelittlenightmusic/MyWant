@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -34,9 +35,15 @@ type MemoStat struct {
 
 // Constellation is a named set of memo values or wants, stored as labels.
 type Constellation struct {
-	Name    string   `json:"name"`
-	Kind    string   `json:"kind"` // memo | want
-	Members []string `json:"members"`
+	Name  string `json:"name" yaml:"name"`
+	Kind  string `json:"kind" yaml:"kind"` // thing | want | mixed
+	Color string `json:"color,omitempty" yaml:"color,omitempty"`
+	Art   string `json:"art,omitempty" yaml:"art,omitempty"`
+	// Capture: the hub's tile — a capture into it; "" is an order, a chain.
+	Capture     string            `json:"capture,omitempty" yaml:"capture,omitempty"`
+	CaptureAt   string            `json:"captureAt,omitempty" yaml:"captureAt,omitempty"`
+	Members     []string          `json:"members" yaml:"members"`
+	MemberKinds map[string]string `json:"memberKinds,omitempty" yaml:"memberKinds,omitempty"`
 }
 
 // ThingDefinition is a name given to a value, and who gave it.
@@ -83,9 +90,8 @@ func (c *Client) GetThings() ([]Thing, error) {
 	return result.Things, nil
 }
 
-// GetThingsByCatalog folds the list back into catalog → values, which is both
-// the shape PutThings takes and the shape a caller wants when it only cares
-// which values exist.
+// GetThingsByCatalog folds the list back into catalog → values, the shape a
+// caller wants when it only cares which values exist.
 func (c *Client) GetThingsByCatalog() (map[string][]string, error) {
 	things, err := c.GetThings()
 	if err != nil {
@@ -96,15 +102,6 @@ func (c *Client) GetThingsByCatalog() (map[string][]string, error) {
 		out[t.Catalog] = append(out[t.Catalog], t.Value)
 	}
 	return out, nil
-}
-
-// PutThings replaces the whole memo catalog.
-//
-// Identity-blind: a value that moves between catalogs across two of these
-// looks like a delete and an unrelated create. Prefer the three below when the
-// thing being changed is one you already have in hand.
-func (c *Client) PutThings(memo map[string][]string) error {
-	return c.Request("PUT", "/api/v1/things", memo, nil)
 }
 
 // ThingEntry is a thing as stored: an identity, and what is true about it.
@@ -145,6 +142,68 @@ func (c *Client) PatchThing(id, catalog, value string) (ThingEntry, error) {
 // DeleteThing forgets one thing by identity.
 func (c *Client) DeleteThing(id string) error {
 	return c.Request("DELETE", fmt.Sprintf("/api/v1/things/%s", url.PathEscape(id)), nil, nil)
+}
+
+// GetThing is one thing, whole (GET /things/{id}).
+func (c *Client) GetThing(id string) (*Thing, error) {
+	var out Thing
+	if err := c.Request("GET", "/api/v1/things/"+url.PathEscape(id), nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// Removed is what a delete of several took, and what it found nothing of.
+type Removed struct {
+	Deleted []string `json:"deleted"`
+	Missing []string `json:"missing"`
+}
+
+// DeleteThings forgets several things at once (DELETE /things?ids=).
+func (c *Client) DeleteThings(ids []string) (Removed, error) {
+	var out Removed
+	err := c.Request("DELETE", "/api/v1/things?ids="+url.QueryEscape(strings.Join(ids, ",")), nil, &out)
+	return out, err
+}
+
+// PatchThingLabels sets and removes several of a thing's labels in one request.
+func (c *Client) PatchThingLabels(id string, set map[string]string, remove []string) (map[string]string, error) {
+	var out struct {
+		Labels map[string]string `json:"labels"`
+	}
+	body := map[string]any{"set": set, "remove": remove}
+	if err := c.Request("PATCH", "/api/v1/things/"+url.PathEscape(id)+"/labels", body, &out); err != nil {
+		return nil, err
+	}
+	return out.Labels, nil
+}
+
+// ExportThings is things as YAML (all, or those ids).
+func (c *Client) ExportThings(ids []string) ([]byte, error) {
+	path := "/api/v1/things/export"
+	if len(ids) > 0 {
+		path += "?ids=" + url.QueryEscape(strings.Join(ids, ","))
+	}
+	return c.RawRequest("POST", path, nil, "application/json")
+}
+
+// ImportThings reads things from YAML; the ids they have here.
+func (c *Client) ImportThings(yamlData []byte) ([]string, error) {
+	return importIDs(c, "/api/v1/things/import", yamlData)
+}
+
+func importIDs(c *Client, path string, yamlData []byte) ([]string, error) {
+	raw, err := c.RawRequest("POST", path, yamlData, "application/yaml")
+	if err != nil {
+		return nil, err
+	}
+	var out struct {
+		Imported []string `json:"imported"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("%s", strings.TrimSpace(string(raw)))
+	}
+	return out.Imported, nil
 }
 
 // GetThingSuggestions returns the values recorded for one subtype, newest first.
@@ -268,29 +327,61 @@ func (c *Client) GetConstellations(kind string) ([]Constellation, error) {
 	return result.Constellations, nil
 }
 
-// CreateConstellation creates a constellation of memo values or wants.
-func (c *Client) CreateConstellation(name, kind string, members []string) error {
-	body := map[string]any{"name": name, "kind": kind, "members": members}
-	return c.Request("POST", "/api/v1/constellations", body, nil)
+// ConstellationChange is what a create or an update says; nil (or "" on
+// create) leaves a field as it is.
+type ConstellationChange struct {
+	Name    *string   `json:"name,omitempty"`
+	Members *[]string `json:"members,omitempty"`
+	Color   *string   `json:"color,omitempty"`
+	// Capture: the hub's tile id — a capture into it; "" makes it an order.
+	Capture *string `json:"capture,omitempty"`
 }
 
-// UpdateConstellation renames a constellation and/or replaces its members.
-func (c *Client) UpdateConstellation(name, kind string, newName *string, members *[]string) error {
-	body := map[string]any{"kind": kind}
-	if newName != nil {
-		body["name"] = *newName
+// CreateConstellation makes a constellation of things or wants.
+func (c *Client) CreateConstellation(name string, ch ConstellationChange) error {
+	ch.Name = &name
+	if ch.Members == nil {
+		ch.Members = &[]string{}
 	}
-	if members != nil {
-		body["members"] = *members
-	}
-	return c.Request("PUT", "/api/v1/constellations/"+url.PathEscape(name), body, nil)
+	return c.Request("POST", "/api/v1/constellations", ch, nil)
 }
 
-// DeleteConstellation removes a constellation, leaving its members in place.
-func (c *Client) DeleteConstellation(name, kind string) error {
-	path := "/api/v1/constellations/" + url.PathEscape(name)
-	if kind != "" {
-		path += "?kind=" + url.QueryEscape(kind)
+// GetConstellation is one constellation (GET /constellations/{name}).
+func (c *Client) GetConstellation(name string) (*Constellation, error) {
+	var out Constellation
+	if err := c.Request("GET", "/api/v1/constellations/"+url.PathEscape(name), nil, &out); err != nil {
+		return nil, err
 	}
-	return c.Request("DELETE", path, nil, nil)
+	return &out, nil
+}
+
+// UpdateConstellation changes what it is given: its name, members, colour, hub.
+func (c *Client) UpdateConstellation(name string, ch ConstellationChange) error {
+	return c.Request("PATCH", "/api/v1/constellations/"+url.PathEscape(name), ch, nil)
+}
+
+// DeleteConstellations removes several at once, leaving their members in place.
+func (c *Client) DeleteConstellations(names []string) (Removed, error) {
+	var out Removed
+	err := c.Request("DELETE", "/api/v1/constellations?names="+url.QueryEscape(strings.Join(names, ",")), nil, &out)
+	return out, err
+}
+
+// ExportConstellations is constellations as YAML (all, or those names).
+func (c *Client) ExportConstellations(names []string) ([]byte, error) {
+	path := "/api/v1/constellations/export"
+	if len(names) > 0 {
+		path += "?names=" + url.QueryEscape(strings.Join(names, ","))
+	}
+	return c.RawRequest("POST", path, nil, "application/json")
+}
+
+// ImportConstellations reads constellations from YAML; their names.
+func (c *Client) ImportConstellations(yamlData []byte) ([]string, error) {
+	return importIDs(c, "/api/v1/constellations/import", yamlData)
+}
+
+// DeleteConstellation removes one constellation, leaving its members in place.
+func (c *Client) DeleteConstellation(name string) error {
+	return c.Request("DELETE", "/api/v1/constellations/"+url.PathEscape(name), nil, nil)
 }
