@@ -34,7 +34,7 @@ func (s *Server) wantHub(w *mywant.Want) (name string, existing bool) {
 		return n, true
 	}
 	title := w.Metadata.Name
-	if a := s.fmTypeAliases()[w.Metadata.Type]; len(a) > 0 && a[0] != "" {
+	if a := s.robotTypeAliases()[w.Metadata.Type]; len(a) > 0 && a[0] != "" {
 		title = a[0]
 	}
 	if title == "" {

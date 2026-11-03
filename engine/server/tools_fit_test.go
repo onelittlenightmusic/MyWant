@@ -43,22 +43,22 @@ func TestFMFitParamsByWhatEachParameterIs(t *testing.T) {
 	s.setupRoutes()
 
 	params := map[string]any{"at": "9時40分", "how": "到着"}
-	if _, err := s.fmFitParams("fit_probe", params, ""); err != nil || params["at"] != "09:40" {
+	if _, err := s.robotFitParams("fit_probe", params, ""); err != nil || params["at"] != "09:40" {
 		t.Fatalf("fit = %v, %v", params, err)
 	}
-	if _, err := s.fmFitParams("fit_probe", map[string]any{"how": "着"}, ""); err == nil || !strings.Contains(err.Error(), "到着, 出発") {
+	if _, err := s.robotFitParams("fit_probe", map[string]any{"how": "着"}, ""); err == nil || !strings.Contains(err.Error(), "到着, 出発") {
 		t.Errorf("a value outside the choices: %v", err)
 	}
-	if h := s.fmHintsText(); !strings.Contains(h, "- fit_probe: Say it plainly.") || !strings.Contains(h, "「probe at nine」 → deploy_want fit_probe") {
+	if h := s.robotHintsText(); !strings.Contains(h, "- fit_probe: Say it plainly.") || !strings.Contains(h, "「probe at nine」 → deploy_want fit_probe") {
 		t.Errorf("hints = %q", h)
 	}
-	if d, _ := s.fmDescribeType(map[string]string{"type": "fit_probe"}); !strings.Contains(d, "How: Say it plainly.") {
+	if d, _ := s.robotDescribeType(map[string]string{"type": "fit_probe"}); !strings.Contains(d, "How: Say it plainly.") {
 		t.Errorf("describe = %q", d)
 	}
 }
 
 func TestFMMarkedParams(t *testing.T) {
-	labels := map[string]string{fmMarkerLabel + "from": "から,発", fmMarkerLabel + "to": "まで,へ"}
+	labels := map[string]string{robotMarkerLabel + "from": "から,発", robotMarkerLabel + "to": "まで,へ"}
 	cases := []struct {
 		question string
 		in       map[string]any
@@ -79,12 +79,12 @@ func TestFMMarkedParams(t *testing.T) {
 		{"新宿と渋谷", map[string]any{"from": "渋谷", "to": "新宿"}, "渋谷", "新宿", false},
 	}
 	for _, c := range cases {
-		said := fmMarkedParams(labels, c.in, c.question)
+		said := robotMarkedParams(labels, c.in, c.question)
 		if c.in["from"] != c.from || c.in["to"] != c.to || (said != "") != c.said {
 			t.Errorf("%s: params = %v, said %q", c.question, c.in, said)
 		}
 	}
-	if got := fmMarkedParams(labels, map[string]any{"from": "中野坂上", "to": "銀座"}, ""); got != "" {
+	if got := robotMarkedParams(labels, map[string]any{"from": "中野坂上", "to": "銀座"}, ""); got != "" {
 		t.Errorf("no question: %q", got)
 	}
 }

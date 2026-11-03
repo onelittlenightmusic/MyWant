@@ -11,18 +11,18 @@ import (
 // A capability's skill runs only from inside its type's own directory.
 func TestFMCapSkillPath(t *testing.T) {
 	dir := "/home/me/.mywant/custom-types/golf"
-	if p, ok := fmCapSkillPath(dir, "score.py"); !ok || p != dir+"/score.py" {
+	if p, ok := capSkillPath(dir, "score.py"); !ok || p != dir+"/score.py" {
 		t.Errorf("in the directory: %q %v", p, ok)
 	}
-	if p, ok := fmCapSkillPath(dir, "tools/score.py"); !ok || p != dir+"/tools/score.py" {
+	if p, ok := capSkillPath(dir, "tools/score.py"); !ok || p != dir+"/tools/score.py" {
 		t.Errorf("below it: %q %v", p, ok)
 	}
 	for _, bad := range []string{"../other/x.py", "/usr/bin/env", "tools/../../x.py", ".", ""} {
-		if p, ok := fmCapSkillPath(dir, bad); ok {
+		if p, ok := capSkillPath(dir, bad); ok {
 			t.Errorf("%q let out as %q", bad, p)
 		}
 	}
-	if _, ok := fmCapSkillPath("", "score.py"); ok {
+	if _, ok := capSkillPath("", "score.py"); ok {
 		t.Error("a type with no directory runs nothing")
 	}
 }
@@ -35,7 +35,7 @@ func TestFMCapAnswersText(t *testing.T) {
 		{Timestamp: at("2026-11-01T07:00:00+09:00"), Result: map[string]any{"store": "A"}},
 		{Timestamp: at("2026-11-03T12:00:00+09:00"), Result: map[string]any{"store": "B"}, Current: true},
 	})
-	got := fmCapAnswersText(w)
+	got := capAnswersText(w)
 	a, b := strings.Index(got, `"A"`), strings.Index(got, `"B"`)
 	if a < 0 || b < 0 || b > a {
 		t.Fatalf("newest first: %q", got)

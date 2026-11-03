@@ -105,13 +105,30 @@ enum ServerTools {
         return turn["cards"] as? [[String: Any]] ?? []
     }
 
+    /// A JSON POST to the server, its reply as JSON — for the plan
+    /// (ServerPlan.swift), whose replies are read field by field.
+    static func post(_ path: String, _ payload: [String: Any], target: ServerTarget,
+                     timeout: TimeInterval = 60) async throws -> [String: Any] {
+        let body = try JSONSerialization.data(withJSONObject: payload)
+        let (data, _) = try await request(path, method: "POST", body: body, target: target, timeout: timeout)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
+    /// A GET to the server, its reply as JSON.
+    static func get(_ path: String, query: [URLQueryItem] = [], target: ServerTarget,
+                    timeout: TimeInterval = 20) async throws -> [String: Any] {
+        let (data, _) = try await request(path, method: "GET", body: nil, target: target, query: query, timeout: timeout)
+        return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     private static func request(_ path: String, method: String, body: Data?,
-                                target: ServerTarget, query: [URLQueryItem] = []) async throws -> (Data, HTTPURLResponse) {
+                                target: ServerTarget, query: [URLQueryItem] = [],
+                                timeout: TimeInterval = 20) async throws -> (Data, HTTPURLResponse) {
         var url = target.baseURL.appending(path: path)
         if !query.isEmpty { url.append(queryItems: query) }
         var req = URLRequest(url: url)
         req.httpMethod = method
-        req.timeoutInterval = 20
+        req.timeoutInterval = timeout
         if let authorization = target.authorization {
             req.setValue(authorization, forHTTPHeaderField: "Authorization")
         }

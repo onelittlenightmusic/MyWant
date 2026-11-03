@@ -519,30 +519,39 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/speech", s.listSpeech).Methods("GET", "OPTIONS")
 	api.HandleFunc("/speech", s.postSpeech).Methods("POST")
 
-	// The board robot, in two kinds, each for its own kind of model:
+	// The board robot, for two kinds of model:
 	//
-	//   tools  — the robot's tools and how to use them, for a model that works
-	//            them itself (Claude, through the MCP server): tools.go.
-	//   plan   — a turn as a plan, for a small on-device model (Apple's
-	//            FoundationModels, on an iPhone or a Mac): the server gathers
-	//            what may answer, the model only chooses, the server does it
-	//            and hands back what to answer from: plan.go.
+	//   tools — the robot's tools and how to use them, for a model that works
+	//           them itself (Claude, through the MCP server): tools.go.
+	//   plans — for a small on-device model (Apple's FoundationModels, on an
+	//           iPhone or a Mac): the server helps it decide (brief, params)
+	//           and keeps what it decided as a Plan; nothing is done: plans.go,
+	//           plan.go.
+	//   acts  — a Plan carried out: posted, it is done (the same tool runs as
+	//           tools/call), its progress written into it as a Job's: acts.go.
 	//
-	// Both end in the same tool run; turns records either for every chat
-	// (turns.go). They were fm/… once, when only an Apple model asked.
-	api.HandleFunc("/tools", s.handleFMManifest).Methods("GET")
-	api.HandleFunc("/tools/call", s.handleFMCall).Methods("POST")
-	api.HandleFunc("/plan/brief", s.handleFMBrief).Methods("POST")
-	api.HandleFunc("/plan/params", s.handleFMTypeBrief).Methods("POST")
-	api.HandleFunc("/plan/act", s.handleFMAct).Methods("POST")
-	api.HandleFunc("/turns", s.handleFMTurnPost).Methods("POST")
-	api.HandleFunc("/turns", s.handleFMTurnList).Methods("GET")
-	api.HandleFunc("/turns/{id}", s.handleFMTurnGet).Methods("GET")
-	api.HandleFunc("/turns/{id}/answer", s.handleFMTurnAnswer).Methods("POST")
-	api.HandleFunc("/turns/{id}/replay", s.handleFMTurnReplay).Methods("POST")
+	// turns records a question and what was done for it, for every chat
+	// (turns.go).
+	api.HandleFunc("/tools", s.handleToolsList).Methods("GET")
+	api.HandleFunc("/tools/call", s.handleToolsCall).Methods("POST")
+	api.HandleFunc("/plans/brief", s.handlePlanBrief).Methods("POST")
+	api.HandleFunc("/plans/params", s.handlePlanParams).Methods("POST")
+	api.HandleFunc("/plans", s.handlePlanCreate).Methods("POST")
+	api.HandleFunc("/plans", s.handlePlanList).Methods("GET")
+	api.HandleFunc("/plans/{name}", s.handlePlanGet).Methods("GET")
+	api.HandleFunc("/plans/{name}", s.handlePlanDelete).Methods("DELETE")
+	api.HandleFunc("/acts", s.handleActCreate).Methods("POST")
+	api.HandleFunc("/acts", s.handleActList).Methods("GET")
+	api.HandleFunc("/acts/{name}", s.handleActGet).Methods("GET")
+	api.HandleFunc("/acts/{name}", s.handleActDelete).Methods("DELETE")
+	api.HandleFunc("/turns", s.handleTurnPost).Methods("POST")
+	api.HandleFunc("/turns", s.handleTurnList).Methods("GET")
+	api.HandleFunc("/turns/{id}", s.handleTurnGet).Methods("GET")
+	api.HandleFunc("/turns/{id}/answer", s.handleTurnAnswer).Methods("POST")
+	api.HandleFunc("/turns/{id}/replay", s.handleTurnReplay).Methods("POST")
 	// What a device running the robot's model recorded about itself (device_log.go).
-	api.HandleFunc("/device-log", s.handleFMDeviceLogPost).Methods("POST")
-	api.HandleFunc("/device-log", s.handleFMDeviceLogGet).Methods("GET")
+	api.HandleFunc("/device-log", s.handleDeviceLogPost).Methods("POST")
+	api.HandleFunc("/device-log", s.handleDeviceLogGet).Methods("GET")
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")

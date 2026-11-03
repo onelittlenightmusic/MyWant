@@ -181,15 +181,23 @@ private actor Conversations {
         // board shows the question, what the robot did and its answer.
         let turnID = await ServerTools.openTurn(question: question, target: target, by: "browser", chat: true)
         await TurnBox.shared.set(turnID)
-        let answer = await servedRespond(prompt: question, box: conversation.box,
-                                         tools: conversation.tools, tracker: conversation.tracker)
+        // As a plan (ServerPlan.swift): the server gathers, the model only
+        // chooses, the server does it — as the iPhone and Mac apps answer.
+        let text: String
+        do {
+            text = try await serverPlanned(question: question, turnID: turnID, target: target)
+        } catch {
+            await TurnBox.shared.set(nil)
+            if let turnID { await ServerTools.closeTurn(turnID, answer: "エラー：\(error.localizedDescription)", target: target) }
+            return ["type": "answer", "id": id, "error": "\(error.localizedDescription)"]
+        }
         await TurnBox.shared.set(nil)
         var cards: [[String: Any]] = []
         if let turnID {
-            cards = await ServerTools.closeTurn(turnID, answer: answer.text, target: target)
+            cards = await ServerTools.closeTurn(turnID, answer: text, target: target)
         }
-        _ = await conversation.box.finishedTurn()
-        return ["type": "answer", "id": id, "text": answer.text, "cards": cards]
+        _ = conversation
+        return ["type": "answer", "id": id, "text": text, "cards": cards]
     }
 
     private func conversation(for target: ServerTarget) async -> Conversation? {

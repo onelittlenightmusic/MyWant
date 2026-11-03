@@ -270,7 +270,19 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         let turnID = await ServerTools.openTurn(question: prompt)
         await TurnBox.shared.set(turnID)
         let before = await tracker.count
-        let answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
+        // As a plan (ServerPlan.swift), the same the apps and the browser
+        // follow: the server gathers, the model only chooses, the server does
+        // it. The tool loop below (servedRespond) only when the server has no
+        // plan to give — the server it asks could not be reached.
+        var answer: (text: String, tool: String?, trimmed: Bool)
+        do {
+            let text = try await serverPlanned(question: prompt, turnID: turnID, target: .fromEnvironment)
+            answer = (text, nil, false)
+            await box.remember(prompt: prompt, answer: text)
+        } catch {
+            printErr("[serve] no plan from the server (\(error.localizedDescription)); the tools instead")
+            answer = await servedRespond(prompt: prompt, box: box, tools: localTools, tracker: tracker)
+        }
         await TurnBox.shared.set(nil)
         if let turnID { await ServerTools.closeTurn(turnID, answer: answer.text) }
         let calls = await tracker.count - before

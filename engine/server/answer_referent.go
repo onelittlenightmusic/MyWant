@@ -184,7 +184,7 @@ func (s *Server) wantsNamedIn(q string) (wants []*mywant.Want, title string) {
 		return nil, ""
 	}
 	q = strings.ToLower(q)
-	aliases := s.fmTypeAliases()
+	aliases := s.robotTypeAliases()
 	// Each want named, by the longest of its terms the question holds.
 	type named struct {
 		w   *mywant.Want
@@ -284,7 +284,7 @@ func answerTime(e mywant.ResultHistoryEntry) time.Time {
 // text is the referent as the robot is told it: which answers the
 // question means, each with what it said — said plainly to be the ones meant,
 // not the want's answer now. As many answers, newest first, as fit what look
-// may hand the model (fmLookTokens) — every want the question named can bring
+// may hand the model (robotLookTokens) — every want the question named can bring
 // its own, and the smallest model asking has 4,096 tokens for everything —
 // and always the newest; the rest are counted, not listed.
 func (r *answerReferent) text() string {
@@ -297,7 +297,7 @@ func (r *answerReferent) text() string {
 	for i, a := range r.Answers {
 		raw, _ := json.Marshal(a.Entry.Result)
 		line := fmt.Sprintf("- %s %s: %s\n", a.When.Format("1/2 15:04"), a.Want.Metadata.Name, firstLine(string(raw), 300))
-		if i > 0 && estimateTokens([]byte(b.String()+line)) > fmLookTokens {
+		if i > 0 && estimateTokens([]byte(b.String()+line)) > robotLookTokens {
 			fmt.Fprintf(&b, "(and %d more)\n", len(r.Answers)-i)
 			break
 		}
@@ -306,8 +306,8 @@ func (r *answerReferent) text() string {
 	return b.String()
 }
 
-// fmJapanese says whether a question is written in Japanese (any kana or kanji).
-func fmJapanese(q string) bool {
+// robotJapanese says whether a question is written in Japanese (any kana or kanji).
+func robotJapanese(q string) bool {
 	for _, r := range q {
 		if (r >= 0x3040 && r <= 0x30ff) || (r >= 0x4e00 && r <= 0x9fff) {
 			return true
@@ -316,21 +316,21 @@ func fmJapanese(q string) bool {
 	return false
 }
 
-// fmLookReferent is look's answer when the question named a time of the
+// robotLookReferent is look's answer when the question named a time of the
 // want's answers: those answers, and — asked what a photo of them shows (a
 // score) — the photos joined to them, answered here as the robot on this
 // machine answers them (types.AnswerFromPhotos), else the words read from
 // them for the asker's own model to read.
-func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[string]string) string {
+func (s *Server) robotLookReferent(ref *answerReferent, question string, args map[string]string) string {
 	// The robot goes to what the answer is read off: the want whose answer
 	// it is — and, answered from a photo's field, on to the photo
 	// (types.AnswerEvidence, below).
 	if len(ref.Answers) > 0 {
 		a := ref.Answers[0]
-		args[fmCardArg] = fmCardValue("want", a.Want.Metadata.ID, a.Want.Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", a.Want.Metadata.ID, a.Want.Metadata.Name)
 		s.walkRobotToEvidence(a.ID)
 	} else if len(ref.Wants) > 0 {
-		args[fmCardArg] = fmCardValue("want", ref.Wants[0].Metadata.ID, ref.Wants[0].Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", ref.Wants[0].Metadata.ID, ref.Wants[0].Metadata.Name)
 		s.walkRobotToEvidence(ref.Wants[0].Metadata.ID)
 	}
 	var b strings.Builder

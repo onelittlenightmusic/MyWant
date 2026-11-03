@@ -34,90 +34,90 @@ import (
 )
 
 const (
-	// fmCapSep joins a want's name and its capability's into the choice.
-	fmCapSep = "#"
+	// capSep joins a want's name and its capability's into the choice.
+	capSep = "#"
 	// How long a capability's skill may run.
-	fmCapSkillTimeout = 90 * time.Second
+	capSkillTimeout = 90 * time.Second
 	// How much of each kind of data a prompt is given.
-	fmCapAnswers = 6
-	fmCapPhotos  = 4
-	fmCapLines   = 12
+	capAnswers = 6
+	capPhotos  = 4
+	capLines   = 12
 )
 
-// fmStdCap is a standard capability: one every want has, done the same way
+// stdCap is a standard capability: one every want has, done the same way
 // for every type — so its type need not say it, and a person can ask any want
 // for it (「smartgolfを再実行」「再チェック」「最新を取得」). They are kept in
 // standard_capabilities.yaml, beside this file.
-type fmStdCap struct {
+type stdCap struct {
 	mywant.WantCapabilityDef `yaml:",inline"`
-	// Action is an operation of the server's own (fmStdActions), done instead
+	// Action is an operation of the server's own (stdActions), done instead
 	// of reading data.
 	Action string `yaml:"action,omitempty"`
 }
 
 //go:embed standard_capabilities.yaml
-var fmStdCapsYAML []byte
+var stdCapsYAML []byte
 
-// fmStdActions are the operations a standard capability may name.
-var fmStdActions = map[string]func(s *Server, w *mywant.Want, args map[string]string) (string, error){
-	"restart": (*Server).fmStdRestart,
+// stdActions are the operations a standard capability may name.
+var stdActions = map[string]func(s *Server, w *mywant.Want, args map[string]string) (string, error){
+	"restart": (*Server).stdRestart,
 }
 
-var fmStdCaps = func() []fmStdCap {
+var stdCaps = func() []stdCap {
 	var file struct {
-		Capabilities []fmStdCap `yaml:"capabilities"`
+		Capabilities []stdCap `yaml:"capabilities"`
 	}
-	if err := yaml.Unmarshal(fmStdCapsYAML, &file); err != nil {
+	if err := yaml.Unmarshal(stdCapsYAML, &file); err != nil {
 		panic("standard_capabilities.yaml: " + err.Error())
 	}
 	for _, c := range file.Capabilities {
-		if c.Action != "" && fmStdActions[c.Action] == nil {
+		if c.Action != "" && stdActions[c.Action] == nil {
 			panic("standard_capabilities.yaml: " + c.Name + " names no action the server has: " + c.Action)
 		}
 	}
 	return file.Capabilities
 }()
 
-func fmStdCapNamed(name string) (fmStdCap, bool) {
-	for _, c := range fmStdCaps {
+func stdCapNamed(name string) (stdCap, bool) {
+	for _, c := range stdCaps {
 		if c.Name == name {
 			return c, true
 		}
 	}
-	return fmStdCap{}, false
+	return stdCap{}, false
 }
 
-// fmStdRestart runs a want again, walks to it, and — when it finds what it
+// stdRestart runs a want again, walks to it, and — when it finds what it
 // finds within seconds — says what it found; else that it is running.
-func (s *Server) fmStdRestart(w *mywant.Want, args map[string]string) (string, error) {
+func (s *Server) stdRestart(w *mywant.Want, args map[string]string) (string, error) {
 	if err := s.backend("POST", "/api/v1/wants/"+w.Metadata.ID+"/restart", nil, nil); err != nil {
 		return "", fmt.Errorf("could not run %q again: %v", w.Metadata.Name, err)
 	}
 	out := fmt.Sprintf("Ran %q (%s) again.", w.Metadata.Name, w.Metadata.Type)
-	if s.fmWaitSettled(w.Metadata.ID, fmPlanResultWait) {
-		look := map[string]string{"name": w.Metadata.Name, fmShortArg: "true"}
-		if said, err := s.fmLook(look); err == nil {
+	if s.robotWaitSettled(w.Metadata.ID, planResultWait) {
+		look := map[string]string{"name": w.Metadata.Name, robotShortArg: "true"}
+		if said, err := s.robotLook(look); err == nil {
 			return out + " What it says now:\n" + said, nil
 		}
 	}
 	return out + " It is still running; what it finds will show on its tile — say so.", nil
 }
 
-// fmWantNamed is the want a name means: its own name (or close to it), else
+// robotWantNamed is the want a name means: its own name (or close to it), else
 // the want of the type it is an alias of — the one on the board before one put
 // away. More than one meant, they are said instead.
-func (s *Server) fmWantNamed(name string) (*mywant.Want, error) {
+func (s *Server) robotWantNamed(name string) (*mywant.Want, error) {
 	if s.globalBuilder == nil {
 		return nil, fmt.Errorf("no board")
 	}
 	all := s.globalBuilder.GetWants()
 	var wants []*mywant.Want
 	for _, w := range all {
-		if w.Metadata.Labels[fmArchived] != "true" && w.Metadata.Name != fmRobotWant {
+		if w.Metadata.Labels[robotArchived] != "true" && w.Metadata.Name != robotWantName {
 			wants = append(wants, w)
 		}
 	}
-	loose := fmLooseName
+	loose := robotLooseName
 	var near []*mywant.Want
 	for _, w := range wants {
 		if w.Metadata.Name == name || loose(w.Metadata.Name) == loose(name) {
@@ -132,7 +132,7 @@ func (s *Server) fmWantNamed(name string) (*mywant.Want, error) {
 		for i, w := range wants {
 			typeOf[i] = w.Metadata.Type
 		}
-		for _, i := range fmByAlias(name, typeOf, s.fmTypeAliases()) {
+		for _, i := range robotByAlias(name, typeOf, s.robotTypeAliases()) {
 			near = append(near, wants[i])
 		}
 	}
@@ -149,25 +149,25 @@ func (s *Server) fmWantNamed(name string) (*mywant.Want, error) {
 	return nil, fmt.Errorf("%q could be: %s — ask the person which", name, strings.Join(names, ", "))
 }
 
-// fmCap is one capability of one want on the board.
-type fmCap struct {
+// wantCap is one capability of one want on the board.
+type wantCap struct {
 	want *mywant.Want
 	def  mywant.WantCapabilityDef
 	// The directory the type was loaded from, where its skill must be.
 	dir string
 }
 
-func (c fmCap) ref() string { return c.want.Metadata.Name + fmCapSep + c.def.Name }
+func (c wantCap) ref() string { return c.want.Metadata.Name + capSep + c.def.Name }
 
-// fmCapabilities is every capability of every want on the board (not those
+// boardCapabilities is every capability of every want on the board (not those
 // put away), in the board's order.
-func (s *Server) fmCapabilities() []fmCap {
+func (s *Server) boardCapabilities() []wantCap {
 	if s.globalBuilder == nil || s.wantTypeLoader == nil {
 		return nil
 	}
-	var out []fmCap
+	var out []wantCap
 	for _, w := range s.globalBuilder.GetWants() {
-		if w.Metadata.Labels[fmArchived] == "true" {
+		if w.Metadata.Labels[robotArchived] == "true" {
 			continue
 		}
 		def := s.wantTypeLoader.GetDefinition(w.Metadata.Type)
@@ -182,40 +182,40 @@ func (s *Server) fmCapabilities() []fmCap {
 			if strings.TrimSpace(c.Name) == "" || strings.TrimSpace(c.Description) == "" {
 				continue
 			}
-			out = append(out, fmCap{want: w, def: c, dir: dir})
+			out = append(out, wantCap{want: w, def: c, dir: dir})
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].ref() < out[j].ref() })
 	return out
 }
 
-// fmCapabilityChoices is what use_capability's capability may be: the
+// capabilityChoices is what use_capability's capability may be: the
 // standard ones by name, then each want's own as want#capability.
-func (s *Server) fmCapabilityChoices() []string {
+func (s *Server) capabilityChoices() []string {
 	var out []string
-	for _, c := range fmStdCaps {
+	for _, c := range stdCaps {
 		out = append(out, c.Name)
 	}
-	return append(out, s.fmCapabilityRefs()...)
+	return append(out, s.capabilityRefs()...)
 }
 
-func (s *Server) fmCapabilityRefs() []string {
+func (s *Server) capabilityRefs() []string {
 	var refs []string
-	for _, c := range s.fmCapabilities() {
+	for _, c := range s.boardCapabilities() {
 		refs = append(refs, c.ref())
 	}
 	return refs
 }
 
-// fmCapabilitiesText is the board's capabilities as the robot's instructions
+// capabilitiesText is the board's capabilities as the robot's instructions
 // list them: what each can look up, by its choice.
-func (s *Server) fmCapabilitiesText() string {
+func (s *Server) capabilitiesText() string {
 	var b strings.Builder
 	b.WriteString("\n\nWhat every want can do, asked of it by name — call use_capability with the capability and want set to the want's name:\n")
-	for _, c := range fmStdCaps {
+	for _, c := range stdCaps {
 		fmt.Fprintf(&b, "- %s: %s\n", c.Name, firstLine(c.Description, 160))
 	}
-	if caps := s.fmCapabilities(); len(caps) > 0 {
+	if caps := s.boardCapabilities(); len(caps) > 0 {
 		b.WriteString("What wants on the board can look up beyond what they show — when the person asks exactly this, call use_capability with it:\n")
 		for _, c := range caps {
 			fmt.Fprintf(&b, "- %s: %s\n", c.ref(), firstLine(c.def.Description, 120))
@@ -224,40 +224,40 @@ func (s *Server) fmCapabilitiesText() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// fmUseCapability does one capability: its data gathered (or its skill run)
+// useCapability does one capability: its data gathered (or its skill run)
 // and handed back with the type's way of answering from it.
-func (s *Server) fmUseCapability(args map[string]string) (string, error) {
+func (s *Server) useCapability(args map[string]string) (string, error) {
 	ref := strings.TrimSpace(args["capability"])
 	// A standard one: of the want named (want#restart, or want= beside it).
 	stdName, wantName := ref, strings.TrimSpace(args["want"])
-	if i := strings.LastIndex(ref, fmCapSep); i >= 0 {
-		stdName, wantName = ref[i+len(fmCapSep):], ref[:i]
+	if i := strings.LastIndex(ref, capSep); i >= 0 {
+		stdName, wantName = ref[i+len(capSep):], ref[:i]
 	}
-	if std, ok := fmStdCapNamed(stdName); ok {
+	if std, ok := stdCapNamed(stdName); ok {
 		if wantName == "" {
 			return "", fmt.Errorf("%s needs the want: set want to its name", std.Name)
 		}
-		w, err := s.fmWantNamed(wantName)
+		w, err := s.robotWantNamed(wantName)
 		if err != nil {
 			return "", err
 		}
-		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 		if std.Action != "" {
-			return fmStdActions[std.Action](s, w, args)
+			return stdActions[std.Action](s, w, args)
 		}
 		// Data to read, as a type's own capability: of the want named.
-		return s.fmCapAnswer(fmCap{want: w, def: std.WantCapabilityDef}, args)
+		return s.capAnswer(wantCap{want: w, def: std.WantCapabilityDef}, args)
 	}
 	// A type's own, named beside its want (the plan's capability field).
-	if !strings.Contains(ref, fmCapSep) && wantName != "" {
-		w, err := s.fmWantNamed(wantName)
+	if !strings.Contains(ref, capSep) && wantName != "" {
+		w, err := s.robotWantNamed(wantName)
 		if err != nil {
 			return "", err
 		}
-		ref = w.Metadata.Name + fmCapSep + ref
+		ref = w.Metadata.Name + capSep + ref
 	}
-	var c *fmCap
-	for _, x := range s.fmCapabilities() {
+	var c *wantCap
+	for _, x := range s.boardCapabilities() {
 		if x.ref() == ref {
 			x := x
 			c = &x
@@ -265,17 +265,17 @@ func (s *Server) fmUseCapability(args map[string]string) (string, error) {
 		}
 	}
 	if c == nil {
-		return "", fmt.Errorf("no capability %q; choose one of: %s", ref, strings.Join(s.fmCapabilityChoices(), ", "))
+		return "", fmt.Errorf("no capability %q; choose one of: %s", ref, strings.Join(s.capabilityChoices(), ", "))
 	}
-	return s.fmCapAnswer(*c, args)
+	return s.capAnswer(*c, args)
 }
 
-// fmCapAnswer does a capability that reads (or runs a skill): its data
+// capAnswer does a capability that reads (or runs a skill): its data
 // gathered and handed back with the way of answering from it.
-func (s *Server) fmCapAnswer(c fmCap, args map[string]string) (string, error) {
-	question := args[fmQuestionArg]
+func (s *Server) capAnswer(c wantCap, args map[string]string) (string, error) {
+	question := args[robotQuestionArg]
 	w := c.want
-	args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+	args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	go s.walkRobotToEvidence(w.Metadata.ID)
 
 	var b strings.Builder
@@ -289,7 +289,7 @@ func (s *Server) fmCapAnswer(c fmCap, args map[string]string) (string, error) {
 		b.WriteString("How its data reads (the want type's own words): " + strings.Join(strings.Fields(p), " ") + "\n")
 	}
 	if c.def.Skill != "" {
-		out, err := s.fmRunCapabilitySkill(c, question)
+		out, err := s.runCapabilitySkill(c, question)
 		if err != nil {
 			return "", err
 		}
@@ -298,25 +298,25 @@ func (s *Server) fmCapAnswer(c fmCap, args map[string]string) (string, error) {
 	for _, kind := range c.def.Reads {
 		switch kind {
 		case "answers":
-			b.WriteString("\n" + fmCapAnswersText(w))
+			b.WriteString("\n" + capAnswersText(w))
 		case "answer_photos":
-			b.WriteString("\n" + s.fmCapPhotosText(w, args))
+			b.WriteString("\n" + s.capPhotosText(w, args))
 		case "state":
-			b.WriteString("\nWhat it says now:\n" + s.fmLookFull(w.Metadata.Name, w.Metadata.Type) + "\n")
+			b.WriteString("\nWhat it says now:\n" + s.robotLookFull(w.Metadata.Name, w.Metadata.Type) + "\n")
 		}
 	}
 	return b.String(), nil
 }
 
-// fmCapAnswersText is a want's kept answers, newest first.
-func fmCapAnswersText(w *mywant.Want) string {
+// capAnswersText is a want's kept answers, newest first.
+func capAnswersText(w *mywant.Want) string {
 	h := w.BuildHistory().ResultHistory
 	if len(h) == 0 {
 		return "Its answers: none kept.\n"
 	}
 	var b strings.Builder
 	b.WriteString("Its answers, newest first:\n")
-	for i := len(h) - 1; i >= 0 && len(h)-1-i < fmCapAnswers; i-- {
+	for i := len(h) - 1; i >= 0 && len(h)-1-i < capAnswers; i-- {
 		e := h[i]
 		r, _ := json.Marshal(e.Result)
 		now := ""
@@ -328,28 +328,28 @@ func fmCapAnswersText(w *mywant.Want) string {
 	return b.String()
 }
 
-// fmCapPhotosText is the photos joined to a want's answers, newest answer
+// capPhotosText is the photos joined to a want's answers, newest answer
 // first, with what was read off each.
-func (s *Server) fmCapPhotosText(w *mywant.Want, args map[string]string) string {
+func (s *Server) capPhotosText(w *mywant.Want, args map[string]string) string {
 	photos := s.answerPhotosOf([]*mywant.Want{w}, w.Metadata.Name, nil)
 	if len(photos) == 0 {
 		return "Photos joined to its answers: none.\n"
 	}
 	// Those nobody has read yet, or not read into their fields: handed to the
 	// asker's device to read (the iPhone app's PhotoReader), and queued here.
-	var unread []fmUnreadPhoto
+	var unread []robotUnreadPhoto
 	for _, p := range photos {
 		switch {
 		case p.Read == nil && p.ImageURL != "":
-			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL})
+			unread = append(unread, robotUnreadPhoto{ID: p.ID, Image: p.ImageURL})
 		case len(p.FieldSpec) > 0 && len(p.Fields) == 0:
-			unread = append(unread, fmUnreadPhoto{ID: p.ID, Image: p.ImageURL, Read: true})
+			unread = append(unread, robotUnreadPhoto{ID: p.ID, Image: p.ImageURL, Read: true})
 		}
 	}
 	if len(unread) > 0 {
 		s.readPhotoFieldsSoon()
 		raw, _ := json.Marshal(unread)
-		args[fmUnreadArg] = string(raw)
+		args[robotUnreadArg] = string(raw)
 	}
 	var b strings.Builder
 	if photos[0].Rules != "" {
@@ -357,7 +357,7 @@ func (s *Server) fmCapPhotosText(w *mywant.Want, args map[string]string) string 
 	}
 	b.WriteString("Photos joined to its answers, newest answer first:\n")
 	for i, p := range photos {
-		if i == fmCapPhotos {
+		if i == capPhotos {
 			break
 		}
 		fmt.Fprintf(&b, "- photo %q, for the answer of %s\n", p.Name, p.About)
@@ -374,8 +374,8 @@ func (s *Server) fmCapPhotosText(w *mywant.Want, args map[string]string) string 
 		switch {
 		case p.Read != nil && len(p.Read.Lines) > 0:
 			lines := p.Read.Lines
-			if len(lines) > fmCapLines {
-				lines = lines[:fmCapLines]
+			if len(lines) > capLines {
+				lines = lines[:capLines]
 			}
 			b.WriteString("  its words: " + strings.Join(lines, " / ") + "\n")
 		case len(p.Fields) == 0:
@@ -385,18 +385,18 @@ func (s *Server) fmCapPhotosText(w *mywant.Want, args map[string]string) string 
 	return b.String()
 }
 
-// fmRunCapabilitySkill runs a capability's skill — only one inside its type's
+// runCapabilitySkill runs a capability's skill — only one inside its type's
 // own directory — with the question, and says what it printed.
-func (s *Server) fmRunCapabilitySkill(c fmCap, question string) (string, error) {
+func (s *Server) runCapabilitySkill(c wantCap, question string) (string, error) {
 	if c.dir == "" {
 		return "", fmt.Errorf("%s's type has no directory of its own to run %s from", c.want.Metadata.Name, c.def.Skill)
 	}
-	path, ok := fmCapSkillPath(c.dir, c.def.Skill)
+	path, ok := capSkillPath(c.dir, c.def.Skill)
 	if !ok {
 		return "", fmt.Errorf("%s's skill %s is outside its type's directory", c.want.Metadata.Name, c.def.Skill)
 	}
 	arg, _ := json.Marshal(map[string]string{"question": question})
-	ctx, cancel := context.WithTimeout(context.Background(), fmCapSkillTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), capSkillTimeout)
 	defer cancel()
 	out, err := mywant.RunMRSScript(ctx, path, mywant.MRSRunOptions{Args: []string{string(arg)}})
 	if err != nil {
@@ -406,9 +406,9 @@ func (s *Server) fmRunCapabilitySkill(c fmCap, question string) (string, error) 
 	return firstLine(string(data), 2000), nil
 }
 
-// fmCapSkillPath is a skill's path in its type's directory — or not ok, when
+// capSkillPath is a skill's path in its type's directory — or not ok, when
 // it would leave it (../, an absolute path).
-func fmCapSkillPath(dir, skill string) (string, bool) {
+func capSkillPath(dir, skill string) (string, bool) {
 	if dir == "" || skill == "" || filepath.IsAbs(skill) {
 		return "", false
 	}

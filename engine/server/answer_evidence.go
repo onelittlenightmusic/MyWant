@@ -28,7 +28,7 @@ func (s *Server) walkRobotToEvidence(id string) {
 	if id == "" {
 		return
 	}
-	tiles, err := s.fmTiles()
+	tiles, err := s.robotTiles()
 	if err != nil {
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Server) walkRobotToEvidence(id string) {
 		if t.id != id {
 			continue
 		}
-		if err := s.fmWalkRobot(t.x, t.y); err != nil {
+		if err := s.robotWalkRobot(t.x, t.y); err != nil {
 			log.Printf("[robot] could not walk to %s: %v", t.name, err)
 		}
 		return

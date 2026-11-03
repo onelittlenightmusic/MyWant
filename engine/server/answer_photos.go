@@ -99,7 +99,7 @@ func (s *Server) answerPhotosOf(wants []*mywant.Want, title string, only map[str
 	specs := s.photoTypeSpecs()
 	// How each type's photos are read, as its YAML says (photoReadingLabel).
 	rules := map[string]string{}
-	if wts, err := s.fmWantTypes(); err == nil {
+	if wts, err := s.robotWantTypes(); err == nil {
 		for _, t := range wts {
 			if r := strings.Join(strings.Fields(t.Labels[photoReadingLabel]), " "); r != "" {
 				rules[t.Name] = r

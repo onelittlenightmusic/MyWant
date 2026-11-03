@@ -24,7 +24,7 @@ import (
 // sends nothing — what its previous run wrote to stderr, which is where Swift
 // puts "Fatal error: …".
 
-type fmDeviceLogEntry struct {
+type deviceLogEntry struct {
 	At     string `json:"at"`
 	Device string `json:"device,omitempty"`
 	Event  string `json:"event"`
@@ -33,29 +33,29 @@ type fmDeviceLogEntry struct {
 	Received string `json:"received,omitempty"`
 }
 
-var fmDeviceLogMu sync.Mutex
+var deviceLogMu sync.Mutex
 
-// fmDeviceLogMax: past this the log starts over (the old one kept as .1).
-const fmDeviceLogMax = 5 << 20
+// deviceLogMax: past this the log starts over (the old one kept as .1).
+const deviceLogMax = 5 << 20
 
-func fmDeviceLogPath() string { return thingPath("fm-device-log.jsonl") }
+func deviceLogPath() string { return thingPath("fm-device-log.jsonl") }
 
 // POST /api/v1/device-log  {"device": "...", "entries": [{at, event, detail}]}
-func (s *Server) handleFMDeviceLogPost(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeviceLogPost(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Device  string             `json:"device"`
-		Entries []fmDeviceLogEntry `json:"entries"`
+		Entries []deviceLogEntry `json:"entries"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	now := time.Now().Format(time.RFC3339)
-	path := fmDeviceLogPath()
+	path := deviceLogPath()
 
-	fmDeviceLogMu.Lock()
-	defer fmDeviceLogMu.Unlock()
-	if st, err := os.Stat(path); err == nil && st.Size() > fmDeviceLogMax {
+	deviceLogMu.Lock()
+	defer deviceLogMu.Unlock()
+	if st, err := os.Stat(path); err == nil && st.Size() > deviceLogMax {
 		_ = os.Rename(path, path+".1")
 	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
@@ -72,25 +72,25 @@ func (s *Server) handleFMDeviceLogPost(w http.ResponseWriter, r *http.Request) {
 		line, _ := json.Marshal(e)
 		_, _ = f.Write(append(line, '\n'))
 	}
-	fmWriteJSON(w, map[string]any{"stored": len(req.Entries)})
+	robotWriteJSON(w, map[string]any{"stored": len(req.Entries)})
 }
 
 // GET /api/v1/device-log?tail=200 — the last entries, oldest first.
-func (s *Server) handleFMDeviceLogGet(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleDeviceLogGet(w http.ResponseWriter, r *http.Request) {
 	tail := 200
 	if n, err := strconv.Atoi(r.URL.Query().Get("tail")); err == nil && n > 0 {
 		tail = n
 	}
-	fmDeviceLogMu.Lock()
-	defer fmDeviceLogMu.Unlock()
-	entries := []fmDeviceLogEntry{}
-	f, err := os.Open(fmDeviceLogPath())
+	deviceLogMu.Lock()
+	defer deviceLogMu.Unlock()
+	entries := []deviceLogEntry{}
+	f, err := os.Open(deviceLogPath())
 	if err == nil {
 		defer f.Close()
 		sc := bufio.NewScanner(f)
 		sc.Buffer(make([]byte, 0, 64<<10), 4<<20)
 		for sc.Scan() {
-			var e fmDeviceLogEntry
+			var e deviceLogEntry
 			if json.Unmarshal(sc.Bytes(), &e) == nil {
 				entries = append(entries, e)
 				if len(entries) > tail {
@@ -99,5 +99,5 @@ func (s *Server) handleFMDeviceLogGet(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	fmWriteJSON(w, map[string]any{"entries": entries})
+	robotWriteJSON(w, map[string]any{"entries": entries})
 }

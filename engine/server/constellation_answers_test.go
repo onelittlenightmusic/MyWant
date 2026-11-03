@@ -18,7 +18,7 @@ func TestAnswerConstellationsAreTheWants(t *testing.T) {
 	dir := t.TempDir()
 	s.thingStore = &ThingStore{path: filepath.Join(dir, "memo.yaml")}
 	s.thingLabels = &ThingLabelStore{mwlabels.NewFileStore(filepath.Join(dir, "memo-labels.yaml"))}
-	wantID := fmArchiveTestWant(t, s, "golf", nil, map[string]any{"service_time": 0.1})
+	wantID := robotArchiveTestWant(t, s, "golf", nil, map[string]any{"service_time": 0.1})
 	a1, a2 := wantID+answerSep+"k1", wantID+answerSep+"k2"
 
 	// The old way: a constellation per answer, the answer one of its members.

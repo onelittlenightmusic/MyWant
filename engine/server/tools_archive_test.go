@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// fmArchiveTestWant puts a want on the test server and waits for it.
-func fmArchiveTestWant(t *testing.T, s *Server, name string, labels map[string]string, params map[string]any) string {
+// robotArchiveTestWant puts a want on the test server and waits for it.
+func robotArchiveTestWant(t *testing.T, s *Server, name string, labels map[string]string, params map[string]any) string {
 	t.Helper()
 	w := patchTestDo(t, s, "POST", "/api/v1/wants", []map[string]any{{
 		"metadata": map[string]any{"name": name, "type": "queue", "labels": labels},
@@ -31,7 +31,7 @@ func fmArchiveTestWant(t *testing.T, s *Server, name string, labels map[string]s
 	return ""
 }
 
-func fmParams(t *testing.T, v map[string]any) string {
+func robotParams(t *testing.T, v map[string]any) string {
 	t.Helper()
 	b, _ := json.Marshal(v)
 	return string(b)
@@ -42,12 +42,12 @@ func fmParams(t *testing.T, v map[string]any) string {
 // failed with a 409 the person never saw the reason for.
 func TestFMDeployTakesAnotherNameWhenAnArchivedWantHasIt(t *testing.T) {
 	s := patchTestServer(t)
-	fmArchiveTestWant(t, s, "transit_search",
+	robotArchiveTestWant(t, s, "transit_search",
 		map[string]string{"mywant.io/archived": "true"}, map[string]any{"service_time": 0.1})
 
-	out, err := s.fmDeployWant(map[string]string{
+	out, err := s.robotDeployWant(map[string]string{
 		"type": "queue", "name": "transit_search",
-		"params": fmParams(t, map[string]any{"service_time": 0.7}),
+		"params": robotParams(t, map[string]any{"service_time": 0.7}),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -59,16 +59,16 @@ func TestFMDeployTakesAnotherNameWhenAnArchivedWantHasIt(t *testing.T) {
 
 func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 	s := patchTestServer(t)
-	id := fmArchiveTestWant(t, s, "old-route",
+	id := robotArchiveTestWant(t, s, "old-route",
 		map[string]string{"mywant.io/archived": "true", "mywant.io/canvas-x": "3", "mywant.io/canvas-y": "4"},
 		map[string]any{"service_time": 0.2})
 
 	// The same thing asked again: not made twice, offered back — with its card.
 	deployArgs := map[string]string{
-		"type": "queue", "params": fmParams(t, map[string]any{"service_time": 0.2}),
+		"type": "queue", "params": robotParams(t, map[string]any{"service_time": 0.2}),
 	}
-	out, err := s.fmDeployWant(deployArgs)
-	if card := fmTakeCard(deployArgs); card == nil || card.ID != id {
+	out, err := s.robotDeployWant(deployArgs)
+	if card := robotTakeCard(deployArgs); card == nil || card.ID != id {
 		t.Errorf("deploy card = %+v, want the archived want's (%s)", card, id)
 	}
 	if err != nil {
@@ -85,8 +85,8 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 
 	// Off the board: point has nowhere to walk, and says why — the card still shown.
 	pointArgs := map[string]string{"name": "old-route"}
-	out, err = s.fmPoint(pointArgs)
-	if card := fmTakeCard(pointArgs); card == nil || card.ID != id {
+	out, err = s.robotPoint(pointArgs)
+	if card := robotTakeCard(pointArgs); card == nil || card.ID != id {
 		t.Errorf("point card = %+v, want the archived want's (%s)", card, id)
 	}
 	if err != nil {
@@ -98,7 +98,7 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 
 	// Yes: the archive label comes off.
 	args := map[string]string{"name": "old-route"}
-	out, err = s.fmRestoreWant(args)
+	out, err = s.robotRestoreWant(args)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestFMArchivedWantIsOfferedBack(t *testing.T) {
 	if want.GetLabels()["mywant.io/archived"] == "true" {
 		t.Errorf("still archived: %v", want.GetLabels())
 	}
-	if _, err := s.fmRestoreWant(map[string]string{"name": "old-route"}); err == nil {
+	if _, err := s.robotRestoreWant(map[string]string{"name": "old-route"}); err == nil {
 		t.Errorf("restoring a want that is not archived should say so")
 	}
 }
@@ -123,25 +123,25 @@ func TestFMArchivedQuestionIsRunAgain(t *testing.T) {
 	if def.Metadata.Labels == nil {
 		def.Metadata.Labels = map[string]string{}
 	}
-	def.Metadata.Labels[fmAskAgainLabel] = "run"
-	t.Cleanup(func() { delete(def.Metadata.Labels, fmAskAgainLabel) })
+	def.Metadata.Labels[robotAskAgainLabel] = "run"
+	t.Cleanup(func() { delete(def.Metadata.Labels, robotAskAgainLabel) })
 
-	id := fmArchiveTestWant(t, s, "old-route",
+	id := robotArchiveTestWant(t, s, "old-route",
 		map[string]string{"mywant.io/archived": "true"},
 		map[string]any{"service_time": 0.2, "drop": "x"})
 
 	for _, round := range []string{"params changed", "same params"} {
 		args := map[string]string{
-			"type": "queue", "params": fmParams(t, map[string]any{"service_time": 0.2}),
+			"type": "queue", "params": robotParams(t, map[string]any{"service_time": 0.2}),
 		}
-		out, err := s.fmDeployWant(args)
+		out, err := s.robotDeployWant(args)
 		if err != nil {
 			t.Fatalf("%s: %v", round, err)
 		}
 		if !strings.Contains(out, `Brought "old-route"`) || strings.Contains(out, "restore_want") {
 			t.Errorf("%s: out = %s", round, out)
 		}
-		if card := fmTakeCard(args); card == nil || card.ID != id {
+		if card := robotTakeCard(args); card == nil || card.ID != id {
 			t.Errorf("%s: card = %+v, want the brought-back want's (%s)", round, card, id)
 		}
 		want, _, _ := s.globalBuilder.FindWantByID(id)
@@ -171,7 +171,7 @@ func TestFMArchivedQuestionIsRunAgain(t *testing.T) {
 // A required parameter left out now makes nothing, and the model is told which.
 func TestFMDeployRefusesMissingRequiredParams(t *testing.T) {
 	s := patchTestServer(t)
-	_, err := s.fmDeployWant(map[string]string{"type": "dynamic_background", "name": "bg", "params": "{}"})
+	_, err := s.robotDeployWant(map[string]string{"type": "dynamic_background", "name": "bg", "params": "{}"})
 	if err == nil || !strings.Contains(err.Error(), "character_id") {
 		t.Fatalf("err = %v, want it to name character_id", err)
 	}
@@ -198,7 +198,7 @@ func TestFMParseParams(t *testing.T) {
 		{`{"from":`, "error"},
 		{"新宿→横浜", "error"},
 	} {
-		got, err := fmParseParams(c.raw)
+		got, err := robotParseParams(c.raw)
 		if c.want == "error" {
 			if err == nil {
 				t.Errorf("%q: want an error, got %v", c.raw, got)

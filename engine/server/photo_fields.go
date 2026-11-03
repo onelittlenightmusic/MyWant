@@ -53,7 +53,7 @@ type photoTypeSpec struct {
 // photoTypeSpecs are the types that read their photos into fields.
 func (s *Server) photoTypeSpecs() map[string]photoTypeSpec {
 	out := map[string]photoTypeSpec{}
-	wts, err := s.fmWantTypes()
+	wts, err := s.robotWantTypes()
 	if err != nil {
 		return out
 	}

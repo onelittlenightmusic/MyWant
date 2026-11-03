@@ -11,31 +11,31 @@ func TestFMReplyChoices(t *testing.T) {
 		answer string
 		want   []string
 	}{
-		{"スコアを確認しますか？", fmYesNo},
-		{"アーカイブした「新宿御苑前→銀座」があります。復元しますか？", fmYesNo},
-		{"Shall I check it?", fmYesNo},
+		{"スコアを確認しますか？", robotYesNo},
+		{"アーカイブした「新宿御苑前→銀座」があります。復元しますか？", robotYesNo},
+		{"Shall I check it?", robotYesNo},
 		{"どこに置きますか？", nil},
 		{"何を確認しますか？", nil},
 		{"荻窪に来ました", nil},
 		{"70（-2）です。", nil},
 	} {
-		if got := fmReplyChoices(c.answer); !reflect.DeepEqual(got, c.want) {
-			t.Errorf("fmReplyChoices(%q) = %v, want %v", c.answer, got, c.want)
+		if got := robotReplyChoices(c.answer); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("robotReplyChoices(%q) = %v, want %v", c.answer, got, c.want)
 		}
 	}
 }
 
 func TestFMLocaleText(t *testing.T) {
-	if got := fmLocaleText(""); got != "" {
+	if got := robotLocaleText(""); got != "" {
 		t.Errorf("no locale: %q", got)
 	}
-	if got := fmLocaleText("ja_JP"); !strings.Contains(got, "answer in Japanese") || !strings.Contains(got, "ja_JP") {
+	if got := robotLocaleText("ja_JP"); !strings.Contains(got, "answer in Japanese") || !strings.Contains(got, "ja_JP") {
 		t.Errorf("ja_JP: %q", got)
 	}
-	if got := fmLocaleText("en-US"); !strings.Contains(got, "answer in English") {
+	if got := robotLocaleText("en-US"); !strings.Contains(got, "answer in English") {
 		t.Errorf("en-US: %q", got)
 	}
-	if got := fmLocaleText("xx"); !strings.Contains(got, "locale xx") {
+	if got := robotLocaleText("xx"); !strings.Contains(got, "locale xx") {
 		t.Errorf("xx: %q", got)
 	}
 }

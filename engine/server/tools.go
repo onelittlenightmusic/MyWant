@@ -34,10 +34,10 @@ import (
 // Answers are short on purpose. The model has 8k tokens for the instructions,
 // the tool schemas and the whole talk; the board dumped raw would fill it.
 
-type fmTool struct {
+type robotTool struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
-	Arguments   []fmParam `json:"arguments"`
+	Arguments   []robotParam `json:"arguments"`
 	// Writes: the call changes the board. A device that shows the board
 	// (the iPhone app's web view) says "reflecting…" until it reads it back.
 	Writes bool `json:"writes,omitempty"`
@@ -48,10 +48,10 @@ type fmTool struct {
 	replays bool
 }
 
-// fmParam is one argument. Every argument is a string: the device builds its
+// robotParam is one argument. Every argument is a string: the device builds its
 // schema from these, and one kind keeps that side trivial. A structured value
-// (a want's params) travels as name=value pairs (fmParseParams).
-type fmParam struct {
+// (a want's params) travels as name=value pairs (robotParseParams).
+type robotParam struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
@@ -62,7 +62,7 @@ type fmParam struct {
 	Choices []string `json:"choices,omitempty"`
 }
 
-const fmInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
+const robotInstructions = `You are the robot on the MyWant board, and a guide: a guide does not recite, a guide shows. The person talks to you from their phone; you stand on the board on their computer, and what you do appears there.
 The board holds things (named values: stations, cities, places, albums) and wants (small tasks shown as tiles). Two kinds of question, two tools:
 - WHERE something is (「荻窪はどこ？」): call point with the name alone ("荻窪", never the sentence). It walks you there so the person can see it; then say so, e.g. 「荻窪に来ました」.
 - WHAT something says or how it is (「Nakanoの天気は？」, 「スマートゴルフの予約は？」, a timer's time left, a checklist): call look with the name (「Nakano」 finds NakanoのWeather, 「スマートゴルフ」 finds the SmartGolf want), and tell the person what it reports, e.g. 「Nakanoは曇り、23°Cです」 — the values that answer the question, read by what the type says they mean.
@@ -74,87 +74,87 @@ Some types say how their questions are handled (the lines after these, and in de
 Greetings and remarks about what was just said need no tool.
 Say only what a tool told you or what you were told here; if a tool could not answer, say so, and never fill the gap from your own knowledge of the world. Answer in the language the person used — in Japanese when they write Japanese — in one or two short sentences.`
 
-var fmTools = []fmTool{
+var robotTools = []robotTool{
 	{
 		Name:        "board",
 		Description: "The names of everything on the board, things and wants, with their kinds. To say where one is, use point.",
-		run:         (*Server).fmBoard,
+		run:         (*Server).robotBoard,
 	},
 	{
 		Name:        "point",
 		Description: "For WHERE questions only: walks the robot onto a thing or want so the person sees where it is.",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "name", Description: "The name alone, e.g. 荻窪 or note-instance", Required: true},
 		},
-		run:     (*Server).fmPoint,
+		run:     (*Server).robotPoint,
 		replays: true,
 	},
 	{
 		Name:        "look",
 		Description: "For WHAT questions: what a want on the board says and how it is doing — the weather a weather want fetched, a timer's time left, its status.",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "name", Description: "The want's name or part of it, e.g. Nakano for NakanoのWeather", Required: true},
 		},
-		run: (*Server).fmLook,
+		run: (*Server).robotLook,
 	},
 	{
 		Name:        "use_capability",
 		Description: "Ask a want for one of its capabilities listed in your instructions: what every want can do (restart: run it again for what it finds now), or what one can look up beyond what it shows (e.g. the latest golf score from a golf want's photos).",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "capability", Description: "The capability, exactly as listed: restart, or want#capability", Required: true},
 			{Name: "want", Description: "For one every want has (restart): the want's name, e.g. smartgolf. Empty for want#capability.", Required: false},
 		},
 		Writes: true,
-		run: (*Server).fmUseCapability,
+		run: (*Server).useCapability,
 	},
 	{
 		Name:        "describe_type",
 		Description: "Describe one want type and the parameters it takes. Use before deploy_want.",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "type", Description: "The type name", Required: true},
 		},
-		run: (*Server).fmDescribeType,
+		run: (*Server).robotDescribeType,
 	},
 	{
 		Name:        "deploy_want",
 		Description: "Put a new want on the board, next to the person — or, if one of that type with the same parameters is already there, walk to it instead.",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "type", Description: "The type of the want", Required: true},
 			{Name: "params", Description: "The parameters as name=value pairs separated by commas, e.g. from=新宿, to=渋谷 — no quotes, no braces. Empty when there are none.", Required: true},
 			{Name: "name", Description: "A short name for the want, lowercase with hyphens", Required: false},
 		},
-		run:    (*Server).fmDeployWant,
+		run:    (*Server).robotDeployWant,
 		Writes: true,
 	},
 	{
 		Name:        "restore_want",
 		Description: "Bring an archived want back onto the board — only after the person said yes to restoring it.",
-		Arguments: []fmParam{
+		Arguments: []robotParam{
 			{Name: "name", Description: "The archived want's name, as the tool that found it gave it", Required: true},
 		},
-		run:    (*Server).fmRestoreWant,
+		run:    (*Server).robotRestoreWant,
 		Writes: true,
 	},
 }
 
-func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleToolsList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	// The type names are filled in per request, from the backend's list as it
 	// is now: a type registered a minute ago is choosable without a rebuild.
-	types, err := s.fmTypeNames()
+	types, err := s.robotTypeNames()
 	if err != nil {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	// The board's capabilities as they are now (tools_capability.go); with none,
 	// there is nothing to use and the tool is not offered.
-	caps := s.fmCapabilityChoices()
-	tools := make([]fmTool, 0, len(fmTools))
-	for _, t := range fmTools {
-		t.Arguments = append([]fmParam(nil), t.Arguments...)
+	caps := s.capabilityChoices()
+	tools := make([]robotTool, 0, len(robotTools))
+	for _, t := range robotTools {
+		t.Arguments = append([]robotParam(nil), t.Arguments...)
 		for j, a := range t.Arguments {
 			if a.Name == "type" && t.Name == "deploy_want" {
 				a.Choices = types
@@ -167,24 +167,24 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		}
 		tools = append(tools, t)
 	}
-	fmWriteJSON(w, map[string]any{"instructions": fmInstructions + s.fmHintsText() + s.fmCapabilitiesText() + s.fmGlossaryText() + fmLocaleText(r.URL.Query().Get("locale")), "tools": tools})
+	robotWriteJSON(w, map[string]any{"instructions": robotInstructions + s.robotHintsText() + s.capabilitiesText() + s.robotGlossaryText() + robotLocaleText(r.URL.Query().Get("locale")), "tools": tools})
 }
 
-// fmLanguages names the languages an on-device model may be set to, for the
+// robotLanguages names the languages an on-device model may be set to, for the
 // line that tells it which one to answer in.
-var fmLanguages = map[string]string{
+var robotLanguages = map[string]string{
 	"ja": "Japanese", "en": "English", "zh": "Chinese", "ko": "Korean",
 	"fr": "French", "de": "German", "es": "Spanish", "it": "Italian",
 	"pt": "Portuguese", "nl": "Dutch", "sv": "Swedish", "da": "Danish",
 	"nb": "Norwegian", "tr": "Turkish", "vi": "Vietnamese",
 }
 
-// fmLocaleText is the line that says which language to answer in, for the
+// robotLocaleText is the line that says which language to answer in, for the
 // device's locale (ja_JP, en-US) — sent only when the device's model speaks
 // it. The instructions are in English, and a model set to Japanese read them
 // and answered in English, "the language the person used" notwithstanding;
 // naming the language outright is what keeps it. Nothing for no locale.
-func fmLocaleText(locale string) string {
+func robotLocaleText(locale string) string {
 	if locale == "" {
 		return ""
 	}
@@ -193,14 +193,14 @@ func fmLocaleText(locale string) string {
 		code = locale[:i]
 	}
 	code = strings.ToLower(code)
-	name, ok := fmLanguages[code]
+	name, ok := robotLanguages[code]
 	if !ok {
 		name = "the language of the locale " + locale
 	}
 	return fmt.Sprintf("\n\nThe person's locale is %s: answer in %s, though these instructions are in English.", locale, name)
 }
 
-func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleToolsCall(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -216,7 +216,7 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if fmToolByName(req.Tool).Name == "" {
+	if robotToolByName(req.Tool).Name == "" {
 		http.Error(w, "unknown tool: "+req.Tool, http.StatusNotFound)
 		return
 	}
@@ -224,60 +224,60 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 		req.Arguments = map[string]string{}
 	}
 	if req.Turn != "" {
-		if prev := s.fmRepeatedStep(req.Turn, req.Tool, req.Arguments); prev != nil {
+		if prev := s.robotRepeatedStep(req.Turn, req.Tool, req.Arguments); prev != nil {
 			// The same call again in one turn: not run again, and the model
 			// told so — what it got the first time, and to answer now. A small
 			// model went round describe_type / deploy_want five times after
 			// the want was made, ~40s a round on a phone (fly, 2026-11-02:
 			// 新宿→国分寺 took four minutes for a six-second search).
-			step := fmStep{Tool: req.Tool, Arguments: req.Arguments, Output: fmRepeatOutput(*prev), Card: prev.Card, Done: true, At: time.Now().Format(time.RFC3339)}
-			_, _ = s.fmUpdateTurn(req.Turn, func(t *fmTurn) error { t.Steps = append(t.Steps, step); return nil })
-			fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card})
+			step := robotStep{Tool: req.Tool, Arguments: req.Arguments, Output: robotRepeatOutput(*prev), Card: prev.Card, Done: true, At: time.Now().Format(time.RFC3339)}
+			_, _ = s.robotUpdateTurn(req.Turn, func(t *robotTurn) error { t.Steps = append(t.Steps, step); return nil })
+			robotWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card})
 			return
 		}
 	}
-	if req.Turn != "" && fmHearsQuestion(req.Tool) {
+	if req.Turn != "" && robotHearsQuestion(req.Tool) {
 		// What the person asked, for look to see which of a want's answers
-		// it is about (fmLookReferent) and for deploy_want to set each
-		// parameter from the words that mark it (fmMarkedParams) — taken out
+		// it is about (robotLookReferent) and for deploy_want to set each
+		// parameter from the words that mark it (robotMarkedParams) — taken out
 		// again before the step is kept.
-		if q := s.fmTurnQuestion(req.Turn); q != "" {
-			req.Arguments[fmQuestionArg] = q
+		if q := s.turnQuestion(req.Turn); q != "" {
+			req.Arguments[robotQuestionArg] = q
 		}
 	}
-	step := fmStep{Tool: req.Tool, Arguments: req.Arguments}
+	step := robotStep{Tool: req.Tool, Arguments: req.Arguments}
 	if req.Turn == "" {
 		// Outside a turn it is only run: nobody asked the robot anything, so
 		// its chat has nothing to show.
-		out := s.fmRunTool(req.Tool, req.Arguments)
-		fmWriteJSON(w, map[string]any{"output": out, "card": fmTakeCard(req.Arguments), "unread_photos": fmTakeUnread(req.Arguments)})
+		out := s.robotRunTool(req.Tool, req.Arguments)
+		robotWriteJSON(w, map[string]any{"output": out, "card": robotTakeCard(req.Arguments), "unread_photos": robotTakeUnread(req.Arguments)})
 		return
 	}
-	s.fmRunStep(&step)
-	step.Card = fmTakeCard(step.Arguments)
-	unread := fmTakeUnread(step.Arguments)
-	turn, err := s.fmUpdateTurn(req.Turn, func(t *fmTurn) error {
+	s.robotRunStep(&step)
+	step.Card = robotTakeCard(step.Arguments)
+	unread := robotTakeUnread(step.Arguments)
+	turn, err := s.robotUpdateTurn(req.Turn, func(t *robotTurn) error {
 		t.Steps = append(t.Steps, step)
 		return nil
 	})
 	if err != nil {
 		log.Printf("[fm] step outside a known turn: %v", err)
 	} else if !turn.Quiet {
-		s.fmShowStep(step, "")
+		s.robotShowStep(step, "")
 	}
-	fmWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card, "unread_photos": unread})
+	robotWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card, "unread_photos": unread})
 }
 
-// fmTakeCard takes out of a step's arguments the want its tool brought the
-// robot to (fmCardArg), if any.
-func fmTakeCard(args map[string]string) *fmCard {
-	c, ok := args[fmCardArg]
+// robotTakeCard takes out of a step's arguments the want its tool brought the
+// robot to (robotCardArg), if any.
+func robotTakeCard(args map[string]string) *robotCard {
+	c, ok := args[robotCardArg]
 	if !ok {
 		return nil
 	}
-	delete(args, fmCardArg)
+	delete(args, robotCardArg)
 	parts := strings.SplitN(c, "\x00", 3)
-	card := &fmCard{Kind: "want", ID: parts[0]}
+	card := &robotCard{Kind: "want", ID: parts[0]}
 	if len(parts) > 1 {
 		card.Name = parts[1]
 	}
@@ -287,26 +287,26 @@ func fmTakeCard(args map[string]string) *fmCard {
 	return card
 }
 
-// fmCardValue is how a tool notes the want or thing it brought the robot to
-// (fmCardArg): id, name and kind, for fmTakeCard to read back.
-func fmCardValue(kind, id, name string) string {
+// robotCardValue is how a tool notes the want or thing it brought the robot to
+// (robotCardArg): id, name and kind, for robotTakeCard to read back.
+func robotCardValue(kind, id, name string) string {
 	return id + "\x00" + name + "\x00" + kind
 }
 
-// fmToolByName is the tool of that name, or the zero tool.
-func fmToolByName(name string) fmTool {
-	for _, t := range fmTools {
+// robotToolByName is the tool of that name, or the zero tool.
+func robotToolByName(name string) robotTool {
+	for _, t := range robotTools {
 		if t.Name == name {
 			return t
 		}
 	}
-	return fmTool{}
+	return robotTool{}
 }
 
-// fmRunTool runs a tool and hands back its output. A failure is an answer
+// robotRunTool runs a tool and hands back its output. A failure is an answer
 // too: the model reads it and can try again, so it comes back as output.
-func (s *Server) fmRunTool(name string, args map[string]string) string {
-	t := fmToolByName(name)
+func (s *Server) robotRunTool(name string, args map[string]string) string {
+	t := robotToolByName(name)
 	if t.run == nil {
 		return "Error: unknown tool " + name
 	}
@@ -318,7 +318,7 @@ func (s *Server) fmRunTool(name string, args map[string]string) string {
 	return out
 }
 
-func fmWriteJSON(w http.ResponseWriter, v any) {
+func robotWriteJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(v)
@@ -353,7 +353,7 @@ func (s *Server) backend(method, path string, body any, out any) error {
 	return nil
 }
 
-type fmWantType struct {
+type robotWantType struct {
 	Name       string            `json:"name"`
 	Title      string            `json:"title"`
 	Category   string            `json:"category"`
@@ -361,22 +361,22 @@ type fmWantType struct {
 	Labels     map[string]string `json:"labels"`
 }
 
-// fmAliasLabel is a want type's other names: what a person calls it rather
+// robotAliasLabel is a want type's other names: what a person calls it rather
 // than what it was named — "スマートゴルフ,ゴルフ" for smartgolf_check_reserved.
 // A model this small cannot be relied on to turn スマートゴルフ into smartgolf,
 // so the type says it.
-const fmAliasLabel = "aliases"
+const robotAliasLabel = "aliases"
 
-// fmTypeAliases maps each type to its aliases (fmAliasLabel). Empty on a
+// robotTypeAliases maps each type to its aliases (robotAliasLabel). Empty on a
 // failure: aliases only ever help a lookup, never stop one.
-func (s *Server) fmTypeAliases() map[string][]string {
-	types, err := s.fmWantTypes()
+func (s *Server) robotTypeAliases() map[string][]string {
+	types, err := s.robotWantTypes()
 	if err != nil {
 		return nil
 	}
 	out := map[string][]string{}
 	for _, t := range types {
-		for _, a := range strings.Split(t.Labels[fmAliasLabel], ",") {
+		for _, a := range strings.Split(t.Labels[robotAliasLabel], ",") {
 			if a = strings.TrimSpace(a); a != "" {
 				out[t.Name] = append(out[t.Name], a)
 			}
@@ -385,39 +385,39 @@ func (s *Server) fmTypeAliases() map[string][]string {
 	return out
 }
 
-// fmHintLabel is a want type's word to the robot: how a question for it is
+// robotHintLabel is a want type's word to the robot: how a question for it is
 // handled, in the type's own YAML rather than in this file — transit_search's
 // "a route: deploy at once, the stations need not be on the board, a time goes
 // in as time=09:40, arrive_type=到着". The type knows its questions; the robot
 // only reads what it says.
-const fmHintLabel = "robot-hint"
+const robotHintLabel = "robot-hint"
 
-// fmQALabel prefixes a want type's worked examples for the robot, one label
+// robotQALabel prefixes a want type's worked examples for the robot, one label
 // each: the request after the slash, what should be done or said for it as the
 // value — "robot-qa/9時40分までに戸塚に移動できる乗り換え": "deploy_want
 // transit_search with params to=戸塚, time=09:40, arrive_type=到着". A small
 // model follows an example more surely than a rule.
-const fmQALabel = "robot-qa/"
+const robotQALabel = "robot-qa/"
 
-// fmHintsMax keeps the hints, with the glossary, inside the phone's window.
-const fmHintsMax = 2000
+// robotHintsMax keeps the hints, with the glossary, inside the phone's window.
+const robotHintsMax = 2000
 
-// fmTypeHint is what a type tells the robot, as the instructions and
+// robotTypeHint is what a type tells the robot, as the instructions and
 // describe_type carry it: its hint, then its examples, each 「request」 → what
 // to do. Empty when it says nothing.
-func fmTypeHint(labels map[string]string) string {
+func robotTypeHint(labels map[string]string) string {
 	var b strings.Builder
-	b.WriteString(strings.Join(strings.Fields(labels[fmHintLabel]), " "))
+	b.WriteString(strings.Join(strings.Fields(labels[robotHintLabel]), " "))
 	// Labels are a map: in the requests' order, so the text is the same each time.
 	var asks []string
 	for k := range labels {
-		if strings.HasPrefix(k, fmQALabel) {
+		if strings.HasPrefix(k, robotQALabel) {
 			asks = append(asks, k)
 		}
 	}
 	sort.Strings(asks)
 	for _, k := range asks {
-		q, a := strings.TrimSpace(strings.TrimPrefix(k, fmQALabel)), strings.Join(strings.Fields(labels[k]), " ")
+		q, a := strings.TrimSpace(strings.TrimPrefix(k, robotQALabel)), strings.Join(strings.Fields(labels[k]), " ")
 		if q == "" || a == "" {
 			continue
 		}
@@ -429,20 +429,20 @@ func fmTypeHint(labels map[string]string) string {
 	return b.String()
 }
 
-// fmHintsText is every type's hint as the instructions carry it.
-func (s *Server) fmHintsText() string {
-	types, err := s.fmWantTypes()
+// robotHintsText is every type's hint as the instructions carry it.
+func (s *Server) robotHintsText() string {
+	types, err := s.robotWantTypes()
 	if err != nil {
 		return ""
 	}
 	var b strings.Builder
 	for _, t := range types {
-		h := fmTypeHint(t.Labels)
+		h := robotTypeHint(t.Labels)
 		if h == "" {
 			continue
 		}
 		row := fmt.Sprintf("- %s: %s\n", t.Name, h)
-		if b.Len()+len(row) > fmHintsMax {
+		if b.Len()+len(row) > robotHintsMax {
 			break
 		}
 		b.WriteString(row)
@@ -453,18 +453,18 @@ func (s *Server) fmHintsText() string {
 	return "\n\nWhat some types say about their questions:\n" + b.String()
 }
 
-func fmLoose(v string) string {
+func robotLoose(v string) string {
 	return strings.NewReplacer(" ", "", "　", "", "-", "", "_", "").Replace(strings.ToLower(strings.TrimSpace(v)))
 }
 
-// fmAliasScore is how well what the person said names a type by its aliases:
+// robotAliasScore is how well what the person said names a type by its aliases:
 // the length of the longest alias it is or contains, 0 for none. Longest wins,
 // so 「スマートゴルフの空き」 picks the type called that over the one called
 // スマートゴルフ.
-func fmAliasScore(said string, aliases []string) int {
-	l, best := fmLoose(said), 0
+func robotAliasScore(said string, aliases []string) int {
+	l, best := robotLoose(said), 0
 	for _, a := range aliases {
-		la := fmLoose(a)
+		la := robotLoose(a)
 		if la != "" && strings.Contains(l, la) && len([]rune(la)) > best {
 			best = len([]rune(la))
 		}
@@ -481,8 +481,8 @@ func fmAliasScore(said string, aliases []string) int {
 // constellations as they are each time it is asked for, never stored: a
 // constellation made or changed a moment ago is in the next answer.
 
-// fmGlossary is one line per constellation: its name, then its members' names.
-func (s *Server) fmGlossary() [][]string {
+// robotGlossary is one line per constellation: its name, then its members' names.
+func (s *Server) robotGlossary() [][]string {
 	var groups struct {
 		Groups []struct {
 			Name    string   `json:"name"`
@@ -542,13 +542,13 @@ func (s *Server) fmGlossary() [][]string {
 	return out
 }
 
-// fmGlossaryMax keeps the glossary from crowding the window it is meant to
+// robotGlossaryMax keeps the glossary from crowding the window it is meant to
 // help with (4,096 tokens on an iPhone): past it, the rest is left out.
-const fmGlossaryMax = 800
+const robotGlossaryMax = 800
 
-// fmGlossaryText is the glossary as the instructions carry it.
-func (s *Server) fmGlossaryText() string {
-	lines := s.fmGlossary()
+// robotGlossaryText is the glossary as the instructions carry it.
+func (s *Server) robotGlossaryText() string {
+	lines := s.robotGlossary()
 	if len(lines) == 0 {
 		return ""
 	}
@@ -556,7 +556,7 @@ func (s *Server) fmGlossaryText() string {
 	b.WriteString("\n\nNames on this board that go together (its constellations), one group a line — a name in a line also means the others, so 「中野の天気」 is about a want named after any name in 中野's line:\n")
 	for _, l := range lines {
 		row := strings.Join(l, " = ") + "\n"
-		if b.Len()+len(row) > fmGlossaryMax {
+		if b.Len()+len(row) > robotGlossaryMax {
 			break
 		}
 		b.WriteString(row)
@@ -564,16 +564,16 @@ func (s *Server) fmGlossaryText() string {
 	return b.String()
 }
 
-// fmByGlossary picks the names a person meant through the glossary: every
+// robotByGlossary picks the names a person meant through the glossary: every
 // line holding a word of what they said, and of the names, the ones the most
 // of those lines name. 「中野の天気」 reaches 中野's line (nakano) and 天気's
 // (NakanoのWeather): the want both point at wins.
-func fmByGlossary(said string, names []string, glossary [][]string) []int {
-	l := fmLoose(said)
+func robotByGlossary(said string, names []string, glossary [][]string) []int {
+	l := robotLoose(said)
 	var lines [][]string
 	for _, line := range glossary {
 		for _, word := range line {
-			if w := fmLoose(word); w != "" && strings.Contains(l, w) {
+			if w := robotLoose(word); w != "" && strings.Contains(l, w) {
 				lines = append(lines, line)
 				break
 			}
@@ -584,10 +584,10 @@ func fmByGlossary(said string, names []string, glossary [][]string) []int {
 	}
 	best, out := 0, []int(nil)
 	for i, n := range names {
-		ln, score := fmLoose(n), 0
+		ln, score := robotLoose(n), 0
 		for _, line := range lines {
 			for _, word := range line {
-				if w := fmLoose(word); w != "" && (ln == w || strings.Contains(ln, w)) {
+				if w := robotLoose(word); w != "" && (ln == w || strings.Contains(ln, w)) {
 					score++
 					break
 				}
@@ -604,12 +604,12 @@ func fmByGlossary(said string, names []string, glossary [][]string) []int {
 	return out
 }
 
-// fmByAlias picks, from the types of the wants on the board, the ones the
+// robotByAlias picks, from the types of the wants on the board, the ones the
 // person named by an alias: all of those with the best score.
-func fmByAlias(said string, typeOf []string, aliases map[string][]string) []int {
+func robotByAlias(said string, typeOf []string, aliases map[string][]string) []int {
 	best, out := 0, []int(nil)
 	for i, t := range typeOf {
-		sc := fmAliasScore(said, aliases[t])
+		sc := robotAliasScore(said, aliases[t])
 		if sc == 0 || sc < best {
 			continue
 		}
@@ -621,14 +621,14 @@ func fmByAlias(said string, typeOf []string, aliases map[string][]string) []int 
 	return out
 }
 
-func (s *Server) fmWantTypes() ([]fmWantType, error) {
+func (s *Server) robotWantTypes() ([]robotWantType, error) {
 	var resp struct {
-		WantTypes []fmWantType `json:"wantTypes"`
+		WantTypes []robotWantType `json:"wantTypes"`
 	}
 	if err := s.backend("GET", "/api/v1/want-types", nil, &resp); err != nil {
 		return nil, err
 	}
-	var out []fmWantType
+	var out []robotWantType
 	for _, t := range resp.WantTypes {
 		if !t.SystemType {
 			out = append(out, t)
@@ -638,8 +638,8 @@ func (s *Server) fmWantTypes() ([]fmWantType, error) {
 	return out, nil
 }
 
-func (s *Server) fmTypeNames() ([]string, error) {
-	types, err := s.fmWantTypes()
+func (s *Server) robotTypeNames() ([]string, error) {
+	types, err := s.robotWantTypes()
 	if err != nil {
 		return nil, err
 	}
@@ -650,14 +650,14 @@ func (s *Server) fmTypeNames() ([]string, error) {
 	return names, nil
 }
 
-// fmResolveType finds the type the model meant: exact, then ignoring case
+// robotResolveType finds the type the model meant: exact, then ignoring case
 // and the difference between spaces, hyphens and underscores, then by title.
 // On a miss the error names the closest few, so the next try can succeed.
-func (s *Server) fmResolveType(name string) (string, error) {
+func (s *Server) robotResolveType(name string) (string, error) {
 	norm := func(v string) string {
 		return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(strings.TrimSpace(v)))
 	}
-	types, err := s.fmWantTypes()
+	types, err := s.robotWantTypes()
 	if err != nil {
 		return "", err
 	}
@@ -688,8 +688,8 @@ func (s *Server) fmResolveType(name string) (string, error) {
 	return "", fmt.Errorf("there is no want type %q; did you mean: %s", name, strings.Join(near, ", "))
 }
 
-func (s *Server) fmDescribeType(args map[string]string) (string, error) {
-	name, err := s.fmResolveType(args["type"])
+func (s *Server) robotDescribeType(args map[string]string) (string, error) {
+	name, err := s.robotResolveType(args["type"])
 	if err != nil {
 		return "", err
 	}
@@ -711,7 +711,7 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s\n", name, firstLine(resp.Metadata.Description, 200))
-	if h := fmTypeHint(resp.Metadata.Labels); h != "" {
+	if h := robotTypeHint(resp.Metadata.Labels); h != "" {
 		fmt.Fprintf(&b, "How: %s\n", h)
 	}
 	if len(resp.Parameters) == 0 {
@@ -738,14 +738,14 @@ func (s *Server) fmDescribeType(args map[string]string) (string, error) {
 	return b.String(), nil
 }
 
-func (s *Server) fmDeployWant(args map[string]string) (string, error) {
-	question := args[fmQuestionArg]
-	delete(args, fmQuestionArg)
-	typ, err := s.fmResolveType(args["type"])
+func (s *Server) robotDeployWant(args map[string]string) (string, error) {
+	question := args[robotQuestionArg]
+	delete(args, robotQuestionArg)
+	typ, err := s.robotResolveType(args["type"])
 	if err != nil {
 		return "", err
 	}
-	params, err := fmParseParams(args["params"])
+	params, err := robotParseParams(args["params"])
 	if err != nil {
 		return "", err
 	}
@@ -757,28 +757,28 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// small model often puts the question in the name (「新宿→横浜」) and
 	// sends {} — which made a route with neither end, and an answer that said
 	// it had searched.
-	filled, err := s.fmFitParams(typ, params, question)
+	filled, err := s.robotFitParams(typ, params, question)
 	if err != nil {
 		return "", err
 	}
-	if missing, example := s.fmMissingParams(typ, params); len(missing) > 0 {
+	if missing, example := s.robotMissingParams(typ, params); len(missing) > 0 {
 		return "", fmt.Errorf("%s needs %s in params, e.g. %s — nothing was made; call deploy_want again with them", typ, strings.Join(missing, " and "), example)
 	}
-	wants, err := s.fmWantList()
+	wants, err := s.robotWantList()
 	if err != nil {
 		return "", err
 	}
-	existing, archived := fmFindWant(wants, typ, params)
+	existing, archived := robotFindWant(wants, typ, params)
 	// A question asked again — in the archive or still on the board — is
 	// asked again: run now, not answered from when it was last asked (a
 	// route an hour old gives an hour-old train).
-	if existing != "" && s.fmTypeLabel(typ, fmAskAgainLabel) == "run" {
+	if existing != "" && s.robotTypeLabel(typ, robotAskAgainLabel) == "run" {
 		// A question put away and asked again — 「中野坂上から国分寺への乗り換
 		// え」 a second time — is asked again: the one in the archive is brought
 		// back and run with what was asked now, not offered back to be agreed to.
 		for _, w := range wants {
 			if w.Metadata.Name == existing {
-				return s.fmRunAgain(w, params, filled, args)
+				return s.robotRunAgain(w, params, filled, args)
 			}
 		}
 	}
@@ -789,10 +789,10 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 		// archived).
 		for _, w := range wants {
 			if w.Metadata.Name == existing {
-				args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+				args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 			}
 		}
-		return fmt.Sprintf("%q (%s) with these parameters exists but is archived — put away, off the board. Nothing new was made. %s", existing, typ, fmAskRestore(existing)), nil
+		return fmt.Sprintf("%q (%s) with these parameters exists but is archived — put away, off the board. Nothing new was made. %s", existing, typ, robotAskRestore(existing)), nil
 	}
 	if existing != "" {
 		pointed := map[string]string{"name": existing}
@@ -801,18 +801,18 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 				pointed["id"] = w.Metadata.ID
 			}
 		}
-		if _, err := s.fmPoint(pointed); err == nil {
-			if c, ok := pointed[fmCardArg]; ok {
-				args[fmCardArg] = c
+		if _, err := s.robotPoint(pointed); err == nil {
+			if c, ok := pointed[robotCardArg]; ok {
+				args[robotCardArg] = c
 			}
-			return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ, fmParamsText(params)), nil
+			return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board; the robot is standing on it. Nothing new was made.", existing, typ, robotParamsText(params)), nil
 		}
-		return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board. Nothing new was made.", existing, typ, fmParamsText(params)), nil
+		return fmt.Sprintf("%q (%s, %s) with these parameters is already on the board. Nothing new was made.", existing, typ, robotParamsText(params)), nil
 	}
 	name := strings.TrimSpace(args["name"])
 	// The type's own naming (robot-name, e.g. "{from}→{to}") over the model's:
 	// a route named after where it goes (「戸塚」) is the station's name too.
-	if named := fmNameFrom(s.fmTypeLabel(typ, fmNameLabel), params); named != "" {
+	if named := robotNameFrom(s.robotTypeLabel(typ, robotNameLabel), params); named != "" {
 		name = named
 	}
 	if name == "" {
@@ -821,7 +821,7 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// The name is the model's choice, and it often takes the type's own
 	// ("transit_search") — which an archived want, out of sight, may hold. A
 	// name taken is no reason to fail what was asked: another is found.
-	name = fmFreeName(wants, name)
+	name = robotFreeName(wants, name)
 	want := map[string]any{
 		"metadata": map[string]any{
 			"name": name,
@@ -841,45 +841,45 @@ func (s *Server) fmDeployWant(args map[string]string) (string, error) {
 	// placed beside the person when it is added (CanvasNearHook), which is a
 	// moment after the POST returns: wait for it to be there with its cell.
 	for i := 0; i < 20; i++ {
-		if s.fmWantOnBoard(name) {
+		if s.robotWantOnBoard(name) {
 			pointed := map[string]string{"name": name}
-			if walked, err := s.fmPoint(pointed); err == nil {
-				if c, ok := pointed[fmCardArg]; ok {
-					args[fmCardArg] = c
+			if walked, err := s.robotPoint(pointed); err == nil {
+				if c, ok := pointed[robotCardArg]; ok {
+					args[robotCardArg] = c
 				}
-				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s %s", name, typ, filled, walked, fmDeployedNote), nil
+				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s %s", name, typ, filled, walked, robotDeployedNote), nil
 			}
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here. %s", name, typ, filled, fmDeployedNote), nil
+	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here. %s", name, typ, filled, robotDeployedNote), nil
 }
 
-// fmDeployedNote: a want just made has not finished yet. Read as nothing to
+// robotDeployedNote: a want just made has not finished yet. Read as nothing to
 // report, the phone's model said 「検索に失敗しました」 of a search that was
 // running.
-const fmDeployedNote = "It is working now and its result will show on its tile: say in the person's language that it was made (e.g. 「中野坂上→国分寺を出しました」), not that it failed."
+const robotDeployedNote = "It is working now and its result will show on its tile: say in the person's language that it was made (e.g. 「中野坂上→国分寺を出しました」), not that it failed."
 
-// fmWantOnBoard: a want of this exact name is listed with a cell.
-func (s *Server) fmWantOnBoard(name string) bool {
-	wants, err := s.fmWantList()
+// robotWantOnBoard: a want of this exact name is listed with a cell.
+func (s *Server) robotWantOnBoard(name string) bool {
+	wants, err := s.robotWantList()
 	if err != nil {
 		return false
 	}
 	for _, w := range wants {
 		if w.Metadata.Name == name {
-			_, x := w.Metadata.Labels[fmCanvasX]
-			_, y := w.Metadata.Labels[fmCanvasY]
+			_, x := w.Metadata.Labels[robotCanvasX]
+			_, y := w.Metadata.Labels[robotCanvasY]
 			return x && y
 		}
 	}
 	return false
 }
 
-// fmMissingParams names the type's required parameters these params leave out
+// robotMissingParams names the type's required parameters these params leave out
 // or empty, with the params written out as the type's examples would fill them.
-func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []string, example string) {
+func (s *Server) robotMissingParams(typ string, params map[string]any) (missing []string, example string) {
 	var def struct {
 		Parameters []struct {
 			Name     string `json:"name"`
@@ -907,23 +907,23 @@ func (s *Server) fmMissingParams(typ string, params map[string]any) (missing []s
 		}
 		missing = append(missing, p.Name)
 	}
-	return missing, fmPairs(ex)
+	return missing, robotPairs(ex)
 }
 
-// fmHereLabel names a want type's parameter that, left out, is where the
+// robotHereLabel names a want type's parameter that, left out, is where the
 // person is — transit_search's from: 「戸塚への乗り換え」 starts here.
-const fmHereLabel = "here-param"
+const robotHereLabel = "here-param"
 
-// fmMarkerLabel prefixes a want type's words for one parameter: what follows
+// robotMarkerLabel prefixes a want type's words for one parameter: what follows
 // a value in a request to say it is that parameter — transit_search's
 // "param-marker/from": "から,発" and "param-marker/to": "まで,へ". A request
 // says which end is which in those words; the model does not always keep it.
 // On 2026-10-22 「銀座から中野坂上の乗り換え」 went to the phone's model,
 // which deployed from=中野坂上, to=銀座 — the stations of the type's own worked
 // example, in its order.
-const fmMarkerLabel = "param-marker/"
+const robotMarkerLabel = "param-marker/"
 
-// fmMarkedParams sets each marked parameter to the value the question marks
+// robotMarkedParams sets each marked parameter to the value the question marks
 // for it: of the values sent, the one the question has just before one of
 // the parameter's words (a character between allowed — 「銀座駅から」).
 // Where that value was sent under another marked parameter, the two change
@@ -933,21 +933,21 @@ const fmMarkerLabel = "param-marker/"
 // Values only, never words of its own: what the model sent is what is
 // placed, by what the person said. Says what it put right, for the robot to
 // tell; "" when nothing was.
-func fmMarkedParams(labels map[string]string, params map[string]any, question string) string {
+func robotMarkedParams(labels map[string]string, params map[string]any, question string) string {
 	if strings.TrimSpace(question) == "" {
 		return ""
 	}
 	var names []string
 	for k := range labels {
-		if strings.HasPrefix(k, fmMarkerLabel) {
-			names = append(names, strings.TrimPrefix(k, fmMarkerLabel))
+		if strings.HasPrefix(k, robotMarkerLabel) {
+			names = append(names, strings.TrimPrefix(k, robotMarkerLabel))
 		}
 	}
 	sort.Strings(names)
 	var fixed []string
 	for _, name := range names {
 		var markers []string
-		for _, m := range strings.Split(labels[fmMarkerLabel+name], ",") {
+		for _, m := range strings.Split(labels[robotMarkerLabel+name], ",") {
 			if m = strings.TrimSpace(m); m != "" {
 				markers = append(markers, m)
 			}
@@ -959,7 +959,7 @@ func fmMarkedParams(labels map[string]string, params map[string]any, question st
 				continue
 			}
 			sv := strings.TrimSpace(fmt.Sprint(v))
-			if sv == "" || sv == marked || !fmMarks(question, sv, markers) {
+			if sv == "" || sv == marked || !robotMarks(question, sv, markers) {
 				continue
 			}
 			if marked != "" {
@@ -987,12 +987,12 @@ func fmMarkedParams(labels map[string]string, params map[string]any, question st
 	if len(fixed) == 0 {
 		return ""
 	}
-	return fmt.Sprintf(" (%s, as the person said it: %s)", strings.Join(fixed, ", "), fmPairs(params))
+	return fmt.Sprintf(" (%s, as the person said it: %s)", strings.Join(fixed, ", "), robotPairs(params))
 }
 
-// fmMarks: the question has v just before one of the markers, with at most
+// robotMarks: the question has v just before one of the markers, with at most
 // one character between.
-func fmMarks(question, v string, markers []string) bool {
+func robotMarks(question, v string, markers []string) bool {
 	for i := 0; ; {
 		at := strings.Index(question[i:], v)
 		if at < 0 {
@@ -1011,12 +1011,12 @@ func fmMarks(question, v string, markers []string) bool {
 	}
 }
 
-// fmFitParams makes params what the type takes, by what each parameter is
+// robotFitParams makes params what the type takes, by what each parameter is
 // rather than by the type: a time (subType time) as HH:MM however it was
 // written, a value outside a parameter's choices sent back with them, and the
 // type's here-param, left out, filled with where the person is. Says what it
 // filled, for the robot to tell.
-func (s *Server) fmFitParams(typ string, params map[string]any, question string) (string, error) {
+func (s *Server) robotFitParams(typ string, params map[string]any, question string) (string, error) {
 	var def struct {
 		Metadata struct {
 			Labels map[string]string `json:"labels"`
@@ -1036,11 +1036,11 @@ func (s *Server) fmFitParams(typ string, params map[string]any, question string)
 		v, ok := params[name]
 		return ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != ""
 	}
-	filled := fmMarkedParams(def.Metadata.Labels, params, question)
+	filled := robotMarkedParams(def.Metadata.Labels, params, question)
 	for _, p := range def.Parameters {
 		if !said(p.Name) {
-			if p.Name == def.Metadata.Labels[fmHereLabel] {
-				here, err := s.fmHere(p.SubType)
+			if p.Name == def.Metadata.Labels[robotHereLabel] {
+				here, err := s.robotHere(p.SubType)
 				if err != nil {
 					return "", fmt.Errorf("%s was left out and where the person is is not known (%v): ask the person — nothing was made", p.Name, err)
 				}
@@ -1050,7 +1050,7 @@ func (s *Server) fmFitParams(typ string, params map[string]any, question string)
 			continue
 		}
 		if p.SubType == "time" {
-			hhmm, err := fmClock(params[p.Name])
+			hhmm, err := robotClock(params[p.Name])
 			if err != nil {
 				return "", fmt.Errorf("%s %v — nothing was made", p.Name, err)
 			}
@@ -1072,33 +1072,33 @@ func (s *Server) fmFitParams(typ string, params map[string]any, question string)
 }
 
 var (
-	fmClockColon = regexp.MustCompile(`^(\d{1,2})[:：.](\d{2})$`)
-	fmClockJa    = regexp.MustCompile(`(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分|(半))?`)
-	fmClockPM    = regexp.MustCompile(`午後|夜|夕方|(?i:pm)`)
+	robotClockColon = regexp.MustCompile(`^(\d{1,2})[:：.](\d{2})$`)
+	robotClockJa    = regexp.MustCompile(`(\d{1,2})\s*時\s*(?:(\d{1,2})\s*分|(半))?`)
+	robotClockPM    = regexp.MustCompile(`午後|夜|夕方|(?i:pm)`)
 )
 
-// fmClock reads a time of day as a person or a model writes it — 09:40, 9:40,
+// robotClock reads a time of day as a person or a model writes it — 09:40, 9:40,
 // 9時40分, 9時半, 午後3時, 0940 (which params read as the number 940) — as HH:MM.
-func fmClock(v any) (string, error) {
+func robotClock(v any) (string, error) {
 	raw := strings.TrimSpace(fmt.Sprint(v))
 	if f, ok := v.(float64); ok {
 		raw = fmt.Sprintf("%04d", int(f))
 	}
 	h, m := -1, 0
 	switch {
-	case fmClockColon.MatchString(raw):
-		p := fmClockColon.FindStringSubmatch(raw)
+	case robotClockColon.MatchString(raw):
+		p := robotClockColon.FindStringSubmatch(raw)
 		h, _ = strconv.Atoi(p[1])
 		m, _ = strconv.Atoi(p[2])
-	case fmClockJa.MatchString(raw):
-		p := fmClockJa.FindStringSubmatch(raw)
+	case robotClockJa.MatchString(raw):
+		p := robotClockJa.FindStringSubmatch(raw)
 		h, _ = strconv.Atoi(p[1])
 		if p[2] != "" {
 			m, _ = strconv.Atoi(p[2])
 		} else if p[3] != "" {
 			m = 30
 		}
-		if fmClockPM.MatchString(raw) && h < 12 {
+		if robotClockPM.MatchString(raw) && h < 12 {
 			h += 12
 		}
 	case len(raw) == 4:
@@ -1112,14 +1112,14 @@ func fmClock(v any) (string, error) {
 	return fmt.Sprintf("%02d:%02d", h, m), nil
 }
 
-// fmNearestStationURL is HeartRails Express's nearest stations — what
+// robotNearestStationURL is HeartRails Express's nearest stations — what
 // mywant-nearest-plugin reads for stations in Japan. A variable for the tests.
-var fmNearestStationURL = "https://express.heartrails.com/api/json?method=getStations"
+var robotNearestStationURL = "https://express.heartrails.com/api/json?method=getStations"
 
-// fmHere is where the person is, as a parameter of this subType takes it: a
+// robotHere is where the person is, as a parameter of this subType takes it: a
 // station is the one nearest them, anything else their coordinates. Read from
 // the location want that last heard from a device.
-func (s *Server) fmHere(subType string) (string, error) {
+func (s *Server) robotHere(subType string) (string, error) {
 	var resp struct {
 		Wants []struct {
 			Metadata struct {
@@ -1137,7 +1137,7 @@ func (s *Server) fmHere(subType string) (string, error) {
 	var lat, lng float64
 	latest, found := "", false
 	for _, w := range resp.Wants {
-		if w.Metadata.Type != "location" || w.Metadata.Labels[fmArchived] == "true" {
+		if w.Metadata.Type != "location" || w.Metadata.Labels[robotArchived] == "true" {
 			continue
 		}
 		la, ok1 := w.State.Current["lat"].(float64)
@@ -1154,11 +1154,11 @@ func (s *Server) fmHere(subType string) (string, error) {
 	if subType != "station" {
 		return fmt.Sprintf("%.6f,%.6f", lat, lng), nil
 	}
-	return fmNearestStation(lat, lng)
+	return robotNearestStation(lat, lng)
 }
 
-func fmNearestStation(lat, lng float64) (string, error) {
-	u := fmt.Sprintf("%s&x=%.6f&y=%.6f", fmNearestStationURL, lng, lat)
+func robotNearestStation(lat, lng float64) (string, error) {
+	u := fmt.Sprintf("%s&x=%.6f&y=%.6f", robotNearestStationURL, lng, lat)
 	res, err := (&http.Client{Timeout: 5 * time.Second}).Get(u)
 	if err != nil {
 		return "", fmt.Errorf("nearest station: %w", err)
@@ -1181,8 +1181,8 @@ func fmNearestStation(lat, lng float64) (string, error) {
 	return body.Response.Station[0].Name, nil
 }
 
-// fmPairs writes params the way deploy_want takes them: from=新宿, to=渋谷.
-func fmPairs(params map[string]any) string {
+// robotPairs writes params the way deploy_want takes them: from=新宿, to=渋谷.
+func robotPairs(params map[string]any) string {
 	keys := make([]string, 0, len(params))
 	for k := range params {
 		keys = append(keys, k)
@@ -1195,14 +1195,14 @@ func fmPairs(params map[string]any) string {
 	return strings.Join(parts, ", ")
 }
 
-// fmParseParams reads deploy_want's params: name=value pairs, separated by
+// robotParseParams reads deploy_want's params: name=value pairs, separated by
 // commas (or 、, ;, new lines), name and value split at the first = or :.
 //
 // Not JSON, though JSON is still read: every argument reaches the model as a
 // string, and a model writing a JSON object inside one has to escape each of
 // its quotes. The Mac's did not — its {"from":" ended the string there, and it
 // sent {"from": three times over and gave up. Pairs need no quotes at all.
-func fmParseParams(raw string) (map[string]any, error) {
+func robotParseParams(raw string) (map[string]any, error) {
 	raw = strings.TrimSpace(raw)
 	params := map[string]any{}
 	if raw == "" || raw == "{}" {
@@ -1219,7 +1219,7 @@ func fmParseParams(raw string) (map[string]any, error) {
 		}
 		raw = inner
 	}
-	for _, part := range fmPairSep.Split(raw, -1) {
+	for _, part := range robotPairSep.Split(raw, -1) {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
@@ -1234,15 +1234,15 @@ func fmParseParams(raw string) (map[string]any, error) {
 		if name == "" {
 			return nil, fmt.Errorf("params %q: %q has no name", raw, part)
 		}
-		params[name] = fmParamValue(value)
+		params[name] = robotParamValue(value)
 	}
 	return params, nil
 }
 
-var fmPairSep = regexp.MustCompile(`[,、;\n]`)
+var robotPairSep = regexp.MustCompile(`[,、;\n]`)
 
-// fmParamValue: a number or true/false as one, anything else as text.
-func fmParamValue(v string) any {
+// robotParamValue: a number or true/false as one, anything else as text.
+func robotParamValue(v string) any {
 	if f, err := strconv.ParseFloat(v, 64); err == nil {
 		return f
 	}
@@ -1252,8 +1252,8 @@ func fmParamValue(v string) any {
 	return v
 }
 
-// fmWant is a want as the robot's tools see it.
-type fmWant struct {
+// robotWant is a want as the robot's tools see it.
+type robotWant struct {
 	Metadata struct {
 		ID     string            `json:"id"`
 		Name   string            `json:"name"`
@@ -1265,11 +1265,11 @@ type fmWant struct {
 	} `json:"spec"`
 }
 
-func (w fmWant) archived() bool { return w.Metadata.Labels[fmArchived] == "true" }
+func (w robotWant) archived() bool { return w.Metadata.Labels[robotArchived] == "true" }
 
-func (s *Server) fmWantList() ([]fmWant, error) {
+func (s *Server) robotWantList() ([]robotWant, error) {
 	var resp struct {
-		Wants []fmWant `json:"wants"`
+		Wants []robotWant `json:"wants"`
 	}
 	if err := s.backend("GET", "/api/v1/wants", nil, &resp); err != nil {
 		return nil, err
@@ -1277,10 +1277,10 @@ func (s *Server) fmWantList() ([]fmWant, error) {
 	return resp.Wants, nil
 }
 
-// fmFindWant names a want of this type whose parameters already say what
+// robotFindWant names a want of this type whose parameters already say what
 // these say (every non-empty one equal, as text), or "" when there is none —
 // one on the board before one in the archive.
-func fmFindWant(wants []fmWant, typ string, params map[string]any) (name string, archived bool) {
+func robotFindWant(wants []robotWant, typ string, params map[string]any) (name string, archived bool) {
 	text := func(v any) string { return strings.TrimSpace(fmt.Sprint(v)) }
 	asked := 0
 	for _, v := range params {
@@ -1292,7 +1292,7 @@ func fmFindWant(wants []fmWant, typ string, params map[string]any) (name string,
 		return "", false
 	}
 	for _, w := range wants {
-		if w.Metadata.Type != typ || w.Metadata.Name == fmRobotWant {
+		if w.Metadata.Type != typ || w.Metadata.Name == robotWantName {
 			continue
 		}
 		same := true
@@ -1318,8 +1318,8 @@ func fmFindWant(wants []fmWant, typ string, params map[string]any) (name string,
 	return name, archived
 }
 
-// fmFreeName is name, or name-2, name-3… — the first no want has.
-func fmFreeName(wants []fmWant, name string) string {
+// robotFreeName is name, or name-2, name-3… — the first no want has.
+func robotFreeName(wants []robotWant, name string) string {
 	taken := map[string]bool{}
 	for _, w := range wants {
 		taken[w.Metadata.Name] = true
@@ -1334,19 +1334,19 @@ func fmFreeName(wants []fmWant, name string) string {
 	}
 }
 
-// fmAskAgainLabel names what a want type does when deploy_want finds one of
+// robotAskAgainLabel names what a want type does when deploy_want finds one of
 // it with the same parameters in the archive. "run": a question, asked again —
 // it is restored and run with the parameters asked now. Left out: the person
 // is asked whether to restore it.
-const fmAskAgainLabel = "ask-again"
+const robotAskAgainLabel = "ask-again"
 
-// fmNameLabel: how a want of a type is named when the robot makes one —
+// robotNameLabel: how a want of a type is named when the robot makes one —
 // "{from}→{to}", its parameters in braces.
-const fmNameLabel = "robot-name"
+const robotNameLabel = "robot-name"
 
-// fmNameFrom fills a robot-name template from params; "" when there is none
+// robotNameFrom fills a robot-name template from params; "" when there is none
 // or a parameter it names was not given.
-func fmNameFrom(template string, params map[string]any) string {
+func robotNameFrom(template string, params map[string]any) string {
 	template = strings.TrimSpace(template)
 	if template == "" {
 		return ""
@@ -1370,8 +1370,8 @@ func fmNameFrom(template string, params map[string]any) string {
 	return out
 }
 
-// fmParamsText is a want's parameters as the model is told them: "from=中野坂上, to=戸塚".
-func fmParamsText(params map[string]any) string {
+// robotParamsText is a want's parameters as the model is told them: "from=中野坂上, to=戸塚".
+func robotParamsText(params map[string]any) string {
 	keys := make([]string, 0, len(params))
 	for k, v := range params {
 		if v != nil && strings.TrimSpace(fmt.Sprint(v)) != "" {
@@ -1389,9 +1389,9 @@ func fmParamsText(params map[string]any) string {
 	return strings.Join(parts, ", ")
 }
 
-// fmTypeLabel is one of a want type's labels, "" when it has none or the type
+// robotTypeLabel is one of a want type's labels, "" when it has none or the type
 // cannot be read.
-func (s *Server) fmTypeLabel(typ, key string) string {
+func (s *Server) robotTypeLabel(typ, key string) string {
 	var def struct {
 		Metadata struct {
 			Labels map[string]string `json:"labels"`
@@ -1403,11 +1403,11 @@ func (s *Server) fmTypeLabel(typ, key string) string {
 	return def.Metadata.Labels[key]
 }
 
-// fmRunAgain brings an archived want back with the parameters asked now —
+// robotRunAgain brings an archived want back with the parameters asked now —
 // those it had and was not asked for taken off, so a route last searched for
 // 11:00 is searched for now — runs it, and walks the robot to it. A change of
 // parameters runs it by itself; the same ones are run by a restart.
-func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args map[string]string) (string, error) {
+func (s *Server) robotRunAgain(w robotWant, params map[string]any, filled string, args map[string]string) (string, error) {
 	text := func(v any) string { return strings.TrimSpace(fmt.Sprint(v)) }
 	patchParams := map[string]any{}
 	changed := false
@@ -1429,7 +1429,7 @@ func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args
 		}
 	}
 	patch := map[string]any{
-		"metadata": map[string]any{"labels": map[string]any{fmArchived: nil}},
+		"metadata": map[string]any{"labels": map[string]any{robotArchived: nil}},
 		"spec":     map[string]any{"params": patchParams},
 	}
 	if err := s.backend("PATCH", "/api/v1/wants/"+w.Metadata.ID, patch, nil); err != nil {
@@ -1440,85 +1440,85 @@ func (s *Server) fmRunAgain(w fmWant, params map[string]any, filled string, args
 			return "", fmt.Errorf("brought back %q but could not run it: %v", w.Metadata.Name, err)
 		}
 	}
-	out := fmt.Sprintf("Brought %q (%s, %s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, fmParamsText(params), filled)
+	out := fmt.Sprintf("Brought %q (%s, %s)%s back onto the board and ran it again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, robotParamsText(params), filled)
 	if !w.archived() {
-		out = fmt.Sprintf("Ran %q (%s, %s)%s, already on the board, again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, fmParamsText(params), filled)
+		out = fmt.Sprintf("Ran %q (%s, %s)%s, already on the board, again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, robotParamsText(params), filled)
 	}
 	pointed := map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID}
-	if walked, err := s.fmPoint(pointed); err == nil {
-		if c, ok := pointed[fmCardArg]; ok {
-			args[fmCardArg] = c
+	if walked, err := s.robotPoint(pointed); err == nil {
+		if c, ok := pointed[robotCardArg]; ok {
+			args[robotCardArg] = c
 		}
 		out += " " + walked
 	} else {
-		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	}
-	return out + " " + fmDeployedNote, nil
+	return out + " " + robotDeployedNote, nil
 }
 
-// fmAskRestore is what a tool that found an archived want tells the model.
-func fmAskRestore(name string) string {
+// robotAskRestore is what a tool that found an archived want tells the model.
+func robotAskRestore(name string) string {
 	return fmt.Sprintf("Ask the person whether to restore it; if they say yes, call restore_want with name %q.", name)
 }
 
-// fmArchivedNamed is the archived want called name (or loosely so), if any.
-func (s *Server) fmArchivedNamed(name string) (fmWant, bool) {
-	wants, err := s.fmWantList()
+// robotArchivedNamed is the archived want called name (or loosely so), if any.
+func (s *Server) robotArchivedNamed(name string) (robotWant, bool) {
+	wants, err := s.robotWantList()
 	if err != nil {
-		return fmWant{}, false
+		return robotWant{}, false
 	}
 	for _, w := range wants {
-		if w.archived() && (w.Metadata.Name == name || fmLooseName(w.Metadata.Name) == fmLooseName(name)) {
+		if w.archived() && (w.Metadata.Name == name || robotLooseName(w.Metadata.Name) == robotLooseName(name)) {
 			return w, true
 		}
 	}
-	return fmWant{}, false
+	return robotWant{}, false
 }
 
-func fmLooseName(v string) string {
+func robotLooseName(v string) string {
 	return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(v))
 }
 
-// fmRestoreWant takes an archived want out of the archive — the label off,
+// robotRestoreWant takes an archived want out of the archive — the label off,
 // through PATCH as the GUI's restore does — and walks the robot to it.
-func (s *Server) fmRestoreWant(args map[string]string) (string, error) {
+func (s *Server) robotRestoreWant(args map[string]string) (string, error) {
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
 		return "", fmt.Errorf("name is required")
 	}
-	w, ok := s.fmArchivedNamed(name)
+	w, ok := s.robotArchivedNamed(name)
 	if !ok {
 		return "", fmt.Errorf("no archived want named %q", name)
 	}
-	patch := map[string]any{"metadata": map[string]any{"labels": map[string]any{fmArchived: nil}}}
+	patch := map[string]any{"metadata": map[string]any{"labels": map[string]any{robotArchived: nil}}}
 	if err := s.backend("PATCH", "/api/v1/wants/"+w.Metadata.ID, patch, nil); err != nil {
 		return "", fmt.Errorf("could not restore %q: %v", w.Metadata.Name, err)
 	}
 	out := fmt.Sprintf("Restored %q (%s); it is back on the board.", w.Metadata.Name, w.Metadata.Type)
 	pointed := map[string]string{"name": w.Metadata.Name}
-	if walked, err := s.fmPoint(pointed); err == nil {
-		if c, ok := pointed[fmCardArg]; ok {
-			args[fmCardArg] = c
+	if walked, err := s.robotPoint(pointed); err == nil {
+		if c, ok := pointed[robotCardArg]; ok {
+			args[robotCardArg] = c
 		}
 		out += " " + walked
 	} else {
-		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 	}
 	return out, nil
 }
 
 const (
-	fmRobotWant   = "robot"
-	fmCanvasOn    = "mywant.io/canvas"
-	fmCanvasX     = "mywant.io/canvas-x"
-	fmCanvasY     = "mywant.io/canvas-y"
-	fmArchived    = "mywant.io/archived"
-	fmBoardLimit  = 50
-	fmNearMatches = 6
+	robotWantName   = "robot"
+	robotCanvasOn    = "mywant.io/canvas"
+	robotCanvasX     = "mywant.io/canvas-x"
+	robotCanvasY     = "mywant.io/canvas-y"
+	robotArchived    = "mywant.io/archived"
+	robotBoardLimit  = 50
+	robotNearMatches = 6
 )
 
-// fmTile is one thing or want with a cell on the board.
-type fmTile struct {
+// robotTile is one thing or want with a cell on the board.
+type robotTile struct {
 	name, kind string
 	x, y       int
 	// typ: a want's type ("" for a thing); aliases: what its type is also called.
@@ -1530,19 +1530,19 @@ type fmTile struct {
 	cardKind string
 }
 
-// fmCardArg is the key under which a tool notes, in its own arguments, the
-// want it brought the robot to; handleFMCall takes it out again and hands it
+// robotCardArg is the key under which a tool notes, in its own arguments, the
+// want it brought the robot to; handleToolsCall takes it out again and hands it
 // back as the call's card — what the chat shows under the robot's words.
-const fmCardArg = "_card"
+const robotCardArg = "_card"
 
-// fmUnreadArg carries the photos look needed and could not read (a server
-// with no recogniser — Fly); handleFMCall hands them back as the call's
+// robotUnreadArg carries the photos look needed and could not read (a server
+// with no recogniser — Fly); handleToolsCall hands them back as the call's
 // unread_photos, for the asker to read on its own device and call again.
-const fmUnreadArg = "_unread"
+const robotUnreadArg = "_unread"
 
-// fmUnreadPhoto is a photo to read: its thing, and the image as the server
+// robotUnreadPhoto is a photo to read: its thing, and the image as the server
 // knows it — kept beside the reading (picture-read-from) to say what was read.
-type fmUnreadPhoto struct {
+type robotUnreadPhoto struct {
 	ID    string `json:"id"`
 	Image string `json:"image"`
 	// Read: its words are read already, and only reading them into fields
@@ -1550,37 +1550,37 @@ type fmUnreadPhoto struct {
 	Read bool `json:"read,omitempty"`
 }
 
-// fmTakeUnread takes out of a step's arguments the photos look could not read.
-func fmTakeUnread(args map[string]string) []fmUnreadPhoto {
-	raw, ok := args[fmUnreadArg]
+// robotTakeUnread takes out of a step's arguments the photos look could not read.
+func robotTakeUnread(args map[string]string) []robotUnreadPhoto {
+	raw, ok := args[robotUnreadArg]
 	if !ok {
 		return nil
 	}
-	delete(args, fmUnreadArg)
-	var list []fmUnreadPhoto
+	delete(args, robotUnreadArg)
+	var list []robotUnreadPhoto
 	_ = json.Unmarshal([]byte(raw), &list)
 	return list
 }
 
-// fmQuestionArg carries what the person asked to look and deploy_want,
-// within a turn (handleFMCall); each takes it out before anything is kept.
-const fmQuestionArg = "_question"
+// robotQuestionArg carries what the person asked to look and deploy_want,
+// within a turn (handleToolsCall); each takes it out before anything is kept.
+const robotQuestionArg = "_question"
 
-// fmShortArg asks look for its short form (the values and what they mean),
+// robotShortArg asks look for its short form (the values and what they mean),
 // never the whole type and want.
-const fmShortArg = "_short"
+const robotShortArg = "_short"
 
-// fmHearsQuestion: the tool is handed what the person asked (fmQuestionArg).
-func fmHearsQuestion(tool string) bool {
+// robotHearsQuestion: the tool is handed what the person asked (robotQuestionArg).
+func robotHearsQuestion(tool string) bool {
 	return tool == "look" || tool == "deploy_want" || tool == "use_capability"
 }
 
-// fmCard is a want a step brought the robot to.
-type fmCard struct {
+// robotCard is a want a step brought the robot to.
+type robotCard struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	// What the card says, filled when the answer is settled (fmAnswerCards):
+	// What the card says, filled when the answer is settled (robotAnswerCards):
 	// the same for every client that shows it — the GUI's chat, guiex, the
 	// phone's chat, answer window and Live Activity — which each draw it their
 	// own way.
@@ -1589,20 +1589,20 @@ type fmCard struct {
 	Summary string `json:"summary,omitempty"`
 }
 
-func (t fmTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
+func (t robotTile) String() string { return fmt.Sprintf("%s (%s) at (%d, %d)", t.name, t.kind, t.x, t.y) }
 
 // named is the tile without its cell, as board lists it: a model handed the
 // cells reads them out ("荻窪 is at (6, 0)") rather than showing the place, so
 // where a tile is comes only from point, which walks the robot there.
-func (t fmTile) named() string {
+func (t robotTile) named() string {
 	if len(t.aliases) > 0 {
 		return fmt.Sprintf("%s (%s; also called %s)", t.name, t.kind, strings.Join(t.aliases, ", "))
 	}
 	return fmt.Sprintf("%s (%s)", t.name, t.kind)
 }
 
-// fmTiles is the board: things first, then wants, each only when it has a cell.
-func (s *Server) fmTiles() ([]fmTile, error) {
+// robotTiles is the board: things first, then wants, each only when it has a cell.
+func (s *Server) robotTiles() ([]robotTile, error) {
 	var things struct {
 		Things []struct {
 			ID      string            `json:"id"`
@@ -1628,27 +1628,27 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 	if err := s.backend("GET", "/api/v1/wants", nil, &wants); err != nil {
 		return nil, err
 	}
-	aliases := s.fmTypeAliases()
-	var tiles []fmTile
+	aliases := s.robotTypeAliases()
+	var tiles []robotTile
 	for _, t := range things.Things {
-		if t.Labels[fmCanvasOn] != "true" {
+		if t.Labels[robotCanvasOn] != "true" {
 			continue
 		}
 		kind := t.Subtype
 		if kind == "" {
 			kind = t.Catalog
 		}
-		if tile, ok := fmTileAt(t.Value, kind, t.Labels); ok {
+		if tile, ok := robotTileAt(t.Value, kind, t.Labels); ok {
 			tile.id, tile.cardKind = t.ID, "thing"
 			tiles = append(tiles, tile)
 		}
 	}
 	for _, w := range wants.Wants {
 		// Archived: put away, off the board — as the GUI draws it.
-		if w.Metadata.Name == fmRobotWant || w.Metadata.Labels[fmArchived] == "true" {
+		if w.Metadata.Name == robotWantName || w.Metadata.Labels[robotArchived] == "true" {
 			continue
 		}
-		if tile, ok := fmTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
+		if tile, ok := robotTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
 			tile.id, tile.cardKind = w.Metadata.ID, "want"
 			tile.typ = w.Metadata.Type
 			tile.aliases = aliases[w.Metadata.Type]
@@ -1658,24 +1658,24 @@ func (s *Server) fmTiles() ([]fmTile, error) {
 	return tiles, nil
 }
 
-func fmTileAt(name, kind string, labels map[string]string) (fmTile, bool) {
-	xs, okX := labels[fmCanvasX]
-	ys, okY := labels[fmCanvasY]
+func robotTileAt(name, kind string, labels map[string]string) (robotTile, bool) {
+	xs, okX := labels[robotCanvasX]
+	ys, okY := labels[robotCanvasY]
 	if !okX || !okY {
-		return fmTile{}, false
+		return robotTile{}, false
 	}
 	var x, y int
 	if _, err := fmt.Sscan(xs, &x); err != nil {
-		return fmTile{}, false
+		return robotTile{}, false
 	}
 	if _, err := fmt.Sscan(ys, &y); err != nil {
-		return fmTile{}, false
+		return robotTile{}, false
 	}
-	return fmTile{name: name, kind: kind, x: x, y: y}, true
+	return robotTile{name: name, kind: kind, x: x, y: y}, true
 }
 
-func (s *Server) fmBoard(map[string]string) (string, error) {
-	tiles, err := s.fmTiles()
+func (s *Server) robotBoard(map[string]string) (string, error) {
+	tiles, err := s.robotTiles()
 	if err != nil {
 		return "", err
 	}
@@ -1684,8 +1684,8 @@ func (s *Server) fmBoard(map[string]string) (string, error) {
 	}
 	var b strings.Builder
 	for i, t := range tiles {
-		if i == fmBoardLimit {
-			fmt.Fprintf(&b, "...and %d more\n", len(tiles)-fmBoardLimit)
+		if i == robotBoardLimit {
+			fmt.Fprintf(&b, "...and %d more\n", len(tiles)-robotBoardLimit)
 			break
 		}
 		b.WriteString(t.named() + "\n")
@@ -1693,21 +1693,21 @@ func (s *Server) fmBoard(map[string]string) (string, error) {
 	return b.String(), nil
 }
 
-// fmPoint walks the robot onto the named tile — the same answer as the
+// robotPoint walks the robot onto the named tile — the same answer as the
 // coordinates, pointed at rather than spelled out — and has it say where.
-func (s *Server) fmPoint(args map[string]string) (string, error) {
+func (s *Server) robotPoint(args map[string]string) (string, error) {
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
 		return "", fmt.Errorf("name is required")
 	}
-	tiles, err := s.fmTiles()
+	tiles, err := s.robotTiles()
 	if err != nil {
 		return "", err
 	}
 	loose := func(v string) string {
 		return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(v))
 	}
-	var found *fmTile
+	var found *robotTile
 	var near []string
 	// By its id when the caller knows which one it means (a want just brought
 	// back or found by its parameters): a route named 「戸塚」 and the station
@@ -1740,19 +1740,19 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		}
 	}
 	if found == nil && len(near) == 0 {
-		// Not by its name — by what its type is also called (fmAliasLabel).
+		// Not by its name — by what its type is also called (robotAliasLabel).
 		typeOf := make([]string, len(tiles))
 		for i, t := range tiles {
 			typeOf[i] = t.typ
 		}
-		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		hits := robotByAlias(name, typeOf, s.robotTypeAliases())
 		if len(hits) == 0 {
 			// Nor by an alias — by a name its constellation puts beside it.
 			names := make([]string, len(tiles))
 			for i, t := range tiles {
 				names[i] = t.name
 			}
-			hits = fmByGlossary(name, names, s.fmGlossary())
+			hits = robotByGlossary(name, names, s.robotGlossary())
 		}
 		if len(hits) == 1 {
 			found = &tiles[hits[0]]
@@ -1762,12 +1762,12 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		}
 	}
 	if found == nil {
-		if w, ok := s.fmArchivedNamed(name); ok {
-			args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
-			return fmt.Sprintf("%q (%s) is archived — put away, off the board, so there is nowhere to walk to. %s", w.Metadata.Name, w.Metadata.Type, fmAskRestore(w.Metadata.Name)), nil
+		if w, ok := s.robotArchivedNamed(name); ok {
+			args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
+			return fmt.Sprintf("%q (%s) is archived — put away, off the board, so there is nowhere to walk to. %s", w.Metadata.Name, w.Metadata.Type, robotAskRestore(w.Metadata.Name)), nil
 		}
-		if len(near) > fmNearMatches {
-			near = near[:fmNearMatches]
+		if len(near) > robotNearMatches {
+			near = near[:robotNearMatches]
 		}
 		if len(near) > 0 {
 			return "", fmt.Errorf("%q is not on the board by that name; did you mean: %s", name, strings.Join(near, ", "))
@@ -1776,44 +1776,44 @@ func (s *Server) fmPoint(args map[string]string) (string, error) {
 		// here and read out another want instead.
 		return "", fmt.Errorf("%q is not on the board — a want's parameter need not be: if it was asked for, deploy_want with it", name)
 	}
-	if err := s.fmWalkRobot(found.x, found.y); err != nil {
+	if err := s.robotWalkRobot(found.x, found.y); err != nil {
 		return "", fmt.Errorf("could not walk the robot there: %v", err)
 	}
 	if found.id != "" {
-		args[fmCardArg] = fmCardValue(found.cardKind, found.id, found.name)
+		args[robotCardArg] = robotCardValue(found.cardKind, found.id, found.name)
 	}
 	words := fmt.Sprintf("「%s」はここです (%d, %d)", found.name, found.x, found.y)
-	if err := s.fmSay(words); err != nil {
+	if err := s.robotSay(words); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("The robot is standing on %s and saying: %s", found, words), nil
 }
 
-// fmWalkRobot stands the robot on a cell — how point shows where something is,
+// robotWalkRobot stands the robot on a cell — how point shows where something is,
 // and how an answer shows what it was read off (answer_evidence.go).
-func (s *Server) fmWalkRobot(x, y int) error {
+func (s *Server) robotWalkRobot(x, y int) error {
 	// x and y in one step: two would leave the robot a moment at one of them.
 	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
-		fmCanvasX: fmt.Sprint(x), fmCanvasY: fmt.Sprint(y),
+		robotCanvasX: fmt.Sprint(x), robotCanvasY: fmt.Sprint(y),
 	}}}
-	return s.backend("PATCH", "/api/v1/wants/"+fmRobotWant, walk, nil)
+	return s.backend("PATCH", "/api/v1/wants/"+robotWantName, walk, nil)
 }
 
-// fmLook reads one want: its status and the state it has gathered, short.
+// robotLook reads one want: its status and the state it has gathered, short.
 //
 // Only what says something — not the bookkeeping every want carries
 // (achieving_percentage, action_by_agent…), not empty values, not the chat
 // buffers, and never a value whose name says it is a secret: what this
 // returns is read by a model and may be read out.
-func (s *Server) fmLook(args map[string]string) (string, error) {
-	question := args[fmQuestionArg]
-	delete(args, fmQuestionArg)
+func (s *Server) robotLook(args map[string]string) (string, error) {
+	question := args[robotQuestionArg]
+	delete(args, robotQuestionArg)
 	name := strings.TrimSpace(args["name"])
 	if name == "" {
 		return "", fmt.Errorf("name is required")
 	}
 	// Asked about a time of a want's answers (「今朝のゴルフのスコアは？」):
-	// those answers, not the want as it stands (fmLookReferent).
+	// those answers, not the want as it stands (robotLookReferent).
 	ref := s.resolveAnswerReferent(question, time.Now())
 	var resp struct {
 		Wants []struct {
@@ -1836,9 +1836,9 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// The wants on the board before the archived ones: a name both have is the
 	// one in sight.
 	sort.SliceStable(resp.Wants, func(i, j int) bool {
-		return resp.Wants[i].Metadata.Labels[fmArchived] != "true" && resp.Wants[j].Metadata.Labels[fmArchived] == "true"
+		return resp.Wants[i].Metadata.Labels[robotArchived] != "true" && resp.Wants[j].Metadata.Labels[robotArchived] == "true"
 	})
-	loose := fmLooseName
+	loose := robotLooseName
 	found, near := -1, []string{}
 	for i, w := range resp.Wants {
 		if w.Metadata.Name == name || loose(w.Metadata.Name) == loose(name) {
@@ -1857,19 +1857,19 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 		}
 	}
 	if found < 0 && len(near) == 0 {
-		// Not by its name — by what its type is also called (fmAliasLabel).
+		// Not by its name — by what its type is also called (robotAliasLabel).
 		typeOf := make([]string, len(resp.Wants))
 		for i, w := range resp.Wants {
 			typeOf[i] = w.Metadata.Type
 		}
-		hits := fmByAlias(name, typeOf, s.fmTypeAliases())
+		hits := robotByAlias(name, typeOf, s.robotTypeAliases())
 		if len(hits) == 0 {
 			// Nor by an alias — by a name its constellation puts beside it.
 			names := make([]string, len(resp.Wants))
 			for i, w := range resp.Wants {
 				names[i] = w.Metadata.Name
 			}
-			hits = fmByGlossary(name, names, s.fmGlossary())
+			hits = robotByGlossary(name, names, s.robotGlossary())
 		}
 		if len(hits) == 1 {
 			found = hits[0]
@@ -1890,12 +1890,12 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 			}
 		}
 		if hit {
-			return s.fmLookReferent(ref, question, args), nil
+			return s.robotLookReferent(ref, question, args), nil
 		}
 	}
 	if found < 0 {
-		if len(near) > fmNearMatches {
-			near = near[:fmNearMatches]
+		if len(near) > robotNearMatches {
+			near = near[:robotNearMatches]
 		}
 		if len(near) > 0 {
 			return "", fmt.Errorf("no want named %q; did you mean: %s", name, strings.Join(near, ", "))
@@ -1908,26 +1908,26 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// says Nakano. Archived, it still has its card (its status says so), what
 	// it holds is still read, and the person is asked whether to bring it back.
 	if w.Metadata.ID != "" {
-		args[fmCardArg] = fmCardValue("want", w.Metadata.ID, w.Metadata.Name)
+		args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 		// What the answer is read off: the robot stands on the want.
 		if question != "" {
 			s.walkRobotToEvidence(w.Metadata.ID)
 		}
 	}
 	note := ""
-	if w.Metadata.Labels[fmArchived] == "true" {
-		note = fmt.Sprintf("%q is archived — put away, off the board. %s\n", w.Metadata.Name, fmAskRestore(w.Metadata.Name))
+	if w.Metadata.Labels[robotArchived] == "true" {
+		note = fmt.Sprintf("%q is archived — put away, off the board. %s\n", w.Metadata.Name, robotAskRestore(w.Metadata.Name))
 	}
 
 	// Everything there is about it — the whole type definition (what it is,
 	// what each of its values means, how it is made) and the whole want — cut
-	// to what the smallest model can take (fmLookFull). A want that cannot be
+	// to what the smallest model can take (robotLookFull). A want that cannot be
 	// cut to fit falls back to the short form below.
 	// The plan's look (plan.go) asks for the short form only: what it
 	// reads goes into a prompt with the rest of the turn, cut at its length,
 	// and the type's definition first left the values themselves past the cut.
-	if args[fmShortArg] != "true" {
-		if full := s.fmLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
+	if args[robotShortArg] != "true" {
+		if full := s.robotLookFull(w.Metadata.Name, w.Metadata.Type); full != "" {
 			return note + full, nil
 		}
 	}
@@ -1948,14 +1948,14 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	meaning := map[string]string{}
 	var order []string
 	for _, st := range def.State {
-		meaning[st.Name] = fmFirstSentence(st.Description, 90)
+		meaning[st.Name] = robotFirstSentence(st.Description, 90)
 		order = append(order, st.Name)
 	}
 
 	var b strings.Builder
 	b.WriteString(note)
 	fmt.Fprintf(&b, "%s (%s): %s\n", w.Metadata.Name, w.Metadata.Type, w.Status)
-	if about := fmFirstSentence(def.Metadata.Description, 160); about != "" {
+	if about := robotFirstSentence(def.Metadata.Description, 160); about != "" {
 		fmt.Fprintf(&b, "What it is: %s\n", about)
 	}
 	// In the order the type lists them — the author's order, not the alphabet's
@@ -1981,7 +1981,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// over loses the thread before it reaches the end.
 	said := map[string]bool{}
 	for _, k := range keys {
-		if fmLookSkip(k) {
+		if robotLookSkip(k) {
 			continue
 		}
 		v := w.State.Current[k]
@@ -2016,24 +2016,24 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	return b.String(), nil
 }
 
-// fmLookTokens is what look may hand the model, in tokens.
+// robotLookTokens is what look may hand the model, in tokens.
 //
 // Sized for the smallest window that asks: an iPhone's model has 4,096 tokens
 // (a Mac's 8,192) for the instructions and the tool schemas — about 2,000 of
 // them together — the question, this answer and the reply. A smartgolf want
 // and its type handed over whole came to 5,327 tokens there and the turn
 // failed outright.
-const fmLookTokens = 1500
+const robotLookTokens = 1500
 
-// fmLookFull is one want with its type's whole definition, as JSON, cut to
-// fmLookTokens by the same token budget every GET can ask for (token_budget.go):
+// robotLookFull is one want with its type's whole definition, as JSON, cut to
+// robotLookTokens by the same token budget every GET can ask for (token_budget.go):
 // its history first, then bookkeeping, display hints, the framework's shared
 // fields, how the type is made, and long values — what it is and what its
 // values mean go last. "" when it cannot be read or cut to fit.
 //
 // Secrets stay out here too: a state or label whose name says it is one is
-// dropped, as fmLookSkip drops it from the short form.
-func (s *Server) fmLookFull(name, typ string) string {
+// dropped, as robotLookSkip drops it from the short form.
+func (s *Server) robotLookFull(name, typ string) string {
 	var typeDef map[string]any
 	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &typeDef); err != nil {
 		return ""
@@ -2053,9 +2053,9 @@ func (s *Server) fmLookFull(name, typ string) string {
 	if want == nil {
 		return ""
 	}
-	fmDropSecrets(want)
-	fmDropSecrets(typeDef)
-	cut, res := budgetFit(map[string]any{"type": typeDef, "want": want}, fmLookTokens)
+	robotDropSecrets(want)
+	robotDropSecrets(typeDef)
+	cut, res := budgetFit(map[string]any{"type": typeDef, "want": want}, robotLookTokens)
 	if !res.Fits {
 		return ""
 	}
@@ -2065,34 +2065,34 @@ func (s *Server) fmLookFull(name, typ string) string {
 	return "Type definition:\n" + string(td) + "\n\nWant:\n" + string(wj)
 }
 
-// fmDropSecrets removes, at any depth, every map entry whose key names a
-// secret (see fmLookSecret) — or, in a state definition's list, every entry
+// robotDropSecrets removes, at any depth, every map entry whose key names a
+// secret (see robotLookSecret) — or, in a state definition's list, every entry
 // whose "name" does.
-func fmDropSecrets(v any) {
+func robotDropSecrets(v any) {
 	switch x := v.(type) {
 	case map[string]any:
 		for k, child := range x {
-			if fmLookSecret(k) {
+			if robotLookSecret(k) {
 				delete(x, k)
 				continue
 			}
-			fmDropSecrets(child)
+			robotDropSecrets(child)
 		}
 	case []any:
 		for i, child := range x {
 			if m, ok := child.(map[string]any); ok {
-				if n, _ := m["name"].(string); n != "" && fmLookSecret(n) {
+				if n, _ := m["name"].(string); n != "" && robotLookSecret(n) {
 					x[i] = map[string]any{"name": n, "omitted": "secret"}
 					continue
 				}
 			}
-			fmDropSecrets(child)
+			robotDropSecrets(child)
 		}
 	}
 }
 
-// fmLookSecret: a key whose name says it holds a secret.
-func fmLookSecret(key string) bool {
+// robotLookSecret: a key whose name says it holds a secret.
+func robotLookSecret(key string) bool {
 	lower := strings.ToLower(key)
 	for _, secret := range []string{"key", "token", "secret", "password", "credential", "auth"} {
 		if strings.Contains(lower, secret) {
@@ -2102,8 +2102,8 @@ func fmLookSecret(key string) bool {
 	return false
 }
 
-// fmLookSkip: the state every want keeps for its own running, and secrets.
-func fmLookSkip(key string) bool {
+// robotLookSkip: the state every want keeps for its own running, and secrets.
+func robotLookSkip(key string) bool {
 	switch key {
 	case "achieved", "achieving_percentage", "action_by_agent", "completed", "say", "skill_path":
 		return true
@@ -2117,22 +2117,22 @@ func fmLookSkip(key string) bool {
 	if strings.HasPrefix(lower, "cc_") || strings.HasPrefix(lower, "webhook_") || strings.HasPrefix(lower, "fm_") {
 		return true
 	}
-	return fmLookSecret(lower)
+	return robotLookSecret(lower)
 }
 
-// fmSay puts words in the robot's speech bubble on the board.
-func (s *Server) fmSay(words string) error {
+// robotSay puts words in the robot's speech bubble on the board.
+func (s *Server) robotSay(words string) error {
 	words = strings.TrimSpace(words)
 	if words == "" {
 		return nil
 	}
-	return s.backend("PUT", "/api/v1/states/"+fmRobotWant, map[string]any{"say": words}, nil)
+	return s.backend("PUT", "/api/v1/states/"+robotWantName, map[string]any{"say": words}, nil)
 }
 
-// fmFirstSentence is a description cut to its first sentence, on one line —
+// robotFirstSentence is a description cut to its first sentence, on one line —
 // a type's YAML wraps its descriptions across lines and goes on to say more
 // than a model needs to read a value by.
-func fmFirstSentence(s string, max int) string {
+func robotFirstSentence(s string, max int) string {
 	s = strings.Join(strings.Fields(s), " ")
 	// "e.g. 北新宿店" is not the end of a sentence; its example is the useful half.
 	guard := strings.NewReplacer("e.g. ", "e.g.\x00", "i.e. ", "i.e.\x00")

@@ -319,7 +319,7 @@ func (s *Server) proposeCapture(thingID string) {
 // is: the type's photo-match field, else when the photo was taken, else when
 // the thing was saved.
 func (s *Server) captureTime(thingID string, labels map[string]string, wantType string) (time.Time, string) {
-	if wts, err := s.fmWantTypes(); err == nil {
+	if wts, err := s.robotWantTypes(); err == nil {
 		for _, t := range wts {
 			if t.Name != wantType {
 				continue
