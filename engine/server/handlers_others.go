@@ -724,16 +724,17 @@ func (s *Server) registerAgentYAML(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 	var data struct {
-		Name         string   `json:"name"`
-		Type         string   `json:"type"`
-		Capabilities []string `json:"capabilities"`
+		Name         string            `json:"name"`
+		Type         string            `json:"type"`
+		Capabilities []string          `json:"capabilities"`
+		Labels       map[string]string `json:"labels"`
 	}
 	if err := DecodeRequest(r, &data); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "Invalid request", err.Error())
 		return
 	}
 
-	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type)}
+	base := mywant.BaseAgent{Name: data.Name, Capabilities: data.Capabilities, Type: mywant.AgentType(data.Type), Labels: data.Labels}
 	var agent mywant.Agent
 	if data.Type == "do" {
 		agent = &mywant.DoAgent{BaseAgent: base}
@@ -741,7 +742,7 @@ func (s *Server) createAgent(w http.ResponseWriter, r *http.Request) {
 		agent = &mywant.MonitorAgent{BaseAgent: base}
 	}
 	s.agentRegistry.RegisterAgent(agent)
-	s.JSONResponse(w, http.StatusCreated, map[string]any{"name": agent.GetName(), "type": agent.GetType()})
+	s.JSONResponse(w, http.StatusCreated, map[string]any{"name": agent.GetName(), "type": agent.GetType(), "capabilities": agent.GetCapabilities(), "labels": agent.GetLabels()})
 }
 
 func (s *Server) listAgents(w http.ResponseWriter, r *http.Request) {
