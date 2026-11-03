@@ -1,11 +1,11 @@
 # Standard capabilities: what every want can do, whatever its type. A want
 # type's YAML does not list these — they are kept here, read once by the
-# server (fm_capability.go), and offered for every want on the board.
+# server (tools_capability.go), and offered for every want on the board.
 #
 # Each is written as a type's own capability is (want-spec's
 # WantCapabilityDef: name, description, reads, prompt), done for the want the
 # person names. One that is an operation of the server's own rather than data
-# to read says which (action); only the actions fm_capability.go knows can be
+# to read says which (action); only the actions tools_capability.go knows can be
 # named.
 capabilities:
   - name: restart

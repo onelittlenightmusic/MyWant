@@ -266,7 +266,7 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
 
         // A turn on the server for this question, so what the robot does about
         // it is kept there whole, the same as when a phone's model answers
-        // (engine/server/fm_turns.go). The server's tools read its id.
+        // (engine/server/turns.go). The server's tools read its id.
         let turnID = await ServerTools.openTurn(question: prompt)
         await TurnBox.shared.set(turnID)
         let before = await tracker.count

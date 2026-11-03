@@ -5,12 +5,12 @@ import FoundationModels
 ///
 /// The server keeps one set (engine/server/fm.go): what the robot can do on
 /// the board, and how it is to behave. A phone's model takes it from
-/// /api/v1/fm/manifest; so does this one. A tool added there is in both hands
+/// /api/v1/tools; so does this one. A tool added there is in both hands
 /// the next time each starts, and the two answer the same question the same
 /// way. What only a Mac has — its clock, its files, its hostname — stays here
 /// as tools of this agent's own, offered beside the server's.
 ///
-/// Every call goes back to the server (/api/v1/fm/call) and runs there, as a
+/// Every call goes back to the server (/api/v1/tools/call) and runs there, as a
 /// step of the turn this agent opened for the question (see `TurnBox` and
 /// serve()), so the robot's record has what it did whichever model did it.
 struct ServerManifest: Decodable {
@@ -55,7 +55,7 @@ enum ServerTools {
     /// agent falls back to the tools it carries itself.
     static func fetch(_ target: ServerTarget = .fromEnvironment) async -> ServerManifest? {
         do {
-            let (data, _) = try await request("api/v1/fm/manifest", method: "GET", body: nil, target: target,
+            let (data, _) = try await request("api/v1/tools", method: "GET", body: nil, target: target,
                                               query: modelLocale.map { [URLQueryItem(name: "locale", value: $0)] } ?? [])
             return try JSONDecoder().decode(ServerManifest.self, from: data)
         } catch {
@@ -75,7 +75,7 @@ enum ServerTools {
                      target: ServerTarget = .fromEnvironment) async throws -> String {
         var payload: [String: Any] = ["tool": tool, "arguments": arguments]
         if let turn { payload["turn"] = turn }
-        let (data, _) = try await request("api/v1/fm/call", method: "POST",
+        let (data, _) = try await request("api/v1/tools/call", method: "POST",
                                           body: try JSONSerialization.data(withJSONObject: payload), target: target)
         struct Reply: Decodable { let output: String }
         return try JSONDecoder().decode(Reply.self, from: data).output
@@ -90,7 +90,7 @@ enum ServerTools {
                          by: String = "robot", chat: Bool = false) async -> String? {
         let payload: [String: Any] = ["question": question, "by": by, "chat": chat]
         guard let body = try? JSONSerialization.data(withJSONObject: payload),
-              let (data, _) = try? await request("api/v1/fm/turns", method: "POST", body: body, target: target) else { return nil }
+              let (data, _) = try? await request("api/v1/turns", method: "POST", body: body, target: target) else { return nil }
         struct Turn: Decodable { let id: String }
         return (try? JSONDecoder().decode(Turn.self, from: data))?.id
     }
@@ -100,7 +100,7 @@ enum ServerTools {
     @discardableResult
     static func closeTurn(_ id: String, answer: String, target: ServerTarget = .fromEnvironment) async -> [[String: Any]] {
         guard let body = try? JSONSerialization.data(withJSONObject: ["answer": answer]),
-              let (data, _) = try? await request("api/v1/fm/turns/\(id)/answer", method: "POST", body: body, target: target),
+              let (data, _) = try? await request("api/v1/turns/\(id)/answer", method: "POST", body: body, target: target),
               let turn = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [] }
         return turn["cards"] as? [[String: Any]] ?? []
     }

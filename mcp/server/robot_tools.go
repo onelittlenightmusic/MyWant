@@ -3,10 +3,10 @@ package main
 // robot_tools.go — the board robot's own tools, for Claude.
 //
 // The robot on the MyWant board (the iPhone's, the Mac's) works the board
-// with the tools the server lists at /api/v1/fm/manifest — board, point,
+// with the tools the server lists at /api/v1/tools — board, point,
 // look, use_capability (a want's capabilities: its type's, and the standard
 // ones every want has, such as restart), deploy_want, … — and calls them at
-// /api/v1/fm/call. These are those same tools, built from that same list and
+// /api/v1/tools/call. These are those same tools, built from that same list and
 // sent to that same call, so Claude asks the board what the robot asks, and a
 // tool, a capability or a choice added on the server is here without a
 // change to this file. The choices (the types a want can be, the
@@ -57,7 +57,7 @@ var robotQuestionTools = map[string]bool{"look": true, "deploy_want": true, "use
 
 func (s *MCPServer) robotManifest() (robotManifest, error) {
 	var m robotManifest
-	resp, err := s.httpClient.Get(s.apiBaseURL + "/api/v1/fm/manifest")
+	resp, err := s.httpClient.Get(s.apiBaseURL + "/api/v1/tools")
 	if err != nil {
 		return m, err
 	}
@@ -72,7 +72,7 @@ func (s *MCPServer) robotManifest() (robotManifest, error) {
 // robotCall runs one of the robot's tools on the board and says what it said.
 func (s *MCPServer) robotCall(ctx context.Context, tool string, args map[string]string) (string, error) {
 	body, _ := json.Marshal(map[string]any{"tool": tool, "arguments": args})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiBaseURL+"/api/v1/fm/call", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.apiBaseURL+"/api/v1/tools/call", bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}

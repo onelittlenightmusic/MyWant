@@ -339,6 +339,6 @@ func (s *Server) fmLookReferent(ref *answerReferent, question string, args map[s
 		return b.String()
 	}
 	// What a photo of them shows is a capability of the want's type now
-	// (fm_capability.go): use_capability, not look.
+	// (tools_capability.go): use_capability, not look.
 	return b.String()
 }

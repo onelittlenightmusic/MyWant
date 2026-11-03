@@ -22,7 +22,7 @@ import (
 // that Mac); the iPhone app has Apple's model on the phone; this server has
 // one only when it runs on a Mac with fmtool — never on Fly. What the model is
 // asked, and what becomes of its answer, is worked out here either way, as for
-// the robot (fm.go): a device only runs the model on what it is handed.
+// the robot (tools.go): a device only runs the model on what it is handed.
 //
 // The queue is the web errands' (handlers_web_wants.go): the same claimQueue,
 // handed out by the same polled GET /api/v1/web-wants/pending-action — kind

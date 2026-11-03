@@ -20,10 +20,10 @@ import (
 // iPhone).
 //
 // The model runs on the device; who it is and everything it reaches for come
-// from here. The app fetches /api/v1/fm/manifest — the robot's instructions
+// from here. The app fetches /api/v1/tools — the robot's instructions
 // and each tool's name, description and string arguments — builds its tools
-// from that at runtime, and sends every call back to /api/v1/fm/call — each
-// as a step of a turn (fm_turns.go): the question, what the robot did, and
+// from that at runtime, and sends every call back to /api/v1/tools/call — each
+// as a step of a turn (turns.go): the question, what the robot did, and
 // what it answered, kept here whole so the robot on the board has done it. So the
 // app holds no knowledge of MyWant at all: the frame is this file, and
 // changing the robot is a change here, not a new build on the phone.
@@ -42,7 +42,7 @@ type fmTool struct {
 	// (the iPhone app's web view) says "reflecting…" until it reads it back.
 	Writes bool `json:"writes,omitempty"`
 	run    func(s *Server, args map[string]string) (string, error)
-	// replays: run again when a turn is played again (fm_turns.go) — the
+	// replays: run again when a turn is played again (turns.go) — the
 	// steps that show something. Not the ones that make something, which a
 	// second run would make twice, nor the ones that only read.
 	replays bool
@@ -149,7 +149,7 @@ func (s *Server) handleFMManifest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
 	}
-	// The board's capabilities as they are now (fm_capability.go); with none,
+	// The board's capabilities as they are now (tools_capability.go); with none,
 	// there is nothing to use and the tool is not offered.
 	caps := s.fmCapabilityChoices()
 	tools := make([]fmTool, 0, len(fmTools))
@@ -208,7 +208,7 @@ func (s *Server) handleFMCall(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Tool      string            `json:"tool"`
 		Arguments map[string]string `json:"arguments"`
-		// The turn this call is a step of (fm_turns.go); recorded there and
+		// The turn this call is a step of (turns.go); recorded there and
 		// shown in the robot's chat. Without one the call is only run.
 		Turn string `json:"turn"`
 	}
@@ -1923,7 +1923,7 @@ func (s *Server) fmLook(args map[string]string) (string, error) {
 	// what each of its values means, how it is made) and the whole want — cut
 	// to what the smallest model can take (fmLookFull). A want that cannot be
 	// cut to fit falls back to the short form below.
-	// The plan's look (fm_plan.go) asks for the short form only: what it
+	// The plan's look (plan.go) asks for the short form only: what it
 	// reads goes into a prompt with the rest of the turn, cut at its length,
 	// and the type's definition first left the values themselves past the cut.
 	if args[fmShortArg] != "true" {

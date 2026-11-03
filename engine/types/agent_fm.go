@@ -29,7 +29,7 @@ import (
 // transcript and starts again when it fills, and says so when it did.
 
 // FMServerURL is this server's own address, handed to the on-device agent so
-// it can take its tools and instructions from /api/v1/fm/manifest — the robot's
+// it can take its tools and instructions from /api/v1/tools — the robot's
 // one set, the same a phone's model gets. Set by the server at start.
 var FMServerURL string
 

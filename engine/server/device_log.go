@@ -12,7 +12,7 @@ import (
 
 // What a device running the robot's model recorded about itself.
 //
-// The turns (fm_turns.go) say what was asked, which tools ran and what was
+// The turns (turns.go) say what was asked, which tools ran and what was
 // answered; they end where the device takes the answer back. What the device
 // did after that — the window it showed, the voice it read out, the intent
 // returning — and why it stopped, if it stopped, happens where this server
@@ -40,7 +40,7 @@ const fmDeviceLogMax = 5 << 20
 
 func fmDeviceLogPath() string { return thingPath("fm-device-log.jsonl") }
 
-// POST /api/v1/fm/device-log  {"device": "...", "entries": [{at, event, detail}]}
+// POST /api/v1/device-log  {"device": "...", "entries": [{at, event, detail}]}
 func (s *Server) handleFMDeviceLogPost(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Device  string             `json:"device"`
@@ -75,7 +75,7 @@ func (s *Server) handleFMDeviceLogPost(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, map[string]any{"stored": len(req.Entries)})
 }
 
-// GET /api/v1/fm/device-log?tail=200 — the last entries, oldest first.
+// GET /api/v1/device-log?tail=200 — the last entries, oldest first.
 func (s *Server) handleFMDeviceLogGet(w http.ResponseWriter, r *http.Request) {
 	tail := 200
 	if n, err := strconv.Atoi(r.URL.Query().Get("tail")); err == nil && n > 0 {

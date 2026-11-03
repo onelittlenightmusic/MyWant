@@ -26,7 +26,7 @@ import (
 // it and it can be played again.
 //
 // A turn is built live — opened with the question, each tool call recorded as
-// it is run (/fm/call with the turn's id), closed with the answer — or posted
+// it is run (/tools/call with the turn's id), closed with the answer — or posted
 // whole afterwards, by a device that worked without this server and brings
 // the exchange back: its steps not yet run here are run then. Either way the
 // robot's chat shows it the way it shows its own: the question, the steps as
@@ -473,7 +473,7 @@ func (s *Server) fmRunStep(step *fmStep) {
 
 // ── Handlers ────────────────────────────────────────────────────────────────
 
-// POST /api/v1/fm/turns
+// POST /api/v1/turns
 //
 //	{question}                     opens a turn; answer it with /answer
 //	{question, steps, answer}      a whole turn, brought back afterwards:
@@ -544,7 +544,7 @@ func (s *Server) handleFMTurnPost(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, turn)
 }
 
-// POST /api/v1/fm/turns/{id}/answer  {answer, choices?} or {error}
+// POST /api/v1/turns/{id}/answer  {answer, choices?} or {error}
 func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Answer  string   `json:"answer"`
@@ -596,7 +596,7 @@ func (s *Server) handleFMTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, turn)
 }
 
-// GET /api/v1/fm/turns — the latest turns, oldest first.
+// GET /api/v1/turns — the latest turns, oldest first.
 func (s *Server) handleFMTurnList(w http.ResponseWriter, r *http.Request) {
 	robot, err := s.fmRobot()
 	if err != nil {
@@ -609,7 +609,7 @@ func (s *Server) handleFMTurnList(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, map[string]any{"turns": turns})
 }
 
-// GET /api/v1/fm/turns/{id}
+// GET /api/v1/turns/{id}
 func (s *Server) handleFMTurnGet(w http.ResponseWriter, r *http.Request) {
 	turn, err := s.fmUpdateTurn(mux.Vars(r)["id"], func(*fmTurn) error { return nil })
 	if err != nil {
@@ -619,7 +619,7 @@ func (s *Server) handleFMTurnGet(w http.ResponseWriter, r *http.Request) {
 	fmWriteJSON(w, turn)
 }
 
-// POST /api/v1/fm/turns/{id}/replay
+// POST /api/v1/turns/{id}/replay
 //
 // Plays the turn again: the steps that show something (a walk to a tile) are
 // run again, and the robot says its answer again. Steps that make something

@@ -237,7 +237,7 @@ func (s *fmServer) start(root string) error {
 		env = append(env, "MYWANT_BIN="+binary)
 	}
 	// Where this server is, so the agent can fetch the robot's tools and
-	// instructions from it (/api/v1/fm/manifest) and run them here — the same
+	// instructions from it (/api/v1/tools) and run them here — the same
 	// ones a phone's model gets.
 	if FMServerURL != "" {
 		env = append(env, "MYWANT_SERVER_URL="+FMServerURL)

@@ -1,18 +1,18 @@
 package server
 
-// fm_plan.go — the robot's turn as a plan, not a loop of tools.
+// plan.go — the robot's turn as a plan, not a loop of tools.
 //
 // What the person asks the robot for is information, and on the board
 // information is a want: one already there that answers it, or one made for
 // it. So the model is asked only what a model is needed for, and everything
 // else is done here, the same way every time:
 //
-//	POST /fm/brief       what is on the board that may answer it, and the
+//	POST /plan/brief       what is on the board that may answer it, and the
 //	                     types that could make one → the decision's prompt
 //	                     and its choices (an existing want or thing by name,
 //	                     a type to make, or none — not about the board)
-//	POST /fm/type-brief  a chosen type's parameters → the prompt to fill them
-//	POST /fm/act         the decision carried out (shown, brought back from
+//	POST /plan/params  a chosen type's parameters → the prompt to fill them
+//	POST /plan/act         the decision carried out (shown, brought back from
 //	                     the archive, or made — a want with the same
 //	                     parameters shown instead of made twice), recorded as
 //	                     the turn's steps → the prompt for the answer, from
@@ -50,7 +50,7 @@ type fmBriefResponse struct {
 	Prompt string   `json:"prompt"`
 	Refs   []string `json:"refs"`
 	Types  []string `json:"types"`
-	// What may be asked of the want chosen as ref (fm_capability.go): the
+	// What may be asked of the want chosen as ref (tools_capability.go): the
 	// standard capabilities and those of the candidates' types, by name; the
 	// first, "-", is just to show it.
 	Capabilities []string `json:"capabilities"`
@@ -63,7 +63,7 @@ type fmCandidate struct {
 	want bool
 }
 
-// POST /api/v1/fm/brief
+// POST /api/v1/plan/brief
 func (s *Server) handleFMBrief(w http.ResponseWriter, r *http.Request) {
 	var req fmBriefRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -131,7 +131,7 @@ func (s *Server) fmBrief(question, locale string) (fmBriefResponse, error) {
 	if typesText != "" {
 		b.WriteString("\nTypes that could make a want for it:\n" + typesText)
 	}
-	// What may be asked of a want (fm_capability.go): the standard
+	// What may be asked of a want (tools_capability.go): the standard
 	// capabilities once, for every want; a type's own on its wants' lines
 	// (above). Not one line per want and capability: the decision's prompt is
 	// read by a small model, and every want is not asked to run again.
@@ -344,7 +344,7 @@ type fmPlanParam struct {
 	Required    bool   `json:"required"`
 }
 
-// POST /api/v1/fm/type-brief
+// POST /api/v1/plan/params
 func (s *Server) handleFMTypeBrief(w http.ResponseWriter, r *http.Request) {
 	var req fmTypeBriefRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -402,11 +402,11 @@ type fmActRequest struct {
 	Ref      string            `json:"ref"`
 	Type     string            `json:"type"`
 	Params   map[string]string `json:"params"`
-	// For existing: what is asked of the want (fm_capability.go), or "-".
+	// For existing: what is asked of the want (tools_capability.go), or "-".
 	Capability string `json:"capability"`
 }
 
-// POST /api/v1/fm/act
+// POST /api/v1/plan/act
 func (s *Server) handleFMAct(w http.ResponseWriter, r *http.Request) {
 	var req fmActRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -463,7 +463,7 @@ func (s *Server) fmAct(req fmActRequest) []fmStep {
 			return nil
 		}
 		if c := strings.TrimSpace(req.Capability); c != "" && c != fmPlanNone {
-			// A capability of the want (fm_capability.go): done here, what it
+			// A capability of the want (tools_capability.go): done here, what it
 			// found handed to the answer.
 			return []fmStep{run("use_capability", map[string]string{"capability": c, "want": name})}
 		}

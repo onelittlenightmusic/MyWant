@@ -519,20 +519,30 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/speech", s.listSpeech).Methods("GET", "OPTIONS")
 	api.HandleFunc("/speech", s.postSpeech).Methods("POST")
 
-	// The robot for an on-device model on another device — see fm.go.
-	api.HandleFunc("/fm/manifest", s.handleFMManifest).Methods("GET")
-	api.HandleFunc("/fm/call", s.handleFMCall).Methods("POST")
-	api.HandleFunc("/fm/brief", s.handleFMBrief).Methods("POST")
-	api.HandleFunc("/fm/type-brief", s.handleFMTypeBrief).Methods("POST")
-	api.HandleFunc("/fm/act", s.handleFMAct).Methods("POST")
-	api.HandleFunc("/fm/turns", s.handleFMTurnPost).Methods("POST")
-	api.HandleFunc("/fm/turns", s.handleFMTurnList).Methods("GET")
-	api.HandleFunc("/fm/turns/{id}", s.handleFMTurnGet).Methods("GET")
-	api.HandleFunc("/fm/turns/{id}/answer", s.handleFMTurnAnswer).Methods("POST")
-	api.HandleFunc("/fm/turns/{id}/replay", s.handleFMTurnReplay).Methods("POST")
-	// What a device running the robot's model recorded about itself (fm_device_log.go).
-	api.HandleFunc("/fm/device-log", s.handleFMDeviceLogPost).Methods("POST")
-	api.HandleFunc("/fm/device-log", s.handleFMDeviceLogGet).Methods("GET")
+	// The board robot, in two kinds, each for its own kind of model:
+	//
+	//   tools  — the robot's tools and how to use them, for a model that works
+	//            them itself (Claude, through the MCP server): tools.go.
+	//   plan   — a turn as a plan, for a small on-device model (Apple's
+	//            FoundationModels, on an iPhone or a Mac): the server gathers
+	//            what may answer, the model only chooses, the server does it
+	//            and hands back what to answer from: plan.go.
+	//
+	// Both end in the same tool run; turns records either for every chat
+	// (turns.go). They were fm/… once, when only an Apple model asked.
+	api.HandleFunc("/tools", s.handleFMManifest).Methods("GET")
+	api.HandleFunc("/tools/call", s.handleFMCall).Methods("POST")
+	api.HandleFunc("/plan/brief", s.handleFMBrief).Methods("POST")
+	api.HandleFunc("/plan/params", s.handleFMTypeBrief).Methods("POST")
+	api.HandleFunc("/plan/act", s.handleFMAct).Methods("POST")
+	api.HandleFunc("/turns", s.handleFMTurnPost).Methods("POST")
+	api.HandleFunc("/turns", s.handleFMTurnList).Methods("GET")
+	api.HandleFunc("/turns/{id}", s.handleFMTurnGet).Methods("GET")
+	api.HandleFunc("/turns/{id}/answer", s.handleFMTurnAnswer).Methods("POST")
+	api.HandleFunc("/turns/{id}/replay", s.handleFMTurnReplay).Methods("POST")
+	// What a device running the robot's model recorded about itself (device_log.go).
+	api.HandleFunc("/device-log", s.handleFMDeviceLogPost).Methods("POST")
+	api.HandleFunc("/device-log", s.handleFMDeviceLogGet).Methods("GET")
 	api.HandleFunc("/cursors", s.listCursors).Methods("GET", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.updateCursor).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/cursors/{characterId}", s.deleteCursor).Methods("DELETE", "OPTIONS")

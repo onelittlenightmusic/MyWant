@@ -9,8 +9,8 @@ import AppKit
 /// Mac when it is open in that Mac's browser. The MyWant extension
 /// (mywant-guiex webext) keeps this process open — chrome.runtime.connectNative
 /// — and sends it the robot's questions; it answers them as a phone answers
-/// them: the server's instructions and tools (/api/v1/fm/manifest), every call
-/// run there as a step of a turn (fm_turns.go), the turn written into the
+/// them: the server's instructions and tools (/api/v1/tools), every call
+/// run there as a step of a turn (turns.go), the turn written into the
 /// robot's chat with its cards. Only the model is this Mac's.
 ///
 /// Chrome starts the host with the extension's origin as its only argument
@@ -174,7 +174,7 @@ private actor Conversations {
             return ["type": "answer", "id": id, "error": "question and server are required"]
         }
         guard let conversation = await conversation(for: target) else {
-            return ["type": "answer", "id": id, "error": "\(target.baseURL.absoluteString) の手順書（/api/v1/fm/manifest）を読めませんでした"]
+            return ["type": "answer", "id": id, "error": "\(target.baseURL.absoluteString) の手順書（/api/v1/tools）を読めませんでした"]
         }
 
         // The turn, as a phone opens it: written into the robot's chat, so the

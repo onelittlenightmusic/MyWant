@@ -1,6 +1,6 @@
 package server
 
-// fm_capability.go — what a want can answer beyond its own result.
+// tools_capability.go — what a want can answer beyond its own result.
 //
 // A want type says it in its YAML (capabilities): each in the person's words
 // ("最新のゴルフのスコアを検索できる"), for the robot to choose by, and how it
@@ -14,7 +14,7 @@ package server
 // the robot's instructions know none of it.
 //
 // One tool for the device's tool loop (use_capability, its choices the board's
-// capabilities as they are now), and the same step for the plan (fm_plan.go:
+// capabilities as they are now), and the same step for the plan (plan.go:
 // a capability is chosen as a ref, "want#capability").
 
 import (

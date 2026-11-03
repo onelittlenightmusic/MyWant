@@ -426,8 +426,8 @@ wantType:
       iPhone's FoundationModels) — each {id, question, steps, answer, error,
       started_at, finished_at, by}, a step being {tool, arguments, output,
       done, at}. The whole exchange, kept so it outlives a restart and can be
-      read back or played again (POST /api/v1/fm/turns/{id}/replay). See
-      engine/server/fm_turns.go.
+      read back or played again (POST /api/v1/turns/{id}/replay). See
+      engine/server/turns.go.
     type: object
     persistent: true
     initialValue: []
