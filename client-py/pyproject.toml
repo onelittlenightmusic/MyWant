@@ -4,11 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mywant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python SDK for MyWant: the server's API, and the want a plugin script runs for"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
-[tool.setuptools.packages.find]
-include = ["mywant*"]
+# The package itself lives in the engine, which embeds it for plugin scripts
+# (engine/core/mrs_sdk.go) — one copy, used by both.
+[tool.setuptools]
+packages = ["mywant"]
+package-dir = { mywant = "../engine/core/pysdk/mywant" }

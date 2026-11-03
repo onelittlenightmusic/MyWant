@@ -45,7 +45,7 @@ else:
         # Only the one it goes for, by id, every turn; the whole board only
         # when it is time to take a step through it.
         tid = me.params.get("target_id")
-        target = me.server.want(tid) if tid else me.server.want_named(on)
+        target = me.server.wants.get(tid) if tid else me.server.wants.named(on)
         here, there = b.cell_of(me.labels), b.cell_of(target) if target else None
         if here is not None and there is not None:
             if b.dist(here, there) <= 1.5:
@@ -56,7 +56,7 @@ else:
                 if not isinstance(last, (int, float)):
                     me.set("last_step", t)  # just come in: a step's time first
                 elif t - last >= 1000 / max(float(me.params.get("speed", 0.6)), 0.05):
-                    wants = me.server.wants()
+                    wants = me.server.wants.list()
                     taken = b.occupied_cells(wants) | b.blocked_cells(wants)
                     nxt = b.step_toward(here, there, lambda c: c in taken)
                     if nxt is not None:

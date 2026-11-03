@@ -59,9 +59,9 @@ me.set("achieved", False)
 try:
     # Everything this turn reads, read first: a turn that cannot see the
     # board changes nothing at all, rather than half of what it would.
-    wants = srv.wants()
-    gs = srv.global_state()
-    cursor_list = srv.cursors() or []
+    wants = srv.wants.list()
+    gs = srv.global_state.get()
+    cursor_list = srv.cursors.list() or []
 except MyWantError:
     # The board could not be read this turn: nothing is changed, and the next
     # turn asks again.
@@ -108,7 +108,7 @@ def aim(w, target_name):
     have = b.params_of(w).get("target") or ""
     if have != (target_name or ""):
         tid = b.meta(by_name[target_name])["id"] if target_name in by_name else None
-        srv.patch_want(b.meta(w)["id"], params={"target": target_name or None, "target_id": tid})
+        srv.wants.patch(b.meta(w)["id"], params={"target": target_name or None, "target_id": tid})
 
 
 fallen = dict(me.state.get("fallen") or {})
@@ -119,7 +119,7 @@ for w in wants:
     wid = b.meta(w)["id"]
     if wid in fallen:
         if t - fallen[wid] >= FALL_LINGER_MS:
-            srv.delete_want(wid)
+            srv.wants.delete(wid)
             fallen.pop(wid)
         continue
     enemies.append(w)
@@ -135,12 +135,12 @@ for w in wants:
     on = bool(b.current_of(w).get("characters"))
     if on and not reset_on.get(m["id"]):
         for e in enemies:
-            srv.delete_want(b.meta(e)["id"])
+            srv.wants.delete(b.meta(e)["id"])
         enemies = []
         down = [b.meta(x)["id"] for x in in_room()
                 if b.meta(x).get("type") in b.DEFENDABLE_TYPES and x.get("status") == "suspended"]
         if down:
-            srv.resume(*down)
+            srv.wants.resume(*down)
         rnd += 1
         phase = "ready"
         me.set("spawned", 0)
@@ -152,7 +152,7 @@ me.set("reset_stood_on", reset_on)
 
 # It says which round it is, from the first.
 rkey = b.round_key(me.name)
-srv.expose(me.id, "round", rkey)
+srv.wants.expose(me.id, "round", rkey)
 
 # Someone stepping on it begins a battle that is waiting, or over.
 on = bool(me.state.get("characters"))
@@ -210,7 +210,7 @@ for w in wants:
     if cid and cid not in have:
         cell = near_middle()
         labels = {b.CANVAS_X: str(cell[0]), b.CANVAS_Y: str(cell[1])} if cell else {"mywant.io/canvas-hidden": "true"}
-        srv.create_want({
+        srv.wants.create({
             "metadata": {"name": f"fighter-{cid}", "type": b.FIGHTER_TYPE, "labels": labels},
             "spec": {"params": {"character_id": cid},
                      "exposes": [{"currentState": "strike", "as": b.action_key(f"fighter-{cid}", "attack")}]},
@@ -219,7 +219,7 @@ for f in fighters:
     if (b.meta(f).get("labels") or {}).get("mywant.io/canvas-hidden") == "true":
         cell = near_middle()
         if cell:
-            srv.patch_want(b.meta(f)["id"], labels={
+            srv.wants.patch(b.meta(f)["id"], labels={
                 b.CANVAS_X: str(cell[0]), b.CANVAS_Y: str(cell[1]), "mywant.io/canvas-hidden": None})
 
 if phase != "fighting":
@@ -227,7 +227,7 @@ if phase != "fighting":
     for w in shooters:
         aim(w, None)
     for e in enemies:
-        srv.delete_want(b.meta(e)["id"])
+        srv.wants.delete(b.meta(e)["id"])
     me.set("phase", phase)
     me.set("fallen", {})
     me.set("failed", _failed[-5:])
@@ -240,7 +240,7 @@ if phase != "fighting":
 for w in shooters + heals:
     act = "heal" if b.meta(w).get("type") == "heal" else "attack"
     field = "pulse" if act == "heal" else "strike"
-    srv.expose(b.meta(w)["id"], field, b.action_key(b.meta(w)["name"], act))
+    srv.wants.expose(b.meta(w)["id"], field, b.action_key(b.meta(w)["name"], act))
 
 # What is acted on reads what can reach it — each only once there is
 # something behind it, so it is never held back waiting.
@@ -265,7 +265,7 @@ def wire(w, keys, also=None):
         imports[k] = b.ACTION_PREFIX + k
     for k, v in (also or {}).items():
         imports[k] = v
-    srv.set_imports(b.meta(w)["id"], imports)
+    srv.wants.set_imports(b.meta(w)["id"], imports)
 
 
 round_also = {rkey: b.ROUND_IMPORT} if gs.get(rkey) is not None else {}
@@ -314,7 +314,7 @@ if due:
             labels["mywant.io/canvas-size"] = "0.5"
         else:
             me.set("say", "ボスが現れた！")
-        srv.create_want({
+        srv.wants.create({
             # The round in its id: an enemy of an earlier round is another
             # want, and what was aimed at that one (a capture's hub)
             # is not this one's.

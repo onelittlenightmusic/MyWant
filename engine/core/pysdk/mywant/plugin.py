@@ -9,7 +9,7 @@ server that made the call.
 
     me = current()
     hp = me.state.get("hp", 0)
-    me.server.wants(type="enemy")
+    me.server.wants.list(type="enemy")
     if hp <= 0:
         me.suspend()
 

@@ -1,8 +1,16 @@
 """The server's HTTP API, as Python.
 
 Standard library only (urllib), so a plugin can use it with nothing
-installed. Every call raises MyWantError on a status outside 2xx, carrying
-the status and what the server said.
+installed. One object per resource, as the API has them:
+
+    c = Client()
+    c.wants.list(type="enemy")
+    c.things.create("stations", "国分寺")
+    c.constellations.update("通勤", members=[...])
+
+Every call raises MyWantError (NotFoundError on 404, ConflictError on 409,
+ValidationError on 400) on a status outside 2xx, carrying the status and
+what the server said.
 """
 
 from __future__ import annotations
@@ -13,7 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from base64 import b64encode
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Mapping, Optional
 
 DEFAULT_URL = "http://localhost:8080"
 
@@ -25,6 +33,21 @@ class MyWantError(Exception):
         super().__init__(message)
         self.status = status
         self.body = body
+
+
+class ValidationError(MyWantError):
+    """400: what was sent does not hold."""
+
+
+class NotFoundError(MyWantError):
+    """404: no such one."""
+
+
+class ConflictError(MyWantError):
+    """409: taken, or in a state that forbids it."""
+
+
+_ERRORS = {400: ValidationError, 404: NotFoundError, 409: ConflictError}
 
 
 class Client:
@@ -54,11 +77,56 @@ class Client:
         # server busy for a moment usually answers the second time.
         self.retries = retries
 
+        # Imported here: each resource module imports this one for _q.
+        from .agents import Agents
+        from .capabilities import Capabilities
+        from .character_skills import CharacterSkills
+        from .characters import Characters
+        from .constellations import Constellations
+        from .cursors import Cursors
+        from .devices import Devices
+        from .errors import Errors
+        from .global_state import GlobalState
+        from .labels import Labels
+        from .llm import LLM
+        from .logs import Logs
+        from .reactions import Reactions
+        from .recipes import Recipes
+        from .states import States
+        from .system import System
+        from .things import Things
+        from .want_types import WantTypes
+        from .wants import Wants
+        from .webhooks import Webhooks
+
+        self.wants = Wants(self)
+        self.states = States(self)
+        self.global_state = GlobalState(self)
+        self.want_types = WantTypes(self)
+        self.recipes = Recipes(self)
+        self.agents = Agents(self)
+        self.capabilities = Capabilities(self)
+        self.labels = Labels(self)
+        self.things = Things(self)
+        self.constellations = Constellations(self)
+        self.characters = Characters(self)
+        self.character_skills = CharacterSkills(self)
+        self.devices = Devices(self)
+        self.cursors = Cursors(self)
+        self.system = System(self)
+        self.logs = Logs(self)
+        self.errors = Errors(self)
+        self.llm = LLM(self)
+        self.webhooks = Webhooks(self)
+        self.reactions = Reactions(self)
+
     # ── the one way every call goes ─────────────────────────────────────────
 
-    def request(self, method: str, path: str, body: Any = None, query: Optional[Mapping[str, Any]] = None) -> Any:
-        """Any endpoint: `path` from /api/v1/…, `body` sent as JSON. The
-        decoded JSON answer, or the text when it is not JSON, or None."""
+    def request(self, method: str, path: str, body: Any = None, query: Optional[Mapping[str, Any]] = None,
+                *, yaml: Optional[str] = None, text: bool = False) -> Any:
+        """Any endpoint: `path` from /api/v1/…, `body` sent as JSON, or
+        `yaml` sent as it is. The decoded JSON answer — or, with `text` or
+        when it is not JSON, the text — or None."""
         url = self.url + path
         if query:
             pairs = []
@@ -70,8 +138,11 @@ class Client:
             if pairs:
                 url += "?" + urllib.parse.urlencode(pairs)
         data = None
-        headers = {"Accept": "application/json", "User-Agent": "mywant-py/0.1.0"}
-        if body is not None:
+        headers = {"Accept": "application/json", "User-Agent": "mywant-py/0.2.0"}
+        if yaml is not None:
+            data = yaml.encode("utf-8")
+            headers["Content-Type"] = "application/yaml"
+        elif body is not None:
             data = json.dumps(body, ensure_ascii=False).encode("utf-8")
             headers["Content-Type"] = "application/json"
         if self.token:
@@ -87,8 +158,9 @@ class Client:
                     raw = resp.read()
                 break
             except urllib.error.HTTPError as e:
-                text = e.read().decode("utf-8", "replace")
-                raise MyWantError(f"{method.upper()} {path}: {e.code} {text.strip()}", e.code, text) from None
+                msg = e.read().decode("utf-8", "replace")
+                cls = _ERRORS.get(e.code, MyWantError)
+                raise cls(f"{method.upper()} {path}: {e.code} {msg.strip()}", e.code, msg) from None
             except (urllib.error.URLError, TimeoutError, OSError) as e:
                 if attempt + 1 < tries:
                     continue
@@ -96,144 +168,13 @@ class Client:
                 raise MyWantError(f"{method.upper()} {path}: cannot reach {self.url}: {reason}") from None
         if not raw:
             return None
-        text = raw.decode("utf-8", "replace")
+        decoded = raw.decode("utf-8", "replace")
+        if text:
+            return decoded
         try:
-            return json.loads(text)
+            return json.loads(decoded)
         except ValueError:
-            return text
-
-    # ── wants ───────────────────────────────────────────────────────────────
-
-    def wants(self, *, type: Optional[str] = None, labels: Optional[Mapping[str, str]] = None,
-              include_system: bool = False) -> list:
-        """Every want (or those of one type, or carrying these labels)."""
-        query: dict = {}
-        if type:
-            query["type"] = type
-        if labels:
-            query["label"] = [f"{k}={v}" for k, v in labels.items()]
-        if include_system:
-            query["includeSystemWants"] = True
-        got = self.request("GET", "/api/v1/wants", query=query)
-        if isinstance(got, dict):
-            return got.get("wants") or []
-        return got or []
-
-    def want(self, id: str) -> dict:
-        """One want, by id."""
-        return self.request("GET", f"/api/v1/wants/{_q(id)}")
-
-    def want_named(self, name: str) -> Optional[dict]:
-        """One want, by name — None when there is none."""
-        for w in self.wants():
-            if (w.get("metadata") or {}).get("name") == name:
-                return w
-        return None
-
-    def create_wants(self, wants: Iterable[Mapping[str, Any]]) -> Any:
-        """Add wants (each {metadata, spec})."""
-        return self.request("POST", "/api/v1/wants", list(wants))
-
-    def create_want(self, want: Mapping[str, Any]) -> Any:
-        return self.create_wants([want])
-
-    def delete_want(self, id: str) -> None:
-        self.request("DELETE", f"/api/v1/wants/{_q(id)}")
-
-    def update_want(self, id: str, want: Mapping[str, Any]) -> Any:
-        """Replace a want's metadata and spec (PUT)."""
-        return self.request("PUT", f"/api/v1/wants/{_q(id)}", dict(want))
-
-    def patch_want(self, id: str, *, params: Optional[Mapping[str, Any]] = None,
-                   labels: Optional[Mapping[str, Optional[str]]] = None) -> Any:
-        """Change only these params and labels; a value of None takes it away."""
-        body: dict = {}
-        if labels is not None:
-            body["metadata"] = {"labels": dict(labels)}
-        if params is not None:
-            body["spec"] = {"params": dict(params)}
-        return self.request("PATCH", f"/api/v1/wants/{_q(id)}", body)
-
-    def set_label(self, id: str, key: str, value: str) -> None:
-        self.request("POST", f"/api/v1/wants/{_q(id)}/labels", {"key": key, "value": value})
-
-    def remove_label(self, id: str, key: str) -> None:
-        self.request("DELETE", f"/api/v1/wants/{_q(id)}/labels/{_q(key)}")
-
-    def _control(self, op: str, ids: Iterable[str]) -> None:
-        self.request("POST", f"/api/v1/wants/{op}", {"ids": list(ids)})
-
-    def suspend(self, *ids: str) -> None:
-        self._control("suspend", ids)
-
-    def resume(self, *ids: str) -> None:
-        self._control("resume", ids)
-
-    def restart(self, *ids: str) -> None:
-        self._control("restart", ids)
-
-    def stop(self, *ids: str) -> None:
-        self._control("stop", ids)
-
-    def start(self, *ids: str) -> None:
-        self._control("start", ids)
-
-    # ── a want's wiring (its spec) ──────────────────────────────────────────
-
-    def expose(self, id: str, current_state: str, as_key: str) -> bool:
-        """Have a want publish one of its state fields under a global key —
-        unless it already does. Whether anything changed."""
-        w = self.want(id)
-        for e in ((w.get("spec") or {}).get("exposes") or []):
-            if e.get("currentState") == current_state and e.get("as") == as_key:
-                return False
-        self.request("POST", f"/api/v1/wants/{_q(id)}/relations",
-                     {"currentState": current_state, "as": as_key})
-        return True
-
-    def set_imports(self, id: str, imports: Mapping[str, str]) -> bool:
-        """Make a want's imports exactly these (global key → its local key) —
-        unless they already are. Read from the want itself, not a listing,
-        which can lag behind it. Whether anything changed."""
-        w = self.want(id)
-        if ((w.get("spec") or {}).get("imports") or {}) == dict(imports):
-            return False
-        self.update_want(id, {"metadata": w["metadata"],
-                              "spec": {**(w.get("spec") or {}), "imports": dict(imports)}})
-        return True
-
-    # ── state ───────────────────────────────────────────────────────────────
-
-    def state(self, id: str) -> dict:
-        """A want's state, as /states gives it."""
-        return self.request("GET", f"/api/v1/states/{_q(id)}")
-
-    def set_state(self, id: str, key: str, value: Any) -> None:
-        self.request("PUT", f"/api/v1/states/{_q(id)}/{_q(key)}", value)
-
-    def global_state(self) -> dict:
-        got = self.request("GET", "/api/v1/global-state")
-        if isinstance(got, dict) and "state" in got and isinstance(got["state"], dict):
-            return got["state"]
-        return got or {}
-
-    def set_global_state(self, key: str, value: Any) -> None:
-        self.request("PUT", f"/api/v1/global-state/{_q(key)}", value)
-
-    # ── the board ───────────────────────────────────────────────────────────
-
-    def cursors(self) -> Any:
-        """Where each character stands."""
-        return self.request("GET", "/api/v1/cursors")
-
-    def things(self) -> Any:
-        return self.request("GET", "/api/v1/things")
-
-    def want_types(self) -> Any:
-        return self.request("GET", "/api/v1/want-types")
-
-    def want_type(self, name: str) -> Any:
-        return self.request("GET", f"/api/v1/want-types/{_q(name)}")
+            return decoded
 
 
 def _query_value(v: Any) -> str:
@@ -244,3 +185,16 @@ def _query_value(v: Any) -> str:
 
 def _q(s: str) -> str:
     return urllib.parse.quote(str(s), safe="")
+
+
+def _csv(items) -> str:
+    """Items for an ?ids= / ?names= list."""
+    return ",".join(items)
+
+
+def _send(c: "Client", method: str, path: str, data: Any, query: Optional[Mapping[str, Any]] = None) -> Any:
+    """`data` as the server reads it either way: a string is YAML, sent as it
+    is; anything else is JSON (which the server's YAML reader takes too)."""
+    if isinstance(data, str):
+        return c.request(method, path, query=query, yaml=data)
+    return c.request(method, path, data, query)

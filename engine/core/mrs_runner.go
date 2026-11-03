@@ -36,7 +36,7 @@ type MRSRunOptions struct {
 	// Args are the CLI arguments passed to the script (usually a single JSON string).
 	Args []string
 	// Context is the want the call runs for, handed to the script's SDK
-	// (client-py: mywant.current()): want_id, want_name, state, params,
+	// (pysdk: mywant.current()): want_id, want_name, state, params,
 	// labels, and server {url}. Nil for a call made for no want.
 	Context map[string]any
 	// OnDirective receives what a script says about its own want — a line

@@ -20,7 +20,7 @@ if not b.take_hits(me):
         here = b.cell_of(me.labels)
         reach = float(me.params.get("range", 2))
         if here is not None:
-            for w in me.server.wants():
+            for w in me.server.wants.list():
                 m = b.meta(w)
                 c = b.cell_of(w)
                 cur = b.current_of(w)

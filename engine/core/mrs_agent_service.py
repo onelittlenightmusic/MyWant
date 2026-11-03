@@ -200,7 +200,7 @@ def _forget_changed_modules():
 
 
 def _sdk_enter(context, out):
-    """The want this call runs for, as the SDK's current() (client-py:
+    """The want this call runs for, as the SDK's current() (pysdk:
     mywant/plugin.py) — per thread, as argv and stdout are. None when the
     call is for no want, or the SDK is not on the path."""
     if not context:

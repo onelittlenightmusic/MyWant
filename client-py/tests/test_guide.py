@@ -4,7 +4,7 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "engine", "core", "pysdk"))
 
 from mywant import fill_goto, fill_template, goto_template  # noqa: E402
 

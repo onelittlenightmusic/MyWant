@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// The Python SDK (client-py/, the `mywant` package), for plugin scripts.
+// The Python SDK (the `mywant` package, pysdk/mywant), for plugin scripts.
 //
 // A plugin script is called for one want at a time, and the SDK is how it
 // knows which: `mywant.current()` is that want — its id, name, params,
@@ -23,10 +23,9 @@ import (
 // itself, move its own tile — comes back as a directive line ("_control",
 // "_tile"), and the agent applies it to that want and no other.
 //
-// The package is embedded here (pysdk/, a copy of client-py/mywant kept in
-// step by `make pysdk`; TestPySDKMatchesClientPy says when it is not) and
-// written out once to a directory every interpreter the engine starts has
-// on its PYTHONPATH.
+// The package lives here, in pysdk/ (client-py/ packages this same directory
+// for pip), and is embedded and written out once to a directory every
+// interpreter the engine starts has on its PYTHONPATH.
 
 //go:embed pysdk/mywant/*.py
 var pySDK embed.FS

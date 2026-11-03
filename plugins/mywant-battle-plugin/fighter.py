@@ -27,7 +27,7 @@ if me.labels.get("mywant.io/canvas-hidden") != "true":
     at = b.cell_of(me.labels)
 if at is None:
     char = me.params.get("character_id") or ""
-    for c in me.server.cursors() or []:
+    for c in me.server.cursors.list() or []:
         if (c.get("character_id") or c.get("characterId") or c.get("id")) == char:
             at = (float(c.get("x", 0)), float(c.get("y", 0)))
 
@@ -35,7 +35,7 @@ on = None
 if at is not None:
     reach = float(me.params.get("reach", 6))
     told, rest = [], []
-    for e in me.server.wants():
+    for e in me.server.wants.list():
         m = b.meta(e)
         if m.get("type") not in b.ENEMY_TYPES or b.current_of(e).get("defeated"):
             continue
