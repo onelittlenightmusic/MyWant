@@ -1,0 +1,203 @@
+openapi: 3.0.3
+info:
+  title: MyWant Constellation Schema
+  description: |
+    OpenAPI specification for a MyWant constellation — a named group of
+    things (thing-spec.yaml) and wants drawn together on the board, as stars
+    are. It is a facade over labels: each member carries
+    constellation/<name>, and its colour, art and capture ride on the members
+    the same way. Kept by the backend:
+
+      GET    /api/v1/constellations                    ConstellationList
+                                                       ?kind=thing|want for one side only
+      POST   /api/v1/constellations                    ConstellationCreate → Constellation
+      DELETE /api/v1/constellations?names=a,b          ConstellationsDeleted
+      GET    /api/v1/constellations/{name}             Constellation
+      PATCH  /api/v1/constellations/{name}             ConstellationUpdate → what is
+      PUT    /api/v1/constellations/{name}               given changes (PATCH is PUT)
+      DELETE /api/v1/constellations/{name}
+      POST   /api/v1/constellations/export[?names=a,b] YAML: [Constellation, ...]
+      POST   /api/v1/constellations/import             YAML (or JSON): [Constellation, ...]
+                                                       → ConstellationsImported
+
+    Import makes each by name (else its id), or joins one already there,
+    and lays on its members, color, art, capture and captureAt. kind and
+    memberKinds are derived again, not read.
+
+    Two shapes, by capture:
+      - an order (capture empty): its members are drawn as a chain, one to
+        the next, in members' order.
+      - a capture (capture set): one member is its hub — the tile it was
+        caught into — and it is drawn from the hub out to each member.
+
+    A want's answers. When the hub is a want, the members are joined to that
+    want's answers (the photo of the score card taken at the practice a golf
+    reservation was for): one constellation for the want, not one per answer.
+    Which answer each member is for is a label on the member:
+
+      constellation-answer/<name> = <the answer's key>
+
+    The answers themselves are not members; the want is, as the hub.
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+paths: {}
+
+components:
+  schemas:
+    Constellation:
+      type: object
+      description: One constellation as it is read.
+      required:
+        - id
+        - name
+        - kind
+        - members
+      properties:
+        id:
+          type: string
+          description: The same as name.
+          example: "ゴルフ"
+        name:
+          type: string
+          description: What it is called, and what it is kept by. Not empty, no '/'.
+          pattern: '^[^/]+$'
+          example: "ゴルフ"
+        kind:
+          $ref: '#/components/schemas/ConstellationKind'
+        color:
+          type: string
+          description: Its colour; absent draws it in the default starlight.
+          pattern: '^#[0-9a-fA-F]{6}$'
+          example: "#f5c542"
+        art:
+          type: string
+          description: |
+            The URL of a picture laid on the board's floor under it. It may
+            carry a fragment saying how it is drawn (#scale=1.5).
+          example: "/api/v1/art/files/abc.png#scale=1.5"
+        capture:
+          type: string
+          description: |
+            The id of its hub's tile (a want's or a thing's), for a capture.
+            Absent, it is an order, drawn as a chain.
+        captureAt:
+          type: string
+          description: |
+            The cell its hub was last seen in, "x,y" — its ring stays there
+            when the hub is gone.
+          pattern: '^-?[0-9]+,-?[0-9]+$'
+          example: "12,7"
+        members:
+          type: array
+          description: Its members' ids — thing ids or want ids — in order.
+          items:
+            type: string
+        memberKinds:
+          type: object
+          description: Which kind each member is, keyed by the ids in members.
+          additionalProperties:
+            $ref: '#/components/schemas/ConstellationMemberKind'
+      additionalProperties: false
+
+    ConstellationKind:
+      type: string
+      description: What its members are — derived from them.
+      enum: ["thing", "want", "mixed"]
+
+    ConstellationMemberKind:
+      type: string
+      enum: ["thing", "want"]
+
+    ConstellationList:
+      type: object
+      description: GET /constellations.
+      required:
+        - groups
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Constellation'
+      additionalProperties: false
+
+    ConstellationCreate:
+      type: object
+      description: |
+        The body of POST /constellations. A name already there folds the new
+        members in. kind decides nothing — each member is written where it
+        lives — but is still validated when given.
+      required:
+        - name
+        - members
+      properties:
+        name:
+          type: string
+          pattern: '^[^/]+$'
+        kind:
+          $ref: '#/components/schemas/ConstellationKind'
+        members:
+          type: array
+          items:
+            type: string
+        color:
+          type: string
+          pattern: '^#[0-9a-fA-F]{6}$'
+        capture:
+          type: string
+          description: The tile it is a capture into (one of its members); absent, an order.
+      additionalProperties: false
+
+    ConstellationUpdate:
+      type: object
+      description: |
+        The body of PUT /constellations/{name}. Every field is optional; one
+        left out is left as it is. members reconciles membership to the set
+        given; "" for color, capture or captureAt clears it.
+      properties:
+        name:
+          type: string
+          description: Its new name.
+          pattern: '^[^/]+$'
+        members:
+          type: array
+          items:
+            type: string
+        kind:
+          $ref: '#/components/schemas/ConstellationKind'
+        color:
+          type: string
+        capture:
+          type: string
+        captureAt:
+          type: string
+      additionalProperties: false
+
+    ConstellationsDeleted:
+      type: object
+      description: DELETE /constellations?names=a,b.
+      properties:
+        deleted:
+          type: array
+          description: The names deleted.
+          items:
+            type: string
+        missing:
+          type: array
+          description: The names asked for that were not there.
+          items:
+            type: string
+      additionalProperties: false
+
+    ConstellationsImported:
+      type: object
+      description: POST /constellations/import.
+      properties:
+        imported:
+          type: array
+          description: The names of the constellations imported, in the file's order.
+          items:
+            type: string
+      additionalProperties: false

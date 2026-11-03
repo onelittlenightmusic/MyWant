@@ -1,6 +1,8 @@
 package server
 
 import (
+	ws "github.com/onelittlenightmusic/want-spec"
+
 	"encoding/json"
 	"fmt"
 	"log"
@@ -32,26 +34,17 @@ import (
 // robot's chat shows it the way it shows its own: the question, the steps as
 // its working log, the answer in its voice.
 
-type robotStep struct {
-	Tool      string            `json:"tool"`
-	Arguments map[string]string `json:"arguments"`
-	Output    string            `json:"output,omitempty"`
-	// Card: the want this step brought the robot to, shown under its words.
-	Card *robotCard `json:"card,omitempty"`
-	// Done: run against this server already. A step posted without it is
-	// run when the turn arrives.
-	Done bool   `json:"done"`
-	At   string `json:"at,omitempty"`
-}
+// robotStep is want-spec's RobotStep: one tool run.
+type robotStep = ws.RobotStep
 
 type robotTurn struct {
-	ID         string   `json:"id"`
-	Question   string   `json:"question"`
+	ID         string      `json:"id"`
+	Question   string      `json:"question"`
 	Steps      []robotStep `json:"steps"`
-	Answer     string   `json:"answer,omitempty"`
-	Error      string   `json:"error,omitempty"`
-	StartedAt  string   `json:"started_at"`
-	FinishedAt string   `json:"finished_at,omitempty"`
+	Answer     string      `json:"answer,omitempty"`
+	Error      string      `json:"error,omitempty"`
+	StartedAt  string      `json:"started_at"`
+	FinishedAt string      `json:"finished_at,omitempty"`
 	// Where the answering model ran: "device" for one elsewhere, "robot" for
 	// the Mac's own (fmtool).
 	By string `json:"by,omitempty"`

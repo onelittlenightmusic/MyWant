@@ -1,0 +1,341 @@
+openapi: 3.0.3
+info:
+  title: MyWant Thing Schema
+  description: |
+    OpenAPI specification for a MyWant thing — one value the city remembers
+    (a station, a place, a date, …): what a parameter with a subType records
+    when a person types into it (want-type-spec.yaml's recordThing), and what
+    a character picks up and throws on the board. Kept by the backend in its
+    thing store, and read back with everything derived about it:
+
+      GET    /api/v1/things                    ThingList
+      POST   /api/v1/things                    ThingWrite → the ThingEntry made
+      DELETE /api/v1/things?ids=a,b            ThingsDeleted
+      GET    /api/v1/things/{id}               ThingFull
+      PATCH  /api/v1/things/{id}               ThingWrite (either field) →
+      PUT    /api/v1/things/{id}                 refiled or renamed, still the
+                                                 same thing (PUT is PATCH)
+      DELETE /api/v1/things/{id}
+      POST   /api/v1/things/{id}/labels        ThingLabelWrite — one put on
+      PATCH  /api/v1/things/{id}/labels        ThingLabelsPatch → ThingLabels
+      DELETE /api/v1/things/{id}/labels/{key}
+      POST   /api/v1/things/export[?ids=a,b]   YAML: [ThingExport, ...]
+      POST   /api/v1/things/import             YAML (or JSON): [ThingExport, ...]
+                                               → ThingsImported
+
+    Import matches each by catalog and value: one already there keeps its
+    id (an id in the file is not used), and the labels given are laid on it.
+
+    A thing's labels are read with it (GET /things, GET /things/{id}). Its
+    picture-url label, put on by POST or by PATCH's set, has the words in
+    the picture read.
+
+    A thing's id is its identity: it survives its catalog and its value
+    changing, and everything pointing at it (where it sits on the board, which
+    constellation it joined — constellation-spec.yaml) is keyed by it.
+  version: 1.0.0
+  contact:
+    name: MyWant
+    url: https://github.com/onelittlenightmusic/MyWant
+
+paths: {}
+
+components:
+  schemas:
+    ThingEntry:
+      type: object
+      description: One thing as the store keeps it.
+      required:
+        - id
+        - catalog
+        - value
+      properties:
+        id:
+          type: string
+          description: Its identity, made once when it is added.
+          pattern: '^thg-'
+          example: "thg-3f2a9c1e-8b4d-4e7a-9c21-5d6f7a8b9c0d"
+        catalog:
+          type: string
+          description: |
+            What it is filed under — the catalog key of its subtype (a
+            subType's plural: station → stations).
+          example: "stations"
+        value:
+          type: string
+          description: What it is called — what is shown for it.
+          example: "渋谷"
+        createdAt:
+          type: string
+          format: date-time
+          description: |
+            When it was added (RFC 3339). Things added before this was kept
+            have none; their place in the store still says which came first
+            (ThingFull.addedOrder).
+      additionalProperties: false
+
+    ThingWrite:
+      type: object
+      description: |
+        The body of POST /things (both required) and PATCH /things/{id}
+        (either). catalog may be given as the catalog key ("stations") or as
+        the subtype ("station").
+      properties:
+        catalog:
+          type: string
+          example: "stations"
+        value:
+          type: string
+          example: "渋谷"
+      additionalProperties: false
+
+    ThingFull:
+      type: object
+      description: One thing as it is read — the entry and what is derived about it.
+      required:
+        - id
+        - catalog
+        - subtype
+        - value
+        - addedOrder
+        - icon
+        - color
+      properties:
+        id:
+          type: string
+          description: The entry's id (ThingEntry.id).
+          example: "thg-3f2a9c1e-8b4d-4e7a-9c21-5d6f7a8b9c0d"
+        catalog:
+          type: string
+          example: "stations"
+        subtype:
+          type: string
+          description: The subType its catalog is the catalog of.
+          example: "station"
+        value:
+          type: string
+          example: "渋谷"
+        addedOrder:
+          type: integer
+          minimum: 0
+          description: |
+            Its place among all things in the order they were added, 0 the
+            first. With createdAt, sorts newest first.
+        createdAt:
+          type: string
+          format: date-time
+        icon:
+          type: string
+          description: Its subtype's icon.
+        color:
+          type: string
+          description: Its subtype's colour.
+        background:
+          type: string
+          description: Its subtype's picture name, for a subtype that has one.
+        definitions:
+          type: array
+          description: The names given to this value, by every character.
+          items:
+            $ref: '#/components/schemas/ThingDefinition'
+        stats:
+          $ref: '#/components/schemas/ThingStats'
+        wantIDs:
+          type: array
+          description: The live wants naming this value right now.
+          items:
+            type: string
+        listWantIDs:
+          type: array
+          description: |
+            Those of wantIDs that name it as one of several — a stop on a
+            route rather than either end. The board draws those dashed.
+          items:
+            type: string
+        labels:
+          type: object
+          description: |
+            Its labels (/things/{id}/labels). Constellations ride on
+            constellation/<name> keys (constellation-spec.yaml).
+          additionalProperties:
+            type: string
+      additionalProperties: false
+
+    ThingList:
+      type: object
+      description: GET /things.
+      required:
+        - things
+      properties:
+        things:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThingFull'
+      additionalProperties: false
+
+    ThingDefinition:
+      type: object
+      description: One name given to a value, by one character, from one want.
+      required:
+        - catalog
+        - subtype
+        - name
+        - at
+      properties:
+        catalog:
+          type: string
+        subtype:
+          type: string
+        name:
+          type: string
+        value:
+          description: What the name stands for, when it is more than the name.
+        at:
+          type: string
+          format: date-time
+        characterId:
+          type: string
+        characterName:
+          type: string
+        wantId:
+          type: string
+        wantType:
+          type: string
+      additionalProperties: false
+
+    ThingStats:
+      type: object
+      description: How a value has been used (the backend's MemoStat).
+      required:
+        - count
+        - lastUsed
+        - topWantTypes
+      properties:
+        count:
+          type: integer
+          description: Number of recorded uses.
+        lastUsed:
+          type: string
+          format: date-time
+        topWantTypes:
+          type: array
+          description: The most-used want types, most first (up to 3).
+          items:
+            $ref: '#/components/schemas/WantTypeCount'
+      additionalProperties: false
+
+    WantTypeCount:
+      type: object
+      required:
+        - type
+        - count
+      properties:
+        type:
+          type: string
+        count:
+          type: integer
+      additionalProperties: false
+
+    ThingLabelWrite:
+      type: object
+      description: |
+        The body of POST /things/{id}/labels — one label put on. A
+        picture-url label has the words in the picture read.
+      required:
+        - key
+      properties:
+        key:
+          type: string
+          example: "picture"
+        value:
+          type: string
+      additionalProperties: false
+
+    ThingsDeleted:
+      type: object
+      description: DELETE /things?ids=a,b.
+      properties:
+        deleted:
+          type: array
+          description: The ids deleted.
+          items:
+            type: string
+        missing:
+          type: array
+          description: The ids asked for that were not there.
+          items:
+            type: string
+      additionalProperties: false
+
+    ThingExport:
+      type: object
+      description: |
+        One thing as written out by POST /things/export and read back in by
+        POST /things/import: its entry and its labels.
+      required:
+        - catalog
+        - value
+      properties:
+        id:
+          type: string
+          description: Written out; on import, not used — a thing is matched by catalog and value.
+        catalog:
+          type: string
+          description: The catalog key, or on import the subtype.
+          example: "stations"
+        value:
+          type: string
+          example: "渋谷"
+        createdAt:
+          type: string
+          format: date-time
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+      additionalProperties: false
+
+    ThingsImported:
+      type: object
+      description: POST /things/import.
+      properties:
+        imported:
+          type: array
+          description: The ids of the things imported, in the file's order.
+          items:
+            type: string
+      additionalProperties: false
+
+    ThingLabelsPatch:
+      type: object
+      description: |
+        The body of PATCH /things/{id}/labels — several labels put on and
+        taken off at once, told as one change. A picture-url in set has the
+        words in the picture read.
+      properties:
+        set:
+          type: object
+          description: Labels put on, replacing a value already there.
+          additionalProperties:
+            type: string
+        remove:
+          type: array
+          description: Keys taken off.
+          items:
+            type: string
+      additionalProperties: false
+
+    ThingLabels:
+      type: object
+      description: PATCH /things/{id}/labels — the thing's labels after the change, all of them.
+      required:
+        - id
+        - labels
+      properties:
+        id:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+      additionalProperties: false

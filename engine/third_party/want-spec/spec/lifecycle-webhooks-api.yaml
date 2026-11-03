@@ -1,0 +1,322 @@
+openapi: "3.0.3"
+info:
+  title: mywant Lifecycle Webhooks API
+  version: "1.0"
+  description: |
+    The lifecycle webhooks API allows external systems to subscribe to want lifecycle
+    events (creation, achievement) and react to them.
+
+    Two subscription models are provided:
+
+    ## 1. Unfiltered webhooks (simple)
+    Register an endpoint URL; mywant POSTs every lifecycle event to it.
+    The recipient is responsible for filtering.
+
+      POST /api/v1/lifecycle-webhooks
+      DELETE /api/v1/lifecycle-webhooks/{id}
+
+    ## 2. Filtered rules (admission-webhook style)
+    Register a rule with match criteria; mywant only calls the endpoint when the
+    criteria are satisfied.  The rule's metadata is forwarded in the payload so
+    the recipient can embed action instructions without maintaining its own state.
+
+      POST /api/v1/lifecycle-webhooks/rules
+      GET  /api/v1/lifecycle-webhooks/rules
+      DELETE /api/v1/lifecycle-webhooks/rules/{id}
+
+    ### Want type: rpg_hook
+    The `rpg_hook` want type wraps the filtered rule API.  Deploying the want
+    registers a rule; deleting the want removes it.  This makes hook lifecycle
+    visible on the canvas and self-cleaning.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local mywant server
+
+paths:
+
+  # ── Unfiltered webhooks ────────────────────────────────────────────────────
+
+  /lifecycle-webhooks:
+    post:
+      summary: Register an unfiltered webhook endpoint
+      description: |
+        Registers a URL to receive all lifecycle events (want_created, want_achieved).
+        All events are forwarded without filtering.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  description: HTTP endpoint to POST lifecycle events to
+                  example: "http://localhost:7100/api/v1/hooks/mywant"
+      responses:
+        "201":
+          description: Webhook registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Webhook ID (use to delete)
+                  url:
+                    type: string
+
+    get:
+      summary: List registered unfiltered webhooks
+      responses:
+        "200":
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  webhooks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LifecycleWebhookConfig'
+
+  /lifecycle-webhooks/{id}:
+    delete:
+      summary: Remove an unfiltered webhook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Removed
+        "404":
+          description: Not found
+
+  # ── Filtered rules ─────────────────────────────────────────────────────────
+
+  /lifecycle-webhooks/rules:
+    post:
+      summary: Register a filtered lifecycle rule
+      description: |
+        Registers a rule that matches specific lifecycle events by want type, owner,
+        name, or labels.  Only matching events are forwarded to target_url.
+
+        The `metadata` field is forwarded as-is in the `rule.metadata` payload field.
+        This lets the recipient (e.g. RPG server) embed action instructions inside
+        the rule itself, without maintaining separate state.
+
+        ### Payload sent to target_url
+
+        ```json
+        {
+          "event": "want_created",
+          "want": {
+            "id": "want-xxx",
+            "name": "reminder-instance",
+            "type": "reminder",
+            "status": "reaching",
+            "owner_references": [{ "name": "wife-target", "controller": true }]
+          },
+          "rule": {
+            "id": "rule-yyy",
+            "metadata": {
+              "activate": "wife_remind_created",
+              "skip_if_achievement": "wife_remind_created",
+              "run": ["mywant-gui say '妻のリマインダーが加わった。'"]
+            }
+          }
+        }
+        ```
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleWebhookRuleInput'
+            examples:
+              wife-reminder-hook:
+                summary: Fire when a reminder want is created under wife-target
+                value:
+                  event: want_created
+                  match:
+                    type: reminder
+                    owner: wife-target
+                  target_url: "http://localhost:7100/api/v1/hooks/mywant"
+                  metadata:
+                    activate: wife_remind_created
+                    skip_if_achievement: wife_remind_created
+                    run:
+                      - "mywant-gui say '妻のリマインダーが加わった。' --duration 4"
+              wife-chain-complete-hook:
+                summary: Fire when the reminder under wife-target achieves
+                value:
+                  event: want_achieved
+                  match:
+                    type: reminder
+                    owner: wife-target
+                  target_url: "http://localhost:7100/api/v1/hooks/mywant"
+                  metadata:
+                    activate: wife_target
+                    skip_if_achievement: wife_rescued
+                    require_achievements: []
+                    run:
+                      - "mywant-gui say '妻の手配完了。' --duration 4"
+      responses:
+        "201":
+          description: Rule registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Rule ID (use to delete)
+        "400":
+          description: Missing required fields (event or target_url)
+
+    get:
+      summary: List registered filtered rules
+      responses:
+        "200":
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LifecycleWebhookRule'
+
+  /lifecycle-webhooks/rules/{id}:
+    delete:
+      summary: Remove a filtered rule
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Removed
+        "404":
+          description: Rule not found
+
+components:
+  schemas:
+
+    LifecycleWebhookConfig:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+
+    LifecycleRuleMatch:
+      type: object
+      description: Match criteria — all specified fields must match (AND logic)
+      properties:
+        type:
+          type: string
+          description: Want type (e.g. "reminder", "weather")
+        owner:
+          type: string
+          description: Controller ownerReference name (e.g. "wife-target")
+        name:
+          type: string
+          description: Exact want name
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Label key/value pairs that must all be present
+
+    LifecycleWebhookRuleInput:
+      type: object
+      required: [event, target_url]
+      properties:
+        event:
+          type: string
+          enum: [want_created, want_achieved, want_deleted]
+          description: Lifecycle event to subscribe to
+        match:
+          $ref: '#/components/schemas/LifecycleRuleMatch'
+        target_url:
+          type: string
+          description: HTTP endpoint to POST matching events to
+        metadata:
+          type: object
+          additionalProperties: true
+          description: |
+            Arbitrary key/value pairs forwarded to target_url as `rule.metadata`.
+            For RPG integration, standard keys are:
+            - activate (string): RPG achievement ID to fire
+            - skip_if_achievement (string): skip if this achievement is already set
+            - require_achievements (array of string): all must be set before firing
+            - run (array of string): shell commands for RPG to execute
+
+    LifecycleWebhookRule:
+      allOf:
+        - $ref: '#/components/schemas/LifecycleWebhookRuleInput'
+        - type: object
+          properties:
+            id:
+              type: string
+              description: Unique rule ID assigned by mywant
+
+    LifecycleWebhookPayload:
+      type: object
+      description: JSON body POSTed to target_url (or unfiltered endpoint) when a rule fires
+      properties:
+        event:
+          type: string
+          example: want_created
+        want:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+            status:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+            owner_references:
+              type: array
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  id:
+                    type: string
+                  controller:
+                    type: boolean
+            final_result:
+              description: Final result value if want has achieved
+        rule:
+          type: object
+          nullable: true
+          description: Present only for filtered rule notifications
+          properties:
+            id:
+              type: string
+            metadata:
+              type: object
+              additionalProperties: true

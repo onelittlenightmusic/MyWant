@@ -36,72 +36,26 @@ package server
 //	DELETE /api/v1/acts/{name}         its record let go — what it did on the
 //	                                   board stays done
 //
-// Kept in memory, the latest actsKept.
+// The document is want-spec's Act (types_act.go, spec/act-spec.yaml); where
+// it is kept, robot_resources.go — written again at each step, so it is there
+// after a restart (Failed, if the restart caught it unfinished).
 
 import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
-const (
-	actsKept   = 200
-	actWaitMax = 120 * time.Second
-)
-
-const (
-	actPending   = "Pending"
-	actRunning   = "Running"
-	actSucceeded = "Succeeded"
-	actFailed    = "Failed"
-)
-
-type actSpec struct {
-	Plan   string `json:"plan" yaml:"plan"`
-	Turn   string `json:"turn,omitempty" yaml:"turn,omitempty"`
-	Locale string `json:"locale,omitempty" yaml:"locale,omitempty"`
-}
-
-type actStatus struct {
-	Phase          string       `json:"phase" yaml:"phase"`
-	StartTime      string       `json:"startTime,omitempty" yaml:"startTime,omitempty"`
-	CompletionTime string       `json:"completionTime,omitempty" yaml:"completionTime,omitempty"`
-	Steps          []robotStep  `json:"steps" yaml:"steps"`
-	Cards          []*robotCard `json:"cards" yaml:"cards"`
-	Prompt         string       `json:"prompt,omitempty" yaml:"prompt,omitempty"`
-	Message        string       `json:"message,omitempty" yaml:"message,omitempty"`
-}
-
-type actDoc struct {
-	APIVersion string       `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string       `json:"kind" yaml:"kind"`
-	Metadata   resourceMeta `json:"metadata" yaml:"metadata"`
-	Spec       actSpec      `json:"spec" yaml:"spec"`
-	Status     actStatus    `json:"status" yaml:"status"`
-}
-
-type actEntry struct {
-	doc  actDoc
-	done chan struct{} // closed when the act has finished
-}
-
-var actStore struct {
-	mu   sync.Mutex
-	list []*actEntry // oldest first
-}
-
-func (d *actDoc) finished() bool {
-	return d.Status.Phase == actSucceeded || d.Status.Phase == actFailed
-}
+const actWaitMax = 120 * time.Second
 
 func actNamed(name string) (*actEntry, bool) {
-	actStore.mu.Lock()
-	defer actStore.mu.Unlock()
-	for _, a := range actStore.list {
+	lockRobotRes()
+	defer robotRes.mu.Unlock()
+	for _, a := range robotRes.acts {
 		if a.doc.Metadata.Name == name {
 			return a, true
 		}
@@ -109,31 +63,38 @@ func actNamed(name string) (*actEntry, bool) {
 	return nil, false
 }
 
-// snapshot is the act as it stands, copied out from under the lock.
-func (a *actEntry) snapshot() actDoc {
-	actStore.mu.Lock()
-	defer actStore.mu.Unlock()
+// snapshotLocked is the act as it stands, copied (robotRes.mu held).
+func (a *actEntry) snapshotLocked() ws.Act {
 	d := a.doc
-	d.Status.Steps = append([]robotStep{}, a.doc.Status.Steps...)
-	d.Status.Cards = append([]*robotCard{}, a.doc.Status.Cards...)
+	d.Status.Steps = append([]ws.RobotStep{}, a.doc.Status.Steps...)
+	d.Status.Cards = append([]*ws.RobotCard{}, a.doc.Status.Cards...)
 	return d
 }
 
-func (a *actEntry) update(f func(d *actDoc)) {
-	actStore.mu.Lock()
+// snapshot is the act as it stands, copied out from under the lock.
+func (a *actEntry) snapshot() ws.Act {
+	robotRes.mu.Lock()
+	defer robotRes.mu.Unlock()
+	return a.snapshotLocked()
+}
+
+// update changes the act and writes it.
+func (a *actEntry) update(f func(d *ws.Act)) {
+	robotRes.mu.Lock()
 	f(&a.doc)
-	actStore.mu.Unlock()
+	robotRes.mu.Unlock()
+	a.save()
 }
 
 // POST /api/v1/acts
 func (s *Server) handleActCreate(w http.ResponseWriter, r *http.Request) {
-	var doc actDoc
+	var doc ws.Act
 	if err := readDoc(r, &doc); err != nil {
 		http.Error(w, "bad act: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	if doc.Kind != "" && doc.Kind != "Act" {
-		http.Error(w, "kind must be Act", http.StatusBadRequest)
+	if doc.Kind != "" && doc.Kind != ws.ActKind {
+		http.Error(w, "kind must be "+ws.ActKind, http.StatusBadRequest)
 		return
 	}
 	plan, ok := planNamed(doc.Spec.Plan)
@@ -142,16 +103,16 @@ func (s *Server) handleActCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	doc.APIVersion, doc.Kind = resourceAPIVersion, "Act"
-	doc.Metadata = resourceMeta{Name: fmt.Sprintf("act-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
-	doc.Status = actStatus{Phase: actPending, Steps: []robotStep{}, Cards: []*robotCard{}}
+	doc.APIVersion, doc.Kind = ws.ResourceAPIVersion, ws.ActKind
+	doc.Metadata = ws.ResourceMeta{Name: fmt.Sprintf("act-%d", now.UnixNano()), CreatedAt: now.Format(time.RFC3339)}
+	doc.Status = ws.ActStatus{Phase: ws.ActPending, Steps: []ws.RobotStep{}, Cards: []*ws.RobotCard{}}
 	a := &actEntry{doc: doc, done: make(chan struct{})}
-	actStore.mu.Lock()
-	actStore.list = append(actStore.list, a)
-	if len(actStore.list) > actsKept {
-		actStore.list = actStore.list[len(actStore.list)-actsKept:]
-	}
-	actStore.mu.Unlock()
+	lockRobotRes()
+	robotRes.acts = append(robotRes.acts, a)
+	plans, acts := pruneRobotResLocked(now)
+	robotRes.mu.Unlock()
+	removeRobotRes(plans, acts)
+	a.save()
 
 	go s.runAct(a, plan.Spec)
 
@@ -161,20 +122,20 @@ func (s *Server) handleActCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // runAct carries the plan out, writing the act's status as it goes.
-func (s *Server) runAct(a *actEntry, plan planSpec) {
+func (s *Server) runAct(a *actEntry, plan ws.PlanSpec) {
 	defer close(a.done)
 	defer func() {
 		if p := recover(); p != nil {
-			a.update(func(d *actDoc) {
-				d.Status.Phase = actFailed
+			a.update(func(d *ws.Act) {
+				d.Status.Phase = ws.ActFailed
 				d.Status.Message = fmt.Sprint(p)
 				d.Status.CompletionTime = time.Now().Format(time.RFC3339)
 			})
 		}
 	}()
 	spec := a.snapshot().Spec
-	a.update(func(d *actDoc) {
-		d.Status.Phase = actRunning
+	a.update(func(d *ws.Act) {
+		d.Status.Phase = ws.ActRunning
 		d.Status.StartTime = time.Now().Format(time.RFC3339)
 	})
 	seen := map[string]bool{}
@@ -183,7 +144,7 @@ func (s *Server) runAct(a *actEntry, plan planSpec) {
 		Kind: plan.Action, Ref: plan.Target, Capability: plan.Capability,
 		Type: plan.Type, Params: plan.Params,
 	}, func(st robotStep) {
-		a.update(func(d *actDoc) {
+		a.update(func(d *ws.Act) {
 			d.Status.Steps = append(d.Status.Steps, st)
 			if st.Card != nil && !seen[st.Card.ID] {
 				seen[st.Card.ID] = true
@@ -191,8 +152,8 @@ func (s *Server) runAct(a *actEntry, plan planSpec) {
 			}
 		})
 	})
-	a.update(func(d *actDoc) {
-		d.Status.Phase = actSucceeded
+	a.update(func(d *ws.Act) {
+		d.Status.Phase = ws.ActSucceeded
 		d.Status.Prompt = prompt
 		d.Status.CompletionTime = time.Now().Format(time.RFC3339)
 	})
@@ -201,17 +162,13 @@ func (s *Server) runAct(a *actEntry, plan planSpec) {
 // GET /api/v1/acts
 func (s *Server) handleActList(w http.ResponseWriter, r *http.Request) {
 	limit := listLimit(r, actsKept)
-	actStore.mu.Lock()
-	entries := make([]*actEntry, 0, limit)
-	for i := len(actStore.list) - 1; i >= 0 && len(entries) < limit; i-- {
-		entries = append(entries, actStore.list[i])
+	lockRobotRes()
+	out := ws.ActList{Acts: make([]ws.Act, 0, limit)}
+	for i := len(robotRes.acts) - 1; i >= 0 && len(out.Acts) < limit; i-- {
+		out.Acts = append(out.Acts, robotRes.acts[i].snapshotLocked())
 	}
-	actStore.mu.Unlock()
-	out := make([]actDoc, len(entries))
-	for i, a := range entries {
-		out[i] = a.snapshot()
-	}
-	writeDoc(w, r, http.StatusOK, map[string]any{"acts": out})
+	robotRes.mu.Unlock()
+	writeDoc(w, r, http.StatusOK, &out)
 }
 
 // GET /api/v1/acts/{name}[?wait=<seconds>]
@@ -240,14 +197,17 @@ func (s *Server) handleActGet(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/v1/acts/{name}
 func (s *Server) handleActDelete(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
-	actStore.mu.Lock()
-	defer actStore.mu.Unlock()
-	for i, a := range actStore.list {
+	lockRobotRes()
+	for i, a := range robotRes.acts {
 		if a.doc.Metadata.Name == name {
-			actStore.list = append(actStore.list[:i], actStore.list[i+1:]...)
+			robotRes.acts = append(robotRes.acts[:i], robotRes.acts[i+1:]...)
+			a.deleted = true
+			robotRes.mu.Unlock()
+			removeRobotRes(nil, []*actEntry{a})
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 	}
+	robotRes.mu.Unlock()
 	http.Error(w, "no act "+name, http.StatusNotFound)
 }

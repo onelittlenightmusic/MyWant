@@ -72,6 +72,10 @@ make release                                        # Build CLI only
 ./bin/mywant world list|open|save|export|import        # named snapshots of all wants
 ./bin/mywant state global get|set|delete|clear         # moved here from `thing`
 
+# Robot plans / acts (want-spec Plan / Act; kept in ~/.mywant/plans, acts)
+./bin/mywant plans list|get|create -f|delete
+./bin/mywant acts  list|get|create -f|delete|wait <name>|run -f plan.yaml
+
 # System
 ./bin/mywant types/agents/capabilities list
 ./bin/mywant logs
@@ -134,7 +138,7 @@ description: "Luxury hotel bookings with automated upgrades."
 
 ## System Directories
 
-**`~/.mywant/`** - config.yaml • server.pid/log • agent-service.pid/port/log • flight-server.log
+**`~/.mywant/`** - config.yaml • plans/ & acts/ (robot Plan/Act, one YAML each) • server.pid/log • agent-service.pid/port/log • flight-server.log
 
 **Customs (`mywant custom`):** `customs.yaml` (registry) • `customs/<name>/` (store) → linked into `custom-types/` • `design-plugin/` • `recipes/` • `icons/`
 Logic lives in `engine/core/custom_store.go` (shared by CLI and server); API in `engine/server/handlers_customs.go` (`/api/v1/customs`). Remote contexts install onto the server's machine.
