@@ -1,0 +1,30 @@
+name: Python SDK to TestPyPI
+
+# The `mywant` Python package (client-py/, its code in engine/core/pysdk).
+# A wheel only: client-py points at the engine's directory, which an sdist
+# built on its own would not have.
+on:
+  push:
+    tags:
+      - 'pysdk-v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Test
+        run: cd client-py && python -m unittest discover -s tests -v
+      - name: Build the wheel
+        run: |
+          pip install --upgrade build
+          python -m build --wheel --outdir dist client-py
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
