@@ -73,6 +73,8 @@ github.com/onelittlenightmusic/want-spec v0.1.28 h1:8X2+VBDuAVzF+NWZ3+/KJ7X8z8dR
 github.com/onelittlenightmusic/want-spec v0.1.28/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104124316-bde4e6a00aa4 h1:aKgwsjqdYmTbGp/lMm5Lhbt0oHToOQ8oQwgLrGHX9pQ=
 github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104124316-bde4e6a00aa4/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
+github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104125358-1c42c36c4531 h1:++u/SKh/eMQb+BMoyqwRKT+eu7jlcL3R8Etv6xHEC/I=
+github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104125358-1c42c36c4531/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/pelletier/go-toml/v2 v2.2.4 h1:mye9XuhQ6gvn5h28+VilKrrPoQVanw5PMw/TB0t5Ec4=
 github.com/pelletier/go-toml/v2 v2.2.4/go.mod h1:2gIqNv+qfxSVS7cM2xJQKtLSTLUE9V8t9Stt+h56mCY=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=

@@ -29,7 +29,7 @@ question, declared and nothing done yet. An act carries one out.
   kind: Plan
   spec:
     question: 最新のゴルフのスコアは？
-    action: existing          # existing | new | none | previous
+    action: existing          # existing | new | none
     target: smartgolf-check-reserved-instance
     capability: rounds        # existing: what is asked of the want
     type: ""                  # new: the type to make

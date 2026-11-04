@@ -46,6 +46,9 @@ const (
 type planBriefRequest struct {
 	Question string `json:"question"`
 	Locale   string `json:"locale"`
+	// Turn is the turn being answered, when the client has opened one: what
+	// was said before it is part of the brief (plan_earlier.go).
+	Turn string `json:"turn,omitempty"`
 }
 
 type planBriefResponse struct {
@@ -57,8 +60,8 @@ type planBriefResponse struct {
 	// first, "-", is just to show it.
 	Capabilities []string `json:"capabilities"`
 	// Actions are the actions to choose from (want-spec's PlanActions):
-	// existing, new, none, previous. A client offers these rather than its
-	// own list, so an action added here needs no new app.
+	// existing, new, none. A client offers these rather than its own list,
+	// so an action added here needs no new app.
 	Actions []string `json:"actions"`
 }
 
@@ -76,7 +79,7 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	brief, err := s.planBrief(req.Question, req.Locale)
+	brief, err := s.planBrief(req.Question, req.Locale, req.Turn)
 	if err != nil {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
@@ -84,11 +87,15 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 	robotWriteJSON(w, brief)
 }
 
-func (s *Server) planBrief(question, locale string) (planBriefResponse, error) {
+func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, error) {
 	cands, err := s.candidatesFor(question)
 	if err != nil {
 		return planBriefResponse{}, err
 	}
+	// What was said just before, and the wants it showed, first among the
+	// candidates (plan_earlier.go).
+	earlier := s.earlierInConversation(turn, question)
+	cands = withEarlierFirst(cands, earlier)
 	allTypes, err := s.robotTypeNames()
 	if err != nil {
 		return planBriefResponse{}, err
@@ -97,11 +104,11 @@ func (s *Server) planBrief(question, locale string) (planBriefResponse, error) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", question)
+	b.WriteString(earlierText(earlier))
 	b.WriteString("You answer with the board: show a want or thing already there that answers it, or make a want that will. Decide which:\n")
 	b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not. When the question asks a want for something it can do or look up (below, and on its line), choose it as ref and that as capability; just to show it, capability -.\n")
 	b.WriteString("- new: nothing below answers it, and a type can make a want that will — choose the type.\n")
-	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n")
-	b.WriteString("- previous: it is about something from earlier in this conversation that it does not name — choose as type the type of what it was about (- if you cannot tell), and as capability what to ask of it.\n\n")
+	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n\n")
 	// A candidate's type's own capabilities, on its line.
 	ownCaps := map[string][]string{}
 	var capNames []string
@@ -344,6 +351,9 @@ type planParamsRequest struct {
 	Question string `json:"question"`
 	Type     string `json:"type"`
 	Locale   string `json:"locale"`
+	// Turn is the turn being answered, as for the brief: what was said
+	// before it may fill what this question leaves out (「同じルートで明日」).
+	Turn string `json:"turn,omitempty"`
 }
 
 type planParam struct {
@@ -385,7 +395,8 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 	if h := planHint(robotTypeHint(resp.Metadata.Labels)); h != "" {
 		b.WriteString(h + "\n")
 	}
-	b.WriteString("Fill its parameters from what the person said. Leave a parameter empty when they did not say it — never make a value up.\n")
+	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question)))
+	b.WriteString("Fill its parameters from what the person said — and, when they refer to what was said earlier, from that. Leave a parameter empty when it was not said — never make a value up.\n")
 	var params []planParam
 	for i, p := range resp.Parameters {
 		if i == 10 {
