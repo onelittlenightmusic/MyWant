@@ -1,20 +1,24 @@
 package server
 
-// plan_earlier.go — what was said just before, in the brief a plan is made from.
+// plan_earlier.go — what was asked just before, in the brief a plan is made from.
 //
-// 「乗り換えを再検索して」 names nothing on the board: it means the route shown
-// a moment ago. So the brief (plan.go) carries the conversation's last turns,
-// a line each — what was asked and the wants it showed, with what they were
-// asked:
+// 「乗り換えを再検索して」 names nothing: it means the route asked about a
+// moment ago. So the brief (plan.go) carries the conversation's last
+// questions, a line each, and — faintly, after it — the wants that turn
+// showed:
 //
-//	Said earlier in this conversation (only when the question is about it):
-//	- 「中野坂上から大森の乗り換え」 → transit_search-2131 (from=中野坂上, to=大森)
+//	Asked earlier in this conversation (only when the question is about it):
+//	- 「中野坂上から大森の乗り換え」 (shown then, maybe not right: transit_search-2118)
 //
-// and those wants come first among the candidates. The model that plans reads
-// the question and decides whether it is about them — an existing plan on
-// transit_search-2131 asking restart — as it decides everything else; nothing
-// here reads the question for words like 再検索. A line or two, not the
-// turns' answers: the brief is read by a small model with a small window.
+// The question is what is carried. What was done for it was a small model's
+// choice and often wrong (that turn showed the route to 銀座), so the want is
+// named only so it can be chosen, without its parameters, and it is not put
+// first among the candidates. The model that plans reads the question and
+// what was asked before it and decides again — here, a new route from 中野坂上
+// to 大森, its parameters filled from the question before (/plans/params
+// carries the same lines). Nothing here reads the question for words like
+// 再検索. A line a turn, not the turns' answers: the brief is read by a small
+// model with a small window.
 //
 // The turns are the robot's (turns.go), kept for every device that talks to
 // it. Which are "before": those before the turn being answered, when the
@@ -29,22 +33,23 @@ import (
 )
 
 const (
-	planEarlierTurns  = 2                // turns carried into the brief
-	planEarlierWants  = 2                // wants named per turn
+	planEarlierTurns  = 2                // questions carried into the brief
+	planEarlierWants  = 2                // wants named, faintly, per question
 	planEarlierWindow = 30 * time.Minute // older than this, not this conversation
 )
 
-// planEarlier is one earlier turn, as the brief carries it.
+// planEarlier is one earlier turn, as the brief carries it: its question,
+// and the wants it showed that are still on the board.
 type planEarlier struct {
 	question string
 	wants    []robotWant
 }
 
 // earlierTurns picks, from turns (oldest first, as kept), the last
-// planEarlierTurns before the turn being answered that showed a want still
-// among wants — newest first. current is that turn's id, or "" when the client
-// did not say: then the newest turn, asking question, is the one being
-// answered.
+// planEarlierTurns questions before the turn being answered — newest first —
+// with the wants still among wants that each showed. current is that turn's
+// id, or "" when the client did not say: then the newest turn, asking
+// question, is the one being answered.
 func earlierTurns(turns []robotTurn, current, question string, wants []robotWant, now time.Time) []planEarlier {
 	byRef := map[string]robotWant{}
 	for _, w := range wants {
@@ -71,6 +76,10 @@ func earlierTurns(turns []robotTurn, current, question string, wants []robotWant
 		if at, err := time.Parse(time.RFC3339, t.StartedAt); err == nil && now.Sub(at) > planEarlierWindow {
 			break // older still, and older than this conversation
 		}
+		q := strings.TrimSpace(t.Question)
+		if q == "" {
+			continue
+		}
 		var cards []robotCard
 		cards = append(cards, t.Cards...)
 		for _, st := range t.Steps {
@@ -78,7 +87,7 @@ func earlierTurns(turns []robotTurn, current, question string, wants []robotWant
 				cards = append(cards, *st.Card)
 			}
 		}
-		e := planEarlier{question: t.Question}
+		e := planEarlier{question: q}
 		seen := map[string]bool{}
 		for _, c := range cards {
 			if c.Kind != "" && c.Kind != "want" {
@@ -94,9 +103,7 @@ func earlierTurns(turns []robotTurn, current, question string, wants []robotWant
 			seen[w.Metadata.Name] = true
 			e.wants = append(e.wants, w)
 		}
-		if len(e.wants) > 0 {
-			out = append(out, e)
-		}
+		out = append(out, e)
 	}
 	return out
 }
@@ -113,74 +120,52 @@ func (s *Server) earlierInConversation(current, question string) []planEarlier {
 	if len(turns) == 0 {
 		return nil
 	}
-	wants, err := s.robotWantList()
-	if err != nil {
-		return nil
-	}
+	wants, _ := s.robotWantList() // without them, the questions alone
 	return earlierTurns(turns, current, question, wants, time.Now())
 }
 
-// earlierText is the brief's lines for them, or "" for none.
+// earlierText is the brief's lines for them, or "" for none: each question,
+// and faintly after it the wants it showed, by name.
 func earlierText(earlier []planEarlier) string {
 	if len(earlier) == 0 {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString("Said earlier in this conversation (only when the question is about it):\n")
+	b.WriteString("Asked earlier in this conversation (only when the question is about it):\n")
 	for _, e := range earlier {
-		names := make([]string, len(e.wants))
-		for i, w := range e.wants {
-			names[i] = earlierWantText(w)
+		fmt.Fprintf(&b, "- 「%s」", e.question)
+		if len(e.wants) > 0 {
+			names := make([]string, len(e.wants))
+			for i, w := range e.wants {
+				names[i] = w.Metadata.Name
+			}
+			fmt.Fprintf(&b, " (shown then, maybe not right: %s)", strings.Join(names, ", "))
 		}
-		fmt.Fprintf(&b, "- 「%s」 → %s\n", e.question, strings.Join(names, ", "))
+		b.WriteString("\n")
 	}
 	b.WriteString("\n")
 	return b.String()
 }
 
-func earlierWantText(w robotWant) string {
-	if len(w.Spec.Params) == 0 {
-		return w.Metadata.Name
+// withEarlierWants adds the wants the earlier turns showed to the candidates,
+// after them, when they are not there already — so they may be chosen, not so
+// they are chosen first. At most planCandidates: an earlier want is the first
+// to give way.
+func withEarlierWants(cands []planCandidate, earlier []planEarlier) []planCandidate {
+	have := map[string]bool{}
+	for _, c := range cands {
+		have[c.name] = true
 	}
-	return w.Metadata.Name + " (" + robotParamsText(w.Spec.Params) + ")"
-}
-
-// withEarlierFirst puts the wants the earlier turns showed first among the
-// candidates — those already there moved up, the rest added — so they are
-// among the names the plan may choose. At most planCandidates.
-func withEarlierFirst(cands []planCandidate, earlier []planEarlier) []planCandidate {
-	if len(earlier) == 0 {
-		return cands
-	}
-	var out []planCandidate
-	placed := map[string]bool{}
+	out := cands
 	for _, e := range earlier {
 		for _, w := range e.wants {
-			if placed[w.Metadata.Name] {
+			if have[w.Metadata.Name] || len(out) >= planCandidates {
 				continue
 			}
-			placed[w.Metadata.Name] = true
-			c := planCandidate{name: w.Metadata.Name, want: true,
-				line: fmt.Sprintf("- %s: want %s", w.Metadata.Name, w.Metadata.Type)}
-			if len(w.Spec.Params) > 0 {
-				c.line += " (" + robotParamsText(w.Spec.Params) + ")"
-			}
-			for _, have := range cands {
-				if have.name == c.name {
-					c = have
-					break
-				}
-			}
-			out = append(out, c)
+			have[w.Metadata.Name] = true
+			out = append(out, planCandidate{name: w.Metadata.Name, want: true,
+				line: fmt.Sprintf("- %s: want %s, shown earlier in this conversation", w.Metadata.Name, w.Metadata.Type)})
 		}
-	}
-	for _, c := range cands {
-		if !placed[c.name] {
-			out = append(out, c)
-		}
-	}
-	if len(out) > planCandidates {
-		out = out[:planCandidates]
 	}
 	return out
 }

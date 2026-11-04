@@ -92,10 +92,10 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 	if err != nil {
 		return planBriefResponse{}, err
 	}
-	// What was said just before, and the wants it showed, first among the
-	// candidates (plan_earlier.go).
+	// What was asked just before (plan_earlier.go): its questions in the
+	// brief, the wants it showed among the candidates, last.
 	earlier := s.earlierInConversation(turn, question)
-	cands = withEarlierFirst(cands, earlier)
+	cands = withEarlierWants(cands, earlier)
 	allTypes, err := s.robotTypeNames()
 	if err != nil {
 		return planBriefResponse{}, err
