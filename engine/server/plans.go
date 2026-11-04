@@ -15,7 +15,7 @@ package server
 //	  labels: {device: iphone}    (kept as posted)
 //	spec:
 //	  question: 最新のゴルフのスコアは？
-//	  action: existing             # existing | new | none | previous
+//	  action: existing             # existing | new | none
 //	  target: smartgolf-check-reserved-instance
 //	  capability: rounds           # for existing: what is asked of it
 //	  type: ""                     # for new: the type to make
