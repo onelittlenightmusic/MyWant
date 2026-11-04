@@ -244,7 +244,11 @@ func (s *Server) candidatesFor(question string) ([]planCandidate, error) {
 	for _, i := range robotByGlossary(question, names, glossary) {
 		byGlossary[i] = true
 	}
+	typeCalled := robotTypeCalled(question, aliases)
 	for i, t := range tiles {
+		if thingIsAValue(t.cardKind, typeCalled) {
+			continue
+		}
 		sc := score(t.name, t.typ, paramsOf[t.name])
 		if byGlossary[i] {
 			sc += 2
@@ -279,6 +283,27 @@ func (s *Server) candidatesFor(question string) ([]planCandidate, error) {
 		out = out[:planCandidates]
 	}
 	return out, nil
+}
+
+// robotTypeCalled: the question calls a want type by one of its aliases
+// (「乗り換え」 for transit_search).
+func robotTypeCalled(question string, aliases map[string][]string) bool {
+	for _, a := range aliases {
+		if robotAliasScore(question, a) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// thingIsAValue: a thing on the board, when the question calls a type, is
+// not what answers it but a value for that type's want — 戸塚 in
+// 「中野坂上から戸塚への乗り換え」 is where the route goes, not the route. Offered
+// as a candidate, a small model chose it (existing, 戸塚) and the robot walked
+// to the station instead of searching the route. Things stay candidates for
+// a question that calls no type (「戸塚はどこ？」).
+func thingIsAValue(cardKind string, typeCalled bool) bool {
+	return cardKind != "want" && typeCalled
 }
 
 // robotNamePartSaid: a part of the name (split at の, spaces and dashes) of
