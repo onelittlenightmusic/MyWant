@@ -7,7 +7,9 @@ import FoundationModels
 ///
 ///   1. /api/v1/plans/brief   what on the board may answer it, the types that
 ///                            could make a want for it, what may be asked of a
-///                            want (its capabilities) — the model chooses
+///                            want (its capabilities), the actions — the model
+///                            chooses; previous (「乗り換えを再検索して」) is
+///                            found by the server in the earlier turns
 ///   2. /api/v1/plans/params  for a want to make: its parameters, filled from
 ///                            what was asked
 ///   3. POST /api/v1/plans    the decision kept as a Plan
@@ -30,10 +32,14 @@ func serverPlanned(question: String, turnID: String?, target: ServerTarget) asyn
     let refs = brief["refs"] as? [String] ?? ["-"]
     let types = brief["types"] as? [String] ?? ["-"]
     let caps = brief["capabilities"] as? [String] ?? []
+    // The actions to choose from, as the server offers them (want-spec's
+    // PlanActions: existing, new, none, previous); a server from before it
+    // said them offers the first three.
+    let actions = brief["actions"] as? [String] ?? ["existing", "new", "none"]
 
     var properties: [DynamicGenerationSchema.Property] = [
-        .init(name: "kind", description: "existing: show what is there; new: make a want; none: not about the board",
-              schema: DynamicGenerationSchema(name: "kind", anyOf: ["existing", "new", "none"])),
+        .init(name: "kind", description: "existing: show what is there; new: make a want; none: not about the board; previous: about something earlier in this conversation it does not name",
+              schema: DynamicGenerationSchema(name: "kind", anyOf: actions)),
         .init(name: "ref", description: "For existing: the name chosen; otherwise -",
               schema: DynamicGenerationSchema(name: "ref", anyOf: refs)),
     ]
@@ -41,7 +47,7 @@ func serverPlanned(question: String, turnID: String?, target: ServerTarget) asyn
         properties.append(.init(name: "capability", description: "For existing: what to ask of it, as listed; - to just show it",
                                 schema: DynamicGenerationSchema(name: "capability", anyOf: caps)))
     }
-    properties.append(.init(name: "type", description: "For new: the type to make; otherwise -",
+    properties.append(.init(name: "type", description: "For new: the type to make; for previous: the type of what it was about; otherwise -",
                             schema: DynamicGenerationSchema(name: "type", anyOf: types)))
     let decision = try GenerationSchema(root: DynamicGenerationSchema(name: "decision", properties: properties), dependencies: [])
     let decided = try await LanguageModelSession().respond(to: prompt, schema: decision).content

@@ -436,7 +436,7 @@ metadata:
   labels: {device: iphone}   # 送ったまま残る（name と createdAt はサーバーが付ける）
 spec:
   question: 最新のゴルフのスコアは？
-  action: existing          # existing | new | none
+  action: existing          # existing | new | none | previous
   target: smartgolf-check-reserved-instance
   capability: rounds
 ```
