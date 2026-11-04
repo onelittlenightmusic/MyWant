@@ -559,7 +559,14 @@ func (s *Server) updateCursor(w http.ResponseWriter, r *http.Request) {
 		MessageAt:   messageAt,
 	}
 	lastCursorPos[characterID] = cursors[characterID]
+	storyAt := cursors[characterID]
 	cursorsMu.Unlock()
+	// Where they are now, and what they said, into their story (story.go).
+	storySaid := ""
+	if isNewMessage {
+		storySaid = body.Message
+	}
+	s.storyCursor(characterID, storyAt.X, storyAt.Y, body.DeviceID, storySaid)
 
 	// The want bound to this character follows them, so the card is reachable
 	// from where they are. The same mover the robot has always used — it is

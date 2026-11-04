@@ -609,6 +609,11 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	log.Println("Shutting down components...")
 
+	// 0. What the characters did, written before the rest goes (story.go).
+	if err := story.flush(); err != nil {
+		log.Printf("[SERVER] Warning: story flush: %v\n", err)
+	}
+
 	// 1. Shutdown ChainBuilder (this triggers OnDelete for all wants)
 	if s.globalBuilder != nil {
 		s.globalBuilder.Shutdown()

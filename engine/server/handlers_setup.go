@@ -440,6 +440,8 @@ func (s *Server) setupRoutes() {
 	// Move a character to a cell — optionally asking first. The one place that
 	// answers "somebody should be over there", for the GUI's Call and the CLI's
 	// take alike. See handlers_character_summon.go.
+	// What the person playing it did on the board (story.go).
+	characters.HandleFunc("/{id}/story", s.getCharacterStory).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/summon", s.summonCharacter).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/summon/respond", s.respondToSummon).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")

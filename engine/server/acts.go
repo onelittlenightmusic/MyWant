@@ -125,6 +125,8 @@ func (s *Server) handleActCreate(w http.ResponseWriter, r *http.Request) {
 // runAct carries the plan out, writing the act's status as it goes.
 func (s *Server) runAct(a *actEntry, plan ws.PlanSpec) {
 	defer close(a.done)
+	// What the plan did, into the asker's story (story.go).
+	defer func() { story.actDone(a.snapshot(), plan) }()
 	defer func() {
 		if p := recover(); p != nil {
 			a.update(func(d *ws.Act) {

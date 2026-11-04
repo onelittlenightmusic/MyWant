@@ -44,6 +44,11 @@ type robotTurn struct {
 	Answer     string      `json:"answer,omitempty"`
 	Error      string      `json:"error,omitempty"`
 	StartedAt  string      `json:"started_at"`
+	// DeviceID and Character are who asked, when the client says: the
+	// device's own id (its character is the one it is assigned to) or the
+	// character itself. Whose story the turn is part of (story.go).
+	DeviceID  string `json:"deviceId,omitempty"`
+	Character string `json:"character,omitempty"`
 	FinishedAt string      `json:"finished_at,omitempty"`
 	// Where the answering model ran: "device" for one elsewhere, "robot" for
 	// the Mac's own (fmtool).
@@ -533,6 +538,11 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	// Into the asker's story (story.go): asked, and answered when posted whole.
+	story.ask(story.characterOf(turn.Character, turn.DeviceID, turn.Question, storyDeviceCharacter), turn.ID, turn.DeviceID, turn.Question)
+	if turn.FinishedAt != "" {
+		story.answer(turn.ID, turn.Cards, turn.Error != "")
+	}
 	log.Printf("[fm] turn %s: %q (%d steps)", turn.ID, firstLine(turn.Question, 80), len(turn.Steps))
 	robotWriteJSON(w, turn)
 }
@@ -585,6 +595,7 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 			types.RecordCCActivityDetail(robot, "error", firstLine(turn.Error, 120), turn.Error)
 		}
 	}
+	story.answer(turn.ID, turn.Cards, turn.Error != "")
 	log.Printf("[fm] turn %s answered: %q", turn.ID, firstLine(turn.Answer+turn.Error, 120))
 	robotWriteJSON(w, turn)
 }

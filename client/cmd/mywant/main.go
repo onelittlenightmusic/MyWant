@@ -47,6 +47,7 @@ func main() {
 	rootCmd.AddCommand(commands.ConstCmd)
 	rootCmd.AddCommand(commands.PlansCmd)
 	rootCmd.AddCommand(commands.ActsCmd)
+	rootCmd.AddCommand(commands.StoryCmd)
 
 	rootCmd.AddCommand(commands.AgentsCmd)
 
