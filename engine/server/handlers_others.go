@@ -1426,6 +1426,8 @@ func (s *Server) updateGUIState(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
 		return
 	}
+	// What a character opened or switched to, into their story (story.go).
+	story.guiState(updates, s.storyWant)
 
 	// Snapshot the prior values of the character-presence keys before the merge
 	// so we can tell an actual ride/web-location change from a no-op rewrite

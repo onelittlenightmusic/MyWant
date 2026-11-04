@@ -88,7 +88,9 @@ type intersectionContext struct {
 // cares about one want type says so here and nowhere else. `leave` is optional:
 // most arrivals are events rather than states.
 type intersectionRule struct {
-	name    string
+	name string
+	// quiet: not announced to the GUI (the story only records).
+	quiet   bool
 	applies func(ctx intersectionContext, want *mywant.Want, m mover) bool
 	enter   func(ctx intersectionContext, want *mywant.Want, m mover)
 	leave   func(ctx intersectionContext, want *mywant.Want, m mover)
@@ -177,7 +179,9 @@ func applyIntersections(
 		for _, rule := range intersectionRules {
 			if rule.leave != nil && rule.applies(ctx, want, m) {
 				rule.leave(ctx, want, m)
-				announce(rule, want, m, "leave")
+				if !rule.quiet {
+					announce(rule, want, m, "leave")
+				}
 			}
 		}
 	}
@@ -188,7 +192,9 @@ func applyIntersections(
 		for _, rule := range intersectionRules {
 			if rule.applies(ctx, want, m) {
 				rule.enter(ctx, want, m)
-				announce(rule, want, m, "enter")
+				if !rule.quiet {
+					announce(rule, want, m, "enter")
+				}
 			}
 		}
 	}
@@ -289,6 +295,7 @@ var intersectionRules = []intersectionRule{
 	occupancyRule,
 	goingRule,
 	trashRule,
+	storyRule,
 }
 
 // occupancyRule keeps a want's target array equal to who is standing on it.
