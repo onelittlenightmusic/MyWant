@@ -250,3 +250,32 @@ func TestStoryWrittenReadTidied(t *testing.T) {
 		t.Errorf("today's left plain: %v", err)
 	}
 }
+
+// A read across midnight finds the days on disk on both sides of it, whatever
+// the time of day since and until are.
+func TestStoryReadAcrossMidnight(t *testing.T) {
+	now := time.Date(2026, 11, 5, 0, 30, 0, 0, time.Local)
+	r := storyTestRecorder(t, &now)
+	r.add(ws.StoryEvent{Character: "c", Kind: ws.StoryKindSay, At: time.Date(2026, 11, 4, 23, 50, 0, 0, time.Local).Format(time.RFC3339)})
+	r.add(ws.StoryEvent{Character: "c", Kind: ws.StoryKindSay, At: now.Add(-10 * time.Minute).Format(time.RFC3339)})
+	if err := r.flush(); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name         string
+		since, until time.Time
+		want         int
+	}{
+		{"since 1h at 00:30", now.Add(-time.Hour), now.Add(time.Second), 2},
+		{"until earlier in the day than since", time.Date(2026, 11, 4, 10, 0, 0, 0, time.Local), time.Date(2026, 11, 5, 9, 0, 0, 0, time.Local), 2},
+		{"today only", time.Date(2026, 11, 5, 0, 0, 0, 0, time.Local), now.Add(time.Second), 1},
+	} {
+		evs, err := r.read("c", storyQuery{since: c.since, until: c.until})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(evs) != c.want {
+			t.Errorf("%s: %d events, want %d", c.name, len(evs), c.want)
+		}
+	}
+}

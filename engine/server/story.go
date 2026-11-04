@@ -558,7 +558,10 @@ func (r *storyRecorder) read(character string, q storyQuery) ([]ws.StoryEvent, e
 		out = append(out, ev)
 	}
 	dir := filepath.Join(r.root(), character)
-	for d := q.since.In(time.Local); !d.After(q.until.In(time.Local)); d = d.AddDate(0, 0, 1) {
+	// A day at a time from the start of since's day — not since's time of
+	// day, or the last day (until's, earlier in the day than since) is skipped.
+	s := q.since.In(time.Local)
+	for d := time.Date(s.Year(), s.Month(), s.Day(), 0, 0, 0, 0, time.Local); d.Before(q.until); d = d.AddDate(0, 0, 1) {
 		day := d.Format("2006-01-02")
 		for _, name := range []string{day + ".jsonl", day + ".jsonl.gz"} {
 			if err := readStoryFile(filepath.Join(dir, name), keep); err != nil && !os.IsNotExist(err) {
