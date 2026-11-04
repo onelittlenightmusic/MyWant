@@ -426,6 +426,7 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 			Description string `json:"description"`
 			Required    bool   `json:"required"`
 			Example     any    `json:"example"`
+			SubType     string `json:"subType"`
 		} `json:"parameters"`
 	}
 	if err := s.backend("GET", "/api/v1/want-types/"+name, nil, &resp); err != nil {
@@ -442,10 +443,11 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 	if h := planHint(robotTypeHint(resp.Metadata.Labels)); h != "" {
 		b.WriteString(h + "\n")
 	}
+	now := planNow(req.Timezone, time.Now())
 	b.WriteString(planNowText(req.Timezone, time.Now()))
 	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question)))
 	if rerun != nil {
-		b.WriteString(rerunParamsText(rerun.params))
+		b.WriteString(rerunParamsText())
 	} else {
 		b.WriteString("Fill its parameters from what the person said — and, when they refer to what was said earlier, from that. Leave a parameter empty when it was not said — never make a value up.\n")
 	}
@@ -457,6 +459,14 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 		desc := firstLine(p.Description, 120)
 		if p.Example != nil {
 			desc += fmt.Sprintf(" e.g. %v", p.Example)
+		}
+		// The time now beside a time or date, where it is filled (「今」).
+		desc += paramNowHint(p.SubType, now)
+		// Run again: what it is now, beside it, and empty to keep it — told
+		// as one list, a small model copied the list back (time 21:17 for
+		// 「今の時刻で再検索」).
+		if rerun != nil {
+			desc += rerunParamHint(rerun.params[p.Name])
 		}
 		// Run again, nothing must be given: what is not changed stays.
 		params = append(params, planParam{Name: p.Name, Description: desc, Required: p.Required && rerun == nil})

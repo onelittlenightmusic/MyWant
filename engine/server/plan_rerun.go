@@ -44,23 +44,49 @@ func (s *Server) rerunWantNamed(ref string) (*rerunWant, error) {
 	return &rerunWant{id: w.Metadata.ID, name: w.Metadata.Name, typ: w.Metadata.Type, params: params}, nil
 }
 
-// rerunParamsText tells the model what the want is asked now, and to fill
-// only what the question changes.
-func rerunParamsText(params map[string]any) string {
-	var b strings.Builder
-	if len(params) > 0 {
-		b.WriteString("Its parameters now: " + robotParamsText(params) + ".\n")
+// rerunParamsText tells the model to fill only what the question changes.
+// What each parameter is now is said beside it (rerunParamHint), not as one
+// list here: told the list, a small model copied it back.
+func rerunParamsText() string {
+	return "Fill only the parameters the person changes, with the new value from what they said. Leave every other parameter empty: it stays as it is. Never copy the value it has now, and never make a value up.\n"
+}
+
+// rerunParamHint is said beside a parameter of a want run again: what it is
+// now, and that empty keeps it.
+func rerunParamHint(current any) string {
+	if current == nil || robotEmptyParam(current) {
+		return " — not set now; a value only if the person gives one, else empty."
 	}
-	b.WriteString("Fill only the parameters the person changes — the new value, from what they said. Leave every other parameter empty: it stays as it is. Never make a value up.\n")
-	return b.String()
+	return fmt.Sprintf(" — now %v; a new value only if the person changes it, else empty.", current)
+}
+
+// paramNowHint is said beside a time or a date parameter: what it is now,
+// for 「今」「今日」「30分後」.
+func paramNowHint(subType string, now time.Time) string {
+	switch strings.ToLower(strings.TrimSpace(subType)) {
+	case "time":
+		return fmt.Sprintf(" (the time now: %s)", now.Format("15:04"))
+	case "date":
+		return fmt.Sprintf(" (today: %s)", now.Format("2006-01-02"))
+	case "datetime", "date_time":
+		return fmt.Sprintf(" (now: %s)", now.Format("2006-01-02 15:04"))
+	}
+	return ""
+}
+
+// planNow is now for the asker: in their timezone when given and known, else
+// the server's.
+func planNow(timezone string, now time.Time) time.Time {
+	if loc, err := time.LoadLocation(strings.TrimSpace(timezone)); timezone != "" && err == nil {
+		return now.In(loc)
+	}
+	return now
 }
 
 // planNowText is what time it is for the asker, so 「今」「30分後」 can be
-// filled: their timezone when given and known, else the server's.
+// filled.
 func planNowText(timezone string, now time.Time) string {
-	if loc, err := time.LoadLocation(strings.TrimSpace(timezone)); timezone != "" && err == nil {
-		now = now.In(loc)
-	}
+	now = planNow(timezone, now)
 	return fmt.Sprintf("It is now %s (%s, %s).\n", now.Format("2006-01-02 15:04"), now.Weekday(), now.Format("MST"))
 }
 
