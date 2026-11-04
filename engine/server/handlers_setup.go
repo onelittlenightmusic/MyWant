@@ -442,6 +442,10 @@ func (s *Server) setupRoutes() {
 	// take alike. See handlers_character_summon.go.
 	// What the person playing it did on the board (story.go).
 	characters.HandleFunc("/{id}/story", s.getCharacterStory).Methods("GET", "OPTIONS")
+	// A turn keeps how its answer went, once the story has judged it.
+	story.onOutcome = func(turn, outcome string) {
+		_, _ = s.robotUpdateTurn(turn, func(t *robotTurn) error { t.Outcome = outcome; return nil })
+	}
 	characters.HandleFunc("/{id}/summon", s.summonCharacter).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/summon/respond", s.respondToSummon).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}/devices", s.assignDevicesToCharacter).Methods("PUT", "OPTIONS")

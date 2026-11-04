@@ -65,6 +65,9 @@ type robotTurn struct {
 	// → はい / いいえ), which every chat offers beside its input. Given by
 	// the client, or read from the answer (robotReplyChoices).
 	Choices []string `json:"choices,omitempty"`
+	// Outcome: how the answer went, judged by what the person did next
+	// (story_outcome.go: success, corrected, reask, ignored).
+	Outcome string `json:"outcome,omitempty"`
 }
 
 const (

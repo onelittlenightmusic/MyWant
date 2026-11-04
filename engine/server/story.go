@@ -86,6 +86,12 @@ type storyRecorder struct {
 	turns   map[string]string // turn → character, for the events that follow it
 	tidied  string            // the day old files were last seen to
 	start   sync.Once
+	// judging: the turns waiting for what the person does next
+	// (story_outcome.go); afterEvent, what an event decided, held after it.
+	judging    map[string]*storyJudging
+	afterEvent []func()
+	// onOutcome is told each turn's outcome (the turn keeps it, turns.go).
+	onOutcome func(turn, outcome string)
 }
 
 var story = newStoryRecorder("")
@@ -96,6 +102,7 @@ func newStoryRecorder(dir string) *storyRecorder {
 		pending: map[string][]ws.StoryEvent{},
 		state:   map[string]*storyState{},
 		turns:   map[string]string{},
+		judging: map[string]*storyJudging{},
 	}
 }
 
@@ -144,7 +151,13 @@ func (r *storyRecorder) addLocked(ev ws.StoryEvent) {
 	if ev.At == "" {
 		ev.At = r.now().Format(time.RFC3339)
 	}
+	r.judgeLocked(&ev)
 	r.pending[ev.Character] = append(r.pending[ev.Character], ev)
+	after := r.afterEvent
+	r.afterEvent = nil
+	for _, decide := range after {
+		decide()
+	}
 }
 
 func (r *storyRecorder) add(ev ws.StoryEvent) {
@@ -234,6 +247,7 @@ func (r *storyRecorder) noticeStops() {
 	now := r.now()
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.expireLocked() // and the turns whose time to be judged is up
 	for character, s := range r.state {
 		if !s.moved || s.onWant || now.Sub(s.movedAt) < storyDwell {
 			continue
@@ -340,14 +354,19 @@ func (r *storyRecorder) characterOf(character, device, question string, byDevice
 
 // ask is a turn opened: its character remembered for what follows it.
 func (r *storyRecorder) ask(character, turn, device, question string) {
+	r.running()
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.turns[turn] = character
 	if len(r.turns) > 500 {
 		r.turns = map[string]string{turn: character}
 	}
-	r.mu.Unlock()
-	r.add(ws.StoryEvent{Character: character, Kind: ws.StoryKindChatAsk, Ref: turn, Device: device,
+	if character == "" {
+		character = storyUnknown
+	}
+	r.addLocked(ws.StoryEvent{Character: character, Kind: ws.StoryKindChatAsk, Ref: turn, Device: device,
 		Detail: map[string]string{"question": question}})
+	r.askedLocked(character, turn, question)
 }
 
 // turnCharacter is whose a turn was, as it was asked.
@@ -367,7 +386,15 @@ func (r *storyRecorder) answer(turn string, cards []robotCard, failed bool) {
 	if failed {
 		detail["error"] = "true"
 	}
-	r.add(ws.StoryEvent{Character: r.turnCharacter(turn), Kind: ws.StoryKindChatAnswer, Ref: turn, Detail: detail})
+	r.running()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.addLocked(ws.StoryEvent{Character: r.turns[turn], Kind: ws.StoryKindChatAnswer, Ref: turn, Detail: detail})
+	if failed {
+		delete(r.judging, turn) // nothing was answered to judge
+		return
+	}
+	r.answeredLocked(turn, cards)
 }
 
 // actDone is an act finished: what its plan did, in the turn's story.
@@ -381,14 +408,20 @@ func (r *storyRecorder) actDone(a ws.Act, plan ws.PlanSpec) {
 	if r := a.Status.Message; r != "" {
 		detail["message"] = r
 	}
-	ev := ws.StoryEvent{Character: r.turnCharacter(a.Spec.Turn), Kind: ws.StoryKindActDone, Ref: a.Metadata.Name, Detail: detail}
+	r.running()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ev := ws.StoryEvent{Character: r.turns[a.Spec.Turn], Kind: ws.StoryKindActDone, Ref: a.Metadata.Name, Detail: detail}
 	for _, c := range a.Status.Cards {
 		if c != nil {
 			ev.To = &ws.StoryPlace{Kind: c.Kind, ID: c.ID, Name: c.Name, Type: c.Type}
 			break
 		}
 	}
-	r.add(ev)
+	r.addLocked(ev)
+	if a.Status.Phase == "Succeeded" {
+		r.actedLocked(a.Spec.Turn, plan, a.Status.Cards)
+	}
 }
 
 // ── written, read, tidied ──────────────────────────────────────────────────
