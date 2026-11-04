@@ -179,7 +179,10 @@ private actor Conversations {
 
         // The turn, as a phone opens it: written into the robot's chat, so the
         // board shows the question, what the robot did and its answer.
-        let turnID = await ServerTools.openTurn(question: question, target: target, by: "browser", chat: true)
+        // Whose question it is: the character the page plays, as the page says.
+        let character = message["character"] as? String
+        let turnID = await ServerTools.openTurn(question: question, target: target, by: "browser", chat: true,
+                                                character: character)
         await TurnBox.shared.set(turnID)
         // As a plan (ServerPlan.swift): the server gathers, the model only
         // chooses, the server does it — as the iPhone and Mac apps answer.

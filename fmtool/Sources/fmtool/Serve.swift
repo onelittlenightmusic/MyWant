@@ -122,6 +122,9 @@ private struct ServeRequest: Decodable {
     let id: Int?
     let prompt: String?
     let reset: Bool?
+    /// The character who asked, when the server knows (a chat message says
+    /// who sent it): the turn opened for the question is theirs.
+    let character: String?
     /// Answer with the model alone: no tools, no memory of this conversation.
     ///
     /// The caller that asks for this is not chatting — it is MyWant working out
@@ -267,7 +270,7 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         // A turn on the server for this question, so what the robot does about
         // it is kept there whole, the same as when a phone's model answers
         // (engine/server/turns.go). The server's tools read its id.
-        let turnID = await ServerTools.openTurn(question: prompt)
+        let turnID = await ServerTools.openTurn(question: prompt, character: request.character)
         await TurnBox.shared.set(turnID)
         let before = await tracker.count
         // As a plan (ServerPlan.swift), the same the apps and the browser

@@ -447,6 +447,13 @@ wantType:
     initialValue: ""
     label: current
 
+  - name: webhook_auto_character
+    description: The character who asked webhook_auto_request, when known — whose story the turn is part of
+    type: string
+    persistent: false
+    initialValue: ""
+    label: current
+
   - name: cc_webhook_processed
     description: Number of webhook messages already processed by ThinkAgent
     type: int

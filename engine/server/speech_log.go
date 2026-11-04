@@ -225,6 +225,7 @@ func (s *Server) forwardToRobotIfAddressed(speakerID, text string) {
 		Text:      request,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Context:   context,
+		Character: speakerID,
 	}, ccStateCfg)
 	log.Printf("[Speech] %s asked the robot: %s", speakerID, request)
 }

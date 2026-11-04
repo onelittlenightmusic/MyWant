@@ -17,6 +17,10 @@ type webhookMessage struct {
 	// Kept apart so a chat shows the words alone; the agent joins the two
 	// when it asks (claudeCodeWatcherThink).
 	Context string `json:"context,omitempty"`
+	// Character: the character who said it, when known — the board's chat
+	// says it, and a speech addressed to the robot is its speaker's. Whose
+	// story the turn it opens is part of (story.go).
+	Character string `json:"character,omitempty"`
 }
 
 // webhookStateConfig holds state key names for a specific webhook platform.
@@ -42,6 +46,9 @@ func storeWebhookMessage(want *mywant.Want, msg webhookMessage, cfg webhookState
 	}
 	if msg.Context != "" {
 		msgMap["context"] = msg.Context
+	}
+	if msg.Character != "" {
+		msgMap["character"] = msg.Character
 	}
 	messages = append(messages, msgMap)
 	if len(messages) > 20 {

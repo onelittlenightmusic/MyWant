@@ -164,6 +164,9 @@ func claudeCodeWatcherThink(ctx context.Context, want *Want) error {
 						text += "\n\n" + context
 					}
 					want.SetCurrent("webhook_auto_request", text)
+					// Who asked, for the turn the answer opens (fmRequester).
+					character, _ := latestMsg["character"].(string)
+					want.SetCurrent("webhook_auto_character", character)
 					want.SetCurrent("cc_webhook_processed", msgCount)
 				}
 			}

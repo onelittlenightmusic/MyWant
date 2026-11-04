@@ -156,8 +156,12 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	// Webhook message first, static auto_request second — the same order the
 	// other two providers read them in.
 	request := GetCurrent(want, "webhook_auto_request", "")
+	// Who asked it, when the message said (a static auto_request is no one's).
+	asker := ""
 	if request != "" {
 		want.SetCurrent("webhook_auto_request", "")
+		asker = GetCurrent(want, "webhook_auto_character", "")
+		want.SetCurrent("webhook_auto_character", "")
 	} else {
 		request = GetGoal(want, "auto_request", "")
 	}
@@ -233,6 +237,9 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	server.broker(func(command string, args []string) (bool, bool, string) {
 		return fmBrokerRun(ctx, want, request, command, args)
 	})
+	// Who asked goes with the question, so the turn fmtool opens for it is
+	// that character's (the server's story.go).
+	server.askedBy(asker)
 	// A question about a photo is answered from the photo and the words in
 	// it, not from whatever command the model would reach for — see
 	// robot_subject.go for how the subject is decided and why here.
@@ -260,6 +267,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	}
 	server.watch(nil)
 	server.broker(nil)
+	server.askedBy("")
 	answer := strings.TrimSpace(reply.Text)
 	notes := reply.Error
 

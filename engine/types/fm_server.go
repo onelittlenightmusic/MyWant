@@ -48,6 +48,10 @@ type fmServer struct {
 	// is why what it writes to must be safe to write to from anywhere.
 	activityMu sync.Mutex
 	onActivity func(kind, text string)
+	// asker: the character who asked this question, sent with it as
+	// "character" (fmtool's openTurn puts it on the turn). Set like the
+	// handlers, for one question.
+	asker string
 
 	// How a person stops a turn that is already running.
 	//
@@ -103,6 +107,13 @@ func (s *fmServer) stopper() chan struct{} {
 func (s *fmServer) watch(handler func(kind, text string)) {
 	s.activityMu.Lock()
 	s.onActivity = handler
+	s.activityMu.Unlock()
+}
+
+// askedBy is who asks the next question, "" for no one known.
+func (s *fmServer) askedBy(character string) {
+	s.activityMu.Lock()
+	s.asker = character
 	s.activityMu.Unlock()
 }
 
@@ -411,6 +422,11 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, extra map
 		}
 		s.nextID++
 		body := map[string]any{"id": s.nextID, "prompt": prompt}
+		s.activityMu.Lock()
+		if s.asker != "" {
+			body["character"] = s.asker
+		}
+		s.activityMu.Unlock()
 		for k, v := range extra {
 			body[k] = v
 		}

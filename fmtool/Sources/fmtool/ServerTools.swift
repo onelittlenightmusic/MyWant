@@ -86,9 +86,13 @@ enum ServerTools {
     /// chat, so the turn is only kept, not written there again. Asked from a
     /// browser, nothing else writes them: `chat` puts them in the robot's chat,
     /// as a phone's do.
+    /// `character` is who asked, when the caller knows: the turn is then that
+    /// character's, in its story beside where it went next (the server's
+    /// story.go).
     static func openTurn(question: String, target: ServerTarget = .fromEnvironment,
-                         by: String = "robot", chat: Bool = false) async -> String? {
-        let payload: [String: Any] = ["question": question, "by": by, "chat": chat]
+                         by: String = "robot", chat: Bool = false, character: String? = nil) async -> String? {
+        var payload: [String: Any] = ["question": question, "by": by, "chat": chat]
+        if let character, !character.isEmpty { payload["character"] = character }
         guard let body = try? JSONSerialization.data(withJSONObject: payload),
               let (data, _) = try? await request("api/v1/turns", method: "POST", body: body, target: target) else { return nil }
         struct Turn: Decodable { let id: String }

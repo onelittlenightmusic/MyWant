@@ -57,10 +57,12 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		want.Metadata.Type == "robot" || want.Metadata.Type == "character_chat" {
 		text, _ := payload["text"].(string)
 		sender, _ := payload["sender"].(string)
+		character, _ := payload["character"].(string)
 		storeWebhookMessage(want, webhookMessage{
 			Sender:    sender,
 			Text:      text,
 			Timestamp: time.Now().Format(time.RFC3339),
+			Character: character,
 		}, ccStateCfg)
 		if want.Metadata.Type == "character_chat" {
 			speaker := characterIDForChatWant(want)
