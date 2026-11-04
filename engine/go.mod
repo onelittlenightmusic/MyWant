@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
-	github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104145048-8ee77c6b9e04
+	github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104145419-fc27ae03083d
 	github.com/stretchr/testify v1.12.1
 	github.com/tetratelabs/wazero v1.11.0
 	go.opentelemetry.io/otel v1.46.0
