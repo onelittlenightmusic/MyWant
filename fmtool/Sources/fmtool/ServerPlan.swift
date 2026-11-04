@@ -59,8 +59,13 @@ func serverPlanned(question: String, turnID: String?, target: ServerTarget) asyn
     printErr("[plan] \(kind) ref=\(ref) capability=\(capability) type=\(type)")
 
     var params: [String: String] = [:]
-    if kind == "new", type != "-" {
-        var req: [String: Any] = ["question": question, "type": type]
+    // A want made, or one run again (existing, restart): its parameters from
+    // what was asked — run again, only those the question changes
+    // (「出発時刻を今にして再検索」), the want named as ref.
+    let rerun = kind == "existing" && capability == "restart" && ref != "-"
+    if (kind == "new" && type != "-") || rerun {
+        var req: [String: Any] = ["question": question, "timezone": TimeZone.current.identifier]
+        if rerun { req["ref"] = ref } else { req["type"] = type }
         if let locale { req["locale"] = locale }
         if let turnID { req["turn"] = turnID }
         let tb = try await ServerTools.post("api/v1/plans/params", req, target: target, timeout: 30)
