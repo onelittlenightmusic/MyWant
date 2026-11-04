@@ -27,6 +27,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	ws "github.com/onelittlenightmusic/want-spec"
 	"net/http"
 	"regexp"
 	"sort"
@@ -55,6 +56,10 @@ type planBriefResponse struct {
 	// standard capabilities and those of the candidates' types, by name; the
 	// first, "-", is just to show it.
 	Capabilities []string `json:"capabilities"`
+	// Actions are the actions to choose from (want-spec's PlanActions):
+	// existing, new, none, previous. A client offers these rather than its
+	// own list, so an action added here needs no new app.
+	Actions []string `json:"actions"`
 }
 
 type planCandidate struct {
@@ -95,7 +100,8 @@ func (s *Server) planBrief(question, locale string) (planBriefResponse, error) {
 	b.WriteString("You answer with the board: show a want or thing already there that answers it, or make a want that will. Decide which:\n")
 	b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not. When the question asks a want for something it can do or look up (below, and on its line), choose it as ref and that as capability; just to show it, capability -.\n")
 	b.WriteString("- new: nothing below answers it, and a type can make a want that will — choose the type.\n")
-	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n\n")
+	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n")
+	b.WriteString("- previous: it is about something from earlier in this conversation that it does not name — choose as type the type of what it was about (- if you cannot tell), and as capability what to ask of it.\n\n")
 	// A candidate's type's own capabilities, on its line.
 	ownCaps := map[string][]string{}
 	var capNames []string
@@ -160,6 +166,7 @@ func (s *Server) planBrief(question, locale string) (planBriefResponse, error) {
 		Refs:         refs,
 		Types:        append([]string{planNone}, allTypes...),
 		Capabilities: caps,
+		Actions:      append([]string{}, ws.PlanActions...),
 	}, nil
 }
 

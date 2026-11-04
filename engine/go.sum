@@ -64,6 +64,8 @@ github.com/onelittlenightmusic/want-spec v0.1.28-0.20261103120524-b439e7dd3d2a h
 github.com/onelittlenightmusic/want-spec v0.1.28-0.20261103120524-b439e7dd3d2a/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/onelittlenightmusic/want-spec v0.1.28 h1:8X2+VBDuAVzF+NWZ3+/KJ7X8z8dRAgrWnFKK+B6Y6Dk=
 github.com/onelittlenightmusic/want-spec v0.1.28/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
+github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104124316-bde4e6a00aa4 h1:aKgwsjqdYmTbGp/lMm5Lhbt0oHToOQ8oQwgLrGHX9pQ=
+github.com/onelittlenightmusic/want-spec v0.1.29-0.20261104124316-bde4e6a00aa4/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

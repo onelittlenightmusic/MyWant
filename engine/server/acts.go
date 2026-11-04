@@ -69,6 +69,10 @@ func (a *actEntry) snapshotLocked() ws.Act {
 	d := a.doc
 	d.Status.Steps = append([]ws.RobotStep{}, a.doc.Status.Steps...)
 	d.Status.Cards = append([]*ws.RobotCard{}, a.doc.Status.Cards...)
+	if r := a.doc.Status.Resolved; r != nil {
+		copied := *r
+		d.Status.Resolved = &copied
+	}
 	return d
 }
 
@@ -139,12 +143,23 @@ func (s *Server) runAct(a *actEntry, plan ws.PlanSpec) {
 		d.Status.Phase = ws.ActRunning
 		d.Status.StartTime = time.Now().Format(time.RFC3339)
 	})
-	seen := map[string]bool{}
-	prompt, _, _ := s.doAct(actRequest{
+	req := actRequest{
 		Turn: spec.Turn, Question: plan.Question, Locale: spec.Locale,
 		Kind: plan.Action, Ref: plan.Target, Capability: plan.Capability,
 		Type: plan.Type, Params: plan.Params,
-	}, func(st robotStep) {
+	}
+	if plan.Action == ws.PlanActionPrevious {
+		// What it is about is found in the earlier turns (plan_previous.go),
+		// and the plan carried out on it as existing; found nothing, there is
+		// nothing to show, and the answer says so.
+		req.Kind, req.Ref, req.Type = ws.PlanActionExisting, "", ""
+		if found, ok := s.resolvePrevious(spec.Turn, plan.Type); ok {
+			req.Ref = found.Target
+			a.update(func(d *ws.Act) { d.Status.Resolved = &found })
+		}
+	}
+	seen := map[string]bool{}
+	prompt, _, _ := s.doAct(req, func(st robotStep) {
 		a.update(func(d *ws.Act) {
 			d.Status.Steps = append(d.Status.Steps, st)
 			if st.Card != nil && !seen[st.Card.ID] {
