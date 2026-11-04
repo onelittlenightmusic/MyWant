@@ -379,6 +379,13 @@ type planParamsRequest struct {
 	// Turn is the turn being answered, as for the brief: what was said
 	// before it may fill what this question leaves out (「同じルートで明日」).
 	Turn string `json:"turn,omitempty"`
+	// Ref is a want already there that is run again (existing, restart):
+	// its parameters are filled only where the question changes them
+	// (「出発時刻を今にして再検索」), the rest left as they are (plan_rerun.go).
+	Ref string `json:"ref,omitempty"`
+	// Timezone is the asker's (an IANA name, Asia/Tokyo): what "now" is,
+	// for a time the question gives as 今 or 30分後. The server's own, absent.
+	Timezone string `json:"timezone,omitempty"`
 }
 
 type planParam struct {
@@ -393,6 +400,16 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
+	}
+	// A want already there, run again: its type, and what it is asked now.
+	var rerun *rerunWant
+	if ref := strings.TrimSpace(req.Ref); ref != "" && ref != planNone {
+		found, err := s.rerunWantNamed(ref)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		rerun, req.Type = found, found.typ
 	}
 	name, err := s.robotResolveType(req.Type)
 	if err != nil {
@@ -416,12 +433,22 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "The person asked: 「%s」\n\nA new %s want is made for it (%s).\n", req.Question, name, firstLine(resp.Metadata.Description, 160))
+	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", req.Question)
+	if rerun != nil {
+		fmt.Fprintf(&b, "The %s want %s is run again for it (%s).\n", name, rerun.name, firstLine(resp.Metadata.Description, 160))
+	} else {
+		fmt.Fprintf(&b, "A new %s want is made for it (%s).\n", name, firstLine(resp.Metadata.Description, 160))
+	}
 	if h := planHint(robotTypeHint(resp.Metadata.Labels)); h != "" {
 		b.WriteString(h + "\n")
 	}
+	b.WriteString(planNowText(req.Timezone, time.Now()))
 	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question)))
-	b.WriteString("Fill its parameters from what the person said — and, when they refer to what was said earlier, from that. Leave a parameter empty when it was not said — never make a value up.\n")
+	if rerun != nil {
+		b.WriteString(rerunParamsText(rerun.params))
+	} else {
+		b.WriteString("Fill its parameters from what the person said — and, when they refer to what was said earlier, from that. Leave a parameter empty when it was not said — never make a value up.\n")
+	}
 	var params []planParam
 	for i, p := range resp.Parameters {
 		if i == 10 {
@@ -431,7 +458,8 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 		if p.Example != nil {
 			desc += fmt.Sprintf(" e.g. %v", p.Example)
 		}
-		params = append(params, planParam{Name: p.Name, Description: desc, Required: p.Required})
+		// Run again, nothing must be given: what is not changed stays.
+		params = append(params, planParam{Name: p.Name, Description: desc, Required: p.Required && rerun == nil})
 	}
 	robotWriteJSON(w, map[string]any{"prompt": b.String() + robotLocaleText(req.Locale), "type": name, "params": params})
 }
@@ -486,12 +514,18 @@ func (s *Server) doAct(req actRequest, onStep func(robotStep)) (prompt string, c
 // carryOutPlan carries the decision out, as the steps the old tools would have
 // taken — the same tools, so the board, the turn and its cards are as before.
 func (s *Server) carryOutPlan(req actRequest, onStep func(robotStep)) []robotStep {
+	// said: what was done before the step, said first in its output (the
+	// parameters changed before a want is run again).
+	said := ""
 	run := func(tool string, args map[string]string) robotStep {
 		if robotHearsQuestion(tool) && req.Question != "" {
 			args[robotQuestionArg] = req.Question
 		}
 		st := robotStep{Tool: tool, Arguments: args}
 		s.robotRunStep(&st)
+		if said != "" {
+			st.Output = said + " " + st.Output
+		}
 		delete(st.Arguments, robotQuestionArg)
 		delete(st.Arguments, robotShortArg)
 		st.Card = robotTakeCard(st.Arguments)
@@ -509,6 +543,16 @@ func (s *Server) carryOutPlan(req actRequest, onStep func(robotStep)) []robotSte
 			return nil
 		}
 		if c := strings.TrimSpace(req.Capability); c != "" && c != planNone {
+			// Run again with what the question changes (plan_rerun.go):
+			// 「出発時刻を今にして再検索」 sets time before it runs.
+			if c == rerunCapability && len(req.Params) > 0 {
+				changed, err := s.changeWantParams(name, req.Params)
+				if err != nil {
+					said = "Error: " + err.Error() + "."
+				} else {
+					said = changed
+				}
+			}
 			// A capability of the want (tools_capability.go): done here, what it
 			// found handed to the answer.
 			return []robotStep{run("use_capability", map[string]string{"capability": c, "want": name})}

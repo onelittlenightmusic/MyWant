@@ -19,7 +19,7 @@ package server
 //	  target: smartgolf-check-reserved-instance
 //	  capability: rounds           # for existing: what is asked of it
 //	  type: ""                     # for new: the type to make
-//	  params: {}                   # for new: its parameters
+//	  params: {}                   # new: its parameters; existing + restart: what it changes
 //
 // It is carried out by an Act that names it (acts.go). Posted as YAML or
 // JSON; read back as JSON, or YAML with ?format=yaml.
