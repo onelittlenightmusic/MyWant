@@ -16,6 +16,9 @@ func TestMain(m *testing.M) {
 	}
 	translationsPath = func() string { return filepath.Join(dir, "translations.json") }
 	translationReaders = func() []string { return nil }
+	// The stories (story.go) and their ledger: the tests' own, not the
+	// person's ~/.mywant/stories, whose statistics a test's turns would join.
+	story.dir = filepath.Join(dir, "stories")
 	code := m.Run()
 	_ = os.RemoveAll(dir)
 	os.Exit(code)
