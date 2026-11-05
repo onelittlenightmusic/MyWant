@@ -42,6 +42,15 @@ func TestStoryQADeclares(t *testing.T) {
 	if storyDeclared(qas, "中野の天気は？", "") != nil {
 		t.Error("a weather question taken for a route")
 	}
+
+	// A route searched again (transit_search's robot-qa): its time a name.
+	again := newStoryQA("transit_search", "今の時刻で再検索", "run the route already there again (capability restart) with params time=今の時刻")
+	if again.Template != "{time}で再検索" {
+		t.Fatalf("template %q", again.Template)
+	}
+	if storyDeclared([]storyQA{again}, "10時で再検索", "") == nil {
+		t.Error("10時で再検索 is not one of it")
+	}
 }
 
 // storyJudged is a turn asked, planned, answered with want and judged: gone to

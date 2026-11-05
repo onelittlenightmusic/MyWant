@@ -9,5 +9,5 @@
 # named.
 capabilities:
   - name: restart
-    description: もう一度実行して最新を取得する（再実行・再チェック・更新・最新を取得） — run it again for what it finds now
+    description: もう一度実行して最新を取得する（再実行・再検索・再チェック・更新・最新を取得） — run it again for what it finds now
     action: restart
