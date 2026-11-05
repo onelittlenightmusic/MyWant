@@ -87,12 +87,23 @@ func (r *storyRecorder) actedLocked(turn string, plan ws.PlanSpec, cards []*robo
 			j.plan[k] = v
 		}
 	}
+	for k, v := range plan.Params {
+		if v != "" {
+			j.plan["param."+k] = v
+		}
+	}
 	if plan.Type != "" {
 		j.types[plan.Type] = true
 	}
 	for _, c := range cards {
 		if c != nil && c.Kind == "want" {
 			j.show(c.ID, c.Type)
+			// The type of the want an existing plan was about: how it was
+			// answered, without its name (story_ledger.go's shape).
+			if plan.Action == "existing" && j.plan["targetType"] == "" && c.Type != "" &&
+				(c.Name == plan.Target || c.ID == plan.Target || len(cards) == 1) {
+				j.plan["targetType"] = c.Type
+			}
 		}
 	}
 }
@@ -183,7 +194,7 @@ func (r *storyRecorder) decideLocked(j *storyJudging, outcome string, to *ws.Sto
 	}
 	delete(r.judging, j.turn)
 	now := r.now()
-	detail := map[string]string{"outcome": outcome, "question": j.question}
+	detail := map[string]string{"outcome": outcome, "question": j.question, "asked": j.askedAt.Format(time.RFC3339)}
 	if len(j.shownOrder) > 0 {
 		detail["shown"] = strings.Join(j.shownOrder, ",")
 	}
@@ -199,6 +210,7 @@ func (r *storyRecorder) decideLocked(j *storyJudging, outcome string, to *ws.Sto
 	ev := ws.StoryEvent{Character: j.character, Kind: ws.StoryKindTurnOutcome, Ref: j.turn,
 		At: now.Format(time.RFC3339), To: to, Detail: detail}
 	r.pending[ev.Character] = append(r.pending[ev.Character], ev)
+	r.ledgerAdd(ev) // kept for good, beside every other judged answer
 	if r.onOutcome != nil {
 		turn, hook := j.turn, r.onOutcome
 		go hook(turn, outcome)

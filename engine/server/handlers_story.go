@@ -17,6 +17,7 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -125,4 +126,55 @@ func (s *Server) getCharacterDigests(w http.ResponseWriter, r *http.Request) {
 		digests = []ws.StoryDigest{}
 	}
 	writeDoc(w, r, http.StatusOK, &storyDigestList{Digests: digests})
+}
+
+// GET /api/v1/patterns — the kinds of question asked, and which way of
+// answering each goes well (story_ledger.go).
+//
+//	?q=          a question: the kinds it is one of (else the most like it)
+//	?character=  only this character's answers
+//	?limit=      at most this many kinds
+//
+// A kind a want type names in a worked example (robot-qa/…) says so
+// (declared); one none names is a worked example to add.
+func (s *Server) getStoryPatterns(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	query := storyPatternQuery{question: q.Get("q"), character: q.Get("character"), qas: s.storyQAs()}
+	if n, err := strconv.Atoi(q.Get("limit")); err == nil && n > 0 {
+		query.limit = n
+	}
+	patterns := story.patterns(query)
+	if patterns == nil {
+		patterns = []storyPatternStat{}
+	}
+	writeDoc(w, r, http.StatusOK, &struct {
+		Patterns []storyPatternStat `yaml:"patterns" json:"patterns"`
+	}{patterns})
+}
+
+// storyQAs is every want type's worked examples (robot-qa/…), as kinds of
+// question — read now, so an example added or changed applies to every
+// answer already kept.
+func (s *Server) storyQAs() []storyQA {
+	types, err := s.robotWantTypes()
+	if err != nil {
+		return nil
+	}
+	var out []storyQA
+	for _, t := range types {
+		var keys []string
+		for k := range t.Labels {
+			if strings.HasPrefix(k, robotQALabel) {
+				keys = append(keys, k)
+			}
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			req := strings.Trim(strings.TrimSpace(strings.TrimPrefix(k, robotQALabel)), "「」")
+			if req != "" {
+				out = append(out, newStoryQA(t.Name, req, strings.Join(strings.Fields(t.Labels[k]), " ")))
+			}
+		}
+	}
+	return out
 }

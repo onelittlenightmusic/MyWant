@@ -152,8 +152,8 @@ func showDigests(cmd *cobra.Command, c *client.Client, id, since, until string) 
 			o[ws.TurnOutcomeReask], o[ws.TurnOutcomeIgnored], rate)
 	}
 	for _, d := range digests {
-		line(d.Date, len(d.Turns), d.Outcomes)
-		questions += len(d.Turns)
+		line(d.Date, d.Counts[ws.StoryKindChatAsk], d.Outcomes)
+		questions += d.Counts[ws.StoryKindChatAsk]
 		for k, v := range d.Outcomes {
 			total[k] += v
 		}

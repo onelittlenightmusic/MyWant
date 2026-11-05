@@ -443,6 +443,8 @@ func (s *Server) setupRoutes() {
 	// What the person playing it did on the board (story.go).
 	characters.HandleFunc("/{id}/story", s.getCharacterStory).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/digests", s.getCharacterDigests).Methods("GET", "OPTIONS")
+	// Kinds of question and how each is best answered (story_ledger.go).
+	api.HandleFunc("/patterns", s.getStoryPatterns).Methods("GET", "OPTIONS")
 	// A turn keeps how its answer went, once the story has judged it.
 	story.onOutcome = func(turn, outcome string) {
 		_, _ = s.robotUpdateTurn(turn, func(t *robotTurn) error { t.Outcome = outcome; return nil })

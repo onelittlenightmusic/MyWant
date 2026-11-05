@@ -60,20 +60,10 @@ func TestStoryDigestOfADay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Turns) != 4 {
-		t.Fatalf("turns %+v, want 4", d.Turns)
+	if len(d.Turns) != 0 || d.Counts[ws.StoryKindChatAsk] != 4 {
+		t.Fatalf("turns %d (the ledger's, not the digest's), asks %d, want 0 and 4", len(d.Turns), d.Counts[ws.StoryKindChatAsk])
 	}
-	t1 := d.Turns[0]
-	if t1.Outcome != ws.TurnOutcomeSuccess || t1.SecondsToAct != 8 || t1.Plan == nil ||
-		t1.Plan.Action != "new" || t1.Plan.Params["to"] != "銀座" || len(t1.Shown) != 1 || t1.Shown[0] != "want:want-a" {
-		t.Errorf("t1 %+v (plan %+v)", t1, t1.Plan)
-	}
-	if d.Turns[1].Outcome != ws.TurnOutcomeReask {
-		t.Errorf("t2 %+v, want reask", d.Turns[1])
-	}
-	if d.Turns[3].Outcome != ws.TurnOutcomeIgnored {
-		t.Errorf("t4 %+v, want ignored (judged after midnight)", d.Turns[3])
-	}
+	// t4, answered just before midnight, is judged (ignored) after it.
 	if d.Outcomes[ws.TurnOutcomeSuccess] != 1 || d.Outcomes[ws.TurnOutcomeReask] != 1 || d.Outcomes[ws.TurnOutcomeIgnored] != 1 {
 		t.Errorf("outcomes %v", d.Outcomes)
 	}
@@ -136,8 +126,8 @@ func TestStoryDigestWrittenOnceDueAndKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 || got[0].Date != "2026-11-05" || got[0].Turns[0].Question != "中野の天気は？" ||
-		got[1].Date != "2027-03-01" || got[1].Turns[0].Turn != "t9" {
+	if len(got) != 2 || got[0].Date != "2026-11-05" || got[0].Counts[ws.StoryKindChatAsk] != 1 ||
+		got[1].Date != "2027-03-01" || got[1].Counts[ws.StoryKindChatAsk] != 1 {
 		t.Fatalf("digests %+v", got)
 	}
 }

@@ -92,6 +92,8 @@ type storyRecorder struct {
 	afterEvent []func()
 	// onOutcome is told each turn's outcome (the turn keeps it, turns.go).
 	onOutcome func(turn, outcome string)
+	// ledger: every judged turn, kept for good (story_ledger.go).
+	ledger storyLedger
 }
 
 var story = newStoryRecorder("")
@@ -472,6 +474,9 @@ func (r *storyRecorder) flush() error {
 				firstErr = err
 			}
 		}
+	}
+	if err := r.ledgerFlush(); err != nil && firstErr == nil {
+		firstErr = err
 	}
 	// Once a day (a little past midnight): the days over are digested
 	// (story_digest.go), kept for good, before old days are gzipped or let go.

@@ -85,3 +85,57 @@ func (c *Client) GetDigests(character, since, until string) ([]ws.StoryDigest, e
 	}
 	return out.Digests, nil
 }
+
+// PatternAnswer is one way a kind of question was answered, and how it went.
+type PatternAnswer struct {
+	Shape       string         `json:"shape" yaml:"shape"`
+	Count       int            `json:"count" yaml:"count"`
+	Outcomes    map[string]int `json:"outcomes" yaml:"outcomes"`
+	SuccessRate float64        `json:"successRate" yaml:"successRate"`
+	Example     *ws.PlanSpec   `json:"example,omitempty" yaml:"example,omitempty"`
+}
+
+// PatternQA is the want type's worked example a kind of question is.
+type PatternQA struct {
+	Type     string `json:"type" yaml:"type"`
+	Request  string `json:"request" yaml:"request"`
+	Answer   string `json:"answer" yaml:"answer"`
+	Template string `json:"template" yaml:"template"`
+}
+
+// Pattern is a kind of question (GET /api/v1/patterns).
+type Pattern struct {
+	Pattern  string          `json:"pattern" yaml:"pattern"`
+	Declared *PatternQA      `json:"declared,omitempty" yaml:"declared,omitempty"`
+	Match    string          `json:"match,omitempty" yaml:"match,omitempty"`
+	Count    int             `json:"count" yaml:"count"`
+	Answers  []PatternAnswer `json:"answers" yaml:"answers"`
+	LastAt   string          `json:"lastAt" yaml:"lastAt"`
+}
+
+// GetPatterns is the kinds of question asked and how each was best answered:
+// those question is one of (else the most like it), or all; one character's
+// answers, or everyone's.
+func (c *Client) GetPatterns(question, character string, limit int) ([]Pattern, error) {
+	v := url.Values{}
+	if question != "" {
+		v.Set("q", question)
+	}
+	if character != "" {
+		v.Set("character", character)
+	}
+	if limit > 0 {
+		v.Set("limit", strconv.Itoa(limit))
+	}
+	path := "/api/v1/patterns"
+	if len(v) > 0 {
+		path += "?" + v.Encode()
+	}
+	var out struct {
+		Patterns []Pattern `json:"patterns"`
+	}
+	if err := c.Request("GET", path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Patterns, nil
+}

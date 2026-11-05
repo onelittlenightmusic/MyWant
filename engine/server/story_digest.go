@@ -4,12 +4,11 @@ package server
 // (want-spec's StoryDigest) after the day's events are let go (story.go:
 // gzipped after storyRawDays, gone after storyGzipDays).
 //
-// What the statistics are taken from: each question of the day with what was
-// decided for it (the plan), what the answer showed and how it went
-// (story_outcome.go) — one row a question, not only counts, so they can be
-// counted again another way and an answer that went well can be shown to the
-// model as an example. Beside them, the wants visited and the moves between
-// them, and the day's counts.
+// How the day went: the wants visited and the moves the person made between
+// them, the day's events by kind and its answers by outcome. Each judged
+// answer itself — the question, the plan, how it went — is the ledger's
+// (story_ledger.go), kept in one place for good to be searched; a digest
+// leaves its turns empty.
 //
 //	~/.mywant/stories/<character>/digest/<YYYY-MM-DD>.yaml
 //
@@ -134,7 +133,7 @@ func (r *storyRecorder) digests(character, since, until string) ([]ws.StoryDiges
 		if err != nil {
 			return nil, err
 		}
-		if len(dg.Turns) > 0 || len(dg.Counts) > 0 {
+		if len(dg.Counts) > 0 {
 			out = append(out, *dg)
 		}
 	}
@@ -272,9 +271,7 @@ func buildStoryDigest(character, day string, events, late []ws.StoryEvent) *ws.S
 		outcome(ev)
 	}
 	for _, ref := range order {
-		t := turns[ref]
-		d.Turns = append(d.Turns, *t)
-		if t.Outcome != "" {
+		if t := turns[ref]; t.Outcome != "" {
 			d.Outcomes[t.Outcome]++
 		}
 	}
