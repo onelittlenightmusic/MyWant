@@ -400,6 +400,16 @@ func (r *storyRecorder) answer(turn string, cards []robotCard, failed bool) {
 // actDone is an act finished: what its plan did, in the turn's story.
 func (r *storyRecorder) actDone(a ws.Act, plan ws.PlanSpec) {
 	detail := map[string]string{"phase": a.Status.Phase, "plan": a.Spec.Plan, "action": plan.Action}
+	// The turn it answered, and what a new want was given: the day's digest
+	// keeps the plan whole beside the question (story_digest.go).
+	if a.Spec.Turn != "" {
+		detail["turn"] = a.Spec.Turn
+	}
+	for k, v := range plan.Params {
+		if v != "" {
+			detail["param."+k] = v
+		}
+	}
 	for k, v := range map[string]string{"target": plan.Target, "capability": plan.Capability, "type": plan.Type} {
 		if v != "" {
 			detail[k] = v
@@ -463,8 +473,13 @@ func (r *storyRecorder) flush() error {
 			}
 		}
 	}
-	if day := r.now().Format("2006-01-02"); day != r.tidied {
-		r.tidied = day
+	// Once a day (a little past midnight): the days over are digested
+	// (story_digest.go), kept for good, before old days are gzipped or let go.
+	if due := r.digestDue(); due != r.tidied {
+		r.tidied = due
+		if err := r.digestDays(); err != nil && firstErr == nil {
+			firstErr = err
+		}
 		if err := r.tidy(); err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -519,7 +534,12 @@ func (r *storyRecorder) tidy() error {
 			name := f.Name()
 			switch {
 			case strings.HasSuffix(name, ".jsonl"):
-				if day := strings.TrimSuffix(name, ".jsonl"); day < rawBefore {
+				day := strings.TrimSuffix(name, ".jsonl")
+				if day < gzBefore {
+					// Past keeping even gzipped (a server long stopped): let go —
+					// its digest, written before this, keeps the day.
+					_ = os.Remove(filepath.Join(dir, name))
+				} else if day < rawBefore {
 					if err := gzipFile(filepath.Join(dir, name)); err != nil {
 						log.Printf("[story] gzip %s: %v", name, err)
 					}

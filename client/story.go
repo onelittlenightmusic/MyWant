@@ -61,3 +61,27 @@ func (c *Client) ListCharacterRefs() ([]CharacterRef, error) {
 	}
 	return out.Characters, nil
 }
+
+// GetDigests is a character's days, one digest each, oldest first: since and
+// until are YYYY-MM-DD or days back (7d); empty, the server's defaults (the
+// last 7 days to today).
+func (c *Client) GetDigests(character, since, until string) ([]ws.StoryDigest, error) {
+	v := url.Values{}
+	if since != "" {
+		v.Set("since", since)
+	}
+	if until != "" {
+		v.Set("until", until)
+	}
+	path := "/api/v1/characters/" + url.PathEscape(character) + "/digests"
+	if len(v) > 0 {
+		path += "?" + v.Encode()
+	}
+	var out struct {
+		Digests []ws.StoryDigest `json:"digests"`
+	}
+	if err := c.Request("GET", path, nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Digests, nil
+}
