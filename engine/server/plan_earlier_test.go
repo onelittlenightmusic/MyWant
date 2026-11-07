@@ -104,3 +104,14 @@ func TestThingIsAValueWhenATypeIsCalled(t *testing.T) {
 		t.Error("a want stays a candidate; a thing stays one when no type is called")
 	}
 }
+
+// Nothing on the board about the question: existing is not offered — chosen
+// with no name, the phone answered 「伊東から中野坂上の乗り換え」 with nothing.
+func TestPlanActionsWithoutRefs(t *testing.T) {
+	if got := strings.Join(planActions(false), ","); got != "new,none" {
+		t.Errorf("no ref: %s", got)
+	}
+	if got := strings.Join(planActions(true), ","); got != "existing,new,none" {
+		t.Errorf("a ref: %s", got)
+	}
+}

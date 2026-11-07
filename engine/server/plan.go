@@ -106,7 +106,13 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", question)
 	b.WriteString(earlierText(earlier))
 	b.WriteString("You answer with the board: show a want or thing already there that answers it, or make a want that will. Decide which:\n")
-	b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not. When the question asks a want for something it can do or look up (below, and on its line), choose it as ref and that as capability; just to show it, capability -.\n")
+	// Nothing on the board about it: existing is not offered at all. Offered,
+	// the phone's small model chose it with no name to go with it (「伊東から
+	// 中野坂上の乗り換え」, the board without that route) and answered that
+	// there was nothing, where the type below would have made the route.
+	if len(cands) > 0 {
+		b.WriteString("- existing: one of the names below answers exactly this question — choose it as ref. A want about something else (other stations, another place or day) does not. When the question asks a want for something it can do or look up (below, and on its line), choose it as ref and that as capability; just to show it, capability -.\n")
+	}
 	b.WriteString("- new: nothing below answers it, and a type can make a want that will — choose the type.\n")
 	b.WriteString("- none: it is not a question about anything on or for the board (a greeting, thanks, a remark).\n\n")
 	// A candidate's type's own capabilities, on its line.
@@ -173,8 +179,21 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 		Refs:         refs,
 		Types:        append([]string{planNone}, allTypes...),
 		Capabilities: caps,
-		Actions:      append([]string{}, ws.PlanActions...),
+		Actions:      planActions(len(cands) > 0),
 	}, nil
+}
+
+// planActions are the actions a brief offers: existing only when there is
+// something on the board (or put away) to choose as its ref.
+func planActions(anyRef bool) []string {
+	var out []string
+	for _, a := range ws.PlanActions {
+		if a == ws.PlanActionExisting && !anyRef {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
 }
 
 // candidatesFor is what on the board (and in the archive) may be about the
