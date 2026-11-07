@@ -82,9 +82,8 @@ func (r *storyRecorder) ledgerLoad() {
 		sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
 		for sc.Scan() {
 			var row storyLedgerRow
-			if json.Unmarshal(sc.Bytes(), &row) == nil && !l.seen[row.Turn] {
-				l.seen[row.Turn] = true
-				l.rows = append(l.rows, row)
+			if json.Unmarshal(sc.Bytes(), &row) == nil {
+				l.keepLocked(row)
 			}
 		}
 		f.Close()
@@ -107,13 +106,12 @@ func (r *storyRecorder) ledgerLoad() {
 				continue
 			}
 			_ = readStoryFile(filepath.Join(dir, name), func(ev ws.StoryEvent) {
-				if ev.Kind != ws.StoryKindTurnOutcome || l.seen[ev.Ref] {
+				if ev.Kind != ws.StoryKindTurnOutcome {
 					return
 				}
-				row := storyRowOf(ev)
-				l.seen[row.Turn] = true
-				l.rows = append(l.rows, row)
-				l.pending = append(l.pending, row)
+				if row := storyRowOf(ev); l.keepLocked(row) {
+					l.pending = append(l.pending, row)
+				}
 			})
 		}
 	}
@@ -126,13 +124,47 @@ func (r *storyRecorder) ledgerAdd(ev ws.StoryEvent) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	r.ledgerLoad()
-	if l.seen[ev.Ref] {
-		return
+	if row := storyRowOf(ev); l.keepLocked(row) {
+		l.pending = append(l.pending, row)
 	}
-	row := storyRowOf(ev)
-	l.seen[row.Turn] = true
-	l.rows = append(l.rows, row)
-	l.pending = append(l.pending, row)
+}
+
+// ledgerRow is the row kept for a turn, if it was judged.
+func (r *storyRecorder) ledgerRow(turn string) (storyLedgerRow, bool) {
+	l := &r.ledger
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	r.ledgerLoad()
+	for i := len(l.rows) - 1; i >= 0; i-- {
+		if l.rows[i].Turn == turn {
+			return l.rows[i], true
+		}
+	}
+	return storyLedgerRow{}, false
+}
+
+// keepLocked keeps a judged turn's row, whether it is kept: the first of a
+// turn's, unless a later one is the person's own word (by person), which
+// takes its place. Caller holds l.mu.
+func (l *storyLedger) keepLocked(row storyLedgerRow) bool {
+	if !l.seen[row.Turn] {
+		l.seen[row.Turn] = true
+		l.rows = append(l.rows, row)
+		return true
+	}
+	if row.By != ws.TurnOutcomeByPerson {
+		return false
+	}
+	for i := range l.rows {
+		if l.rows[i].Turn == row.Turn {
+			if l.rows[i].By == ws.TurnOutcomeByPerson && l.rows[i].JudgedAt > row.JudgedAt {
+				return false // a later word of theirs is kept already
+			}
+			l.rows[i] = row
+			return true
+		}
+	}
+	return false
 }
 
 // ledgerFlush writes the rows not yet written.
@@ -171,7 +203,7 @@ func (r *storyRecorder) ledgerFlush() error {
 func storyRowOf(ev ws.StoryEvent) storyLedgerRow {
 	d := ev.Detail
 	row := storyLedgerRow{Character: ev.Character, JudgedAt: ev.At}
-	row.Turn, row.At, row.Question, row.Outcome = ev.Ref, d["asked"], d["question"], d["outcome"]
+	row.Turn, row.At, row.Question, row.Outcome, row.By = ev.Ref, d["asked"], d["question"], d["outcome"], d["by"]
 	if row.At == "" {
 		row.At = ev.At
 	}

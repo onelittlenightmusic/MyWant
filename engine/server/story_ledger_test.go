@@ -138,3 +138,53 @@ func TestStoryLedgerPatterns(t *testing.T) {
 		t.Fatalf("the rebuilt ledger was not written: %v", err)
 	}
 }
+
+// A 👍 or 👎 is the person's word: it judges a turn still being judged, and
+// takes the place of what was judged from what they did — still counted
+// against the kind of answer it was.
+func TestStoryLedgerPersonSaid(t *testing.T) {
+	now := time.Date(2026, 11, 7, 9, 0, 0, 0, time.Local)
+	r := storyTestRecorder(t, &now)
+	route := robotCard{Kind: "want", ID: "want-r", Name: "伊東→中野坂上", Type: "transit_search"}
+	// Judged ignored (not gone to), then said wrong.
+	storyJudged(r, &now, "t1", "伊東から中野坂上の乗り換え",
+		ws.PlanSpec{Action: "new", Type: "transit_search", Params: map[string]string{"from": "伊東", "to": "中野坂上"}}, route, false)
+	r.said("t1", "chr-1", "伊東から中野坂上の乗り換え", ws.TurnOutcomeWrong)
+	// Still being judged, said good.
+	r.ask("chr-1", "t2", "", "Nakanoの天気は？")
+	r.said("t2", "", "Nakanoの天気は？", ws.TurnOutcomeSuccess)
+
+	rows := map[string]storyLedgerRow{}
+	for _, row := range r.ledger.rows {
+		rows[row.Turn] = row
+	}
+	if len(r.ledger.rows) != 2 {
+		t.Fatalf("one row a turn: %+v", r.ledger.rows)
+	}
+	if w := rows["t1"]; w.Outcome != ws.TurnOutcomeWrong || w.By != ws.TurnOutcomeByPerson || w.Shape != "new transit_search(from,to)" {
+		t.Errorf("t1 %+v", w)
+	}
+	if g := rows["t2"]; g.Outcome != ws.TurnOutcomeSuccess || g.By != ws.TurnOutcomeByPerson || g.Character != "chr-1" {
+		t.Errorf("t2 %+v", g)
+	}
+	// Read again from the file: the person's word, not the first judgement.
+	if err := r.flush(); err != nil {
+		t.Fatal(err)
+	}
+	again := storyTestRecorder(t, &now)
+	again.dir = r.dir
+	if row, ok := again.ledgerRow("t1"); !ok || row.Outcome != ws.TurnOutcomeWrong {
+		t.Errorf("read again: %+v", row)
+	}
+}
+
+// After the chat is cleared, nothing before it is earlier in the conversation.
+func TestTurnsSince(t *testing.T) {
+	turns := []robotTurn{{ID: "a", StartedAt: "2026-11-07T18:00:00+09:00"}, {ID: "b", StartedAt: "2026-11-07T18:10:00+09:00"}}
+	if got := turnsSince(turns, "2026-11-07T18:05:00+09:00"); len(got) != 1 || got[0].ID != "b" {
+		t.Errorf("since: %+v", got)
+	}
+	if got := turnsSince(turns, ""); len(got) != 2 {
+		t.Errorf("no since: %+v", got)
+	}
+}

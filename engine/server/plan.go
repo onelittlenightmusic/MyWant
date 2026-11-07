@@ -52,6 +52,9 @@ type planBriefRequest struct {
 	// Timezone is the asker's (as for the params): the time now, for the
 	// parameters the brief has filled with the decision.
 	Timezone string `json:"timezone,omitempty"`
+	// Since is when the client's conversation began (RFC 3339) — cleared
+	// then: nothing asked before it is "earlier in this conversation".
+	Since string `json:"since,omitempty"`
 }
 
 type planBriefResponse struct {
@@ -90,7 +93,7 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	brief, err := s.planBrief(req.Question, req.Locale, req.Turn, req.Timezone)
+	brief, err := s.planBrief(req.Question, req.Locale, req.Turn, req.Timezone, req.Since)
 	if err != nil {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
@@ -98,14 +101,14 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 	robotWriteJSON(w, brief)
 }
 
-func (s *Server) planBrief(question, locale, turn, timezone string) (planBriefResponse, error) {
+func (s *Server) planBrief(question, locale, turn, timezone, since string) (planBriefResponse, error) {
 	cands, err := s.candidatesFor(question)
 	if err != nil {
 		return planBriefResponse{}, err
 	}
 	// What was asked just before (plan_earlier.go): its questions in the
 	// brief, the wants it showed among the candidates, last.
-	earlier := s.earlierInConversation(turn, question)
+	earlier := s.earlierInConversation(turn, question, since)
 	cands = withEarlierWants(cands, earlier)
 	allTypes, err := s.robotTypeNames()
 	if err != nil {
@@ -432,6 +435,8 @@ type planParamsRequest struct {
 	// Timezone is the asker's (an IANA name, Asia/Tokyo): what "now" is,
 	// for a time the question gives as 今 or 30分後. The server's own, absent.
 	Timezone string `json:"timezone,omitempty"`
+	// Since, as for the brief: the conversation cleared then.
+	Since string `json:"since,omitempty"`
 }
 
 type planParam struct {
@@ -491,7 +496,7 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 	}
 	now := planNow(req.Timezone, time.Now())
 	b.WriteString(planNowText(req.Timezone, time.Now()))
-	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question)))
+	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question, req.Since)))
 	if rerun != nil {
 		b.WriteString(rerunParamsText())
 	} else {

@@ -217,6 +217,59 @@ func (r *storyRecorder) decideLocked(j *storyJudging, outcome string, to *ws.Sto
 	}
 }
 
+// said is an answer judged by the person themself — a 👍 (success) or a 👎
+// (wrong) — which decides over what was judged from what they did: a turn
+// still being judged is decided now; one already judged (or let go unjudged)
+// is judged again, by person, and the ledger keeps this one.
+func (r *storyRecorder) said(turn, character, question, outcome string) {
+	r.running()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	j := r.judging[turn]
+	if j == nil {
+		if c := r.turns[turn]; c != "" {
+			character = c
+		}
+		if character == "" {
+			character = storyUnknown
+		}
+		j = &storyJudging{turn: turn, character: character, question: question, askedAt: r.now(),
+			shown: map[string]bool{}, types: map[string]bool{}}
+		// Judged already: what the answer was (its plan, what it showed)
+		// stays the row's, so the word counts against that kind of answer.
+		if row, ok := r.ledgerRow(turn); ok {
+			if row.Question != "" {
+				j.question = row.Question
+			}
+			if at, err := time.Parse(time.RFC3339, row.At); err == nil {
+				j.askedAt = at
+			}
+			for _, sh := range row.Shown {
+				j.show(strings.TrimPrefix(sh, "want:"), "")
+			}
+			if p := row.Plan; p != nil {
+				j.plan = map[string]string{}
+				for k, v := range map[string]string{"action": p.Action, "type": p.Type, "target": p.Target, "capability": p.Capability} {
+					if v != "" {
+						j.plan[k] = v
+					}
+				}
+				for k, v := range p.Params {
+					j.plan["param."+k] = v
+				}
+				// "existing smartgolf#rounds": the type it was about.
+				if rest, ok := strings.CutPrefix(row.Shape, "existing "); ok {
+					if t, _, _ := strings.Cut(rest, "#"); t != "" {
+						j.plan["targetType"] = t
+					}
+				}
+			}
+		}
+		r.judging[turn] = j
+	}
+	r.decideLocked(j, outcome, nil, map[string]string{"by": ws.TurnOutcomeByPerson})
+}
+
 // judgingOf is a character's turns being judged.
 func (r *storyRecorder) judgingOf(character string) []*storyJudging {
 	var out []*storyJudging

@@ -551,6 +551,35 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/turns/{id}/answer  {answer, choices?} or {error}
+// POST /api/v1/turns/{id}/feedback — the person's word on an answer:
+// {"reaction": "good"} (👍) or {"reaction": "wrong"} (👎). Said on its own,
+// with nothing asked after it; it is the turn's outcome (success, wrong) in
+// the asker's story, by person, over what was judged from what they did.
+func (s *Server) handleTurnFeedback(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Reaction string `json:"reaction"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	outcome := map[string]string{"good": ws.TurnOutcomeSuccess, "wrong": ws.TurnOutcomeWrong}[strings.TrimSpace(req.Reaction)]
+	if outcome == "" {
+		http.Error(w, "reaction must be good or wrong", http.StatusBadRequest)
+		return
+	}
+	turn, err := s.robotUpdateTurn(mux.Vars(r)["id"], func(t *robotTurn) error {
+		t.Outcome = outcome
+		return nil
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	story.said(turn.ID, turn.Character, turn.Question, outcome)
+	robotWriteJSON(w, map[string]string{"turn": turn.ID, "outcome": outcome})
+}
+
 func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Answer  string   `json:"answer"`

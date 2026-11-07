@@ -110,13 +110,14 @@ func earlierTurns(turns []robotTurn, current, question string, wants []robotWant
 
 // earlierInConversation is the turns before the one being answered
 // (earlierTurns), from the robot's turns and the wants on the board.
-func (s *Server) earlierInConversation(current, question string) []planEarlier {
+func (s *Server) earlierInConversation(current, question, since string) []planEarlier {
 	turnsMu.Lock()
 	var turns []robotTurn
 	if robot, err := s.robotWantNow(); err == nil {
 		turns = robotLoadTurns(robot)
 	}
 	turnsMu.Unlock()
+	turns = turnsSince(turns, since)
 	if len(turns) == 0 {
 		return nil
 	}
@@ -166,6 +167,24 @@ func withEarlierWants(cands []planCandidate, earlier []planEarlier) []planCandid
 			out = append(out, planCandidate{name: w.Metadata.Name, want: true,
 				line: fmt.Sprintf("- %s: want %s, shown earlier in this conversation", w.Metadata.Name, w.Metadata.Type)})
 		}
+	}
+	return out
+}
+
+// turnsSince are the turns asked at or after since (RFC 3339): a client whose
+// conversation was cleared then (the chat's クリア) is not answered from what
+// was said before it. "" or unreadable: every turn.
+func turnsSince(turns []robotTurn, since string) []robotTurn {
+	from, err := time.Parse(time.RFC3339, strings.TrimSpace(since))
+	if err != nil {
+		return turns
+	}
+	var out []robotTurn
+	for _, t := range turns {
+		if at, err := time.Parse(time.RFC3339, t.StartedAt); err == nil && at.Before(from) {
+			continue
+		}
+		out = append(out, t)
 	}
 	return out
 }
