@@ -49,6 +49,9 @@ type planBriefRequest struct {
 	// Turn is the turn being answered, when the client has opened one: what
 	// was said before it is part of the brief (plan_earlier.go).
 	Turn string `json:"turn,omitempty"`
+	// Timezone is the asker's (as for the params): the time now, for the
+	// parameters the brief has filled with the decision.
+	Timezone string `json:"timezone,omitempty"`
 }
 
 type planBriefResponse struct {
@@ -63,6 +66,14 @@ type planBriefResponse struct {
 	// existing, new, none. A client offers these rather than its own list,
 	// so an action added here needs no new app.
 	Actions []string `json:"actions"`
+	// TypeParams are the parameters of the types the brief offers (its
+	// "Types that could make a want"), filled with the decision: a client
+	// that has them asks no /plans/params for those types.
+	TypeParams map[string][]planParam `json:"typeParams,omitempty"`
+	// NeedsTemplate are the types among those with no answer template kept
+	// for this locale (plan_answer.go): the decision writes one, as
+	// answer_template, sent with the plan as spec.answerTemplate.
+	NeedsTemplate []string `json:"needsTemplate,omitempty"`
 }
 
 type planCandidate struct {
@@ -79,7 +90,7 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	brief, err := s.planBrief(req.Question, req.Locale, req.Turn)
+	brief, err := s.planBrief(req.Question, req.Locale, req.Turn, req.Timezone)
 	if err != nil {
 		http.Error(w, "backend: "+err.Error(), http.StatusBadGateway)
 		return
@@ -87,7 +98,7 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 	robotWriteJSON(w, brief)
 }
 
-func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, error) {
+func (s *Server) planBrief(question, locale, turn, timezone string) (planBriefResponse, error) {
 	cands, err := s.candidatesFor(question)
 	if err != nil {
 		return planBriefResponse{}, err
@@ -101,6 +112,9 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 		return planBriefResponse{}, err
 	}
 	typesText := s.planTypesText(question)
+	// What the decision fills too: the offered types' parameters, and an
+	// answer template for those that have none kept (plan_answer.go).
+	typeParams, needsTemplate, alsoText := s.planBriefAlso(question, locale, timezone)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", question)
@@ -164,6 +178,7 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 	for _, n := range capNames {
 		caps = append(caps, n)
 	}
+	b.WriteString(alsoText)
 	b.WriteString("\nSet the fields you do not use to " + planNone + ".")
 
 	refs := []string{planNone}
@@ -175,11 +190,13 @@ func (s *Server) planBrief(question, locale, turn string) (planBriefResponse, er
 		}
 	}
 	return planBriefResponse{
-		Prompt:       b.String() + robotLocaleText(locale),
-		Refs:         refs,
-		Types:        append([]string{planNone}, allTypes...),
-		Capabilities: caps,
-		Actions:      planActions(len(cands) > 0),
+		Prompt:        b.String() + robotLocaleText(locale),
+		Refs:          refs,
+		Types:         append([]string{planNone}, allTypes...),
+		Capabilities:  caps,
+		Actions:       planActions(len(cands) > 0),
+		TypeParams:    typeParams,
+		NeedsTemplate: needsTemplate,
 	}, nil
 }
 
@@ -346,9 +363,22 @@ func robotNamePartSaid(name, said string) bool {
 // and what they say about their questions: called by an alias or their title
 // first, then those that say how their questions go.
 func (s *Server) planTypesText(question string) string {
+	var b strings.Builder
+	for _, t := range s.planTypesFor(question) {
+		fmt.Fprintf(&b, "- %s: %s\n", t.Name, firstLine(t.Title, 80))
+		if h := planHint(robotTypeHint(t.Labels)); h != "" && b.Len()+len(h) < robotHintsMax {
+			b.WriteString("  " + strings.ReplaceAll(h, "\n", "\n  ") + "\n")
+		}
+	}
+	return b.String()
+}
+
+// planTypesFor is the types the question may be for, the likeliest first, at
+// most planTypes of them.
+func (s *Server) planTypesFor(question string) []robotWantType {
 	types, err := s.robotWantTypes()
 	if err != nil {
-		return ""
+		return nil
 	}
 	aliases := s.robotTypeAliases()
 	said := robotLoose(question)
@@ -370,17 +400,14 @@ func (s *Server) planTypesText(question string) string {
 		}
 	}
 	sort.SliceStable(rs, func(i, j int) bool { return rs[i].score > rs[j].score })
-	var b strings.Builder
+	var out []robotWantType
 	for i, r := range rs {
 		if i == planTypes {
 			break
 		}
-		fmt.Fprintf(&b, "- %s: %s\n", r.t.Name, firstLine(r.t.Title, 80))
-		if h := planHint(robotTypeHint(r.t.Labels)); h != "" && b.Len()+len(h) < robotHintsMax {
-			b.WriteString("  " + strings.ReplaceAll(h, "\n", "\n  ") + "\n")
-		}
+		out = append(out, r.t)
 	}
-	return b.String()
+	return out
 }
 
 // planHint is a type's hint as the plan reads it: written for the robot's
@@ -475,12 +502,7 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 		if i == 10 {
 			break
 		}
-		desc := firstLine(p.Description, 120)
-		if p.Example != nil {
-			desc += fmt.Sprintf(" e.g. %v", p.Example)
-		}
-		// The time now beside a time or date, where it is filled (「今」).
-		desc += paramNowHint(p.SubType, now)
+		desc := planParamDescription(p.Description, p.Example, p.SubType, now)
 		// Run again: what it is now, beside it, and empty to keep it — told
 		// as one list, a small model copied the list back (time 21:17 for
 		// 「今の時刻で再検索」).
@@ -491,6 +513,16 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 		params = append(params, planParam{Name: p.Name, Description: desc, Required: p.Required && rerun == nil})
 	}
 	robotWriteJSON(w, map[string]any{"prompt": b.String() + robotLocaleText(req.Locale), "type": name, "params": params})
+}
+
+// planParamDescription is a parameter as the model is told it: what it is,
+// an example, and the time now beside a time or date (「今」).
+func planParamDescription(description string, example any, subType string, now time.Time) string {
+	desc := firstLine(description, 120)
+	if example != nil {
+		desc += fmt.Sprintf(" e.g. %v", example)
+	}
+	return desc + paramNowHint(subType, now)
 }
 
 // ── act ─────────────────────────────────────────────────────────────────────

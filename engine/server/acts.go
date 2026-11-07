@@ -156,9 +156,13 @@ func (s *Server) runAct(a *actEntry, plan ws.PlanSpec) {
 			}
 		})
 	})
+	// Worded already, where the type's answer template is filled by what
+	// the want found (plan_answer.go).
+	answer := s.actAnswer(plan, spec.Locale, a.snapshot().Status.Cards)
 	a.update(func(d *ws.Act) {
 		d.Status.Phase = ws.ActSucceeded
 		d.Status.Prompt = prompt
+		d.Status.Answer = answer
 		d.Status.CompletionTime = time.Now().Format(time.RFC3339)
 	})
 }
