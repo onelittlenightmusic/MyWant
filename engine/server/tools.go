@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	mywant "mywant/engine/core"
 )
 
 // The robot, for an on-device model elsewhere (Apple FoundationModels on an
@@ -1270,6 +1272,24 @@ type robotWant struct {
 func (w robotWant) archived() bool { return w.Metadata.Labels[robotArchived] == "true" }
 
 func (s *Server) robotWantList() ([]robotWant, error) {
+	// From the builder, as /api/v1/wants lists them (no system wants, none
+	// cancelled), without the list's JSON: on fly that is 2.6MB marshalled
+	// and read back, four seconds each time, and a plan's brief asked three
+	// times — the phone's 30 seconds were gone before it had its brief.
+	if s.globalBuilder != nil {
+		var out []robotWant
+		for _, w := range s.globalBuilder.GetAllWantStates() {
+			if shouldHideSystemWant(w, false) || w.GetStatus() == mywant.WantStatusCancelled {
+				continue
+			}
+			var rw robotWant
+			rw.Metadata.ID, rw.Metadata.Name, rw.Metadata.Type = w.Metadata.ID, w.Metadata.Name, w.Metadata.Type
+			rw.Metadata.Labels = w.Metadata.Labels
+			rw.Spec.Params = w.Spec.Params
+			out = append(out, rw)
+		}
+		return out, nil
+	}
 	var resp struct {
 		Wants []robotWant `json:"wants"`
 	}
@@ -1610,19 +1630,11 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 	if err := s.backend("GET", "/api/v1/things", nil, &things); err != nil {
 		return nil, err
 	}
-	var wants struct {
-		Wants []struct {
-			Metadata struct {
-				ID     string            `json:"id"`
-				Name   string            `json:"name"`
-				Type   string            `json:"type"`
-				Labels map[string]string `json:"labels"`
-			} `json:"metadata"`
-		} `json:"wants"`
-	}
-	if err := s.backend("GET", "/api/v1/wants", nil, &wants); err != nil {
+	list, err := s.robotWantList()
+	if err != nil {
 		return nil, err
 	}
+	wants := struct{ Wants []robotWant }{list}
 	aliases := s.robotTypeAliases()
 	var tiles []robotTile
 	for _, t := range things.Things {
