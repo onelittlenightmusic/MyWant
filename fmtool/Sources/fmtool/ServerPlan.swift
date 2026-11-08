@@ -30,6 +30,12 @@ func serverPlanned(question: String, turnID: String?, target: ServerTarget) asyn
     // The turn being answered: what was said before it is in the brief.
     if let turnID { briefReq["turn"] = turnID }
     let brief = try await ServerTools.post("api/v1/plans/brief", briefReq, target: target, timeout: 30)
+    // A reply to the robot's offer (はい / いいえ): the server has done it and
+    // said so; nothing to decide.
+    if let answered = brief["answered"] as? String, !answered.isEmpty {
+        printErr("[plan] answered by the server: \(answered)")
+        return answered
+    }
     let prompt = brief["prompt"] as? String ?? question
     let refs = brief["refs"] as? [String] ?? ["-"]
     let types = brief["types"] as? [String] ?? ["-"]

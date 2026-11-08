@@ -73,6 +73,7 @@ type Server struct {
 	thingStore           *ThingStore                     // Persists user-entered values to ~/.mywant/memo.yaml
 	thingEvents          *ThingEventStore                // Provenance timeline for named values (~/.mywant/memo-events.yaml)
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
+	initiative           *robotInitiative                // The robot acting on its own (robot_initiative.go); nil when off
 	pushStore            *PushStore                      // Web Push subscriptions for per-want alerts (~/.mywant/push-subscriptions.yaml)
 	vapid                vapidKeys                       // Web Push signing keypair (~/.mywant/vapid.json or MYWANT_VAPID_*)
 	kataLabels           *labels.FileStore               // Labels set on kata at runtime (~/.mywant/kata-labels.yaml); see kata_labels.go
@@ -524,6 +525,9 @@ func (s *Server) Start() error {
 
 	// Every new answer a want arrives at becomes that want's alert.
 	s.RegisterOutputCallback()
+
+	// The robot acting on events, not only when spoken to (off unless asked).
+	s.startRobotInitiative()
 
 	// Seed "default" so a fresh install is never worldless. Until now a world
 	// file only appeared when you switched worlds (openWorld auto-saves the

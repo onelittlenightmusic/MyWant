@@ -560,6 +560,11 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/turns/{id}", s.handleTurnGet).Methods("GET")
 	api.HandleFunc("/turns/{id}/answer", s.handleTurnAnswer).Methods("POST")
 	api.HandleFunc("/turns/{id}/feedback", s.handleTurnFeedback).Methods("POST")
+	api.HandleFunc("/robot/initiative", s.handleRobotInitiative).Methods("POST")
+	api.HandleFunc("/robot/initiative", s.handleRobotInitiativeStatus).Methods("GET")
+	api.HandleFunc("/robot/initiative/label", s.handleRobotInitiativeLabel).Methods("POST")
+	api.HandleFunc("/robot/initiative/retrain", s.handleRobotInitiativeRetrain).Methods("POST")
+	api.HandleFunc("/robot/offer/reply", s.handleRobotOfferReply).Methods("POST")
 	api.HandleFunc("/turns/{id}/replay", s.handleTurnReplay).Methods("POST")
 	// What a device running the robot's model recorded about itself (device_log.go).
 	api.HandleFunc("/device-log", s.handleDeviceLogPost).Methods("POST")

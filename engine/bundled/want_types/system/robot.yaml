@@ -408,6 +408,17 @@ wantType:
     initialValue: []
     label: current
 
+  - name: robot_offer
+    description: |
+      The offer the robot is waiting on a reply to (engine/server/robot_offer.go):
+      {id, ask, choices, at}, or empty when none is waiting. The board's robot
+      bubble shows it with its choices as buttons, answered through
+      POST /api/v1/robot/offer/reply.
+    type: object
+    persistent: false
+    initialValue: {}
+    label: current
+
   - name: cc_activity
     description: |
       FIFO buffer (last 100) of what the agent did between question and answer —

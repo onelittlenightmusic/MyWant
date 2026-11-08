@@ -2127,12 +2127,16 @@ func robotLookSkip(key string) bool {
 	return robotLookSecret(lower)
 }
 
-// robotSay puts words in the robot's speech bubble on the board.
+// robotSay puts words in the robot's speech bubble on the board — said in
+// the room, as every character's words are (recordSpeech): the bubble over
+// its head and a line in the conversation the board's column keeps. Written
+// only to the robot want's `say`, they reached neither.
 func (s *Server) robotSay(words string) error {
 	words = strings.TrimSpace(words)
 	if words == "" {
 		return nil
 	}
+	recordSpeech(robotCharacterID, words, "say")
 	return s.backend("PUT", "/api/v1/states/"+robotWantName, map[string]any{"say": words}, nil)
 }
 

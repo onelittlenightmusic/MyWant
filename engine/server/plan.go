@@ -77,6 +77,10 @@ type planBriefResponse struct {
 	// for this locale (plan_answer.go): the decision writes one, as
 	// answer_template, sent with the plan as spec.answerTemplate.
 	NeedsTemplate []string `json:"needsTemplate,omitempty"`
+	// Answered: the question was answered here and no decision is wanted —
+	// a reply to the robot's offer (robot_offer.go): the client closes the
+	// turn with these words and asks its model nothing.
+	Answered string `json:"answered,omitempty"`
 }
 
 type planCandidate struct {
@@ -102,6 +106,11 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) planBrief(question, locale, turn, timezone, since string) (planBriefResponse, error) {
+	// A reply to what the robot offered (はい / いいえ): done here.
+	if answer, ok := s.robotOfferReply(question); ok {
+		return planBriefResponse{Answered: answer, Refs: []string{"-"}, Types: []string{"-"},
+			Capabilities: []string{"-"}, Actions: []string{"none"}}, nil
+	}
 	cands, err := s.candidatesFor(question)
 	if err != nil {
 		return planBriefResponse{}, err

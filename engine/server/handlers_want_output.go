@@ -48,6 +48,12 @@ func (s *Server) RegisterOutputCallback() {
 			log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
 			return
 		}
+		if !characterWantTypes[w.Metadata.Type] {
+			s.robotInitiativeNotify(initiativeEvent{
+				Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
+				WantType: w.Metadata.Type, Message: msg,
+			})
+		}
 		title := w.Metadata.Name
 		if title == "" {
 			title = "MyWant"
