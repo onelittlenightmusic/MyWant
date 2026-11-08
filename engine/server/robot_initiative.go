@@ -122,7 +122,7 @@ var robotInitiatives = []initiativeCapability{
 				return "", err
 			}
 			words := fmt.Sprintf("「%s」: %s", sit.Event.WantName, sit.Event.Message)
-			if err := s.robotSay(words); err != nil {
+			if err := s.robotSayAs(words, speechNotice); err != nil {
 				return "", err
 			}
 			return fmt.Sprintf("walked to %s (%d, %d) and said: %s", sit.Event.WantName, sit.TileX, sit.TileY, words), nil

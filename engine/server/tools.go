@@ -2132,11 +2132,16 @@ func robotLookSkip(key string) bool {
 // its head and a line in the conversation the board's column keeps. Written
 // only to the robot want's `say`, they reached neither.
 func (s *Server) robotSay(words string) error {
+	return s.robotSayAs(words, "")
+}
+
+// robotSayAs is robotSay with what kind of line it is (SpeechEntry.Kind).
+func (s *Server) robotSayAs(words, kind string) error {
 	words = strings.TrimSpace(words)
 	if words == "" {
 		return nil
 	}
-	recordSpeech(robotCharacterID, words, "say")
+	recordSpeechAs(robotCharacterID, words, "say", kind)
 	return s.backend("PUT", "/api/v1/states/"+robotWantName, map[string]any{"say": words}, nil)
 }
 

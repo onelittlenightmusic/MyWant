@@ -36,7 +36,17 @@ type SpeechEntry struct {
 	// "chat" (posted to the character's chat want). Kept because they are
 	// different acts even though they land in the same column.
 	Source string `json:"source"`
+	// What kind of line it is, for a page to mark it: "ask" (a question
+	// waiting on a reply — the robot's offer), "notice" (news it brings
+	// unasked — a want's new answer told), or empty (anything else).
+	Kind string `json:"kind,omitempty"`
 }
+
+// The kinds of line a page marks (SpeechEntry.Kind).
+const (
+	speechAsk    = "ask"
+	speechNotice = "notice"
+)
 
 const speechLogMax = 200
 
@@ -47,6 +57,11 @@ var (
 
 // recordSpeech appends an utterance. Empty text is not an utterance.
 func recordSpeech(characterID, text, source string) {
+	recordSpeechAs(characterID, text, source, "")
+}
+
+// recordSpeechAs is recordSpeech with what kind of line it is (SpeechEntry.Kind).
+func recordSpeechAs(characterID, text, source, kind string) {
 	if characterID == "" || text == "" {
 		return
 	}
@@ -57,6 +72,7 @@ func recordSpeech(characterID, text, source string) {
 		Text:        text,
 		At:          at,
 		Source:      source,
+		Kind:        kind,
 	})
 	if len(speechLog) > speechLogMax {
 		speechLog = speechLog[len(speechLog)-speechLogMax:]
@@ -67,6 +83,7 @@ func recordSpeech(characterID, text, source string) {
 	// tab used to ask for what was new every second.
 	m := speechMoment("character", characterID, text, "")
 	m.At = at
+	m.Mark = kind
 	moments.add(m)
 }
 

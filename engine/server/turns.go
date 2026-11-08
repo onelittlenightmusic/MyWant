@@ -256,7 +256,12 @@ func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []strin
 	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
 	responses = append(responses, entry)
 	robot.SetCurrent("cc_responses", robotLastN(responses))
-	mywant.CharacterSpeaks(robotWantName, answer, "agent")
+	// An answer asking for a reply (its choices) is a question, marked so.
+	kind := ""
+	if len(choices) > 0 {
+		kind = speechAsk
+	}
+	recordSpeechAs(robotCharacterID, answer, "agent", kind)
 }
 
 // robotAnswerCards is the turn's cards, each filled with what its want says now
