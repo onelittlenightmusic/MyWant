@@ -93,6 +93,7 @@ type Server struct {
 
 // New creates a new MyWant server
 func New(config Config) *Server {
+	openImportanceStore() // importance.go
 	// Initialise OpenTelemetry (best-effort; non-fatal on failure)
 	otelShutdown, err := mywant.InitOTEL(context.Background(), config.OTELEndpoint)
 	if err != nil {

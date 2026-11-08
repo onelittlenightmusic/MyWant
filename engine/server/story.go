@@ -708,7 +708,10 @@ var storyRule = intersectionRule{
 		return m.kind == moverCharacter && w != nil &&
 			!characterWantTypes[w.Metadata.Type] && !w.Metadata.IsSystemWant
 	},
-	enter: func(_ intersectionContext, w *mywant.Want, m mover) { story.arrive(m.id, storyWantPlace(w)) },
+	enter: func(_ intersectionContext, w *mywant.Want, m mover) {
+		story.arrive(m.id, storyWantPlace(w))
+		noteWantVisited(w.Metadata.ID) // importance.go: Laya reads it as visited
+	},
 	leave: func(_ intersectionContext, w *mywant.Want, m mover) { story.leave(m.id, storyWantPlace(w)) },
 }
 

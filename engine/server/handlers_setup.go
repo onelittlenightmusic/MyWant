@@ -519,6 +519,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/gui/state", s.getGUIState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/gui/state", s.updateGUIState).Methods("PUT", "OPTIONS")
 	api.HandleFunc("/gui/pending-action", s.appendPendingDeviceAction).Methods("POST", "OPTIONS")
+	api.HandleFunc("/importance", s.importance).Methods("POST", "OPTIONS") // prototype: Laya's importance of what is in view
 
 	// Riff: propose absurd wirings between named things and effect toys, and
 	// deploy one straight from its structure (no LLM round-trip).
