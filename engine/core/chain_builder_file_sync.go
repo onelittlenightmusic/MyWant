@@ -141,11 +141,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	written := 0
 	// YAML: one-item sequences end to end. JSON: the objects of one array.
 	asJSON := memoryIsJSON(cb.memoryPath)
-	encode := func(want *Want) bool {
-		data, err := encodeMemoryWant(want, asJSON)
-		if err != nil {
-			return false
-		}
+	put := func(data []byte) {
 		if asJSON {
 			if written == 0 {
 				w.WriteString("[\n")
@@ -155,6 +151,28 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		}
 		w.Write(data)
 		written++
+	}
+	// Each want's bytes as the last write made them, when nothing they were
+	// made from has moved since (memory_cache.go).
+	useCache, kept := cb.memCache.begin(time.Now())
+	cached := func(id string, key memoryCacheKey) bool {
+		if !useCache {
+			return false
+		}
+		data, ok := cb.memCache.get(id, key)
+		if ok {
+			put(data)
+			kept[id] = memoryCacheEntry{key: key, data: data}
+		}
+		return ok
+	}
+	encode := func(id string, key memoryCacheKey, want *Want) bool {
+		data, err := encodeMemoryWant(want, asJSON)
+		if err != nil {
+			return false
+		}
+		put(data)
+		kept[id] = memoryCacheEntry{key: key, data: data}
 		return true
 	}
 	abandon := func() {
@@ -172,7 +190,16 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		}
 		seenIDs[want.Metadata.ID] = true
 		configWantMap[want.Metadata.Name] = true
-		if runtimeWant, exists := wantsSnapshot[want.Metadata.ID]; exists {
+		runtimeWant, exists := wantsSnapshot[want.Metadata.ID]
+		var running *Want
+		if exists {
+			running = runtimeWant.want
+		}
+		key := memoryKeyOf(want, running, asJSON)
+		if cached(want.Metadata.ID, key) {
+			continue
+		}
+		if exists {
 			// Update with runtime data including spec using
 			want.Spec = *runtimeWant.want.GetSpec() // Preserve using from runtime spec
 			// Stats field removed - data now in State
@@ -196,7 +223,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			want.History = runtimeWant.want.BuildHistory()  // Include history in stats writes
 			want.ResultHistory = want.History.ResultHistory // ...and persist the answers (result_history.go)
 		}
-		if !encode(want) {
+		if !encode(want.Metadata.ID, key, want) {
 			abandon()
 			return
 		}
@@ -207,6 +234,11 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		wantName := runtimeWant.want.GetMetadata().Name // see the OrderKey comment above
 		if !configWantMap[wantName] {
 			// This want exists in runtime but not in config - include it
+			id := runtimeWant.want.Metadata.ID
+			key := memoryKeyOf(nil, runtimeWant.want, asJSON)
+			if cached(id, key) {
+				continue
+			}
 
 			// Deep copy — same reason as above.
 			stateCopy := runtimeWant.want.GetAllStateDeep()
@@ -220,7 +252,7 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 			}
 			wantConfig.ResultHistory = wantConfig.History.ResultHistory // see above
 			wantConfig.storeStateMulti(stateCopy)
-			if !encode(wantConfig) {
+			if !encode(id, key, wantConfig) {
 				abandon()
 				return
 			}
@@ -235,6 +267,8 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		abandon()
 		return
 	}
+
+	cb.memCache.finish(kept)
 
 	// Calculate hash of stats data for change detection
 	statsHash := fmt.Sprintf("%x", hash.Sum(nil))

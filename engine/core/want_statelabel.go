@@ -44,6 +44,7 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 	}
 	// All at once: a want running sees the labels before or after, not half.
 	n.StateLabels.Replace(labels)
+	n.persistTouched()
 }
 
 func (n *Want) SetGoal(key string, value any) {

@@ -30,36 +30,55 @@ func TestMemoryWriteCost(t *testing.T) {
 		cb.wantNameToID[w.Metadata.Name] = w.Metadata.ID
 	}
 	dir := t.TempDir()
+	// The smallest want: what a location webhook changes every second.
+	var small *Want
+	smallest := -1
+	for _, w := range loaded {
+		if b, err := encodeMemoryWant(w, true); err == nil && (smallest < 0 || len(b) < smallest) {
+			small, smallest = w, len(b)
+		}
+	}
 	const rounds = 10
-	for _, name := range []string{"state.yaml", "state.json"} {
-		cb.memoryPath = filepath.Join(dir, name)
-		cb.lastStatsHash = ""
-		var before, after runtime.MemStats
+	measure := func(name, scenario string, before func(i int)) {
+		var ms0, ms1 runtime.MemStats
 		runtime.GC()
-		runtime.ReadMemStats(&before)
-		start := time.Now()
+		runtime.ReadMemStats(&ms0)
+		var spent time.Duration
 		for i := 0; i < rounds; i++ {
+			before(i)
 			bumpStateEpoch()
 			cb.lastStatsHash = "" // written every round, as when something has changed
+			start := time.Now()
 			cb.writeStatsToMemory()
+			spent += time.Since(start)
 		}
-		elapsed := time.Since(start) / rounds
-		runtime.ReadMemStats(&after)
+		runtime.ReadMemStats(&ms1)
 		info, err := os.Stat(cb.memoryPath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Logf("%-10s %d wants  %8d bytes  %8.1f ms/write  %6.1f MB allocated/write",
-			name, len(loaded), info.Size(), float64(elapsed.Microseconds())/1000,
-			float64(after.TotalAlloc-before.TotalAlloc)/rounds/1e6)
+		t.Logf("%-10s %-26s %8d bytes  %7.2f ms/write  %6.2f MB allocated/write",
+			name, scenario, info.Size(), float64(spent.Microseconds())/1000/rounds,
+			float64(ms1.TotalAlloc-ms0.TotalAlloc)/rounds/1e6)
+	}
+	for _, name := range []string{"state.yaml", "state.json"} {
+		cb.memoryPath = filepath.Join(dir, name)
+		noCache := func(int) { cb.memCache.finish(nil) }
+		measure(name, "whole (no cache)", noCache)
+		cb.memCache.finish(nil)
+		bumpStateEpoch()
+		cb.lastStatsHash = ""
+		cb.writeStatsToMemory() // the cache filled
+		measure(name, "cached, nothing changed", func(int) {})
+		measure(name, "cached, one small changed", func(i int) { small.StoreState("_bench_tick", i) })
 
 		// And it reads back: the same wants.
+		start := time.Now()
 		back, err := LoadWantsFromMemoryFile(cb.memoryPath)
 		if err != nil || len(back) != len(loaded) {
 			t.Fatalf("%s read back: %v, %d wants", name, err, len(back))
 		}
-		start = time.Now()
-		_, _ = LoadWantsFromMemoryFile(cb.memoryPath)
 		t.Logf("%-10s read back in %.1f ms", name, float64(time.Since(start).Microseconds())/1000)
 	}
+	t.Logf("the small want: %s (%d bytes)", small.Metadata.Name, smallest)
 }

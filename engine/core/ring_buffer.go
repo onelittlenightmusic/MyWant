@@ -18,7 +18,24 @@ type ringBuffer[T any] struct {
 	buf  []atomic.Value // pre-allocated fixed-size slots
 	cap_ int64
 	head atomic.Int64 // monotonically increasing write count
+	// version changes with every change to what the ring holds (an entry
+	// appended, the last one updated, the ring cleared) — from one counter
+	// for every ring, so two rings never share one. What a cached copy of the
+	// ring (the memory file's, memory_cache.go) is checked against.
+	version atomic.Uint64
 }
+
+var ringVersions atomic.Uint64
+
+// Version is what the ring holds, as a number that changes whenever it does.
+func (r *ringBuffer[T]) Version() uint64 {
+	if r == nil {
+		return 0
+	}
+	return r.version.Load()
+}
+
+func (r *ringBuffer[T]) touched() { r.version.Store(ringVersions.Add(1)) }
 
 func newRingBuffer[T any](capacity int) *ringBuffer[T] {
 	return &ringBuffer[T]{
@@ -32,6 +49,7 @@ func newRingBuffer[T any](capacity int) *ringBuffer[T] {
 func (r *ringBuffer[T]) Append(v T) {
 	idx := r.head.Add(1) - 1
 	r.buf[idx%r.cap_].Store(v)
+	r.touched()
 }
 
 // Snapshot returns the most recent entries in FIFO order.
@@ -93,6 +111,7 @@ func (r *ringBuffer[T]) UpdateLast(fn func(*T)) bool {
 	entry := v.(T)
 	fn(&entry)
 	r.buf[idx].Store(entry)
+	r.touched()
 	return true
 }
 
@@ -102,6 +121,7 @@ func (r *ringBuffer[T]) Clear() {
 	for i := range r.buf {
 		r.buf[i] = atomic.Value{}
 	}
+	r.touched()
 }
 
 // Len returns the number of entries currently stored (capped at capacity).

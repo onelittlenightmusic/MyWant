@@ -106,6 +106,7 @@ type WantOperation struct {
 type ChainBuilder struct {
 	configPath           string                          // Path to original config file
 	memoryPath           string                          // Path to memory file (watched for changes)
+	memCache             memoryCache                     // each want's bytes in the memory file, made again only when it changed (memory_cache.go)
 	wants                map[string]*runtimeWant         // Runtime want registry, keyed by ID
 	wantNameToID         map[string]string               // Name → ID index for O(1) name lookups (protected by wantsMu)
 	registry             map[string]WantFactory          // Want type factories
@@ -1023,6 +1024,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 						runtimeWant.want.State.Store(k, v)
 						return true
 					})
+					runtimeWant.want.persistTouched()
 
 					// Re-initialize progressable linkage
 					if progressable, ok := runtimeWant.function.(Progressable); ok {

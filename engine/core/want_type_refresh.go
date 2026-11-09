@@ -66,6 +66,7 @@ func (n *Want) refreshTypeDefinition(def *WantTypeDefinition) {
 		}
 		if _, ok := n.State.Load(sd.Name); !ok {
 			n.State.Store(sd.Name, sd.InitialValue)
+			n.persistTouched()
 		}
 	}
 

@@ -258,6 +258,12 @@ type Want struct {
 	// rewritten. It is how a cycle can ask "is anything I derived from this
 	// still current?" without re-deriving it to find out.
 	stateRevision atomic.Uint64
+	// persistRev moves whenever anything the memory file keeps of this want
+	// does — a state value written by any path (StoreState, storeStateMulti,
+	// MergeState, Append/DrainState, DeleteState, a type's initial values),
+	// its status, labels, parameters. The memory file's copy of the want is
+	// made again only when it has moved (memory_cache.go).
+	persistRev atomic.Uint64
 	// derivedAtRevision is the revision the fetchFrom fields were last expanded
 	// at. Equal revisions mean nothing has moved since, so the expansion — one
 	// JSON-path extraction and one comparison per declared field, of which a
@@ -475,6 +481,7 @@ func (n *Want) SetStatus(status WantStatus) {
 	oldStatus := n.Status
 	n.Status = status
 	if oldStatus != status {
+		n.persistTouched()
 		bumpStateEpoch() // Status is persisted alongside state
 		n.changed()
 		n.wantMoment(MomentStatusKey, status, oldStatus)
@@ -628,6 +635,7 @@ func (n *Want) UpdateParameter(paramName string, paramValue any) {
 	}
 	n.Spec.Params[paramName] = paramValue
 	n.metadataMutex.Unlock()
+	n.persistTouched()
 
 	n.getHistoryManager().AddParameterEntry(paramName, paramValue)
 
@@ -1228,7 +1236,8 @@ func (n *Want) StoreState(key string, value any) {
 	n.stateTimestamps.Store(key, now)
 	n.getHistoryManager().AddStateEntry(key, value)
 	n.stateRevision.Add(1) // per want, for skipping work derived from this state
-	bumpStateEpoch()       // this is the only path by which state actually changes
+	n.persistTouched()
+	bumpStateEpoch() // a value changed: the memory file is to be written
 
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
@@ -1265,8 +1274,11 @@ func (n *Want) GetStateTimestamps() map[string]time.Time {
 
 // DeleteState removes a key from the want's state map.
 func (n *Want) DeleteState(key string) {
-	if _, had := n.State.LoadAndDelete(key); had && !n.isVolatileState(key) {
-		n.changed()
+	if _, had := n.State.LoadAndDelete(key); had {
+		n.persistTouched()
+		if !n.isVolatileState(key) {
+			n.changed()
+		}
 	}
 }
 
@@ -1317,6 +1329,7 @@ func (n *Want) MergeState(updates map[string]any) {
 
 		n.State.Store(key, merged)
 		n.getHistoryManager().AddStateEntry(key, merged)
+		n.persistTouched()
 		mu.Unlock()
 	}
 
@@ -1367,6 +1380,7 @@ func (n *Want) AppendState(key string, value any) {
 	n.State.Store(key, list)
 	n.stateTimestamps.Store(key, time.Now())
 	n.getHistoryManager().AddStateEntry(key, list)
+	n.persistTouched()
 }
 
 // DrainState atomically reads and clears the array-typed state field at
@@ -1384,6 +1398,7 @@ func (n *Want) DrainState(key string) []any {
 	}
 	n.State.Store(key, []any{})
 	n.stateTimestamps.Store(key, time.Now())
+	n.persistTouched()
 	return list
 }
 
@@ -1414,6 +1429,7 @@ func (n *Want) storeStateMulti(updates map[string]any) {
 		n.State.Store(key, value)
 		n.stateTimestamps.Store(key, now)
 		n.getHistoryManager().AddStateEntry(key, value)
+		n.persistTouched()
 
 		notification := StateNotification{
 			SourceWantName: n.Metadata.Name,
@@ -1480,6 +1496,11 @@ func (n *Want) storeState(key string, value any) {
 // Deprecated: For logic within Progress(), use SetCurrent, SetGoal, etc.
 func StoreStateMulti(wp WantPointer, updates map[string]any) {
 	wp.GetWant().storeStateMulti(updates)
+	// The memory file is to be written: a webhook's payload stored this way
+	// waited for some other change before it was. Not in storeStateMulti —
+	// writeStatsToMemory fills its own copies with it, and a write would ask
+	// for the next.
+	bumpStateEpoch()
 }
 
 // GetPendingStateChanges is obsolete; state changes are committed immediately via StoreState.
@@ -1927,6 +1948,7 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 		// Initialize state field with initial value if provided
 		if stateDef.InitialValue != nil {
 			n.State.Store(stateDef.Name, stateDef.InitialValue)
+			n.persistTouched()
 		}
 	}
 
@@ -1963,6 +1985,7 @@ func (n *Want) SetWantTypeDefinition(typeDef *WantTypeDefinition) {
 					// Initialize the new field too
 					if sd.InitialValue != nil {
 						n.State.Store(sd.Name, sd.InitialValue)
+						n.persistTouched()
 					}
 					n.ProvidedStateFields = append(n.ProvidedStateFields, sd.Name)
 				}
@@ -2167,7 +2190,7 @@ func (w *Want) GetMetadata() Metadata {
 // reentrant — and touches the map directly inside its own critical section.
 func (n *Want) labelSet() labels.Guarded {
 	// Told while the metadata lock is held: OnWantChanged only records the id.
-	return labels.Guard(&n.metadataMutex, &n.Metadata.Labels, func() { bumpStateEpoch(); n.changed() })
+	return labels.Guard(&n.metadataMutex, &n.Metadata.Labels, func() { n.persistTouched(); bumpStateEpoch(); n.changed() })
 }
 
 // GetLabels returns a copy of the want's labels.
