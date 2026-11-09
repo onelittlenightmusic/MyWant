@@ -25,8 +25,8 @@ func (cb *ChainBuilder) copyConfigToMemory() error {
 		return fmt.Errorf("failed to create memory directory: %w", err)
 	}
 
-	// Marshal config to YAML
-	data, err := yaml.Marshal(cb.config)
+	// Marshal config (YAML, or JSON for a .json memory file — memory_format.go)
+	data, err := marshalMemory(cb.config, memoryIsJSON(cb.memoryPath))
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
@@ -139,10 +139,19 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 	hash := md5.New()
 	w := bufio.NewWriter(io.MultiWriter(f, hash))
 	written := 0
+	// YAML: one-item sequences end to end. JSON: the objects of one array.
+	asJSON := memoryIsJSON(cb.memoryPath)
 	encode := func(want *Want) bool {
-		data, err := yaml.Marshal([]*Want{want})
+		data, err := encodeMemoryWant(want, asJSON)
 		if err != nil {
 			return false
+		}
+		if asJSON {
+			if written == 0 {
+				w.WriteString("[\n")
+			} else {
+				w.WriteString(",\n")
+			}
 		}
 		w.Write(data)
 		written++
@@ -218,7 +227,9 @@ func (cb *ChainBuilder) writeStatsToMemory() {
 		}
 	}
 	if written == 0 {
-		w.WriteString("[]\n") // what yaml.Marshal writes for an empty list
+		w.WriteString("[]\n") // an empty list, in YAML and JSON alike
+	} else if asJSON {
+		w.WriteString("\n]\n")
 	}
 	if err := w.Flush(); err != nil {
 		abandon()

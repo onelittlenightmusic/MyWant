@@ -37,8 +37,8 @@ func LoadWantsFromMemoryFile(filename string) ([]*Want, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read memory file: %w", err)
 	}
-	var wants []*Want
-	if err := yaml.Unmarshal(data, &wants); err != nil {
+	wants, err := unmarshalMemory(data, memoryIsJSON(filename))
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse memory file: %w", err)
 	}
 	InfoLog("[CONFIG-YAML] ✅ Loaded %d wants (with state) from %s\n", len(wants), filename)
