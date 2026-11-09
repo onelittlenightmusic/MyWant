@@ -836,29 +836,42 @@ func (s *Server) robotDeployWant(args map[string]string) (string, error) {
 		},
 		"spec": map[string]any{"params": params},
 	}
-	if err := s.backend("POST", "/api/v1/wants", want, nil); err != nil {
+	var created struct {
+		WantIDs []string `json:"want_ids"`
+	}
+	if err := s.backend("POST", "/api/v1/wants", want, &created); err != nil {
 		return "", err
 	}
-	// Walk there, as for one already on the board, and show its card. Left
-	// where it stood, the robot said 「ここに『荻窪→中野坂上』があります」 from
-	// the station it had been asked about a question earlier. The new want is
-	// placed beside the person when it is added (CanvasNearHook), which is a
-	// moment after the POST returns: wait for it to be there with its cell.
-	for i := 0; i < 20; i++ {
-		if s.robotWantOnBoard(name) {
-			pointed := map[string]string{"name": name}
-			if walked, err := s.robotPoint(pointed); err == nil {
-				if c, ok := pointed[robotCardArg]; ok {
-					args[robotCardArg] = c
-				}
-				return fmt.Sprintf("Deployed %q (%s)%s, next to the person. %s %s", name, typ, filled, walked, robotDeployedNote), nil
-			}
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
+	// Its card, from what the POST answered: shown with the answer whether or
+	// not the robot gets there in time. Waited for, on fly the want was not on
+	// the board within two seconds and 「武蔵境→中野坂上」 was answered with no
+	// card (2026-11-09).
+	if len(created.WantIDs) > 0 {
+		args[robotCardArg] = robotCardValue("want", created.WantIDs[0], name)
 	}
-	return fmt.Sprintf("Deployed %q (%s)%s, next to the person. The robot has not walked to it: do not say it is here. %s", name, typ, filled, robotDeployedNote), nil
+	// Walk there, as for one already on the board. Left where it stood, the
+	// robot said 「ここに『荻窪→中野坂上』があります」 from the station it had
+	// been asked about a question earlier. The new want is placed beside the
+	// person when it is added (CanvasNearHook), a moment after the POST
+	// returns — on fly more than two seconds later. The answer does not wait
+	// for the walk: its card is already the POST's, and the robot goes there
+	// once the want is on the board.
+	go func() {
+		for i := 0; i < robotDeployWalkWait; i++ {
+			if s.robotWantOnBoard(name) {
+				s.robotPoint(map[string]string{"name": name})
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
+	return fmt.Sprintf("Deployed %q (%s)%s, next to the person, and the robot is going to it: you may say it is here. %s", name, typ, filled, robotDeployedNote), nil
 }
+
+// robotDeployWalkWait: how long (in tenths of a second) the robot, after
+// deploy_want, waits for the want made to be on the board to walk there —
+// behind the answer, which does not wait. Two seconds was not enough on fly.
+const robotDeployWalkWait = 60
 
 // robotDeployedNote: a want just made has not finished yet. Read as nothing to
 // report, the phone's model said 「検索に失敗しました」 of a search that was

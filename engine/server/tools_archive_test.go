@@ -210,3 +210,39 @@ func TestFMParseParams(t *testing.T) {
 		}
 	}
 }
+
+// 「荻窪から国分寺の乗り換え」 on Fly, 2026-11-09: the route put away the other
+// way (国分寺→荻窪) was offered as existing; the phone's model chose existing
+// with no name, and nothing was made. A question type's put-away wants are not
+// candidates — made new, deploy_want brings back the one with those parameters.
+func TestPlanCandidatesLeaveOutArchivedQuestions(t *testing.T) {
+	s := patchTestServer(t)
+	robotArchiveTestWant(t, s, "old-route",
+		map[string]string{"mywant.io/archived": "true"},
+		map[string]any{"drop": "国分寺", "drop2": "荻窪"})
+	named := func() bool {
+		cands, err := s.candidatesFor("荻窪から国分寺の乗り換え")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, c := range cands {
+			if c.name == "old-route" {
+				return true
+			}
+		}
+		return false
+	}
+	if !named() {
+		t.Fatalf("a put-away want plainly asked about should be a candidate")
+	}
+
+	def := s.wantTypeLoader.GetDefinition("queue")
+	if def.Metadata.Labels == nil {
+		def.Metadata.Labels = map[string]string{}
+	}
+	def.Metadata.Labels[robotAskAgainLabel] = "run"
+	t.Cleanup(func() { delete(def.Metadata.Labels, robotAskAgainLabel) })
+	if named() {
+		t.Errorf("a put-away question (ask-again: run) should not be a candidate")
+	}
+}

@@ -316,6 +316,14 @@ func (s *Server) candidatesFor(question string) ([]planCandidate, error) {
 		if !w.archived() || w.Metadata.Name == robotWantName {
 			continue
 		}
+		// A question asked again (ask-again: run, a route): made new, and
+		// deploy_want brings back the one put away with the same parameters.
+		// Offered, the put-away route 国分寺→荻窪 let existing in for
+		// 「荻窪から国分寺の乗り換え」, and the phone's model chose existing
+		// with no name and answered there was nothing (fly, 2026-11-09).
+		if s.robotTypeLabel(w.Metadata.Type, robotAskAgainLabel) == "run" {
+			continue
+		}
 		sc := score(w.Metadata.Name, w.Metadata.Type, w.Spec.Params)
 		if sc < 4 {
 			continue // put away: only one that is plainly this question
@@ -615,6 +623,12 @@ func (s *Server) carryOutPlan(req actRequest, onStep func(robotStep)) []robotSte
 	case "existing":
 		name := strings.TrimSpace(req.Ref)
 		if name == "" || name == planNone {
+			// Existing with nothing chosen: what was chosen to make, made —
+			// with its parameters only (none sent, nothing was asked of it).
+			if t := strings.TrimSpace(req.Type); t != "" && t != planNone && len(req.Params) > 0 {
+				req.Kind = "new"
+				return s.carryOutPlan(req, onStep)
+			}
 			return nil
 		}
 		if c := strings.TrimSpace(req.Capability); c != "" && c != planNone {
