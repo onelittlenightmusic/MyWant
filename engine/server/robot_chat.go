@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gorilla/mux"
 	mywant "mywant/engine/core"
 )
 
@@ -38,6 +39,9 @@ type robotChatLine struct {
 }
 
 type robotChatResponse struct {
+	// Chat: the want has a chat at all (GET /api/v1/wants/{id}/chat) — a
+	// client shows the thread for one, and the want's own card for another.
+	Chat  bool            `json:"chat"`
 	Lines []robotChatLine `json:"lines"`
 	// The last クリア: the conversation shown starts after it.
 	ResetAt string `json:"resetAt,omitempty"`
@@ -50,7 +54,20 @@ func (s *Server) robotChat(after int64) (robotChatResponse, error) {
 	if err != nil {
 		return robotChatResponse{}, err
 	}
-	var out robotChatResponse
+	return wantChat(robot, after), nil
+}
+
+// isChatWant: a want with a chat — its type keeps what was said to it
+// (cc_messages). The robot, a character's chat, a coding agent.
+func isChatWant(w *mywant.Want) bool {
+	_, ok := w.StateLabels["cc_messages"]
+	return ok
+}
+
+// wantChat is a chat want's conversation, in order, after its last reset;
+// only the lines after seq `after` when it is given.
+func wantChat(robot *mywant.Want, after int64) robotChatResponse {
+	out := robotChatResponse{Chat: true}
 	resets := mywant.GetCurrent(robot, "cc_session_resets", []any{})
 	var resetAt time.Time
 	if len(resets) > 0 {
@@ -91,7 +108,7 @@ func (s *Server) robotChat(after int64) (robotChatResponse, error) {
 	if out.Lines == nil {
 		out.Lines = []robotChatLine{}
 	}
-	return out, nil
+	return out
 }
 
 // GET /api/v1/robot/chat[?after=<seq>]
@@ -103,4 +120,21 @@ func (s *Server) handleRobotChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.JSONResponse(w, http.StatusOK, out)
+}
+
+// GET /api/v1/wants/{id}/chat[?after=<seq>] — any chat want's conversation,
+// as the robot's (the phone draws a chat want's card as the thread itself);
+// {"chat": false} for a want with none.
+func (s *Server) handleWantChat(w http.ResponseWriter, r *http.Request) {
+	want := s.findWantByIDOrName(mux.Vars(r)["id"])
+	if want == nil {
+		http.Error(w, "want not found", http.StatusNotFound)
+		return
+	}
+	if !isChatWant(want) {
+		s.JSONResponse(w, http.StatusOK, robotChatResponse{Lines: []robotChatLine{}})
+		return
+	}
+	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+	s.JSONResponse(w, http.StatusOK, wantChat(want, after))
 }

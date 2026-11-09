@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 // robotArchiveTestWant puts a want on the test server and waits for it.
@@ -296,5 +295,43 @@ func TestRobotChatIsOneConversationInOrder(t *testing.T) {
 	robot.SetCurrent("cc_session_resets", []any{time.Now().Add(time.Second).Format(time.RFC3339)})
 	if chat, _ := s.robotChat(0); len(chat.Lines) != 0 {
 		t.Errorf("after クリア: %+v", chat.Lines)
+	}
+}
+
+// A want's chat, as the phone reads it to draw a chat want's card as the
+// thread: the conversation for a want whose type keeps cc_messages, and
+// {"chat": false} for one that does not.
+func TestWantChatSaysWhetherItIsAChat(t *testing.T) {
+	s := patchTestServer(t)
+	id := robotArchiveTestWant(t, s, "not-a-chat", nil, map[string]any{"service_time": 0.1})
+	w := patchTestDo(t, s, "GET", "/api/v1/wants/"+id+"/chat", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("%d %s", w.Code, w.Body.String())
+	}
+	var got robotChatResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Chat {
+		t.Errorf("a queue is no chat: %+v", got)
+	}
+	// The robot's type keeps cc_messages (its definition's state): a chat,
+	// with what was said to it.
+	robot, err := s.robotWantNow()
+	if err != nil {
+		t.Skip("no robot on the test board")
+	}
+	if !isChatWant(robot) {
+		t.Skipf("the robot here is a %s, not the robot type", robot.Metadata.Type)
+	}
+	s.robotAsked("やあ", "turn-x")
+	w = patchTestDo(t, s, "GET", "/api/v1/wants/"+robot.Metadata.ID+"/chat", nil)
+	got = robotChatResponse{}
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if !got.Chat || len(got.Lines) == 0 {
+		t.Fatalf("chat = %+v", got)
+	}
+	if last := got.Lines[len(got.Lines)-1]; last.Text != "やあ" || last.Seq == 0 || last.Turn != "turn-x" {
+		t.Errorf("last line = %+v", last)
 	}
 }

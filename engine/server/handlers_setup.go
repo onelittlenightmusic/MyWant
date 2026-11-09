@@ -65,6 +65,7 @@ func (s *Server) setupRoutes() {
 	// conversation inside it (see handlers_chat_control.go).
 	wants.HandleFunc("/{id}/chat/interrupt", s.interruptWantChat).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/chat/session", s.clearWantChatSession).Methods("DELETE", "OPTIONS")
+	wants.HandleFunc("/{id}/chat", s.handleWantChat).Methods("GET")
 	wants.HandleFunc("/{id}/suspend", s.suspendWant).Methods("POST")
 	wants.HandleFunc("/{id}/resume", s.resumeWant).Methods("POST")
 	wants.HandleFunc("/{id}/stop", s.stopWant).Methods("POST")
