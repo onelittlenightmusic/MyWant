@@ -147,7 +147,7 @@ func (n *Want) StoreParentState(key string, value any) {
 	}
 
 	role := n.GetRole()
-	label := parent.StateLabels[key]
+	label, _ := parent.StateLabels.Get(key)
 	engine := &GovernanceEngine{}
 
 	if !engine.CanWriteParentState(role, label) {
@@ -170,7 +170,7 @@ func (n *Want) MergeParentState(updates map[string]any) {
 	engine := &GovernanceEngine{}
 
 	for k := range updates {
-		label := parent.StateLabels[k]
+		label, _ := parent.StateLabels.Get(k)
 		if !engine.CanWriteParentState(role, label) {
 			n.StoreLog("[GOVERNANCE] Merge Warning: child %q (role:%s) attempted to write %q's key %q (label:%v) — policy not satisfied, proceeding anyway\n",
 				n.Metadata.Name, role, parent.Metadata.Name, k, label)

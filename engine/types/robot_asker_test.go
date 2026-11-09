@@ -20,9 +20,9 @@ func TestRobotWebhookCarriesTheAsker(t *testing.T) {
 		{"not said", map[string]any{"text": "中野の天気は？", "sender": "user"}, ""},
 	} {
 		w := newCCWant()
-		w.StateLabels["webhook_auto_character"] = LabelCurrent
-		w.StateLabels["cc_webhook_processed"] = LabelCurrent
-		w.StateLabels["phase"] = LabelCurrent
+		w.StateLabels.Set("webhook_auto_character", LabelCurrent)
+		w.StateLabels.Set("cc_webhook_processed", LabelCurrent)
+		w.StateLabels.Set("phase", LabelCurrent)
 		w.SetCurrent("webhook_auto_character", "chr-stale")
 		w.SetCurrent("cc_latest_message", c.msg)
 		w.SetCurrent("cc_message_count", 1)

@@ -73,7 +73,7 @@ func (cb *ChainBuilder) SearchWantStateByField(field, ancestorID string, include
 			continue
 		}
 		label := LabelNone
-		if l, has := want.StateLabels[field]; has {
+		if l, has := want.StateLabels.Get(field); has {
 			label = l
 		}
 		results = append(results, CrossWantStateEntry{

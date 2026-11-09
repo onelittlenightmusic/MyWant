@@ -309,10 +309,7 @@ func (t *Target) CreateChildWants() []*Want {
 
 		// Store the blueprint in plan state so the GUI can display the reasoning
 		// trace immediately after the first Progress cycle commits it.
-		if t.StateLabels == nil {
-			t.StateLabels = make(map[string]StateLabel)
-		}
-		t.StateLabels["planner_result"] = LabelPlan
+		t.StateLabels.Set("planner_result", LabelPlan)
 		t.StoreState("planner_result", map[string]any{
 			"confidence": result.Confidence,
 			"steps":      result.Steps,
@@ -444,9 +441,6 @@ func (t *Target) Initialize() {
 	// the coordinator itself can call SetGoal/SetCurrent immediately.
 	if t.recipeLoader != nil {
 		if stateDefs, err := t.recipeLoader.GetRecipeState(t.RecipePath); err == nil {
-			if t.StateLabels == nil {
-				t.StateLabels = make(map[string]StateLabel)
-			}
 			for _, def := range stateDefs {
 				if def.Label != "" {
 					var label StateLabel
@@ -462,7 +456,7 @@ func (t *Target) Initialize() {
 					default:
 						label = LabelNone
 					}
-					t.StateLabels[def.Name] = label
+					t.StateLabels.Set(def.Name, label)
 				}
 				// Register in ProvidedStateFields so fields appear in explicit state (not hidden_state)
 				if !Contains(t.ProvidedStateFields, def.Name) {
@@ -599,12 +593,9 @@ func (t *Target) Progress() {
 
 		if planStatus == "" {
 			// First cycle: run planner, store blueprint in state.plan, mark pending approval.
-			if t.StateLabels == nil {
-				t.StateLabels = make(map[string]StateLabel)
-			}
-			t.StateLabels["plan_status"] = LabelCurrent
-			t.StateLabels["plan_approved"] = LabelCurrent
-			t.StateLabels["planner_result"] = LabelPlan
+			t.StateLabels.Set("plan_status", LabelCurrent)
+			t.StateLabels.Set("plan_approved", LabelCurrent)
+			t.StateLabels.Set("planner_result", LabelPlan)
 
 			// Run planner now so the blueprint is visible in the balloon before approval.
 			if t.builder != nil {
@@ -671,9 +662,6 @@ func (t *Target) Progress() {
 		// will accept these keys on the coordinator want.
 		if t.recipeLoader != nil {
 			if stateDefs, err := t.recipeLoader.GetRecipeState(t.RecipePath); err == nil {
-				if t.StateLabels == nil {
-					t.StateLabels = make(map[string]StateLabel)
-				}
 				for _, def := range stateDefs {
 					if !Contains(t.ProvidedStateFields, def.Name) {
 						t.ProvidedStateFields = append(t.ProvidedStateFields, def.Name)
@@ -692,7 +680,7 @@ func (t *Target) Progress() {
 						default:
 							label = LabelNone
 						}
-						t.StateLabels[def.Name] = label
+						t.StateLabels.Set(def.Name, label)
 					}
 				}
 			}

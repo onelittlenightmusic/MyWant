@@ -39,7 +39,7 @@ func (s *Server) receiveOAuthCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify the want has a webhook_payload field (opt-in to OAuth callback)
-	if _, ok := want.StateLabels["webhook_payload"]; !ok {
+	if !want.StateLabels.Has("webhook_payload") {
 		errPage(w, http.StatusBadRequest, fmt.Sprintf("Want %q does not declare a webhook_payload state field. Add it to the want type YAML.", stateParam))
 		return
 	}

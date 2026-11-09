@@ -16,7 +16,7 @@ import (
 // reason.
 func newCCWant() *Want {
 	w := &Want{Metadata: Metadata{ID: "robot", Type: "robot"}}
-	w.StateLabels = map[string]StateLabel{
+	w.StateLabels.Replace(map[string]StateLabel{
 		"session_id":           LabelGoal,
 		"auto_request":         LabelGoal,
 		"webhook_auto_request": LabelCurrent,
@@ -24,7 +24,7 @@ func newCCWant() *Want {
 		"cc_latest_message":    LabelCurrent,
 		"request_count":        LabelCurrent,
 		"matched_content":      LabelCurrent,
-	}
+	})
 	return w
 }
 

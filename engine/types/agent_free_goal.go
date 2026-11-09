@@ -119,9 +119,8 @@ func runGoalInline(ctx context.Context, request string, report func(string)) (an
 	scratch := &Want{}
 	scratch.Metadata.Name = "goal"
 	scratch.Metadata.Type = "free_goal"
-	scratch.StateLabels = make(map[string]StateLabel, len(freeGoalScratchKeys))
 	for _, key := range freeGoalScratchKeys {
-		scratch.StateLabels[key] = LabelCurrent
+		scratch.StateLabels.Set(key, LabelCurrent)
 	}
 	scratch.SetCurrent("request", request)
 	scratch.SetCurrent("phase", "planning")

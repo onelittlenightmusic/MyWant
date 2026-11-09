@@ -543,7 +543,7 @@ func collectSourceFields(s *Server, want *mywant.Want, allowedLabels map[mywant.
 		if strings.HasPrefix(k, "_") || reservedFields[k] {
 			continue
 		}
-		label, hasLabel := want.StateLabels[k]
+		label, hasLabel := want.StateLabels.Get(k)
 		effective := label
 		if !hasLabel || label == mywant.LabelNone {
 			effective = mywant.LabelCurrent

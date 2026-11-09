@@ -16,10 +16,10 @@ func wantAt(id, typeName string, x, y int) *mywant.Want {
 	// What the type definition's `state:` list supplies in a real deployment.
 	// SetCurrent silently no-ops on an undeclared key, so without this a test
 	// reads as "the rule never fired" when the rule fired and was ignored.
-	w.StateLabels = map[string]mywant.StateLabel{
+	w.StateLabels.Replace(map[string]mywant.StateLabel{
 		targetsCharacters: mywant.LabelCurrent,
 		targetsThings:     mywant.LabelCurrent,
-	}
+	})
 	w.SetLabel(canvasLabelX, strconv.Itoa(x))
 	w.SetLabel(canvasLabelY, strconv.Itoa(y))
 	return w

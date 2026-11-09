@@ -219,14 +219,14 @@ func NewWantWithLocals(
 
 // Want represents a processing unit in the chain
 type Want struct {
-	Metadata        Metadata              `json:"metadata" yaml:"metadata"`
-	Spec            WantSpec              `json:"spec" yaml:"spec"`
-	Status          WantStatus            `json:"status,omitempty" yaml:"status,omitempty"`
-	State           sync.Map              `json:"-" yaml:"-"`
-	stateTimestamps sync.Map              `json:"-" yaml:"-"` // key → time.Time, updated on every StoreState call
-	StateLabels     map[string]StateLabel `json:"state_labels,omitempty" yaml:"state_labels,omitempty"`
-	HiddenState     map[string]any        `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
-	History         WantHistory           `json:"history" yaml:"-"`
+	Metadata        Metadata       `json:"metadata" yaml:"metadata"`
+	Spec            WantSpec       `json:"spec" yaml:"spec"`
+	Status          WantStatus     `json:"status,omitempty" yaml:"status,omitempty"`
+	State           sync.Map       `json:"-" yaml:"-"`
+	stateTimestamps sync.Map       `json:"-" yaml:"-"`                     // key → time.Time, updated on every StoreState call
+	StateLabels     StateLabelSet  `json:"state_labels,omitzero" yaml:"-"` // to YAML in MarshalYAML, as State
+	HiddenState     map[string]any `json:"hidden_state,omitempty" yaml:"hidden_state,omitempty"`
+	History         WantHistory    `json:"history" yaml:"-"`
 	// ResultHistory is the one history that goes through state.yaml, so a want's
 	// answers survive a `mywant restart` — History above is `yaml:"-"` because
 	// two hundred per-write snapshots per want would dwarf the state they are
@@ -420,12 +420,14 @@ func (n *Want) MarshalYAML() (any, error) {
 		return true
 	})
 	return &struct {
-		State           map[string]any       `yaml:"state,omitempty"`
-		StateTimestamps map[string]time.Time `yaml:"state_timestamps,omitempty"`
+		State           map[string]any        `yaml:"state,omitempty"`
+		StateTimestamps map[string]time.Time  `yaml:"state_timestamps,omitempty"`
+		StateLabels     map[string]StateLabel `yaml:"state_labels,omitempty"`
 		*Alias          `yaml:",inline"`
 	}{
 		State:           stateMap,
 		StateTimestamps: tsMap,
+		StateLabels:     n.StateLabels.Map(),
 		Alias:           (*Alias)(n),
 	}, nil
 }
@@ -435,14 +437,18 @@ func (n *Want) MarshalYAML() (any, error) {
 func (n *Want) UnmarshalYAML(value *yaml.Node) error {
 	type Alias Want
 	aux := &struct {
-		State           map[string]any       `yaml:"state"`
-		StateTimestamps map[string]time.Time `yaml:"state_timestamps"`
+		State           map[string]any        `yaml:"state"`
+		StateTimestamps map[string]time.Time  `yaml:"state_timestamps"`
+		StateLabels     map[string]StateLabel `yaml:"state_labels"`
 		*Alias          `yaml:",inline"`
 	}{
 		Alias: (*Alias)(n),
 	}
 	if err := value.Decode(aux); err != nil {
 		return err
+	}
+	if aux.StateLabels != nil {
+		n.StateLabels.Replace(aux.StateLabels)
 	}
 	for key, val := range aux.State {
 		n.State.Store(key, val)
@@ -564,7 +570,7 @@ func (n *Want) prepareForRestart() {
 			if typeDef != nil {
 				resetState := make(map[string]any)
 				for _, sd := range typeDef.State {
-					if label, exists := n.StateLabels[sd.Name]; exists && label == LabelGoal {
+					if n.StateLabels.Is(sd.Name, LabelGoal) {
 						continue // goal state is re-set by Initialize(); don't wipe it here
 					}
 					if sd.Persistent {

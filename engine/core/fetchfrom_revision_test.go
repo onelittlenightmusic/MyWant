@@ -20,10 +20,10 @@ func fetchFromWant() *Want {
 			OnFetchData: "summary",
 		}},
 	}
-	w.StateLabels = map[string]StateLabel{
+	w.StateLabels.Replace(map[string]StateLabel{
 		"mrs_raw_output": LabelCurrent,
 		"summary":        LabelCurrent,
-	}
+	})
 	return w
 }
 

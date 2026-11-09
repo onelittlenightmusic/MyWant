@@ -197,7 +197,7 @@ func pythonThinkerThink(ctx context.Context, want *Want) error {
 	// accidental overwrite of internal or plan-labeled state.
 	if updates, ok := output["current_updates"].(map[string]any); ok {
 		for k, v := range updates {
-			if label, exists := want.StateLabels[k]; exists && label == LabelCurrent {
+			if want.StateLabels.Is(k, LabelCurrent) {
 				want.SetCurrent(k, v)
 			} else {
 				want.StoreLog("[PYTHON-THINKER] WARN: current_updates key %q is not a current-labeled field; skipped", k)

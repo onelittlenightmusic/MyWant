@@ -118,7 +118,7 @@ func webFormSeedPlanFromParams(want *Want) {
 		if !isParam[sd.Name] || sd.Type == "bool" || sd.Type == "boolean" {
 			continue
 		}
-		if label, ok := want.StateLabels[sd.Name]; !ok || label != LabelPlan {
+		if !want.StateLabels.Is(sd.Name, LabelPlan) {
 			continue
 		}
 		v := want.GetStringParam(sd.Name, "")
@@ -156,7 +156,7 @@ func webFormBuildPlanSnapshot(want *Want) string {
 		if reserved[sd.Name] {
 			continue
 		}
-		label, exists := want.StateLabels[sd.Name]
+		label, exists := want.StateLabels.Get(sd.Name)
 		if !exists || label != LabelPlan {
 			continue
 		}
@@ -186,7 +186,7 @@ func webFormAllPlanFilled(want *Want) bool {
 		if reserved[sd.Name] {
 			continue
 		}
-		label, exists := want.StateLabels[sd.Name]
+		label, exists := want.StateLabels.Get(sd.Name)
 		if !exists || label != LabelPlan {
 			continue
 		}
@@ -226,7 +226,7 @@ func webFormMonitorSubmit(_ context.Context, want *Want) error {
 		})
 		// The card shows the page it arrived at. Types generated before
 		// embed_url existed do not declare it; leave those as they were.
-		if _, ok := want.StateLabels["embed_url"]; ok {
+		if want.StateLabels.Has("embed_url") {
 			want.SetCurrent("embed_url", builtURL)
 		}
 		return nil
@@ -235,7 +235,7 @@ func webFormMonitorSubmit(_ context.Context, want *Want) error {
 	fieldValues := map[string]string{}
 	if typeDef := want.WantTypeDefinition; typeDef != nil {
 		for _, sd := range typeDef.State {
-			label, exists := want.StateLabels[sd.Name]
+			label, exists := want.StateLabels.Get(sd.Name)
 			if !exists || label != LabelPlan {
 				continue
 			}

@@ -99,10 +99,10 @@ func TestClampPicturePin(t *testing.T) {
 
 func TestPictureAnswersAndFeedback(t *testing.T) {
 	p := &PictureWant{Want: Want{
-		Metadata:    Metadata{ID: "pic-id", Name: "score-photo", Type: "picture"},
-		Spec:        WantSpec{Params: map[string]any{}},
-		StateLabels: map[string]StateLabel{"answers": LabelCurrent},
+		Metadata: Metadata{ID: "pic-id", Name: "score-photo", Type: "picture"},
+		Spec:     WantSpec{Params: map[string]any{}},
 	}}
+	p.StateLabels.Replace(map[string]StateLabel{"answers": LabelCurrent})
 	// Each webhook lands in a cycle of its own, as it does on a running want.
 	cycle := func(f func()) { p.BeginProgressCycle(); f(); p.EndProgressCycle() }
 

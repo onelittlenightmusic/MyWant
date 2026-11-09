@@ -58,11 +58,6 @@ func (n *Want) refreshTypeDefinition(def *WantTypeDefinition) {
 		}
 	}
 
-	// Labels built aside and put in whole: the want's agents read StateLabels
-	// while this runs, and SetStateLabels fills the map in place.
-	shadow := &Want{}
-	shadow.SetStateLabels(&typeDef)
-
 	provided := make([]string, 0, len(typeDef.State))
 	for _, sd := range typeDef.State {
 		provided = append(provided, sd.Name)
@@ -74,9 +69,11 @@ func (n *Want) refreshTypeDefinition(def *WantTypeDefinition) {
 		}
 	}
 
+	// The labels put in whole (SetStateLabels replaces them in one step): the
+	// want's agents read them while this runs.
+	n.SetStateLabels(&typeDef)
 	n.metadataMutex.Lock()
 	n.WantTypeDefinition = &typeDef
-	n.StateLabels = shadow.StateLabels
 	n.ProvidedStateFields = provided
 	n.metadataMutex.Unlock()
 	// Derive again (want.go's fetchFrom pass): a new fetchFrom field fills from

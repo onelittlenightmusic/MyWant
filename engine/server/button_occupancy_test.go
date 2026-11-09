@@ -15,7 +15,7 @@ func buttonWantAt(id string, x, y int) *mywant.Want {
 	// Real deployment gets this from the type definition's `state:` list
 	// (SetStateLabels), which is what makes SetCurrent/GetCurrent("characters")
 	// work at all — SetCurrent silently no-ops on an undeclared key.
-	w.StateLabels = map[string]mywant.StateLabel{"characters": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"characters": mywant.LabelCurrent})
 	w.SetLabel(canvasLabelX, strconv.Itoa(x))
 	w.SetLabel(canvasLabelY, strconv.Itoa(y))
 	return w
@@ -29,7 +29,7 @@ func buttonWantAt(id string, x, y int) *mywant.Want {
 // "character_motion" want (see motionWantFor) — this is purely the trigger.
 func goingWantAt(id string, x, y int) *mywant.Want {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: id, Type: "going"}}
-	w.StateLabels = map[string]mywant.StateLabel{"characters": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"characters": mywant.LabelCurrent})
 	w.SetLabel(canvasLabelX, strconv.Itoa(x))
 	w.SetLabel(canvasLabelY, strconv.Itoa(y))
 	return w
@@ -40,7 +40,7 @@ func goingWantAt(id string, x, y int) *mywant.Want {
 // actually writes "going" to. startingGoing seeds its initial flag.
 func motionWantFor(characterID string, startingGoing bool) *mywant.Want {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: characterMotionWantName(characterID), Type: "character_motion"}}
-	w.StateLabels = map[string]mywant.StateLabel{"going": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"going": mywant.LabelCurrent})
 	w.SetCurrent("going", startingGoing)
 	return w
 }

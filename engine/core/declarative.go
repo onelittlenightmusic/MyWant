@@ -244,15 +244,9 @@ func SyncLocalsState(n *Want, locals any, toStruct bool) {
 		}
 
 		// 2. Determine state type (Current vs Internal) based on StateLabels
-		// If not in StateLabels, automatically register as internal
-		label, exists := n.StateLabels[stateKey]
-		if !exists {
-			if n.StateLabels == nil {
-				n.StateLabels = make(map[string]StateLabel)
-			}
-			n.StateLabels[stateKey] = LabelInternal
-			label = LabelInternal
-		}
+		// If not in StateLabels, automatically register as internal — unless
+		// another has labelled it meanwhile (that label stands).
+		label := n.StateLabels.SetIfAbsent(stateKey, LabelInternal)
 		if toStruct {
 			// Copy from State to Struct ONLY for internal labels.
 			// Current, Goal, etc. must be accessed via GetCurrent(), GetGoal() etc.

@@ -63,7 +63,7 @@ func TestResolveMotionIsNotScaledByTickDuration(t *testing.T) {
 // zero.
 func TestDirectionVectorOfCoercesIntPersistedFromYAML(t *testing.T) {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: "dir-1", Type: "direction"}}
-	w.StateLabels = map[string]mywant.StateLabel{"dx": mywant.LabelCurrent, "dy": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"dx": mywant.LabelCurrent, "dy": mywant.LabelCurrent})
 	w.SetCurrent("dx", int(-1))
 	w.SetCurrent("dy", int(0))
 
@@ -76,7 +76,7 @@ func TestDirectionVectorOfCoercesIntPersistedFromYAML(t *testing.T) {
 
 func TestGearValueOfCoercesIntPersistedFromYAML(t *testing.T) {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: "gear-1", Type: "gear"}}
-	w.StateLabels = map[string]mywant.StateLabel{"value": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"value": mywant.LabelCurrent})
 	w.SetCurrent("value", int(2))
 
 	got := gearValueOf(w)

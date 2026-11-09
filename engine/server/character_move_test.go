@@ -22,7 +22,7 @@ func wallAt(id string, x, y, rotation, length int) *mywant.Want {
 // the label has to be seeded here the same way real deployment does it.
 func doorAt(id string, x, y int, locked bool) *mywant.Want {
 	w := &mywant.Want{Metadata: mywant.Metadata{ID: id, Type: "door"}}
-	w.StateLabels = map[string]mywant.StateLabel{"locked": mywant.LabelCurrent}
+	w.StateLabels.Replace(map[string]mywant.StateLabel{"locked": mywant.LabelCurrent})
 	w.SetLabel(canvasLabelX, strconv.Itoa(x))
 	w.SetLabel(canvasLabelY, strconv.Itoa(y))
 	w.SetCurrent("locked", locked)

@@ -90,10 +90,7 @@ func TestInterpretDirections(t *testing.T) {
 
 	// parent is "noop" type which has no YAML state definition for desired_dispatch,
 	// so we must label it explicitly to allow the governance engine to permit writes.
-	if rtParent.StateLabels == nil {
-		rtParent.StateLabels = make(map[string]StateLabel)
-	}
-	rtParent.StateLabels["desired_dispatch"] = LabelPlan
+	rtParent.StateLabels.Set("desired_dispatch", LabelPlan)
 	// rtChild is "itinerary" type: child-role:thinker is auto-applied from itinerary.yaml
 
 	// Set directions in runtime child's plan state
@@ -262,10 +259,7 @@ func TestProposeDispatchOverwrites(t *testing.T) {
 	rtParent := getRuntimeWant(t, cb, "parent-id2")
 
 	// parent is "noop" type which has no YAML state definition for desired_dispatch.
-	if rtParent.StateLabels == nil {
-		rtParent.StateLabels = make(map[string]StateLabel)
-	}
-	rtParent.StateLabels["desired_dispatch"] = LabelPlan
+	rtParent.StateLabels.Set("desired_dispatch", LabelPlan)
 	// rtChild is "itinerary" type: child-role:thinker is auto-applied from itinerary.yaml
 
 	// First call: 2 directions

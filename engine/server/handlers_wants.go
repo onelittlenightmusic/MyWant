@@ -493,7 +493,7 @@ func (s *Server) buildWantAPIResponseWith(want *mywant.Want, includeConnectivity
 			finalResult = v
 			continue
 		}
-		label, hasLabel := want.StateLabels[k]
+		label, hasLabel := want.StateLabels.Get(k)
 		if !hasLabel {
 			label = mywant.LabelNone
 		}

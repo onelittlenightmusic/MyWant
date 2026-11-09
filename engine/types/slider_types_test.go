@@ -59,10 +59,10 @@ func TestSliderWant_PropagatesValueToParentGoal(t *testing.T) {
 
 	// Parent want with "max_budget" declared as a goal-labeled state key.
 	parent := &Want{
-		Metadata:    Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
-		Spec:        WantSpec{Params: map[string]any{}},
-		StateLabels: map[string]StateLabel{"max_budget": LabelGoal},
+		Metadata: Metadata{ID: "parent-id", Name: "parent", Type: "noop"},
+		Spec:     WantSpec{Params: map[string]any{}},
 	}
+	parent.StateLabels.Replace(map[string]StateLabel{"max_budget": LabelGoal})
 
 	cb := NewChainBuilder([]*Want{parent})
 	SetGlobalChainBuilder(cb)

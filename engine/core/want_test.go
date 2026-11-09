@@ -12,11 +12,11 @@ func TestWantStateConcurrency(t *testing.T) {
 	want.Init() // Initializes State sync.Map and other fields
 
 	// Define some labels for testing
-	want.StateLabels = map[string]StateLabel{
+	want.StateLabels.Replace(map[string]StateLabel{
 		"current_counter": LabelCurrent,
 		"goal_status":     LabelGoal,
 		"internal_flag":   LabelInternal,
-	}
+	})
 
 	// Call BeginProgressCycle so SetCurrent/SetGoal route to StoreState (which writes
 	// directly to State sync.Map) rather than StoreStateForAgent (which writes to

@@ -16,10 +16,10 @@ func TestMRSRebuildSkillArg_WantIdentityPlaceholders(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{ID: "want-abc123", Name: "spotify-instance", Type: "spotify"},
 	}
-	want.StateLabels = map[string]StateLabel{
+	want.StateLabels.Replace(map[string]StateLabel{
 		"skill_json_arg_template": LabelCurrent,
 		"skill_json_arg":          LabelCurrent,
-	}
+	})
 
 	want.BeginProgressCycle()
 	want.SetCurrent("skill_json_arg_template", `{"name":"%{want_name}","id":"%{want_id}"}`)
@@ -40,10 +40,10 @@ func TestMRSRebuildSkillArg_ParamOverridesWantName(t *testing.T) {
 		Metadata: Metadata{ID: "want-abc123", Name: "spotify-instance", Type: "spotify"},
 		Spec:     WantSpec{Params: map[string]any{"want_name": "explicit-override"}},
 	}
-	want.StateLabels = map[string]StateLabel{
+	want.StateLabels.Replace(map[string]StateLabel{
 		"skill_json_arg_template": LabelCurrent,
 		"skill_json_arg":          LabelCurrent,
-	}
+	})
 
 	want.BeginProgressCycle()
 	want.SetCurrent("skill_json_arg_template", `{"name":"%{want_name}"}`)
@@ -68,11 +68,11 @@ func TestMRSRebuildSkillArg_ValueWithQuotesStaysParseable(t *testing.T) {
 	want := &Want{
 		Metadata: Metadata{ID: "want-reg", Name: "registry-terminal", Type: "rpg_generator"},
 	}
-	want.StateLabels = map[string]StateLabel{
+	want.StateLabels.Replace(map[string]StateLabel{
 		"skill_json_arg_template": LabelCurrent,
 		"skill_json_arg":          LabelCurrent,
 		"error":                   LabelCurrent,
-	}
+	})
 
 	want.BeginProgressCycle()
 	want.SetCurrent("skill_json_arg_template", `{"last_error":"%{error}"}`)
@@ -97,10 +97,10 @@ func TestMRSRebuildSkillArg_PlainValuesUnchanged(t *testing.T) {
 		Metadata: Metadata{ID: "want-reg", Name: "registry-terminal", Type: "rpg_generator"},
 		Spec:     WantSpec{Params: map[string]any{"stage_id": "fortress1", "level": 5}},
 	}
-	want.StateLabels = map[string]StateLabel{
+	want.StateLabels.Replace(map[string]StateLabel{
 		"skill_json_arg_template": LabelCurrent,
 		"skill_json_arg":          LabelCurrent,
-	}
+	})
 
 	want.BeginProgressCycle()
 	want.SetCurrent("skill_json_arg_template", `{"stage_id":"%{stage_id}","level":%{level}}`)

@@ -60,7 +60,7 @@ func (s *Server) robotChat(after int64) (robotChatResponse, error) {
 // isChatWant: a want with a chat — its type keeps what was said to it
 // (cc_messages). The robot, a character's chat, a coding agent.
 func isChatWant(w *mywant.Want) bool {
-	_, ok := w.StateLabels["cc_messages"]
+	ok := w.StateLabels.Has("cc_messages")
 	return ok
 }
 

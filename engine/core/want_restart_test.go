@@ -25,11 +25,11 @@ func TestPrepareForRestartSkipsPersistentFields(t *testing.T) {
 
 	w := &Want{
 		Metadata: Metadata{ID: "w1", Name: "w1", Type: "test-type"},
-		StateLabels: map[string]StateLabel{
-			"persisted_field": LabelCurrent,
-			"volatile_field":  LabelCurrent,
-		},
 	}
+	w.StateLabels.Replace(map[string]StateLabel{
+		"persisted_field": LabelCurrent,
+		"volatile_field":  LabelCurrent,
+	})
 	w.SetCurrent("persisted_field", "user-set")
 	w.SetCurrent("volatile_field", "user-set")
 
@@ -60,9 +60,9 @@ func TestPrepareForRestartStillSkipsGoalFields(t *testing.T) {
 	t.Cleanup(func() { SetGlobalChainBuilder(prevCB) })
 
 	w := &Want{
-		Metadata:    Metadata{ID: "w1", Name: "w1", Type: "test-type"},
-		StateLabels: map[string]StateLabel{"goal_field": LabelGoal},
+		Metadata: Metadata{ID: "w1", Name: "w1", Type: "test-type"},
 	}
+	w.StateLabels.Replace(map[string]StateLabel{"goal_field": LabelGoal})
 	w.SetGoal("goal_field", "user-set")
 
 	w.prepareForRestart()
@@ -90,10 +90,10 @@ func TestPrepareForRestartResetOnRestartFalseSkipsEverything(t *testing.T) {
 
 	no := false
 	w := &Want{
-		Metadata:    Metadata{ID: "w1", Name: "w1", Type: "test-type"},
-		StateLabels: map[string]StateLabel{"volatile_field": LabelCurrent},
-		Spec:        WantSpec{ResetOnRestart: &no},
+		Metadata: Metadata{ID: "w1", Name: "w1", Type: "test-type"},
+		Spec:     WantSpec{ResetOnRestart: &no},
 	}
+	w.StateLabels.Replace(map[string]StateLabel{"volatile_field": LabelCurrent})
 	w.SetCurrent("volatile_field", "user-set")
 
 	w.prepareForRestart()
@@ -123,9 +123,9 @@ func TestScriptableWantInitializeSkipsParamCopyForPersistentField(t *testing.T) 
 
 	sw := &ScriptableWant{Want: Want{
 		Metadata:           Metadata{ID: "w1", Name: "w1", Type: "test-doc"},
-		StateLabels:        map[string]StateLabel{"items": LabelCurrent},
 		WantTypeDefinition: def,
 	}}
+	sw.StateLabels.Replace(map[string]StateLabel{"items": LabelCurrent})
 	// As if reloaded from a persisted snapshot: state already holds what the
 	// user last saved, and the deploy never set an explicit `items` param.
 	sw.SetCurrent("items", []interface{}{"user-item"})
@@ -153,10 +153,10 @@ func TestScriptableWantInitializeStillCopiesNonPersistentParam(t *testing.T) {
 
 	sw := &ScriptableWant{Want: Want{
 		Metadata:           Metadata{ID: "w1", Name: "w1", Type: "test-doc"},
-		StateLabels:        map[string]StateLabel{"label": LabelCurrent},
 		WantTypeDefinition: def,
 		Spec:               WantSpec{Params: map[string]any{"label": "from-param"}},
 	}}
+	sw.StateLabels.Replace(map[string]StateLabel{"label": LabelCurrent})
 
 	sw.Initialize()
 

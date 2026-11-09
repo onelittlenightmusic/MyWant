@@ -93,7 +93,7 @@ func applyScriptOutput(want *Want, out *scriptOutput, agentLabel string) {
 		want.SetPlan("result", out.Result)
 	}
 	for k, v := range out.CurrentUpdates {
-		if label, exists := want.StateLabels[k]; exists && label == LabelCurrent {
+		if want.StateLabels.Is(k, LabelCurrent) {
 			want.SetCurrent(k, v)
 		} else {
 			want.StoreLog("[%s] WARN: current_updates key %q is not current-labeled; skipped", agentLabel, k)

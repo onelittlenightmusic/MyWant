@@ -47,11 +47,11 @@ func TestParentStateAccess_BudgetScenario(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"costs":  LabelCurrent,
-			"status": LabelCurrent,
-		},
 	}
+	parentWant.StateLabels.Replace(map[string]StateLabel{
+		"costs":  LabelCurrent,
+		"status": LabelCurrent,
+	})
 	// Set initial budget on parent
 	parentWant.storeState("budget", 5000.0)
 	parentWant.storeState("costs", map[string]any{})
@@ -142,10 +142,10 @@ func TestParentStateAccess_ConcurrentWrites(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"costs": LabelCurrent,
-		},
 	}
+	parentWant.StateLabels.Replace(map[string]StateLabel{
+		"costs": LabelCurrent,
+	})
 	parentWant.storeState("costs", map[string]any{})
 
 	cb := NewChainBuilder([]*Want{parentWant})
@@ -265,10 +265,10 @@ func TestParentStateAccess_E2E_BudgetAgents(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"costs": LabelCurrent,
-		},
 	}
+	coordinator.StateLabels.Replace(map[string]StateLabel{
+		"costs": LabelCurrent,
+	})
 	coordinator.storeState("budget", 5000.0)
 	coordinator.storeState("costs", map[string]any{})
 
@@ -455,10 +455,10 @@ func TestParentStateAccess_E2E_ConcurrentAgents(t *testing.T) {
 			Type: "coordinator",
 		},
 		Spec: WantSpec{},
-		StateLabels: map[string]StateLabel{
-			"costs": LabelCurrent,
-		},
 	}
+	coordinator.StateLabels.Replace(map[string]StateLabel{
+		"costs": LabelCurrent,
+	})
 	coordinator.storeState("costs", map[string]any{})
 
 	cb := NewChainBuilder([]*Want{coordinator})

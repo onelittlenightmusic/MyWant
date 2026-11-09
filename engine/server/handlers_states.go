@@ -50,7 +50,7 @@ func collectDescendantIDs(ancestorID string, allWants []*mywant.Want) map[string
 
 // labelStringForKey returns the string representation of a Want's state label for a given key.
 func labelStringForKey(want *mywant.Want, key string) string {
-	if label, ok := want.StateLabels[key]; ok {
+	if label, ok := want.StateLabels.Get(key); ok {
 		switch label {
 		case mywant.LabelGoal:
 			return "goal"
@@ -78,7 +78,7 @@ func buildWantStateSnapshot(want *mywant.Want, labelFilter string) WantStateSnap
 			finalResult = v
 			continue
 		}
-		label, hasLabel := want.StateLabels[k]
+		label, hasLabel := want.StateLabels.Get(k)
 		if !hasLabel {
 			label = mywant.LabelNone
 		}
@@ -245,7 +245,7 @@ func (s *Server) updateWantState(w http.ResponseWriter, r *http.Request) {
 	hasPlanChange := false
 	for key, val := range updates {
 		want.StoreState(key, val)
-		if label, ok := want.StateLabels[key]; ok && label == mywant.LabelPlan {
+		if want.StateLabels.Is(key, mywant.LabelPlan) {
 			hasPlanChange = true
 		}
 	}
@@ -279,7 +279,7 @@ func (s *Server) setWantStateKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	want.StoreState(key, value)
-	if label, ok := want.StateLabels[key]; ok && label == mywant.LabelPlan {
+	if want.StateLabels.Is(key, mywant.LabelPlan) {
 		want.TriggerMonitorAgents()
 	}
 

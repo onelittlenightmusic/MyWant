@@ -19,7 +19,7 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 	if def == nil {
 		return
 	}
-	n.StateLabels = make(map[string]StateLabel)
+	labels := make(map[string]StateLabel, len(def.State)+1)
 	for _, s := range def.State {
 		var label StateLabel
 		switch s.Label {
@@ -34,18 +34,20 @@ func (n *Want) SetStateLabels(def *WantTypeDefinition) {
 		default:
 			label = LabelNone
 		}
-		n.StateLabels[s.Name] = label
+		labels[s.Name] = label
 	}
 	// What the want's agents could not do is every want's to show, its type
 	// declaring it or not: a plugin's want whose runner is down says so, and
 	// how to bring it back, where it is looked at.
-	if _, ok := n.StateLabels[StateFieldError]; !ok {
-		n.StateLabels[StateFieldError] = LabelCurrent
+	if _, ok := labels[StateFieldError]; !ok {
+		labels[StateFieldError] = LabelCurrent
 	}
+	// All at once: a want running sees the labels before or after, not half.
+	n.StateLabels.Replace(labels)
 }
 
 func (n *Want) SetGoal(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelGoal {
+	if !n.StateLabels.Is(key, LabelGoal) {
 		WarnLog("[WARN] SetGoal(%q) on want %q (type=%s): key not declared with label 'goal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
@@ -53,14 +55,14 @@ func (n *Want) SetGoal(key string, value any) {
 }
 
 func (n *Want) GetGoal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelGoal {
+	if n.StateLabels.Is(key, LabelGoal) {
 		return n.getState(key)
 	}
 	return nil, false
 }
 
 func (n *Want) SetCurrent(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelCurrent {
+	if !n.StateLabels.Is(key, LabelCurrent) {
 		WarnLog("[WARN] SetCurrent(%q) on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
@@ -71,7 +73,7 @@ func (n *Want) SetCurrent(key string, value any) {
 }
 
 func (n *Want) GetCurrent(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelCurrent {
+	if n.StateLabels.Is(key, LabelCurrent) {
 		return n.getState(key)
 	}
 	return nil, false
@@ -115,19 +117,19 @@ func (n *Want) GetParentAllGoal() map[string]any {
 // getAllByLabel collects all state key-value pairs registered under the given label.
 func (n *Want) getAllByLabel(label StateLabel) map[string]any {
 	result := make(map[string]any)
-	for key, l := range n.StateLabels {
-		if l != label {
-			continue
+	n.StateLabels.Range(func(key string, l StateLabel) bool {
+		if l == label {
+			if val, ok := n.getState(key); ok {
+				result[key] = val
+			}
 		}
-		if val, ok := n.getState(key); ok {
-			result[key] = val
-		}
-	}
+		return true
+	})
 	return result
 }
 
 func (n *Want) SetPlan(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelPlan {
+	if !n.StateLabels.Is(key, LabelPlan) {
 		WarnLog("[WARN] SetPlan(%q) on want %q (type=%s): key not declared with label 'plan' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
@@ -135,20 +137,20 @@ func (n *Want) SetPlan(key string, value any) {
 }
 
 func (n *Want) GetPlan(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
+	if n.StateLabels.Is(key, LabelPlan) {
 		return n.getState(key)
 	}
 	return nil, false
 }
 
 func (n *Want) ClearPlan(key string) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelPlan {
+	if n.StateLabels.Is(key, LabelPlan) {
 		n.storeState(key, nil)
 	}
 }
 
 func (n *Want) SetInternal(key string, value any) {
-	if label, ok := n.StateLabels[key]; !ok || label != LabelInternal {
+	if !n.StateLabels.Is(key, LabelInternal) {
 		WarnLog("[WARN] SetInternal(%q) on want %q (type=%s): key not declared with label 'internal' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
@@ -156,7 +158,7 @@ func (n *Want) SetInternal(key string, value any) {
 }
 
 func (n *Want) GetInternal(key string) (any, bool) {
-	if label, ok := n.StateLabels[key]; ok && label == LabelInternal {
+	if n.StateLabels.Is(key, LabelInternal) {
 		return n.getState(key)
 	}
 	return nil, false

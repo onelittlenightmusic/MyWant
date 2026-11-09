@@ -8,7 +8,7 @@ import (
 
 func inlineTestWant() *Want {
 	w := &Want{Metadata: Metadata{Name: "w", ID: "w1", Type: "demo_type"}}
-	w.StateLabels = map[string]StateLabel{"count": LabelCurrent, "env": LabelCurrent}
+	w.StateLabels.Replace(map[string]StateLabel{"count": LabelCurrent, "env": LabelCurrent})
 	w.SetCurrent("count", 1)
 	return w
 }
