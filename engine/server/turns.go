@@ -218,7 +218,7 @@ func (s *Server) robotAddTurn(turn robotTurn) error {
 }
 
 // robotAsked puts the question in the robot's chat, where what was said to it goes.
-func (s *Server) robotAsked(question string) {
+func (s *Server) robotAsked(question, turn string) {
 	robot, err := s.robotWantNow()
 	if err != nil || question == "" {
 		return
@@ -227,6 +227,7 @@ func (s *Server) robotAsked(question string) {
 	messages = append(messages, map[string]any{
 		"sender": robotDeviceSender, "text": question,
 		"timestamp": time.Now().Format(time.RFC3339), "channel_id": robotDeviceSender,
+		"turn": turn,
 	})
 	robot.SetCurrent("cc_messages", robotLastN(messages))
 }
@@ -239,13 +240,30 @@ func (s *Server) robotAsked(question string) {
 // The wants the turn's steps brought the robot to go with it, as cards: the
 // chat shows each under the answer, so what the answer is about is there at a
 // glance (and a press away), as on the phone.
-func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []string) {
+func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []string, turn string) {
+	if answer == "" {
+		return
+	}
+	s.robotChatSay(answer, cards, choices, turn)
+	// An answer asking for a reply (its choices) is a question, marked so.
+	kind := ""
+	if len(choices) > 0 {
+		kind = speechAsk
+	}
+	recordSpeechAs(robotCharacterID, answer, "agent", kind)
+}
+
+// robotChatSay puts a line of the robot's in its chat (cc_responses) — the one
+// record of its conversation, which the GUI's chat and the phone's both show
+// (GET /api/v1/robot/chat) — with the wants it is about, the replies it takes
+// and the turn it answers ("" when said unasked).
+func (s *Server) robotChatSay(text string, cards []robotCard, choices []string, turn string) {
 	robot, err := s.robotWantNow()
-	if err != nil || answer == "" {
+	if err != nil || text == "" {
 		return
 	}
 	entry := map[string]any{
-		"text": answer, "timestamp": time.Now().Format(time.RFC3339), "subtype": "fm",
+		"text": text, "timestamp": time.Now().Format(time.RFC3339), "subtype": "fm",
 	}
 	if len(cards) > 0 {
 		entry["cards"] = cards
@@ -253,15 +271,28 @@ func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []strin
 	if len(choices) > 0 {
 		entry["choices"] = choices
 	}
+	if turn != "" {
+		entry["turn"] = turn
+	}
 	responses := mywant.GetCurrent(robot, "cc_responses", []any{})
 	responses = append(responses, entry)
 	robot.SetCurrent("cc_responses", robotLastN(responses))
-	// An answer asking for a reply (its choices) is a question, marked so.
-	kind := ""
-	if len(choices) > 0 {
-		kind = speechAsk
+}
+
+// robotSayNotice: news the robot brings unasked (a want's new answer), said
+// as every line of the robot's is — the bubble, and its chat with the want's
+// card.
+func (s *Server) robotSayNotice(words, wantID, wantName string) error {
+	words = strings.TrimSpace(words)
+	if words == "" {
+		return nil
 	}
-	recordSpeechAs(robotCharacterID, answer, "agent", kind)
+	var cards []robotCard
+	if wantID != "" {
+		cards = s.robotAnswerCards(robotTurn{Steps: []robotStep{{Card: &robotCard{Kind: "want", ID: wantID, Name: wantName}}}})
+	}
+	s.robotChatSay(words, cards, nil, "")
+	return s.robotSayAs(words, speechNotice)
 }
 
 // robotAnswerCards is the turn's cards, each filled with what its want says now
@@ -506,7 +537,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 		turn.By = "device"
 	}
 	if !turn.Quiet {
-		s.robotAsked(turn.Question)
+		s.robotAsked(turn.Question, turn.ID)
 	}
 	for i := range turn.Steps {
 		if turn.Steps[i].Arguments == nil {
@@ -539,7 +570,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 			turn.Choices = robotReplyChoices(turn.Answer)
 		}
 		if !turn.Quiet {
-			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices)
+			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices, turn.ID)
 		}
 	}
 	if err := s.robotAddTurn(turn); err != nil {
@@ -624,7 +655,7 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		cards := turn.Cards
 		_, _ = s.robotUpdateTurn(turn.ID, func(t *robotTurn) error { t.Cards = cards; return nil })
 		if !turn.Quiet {
-			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices)
+			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices, turn.ID)
 		}
 	}
 	if turn.Error != "" && !turn.Quiet {

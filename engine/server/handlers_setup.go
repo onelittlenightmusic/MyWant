@@ -566,6 +566,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/robot/initiative/label", s.handleRobotInitiativeLabel).Methods("POST")
 	api.HandleFunc("/robot/initiative/retrain", s.handleRobotInitiativeRetrain).Methods("POST")
 	api.HandleFunc("/robot/offer/reply", s.handleRobotOfferReply).Methods("POST")
+	// The robot's conversation, one record for every client — robot_chat.go.
+	api.HandleFunc("/robot/chat", s.handleRobotChat).Methods("GET")
 	api.HandleFunc("/turns/{id}/replay", s.handleTurnReplay).Methods("POST")
 	// What a device running the robot's model recorded about itself (device_log.go).
 	api.HandleFunc("/device-log", s.handleDeviceLogPost).Methods("POST")

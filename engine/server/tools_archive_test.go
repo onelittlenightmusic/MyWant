@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+
 )
 
 // robotArchiveTestWant puts a want on the test server and waits for it.
@@ -244,5 +245,56 @@ func TestPlanCandidatesLeaveOutArchivedQuestions(t *testing.T) {
 	t.Cleanup(func() { delete(def.Metadata.Labels, robotAskAgainLabel) })
 	if named() {
 		t.Errorf("a put-away question (ask-again: run) should not be a candidate")
+	}
+}
+
+// The robot's conversation is one record (robot_chat.go): a question asked
+// from the phone, its answer, and news the robot brings unasked fall in the
+// order they were said — not paired by index, which put every answer after the
+// news beside the wrong question — each with its turn and cards; a クリア
+// (cc_session_resets) starts it afresh.
+func TestRobotChatIsOneConversationInOrder(t *testing.T) {
+	s := patchTestServer(t)
+	if _, err := s.robotWantNow(); err != nil {
+		robotArchiveTestWant(t, s, robotWantName, nil, map[string]any{"service_time": 0.1})
+	}
+	about := robotArchiveTestWant(t, s, "Nakanoの天気", nil, map[string]any{"service_time": 0.1})
+	start, err := s.robotChat(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var after int64
+	if n := len(start.Lines); n > 0 {
+		after = start.Lines[n-1].Seq
+	}
+
+	s.robotAsked("中野の天気は？", "turn-1")
+	_ = s.robotSayNotice("「Nakanoの天気」: 晴れ", about, "Nakanoの天気")
+	s.sayTurnAnswer("中野は晴れです", nil, nil, "turn-1")
+
+	chat, err := s.robotChat(after)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, l := range chat.Lines {
+		got = append(got, l.Who+":"+l.Text)
+	}
+	want := []string{"person:中野の天気は？", "robot:「Nakanoの天気」: 晴れ", "robot:中野は晴れです"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("lines = %v, want %v", got, want)
+	}
+	if chat.Lines[0].Turn != "turn-1" || chat.Lines[2].Turn != "turn-1" || chat.Lines[1].Turn != "" {
+		t.Errorf("turns = %+v", chat.Lines)
+	}
+	if len(chat.Lines[1].Cards) != 1 || chat.Lines[1].Cards[0].ID != about {
+		t.Errorf("the news's card = %+v", chat.Lines[1].Cards)
+	}
+
+	// Cleared: what was said before is not the conversation shown.
+	robot, _ := s.robotWantNow()
+	robot.SetCurrent("cc_session_resets", []any{time.Now().Add(time.Second).Format(time.RFC3339)})
+	if chat, _ := s.robotChat(0); len(chat.Lines) != 0 {
+		t.Errorf("after クリア: %+v", chat.Lines)
 	}
 }

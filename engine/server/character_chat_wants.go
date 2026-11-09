@@ -167,7 +167,7 @@ const robotNoticeSubtype = "notice"
 
 // robotResponsesMax is how many of the robot's own lines its chat keeps, the
 // same as the agent's answers (see recordRobotAnswer).
-const robotResponsesMax = 20
+const robotResponsesMax = 100
 
 // appendToRobotChat puts what the robot said into its chat window, as one of
 // its own lines.

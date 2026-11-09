@@ -64,6 +64,9 @@ func (n *Want) SetCurrent(key string, value any) {
 		WarnLog("[WARN] SetCurrent(%q) on want %q (type=%s): key not declared with label 'current' in state definition", key, n.Metadata.Name, n.Metadata.Type)
 		n.governanceViolationCount++
 	}
+	if key == "cc_messages" || key == "cc_responses" {
+		stampChatSeq(value)
+	}
 	n.storeState(key, value)
 }
 

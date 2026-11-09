@@ -302,7 +302,7 @@ func (s *Server) robotOffer(ri *robotInitiative, sit initiativeSituation) {
 	// bubble and the conversation) — the bubble keeps it, with the replies as
 	// buttons, while it waits (robot_offer).
 	s.showOffer(rec.ID, c.Ask)
-	s.sayTurnAnswer(c.Ask, nil, robotYesNo)
+	s.sayTurnAnswer(c.Ask, nil, robotYesNo, "")
 }
 
 // showOffer puts the offer waiting in the robot's state, where the board's

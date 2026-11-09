@@ -125,6 +125,6 @@ func (s *Server) handleRobotOfferReply(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no offer waiting, or that is no reply to one", http.StatusConflict)
 		return
 	}
-	s.sayTurnAnswer(answer, nil, nil) // the chat, the bubble and the conversation
+	s.sayTurnAnswer(answer, nil, nil, "") // the chat, the bubble and the conversation
 	robotWriteJSON(w, map[string]string{"answer": answer})
 }
