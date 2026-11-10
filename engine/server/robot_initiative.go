@@ -78,6 +78,12 @@ type initiativeEvent struct {
 	// news that reached the person, so what they did after it teaches
 	// nothing (robotLabelInitiatives passes it over).
 	Injected bool
+	// News: Laya's answer, asked already (outputNews, for the push) — not
+	// asked again; NewsBy who gave it. Push: what became of the push
+	// ("sent", "held"; "" when there was none to decide).
+	News   *decisionAnswer
+	NewsBy string
+	Push   string
 }
 
 // initiativeSituation is what the robot knows when it decides.
@@ -418,11 +424,18 @@ func initiativeEventText(sit initiativeSituation) string {
 	if sit.Event.Kind != initiativeOutput {
 		return ""
 	}
-	msg := []rune(sit.Event.Message)
+	return outputNewsText(sit.Event.WantName, sit.Event.Message)
+}
+
+// outputNewsText is a want's new answer as Laya reads it — the same words for
+// the robot's initiative and for whether the notice is pushed, so one answer
+// serves both and what is learnt from one holds for the other.
+func outputNewsText(wantName, message string) string {
+	msg := []rune(message)
 	if len(msg) > initiativeMessageMax {
 		msg = append(msg[:initiativeMessageMax], '…')
 	}
-	return fmt.Sprintf("出来事: wantの新しい結果。want: %s。結果: %s。", sit.Event.WantName, string(msg))
+	return fmt.Sprintf("出来事: wantの新しい結果。want: %s。結果: %s。", wantName, string(msg))
 }
 
 // initiativeState says the situation in a few words — short, so it fits the
@@ -668,6 +681,7 @@ type initiativeRecord struct {
 	Result    string                      `json:"result,omitempty"`
 	Error     string                      `json:"error,omitempty"`
 	Questions map[string]decisionQuestion `json:"questions"`
+	Push      string                      `json:"push,omitempty"` // the notice's push: sent, held
 }
 
 func (s *Server) robotTakeInitiative(ri *robotInitiative, ev initiativeEvent) initiativeRecord {
@@ -693,7 +707,7 @@ func (s *Server) robotTakeInitiative(ri *robotInitiative, ev initiativeEvent) in
 	rec := initiativeRecord{
 		ID: fmt.Sprintf("init-%d", time.Now().UnixNano()), WantID: ev.WantID,
 		At: ev.At.Format(time.RFC3339), Event: ev.Kind, Want: ev.WantName, WantType: ev.WantType,
-		State: text, Context: initiativeState(sit), By: "rules", Injected: ev.Injected,
+		State: text, Context: initiativeState(sit), By: "rules", Injected: ev.Injected, Push: ev.Push,
 	}
 	for _, c := range offered {
 		rec.Offered = append(rec.Offered, c.Name)
@@ -703,7 +717,13 @@ func (s *Server) robotTakeInitiative(ri *robotInitiative, ev initiativeEvent) in
 	answers := initiativeRules(sit, offered)
 	if text != "" {
 		started := time.Now()
-		if a, by, err := ri.decider.decide(text, questions); err == nil {
+		a, by, err := map[string]decisionAnswer(nil), ev.NewsBy, error(nil)
+		if ev.News != nil {
+			a = map[string]decisionAnswer{newsQuestionID: *ev.News}
+		} else {
+			a, by, err = ri.decider.decide(text, questions)
+		}
+		if err == nil {
 			rec.By, rec.Questions = by, questions
 			news := a[newsQuestionID].Choice == "news"
 			interrupt := initiativeInterrupt(news, sit)

@@ -48,11 +48,27 @@ func (s *Server) RegisterOutputCallback() {
 			log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
 			return
 		}
+		// Pushed unless Laya is sure it is routine (push_news.go); the notice
+		// above is kept either way.
+		ev := initiativeEvent{
+			Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
+			WantType: w.Metadata.Type, Message: msg,
+		}
+		push := true
+		if a, by, ok := s.outputNews(w, msg); ok {
+			ev.News, ev.NewsBy = &a, by
+			push = !pushHeld(a, pushNewsThreshold())
+			ev.Push = "sent"
+			if !push {
+				ev.Push = "held"
+				log.Printf("[push] held %s: %s says routine (news %.2f)", w.Metadata.Name, by, a.Probabilities["news"])
+			}
+		}
 		if !characterWantTypes[w.Metadata.Type] {
-			s.robotInitiativeNotify(initiativeEvent{
-				Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
-				WantType: w.Metadata.Type, Message: msg,
-			})
+			s.robotInitiativeNotify(ev)
+		}
+		if !push {
+			return
 		}
 		title := w.Metadata.Name
 		if title == "" {
