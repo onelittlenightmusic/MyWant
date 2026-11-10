@@ -408,6 +408,17 @@ wantType:
     initialValue: []
     label: current
 
+  - name: cc_traces
+    description: |
+      What the robot did inside, shown in its chat between its words as a
+      processing line, not a message (subtype trace) — Laya's verdict on a
+      want's new answer and whether it was pushed. Apart from cc_responses,
+      so they never crowd out the conversation nor read as an answer.
+    type: object
+    persistent: false
+    initialValue: []
+    label: current
+
   - name: robot_offer
     description: |
       The offer the robot is waiting on a reply to (engine/server/robot_offer.go):

@@ -36,6 +36,9 @@ type robotChatLine struct {
 	// The turn it asked or answered; "" for a line said unasked.
 	Turn   string `json:"turn,omitempty"`
 	Sender string `json:"sender,omitempty"`
+	// A processing line (subtype "trace", cc_traces): what was done inside
+	// and its values — Text says it in the same key=value form.
+	Trace map[string]any `json:"trace,omitempty"`
 }
 
 type robotChatResponse struct {
@@ -98,6 +101,12 @@ func wantChat(robot *mywant.Want, after int64) robotChatResponse {
 	}
 	read("cc_messages", "person")
 	read("cc_responses", "robot")
+	// Its processing lines, where they fell between its words.
+	n := len(out.Lines)
+	read("cc_traces", "robot")
+	for i := n; i < len(out.Lines); i++ {
+		out.Lines[i].Subtype = traceSubtype
+	}
 	// Asked before answered, where two fall in the same place.
 	sort.SliceStable(out.Lines, func(i, j int) bool {
 		if out.Lines[i].Seq != out.Lines[j].Seq {
@@ -137,4 +146,41 @@ func (s *Server) handleWantChat(w http.ResponseWriter, r *http.Request) {
 	}
 	after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
 	s.JSONResponse(w, http.StatusOK, wantChat(want, after))
+}
+
+// traceSubtype marks a processing line: drawn as what was done, not as words.
+const traceSubtype = "trace"
+
+// robotTracesMax: the processing lines kept (a Spotify turns one out a song).
+const robotTracesMax = 100
+
+// robotChatTrace puts a processing line in the robot's chat (cc_traces): what
+// it did inside — a step's name and its values, key=value in the text.
+func (s *Server) robotChatTrace(step string, fields map[string]any, order []string) {
+	robot, err := s.robotWantNow()
+	if err != nil {
+		return
+	}
+	text := step
+	for _, k := range order {
+		v, ok := fields[k]
+		if !ok || v == nil || v == "" {
+			continue
+		}
+		text += fmt.Sprintf(" %s=%v", k, v)
+	}
+	trace := map[string]any{"step": step}
+	for k, v := range fields {
+		if v != nil && v != "" {
+			trace[k] = v
+		}
+	}
+	traces := mywant.GetCurrent(robot, "cc_traces", []any{})
+	traces = append(traces, map[string]any{
+		"text": text, "timestamp": time.Now().Format(time.RFC3339), "subtype": traceSubtype, "trace": trace,
+	})
+	if len(traces) > robotTracesMax {
+		traces = traces[len(traces)-robotTracesMax:]
+	}
+	robot.SetCurrent("cc_traces", traces)
 }

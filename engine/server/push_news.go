@@ -19,10 +19,12 @@ package server
 // `push-filter: none` (what must always reach the person).
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -42,22 +44,84 @@ func pushNewsThreshold() float64 {
 	return pushNewsMin
 }
 
+// pushDecision is one want's new answer as Laya weighed it for the push —
+// kept a line each in ~/.mywant/push-decisions.jsonl, and shown in the robot's
+// chat as a processing line (robotChatTrace).
+type pushDecision struct {
+	At       string             `json:"at"`
+	WantID   string             `json:"wantId"`
+	Want     string             `json:"want"`
+	WantType string             `json:"wantType"`
+	Text     string             `json:"text"` // what Laya read
+	Choice   string             `json:"choice,omitempty"`
+	Probs    map[string]float64 `json:"probabilities,omitempty"`
+	Min      float64            `json:"min"` // p(news) under which it is held
+	By       string             `json:"by,omitempty"`
+	Push     string             `json:"push"` // sent, held
+	Reason   string             `json:"reason"`
+	Ms       int64              `json:"ms"`
+	Error    string             `json:"error,omitempty"`
+}
+
 // outputNews asks Laya whether the want's answer (msg, in its own voice) is
-// news; ok false when it is not asked or nobody answered.
+// news; ok false when it is not asked or nobody answered. Every asking is
+// recorded (notePushDecision), its answer or why there was none.
 func (s *Server) outputNews(w *mywant.Want, msg string) (decisionAnswer, string, bool) {
 	ri := s.initiative
 	if ri == nil || w == nil || characterWantTypes[w.Metadata.Type] || !pushFiltered(w) {
 		return decisionAnswer{}, "", false
 	}
-	a, by, err := ri.decider.decide(outputNewsText(w.Metadata.Name, msg), map[string]decisionQuestion{newsQuestionID: newsQuestion})
-	if err != nil {
-		if err != errNoModel {
-			log.Printf("[push] laya did not answer for %s (%v); pushing", w.Metadata.Name, err)
+	text := outputNewsText(w.Metadata.Name, msg)
+	d := pushDecision{
+		At: time.Now().Format(time.RFC3339), WantID: w.Metadata.ID, Want: w.Metadata.Name,
+		WantType: w.Metadata.Type, Text: text, Min: pushNewsThreshold(), Push: "sent",
+	}
+	started := time.Now()
+	a, by, err := ri.decider.decide(text, map[string]decisionQuestion{newsQuestionID: newsQuestion})
+	d.Ms, d.By = time.Since(started).Milliseconds(), by
+	ans, ok := a[newsQuestionID]
+	switch {
+	case err == errNoModel:
+		d.Reason = "no-worker"
+	case err != nil:
+		d.Reason, d.Error = "no-answer", err.Error()
+		log.Printf("[push] laya did not answer for %s (%v); pushing", w.Metadata.Name, err)
+	case !ok || ans.Choice == "":
+		d.Reason = "no-answer"
+	default:
+		d.Choice, d.Probs = ans.Choice, ans.Probabilities
+		if pushHeld(ans, d.Min) {
+			d.Push, d.Reason = "held", "routine"
+		} else if ans.Choice == "routine" {
+			d.Reason = "unsure" // routine, but not sure enough to hold it
+		} else {
+			d.Reason = "news"
 		}
+	}
+	s.notePushDecision(d)
+	if d.Choice == "" {
 		return decisionAnswer{}, by, false
 	}
-	ans, ok := a[newsQuestionID]
-	return ans, by, ok && ans.Choice != ""
+	return ans, by, true
+}
+
+// notePushDecision keeps the decision (the log) and shows it in the robot's
+// chat — no notice, just what was done: e.g.
+//
+//	laya.push want=Spotify verdict=routine p(news)=0.12 push=held reason=routine by=laya@iPhone ms=1830
+func (s *Server) notePushDecision(d pushDecision) {
+	_ = appendJSONLine(initiativeHomeFile("push-decisions.jsonl"), d)
+	if d.Reason == "no-worker" {
+		return // nothing was weighed: the log has it, the chat need not
+	}
+	fields := map[string]any{
+		"want": d.Want, "wantId": d.WantID, "verdict": d.Choice, "push": d.Push, "reason": d.Reason,
+		"by": d.By, "ms": d.Ms, "error": d.Error,
+	}
+	if p, ok := d.Probs["news"]; ok {
+		fields["p(news)"] = fmt.Sprintf("%.2f", p)
+	}
+	s.robotChatTrace("laya.push", fields, []string{"want", "verdict", "p(news)", "push", "reason", "by", "ms", "error"})
 }
 
 // pushFiltered: the type lets Laya hold its pushes back.

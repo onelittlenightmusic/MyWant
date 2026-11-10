@@ -61,7 +61,6 @@ func (s *Server) RegisterOutputCallback() {
 			ev.Push = "sent"
 			if !push {
 				ev.Push = "held"
-				log.Printf("[push] held %s: %s says routine (news %.2f)", w.Metadata.Name, by, a.Probabilities["news"])
 			}
 		}
 		if !characterWantTypes[w.Metadata.Type] {
