@@ -47,3 +47,46 @@ func TestResultHistoryKeepsOnlyWhatTheTypeCallsAnAnswer(t *testing.T) {
 		t.Fatalf("with history-if: %q", got)
 	}
 }
+
+// With history-on-change (and history-if) on near_place, a position that moves
+// every update is kept only when it arrives somewhere: not while it stays, not
+// as it leaves, and again when it comes back.
+func TestResultHistoryKeepsOnlyWhenTheFieldChanges(t *testing.T) {
+	want := NewWantWithLocals(Metadata{Name: "here"}, WantSpec{FinalResultField: "coordinate"}, nil, "base")
+	want.WantTypeDefinition = &WantTypeDefinition{
+		Metadata: WantTypeMetadata{Labels: map[string]string{historyIfLabel: "near_place", historyOnChangeLabel: "near_place"}},
+		State: []StateDef{
+			{Name: "coordinate"},
+			{Name: "near_place", Persistent: true},
+		},
+	}
+	n := 0
+	at := func(place string) {
+		n++
+		want.BeginProgressCycle()
+		want.storeState("coordinate", map[string]any{"lat": 35.0 + float64(n)/10000, "lng": 139.0})
+		want.storeState("near_place", place)
+		want.EndProgressCycle()
+	}
+	places := func() string {
+		var out []string
+		for _, e := range want.BuildHistory().ResultHistory {
+			out = append(out, e.Fields["near_place"].(string))
+		}
+		return join(out)
+	}
+
+	at("")
+	at("")
+	at("会社") // arrives
+	at("会社")
+	at("会社")
+	at("") // leaves
+	at("")
+	at("会社") // back
+	at("駅")  // on to another
+	at("駅")
+	if got := places(); got != "会社 会社 駅" {
+		t.Fatalf("kept %q, want arrivals only", got)
+	}
+}

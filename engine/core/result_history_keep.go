@@ -17,6 +17,49 @@ import (
 
 const historyIfLabel = "history-if"
 
+// An answer can also be kept only when one field of it changes — label
+// history-on-change: near_place. A want whose result moves all the time (a
+// position, every second) is then news only when what the type cares about
+// moves: the place it is at, not the metres. Whether it changed is read on
+// every recording, kept or not, so 会社 → (nowhere) → 会社 is two arrivals.
+// With history-if on the same field, only the changes to a value are kept:
+// arriving, not leaving.
+const historyOnChangeLabel = "history-on-change"
+
+// historyOnChange is the field whose change keeps an answer, or "".
+func (n *Want) historyOnChange() string {
+	if n.WantTypeDefinition == nil {
+		return ""
+	}
+	return strings.TrimSpace(n.WantTypeDefinition.Metadata.Labels[historyOnChangeLabel])
+}
+
+// answerChanged says whether the type's history-on-change field moved since
+// the last recording (true when the type names none). The first time — a
+// start — it is compared with the last answer kept, so a restart standing
+// where the last arrival was is not another arrival.
+func (n *Want) answerChanged(fields map[string]any) bool {
+	field := n.historyOnChange()
+	if field == "" {
+		return true
+	}
+	now, ok := fields[field]
+	if !ok {
+		if v, inState := resolveNestedStateField(n, field); inState && !isEmptyAnswer(v) {
+			now = v
+		}
+	}
+	if !n.historyChangeKnown {
+		n.historyChangeKnown = true
+		if last := n.getHistoryManager().lastResultEntry(); last != nil {
+			n.historyChangeSeen = last.Fields[field]
+		}
+	}
+	was := n.historyChangeSeen
+	n.historyChangeSeen = now
+	return !sameAnswerResult(was, now)
+}
+
 // historyIf is the field an answer must have true to be kept, or "".
 func (n *Want) historyIf() string {
 	if n.WantTypeDefinition == nil {

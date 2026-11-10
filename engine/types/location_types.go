@@ -69,6 +69,8 @@ func (lw *LocationWant) Progress() {
 			lw.SetCurrent("updated_at", ts)
 		}
 
+		lw.notePlaceArrival(lat, lng)
+
 		// Ask about the place — its name and its height — when the position has
 		// moved far enough to be somewhere else (>~100m), or when an answer is
 		// missing. Both are properties of the coordinates rather than of the
@@ -107,6 +109,97 @@ func (lw *LocationWant) Progress() {
 
 		return true
 	})
+}
+
+// A position is news only when it brings the person to a place they have
+// named (a saved place: the place / location_coordinate catalog). Every
+// position used to be the want's new answer — its coordinate is the result, so
+// that one X-press on the card names where the person stands — and every
+// answer was announced: a notice composed, a push, the robot weighing it,
+// once a second while walking. The coordinate is still written each time; the
+// type keeps it as an answer, and so announces it, only when near_place
+// changes to a place (labels history-if and history-on-change: near_place —
+// the engine's filter, result_history_keep.go). This only says which place.
+
+// placeArrivalRadiusM is how near a saved place counts as at it, unless the
+// place says its own radius.
+const placeArrivalRadiusM = 150.0
+
+// placeLeaveFactor: left only this far out of the radius — a position that
+// wavers across the edge is not a string of arrivals.
+const placeLeaveFactor = 1.5
+
+type savedPlace struct {
+	name             string
+	lat, lng, radius float64
+}
+
+// savedPlaces is every named place with coordinates.
+func savedPlaces() []savedPlace {
+	seen := map[string]bool{}
+	var out []savedPlace
+	for _, kind := range []string{"place", "location_coordinate", "location", "coordinate"} {
+		for name, mark := range AuraDefinitions(kind) {
+			m, ok := mark.Value.(map[string]any)
+			if !ok || seen[name] {
+				continue
+			}
+			lat := ToFloat64(firstOf(m, "lat", "latitude"), math.NaN())
+			lng := ToFloat64(firstOf(m, "lng", "lon", "longitude"), math.NaN())
+			if math.IsNaN(lat) || math.IsNaN(lng) {
+				continue
+			}
+			radius := ToFloat64(firstOf(m, "radius_m", "radius"), placeArrivalRadiusM)
+			if radius <= 0 {
+				radius = placeArrivalRadiusM
+			}
+			seen[name] = true
+			out = append(out, savedPlace{name: name, lat: lat, lng: lng, radius: radius})
+		}
+	}
+	return out
+}
+
+// nearestPlace is the saved place this position is at (within its radius,
+// times factor), the nearest of those, or false.
+func nearestPlace(places []savedPlace, lat, lng, factor float64) (savedPlace, float64, bool) {
+	var best savedPlace
+	bestDist := math.Inf(1)
+	for _, p := range places {
+		d := haversineMeters(p.lat, p.lng, lat, lng)
+		if d <= p.radius*factor && d < bestDist {
+			best, bestDist = p, d
+		}
+	}
+	return best, bestDist, !math.IsInf(bestDist, 1)
+}
+
+// notePlaceArrival sets near_place (and, arriving, summary) for this position.
+func (lw *LocationWant) notePlaceArrival(lat, lng float64) {
+	places := savedPlaces()
+	was := GetCurrent[string](&lw.Want, "near_place", "")
+	// Still at the place it was at, as long as it has not gone well out of it.
+	if was != "" {
+		for _, p := range places {
+			if p.name == was && haversineMeters(p.lat, p.lng, lat, lng) <= p.radius*placeLeaveFactor {
+				return
+			}
+		}
+	}
+	p, dist, at := nearestPlace(places, lat, lng, 1)
+	if !at {
+		if was != "" {
+			lw.SetCurrent("near_place", "")
+			lw.StoreLog("[LOCATION] left %q", was)
+		}
+		return
+	}
+	if p.name == was {
+		return
+	}
+	lw.SetCurrent("near_place", p.name)
+	lw.SetCurrent("summary", fmt.Sprintf("「%s」の近くに来ました", p.name))
+	lw.StoreLog("[LOCATION] arrived at %q (%.0fm ≤ %.0fm)", p.name, dist, p.radius)
 }
 
 type nominatimResponse struct {

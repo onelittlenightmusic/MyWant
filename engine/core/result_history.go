@@ -133,10 +133,18 @@ func (n *Want) recordResultHistory() {
 	}
 
 	fields := n.answerFields(field)
+	// Read on every recording, kept or not: an answer that goes from 会社 to
+	// nowhere and back to 会社 has changed twice.
+	changed := n.answerChanged(fields)
 	if !n.keepsAnswer(fields) {
 		// Not an answer by its type's own account (history-if): a check that
 		// found no reservation, whatever its result field still carries.
 		n.markCurrentAnswer(false)
+		return
+	}
+	if !changed {
+		// Its type keeps an answer only when a field of it changes
+		// (history-on-change), and that one has not: still the answer it was.
 		return
 	}
 	if n.forgottenAnswers()[forgottenResultKey(val)] {

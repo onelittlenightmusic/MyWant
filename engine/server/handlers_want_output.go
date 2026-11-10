@@ -96,6 +96,11 @@ func outputMessage(out mywant.ResultHistoryEntry) string {
 	case []any:
 		return fmt.Sprintf("%d件", len(v))
 	}
+	// An answer with no words of its own (a position) said by what its want
+	// wrote beside it.
+	if s, ok := out.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
+		return truncateRunes(strings.TrimSpace(s), 120)
+	}
 	b, err := json.Marshal(out.Result)
 	if err != nil {
 		return "新しい結果"

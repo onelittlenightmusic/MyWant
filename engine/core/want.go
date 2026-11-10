@@ -275,6 +275,10 @@ type Want struct {
 	// every reconcile of every want.
 	resultRecordedAtRevision uint64
 	resultRecordedOnce       bool
+	// history-on-change: the field's value at the last recording, and
+	// whether it has been read (result_history_keep.go answerChanged).
+	historyChangeSeen  any
+	historyChangeKnown bool
 
 	// Agent system
 	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`

@@ -10,6 +10,11 @@ wantType:
       riffable: source
       user-control: "true"
       type-icon: MapPin
+      # A position is kept as an answer — and so announced — only when it
+      # arrives at a saved place: near_place set, and changed (the engine's
+      # filter, result_history_keep.go). Not every move.
+      history-if: near_place
+      history-on-change: near_place
   # The coordinate object is the location's result — so an X-press on the card
   # aura-marks it (see cardAuraMark), and it names a place in one press.
   finalResultField: coordinate
@@ -52,6 +57,19 @@ wantType:
       label: current
       persistent: true
       exposable: true
+    - name: near_place
+      description: The saved place the position is at, while it stays there; empty elsewhere
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+      exposable: true
+    - name: summary
+      description: The last arrival said in a line (「会社」の近くに来ました) — the notice's words
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
     - name: accuracy
       description: Accuracy in metres
       type: float64

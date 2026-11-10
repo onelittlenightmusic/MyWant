@@ -184,6 +184,20 @@ func (h *HistoryManager) AddResultEntry(entry ResultHistoryEntry) (appended bool
 	return true, nil
 }
 
+// lastResultEntry is the last answer kept, or nil.
+func (h *HistoryManager) lastResultEntry() *ResultHistoryEntry {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.ResultHistoryRing == nil {
+		return nil
+	}
+	last, ok := h.ResultHistoryRing.PeekLast()
+	if !ok {
+		return nil
+	}
+	return &last
+}
+
 // AddParameterEntry adds an entry to parameter history, with similar merging logic
 func (h *HistoryManager) AddParameterEntry(key string, value any) {
 	h.mu.Lock()
