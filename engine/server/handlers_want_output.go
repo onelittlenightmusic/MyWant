@@ -35,35 +35,51 @@ func (s *Server) RegisterOutputCallback() {
 		if s.notifications == nil || w == nil || w.Metadata.ID == "" {
 			return
 		}
-		msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
-		entry := out
-		if err := s.notifications.Record(NotificationEntry{
-			Message:    msg,
-			Mood:       mood,
-			Kind:       "alert",
-			TargetType: "want",
-			TargetID:   w.Metadata.ID,
-			Output:     &entry,
-		}); err != nil {
-			log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
+		// Told of at the moments its type names and the want chose
+		// (core/result_timings.go): murmured, notified, both or neither.
+		tell := w.TellingOf(out)
+		if w.HasTimings() {
+			s.noteTelling(w, out, tell)
+		}
+		if !tell.Murmur && !tell.Notify {
 			return
 		}
-		// Pushed unless Laya is sure it is routine (push_news.go); the notice
-		// above is kept either way.
+		msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
 		ev := initiativeEvent{
 			Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
 			WantType: w.Metadata.Type, Message: msg,
 		}
-		push := true
-		if a, by, ok := s.outputNews(w, msg); ok {
-			ev.News, ev.NewsBy = &a, by
-			push = !pushHeld(a, pushNewsThreshold())
+		if tell.Murmur {
+			// The murmur: the want's alert, its tile's "!".
+			entry := out
+			if err := s.notifications.Record(NotificationEntry{
+				Message:    msg,
+				Mood:       mood,
+				Kind:       "alert",
+				TargetType: "want",
+				TargetID:   w.Metadata.ID,
+				Output:     &entry,
+			}); err != nil {
+				log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
+				return
+			}
+		}
+		// Pushed at its notify timings: as the want chose, or — the type's
+		// default — unless Laya is sure it is routine (push_news.go).
+		push := tell.Notify
+		if push && !tell.NotifyChosen {
+			if a, by, ok := s.outputNews(w, msg); ok {
+				ev.News, ev.NewsBy = &a, by
+				push = !pushHeld(a, pushNewsThreshold())
+			}
+		}
+		if tell.Notify {
 			ev.Push = "sent"
 			if !push {
 				ev.Push = "held"
 			}
 		}
-		if !characterWantTypes[w.Metadata.Type] {
+		if tell.Murmur && !characterWantTypes[w.Metadata.Type] {
 			s.robotInitiativeNotify(ev)
 		}
 		if !push {
@@ -129,4 +145,30 @@ func truncateRunes(s string, n int) string {
 		return s
 	}
 	return string(r[:n]) + "…"
+}
+
+// noteTelling shows in the robot's chat, as a processing line, how a want
+// told of its answer — the timings it came at, and whether it murmured and
+// notified at them:
+//
+//	timing want=Spotify at=album murmur=yes notify=no(chosen)
+func (s *Server) noteTelling(w *mywant.Want, out mywant.ResultHistoryEntry, tell mywant.Telling) {
+	yes := func(b bool) string {
+		if b {
+			return "yes"
+		}
+		return "no"
+	}
+	notify := yes(tell.Notify)
+	if tell.NotifyChosen {
+		notify += "(chosen)"
+	}
+	at := strings.Join(tell.Timings, ",")
+	if at == "" {
+		at = "-"
+	}
+	s.robotChatTrace("timing", map[string]any{
+		"want": w.Metadata.Name, "wantId": w.Metadata.ID, "at": at,
+		"murmur": yes(tell.Murmur), "notify": notify,
+	}, []string{"want", "at", "murmur", "notify"})
 }

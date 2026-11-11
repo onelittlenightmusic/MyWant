@@ -15,6 +15,17 @@ wantType:
       # filter, result_history_keep.go). Not every move.
       history-if: near_place
       history-on-change: near_place
+
+  # When it tells of an answer (the engine's timings, core/result_timings.go):
+  # a want chooses which it murmurs and notifies at (labels murmur / notify).
+  timings:
+    - name: arrival
+      description: 保存した場所の近くに来たとき
+      if: near_place
+      onChange: near_place
+      murmur: true
+      notify: true
+
   # The coordinate object is the location's result — so an X-press on the card
   # aura-marks it (see cardAuraMark), and it names a place in one press.
   finalResultField: coordinate

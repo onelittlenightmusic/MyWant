@@ -76,6 +76,8 @@ github.com/onelittlenightmusic/want-spec v0.1.29-0.20261107094605-ab5d48f15fde h
 github.com/onelittlenightmusic/want-spec v0.1.29-0.20261107094605-ab5d48f15fde/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/onelittlenightmusic/want-spec v0.1.29-0.20261107114316-4432bf93a5e6 h1:vJKeKDH6kikr0tVcfk3Mjnr4RiVJ7oIcBfITBOoNxi4=
 github.com/onelittlenightmusic/want-spec v0.1.29-0.20261107114316-4432bf93a5e6/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
+github.com/onelittlenightmusic/want-spec v0.1.30-0.20261111154710-694a8de7e720 h1:/6wIbArbHcZrv1xm+JfAqtDEBQD/QnZ12G2qTw5aG5w=
+github.com/onelittlenightmusic/want-spec v0.1.30-0.20261111154710-694a8de7e720/go.mod h1:Lj2BsANOvd5h4Qvwxp7tjR16KmrffUKmOd2IU9jYF0M=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

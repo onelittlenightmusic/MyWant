@@ -279,6 +279,11 @@ type Want struct {
 	// whether it has been read (result_history_keep.go answerChanged).
 	historyChangeSeen  any
 	historyChangeKnown bool
+	// The onChange fields of its type's timings, as of its last answer (result_timings.go).
+	timingSeen map[string]any
+	// Timings said by Timing, not yet told of.
+	timingMu       sync.Mutex
+	pendingTimings []string
 
 	// Agent system
 	agentRegistry   *AgentRegistry                `json:"-" yaml:"-"`

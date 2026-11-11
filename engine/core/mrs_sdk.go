@@ -165,7 +165,8 @@ func MRSWantContext(want *Want) map[string]any {
 func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 	_, control := obj["_control"]
 	_, tile := obj["_tile"]
-	if !control && !tile {
+	_, timing := obj["_timing"]
+	if !control && !tile && !timing {
 		return false
 	}
 	if opt.OnDirective != nil {
@@ -175,7 +176,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 }
 
 // MRSApplyDirective does what a plugin script asked of its own want: stop
-// itself ("_control": "suspend"), or move its own tile ("_tile": {x, y}).
+// itself ("_control": "suspend"), move its own tile ("_tile": {x, y}), or say
+// its answer came at a timing ("_timing": "album").
 // Only ever that want — nothing in the line names another.
 func MRSApplyDirective(want *Want, obj map[string]any) {
 	if c, _ := obj["_control"].(string); c != "" {
@@ -192,6 +194,18 @@ func MRSApplyDirective(want *Want, obj map[string]any) {
 			_ = want.SendControlCommand(&ControlCommand{
 				Trigger: trigger, WantID: want.Metadata.ID, Timestamp: time.Now(), Reason: reason,
 			})
+		}
+	}
+	// Its answer came at one of its type's timings (Want.Timing): a name, or
+	// several.
+	switch t := obj["_timing"].(type) {
+	case string:
+		want.Timing(t)
+	case []any:
+		for _, name := range t {
+			if s, ok := name.(string); ok {
+				want.Timing(s)
+			}
 		}
 	}
 	if t, ok := obj["_tile"].(map[string]any); ok {

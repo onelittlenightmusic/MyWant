@@ -85,6 +85,12 @@ class Want:
         """Move its own tile on the board."""
         self._emit({"_tile": {"x": int(x), "y": int(y)}})
 
+    def timing(self, name: str) -> None:
+        """Say its answer came at one of its type's timings ("album"): the
+        want murmurs and notifies at it as it was set to (labels murmur /
+        notify)."""
+        self._emit({"_timing": str(name)})
+
     def progress(self, pct: int, message: str = "") -> None:
         self._emit({"_progress": int(pct), "_message": message})
 

@@ -67,6 +67,9 @@ type ResultHistoryEntry struct {
 	// The rest of the answer — the fields the type publishes or keeps, as they
 	// stood when this answer arrived. See answerFields.
 	Fields map[string]any `json:"fields,omitempty" yaml:"fields,omitempty"`
+	// The type's timings it came at (result_timings.go): what the want tells
+	// of it by.
+	Timings []string `json:"timings,omitempty" yaml:"timings,omitempty"`
 	// This answer is the want's answer now: the live state is this entry. At
 	// most one entry is; none is while the want has no answer (nothing found,
 	// a type's history-if false, a result let go by hand). Set where answers
@@ -110,9 +113,26 @@ func (n *Want) recordResultHistory() {
 	// from this want's state can have moved unless the state moved, and this
 	// runs on every reconcile of every want.
 	rev := n.stateRevision.Load()
-	if n.resultRecordedOnce && rev == n.resultRecordedAtRevision {
+	if n.resultRecordedOnce && rev == n.resultRecordedAtRevision && !n.hasPendingTimings() {
 		return
 	}
+	// Timings said this cycle with no new answer to carry them: told of with
+	// the answer it has.
+	told := false
+	defer func() {
+		if told || OnWantOutput == nil {
+			return
+		}
+		said := n.takeTimings()
+		if len(said) == 0 {
+			return
+		}
+		if last := n.getHistoryManager().lastResultEntry(); last != nil {
+			entry := *last
+			entry.Timings = said
+			go OnWantOutput(n, entry)
+		}
+	}()
 	n.resultRecordedAtRevision = rev
 	n.resultRecordedOnce = true
 
@@ -174,6 +194,8 @@ func (n *Want) recordResultHistory() {
 	if prev != nil && sameAnswerResult(prev.Result, entry.Result) {
 		return
 	}
+	entry.Timings = withTimings(n.answerTimings(fields, prev), n.takeTimings())
+	told = true
 	go OnWantOutput(n, entry)
 }
 
