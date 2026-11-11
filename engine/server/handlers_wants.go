@@ -1,6 +1,7 @@
 package server
 
 import (
+	"hash/fnv"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -463,6 +464,61 @@ type wantAPIResponse struct {
 	Hash                 string                      `json:"hash,omitempty"`
 	ExposableFields      []ExposableFieldInfo        `json:"exposable_fields,omitempty"`
 	ImportableFields     []ImportableFieldInfo       `json:"importable_fields,omitempty"`
+	// Included is what ?include= asked to come with it (wantIncludes).
+	Included *wantIncluded `json:"included,omitempty"`
+}
+
+// wantIncluded is what a want's panel reads beside the want itself, sent with
+// it when asked (GET /wants/{id}?include=results,type) — one answer where
+// there were three, each a round trip of its own, two of them waiting on
+// nothing but the panel having opened:
+//
+//	results  the same as GET /wants/{id}/results
+//	type     the same as GET /want-types/{type}
+type wantIncluded struct {
+	Results any `json:"results,omitempty"`
+	Type    any `json:"type,omitempty"`
+}
+
+// wantIncludes is what ?include= names (comma list): results, type.
+func wantIncludes(r *http.Request) map[string]bool {
+	out := map[string]bool{}
+	for _, part := range strings.Split(r.URL.Query().Get("include"), ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out[part] = true
+		}
+	}
+	return out
+}
+
+// include adds what was asked for to the response, and says what of it the
+// want's hash does not already name (its type's definition), for the ETag.
+func (s *Server) include(resp *wantAPIResponse, want *mywant.Want, asked map[string]bool) string {
+	if len(asked) == 0 {
+		return ""
+	}
+	inc := &wantIncluded{}
+	extra := ""
+	if asked["results"] {
+		inc.Results = map[string]any{"data": want.GetAllState()}
+	}
+	if asked["type"] && s.wantTypeLoader != nil {
+		name := want.Metadata.Type
+		if def := s.wantTypeLoader.GetDefinition(name); def != nil {
+			inc.Type = withSource(def, s.wantTypeLoader.GetOrigin(name))
+			if b, err := json.Marshal(inc.Type); err == nil {
+				extra = "-t" + fmt.Sprintf("%x", fnv32(b))
+			}
+		}
+	}
+	resp.Included = inc
+	return extra
+}
+
+func fnv32(b []byte) uint32 {
+	h := fnv.New32a()
+	_, _ = h.Write(b)
+	return h.Sum32()
 }
 
 // buildWantAPIResponse constructs a wantAPIResponse from a live Want, grouping state fields
@@ -625,13 +681,15 @@ func (s *Server) getWant(w http.ResponseWriter, r *http.Request) {
 	wantID := mux.Vars(r)["id"]
 	includeConnectivity := r.URL.Query().Get("connectivityMetadata") == "true"
 	scope := historyScopeOf(r, historyAll)
+	asked := wantIncludes(r)
 
 	serveWantResponse := func(want *mywant.Want) {
 		resp := s.buildWantAPIResponse(want, includeConnectivity)
 		resp.keepHistory(scope)
-		w.Header().Set("ETag", `"`+resp.Hash+`"`)
+		etag := resp.Hash + s.include(&resp, want, asked)
+		w.Header().Set("ETag", `"`+etag+`"`)
 		ifNoneMatch := strings.Trim(r.Header.Get("If-None-Match"), `"`)
-		if ifNoneMatch != "" && ifNoneMatch == resp.Hash {
+		if ifNoneMatch != "" && ifNoneMatch == etag {
 			w.WriteHeader(http.StatusNotModified)
 			return
 		}

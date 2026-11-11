@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	mywant "mywant/engine/core"
 
 	"sort"
@@ -34,6 +35,58 @@ type boardChange struct {
 	Wants  []string `json:"wants,omitempty"`
 	Things []string `json:"things,omitempty"`
 	All    bool     `json:"all,omitempty"`
+	// Data is the changed wants themselves, as the board reads one
+	// (GET /wants/{id}?history=results — its answers, not every history),
+	// each with its hash: a page or an app keeps them as they come, with no
+	// read of its own after the event. Not every want: one hidden from the
+	// board, one gone, and any past boardChangeDataMax (the rest are read as
+	// before, by id).
+	Data []wantAPIResponse `json:"data,omitempty"`
+	// Hashes is each of Data's wants by the hash the want list's hashes give
+	// it (GET /wants/hashes) — what a poll compares — where Data's own hash
+	// is its body's (a single want's ETag, its correlations folded in).
+	Hashes map[string]string `json:"hashes,omitempty"`
+}
+
+// boardChangeDataMax bounds what one event carries of the wants themselves:
+// so many wants, so many bytes (roughly — their answers are most of it).
+const (
+	boardChangeDataMax      = 40
+	boardChangeDataMaxBytes = 512 << 10
+)
+
+// boardChangeData is the changed wants as the board reads them, up to the
+// bounds.
+func (s *Server) boardChangeData(ids []string) ([]wantAPIResponse, map[string]string) {
+	if s == nil || s.globalBuilder == nil {
+		return nil, nil
+	}
+	var out []wantAPIResponse
+	hashes := map[string]string{}
+	size := 0
+	for _, id := range ids {
+		if len(out) >= boardChangeDataMax || size >= boardChangeDataMaxBytes {
+			break
+		}
+		want, _, found := s.globalBuilder.FindWantByID(id)
+		if !found || shouldHideSystemWant(want, false) {
+			continue
+		}
+		resp := s.buildWantAPIResponse(want, false)
+		resp.keepHistory(historyResults)
+		if b, err := json.Marshal(resp); err == nil {
+			if size+len(b) > boardChangeDataMaxBytes {
+				continue
+			}
+			size += len(b)
+		}
+		out = append(out, resp)
+		hashes[id] = mywant.CalculateWantHash(want)
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, hashes
 }
 
 type boardChangeHub struct {
@@ -131,6 +184,9 @@ func (h *boardChangeHub) flush() {
 	change := boardChange{Wants: boardSortedIDs(wants), Things: boardSortedIDs(things), All: all}
 	if !change.All && len(change.Wants) == 0 && len(change.Things) == 0 {
 		return
+	}
+	if !change.All {
+		change.Data, change.Hashes = s.boardChangeData(change.Wants)
 	}
 	broadcastSSE("board_changed", change)
 }
