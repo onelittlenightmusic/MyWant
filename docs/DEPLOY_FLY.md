@@ -23,7 +23,7 @@ This repository builds a **container image**. It does not deploy it, and holds
 no Fly.io credential.
 
 The `fly.toml` files, app names, regions, scaling knobs, and the Fly API token
-live in **[`mywant-deploy`](https://github.com/onelittlenightmusic/mywant-deploy)**
+live in **[`mywant-fly-deploy`](https://github.com/onelittlenightmusic/mywant-fly-deploy)**
 (private). Two reasons:
 
 1. **The two apps must stay in lockstep.** The GUI's `MYWANT_BACKEND` has to
@@ -56,7 +56,7 @@ artifact, a separate repo publishes it (`homebrew-mywant`, `mywant-gui-dist`).
 
 State (`~/.mywant`: `state.yaml`, `memo.yaml`, `achievements.yaml`, `recipes/`,
 `custom-types/`) is persisted by pointing `HOME` at a Fly **volume** mounted at
-`/data`. The volume, mount, and `HOME` env are configured in `mywant-deploy`.
+`/data`. The volume, mount, and `HOME` env are configured in `mywant-fly-deploy`.
 
 Note that `su-exec` resets `HOME` to the target user's `/etc/passwd` entry, so
 `ENV HOME=/data` alone is not enough — `docker-entrypoint.sh` re-applies it
@@ -73,7 +73,7 @@ curl http://localhost:8080/health
 
 ## Deploying
 
-See the README in `mywant-deploy`. In short: that repo pulls the published
+See the README in `mywant-fly-deploy`. In short: that repo pulls the published
 image, retags it into `registry.fly.io`, and runs `flyctl deploy --image`
 against its own `fly.toml`. Deployment is triggered manually, on a config
 change, or by a `repository_dispatch` from this repo's image workflow (enabled

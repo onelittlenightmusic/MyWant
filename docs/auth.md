@@ -189,7 +189,7 @@ curl -s -o /dev/null -w '%{http_code}\n' https://osaki-mywant-gui.fly.dev/health
   控えを失った場合はローテーションするしかありません
 - デプロイのスモークテスト用に `GUI_SMOKE_AUTH`（`user:password` 形式）を設定している場合、
   ローテーション時に一緒に更新しないとテストが落ちます。
-  シークレット名は **`GUI_SMOKE_AUTH`**（`mywant-deploy` リポジトリ）です。ワークフローのログには
+  シークレット名は **`GUI_SMOKE_AUTH`**（`mywant-fly-deploy` リポジトリ）です。ワークフローのログには
   `SMOKE_AUTH: ***` と出ますが、これは受け取る側の環境変数名なので取り違えないでください
   （`deploy.yml`: `SMOKE_AUTH: ${{ secrets.GUI_SMOKE_AUTH }}`）。
 

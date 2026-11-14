@@ -5,7 +5,7 @@ package mywant
 // A plugin's script used to cost a python3 per call, or with `serve: true` a
 // resident interpreter per plugin — ~25MB apiece, most of it the interpreter
 // itself. On the 256mb Fly Machine two of those, the engine and the GUI left
-// ~10MB free, and the Machine thrashed (mywant-deploy README, 2026-10-06).
+// ~10MB free, and the Machine thrashed (mywant-fly-deploy README, 2026-10-06).
 //
 // So the scripts go to the engine's external-agent service instead
 // (ExecuteRequest in, ExecuteResponse out — webhook.go): mrs_agent_service.py,
