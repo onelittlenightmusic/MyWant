@@ -127,12 +127,20 @@ func (s *Server) robotWantNamed(name string) (*mywant.Want, error) {
 			near = append(near, w)
 		}
 	}
-	if len(near) == 0 {
-		typeOf := make([]string, len(wants))
-		for i, w := range wants {
-			typeOf[i] = w.Metadata.Type
+	// A want's own alias ("golf") is that want, whatever names hold the word.
+	for _, w := range wants {
+		if robotOwnAlias(strings.Split(w.Metadata.Labels[robotAliasLabel], ","), name) {
+			near = []*mywant.Want{w}
+			break
 		}
-		for _, i := range robotByAlias(name, typeOf, s.robotTypeAliases()) {
+	}
+	if len(near) == 0 {
+		typeAliases := s.robotTypeAliases()
+		lists := make([][]string, len(wants))
+		for i, w := range wants {
+			lists[i] = robotWantAliases(w.Metadata.Labels, w.Metadata.Type, typeAliases)
+		}
+		for _, i := range robotByAliasLists(name, lists) {
 			near = append(near, wants[i])
 		}
 	}

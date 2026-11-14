@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -116,10 +117,10 @@ func TestFMCardSummary(t *testing.T) {
 // What a type tells the robot: its hint, then its examples as 「request」 → what to do.
 func TestFMTypeHintCarriesTheHintAndTheExamples(t *testing.T) {
 	got := robotTypeHint(map[string]string{
-		robotHintLabel:            "A route: deploy_want\n  transit_search at once.",
+		robotHintLabel: "A route: deploy_want\n  transit_search at once.",
 		robotQALabel + "戸塚への乗り換え": "deploy_want transit_search with params to=戸塚",
-		robotQALabel:              "nothing asked",
-		"type-icon":            "TrainFront",
+		robotQALabel: "nothing asked",
+		"type-icon":  "TrainFront",
 	})
 	want := "A route: deploy_want transit_search at once.\n  e.g. 「戸塚への乗り換え」 → deploy_want transit_search with params to=戸塚"
 	if got != want {
@@ -164,5 +165,18 @@ func TestFMNearestStationIsTheFirstHeartRailsGives(t *testing.T) {
 
 	if got, err := robotNearestStation(35.69613427769067, 139.6840197085415); err != nil || got != "中野坂上" {
 		t.Errorf("robotNearestStation = %q, %v", got, err)
+	}
+}
+
+func TestRobotWantAliases(t *testing.T) {
+	got := robotWantAliases(map[string]string{"aliases": "golf, ゴルフ"}, "smartgolf_list_available",
+		map[string][]string{"smartgolf_list_available": {"ゴルフの空き", "ゴルフ"}})
+	want := []string{"golf", "ゴルフ", "ゴルフの空き"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("got %v, want %v", got, want)
+	}
+	// A want called golf is found by it, its type's names not needed.
+	if hits := robotByAliasLists("golf", [][]string{{"transit"}, got}); len(hits) != 1 || hits[0] != 1 {
+		t.Errorf("golf found %v", hits)
 	}
 }

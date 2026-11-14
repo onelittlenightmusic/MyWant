@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -43,19 +44,20 @@ The words are joined with spaces, so they need no quotes.`,
 			wait = -1
 		}
 		c := wantsClient()
-		var res struct {
-			Matched  bool              `json:"matched"`
-			Answer   string            `json:"answer"`
-			WantID   string            `json:"wantId"`
-			WantName string            `json:"wantName"`
-			WantType string            `json:"wantType"`
-			Params   map[string]string `json:"params"`
-			Settled  bool              `json:"settled"`
-		}
 		text := strings.Join(args, " ")
-		if err := c.Request("POST", "/api/v1/magic", map[string]any{"text": text, "wait": wait}, &res); err != nil {
+		res, err := magicAsk(text, wait)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
+		}
+		// Not a sentence as a whole: a want named by its alias ("golf"), then
+		// where in its answer — a field, an element of it…
+		// mywant m golf first_time / mywant m golf times 0
+		var path []string
+		if !res.Matched && len(args) > 1 {
+			if first, err := magicAsk(args[0], wait); err == nil && first.Matched && first.WantID != "" {
+				res, path = first, args[1:]
+			}
 		}
 		if !res.Matched {
 			fmt.Fprintf(os.Stderr, "No magic sentence matches %q (see a want type's label magic-sentence)\n", text)
@@ -76,6 +78,21 @@ The words are joined with spaces, so they need no quotes.`,
 			if w, err := c.GetWant(res.WantID, false); err == nil {
 				fields = magicFields(w.State)
 			}
+		}
+		// A path in the answer: that value alone, whole (JSON when not text).
+		if len(path) > 0 {
+			v, err := magicDig(fields, path)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			if asJSON {
+				out, _ := json.MarshalIndent(v, "", "  ")
+				fmt.Println(string(out))
+				return
+			}
+			fmt.Println(magicWhole(v))
+			return
 		}
 		// --field: those fields alone — one asked prints its value bare (whole,
 		// for a script to read), several print a line each.
@@ -199,6 +216,70 @@ func magicValue(v any) string {
 	return s
 }
 
+// magicReply is what POST /api/v1/magic answers.
+type magicReply struct {
+	Matched  bool              `json:"matched"`
+	Answer   string            `json:"answer"`
+	WantID   string            `json:"wantId"`
+	WantName string            `json:"wantName"`
+	WantType string            `json:"wantType"`
+	Params   map[string]string `json:"params"`
+	Settled  bool              `json:"settled"`
+}
+
+func magicAsk(text string, wait int) (magicReply, error) {
+	var res magicReply
+	err := wantsClient().Request("POST", "/api/v1/magic", map[string]any{"text": text, "wait": wait}, &res)
+	return res, err
+}
+
+// magicDig: the value at `path` in a want's fields — a field's name, then a
+// key of an object or an index of an array, each in turn.
+func magicDig(fields map[string]any, path []string) (any, error) {
+	var v any = fields
+	for i, p := range path {
+		switch x := magicParsed(v).(type) {
+		case map[string]any:
+			next, ok := x[p]
+			if !ok {
+				return nil, fmt.Errorf("no %q in %s", p, magicWhere(path[:i]))
+			}
+			v = next
+		case []any:
+			n, err := strconv.Atoi(p)
+			if err != nil || n < 0 || n >= len(x) {
+				return nil, fmt.Errorf("%s has %d elements (0–%d), not %q", magicWhere(path[:i]), len(x), len(x)-1, p)
+			}
+			v = x[n]
+		default:
+			return nil, fmt.Errorf("%s is a value, nothing in it", magicWhere(path[:i]))
+		}
+	}
+	return v, nil
+}
+
+func magicWhere(path []string) string {
+	if len(path) == 0 {
+		return "the answer"
+	}
+	return strings.Join(path, " ")
+}
+
+// A field's value a JSON string holds ("[{…}]" kept as text): read as what it
+// says, so its elements can be gone into.
+func magicParsed(v any) any {
+	if s, ok := v.(string); ok {
+		t := strings.TrimSpace(s)
+		if strings.HasPrefix(t, "[") || strings.HasPrefix(t, "{") {
+			var out any
+			if json.Unmarshal([]byte(t), &out) == nil {
+				return out
+			}
+		}
+	}
+	return v
+}
+
 func init() {
 	MagicCmd.Flags().Int("wait", 15, "Seconds to wait for the want's answer (at most 60)")
 	MagicCmd.Flags().Bool("json", false, "Print the result as JSON")
@@ -280,6 +361,19 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	if len(args) == 0 {
 		var out []string
 		low := strings.ToLower(toComplete)
+		// A want's own aliases: said alone, that want's answer ("golf").
+		if resp, err := wantsClient().ListWants("", nil, nil, false, false); err == nil {
+			for _, w := range resp.Wants {
+				if w.Status == "archived" {
+					continue
+				}
+				for _, a := range strings.Split(w.Metadata.Labels["aliases"], ",") {
+					if a = strings.TrimSpace(a); a != "" && strings.HasPrefix(strings.ToLower(a), low) {
+						out = append(out, fmt.Sprintf("%s\t%s (want)", a, w.Metadata.Name))
+					}
+				}
+			}
+		}
 		for _, c := range cmds {
 			rest := make([]string, len(c.Slots))
 			for i, s := range c.Slots {
@@ -292,6 +386,9 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 			}
 		}
 		return out, cobra.ShellCompDirectiveNoFileComp
+	}
+	if !magicIsCommand(cmds, args[0]) {
+		return completeMagicPath(args, toComplete)
 	}
 	var found *magicCommand
 	for i, c := range cmds {
@@ -426,4 +523,61 @@ func completeMagicField(cmd *cobra.Command, args []string, toComplete string) ([
 		out = append(out, done+f.Name+"\t"+desc)
 	}
 	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
+}
+
+func magicIsCommand(cmds []magicCommand, word string) bool {
+	for _, c := range cmds {
+		for _, a := range c.Aliases {
+			if strings.EqualFold(a, word) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// completeMagicPath: after a want's alias ("golf"), where in its answer — its
+// fields, then the elements of an array (by index) or the keys of an object,
+// each with a glimpse of its value. Nothing is made: an alias only finds.
+func completeMagicPath(args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	res, err := magicAsk(args[0], -1)
+	if err != nil || !res.Matched || res.WantID == "" {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	w, err := wantsClient().GetWant(res.WantID, false)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	v, err := magicDig(magicFields(w.State), args[1:])
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	glimpse := func(x any) string {
+		g := magicValue(x)
+		if r := []rune(g); len(r) > 50 {
+			g = string(r[:50]) + "…"
+		}
+		return g
+	}
+	var out []string
+	switch x := magicParsed(v).(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			if strings.HasPrefix(k, toComplete) {
+				out = append(out, k+"\t"+glimpse(x[k]))
+			}
+		}
+	case []any:
+		for i, e := range x {
+			if k := strconv.Itoa(i); strings.HasPrefix(k, toComplete) {
+				out = append(out, k+"\t"+glimpse(e))
+			}
+		}
+	}
+	return out, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 }

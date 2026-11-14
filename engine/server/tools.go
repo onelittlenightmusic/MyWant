@@ -389,6 +389,32 @@ func (s *Server) robotTypeAliases() map[string][]string {
 	return out
 }
 
+// robotWantAliases: what a want is also called — its own label aliases (set
+// on the want: "golf" for one golf want of several), then what its type is.
+func robotWantAliases(labels map[string]string, typ string, typeAliases map[string][]string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, a := range append(strings.Split(labels[robotAliasLabel], ","), typeAliases[typ]...) {
+		if a = strings.TrimSpace(a); a != "" && !seen[a] {
+			seen[a] = true
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// robotOwnAlias: `said` is one of a want's own aliases, letter case and
+// spaces aside.
+func robotOwnAlias(own []string, said string) bool {
+	n := robotLooseName(said)
+	for _, a := range own {
+		if a = strings.TrimSpace(a); a != "" && robotLooseName(a) == n {
+			return true
+		}
+	}
+	return false
+}
+
 // robotHintLabel is a want type's word to the robot: how a question for it is
 // handled, in the type's own YAML rather than in this file — transit_search's
 // "a route: deploy at once, the stations need not be on the board, a time goes
@@ -611,9 +637,19 @@ func robotByGlossary(said string, names []string, glossary [][]string) []int {
 // robotByAlias picks, from the types of the wants on the board, the ones the
 // person named by an alias: all of those with the best score.
 func robotByAlias(said string, typeOf []string, aliases map[string][]string) []int {
-	best, out := 0, []int(nil)
+	lists := make([][]string, len(typeOf))
 	for i, t := range typeOf {
-		sc := robotAliasScore(said, aliases[t])
+		lists[i] = aliases[t]
+	}
+	return robotByAliasLists(said, lists)
+}
+
+// robotByAliasLists is robotByAlias with each one's own list: a want's own
+// aliases beside its type's (robotWantAliases).
+func robotByAliasLists(said string, lists [][]string) []int {
+	best, out := 0, []int(nil)
+	for i, list := range lists {
+		sc := robotAliasScore(said, list)
 		if sc == 0 || sc < best {
 			continue
 		}
@@ -1559,6 +1595,8 @@ type robotTile struct {
 	// typ: a want's type ("" for a thing); aliases: what its type is also called.
 	typ     string
 	aliases []string
+	// aliasesOwn: what the want itself is also called (its label aliases).
+	aliasesOwn []string
 	// id and cardKind: what a chat shows its card by — a want's id or a
 	// thing's, and which of the two it is.
 	id       string
@@ -1671,7 +1709,8 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 		if tile, ok := robotTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
 			tile.id, tile.cardKind = w.Metadata.ID, "want"
 			tile.typ = w.Metadata.Type
-			tile.aliases = aliases[w.Metadata.Type]
+			tile.aliases = robotWantAliases(w.Metadata.Labels, w.Metadata.Type, aliases)
+			tile.aliasesOwn = strings.Split(w.Metadata.Labels[robotAliasLabel], ",")
 			tiles = append(tiles, tile)
 		}
 	}
@@ -1752,6 +1791,16 @@ func (s *Server) robotPoint(args map[string]string) (string, error) {
 			near = append(near, t.name)
 		}
 	}
+	// What a want was named on purpose (its own label aliases: "golf") comes
+	// before a name that only holds the word (smartgolf-…).
+	if found == nil {
+		for i, t := range tiles {
+			if t.kind != "" && strings.HasPrefix(t.kind, "want ") && robotOwnAlias(t.aliasesOwn, name) {
+				found = &tiles[i]
+				break
+			}
+		}
+	}
 	if found == nil && len(near) == 1 {
 		for i, t := range tiles {
 			if t.name == near[0] {
@@ -1760,12 +1809,12 @@ func (s *Server) robotPoint(args map[string]string) (string, error) {
 		}
 	}
 	if found == nil && len(near) == 0 {
-		// Not by its name — by what its type is also called (robotAliasLabel).
-		typeOf := make([]string, len(tiles))
+		// Not by its name — by what it, or its type, is also called (robotAliasLabel).
+		lists := make([][]string, len(tiles))
 		for i, t := range tiles {
-			typeOf[i] = t.typ
+			lists[i] = t.aliases
 		}
-		hits := robotByAlias(name, typeOf, s.robotTypeAliases())
+		hits := robotByAliasLists(name, lists)
 		if len(hits) == 0 {
 			// Nor by an alias — by a name its constellation puts beside it.
 			names := make([]string, len(tiles))
@@ -1869,6 +1918,16 @@ func (s *Server) robotLook(args map[string]string) (string, error) {
 			near = append(near, w.Metadata.Name)
 		}
 	}
+	// What a want was named on purpose (its own label aliases: "golf") comes
+	// before a name that only holds the word (smartgolf-…).
+	if found < 0 {
+		for i, w := range resp.Wants {
+			if robotOwnAlias(strings.Split(w.Metadata.Labels[robotAliasLabel], ","), name) {
+				found = i
+				break
+			}
+		}
+	}
 	if found < 0 && len(near) == 1 {
 		for i, w := range resp.Wants {
 			if w.Metadata.Name == near[0] {
@@ -1877,12 +1936,13 @@ func (s *Server) robotLook(args map[string]string) (string, error) {
 		}
 	}
 	if found < 0 && len(near) == 0 {
-		// Not by its name — by what its type is also called (robotAliasLabel).
-		typeOf := make([]string, len(resp.Wants))
+		// Not by its name — by what it, or its type, is also called (robotAliasLabel).
+		typeAliases := s.robotTypeAliases()
+		lists := make([][]string, len(resp.Wants))
 		for i, w := range resp.Wants {
-			typeOf[i] = w.Metadata.Type
+			lists[i] = robotWantAliases(w.Metadata.Labels, w.Metadata.Type, typeAliases)
 		}
-		hits := robotByAlias(name, typeOf, s.robotTypeAliases())
+		hits := robotByAliasLists(name, lists)
 		if len(hits) == 0 {
 			// Nor by an alias — by a name its constellation puts beside it.
 			names := make([]string, len(resp.Wants))

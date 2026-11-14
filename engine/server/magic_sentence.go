@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	mywant "mywant/engine/core"
 )
 
 // A want's magic sentence (its label magic-sentence), or its type's (the
@@ -123,7 +125,10 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 	}
 	// Where sentences are said: each want's own, then each type's default. On
 	// a tie the first wins, so a want's own sentence before its type's.
-	type source struct{ name, typ, tmpls string }
+	type source struct {
+		name, typ, tmpls string
+		aliases          []string
+	}
 	var sources []source
 	aliasesOf := map[string][]string{}
 	types, _ := s.robotWantTypes()
@@ -132,12 +137,14 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 	}
 	for _, w := range s.globalBuilder.GetWants() {
 		if t := w.Metadata.Labels[magicSentenceLabel]; t != "" && w.Metadata.Labels[robotArchived] != "true" {
-			sources = append(sources, source{w.Metadata.Name, w.Metadata.Type, t})
+			// A want's <alias> is any of its own aliases, or its type's.
+			own := robotWantAliases(w.Metadata.Labels, w.Metadata.Type, nil)
+			sources = append(sources, source{w.Metadata.Name, w.Metadata.Type, t, append(own, aliasesOf[w.Metadata.Type]...)})
 		}
 	}
 	for _, t := range types {
 		if tmpl := t.Labels[magicSentenceLabel]; tmpl != "" {
-			sources = append(sources, source{"", t.Name, tmpl})
+			sources = append(sources, source{"", t.Name, tmpl, aliasesOf[t.Name]})
 		}
 	}
 	var best magicMatch
@@ -145,7 +152,7 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 	for _, src := range sources {
 		tmpls := src.tmpls
 		for _, tmpl := range strings.FieldsFunc(tmpls, func(r rune) bool { return r == '\n' || r == '|' || r == '｜' }) {
-			re, slots := compileMagic(tmpl, aliasesOf[src.typ]...)
+			re, slots := compileMagic(tmpl, src.aliases...)
 			if re == nil {
 				continue
 			}
@@ -270,6 +277,24 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 	text := strings.TrimSpace(req.Text)
 	mm, ok := s.magicSentenceMatch(text)
 	if !ok {
+		// A want's own alias said alone ("golf"): that want, as it is — its
+		// answer shown, nothing made.
+		if want := s.wantByAlias(text); want != nil {
+			out := magicResponse{Matched: true, Answer: fmt.Sprintf("「%s」です。", want.Metadata.Name),
+				WantID: want.Metadata.ID, WantName: want.Metadata.Name, WantType: want.Metadata.Type}
+			if req.Wait >= 0 {
+				wait := req.Wait
+				if wait == 0 {
+					wait = 15
+				}
+				if wait > 60 {
+					wait = 60
+				}
+				out.Settled = s.robotWaitSettled(want.Metadata.ID, time.Duration(wait)*time.Second)
+			}
+			robotWriteJSON(w, out)
+			return
+		}
 		robotWriteJSON(w, magicResponse{Matched: false})
 		return
 	}
@@ -289,4 +314,37 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 		out.Settled = s.robotWaitSettled(card.ID, time.Duration(wait)*time.Second)
 	}
 	robotWriteJSON(w, out)
+}
+
+// wantByAlias: the want on the board (not archived) that `said` names by an
+// alias — its own (its label aliases: "golf") first, else its type's — nil
+// when none does. Of several of one type, the one created last.
+func (s *Server) wantByAlias(said string) *mywant.Want {
+	var live []*mywant.Want
+	for _, w := range s.globalBuilder.GetWants() {
+		if w.Metadata.Labels[robotArchived] != "true" && w.Metadata.Name != robotWantName {
+			live = append(live, w)
+		}
+	}
+	for _, w := range live {
+		if robotOwnAlias(strings.Split(w.Metadata.Labels[robotAliasLabel], ","), said) {
+			return w
+		}
+	}
+	types, _ := s.robotWantTypes()
+	for _, t := range types {
+		if !robotOwnAlias(strings.Split(t.Labels[robotAliasLabel], ","), said) {
+			continue
+		}
+		var last *mywant.Want
+		for _, w := range live {
+			if w.Metadata.Type == t.Name && (last == nil || w.Metadata.Labels["mywant.io/created-at"] > last.Metadata.Labels["mywant.io/created-at"]) {
+				last = w
+			}
+		}
+		if last != nil {
+			return last
+		}
+	}
+	return nil
 }
