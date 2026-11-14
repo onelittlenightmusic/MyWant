@@ -446,7 +446,7 @@ ${shot("worlds.jpg", "The Worlds page. Press one to switch to it")}
           icon: 'terminal',
           color: '#64748b',
           body: `
-<p>Add <code>--help</code> to any command to see how to use it.</p>
+<p>Add <code>--help</code> to any command to see how to use it. Every command is in the <a href="https://onelittlenightmusic.github.io/MyWant/cli/" target="_blank" rel="noopener">CLI reference</a>.</p>
 <h4>Wants</h4>
 <div class="code"><pre>mywant wants list                 # list them
 mywant wants get coffee-break     # look closer
@@ -481,6 +481,7 @@ If a Want with the same conditions is already there, nothing new is made and its
   arrival: 16:59
   fare: 178
   legs_text: 荻窪(16:49) ─[東京メトロ丸ノ内線]→ 中野坂上(16:59)</pre></div>
+<p>Every flag is in the <a href="https://onelittlenightmusic.github.io/MyWant/cli/reference/magic" target="_blank" rel="noopener">CLI reference for mywant magic</a>.</p>
 <p><code>m</code> is short for <code>magic</code>. Separate the words with spaces; no quotes needed.</p>
 <p>Each Want Type sets its own phrases (its label <code>magic-sentence</code>). For how to write them, see “Make one in a few words” under concepts.</p>
 <h4>Take out just the values you want</h4>

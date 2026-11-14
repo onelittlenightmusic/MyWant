@@ -1,0 +1,10 @@
+node_modules/
+commands.json
+docs/reference/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/.vitepress/reference.json
+.gen-home/
+# The repository ignores *.json; these two are the project.
+!package.json
+!package-lock.json

@@ -1,0 +1,20 @@
+/*
+ * What running a command does, as a badge (gen.mjs): reads, changes, destroys —
+ * and canvas, for the commands about what is drawn on the board. VitePress's
+ * own badge shapes, in the developer docs' colours (mywant-gui-dev).
+ */
+.VPBadge.tip { border-color: transparent; background-color: rgba(16, 185, 129, 0.14); color: #047857; }
+.dark .VPBadge.tip { color: #34d399; }
+.VPBadge.warning { border-color: transparent; background-color: rgba(245, 158, 11, 0.16); color: #b45309; }
+.dark .VPBadge.warning { color: #fbbf24; }
+.VPBadge.danger { border-color: transparent; background-color: rgba(244, 63, 94, 0.14); color: #be123c; }
+.dark .VPBadge.danger { color: #fb7185; }
+.VPBadge.info { border-color: transparent; background-color: rgba(56, 189, 248, 0.16); color: #0369a1; }
+.dark .VPBadge.info { color: #7dd3fc; }
+
+/* A label is one word; never break it across lines (a narrow table cell did). */
+.VPBadge { white-space: nowrap; }
+/* A command's title is long: its badges sit on its line, smaller. */
+.vp-doc h1 .VPBadge { vertical-align: middle; font-size: 12px; }
+/* Flag names never wrap in the middle. */
+.vp-doc td:first-child code { white-space: nowrap; }

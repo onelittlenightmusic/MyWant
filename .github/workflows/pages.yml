@@ -1,12 +1,16 @@
 name: Deploy guide
 
 # The beginner's guide in site/ — static HTML, published as it is to
-# https://onelittlenightmusic.github.io/MyWant/.
+# https://onelittlenightmusic.github.io/MyWant/ — and beside it, at /cli/, the
+# command reference (cli-docs/, VitePress), its pages generated from the CLI
+# built here (`mywant commands --json --groups`), so they say what it does.
 on:
   push:
     branches: [master]
     paths:
       - 'site/**'
+      - 'cli-docs/**'
+      - 'client/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -24,6 +28,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: client/go.mod
+          cache-dependency-path: client/go.sum
+      - name: Build the CLI the reference is read from
+        working-directory: client
+        run: go build -o ../bin/mywant ./cmd/mywant
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cli-docs/package-lock.json
+      - name: Build the CLI reference
+        working-directory: cli-docs
+        run: npm ci && npm run docs:build
+      - name: Put it beside the guide
+        run: |
+          rm -rf site/cli
+          cp -R cli-docs/docs/.vitepress/dist site/cli
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

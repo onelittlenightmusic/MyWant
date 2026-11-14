@@ -44,6 +44,16 @@ window.GUIDE_SITE = {
       sub: { ja: 'キャンバス・ロボット・Web Want', en: 'The canvas, the robot and Web Wants' },
     },
     {
+      id: 'cli',
+      href: 'https://onelittlenightmusic.github.io/MyWant/cli/',
+      icon: 'square-terminal',
+      color: '#334155',
+      title: { ja: 'CLI リファレンス', en: 'CLI reference' },
+      sub: { ja: 'mywant の全コマンド（英語）', en: 'Every mywant command' },
+      // VitePress, English only: no ?lang= to carry over.
+      noLang: true,
+    },
+    {
       id: 'dev',
       href: 'https://onelittlenightmusic.github.io/mywant-gui-dev/',
       icon: 'code',

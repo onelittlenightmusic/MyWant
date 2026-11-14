@@ -1,0 +1,14 @@
+{
+  "name": "mywant-cli-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gen": "node gen.mjs",
+    "docs:dev": "node gen.mjs && vitepress dev docs",
+    "docs:build": "node gen.mjs && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

@@ -45,6 +45,13 @@ type CommandInfo struct {
 	Long string `json:"long,omitempty"`
 	// Examples the command carries, verbatim.
 	Example string `json:"example,omitempty"`
+	// Other names it answers to: "w" for wants, "s" for search.
+	Aliases []string `json:"aliases,omitempty"`
+	// A command that only holds others ("wants", "things") — listed only with
+	// --groups, for a reference that names each group before its commands.
+	// The CLI itself is the group with the empty path; its flags are the
+	// global ones.
+	Group bool `json:"group,omitempty"`
 	// Its own flags (not the global ones, which apply to everything).
 	Flags []FlagInfo `json:"flags,omitempty"`
 	// Whether running it only reads. See readOnlyCommand.
@@ -214,6 +221,7 @@ var (
 	commandsRisk     string
 	commandsKind     string
 	commandsCanvas   bool
+	commandsGroups   bool
 )
 
 // CommandsCmd prints this CLI's command tree.
@@ -235,7 +243,19 @@ canvas commands first, the rest of the CLI only when it asks.`,
   mywant commands --json
   mywant commands --json --safe-only`,
 	Run: func(cmd *cobra.Command, args []string) {
-		infos := collectCommands(cmd.Root(), "")
+		infos := collectCommandsWith(cmd.Root(), "", commandsGroups)
+		if commandsGroups {
+			// The CLI itself first: what it is, and the flags every command takes.
+			root := cmd.Root()
+			var global []FlagInfo
+			root.PersistentFlags().VisitAll(func(f *pflag.Flag) {
+				if !f.Hidden {
+					global = append(global, FlagInfo{Name: f.Name, Shorthand: f.Shorthand, Usage: f.Usage, Default: f.DefValue, Type: f.Value.Type()})
+				}
+			})
+			infos = append([]CommandInfo{{Path: "", Short: root.Short, Use: root.Use, Long: strings.TrimSpace(root.Long),
+				Flags: global, Group: true, Risk: "read", Kind: "observe"}}, infos...)
+		}
 		if !commandsCoreOnly {
 			infos = append(infos, pluginCommands()...)
 		}
@@ -312,12 +332,24 @@ canvas commands first, the rest of the CLI only when it asks.`,
 // root itself, hidden commands, the shell-completion machinery, and any group
 // that is only a heading for its children (`mywant thing` alone does nothing).
 func collectCommands(cmd *cobra.Command, prefix string) []CommandInfo {
+	return collectCommandsWith(cmd, prefix, false)
+}
+
+// collectCommandsWith: groups too when asked (the reference's --groups).
+func collectCommandsWith(cmd *cobra.Command, prefix string, groups bool) []CommandInfo {
 	var infos []CommandInfo
 	for _, child := range cmd.Commands() {
 		if child.Hidden || child.Name() == "completion" || child.Name() == "help" {
 			continue
 		}
 		path := strings.TrimSpace(prefix + " " + child.Name())
+		if groups && !child.Runnable() {
+			infos = append(infos, CommandInfo{
+				Path: path, Short: child.Short, Use: child.Use, Long: strings.TrimSpace(child.Long),
+				Example: strings.TrimSpace(child.Example), Aliases: child.Aliases, Group: true,
+				Risk: "read", Kind: "observe",
+			})
+		}
 		if child.Runnable() {
 			infos = append(infos, CommandInfo{
 				Path:     path,
@@ -325,6 +357,7 @@ func collectCommands(cmd *cobra.Command, prefix string) []CommandInfo {
 				Use:      child.Use,
 				Long:     strings.TrimSpace(child.Long),
 				Example:  strings.TrimSpace(child.Example),
+				Aliases:  child.Aliases,
 				Flags:    collectFlags(child),
 				ReadOnly: readOnlyCommand(path),
 				Risk:     commandRisk(path),
@@ -332,7 +365,7 @@ func collectCommands(cmd *cobra.Command, prefix string) []CommandInfo {
 				Canvas:   commandCanvas(child, path),
 			})
 		}
-		infos = append(infos, collectCommands(child, path)...)
+		infos = append(infos, collectCommandsWith(child, path, groups)...)
 	}
 	return infos
 }
@@ -361,4 +394,5 @@ func init() {
 	CommandsCmd.Flags().StringVar(&commandsRisk, "risk", "", "Only commands of this risk: read, change or destroy (see risk in the JSON)")
 	CommandsCmd.Flags().StringVar(&commandsKind, "kind", "", "Only commands of this kind: observe (they tell you something) or control (they change something)")
 	CommandsCmd.Flags().BoolVar(&commandsCanvas, "canvas", false, "Only the commands about what is drawn on the canvas")
+	CommandsCmd.Flags().BoolVar(&commandsGroups, "groups", false, "Also list the commands that only hold others (wants, things…) and the CLI itself with its global flags — for a reference")
 }

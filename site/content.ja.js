@@ -450,7 +450,7 @@ ${shot("worlds.jpg", "画面の Worlds ページ。押すとその World に切�
           icon: 'terminal',
           color: '#64748b',
           body: `
-<p>どのコマンドも、後ろに <code>--help</code> をつけると使い方が出ます。</p>
+<p>どのコマンドも、後ろに <code>--help</code> をつけると使い方が出ます。全部のコマンドは <a href="https://onelittlenightmusic.github.io/MyWant/cli/" target="_blank" rel="noopener">CLI リファレンス</a>（英語）にまとまっています。</p>
 <h4>Want</h4>
 <div class="code"><pre>mywant wants list                 # 一覧
 mywant wants get coffee-break     # くわしく見る
@@ -485,6 +485,7 @@ mywant config set                    # 質問に答えて設定する</pre></div
   arrival: 16:59
   fare: 178
   legs_text: 荻窪(16:49) ─[東京メトロ丸ノ内線]→ 中野坂上(16:59)</pre></div>
+<p>フラグの一覧は <a href="https://onelittlenightmusic.github.io/MyWant/cli/reference/magic" target="_blank" rel="noopener">CLI リファレンスの mywant magic</a> にあります。</p>
 <p><code>m</code> は <code>magic</code> の短い書きかたです。言葉はスペースで区切るだけで、かぎかっこは要りません。</p>
 <p>使える言いかたは Want Type ごとに決まっています（ラベル <code>magic-sentence</code>）。書きかたは「しくみ」の「ひとことで作る」を見てください。</p>
 <h4>ほしい値だけ取り出す</h4>
