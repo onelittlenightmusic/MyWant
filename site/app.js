@@ -77,6 +77,7 @@
             <span class="card-sub">${t.sub}</span>
           </span>`);
         accentVars(card, t.color);
+        card.classList.add('mw-hover-ring');
         card.style.animationDelay = `${Math.min(delay, 12) * 30}ms`;
         delay++;
         card.addEventListener('click', () => go(t.id));
@@ -103,6 +104,7 @@
         </span>
         <i data-lucide="arrow-up-right" class="card-go"></i>`);
       accentVars(card, g.color);
+      card.classList.add('mw-hover-ring');
       grid.append(card);
     }
     sec.append(grid);
@@ -118,7 +120,7 @@
     menu.append(el('p', { class: 'menu-heading' }, ui.sections));
     const menuGrid = el('div', { class: 'menu-grid' });
     for (const s of sections) {
-      const item = el('button', { class: 'menu-item', role: 'menuitem' }, `<i data-lucide="${s.icon}"></i>${s.title}`);
+      const item = el('button', { class: 'menu-item mw-hover-ring', role: 'menuitem' }, `<i data-lucide="${s.icon}"></i>${s.title}`);
       item.addEventListener('click', () => {
         closeMenu();
         go(null);
@@ -130,7 +132,7 @@
     menu.append(el('p', { class: 'menu-heading', style: 'margin-top:12px' }, ui.startHere));
     const startGrid = el('div', { class: 'menu-grid' });
     for (const t of sections[0].topics.slice(1, 4)) {
-      const item = el('button', { class: 'menu-item', role: 'menuitem' }, `<i data-lucide="${t.icon}"></i>${t.title}`);
+      const item = el('button', { class: 'menu-item mw-hover-ring', role: 'menuitem' }, `<i data-lucide="${t.icon}"></i>${t.title}`);
       item.querySelector('i').style.color = t.color;
       item.addEventListener('click', () => { closeMenu(); go(t.id); });
       startGrid.append(item);
@@ -143,7 +145,7 @@
     for (const g of site.guides) {
       const here = g.id === site.current;
       const item = el(here ? 'span' : 'a', {
-        class: 'menu-item' + (here ? ' menu-item-here' : ''),
+        class: 'menu-item' + (here ? ' menu-item-here' : ' mw-hover-ring'),
         role: 'menuitem',
         ...(here ? { 'aria-current': 'page' } : { href: guideHref(g) }),
       }, `<i data-lucide="${g.icon}"></i>${g.title[lang]}`);
@@ -154,7 +156,11 @@
   }
 
   function openMenu() { menu.hidden = false; menuBtn.setAttribute('aria-expanded', 'true'); }
-  function closeMenu() { menu.hidden = true; menuBtn.setAttribute('aria-expanded', 'false'); }
+  function closeMenu() {
+    if (menu.contains(document.activeElement)) menuBtn.focus();
+    menu.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
   menuBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden ? openMenu() : closeMenu(); });
   document.addEventListener('click', e => { if (!menu.hidden && !menu.contains(e.target)) closeMenu(); });
 
@@ -238,6 +244,7 @@
     $('#sb-prev').disabled = i === 0;
     $('#sb-next').disabled = i === topics.length - 1;
     document.querySelectorAll('.card').forEach(c => c.setAttribute('aria-current', String(c.dataset.id === t.id)));
+    refreshFocus();
     document.title = `${t.title} · ${ui.docTitle}`;
     icons();
   }
@@ -251,6 +258,7 @@
       document.body.classList.remove('sb-open');
       scrim.hidden = true;
       document.querySelectorAll('.card[aria-current="true"]').forEach(c => c.setAttribute('aria-current', 'false'));
+      refreshFocus();
       document.title = ui.docTitle;
       return;
     }
@@ -265,10 +273,10 @@
     if (card && window.innerWidth >= 1024) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  function go(id) {
+  function go(id, replace) {
     const hash = id ? '#' + id : '';
     if (location.hash !== hash) {
-      history.pushState(null, '', id ? hash : location.pathname + location.search);
+      history[replace ? 'replaceState' : 'pushState'](null, '', id ? hash : location.pathname + location.search);
     }
     show(id);
   }
@@ -286,12 +294,124 @@
   scrim.addEventListener('click', () => go(null));
   $('#home-link').addEventListener('click', e => { e.preventDefault(); go(null); window.scrollTo({ top: 0, behavior: 'smooth' }); });
 
+  // ── Focus, as the board has it ────────────────────────────────────────────
+  // One card at a time is "the one you are on": the card the keys are on, else
+  // the open topic's. It wears .mw-card-focus — the lift, the wash and the
+  // character's dot, the same rules as mywant-gui's — and the card under the
+  // pointer wears .mw-ring-on. Arrows move between cards by where they are on
+  // screen, as the board's grids do; with a topic open, the topic follows.
+  const keyed = () => {
+    const a = document.activeElement;
+    return a && a.matches && a.matches('.card, .menu-item') && a.matches(':focus-visible') ? a : null;
+  };
+  function refreshFocus() {
+    const on = keyed() || (current && document.querySelector(`.card[data-id="${current.id}"]`));
+    document.querySelectorAll('.mw-card-focus').forEach(n => { if (n !== on) n.classList.remove('mw-card-focus'); });
+    if (on) on.classList.add('mw-card-focus');
+  }
+  document.addEventListener('focusin', refreshFocus);
+  document.addEventListener('focusout', () => setTimeout(refreshFocus, 0));
+  document.addEventListener('pointerover', e => {
+    if (e.pointerType !== 'mouse') return;
+    const n = e.target.closest && e.target.closest('.mw-hover-ring');
+    document.querySelectorAll('.mw-ring-on').forEach(x => { if (x !== n) x.classList.remove('mw-ring-on'); });
+    if (n) n.classList.add('mw-ring-on');
+  });
+  document.addEventListener('pointerout', e => {
+    if (!e.relatedTarget || !(e.relatedTarget.closest && e.relatedTarget.closest('.mw-hover-ring'))) {
+      document.querySelectorAll('.mw-ring-on').forEach(x => x.classList.remove('mw-ring-on'));
+    }
+  });
+
+  const DIRS = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
+  /** The nearest of `among` from `from` toward [dx, dy]: straight on first. */
+  function nearest(from, among, [dx, dy]) {
+    const r = from.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let best = null, bestScore = Infinity;
+    for (const n of among) {
+      if (n === from) continue;
+      const b = n.getBoundingClientRect();
+      if (!b.width) continue;
+      const ox = b.left + b.width / 2 - cx, oy = b.top + b.height / 2 - cy;
+      const along = ox * dx + oy * dy;
+      if (along <= 4) continue;
+      const across = Math.abs(dx ? oy : ox);
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = n; }
+    }
+    return best;
+  }
+  function moveTo(n) {
+    n.focus({ preventScroll: true });
+    n.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // With a topic open, it follows the cursor (replacing, not stacking, Back).
+    if (current && n.matches('.card[data-id]')) go(n.dataset.id, true);
+  }
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { if (!menu.hidden) closeMenu(); else if (current) go(null); }
-    if (!current || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'ArrowRight') step(1);
-    if (e.key === 'ArrowLeft') step(-1);
+    if (e.metaKey || e.ctrlKey || e.altKey || !DIRS[e.key]) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    // In the menu: between its cards.
+    if (!menu.hidden) {
+      const items = [...menu.querySelectorAll('button.menu-item, a.menu-item')];
+      const from = menu.contains(document.activeElement) ? document.activeElement : null;
+      const next = from ? nearest(from, items, DIRS[e.key]) : items[0];
+      if (next) { e.preventDefault(); next.focus(); }
+      return;
+    }
+    const cards = [...document.querySelectorAll('#sections .card')];
+    const a = document.activeElement;
+    const onCard = a && a.matches && a.matches('#sections .card');
+    if (onCard) {
+      const next = nearest(a, cards, DIRS[e.key]);
+      e.preventDefault();
+      if (next) moveTo(next);
+      return;
+    }
+    // Reading a topic (the keys not on a card): left and right turn its pages.
+    if (current && sidebar.contains(a) && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      step(e.key === 'ArrowRight' ? 1 : -1);
+      return;
+    }
+    // Nowhere yet: the first arrow puts the keys on the open topic's card, or the first.
+    if (!a || a === document.body || (current && !sidebar.contains(a))) {
+      const start = (current && document.querySelector(`.card[data-id="${current.id}"]`)) || cards[0];
+      if (start) { e.preventDefault(); moveTo(start); }
+    } else if (current && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      step(e.key === 'ArrowRight' ? 1 : -1);
+    }
   });
+
+  // ── The reader's character, when the MyWant extension is here ─────────────
+  // Most readers have no extension: the page is whole without it, in the
+  // board's sky blue. With it, the extension (bridge.js, for a page marked
+  // data-mywant-guide) answers with the character the reader plays on their
+  // board — its colour becomes the focus colour (the lift's wash, the dot),
+  // kept for the next visit so it is there before the extension speaks.
+  document.documentElement.dataset.mywantGuide = 'true';
+  const CHARACTER_KEY = 'mywant-guide-character';
+  function wear(ch) {
+    const color = ch && typeof ch.color === 'string' ? ch.color.trim() : '';
+    if (!color || !(window.CSS && CSS.supports('color', color))) return;
+    document.documentElement.style.setProperty('--mw-focus-color', color);
+    document.documentElement.dataset.character = ch.characterId || '';
+  }
+  try { wear(JSON.parse(localStorage.getItem(CHARACTER_KEY) || 'null')); } catch (e) { /* no storage */ }
+  window.addEventListener('message', e => {
+    const m = e.data;
+    if (e.source !== window || !m || m.source !== 'mywant-ext' || m.type !== 'MYWANT_GUIDE_CHARACTER') return;
+    const ch = { color: m.color || '', characterId: m.characterId || '' };
+    wear(ch);
+    try { localStorage.setItem(CHARACTER_KEY, JSON.stringify(ch)); } catch (err) { /* no storage */ }
+  });
+  const askCharacter = () => {
+    try { window.postMessage({ source: 'mywant-guide', type: 'MYWANT_GUIDE_ASK' }, location.origin); } catch (e) { /* file:// has no origin to name */ }
+  };
+  askCharacter();
+  // Changed on the board meanwhile: asked again as the reader comes back.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) askCharacter(); });
 
   window.addEventListener('popstate', () => show(location.hash.slice(1)));
   setLanguage(document.documentElement.lang);

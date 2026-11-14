@@ -283,6 +283,58 @@ ${shot("want-types.jpg", "画面の Want Types ページ。種類を押すと説
 `,
         },
         {
+          id: 'magic-sentence',
+          title: 'ひとことで作る',
+          sub: 'magic sentence と別名',
+          icon: 'wand-sparkles',
+          color: '#8b5cf6',
+          body: `
+<p><strong>magic sentence</strong> は、決まった言いかたの「ひとこと」で Want を作るしくみです。
+乗り換えの Want Type に「<code>&lt;from:station&gt;から&lt;to:station&gt;</code>」と書いておけば、
+「荻窪から中野坂上」と言うだけで <code>from</code> に荻窪、<code>to</code> に中野坂上が入った Want が置かれます。
+AI に考えてもらわないので、すぐに・いつも同じように動きます。</p>
+<div class="box">
+  <p class="box-title"><i data-lucide="message-circle"></i>どこで言えるの？</p>
+  <ul>
+    <li>ロボットとのチャット（アプリ・ブラウザ）</li>
+    <li>MyWant のキーボード（iPhone・Mac）—— 別名を打つと候補に出ます</li>
+    <li>コマンド <code>mywant magic</code>（「よく使うコマンド」の次の「ひとことで頼む」）</li>
+  </ul>
+</div>
+<p>同じ値の Want がもうあれば、新しくは作らずにそれを見せます（「もうあります。ここです」）。</p>
+<h4>ラベルで設定する</h4>
+<p>Want Type か Want の<strong>ラベル</strong>に、次の 2 つを書きます。</p>
+<ul>
+  <li><code>magic-sentence</code> —— ひとことの形。いくつも書けます。</li>
+  <li><code>aliases</code> —— その Type の別名。カンマ区切り。<code>&lt;alias&gt;</code> で使います。</li>
+</ul>
+<div class="code"><pre>wantType:
+  metadata:
+    name: transit_search
+    labels:
+      aliases: "乗り換え,乗換,行き方,transit"
+      magic-sentence: "&lt;from:station&gt;から&lt;to:station&gt;|&lt;alias&gt; &lt;from:station&gt; &lt;to:station&gt;"</pre></div>
+<p>Want Type に書くと、その種類のすべてに使えます（ふだんはこちら）。
+1 つの Want だけに書くこともでき、そのときは Type のものより優先されます。</p>
+<p>Want の画面の Labels から、その Want にだけ <code>magic-sentence</code> を足すこともできます（例：<code>&lt;from:station&gt;から帰る</code>）。</p>
+<h4>書きかた</h4>
+<table>
+  <tr><th>書きかた</th><th>意味</th></tr>
+  <tr><td><code>&lt;from&gt;</code></td><td>パラメータ <code>from</code> に、その場所の言葉が入る</td></tr>
+  <tr><td><code>&lt;from:station&gt;</code></td><td>同じく <code>from</code> に入る。<code>station</code>（駅）の Thing があればそれを優先し、キーボードや補完では駅だけを候補に出す</td></tr>
+  <tr><td><code>&lt;alias&gt;</code></td><td><code>aliases</code> のどれか（大文字小文字は区別しない）。パラメータには入らない</td></tr>
+  <tr><td><code>|</code> または改行</td><td>ひとことの区切り。どれか 1 つに合えば OK</td></tr>
+  <tr><td>スペース</td><td>そこに 1 つ以上のスペースが必要（<code>transit 荻窪 中野坂上</code>）</td></tr>
+  <tr><td>ほかの文字</td><td>そのまま合わせる（<code>から</code>、<code>まで</code> など）</td></tr>
+</table>
+<ul>
+  <li>ひとこと全体が形に合ったときだけ動きます。文の終わりの「。」「？」などは無視します。</li>
+  <li>いくつもの形に合うときは、知っている Thing が多く入るほうを選びます。</li>
+  <li>キーボードと <code>mywant m</code> の補完は、<code>&lt;alias&gt;</code> ではじまり、スペースで区切った形（<code>&lt;alias&gt; &lt;from:station&gt; &lt;to:station&gt;</code>）を使います。</li>
+</ul>
+`,
+        },
+        {
           id: 'agent',
           title: 'Agent',
           sub: 'Want のために実際に動く係',
@@ -414,6 +466,60 @@ mywant stop       # 停止</pre></div>
 mywant config set server_port 9090   # 1 つ変える
 mywant config set                    # 質問に答えて設定する</pre></div>
 <p>設定は <code>~/.mywant/config.yaml</code> に保存されます。</p>
+`,
+        },
+        {
+          id: 'magic',
+          title: 'ひとことで頼む',
+          sub: 'mywant magic（m）',
+          icon: 'wand-sparkles',
+          color: '#8b5cf6',
+          body: `
+<p><strong>magic</strong> は、決まった言いかたの「ひとこと」で Want を置くコマンドです。
+乗り換えなら <code>transit 荻窪 中野坂上</code> と打つだけで、経路を調べる Want が置かれ、結果が表示されます。
+同じ条件の Want がもうあれば、新しくは作らずにその結果を見せます。</p>
+<div class="code"><pre>$ mywant m transit 荻窪 中野坂上
+「荻窪→中野坂上」を作りました。
+荻窪→中野坂上 (transit_search, want-c8ad…)
+  departure: 16:49
+  arrival: 16:59
+  fare: 178
+  legs_text: 荻窪(16:49) ─[東京メトロ丸ノ内線]→ 中野坂上(16:59)</pre></div>
+<p><code>m</code> は <code>magic</code> の短い書きかたです。言葉はスペースで区切るだけで、かぎかっこは要りません。</p>
+<p>使える言いかたは Want Type ごとに決まっています（ラベル <code>magic-sentence</code>）。書きかたは「しくみ」の「ひとことで作る」を見てください。</p>
+<h4>ほしい値だけ取り出す</h4>
+<div class="code"><pre>mywant m transit 荻窪 中野坂上 --field departure        # 16:49 だけ
+mywant m transit 荻窪 中野坂上 --field departure,fare   # 2 つ
+mywant m transit 荻窪 中野坂上 --json                   # JSON で</pre></div>
+<p>結果がまだ出ていないときは、最大 15 秒待ちます。<code>--wait 30</code> のように待つ秒数を変えられます。</p>
+<h4>置いた Want を操作する</h4>
+<p><code>--id</code> をつけると Want の ID だけを出します（結果は待ちません）。ほかのコマンドに渡せます。</p>
+<div class="code"><pre>mywant wants restart $(mywant m transit 荻窪 中野坂上 --id)   # もう一度調べる
+mywant wants get $(mywant m transit 荻窪 中野坂上 --id)       # くわしく見る</pre></div>
+<h4>Tab で補完する</h4>
+<p>補完を有効にすると、<kbd>Tab</kbd> キーで別名、続けて駅の名前が候補に出ます。</p>
+<div class="code"><pre>mywant m tra⇥ → transit
+mywant m transit 荻⇥ → 荻窪 （from の候補）
+mywant m transit 荻窪 中野⇥ → 中野坂上 （to の候補）
+mywant m transit 荻窪 中野坂上 --field dep⇥ → departure</pre></div>
+<p>使っているシェルに合わせて、次のどれかを 1 回だけ設定してください。設定したあとに開いたターミナルから使えます。</p>
+<ol class="steps">
+  <li><strong>zsh</strong>（Mac のふつうのターミナル）：<code>~/.zshrc</code> の最後に 1 行足す
+    <div class="code"><pre>echo 'source <(mywant completion zsh)' >> ~/.zshrc</pre></div>
+  </li>
+  <li><strong>bash</strong>：<code>~/.bashrc</code> に 1 行足す（bash-completion が必要です）
+    <div class="code"><pre>echo 'source <(mywant completion bash)' >> ~/.bashrc</pre></div>
+  </li>
+  <li><strong>fish</strong>：補完ファイルを置く
+    <div class="code"><pre>mywant completion fish > ~/.config/fish/completions/mywant.fish</pre></div>
+  </li>
+</ol>
+<div class="box">
+  <p class="box-title"><i data-lucide="circle-help"></i>Tab を押しても何も出ないとき</p>
+  <p>zsh では、<code>~/.zshrc</code> の中で <code>compinit</code> より後ろに書かれている必要があります。
+  <code>command not found: compdef</code> と出るときは、その行の前に <code>autoload -Uz compinit && compinit</code> を足してください。
+  候補はサーバーから取ってくるので、サーバーが動いている必要もあります。</p>
+</div>
 `,
         },
         {

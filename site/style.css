@@ -135,10 +135,12 @@ svg.lucide { width: 1em; height: 1em; flex-shrink: 0; }
   .cell svg.lucide { font-size: 32px; }
 }
 .cell:hover, .cell[aria-expanded="true"] { background: var(--hover); color: var(--ink); }
-.cell:focus-visible, .tab:focus-visible, .card:focus-visible, .sb-close:focus-visible, .menu-item:focus-visible {
-  outline: 2px solid var(--ring);
+.cell:focus-visible, .tab:focus-visible, .sb-close:focus-visible {
+  outline: 2px solid var(--mw-focus-color);
   outline-offset: -2px;
 }
+/* A card's focus is drawn by .mw-card-focus (below), not an outline. */
+.card:focus-visible, .menu-item:focus-visible { outline: none; }
 .cell-label {
   display: none;
   font-size: 9px;
@@ -256,23 +258,11 @@ svg.lucide { width: 1em; height: 1em; flex-shrink: 0; }
   box-shadow: 0 1px 2px rgba(0,0,0,.05);
   text-align: left;
   cursor: pointer;
-  animation: cardEnter 280ms var(--ease-pop) both;
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+  /* backwards, not both: a fill held after the entrance would hold its
+     transform too, and the focus lift (.mw-card-focus) would never show. */
+  animation: cardEnter 280ms var(--ease-pop) backwards;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast), transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.card::after {
-  /* The hover ring (.mw-hover-ring): lit inward from the edge, never reflows. */
-  content: "";
-  position: absolute;
-  inset: 3px;
-  border-radius: inherit;
-  box-shadow: inset 0 0 4px var(--accent-ring), inset 0 0 14px var(--accent-soft);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-fast) ease-out, inset var(--motion-fast) var(--ease-settle);
-}
-@media (hover: hover) { .card:hover::after { opacity: 1; inset: 0; } }
-.card[aria-current="true"] { border-color: var(--ring); }
-.card[aria-current="true"]::after { opacity: 1; inset: 0; }
 
 .tile {
   flex-shrink: 0;
@@ -538,3 +528,154 @@ svg.lucide { width: 1em; height: 1em; flex-shrink: 0; }
 .card-go { margin-left: auto; align-self: flex-start; font-size: 16px; color: var(--ink-3); }
 .menu-item { text-decoration: none; text-align: center; }
 .menu-item-here { border-color: var(--ring); color: var(--ink); cursor: default; }
+
+/* A small reference table (a notation and what it means). */
+.topic-body table, table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 12px;
+  font-size: 14px;
+}
+table th, table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+table th {
+  background: var(--surface-2);
+  font-weight: 700;
+}
+table td:first-child { white-space: nowrap; }
+@media (max-width: 480px) {
+  table td:first-child { white-space: normal; }
+}
+
+
+/* ══ As the board draws it ════════════════════════════════════════════════════
+   mywant-gui's own look, so the guide reads as one of its pages: the header's
+   buttons are raised cards (the menu on its own, the rest in a pressed-in
+   tray — design/header.ts), the cards and the sidebar are tinted by their
+   colour, and what the cursor is on is shown the board's way (below). */
+
+/* The colour of whoever is reading: the character's, when the MyWant browser
+   extension is there to say (app.js), else the board's own sky blue. */
+:root { --mw-focus-color: #38bdf8; }
+
+.header { align-items: center; }
+.header-left, .header-right { align-self: center; height: 48px; }
+@media (min-width: 640px) { .header-left, .header-right { height: 56px; } }
+/* The menu button: a card on its own; pressed in while its menu is out. */
+.menu-wrap > .cell {
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 1px 2px 4px rgba(15, 23, 42, 0.16);
+}
+.menu-wrap > .cell[aria-expanded="true"] {
+  background: var(--header-bg);
+  box-shadow: inset 1px 2px 4px rgba(15, 23, 42, 0.14);
+}
+/* The right-hand buttons: cards in a pressed-in tray, its ends round. */
+.header-right {
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  background: var(--header-bg);
+  box-shadow: inset 1px 2px 4px rgba(15, 23, 42, 0.14);
+}
+.header-right > .cell {
+  min-width: 44px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 1px 2px 4px rgba(15, 23, 42, 0.16);
+}
+.header-right > .cell:first-child { border-top-left-radius: 9999px; border-bottom-left-radius: 9999px; }
+.header-right > .cell:last-child { border-top-right-radius: 9999px; border-bottom-right-radius: 9999px; }
+@media (min-width: 640px) { .header-right > .cell { min-width: 52px; } .header-right .cell svg.lucide { font-size: 24px; } }
+.header-right > .cell:hover, .menu-wrap > .cell:hover:not([aria-expanded="true"]) { background: var(--hover); }
+.cell-label { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+/* Cards in their colour, as a want type's and an agent's are. */
+.card {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.tile { background: color-mix(in srgb, var(--accent) 20%, var(--surface)); }
+.menu-item {
+  background: color-mix(in srgb, var(--mw-focus-color) 6%, var(--surface));
+  transition: border-color var(--motion-fast), transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The sidebar in the open topic's colour, its cards on it (RightSidebar). */
+.sidebar { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.sb-head, .sb-tabs { background: transparent; }
+.doc .box { background: var(--surface); }
+.doc table { background: var(--surface); border-radius: var(--r-card); overflow: hidden; }
+
+/* ── What the cursor is on (mywant-gui styles/index.css, the same rules) ──────
+   Lifted ×1.08, washed in the reader's colour coming and going, and the
+   character's dot lit on its top-left corner. No line round it: on the board
+   a line is how a want is tied to a thing. app.js puts .mw-card-focus on the
+   card the keys are on and on the open topic's, and .mw-ring-on on the one
+   under the pointer. */
+:root {
+  --mw-focus-lift: 1.08;
+  --mw-focus-wash: 0.35;
+  --mw-focus-beat: 1.4s;
+}
+.mw-card-focus,
+.mw-hover-ring.mw-ring-on {
+  position: relative;
+  z-index: 5;
+  transform: scale(var(--mw-focus-lift)) translateY(-2px);
+  box-shadow: 0 10px 22px -6px rgba(15, 23, 42, 0.35), 0 3px 6px rgba(15, 23, 42, 0.12) !important;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 180ms ease-out;
+}
+.mw-card-focus::after,
+.mw-hover-ring.mw-ring-on::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 20;
+  background: color-mix(in srgb, var(--mw-focus-color, #38bdf8) calc(var(--mw-focus-wash) * 100%), transparent);
+  animation: mw-focus-wash var(--mw-focus-beat) ease-in-out infinite;
+}
+.mw-card-focus::before,
+.mw-hover-ring.mw-ring-on::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 21;
+  background: radial-gradient(circle at 35% 35%,
+    color-mix(in srgb, var(--mw-focus-color, #38bdf8), white 45%) 0%,
+    var(--mw-focus-color, #38bdf8) 55%,
+    color-mix(in srgb, var(--mw-focus-color, #38bdf8), black 12%) 100%);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--mw-focus-color, #38bdf8), black 25%),
+              0 0 10px 3px color-mix(in srgb, var(--mw-focus-color, #38bdf8) 75%, transparent),
+              0 0 22px 6px color-mix(in srgb, var(--mw-focus-color, #38bdf8) 40%, transparent);
+  animation: mw-focus-dot var(--mw-focus-beat) ease-in-out infinite;
+}
+/* The menu's cards are small: a smaller lift and dot. */
+.menu-item.mw-card-focus, .menu-item.mw-hover-ring.mw-ring-on { --mw-focus-lift: 1.05; }
+.menu-item.mw-card-focus::before, .menu-item.mw-ring-on::before { width: 12px; height: 12px; top: -4px; left: -4px; }
+@keyframes mw-focus-wash { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@keyframes mw-focus-dot {
+  0%, 100% { opacity: 1; filter: blur(0px); }
+  50% { opacity: 0.6; filter: blur(0.6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mw-card-focus::after, .mw-hover-ring.mw-ring-on::after,
+  .mw-card-focus::before, .mw-hover-ring.mw-ring-on::before { animation: none; }
+  .mw-card-focus, .mw-hover-ring.mw-ring-on { transition: none; }
+}

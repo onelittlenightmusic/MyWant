@@ -279,6 +279,58 @@ ${shot("want-types.jpg", "The Want Types page. Press a kind to see its descripti
 `,
         },
         {
+          id: 'magic-sentence',
+          title: 'Make one in a few words',
+          sub: 'Magic sentences and aliases',
+          icon: 'wand-sparkles',
+          color: '#8b5cf6',
+          body: `
+<p>A <strong>magic sentence</strong> makes a Want from a short, fixed phrase.
+Give the train route Want Type the sentence “<code>&lt;from:station&gt;から&lt;to:station&gt;</code>”,
+and saying “荻窪から中野坂上” places a Want with <code>from</code> = 荻窪 and <code>to</code> = 中野坂上.
+No AI is asked, so it is instant and always does the same thing.</p>
+<div class="box">
+  <p class="box-title"><i data-lucide="message-circle"></i>Where can I say it?</p>
+  <ul>
+    <li>In the robot's chat (app or browser)</li>
+    <li>In the MyWant keyboard (iPhone, Mac) — type an alias and it is offered</li>
+    <li>With <code>mywant magic</code> (see “Ask in a few words”, after “Everyday commands”)</li>
+  </ul>
+</div>
+<p>If a Want with the same values is already there, nothing new is made; it is shown instead.</p>
+<h4>Set it with labels</h4>
+<p>Put two <strong>labels</strong> on a Want Type or a Want:</p>
+<ul>
+  <li><code>magic-sentence</code> — the phrase's form. You can give several.</li>
+  <li><code>aliases</code> — the type's other names, comma-separated. Used by <code>&lt;alias&gt;</code>.</li>
+</ul>
+<div class="code"><pre>wantType:
+  metadata:
+    name: transit_search
+    labels:
+      aliases: "乗り換え,乗換,行き方,transit"
+      magic-sentence: "&lt;from:station&gt;から&lt;to:station&gt;|&lt;alias&gt; &lt;from:station&gt; &lt;to:station&gt;"</pre></div>
+<p>On a Want Type it works for every Want of that type (the usual place).
+You can also put it on a single Want; then it wins over the type's.</p>
+<p>To give one Want its own, add a <code>magic-sentence</code> label from the Want's Labels on screen (e.g. <code>&lt;from:station&gt;から帰る</code>).</p>
+<h4>Notation</h4>
+<table>
+  <tr><th>Write</th><th>Means</th></tr>
+  <tr><td><code>&lt;from&gt;</code></td><td>The words there go into the parameter <code>from</code></td></tr>
+  <tr><td><code>&lt;from:station&gt;</code></td><td>The same, and <code>station</code> Things are preferred; the keyboard and completion offer only stations</td></tr>
+  <tr><td><code>&lt;alias&gt;</code></td><td>Any of the <code>aliases</code> (case ignored); fills no parameter</td></tr>
+  <tr><td><code>|</code> or a new line</td><td>Separates phrases; matching any one is enough</td></tr>
+  <tr><td>A space</td><td>One or more spaces are needed there (<code>transit 荻窪 中野坂上</code>)</td></tr>
+  <tr><td>Other characters</td><td>Matched as written (<code>から</code>, <code>まで</code>…)</td></tr>
+</table>
+<ul>
+  <li>It works only when the whole phrase fits a form. A closing “。” or “?” is ignored.</li>
+  <li>When several forms fit, the one that names more known Things wins.</li>
+  <li>The keyboard and <code>mywant m</code>'s completion use a form that starts with <code>&lt;alias&gt;</code> with its parts separated by spaces (<code>&lt;alias&gt; &lt;from:station&gt; &lt;to:station&gt;</code>).</li>
+</ul>
+`,
+        },
+        {
           id: 'agent',
           title: 'Agent',
           sub: 'The one who actually does the work',
@@ -410,6 +462,60 @@ mywant stop       # stop</pre></div>
 mywant config set server_port 9090   # change one
 mywant config set                    # set up by answering questions</pre></div>
 <p>Settings are saved in <code>~/.mywant/config.yaml</code>.</p>
+`,
+        },
+        {
+          id: 'magic',
+          title: 'Ask in a few words',
+          sub: 'mywant magic (m)',
+          icon: 'wand-sparkles',
+          color: '#8b5cf6',
+          body: `
+<p><strong>magic</strong> places a Want from a short, fixed phrase.
+For a train route, type <code>transit 荻窪 中野坂上</code>: a Want that looks up the route is placed and its result is shown.
+If a Want with the same conditions is already there, nothing new is made and its result is shown instead.</p>
+<div class="code"><pre>$ mywant m transit 荻窪 中野坂上
+「荻窪→中野坂上」を作りました。
+荻窪→中野坂上 (transit_search, want-c8ad…)
+  departure: 16:49
+  arrival: 16:59
+  fare: 178
+  legs_text: 荻窪(16:49) ─[東京メトロ丸ノ内線]→ 中野坂上(16:59)</pre></div>
+<p><code>m</code> is short for <code>magic</code>. Separate the words with spaces; no quotes needed.</p>
+<p>Each Want Type sets its own phrases (its label <code>magic-sentence</code>). For how to write them, see “Make one in a few words” under concepts.</p>
+<h4>Take out just the values you want</h4>
+<div class="code"><pre>mywant m transit 荻窪 中野坂上 --field departure        # only 16:49
+mywant m transit 荻窪 中野坂上 --field departure,fare   # two of them
+mywant m transit 荻窪 中野坂上 --json                   # as JSON</pre></div>
+<p>If the result isn't in yet, it waits up to 15 seconds. Change that with <code>--wait 30</code>.</p>
+<h4>Act on the Want it placed</h4>
+<p><code>--id</code> prints only the Want's ID (without waiting for the result), to hand to another command.</p>
+<div class="code"><pre>mywant wants restart $(mywant m transit 荻窪 中野坂上 --id)   # look it up again
+mywant wants get $(mywant m transit 荻窪 中野坂上 --id)       # look closer</pre></div>
+<h4>Complete with Tab</h4>
+<p>With completion turned on, <kbd>Tab</kbd> offers the other names, then station names.</p>
+<div class="code"><pre>mywant m tra⇥ → transit
+mywant m transit 荻⇥ → 荻窪 (for from)
+mywant m transit 荻窪 中野⇥ → 中野坂上 (for to)
+mywant m transit 荻窪 中野坂上 --field dep⇥ → departure</pre></div>
+<p>Set it up once, for the shell you use. It works in terminals opened afterwards.</p>
+<ol class="steps">
+  <li><strong>zsh</strong> (the Mac's usual terminal): add a line at the end of <code>~/.zshrc</code>
+    <div class="code"><pre>echo 'source <(mywant completion zsh)' >> ~/.zshrc</pre></div>
+  </li>
+  <li><strong>bash</strong>: add a line to <code>~/.bashrc</code> (needs bash-completion)
+    <div class="code"><pre>echo 'source <(mywant completion bash)' >> ~/.bashrc</pre></div>
+  </li>
+  <li><strong>fish</strong>: put the completion file in place
+    <div class="code"><pre>mywant completion fish > ~/.config/fish/completions/mywant.fish</pre></div>
+  </li>
+</ol>
+<div class="box">
+  <p class="box-title"><i data-lucide="circle-help"></i>Nothing happens on Tab?</p>
+  <p>In zsh, the line has to come after <code>compinit</code> in <code>~/.zshrc</code>.
+  If you see <code>command not found: compdef</code>, add <code>autoload -Uz compinit && compinit</code> before it.
+  The candidates come from the server, so it has to be running.</p>
+</div>
 `,
         },
         {
