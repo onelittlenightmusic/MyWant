@@ -111,6 +111,11 @@ func (s *Server) planBrief(question, locale, turn, timezone, since string) (plan
 		return planBriefResponse{Answered: answer, Refs: []string{"-"}, Types: []string{"-"},
 			Capabilities: []string{"-"}, Actions: []string{"none"}}, nil
 	}
+	// A want's magic sentence (magic_sentence.go): made here, no decision.
+	if answer, ok := s.magicSentenceReply(question, turn, locale); ok {
+		return planBriefResponse{Answered: answer, Refs: []string{"-"}, Types: []string{"-"},
+			Capabilities: []string{"-"}, Actions: []string{"none"}}, nil
+	}
 	cands, err := s.candidatesFor(question)
 	if err != nil {
 		return planBriefResponse{}, err

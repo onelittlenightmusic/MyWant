@@ -1,0 +1,169 @@
+package server
+
+import (
+	"fmt"
+	"regexp"
+	"strings"
+)
+
+// A want's magic sentence (its label magic-sentence), or its type's (the
+// type's label of the same name — the default for every want of it, and said
+// even with none of them on the board): what said to the robot makes a want
+// of that type, with the parameters the sentence names —
+// 「<from:station>から<to:station>」 on a route, and 「荻窪から中野坂上」 typed in
+// the chat makes the route from 荻窪 to 中野坂上, with no model asked. Several
+// sentences may be given, one a line (or split by |). <name:subtype>: the
+// parameter, and what kind of thing fills it — a value that is such a thing
+// is preferred where more than one sentence matches.
+const magicSentenceLabel = "magic-sentence"
+
+var magicSlot = regexp.MustCompile(`<([A-Za-z0-9_\-]+)(?::([A-Za-z0-9_\-]+))?>`)
+
+type magicSlotDef struct{ param, subtype string }
+
+// compileMagic turns a sentence into a whole-question pattern and its slots.
+func compileMagic(tmpl string) (*regexp.Regexp, []magicSlotDef) {
+	var b strings.Builder
+	var slots []magicSlotDef
+	b.WriteString(`^\s*`)
+	last := 0
+	for _, m := range magicSlot.FindAllStringSubmatchIndex(tmpl, -1) {
+		lit := strings.TrimSpace(tmpl[last:m[0]])
+		for i, part := range strings.Fields(lit) {
+			if i > 0 {
+				b.WriteString(`\s*`)
+			}
+			b.WriteString(regexp.QuoteMeta(part))
+		}
+		b.WriteString(`\s*(.+?)\s*`)
+		sub := ""
+		if m[4] >= 0 {
+			sub = tmpl[m[4]:m[5]]
+		}
+		slots = append(slots, magicSlotDef{param: tmpl[m[2]:m[3]], subtype: sub})
+		last = m[1]
+	}
+	for i, part := range strings.Fields(strings.TrimSpace(tmpl[last:])) {
+		if i > 0 {
+			b.WriteString(`\s*`)
+		}
+		b.WriteString(regexp.QuoteMeta(part))
+	}
+	b.WriteString(`\s*$`)
+	if len(slots) == 0 {
+		return nil, nil
+	}
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		return nil, nil
+	}
+	return re, slots
+}
+
+type magicMatch struct {
+	wantName, wantType string
+	params             map[string]string
+	known              int // slot values that are things of their subtype
+}
+
+// magicSentenceMatch: the want whose magic sentence the question is, and the
+// parameters it names — the best of several (most values known as things).
+func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
+	if s.globalBuilder == nil {
+		return magicMatch{}, false
+	}
+	q := strings.TrimRight(strings.TrimSpace(question), "。．.!！?？ ")
+	if q == "" {
+		return magicMatch{}, false
+	}
+	var thingsBySub map[string]map[string]bool
+	knownThing := func(sub, v string) bool {
+		if sub == "" {
+			return false
+		}
+		if thingsBySub == nil {
+			thingsBySub = map[string]map[string]bool{}
+			for _, t := range s.thingFulls() {
+				if thingsBySub[t.Subtype] == nil {
+					thingsBySub[t.Subtype] = map[string]bool{}
+				}
+				thingsBySub[t.Subtype][t.Value] = true
+			}
+		}
+		return thingsBySub[sub][v]
+	}
+	// Where sentences are said: each want's own, then each type's default. On
+	// a tie the first wins, so a want's own sentence before its type's.
+	type source struct{ name, typ, tmpls string }
+	var sources []source
+	for _, w := range s.globalBuilder.GetWants() {
+		if t := w.Metadata.Labels[magicSentenceLabel]; t != "" && w.Metadata.Labels[robotArchived] != "true" {
+			sources = append(sources, source{w.Metadata.Name, w.Metadata.Type, t})
+		}
+	}
+	if types, err := s.robotWantTypes(); err == nil {
+		for _, t := range types {
+			if tmpl := t.Labels[magicSentenceLabel]; tmpl != "" {
+				sources = append(sources, source{"", t.Name, tmpl})
+			}
+		}
+	}
+	var best magicMatch
+	found := false
+	for _, src := range sources {
+		tmpls := src.tmpls
+		for _, tmpl := range strings.FieldsFunc(tmpls, func(r rune) bool { return r == '\n' || r == '|' || r == '｜' }) {
+			re, slots := compileMagic(tmpl)
+			if re == nil {
+				continue
+			}
+			m := re.FindStringSubmatch(q)
+			if m == nil {
+				continue
+			}
+			mm := magicMatch{wantName: src.name, wantType: src.typ, params: map[string]string{}}
+			for i, sl := range slots {
+				v := strings.TrimSpace(m[i+1])
+				mm.params[sl.param] = v
+				if knownThing(sl.subtype, v) {
+					mm.known++
+				}
+			}
+			if !found || mm.known > best.known {
+				best, found = mm, true
+			}
+		}
+	}
+	return best, found
+}
+
+// magicSentenceReply: the question was a want's magic sentence — a want of its
+// type made with what it named (or the one already there shown), and what was
+// done said back, for the brief to answer with (Answered).
+func (s *Server) magicSentenceReply(question, turn, locale string) (string, bool) {
+	mm, ok := s.magicSentenceMatch(question)
+	if !ok {
+		return "", false
+	}
+	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: mm.params}, nil)
+	if len(steps) == 0 {
+		return "", false
+	}
+	made := steps[0]
+	name := ""
+	if made.Card != nil {
+		name = made.Card.Name
+	}
+	switch {
+	case strings.HasPrefix(made.Output, "Error:"):
+		return fmt.Sprintf("「%s」で作ろうとしましたが、できませんでした（%s）。", question, strings.TrimSpace(strings.TrimPrefix(made.Output, "Error:"))), true
+	case strings.Contains(made.Output, "already on the board"):
+		return fmt.Sprintf("もうあります。ここです（%s）。", name), true
+	case strings.Contains(made.Output, "archived"):
+		return fmt.Sprintf("同じものがアーカイブにあります（%s）。", name), true
+	}
+	if name == "" {
+		name = mm.wantType
+	}
+	return fmt.Sprintf("「%s」を作りました。", name), true
+}
