@@ -308,8 +308,9 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	s := found.Slots[slot]
 	var things struct {
 		Things []struct {
-			Subtype string `json:"subtype"`
-			Value   string `json:"value"`
+			Subtype string            `json:"subtype"`
+			Value   string            `json:"value"`
+			Labels  map[string]string `json:"labels"`
 		} `json:"things"`
 	}
 	if err := wantsClient().Request("GET", "/api/v1/things", nil, &things); err != nil {
@@ -317,14 +318,63 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 	}
 	seen := map[string]bool{}
 	var out []string
+	byReading := false
+	typed := strings.ToLower(toComplete)
 	for _, t := range things.Things {
-		if (s.Subtype != "" && t.Subtype != s.Subtype) || t.Value == "" || seen[t.Value] || !strings.HasPrefix(t.Value, toComplete) {
+		if (s.Subtype != "" && t.Subtype != s.Subtype) || t.Value == "" || seen[t.Value] {
+			continue
+		}
+		// By its name, or — letters typed for a name in Japanese — by its
+		// reading (the label reading: "ogi" → 荻窪, reading ogikubo).
+		reading := foldReading(t.Labels[ThingReadingLabel])
+		switch {
+		case strings.HasPrefix(t.Value, toComplete):
+		case typed != "" && isASCII(typed) && reading != "" && strings.HasPrefix(reading, foldReading(typed)):
+			byReading = true
+		default:
 			continue
 		}
 		seen[t.Value] = true
 		out = append(out, fmt.Sprintf("%s\t<%s> %s", t.Value, s.Param, t.Subtype))
 	}
-	return out, cobra.ShellCompDirectiveNoFileComp
+	d := cobra.ShellCompDirectiveNoFileComp
+	if byReading {
+		// What was typed is not the start of these: the shell is to offer them
+		// anyway (CompDirectiveAsChosen, completion_patch.go).
+		d |= CompDirectiveAsChosen
+	}
+	return out, d
+}
+
+// ThingReadingLabel: a thing's name in Latin letters, as it is read
+// (荻窪 → ogikubo) — what letters typed on a keyboard or in a terminal are
+// compared with. The apps fill it in from the system's own reading of
+// Japanese (PaletteFetch.fillReadings); a person may set it.
+const ThingReadingLabel = "reading"
+
+// foldReading: a reading as it is typed, more than one way — long vowels
+// short (toukyou, tokyo; ootemachi, otemachi; yuurakuchou), and the
+// spellings of one sound one (shi/si, chi/ti, tsu/tu, fu/hu, ji/zi, mb/nb).
+// Both what is typed and the label are folded alike.
+func foldReading(s string) string {
+	s = strings.ToLower(s)
+	for _, r := range [][2]string{
+		{"shi", "si"}, {"chi", "ti"}, {"tsu", "tu"}, {"fu", "hu"}, {"ji", "zi"},
+		{"sh", "sy"}, {"ch", "ty"}, {"mb", "nb"}, {"mp", "np"}, {"mm", "nm"},
+		{"ou", "o"}, {"oo", "o"}, {"uu", "u"}, {"ei", "e"}, {"ii", "i"}, {"aa", "a"},
+	} {
+		s = strings.ReplaceAll(s, r[0], r[1])
+	}
+	return s
+}
+
+func isASCII(s string) bool {
+	for _, r := range s {
+		if r > 0x7f {
+			return false
+		}
+	}
+	return true
 }
 
 // completeMagicField: --field's names — the state fields the command's want

@@ -90,6 +90,8 @@ func main() {
 	rootCmd.AddCommand(commands.CommandsCmd)
 	rootCmd.AddCommand(commands.PointCmd)
 	rootCmd.AddCommand(commands.MagicCmd)
+	// The completion scripts take a candidate chosen by its reading (ogi → 荻窪).
+	commands.PatchCompletionScripts(rootCmd)
 	rootCmd.AddCommand(commands.BoardCmd)
 	rootCmd.AddCommand(commands.RelationsCmd)
 	rootCmd.AddCommand(commands.UndoCmd)
