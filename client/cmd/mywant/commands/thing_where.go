@@ -20,8 +20,8 @@ import (
 // all to anything answering the question in words — "新宿というthingの場所は？"
 // has an answer, and until now nothing could say it.
 //
-//	mywant thing where 新宿     the cell, in words
-//	mywant thing point 新宿     the robot goes and stands there, and says so
+//	mywant things where 新宿     the cell, in words
+//	mywant things point 新宿     the robot goes and stands there, and says so
 
 const (
 	canvasOnLabel = "mywant.io/canvas"
@@ -208,8 +208,8 @@ var thingWhereCmd = &cobra.Command{
 
 The answer is one line, in words, so anything that answers questions — the
 robot, an agent, a person reading a terminal — can repeat it as it is.`,
-	Example: `  mywant thing where 新宿
-  mywant thing where Kokubunji`,
+	Example: `  mywant things where 新宿
+  mywant things where Kokubunji`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		c := memoClient()
@@ -247,8 +247,8 @@ spelled out.
 
 Nothing is changed except where the robot is standing and what it is saying —
 both of which change anyway, whenever it speaks or follows somebody.`,
-	Example: `  mywant thing point 新宿
-  mywant thing point 新宿 --say "ここが新宿です"`,
+	Example: `  mywant things point 新宿
+  mywant things point 新宿 --say "ここが新宿です"`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		c := memoClient()

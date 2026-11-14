@@ -357,9 +357,9 @@ ${shot("recipes.jpg", "画面の Recipes ページ")}
 <p>Thing は、よく使う値に名前をつけて覚えておく場所です。
 「自宅の駅」「よく行くお店」などを入れておくと、Want を作るときにすぐ選べます。</p>
 <div class="code"><pre># 覚えさせる
-mywant thing add station 中野
+mywant things add station 中野
 # 見る
-mywant thing list</pre></div>
+mywant things list</pre></div>
 <p>ダッシュボードでは、Thing のカードから直接 Want を作れます。関係のある Thing どうしはまとめて星座（constellation）にできます。</p>
 ${shot("thing.jpg", "画面の Thing ページ。覚えさせた値がカードで並びます")}
 `,

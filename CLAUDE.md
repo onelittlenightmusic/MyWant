@@ -68,7 +68,7 @@ make release                                        # Build CLI only
 ./bin/mywant --context local custom list               # act on this machine
 
 # Things (the values you have named) / worlds / global state
-./bin/mywant thing list|get|add|remove|events|stats|labels|label|groups
+./bin/mywant things list|get|add|remove|events|stats|labels|label|groups
 ./bin/mywant world list|open|save|export|import        # named snapshots of all wants
 ./bin/mywant state global get|set|delete|clear         # moved here from `thing`
 

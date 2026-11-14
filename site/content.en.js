@@ -353,9 +353,9 @@ ${shot("recipes.jpg", "The Recipes page")}
 <p>Things are where you keep values you use often, under a name.
 Put in "my home station" or "my favourite shop", and you can pick them straight away when you make a Want.</p>
 <div class="code"><pre># keep one
-mywant thing add station Nakano
+mywant things add station Nakano
 # look at them
-mywant thing list</pre></div>
+mywant things list</pre></div>
 <p>On the dashboard you can make a Want right from a Thing's card. Related Things can be grouped into a constellation.</p>
 ${shot("thing.jpg", "The Thing page: the values you have kept, as cards")}
 `,

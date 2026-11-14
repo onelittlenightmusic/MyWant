@@ -58,6 +58,12 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		text, _ := payload["text"].(string)
 		sender, _ := payload["sender"].(string)
 		character, _ := payload["character"].(string)
+		// A magic sentence to the robot (magic_sentence.go): done here, not
+		// handed to its model.
+		if want.Metadata.Type == "robot" && sender != "robot" && s.magicSentenceToRobot(text) {
+			s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
+			return
+		}
 		storeWebhookMessage(want, webhookMessage{
 			Sender:    sender,
 			Text:      text,

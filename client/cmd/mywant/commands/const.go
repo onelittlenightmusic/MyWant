@@ -16,7 +16,7 @@ import (
 // Constellations (星座): things and wants named as one — an order, tied one
 // after another and drawn as a chain, or a hub's capture, drawn from its tile
 // out to each member. Their own command, with the same verbs as `mywant
-// thing`; they were "mywant thing constellations", though a constellation is
+// thing`; they were "mywant things constellations", though a constellation is
 // not a kind of thing and holds wants as well.
 var ConstCmd = &cobra.Command{
 	Use:     "const",

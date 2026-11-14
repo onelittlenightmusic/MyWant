@@ -364,36 +364,36 @@ Memo is the catalog of values the user has entered, keyed by catalog (`stations`
 
 ```bash
 # 一覧（種類ごと）と、1つの種類の値（新しい順）
-./bin/mywant thing list
-./bin/mywant thing list --catalog stations --limit 5
+./bin/mywant things list
+./bin/mywant things list --catalog stations --limit 5
 
 # 1つの Thing（名前・id・<catalog>::<value> のどれでも）
-./bin/mywant thing get 中野坂上
-./bin/mywant thing get stations::渋谷 -o yaml     # レコード（ラベル込み）
+./bin/mywant things get 中野坂上
+./bin/mywant things get stations::渋谷 -o yaml     # レコード（ラベル込み）
 
 # 作成・変更・削除
-./bin/mywant thing create stations 渋谷 新宿
-./bin/mywant thing update stations::新宿 --value 新宿三丁目
-./bin/mywant thing update 渋谷 --catalog places   # 別の種類に移す（同じ Thing のまま）
-./bin/mywant thing delete stations::渋谷 thg-5678   # まとめて削除
-./bin/mywant thing delete --catalog stations       # 種類ごと削除
+./bin/mywant things create stations 渋谷 新宿
+./bin/mywant things update stations::新宿 --value 新宿三丁目
+./bin/mywant things update 渋谷 --catalog places   # 別の種類に移す（同じ Thing のまま）
+./bin/mywant things delete stations::渋谷 thg-5678   # まとめて削除
+./bin/mywant things delete --catalog stations       # 種類ごと削除
 
 # ラベル（まとめて1回で）
-./bin/mywant thing label stations::渋谷 favourite=true note=駅 --remove old
+./bin/mywant things label stations::渋谷 favourite=true note=駅 --remove old
 
 # YAML で書き出し・読み込み
-./bin/mywant thing export -o things.yaml
-./bin/mywant thing import -f things.yaml
+./bin/mywant things export -o things.yaml
+./bin/mywant things import -f things.yaml
 
 # どこから来た値か / どれだけ使われたか
-./bin/mywant thing events --limit 20
-./bin/mywant thing events --catalog cities --value Kokubunji
-./bin/mywant thing stats
+./bin/mywant things events --limit 20
+./bin/mywant things events --catalog cities --value Kokubunji
+./bin/mywant things stats
 ```
 
 ### Constellations（`mywant const`）
 
-Thing と want をひとまとまりとして名付けたもの（星座）。順に結ぶ order と、1つのタイルを hub にした capture がある。動詞は `mywant thing` と同じ。
+Thing と want をひとまとまりとして名付けたもの（星座）。順に結ぶ order と、1つのタイルを hub にした capture がある。動詞は `mywant things` と同じ。
 
 ```bash
 ./bin/mywant const list

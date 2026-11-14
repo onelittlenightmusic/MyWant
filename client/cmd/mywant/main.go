@@ -89,6 +89,7 @@ func main() {
 	rootCmd.AddCommand(commands.VersionCmd)
 	rootCmd.AddCommand(commands.CommandsCmd)
 	rootCmd.AddCommand(commands.PointCmd)
+	rootCmd.AddCommand(commands.MagicCmd)
 	rootCmd.AddCommand(commands.BoardCmd)
 	rootCmd.AddCommand(commands.RelationsCmd)
 	rootCmd.AddCommand(commands.UndoCmd)

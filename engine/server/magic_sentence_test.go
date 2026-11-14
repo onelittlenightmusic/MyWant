@@ -30,4 +30,21 @@ func TestCompileMagic(t *testing.T) {
 	if re, _ := compileMagic("ただの文"); re != nil {
 		t.Fatal("a sentence with no slots should not compile")
 	}
+
+	re, slots := compileMagic("<alias> <from:station> <to:station>", "乗り換え", "transit")
+	if re == nil || len(slots) != 2 {
+		t.Fatalf("alias sentence: %v %v", re, slots)
+	}
+	for q, want := range map[string][2]string{"transit 荻窪 中野坂上": {"荻窪", "中野坂上"}, "Transit 荻窪 新宿": {"荻窪", "新宿"}, "乗り換え 中野 大森": {"中野", "大森"}} {
+		m := re.FindStringSubmatch(q)
+		if m == nil || m[1] != want[0] || m[2] != want[1] {
+			t.Fatalf("alias sentence on %q: %v", q, m)
+		}
+	}
+	if re.FindStringSubmatch("route 荻窪 中野坂上") != nil {
+		t.Fatal("a word that is not an alias should not match")
+	}
+	if re, _ := compileMagic("<alias> <from:station>"); re != nil {
+		t.Fatal("<alias> with no aliases should not compile")
+	}
 }

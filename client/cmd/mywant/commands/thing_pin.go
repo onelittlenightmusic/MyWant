@@ -20,8 +20,8 @@ import (
 // means it was not a sentence the robot could act on either. One verb per
 // gesture, taking a name the way every other lookup takes one:
 //
-//	mywant thing pin 荻窪 5 0
-//	mywant thing unpin 荻窪
+//	mywant things pin 荻窪 5 0
+//	mywant things unpin 荻窪
 var thingPinCmd = &cobra.Command{
 	Use:   "pin <thing> <x> <y>",
 	Short: "Put a thing on the canvas at a cell (or move one that is already there)",
@@ -29,8 +29,8 @@ var thingPinCmd = &cobra.Command{
 
 The thing is found the way every other command finds one — by name, loosely, or
 by the id the board prints. A thing already on the canvas is moved.`,
-	Example: `  mywant thing pin 荻窪 5 0
-  mywant thing pin thg-5f4162d0 5 0`,
+	Example: `  mywant things pin 荻窪 5 0
+  mywant things pin thg-5f4162d0 5 0`,
 	Args: cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		x, err := strconv.Atoi(args[1])
@@ -88,7 +88,7 @@ var thingUnpinCmd = &cobra.Command{
 Nothing is forgotten: the thing, its labels, its constellations and the wants
 that name it are all untouched. Only its place on the board goes, and
 ` + "`thing pin`" + ` puts it back.`,
-	Example: `  mywant thing unpin 荻窪`,
+	Example: `  mywant things unpin 荻窪`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		c := memoClient()

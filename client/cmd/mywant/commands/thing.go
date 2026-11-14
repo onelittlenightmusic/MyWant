@@ -25,10 +25,10 @@ import (
 // "mywant state global".
 
 var ThingCmd = &cobra.Command{
-	Use: "thing",
-	// "memo" is what this was called; it keeps working so a habit or a script
-	// does not break on a rename.
-	Aliases: []string{"things", "t", "memo", "m"},
+	Use: "things",
+	// "thing" and "memo" are what this was called; they keep working so a
+	// habit or a script does not break on a rename. "m" is magic's now.
+	Aliases: []string{"thing", "t", "memo"},
 	Short:   "Manage things (the values you have named)",
 	Long: `Manage things: the values you have named, keyed by subtype.
 
@@ -36,20 +36,20 @@ A thing is not a note about something — it is the something: a station, a
 city, an occasion. Wants point at them, and kata are about them.
 
 Examples:
-  mywant thing list                       # every kind, and how many
-  mywant thing list --catalog stations    # one kind's values, newest first
-  mywant thing get 中野坂上                # everything about one (a name, id or catalog::value)
-  mywant thing get thg-1234 -o yaml       # its record
-  mywant thing create stations 渋谷 新宿
-  mywant thing update stations::新宿 --value 新宿三丁目
-  mywant thing update 渋谷 --catalog places
-  mywant thing delete stations::渋谷 thg-5678
-  mywant thing delete --catalog stations  # every value of a kind
-  mywant thing label 中野坂上 favourite=true note=駅 --remove old
-  mywant thing export -o things.yaml
-  mywant thing import -f things.yaml
-  mywant thing events --catalog stations --value 渋谷
-  mywant thing stats
+  mywant things list                       # every kind, and how many
+  mywant things list --catalog stations    # one kind's values, newest first
+  mywant things get 中野坂上                # everything about one (a name, id or catalog::value)
+  mywant things get thg-1234 -o yaml       # its record
+  mywant things create stations 渋谷 新宿
+  mywant things update stations::新宿 --value 新宿三丁目
+  mywant things update 渋谷 --catalog places
+  mywant things delete stations::渋谷 thg-5678
+  mywant things delete --catalog stations  # every value of a kind
+  mywant things label 中野坂上 favourite=true note=駅 --remove old
+  mywant things export -o things.yaml
+  mywant things import -f things.yaml
+  mywant things events --catalog stations --value 渋谷
+  mywant things stats
 
 Constellations are "mywant const".
 `,
