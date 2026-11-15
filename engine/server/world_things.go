@@ -65,6 +65,9 @@ func (s *Server) useWorldThings(name string) {
 	}
 	s.thingStore.SetPath(worldThingsPath(dir, name))
 	s.thingLabels.SetPath(worldThingLabelsPath(dir, name))
+	if s.thingReads != nil {
+		s.thingReads.SetPath(filepath.Join(worldThingsDir(dir), name+"-reads.yaml"))
+	}
 	// The world's photos with their words as fields (thing_picture_text.go).
 	s.readUnreadPictures()
 	// Read into fields too — a moment later, once the want types can be read

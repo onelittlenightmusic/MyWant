@@ -182,6 +182,10 @@ type MemoStat struct {
 	Count        int             `json:"count"`        // number of recorded uses
 	LastUsed     string          `json:"lastUsed"`     // RFC3339 timestamp of the most recent use
 	TopWantTypes []WantTypeCount `json:"topWantTypes"` // most-used want types, desc (up to 3)
+	// When a want last read it (a parameter of a want whose Progress ran),
+	// and the last time as each "<want type>.<parameter>" — thing_reads.go.
+	LastRead string            `json:"lastRead,omitempty"`
+	ReadAs   map[string]string `json:"readAs,omitempty"`
 }
 
 // Stats aggregates the event log into per-(catalog,value) usage counts, last use

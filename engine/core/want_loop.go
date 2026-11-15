@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // want_loop.go — StartProgressionLoop helpers: control signal handling,
@@ -104,6 +105,7 @@ func (n *Want) runProgressWithRecovery() (exitLoop bool) {
 	}
 
 	n.progressable.Progress()
+	n.progressedAt.Store(time.Now().UnixNano())
 
 	// Declarative mapping: Locals → State
 	if locals != nil {

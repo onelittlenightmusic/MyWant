@@ -72,6 +72,7 @@ type Server struct {
 	wantCreationHooks    []WantCreationHook              // Hooks called on POST /api/v1/wants
 	thingStore           *ThingStore                     // Persists user-entered values to ~/.mywant/memo.yaml
 	thingEvents          *ThingEventStore                // Provenance timeline for named values (~/.mywant/memo-events.yaml)
+	thingReads           *ThingReadStore                 // When each thing was last read by a want, and as what (thing_reads.go)
 	notifications        *NotificationStore              // Notices the GUI spoke through the robot bubble (~/.mywant/notifications.yaml)
 	initiative           *robotInitiative                // The robot acting on its own (robot_initiative.go); nil when off
 	pushStore            *PushStore                      // Web Push subscriptions for per-want alerts (~/.mywant/push-subscriptions.yaml)
@@ -359,6 +360,7 @@ func New(config Config) *Server {
 		otelShutdown:          otelShutdown,
 		thingStore:            newThingStore(),
 		thingEvents:           newThingEventStore(),
+		thingReads:            newThingReadStore(),
 		notifications:         newNotificationStore(),
 		pushStore:             newPushStore(),
 		vapid:                 loadVAPIDKeys(),
@@ -409,6 +411,8 @@ func (s *Server) Start() error {
 		events:  s.thingEvents,
 		builder: s.globalBuilder,
 	})
+	// What the wants that progressed read, marked at each reconcile (thing_reads.go).
+	s.globalBuilder.OnProgressed(s.markThingReads)
 	s.setupRoutes()
 
 	// Things with a speed move themselves, on the same board and against the

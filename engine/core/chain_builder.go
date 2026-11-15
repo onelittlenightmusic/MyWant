@@ -68,6 +68,7 @@ const (
 	// want-runtime state. API-driven changes are unaffected — they persist
 	// through TriggerSave/debouncedSaveLoop, which has its own 3s debounce.
 	GlobalStatsInterval = 5 * time.Second
+
 )
 
 // ChangeEvent represents a configuration change
@@ -133,6 +134,8 @@ type ChainBuilder struct {
 	lastStatsHash      string               // Hash of last written stats for change detection
 	lastStatsEpoch     uint64               // State epoch at the last stats write (see state_epoch.go)
 	lastStatsWrite     time.Time            // When stats were last written, for the periodic safety write
+	progressWatchers   []func([]*Want)      // Handed the wants that progressed, at each reconcile (OnProgressed)
+	lastProgressBatch  time.Time            // When the last reconcile gathered them
 
 	// Path and channel management
 	pathMap map[string]Paths // Want path mapping
@@ -548,6 +551,38 @@ func (cb *ChainBuilder) reconcileLoop() {
 	}
 }
 
+// OnProgressed asks to be handed, at each reconcile (its READ phase), the
+// wants whose Progress ran since the last one — each says when it did
+// (Want.ProgressedAt). Called inside the reconcile: fn is to be quick (what is
+// slow, it does on its own goroutine).
+func (cb *ChainBuilder) OnProgressed(fn func(progressed []*Want)) {
+	cb.reconcileMutex.Lock()
+	defer cb.reconcileMutex.Unlock()
+	cb.progressWatchers = append(cb.progressWatchers, fn)
+}
+
+// readPhase gathers the wants that progressed since the last reconcile and
+// hands them on.
+func (cb *ChainBuilder) readPhase() {
+	if len(cb.progressWatchers) == 0 {
+		return
+	}
+	since := cb.lastProgressBatch
+	cb.lastProgressBatch = time.Now()
+	var progressed []*Want
+	for _, w := range cb.GetWants() {
+		if w.ProgressedAt().After(since) {
+			progressed = append(progressed, w)
+		}
+	}
+	if len(progressed) == 0 {
+		return
+	}
+	for _, fn := range cb.progressWatchers {
+		fn(progressed)
+	}
+}
+
 // SaveDebounceDelay is the minimum time after the last state/status change before writing to disk.
 const SaveDebounceDelay = 3 * time.Second
 
@@ -633,6 +668,11 @@ func (cb *ChainBuilder) reconcileWants() {
 
 	// Phase 6: CORRELATE - Annotate changed Wants with inter-Want correlation
 	cb.correlationPhase()
+
+	// Phase 7: READ - Hand on the wants whose Progress ran since the last
+	// reconcile (OnProgressed): what they read is marked here, in a batch, so
+	// Progress itself only ever stores a time.
+	cb.readPhase()
 }
 
 // compilePhase handles configuration loading and want creation/updates

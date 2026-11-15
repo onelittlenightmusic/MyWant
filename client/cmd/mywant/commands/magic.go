@@ -408,11 +408,34 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 			Subtype string            `json:"subtype"`
 			Value   string            `json:"value"`
 			Labels  map[string]string `json:"labels"`
+			Stats   *struct {
+				LastRead string            `json:"lastRead"`
+				ReadAs   map[string]string `json:"readAs"`
+			} `json:"stats"`
 		} `json:"things"`
 	}
 	if err := wantsClient().Request("GET", "/api/v1/things", nil, &things); err != nil {
 		return nil, cobra.ShellCompDirectiveError
 	}
+	// As the keyboards offer them (PaletteComposer.slotOrder): read as this
+	// very parameter lately first ("transit_search.from"), then read by any
+	// want lately. RFC 3339 in one zone sorts as text.
+	as := found.Type + "." + s.Param
+	readAs := func(i int) (string, string) {
+		st := things.Things[i].Stats
+		if st == nil {
+			return "", ""
+		}
+		return st.ReadAs[as], st.LastRead
+	}
+	sort.SliceStable(things.Things, func(i, j int) bool {
+		ai, li := readAs(i)
+		aj, lj := readAs(j)
+		if ai != aj {
+			return ai > aj
+		}
+		return li > lj
+	})
 	seen := map[string]bool{}
 	var out []string
 	byReading := false
@@ -434,7 +457,8 @@ func completeMagic(cmd *cobra.Command, args []string, toComplete string) ([]stri
 		seen[t.Value] = true
 		out = append(out, fmt.Sprintf("%s\t<%s> %s", t.Value, s.Param, t.Subtype))
 	}
-	d := cobra.ShellCompDirectiveNoFileComp
+	// In that order, not the shell's alphabetical one.
+	d := cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveKeepOrder
 	if byReading {
 		// What was typed is not the start of these: the shell is to offer them
 		// anyway (CompDirectiveAsChosen, completion_patch.go).

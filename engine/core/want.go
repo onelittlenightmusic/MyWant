@@ -299,6 +299,11 @@ type Want struct {
 	changeBy   string
 	restartBy  atomic.Pointer[string]
 	stopReason atomic.Pointer[string]
+	// progressedAt: when Progress last ran (unix nanoseconds). One atomic store
+	// a cycle, nothing else: what reads it — the reconcile's READ phase, where
+	// the things a want's parameters name are marked as read (lastRead) — runs
+	// on its own, never in the want's loop.
+	progressedAt atomic.Int64
 
 	// Background agents for long-running operations
 	backgroundAgents map[string]BackgroundAgent `json:"-" yaml:"-"`
@@ -991,6 +996,7 @@ func (n *Want) StartProgressionLoop(
 				// CRITICAL: run one final cycle to flush FinalResultField and propagate state.
 				n.BeginProgressCycle()
 				n.progressable.Progress()
+				n.progressedAt.Store(time.Now().UnixNano())
 				n.EndProgressCycle()
 
 				// Dynamic dispatch coordinators keep monitoring after achievement.
@@ -2418,4 +2424,13 @@ func (w *Want) GetHTTPClient() *HTTPClient {
 		return nil
 	}
 	return cb.GetHTTPClient()
+}
+
+// ProgressedAt is when Progress last ran — the zero time before it ever has.
+func (n *Want) ProgressedAt() time.Time {
+	ns := n.progressedAt.Load()
+	if ns == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, ns)
 }

@@ -154,6 +154,14 @@ func (s *Server) thingFulls() []ThingFull {
 		if st, ok := stats[e.Catalog][e.Value]; ok {
 			t.Stats = &st
 		}
+		if s.thingReads != nil {
+			if r, ok := s.thingReads.Get(e.Value); ok {
+				if t.Stats == nil {
+					t.Stats = &MemoStat{TopWantTypes: []WantTypeCount{}}
+				}
+				t.Stats.LastRead, t.Stats.ReadAs = r.LastRead, r.ReadAs
+			}
+		}
 		out = append(out, t)
 	}
 	sort.Slice(out, func(i, j int) bool {
