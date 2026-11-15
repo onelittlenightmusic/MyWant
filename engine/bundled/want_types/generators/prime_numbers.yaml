@@ -20,6 +20,7 @@ wantType:
     category: mathematics
     pattern: generator
     labels:
+      aliases: "prime,素数"
       type-tone-color: "#2d8a7a"
   finalResultField: current_number
   parameters:

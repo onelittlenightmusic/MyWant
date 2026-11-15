@@ -9,6 +9,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "reset,バトルリセット"
       form-type: button
       type-icon: RotateCcw
       category-icon: Gamepad2

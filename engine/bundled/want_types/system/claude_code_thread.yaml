@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: claude_code_thread
+    labels:
+      aliases: "thread,スレッド"
     title: Claude Code Thread Watcher
     description: |
       Monitors a Claude Code conversation session and sends requests on trigger conditions.

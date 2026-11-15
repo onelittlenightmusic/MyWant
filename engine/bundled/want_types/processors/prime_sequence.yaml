@@ -18,6 +18,7 @@ wantType:
     category: mathematics
     pattern: processor
     labels:
+      aliases: "prime,素数"
       type-tone-color: "#2d8a7a"
   finalResultField: foundPrimes
   parameters:

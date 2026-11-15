@@ -11,6 +11,7 @@ wantType:
     category: system
     pattern: processor
     labels:
+      aliases: "silencer"
       type-icon: BellOff
   parameters:
   - name: policy

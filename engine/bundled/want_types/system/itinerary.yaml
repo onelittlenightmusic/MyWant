@@ -15,6 +15,7 @@ wantType:
     category: travel
     pattern: coordinator
     labels:
+      aliases: "itinerary,旅程"
       child-role: thinker
 
   parameters:

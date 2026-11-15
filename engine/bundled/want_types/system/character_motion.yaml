@@ -27,6 +27,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "motion,モーション"
       user-control: "true"
       type-icon: "Footprints"
       # No tile of its own — the character is already drawn from their

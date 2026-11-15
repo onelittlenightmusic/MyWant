@@ -24,6 +24,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "chat,チャット"
       user-control: "true"
       type-icon: "MessageCircle"
       # Walking onto a character opens their chat, the way it does for the

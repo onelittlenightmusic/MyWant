@@ -16,6 +16,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "reminder,リマインダー"
       type-icon: BellRing
   finalResultField: reaction_result
 

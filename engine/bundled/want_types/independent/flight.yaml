@@ -18,6 +18,7 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      aliases: "flight,フライト,飛行機"
       child-role: doer
       type-tone-color: "#5b8fce"
   finalResultField: reservation_name

@@ -34,6 +34,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "stage,次のステージ"
       type-icon: "LogIn"
       list-visible: "false"
       # The card carries a control the user presses, so the card can be

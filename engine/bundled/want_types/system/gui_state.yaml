@@ -11,6 +11,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "gui,画面"
       system-internal: "true"
 
   parameters: []

@@ -7,6 +7,7 @@ wantType:
     category: effect
     pattern: independent
     labels:
+      aliases: "fireworks,花火"
       riffable: reaction
       type-icon: Sparkles
   parameters:

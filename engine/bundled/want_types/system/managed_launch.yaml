@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: managed_launch
+    labels:
+      aliases: "launch,起動"
     title: Managed Launch
     description: |
       Manages the lifecycle of either a local process or a Docker Compose stack.

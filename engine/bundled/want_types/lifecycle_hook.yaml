@@ -14,6 +14,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "hook,フック"
       type-icon: Webhook
 
   finalResultField: hook_rule_ids

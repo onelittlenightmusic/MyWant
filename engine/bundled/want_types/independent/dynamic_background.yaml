@@ -15,6 +15,7 @@ wantType:
     category: ui
     pattern: independent
     labels:
+      aliases: "background,背景"
       type-icon: "Image"
 
   parameters:

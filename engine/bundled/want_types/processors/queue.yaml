@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: queue
+    labels:
+      aliases: "queue,キュー"
     title: Queue
     description: FIFO queue with configurable service time for processing items
     version: '1.0'

@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: plan
+    labels:
+      aliases: "plan,計画"
     title: Plan Ready
     description: |
       Plans actions using OPA (Open Policy Agent) policy engine combined with LLM reasoning.

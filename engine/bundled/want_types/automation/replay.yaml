@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: replay
+    labels:
+      aliases: "replay,リプレイ"
     title: Browser Replayed
     description: |
       Records user browser interactions via an embedded Playwright browser session

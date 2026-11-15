@@ -15,6 +15,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "log,作業ログ"
       type-icon: NotebookPen
 
   parameters:

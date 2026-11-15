@@ -19,6 +19,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "coding,コーディング"
       user-control: "true"
       type-icon: "Bot"
 

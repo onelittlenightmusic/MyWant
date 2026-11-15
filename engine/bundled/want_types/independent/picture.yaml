@@ -19,6 +19,7 @@ wantType:
     category: ui
     pattern: independent
     labels:
+      aliases: "picture,写真,画像"
       user-control: "true"
       type-icon: "ImagePlus"
 

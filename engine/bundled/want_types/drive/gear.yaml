@@ -7,6 +7,7 @@ wantType:
     category: drive
     pattern: independent
     labels:
+      aliases: "gear,ギア,スピード"
       user-control: "true"
       form-type: button
       type-icon: "Gauge"

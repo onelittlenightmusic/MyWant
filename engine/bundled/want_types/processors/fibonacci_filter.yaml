@@ -19,6 +19,7 @@ wantType:
     category: mathematics
     pattern: sink
     labels:
+      aliases: "fibonacci,フィボナッチ"
       type-tone-color: "#2d8a7a"
   finalResultField: filtered
   parameters:

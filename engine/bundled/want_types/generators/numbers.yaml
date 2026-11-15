@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: numbers
+    labels:
+      aliases: "numbers,数"
     title: numbers
     description: Generates a sequence of integers from start to count
     version: '1.0'

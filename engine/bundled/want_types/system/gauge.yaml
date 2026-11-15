@@ -12,6 +12,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "gauge,ゲージ"
       user-control: "true"
       type-icon: "Gauge"
 

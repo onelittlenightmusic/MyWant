@@ -11,6 +11,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "fighter,ファイター"
       type-icon: Sword
       category-icon: Gamepad2
   parameters:

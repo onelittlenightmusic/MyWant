@@ -10,6 +10,7 @@ wantType:
     category: trigger
     pattern: independent
     labels:
+      aliases: "arrival,到着"
       # A flag planted on the place, with a ring for how near counts as there.
       form-type: flag
       type-icon: MapPin

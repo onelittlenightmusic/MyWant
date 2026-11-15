@@ -15,6 +15,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "file,ファイル"
       type-icon: File
 
   finalResultField: ensure_file_phase

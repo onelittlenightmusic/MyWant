@@ -7,6 +7,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "date,time,日時,時刻"
       user-control: "true"
       type-icon: "Calendar"
   parameters:

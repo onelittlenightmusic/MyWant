@@ -7,6 +7,7 @@ wantType:
     category: effect
     pattern: independent
     labels:
+      aliases: "heart,ハート"
       riffable: reaction
       type-icon: Heart
   parameters:

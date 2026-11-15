@@ -12,6 +12,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "defense,防衛"
       form-type: button
       type-icon: Swords
       category-icon: Gamepad2

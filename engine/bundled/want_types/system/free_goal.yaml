@@ -19,6 +19,7 @@ wantType:
     category: agent
     pattern: independent
     labels:
+      aliases: "goal,ゴール"
       form-type: probe
       tile-icon: output
       user-control: 'true'

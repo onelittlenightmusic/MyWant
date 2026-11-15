@@ -17,6 +17,7 @@ wantType:
     category: approval
     pattern: independent
     labels:
+      aliases: "evidence,証拠"
       type-tone-color: "#4a6080"
   finalResultField: evidence
   parameters:

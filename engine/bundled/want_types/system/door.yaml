@@ -22,6 +22,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "door,ドア"
       # A door is part of the wall it stands in, so it takes the wall's form:
       # the canvas bricks over the gaps on either side of it and carries the
       # wall's depth through the doorway, instead of leaving a hole around the

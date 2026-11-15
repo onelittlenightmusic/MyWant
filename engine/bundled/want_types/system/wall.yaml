@@ -13,6 +13,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "wall,壁"
       # What this takes the shape of on the ground. Tiles that share it are one
       # thing: the canvas runs the brickwork straight through the gaps between
       # them, and projects the depth of the whole run rather than of each tile.

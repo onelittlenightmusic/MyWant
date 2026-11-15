@@ -20,6 +20,7 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      aliases: "buffet,ビュッフェ"
       child-role: doer
       type-tone-color: "#c8a035"
   finalResultField: reservation_name

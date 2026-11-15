@@ -11,6 +11,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "treasure,宝箱"
       type-icon: Gem
       category-icon: Gamepad2
       # Its relations are the battle's wiring, not roads to look at (the

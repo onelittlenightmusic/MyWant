@@ -14,6 +14,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "heal,回復"
       form-type: button
       type-icon: HeartPulse
       category-icon: Gamepad2

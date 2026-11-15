@@ -24,6 +24,7 @@ wantType:
     category: utility
     pattern: independent
     labels:
+      aliases: "backup,バックアップ"
       user-control: 'true'
       type-icon: DatabaseBackup
       # A reach out to the service it writes to.

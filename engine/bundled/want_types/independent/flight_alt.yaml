@@ -16,6 +16,7 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      aliases: "flight,代替フライト"
       child-role: doer
   finalResultField: reservation_name
   parameters:

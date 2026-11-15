@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: goal
+    labels:
+      aliases: "goal,ゴール"
     title: Goal
     description: |
       Represents a user's high-level goal that gets automatically decomposed into

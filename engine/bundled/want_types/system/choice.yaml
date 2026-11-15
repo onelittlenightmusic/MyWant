@@ -7,6 +7,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "choice,選択"
       user-control: "true"
       type-icon: "ListFilter"
   parameters:

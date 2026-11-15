@@ -19,6 +19,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "world,ワールド"
       type-icon: "Milestone"
       list-visible: "false"
 

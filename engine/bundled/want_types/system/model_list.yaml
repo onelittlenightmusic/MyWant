@@ -34,6 +34,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "models,モデル"
       type-icon: "Bot"
 
   parameters:

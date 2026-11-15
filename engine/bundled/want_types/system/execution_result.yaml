@@ -7,6 +7,7 @@ wantType:
     category: system
     pattern: independent
     labels:
+      aliases: "command,コマンド"
       type-tone-color: "#3a6a4f"
 
   finalResultField: stdout

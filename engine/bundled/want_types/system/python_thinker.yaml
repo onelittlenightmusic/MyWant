@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: python
+    labels:
+      aliases: "python"
     title: Thought by Python
     description: |
       Executes a Python script as a think agent on each tick.

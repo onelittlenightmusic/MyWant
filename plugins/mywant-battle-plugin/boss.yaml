@@ -10,6 +10,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "boss,ボス"
       type-icon: Flame
       tile-effect: hat
       tile-effect-colors: black,gold

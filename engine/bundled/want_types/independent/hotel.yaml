@@ -20,6 +20,7 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      aliases: "hotel,ホテル"
       child-role: doer
       type-tone-color: "#8b7355"
   finalResultField: reservation_name

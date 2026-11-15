@@ -10,6 +10,7 @@ wantType:
     category: weather
     pattern: independent
     labels:
+      aliases: "weather,天気"
       # Drawn on the canvas as a probe: a reach out to the place it reads.
       form-type: probe
       # The tile wears the weather itself — sun, cloud, rain — read from the

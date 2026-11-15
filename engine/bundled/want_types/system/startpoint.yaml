@@ -36,6 +36,7 @@ wantType:
     category: game
     pattern: independent
     labels:
+      aliases: "start,スタート"
       type-icon: "Flag"
       list-visible: "false"
       # The card carries a control the user presses, so the card can be

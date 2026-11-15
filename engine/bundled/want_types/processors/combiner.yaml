@@ -1,6 +1,8 @@
 wantType:
   metadata:
     name: combiner
+    labels:
+      aliases: "combiner,結合"
     title: combiner
     description: 'Processor that combines multiple input streams into a single output
       stream.

@@ -7,6 +7,7 @@ wantType:
     category: utility
     pattern: independent
     labels:
+      aliases: "note,メモ,付箋"
       user-control: "true"
       type-icon: StickyNote
       form-type: button
