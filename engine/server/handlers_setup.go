@@ -548,6 +548,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/tools", s.handleToolsList).Methods("GET")
 	api.HandleFunc("/tools/call", s.handleToolsCall).Methods("POST")
 	api.HandleFunc("/plans/brief", s.handlePlanBrief).Methods("POST")
+	api.HandleFunc("/plans/brief/{id}", s.handlePlanBriefGet).Methods("GET")
 	// A magic sentence said for its result (magic_sentence.go): a keyboard, the CLI.
 	api.HandleFunc("/magic", s.handleMagic).Methods("POST")
 	api.HandleFunc("/plans/params", s.handlePlanParams).Methods("POST")
