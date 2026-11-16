@@ -282,7 +282,7 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 		if want := s.wantByAlias(text); want != nil {
 			out := magicResponse{Matched: true, Answer: fmt.Sprintf("「%s」です。", want.Metadata.Name),
 				WantID: want.Metadata.ID, WantName: want.Metadata.Name, WantType: want.Metadata.Type}
-			if req.Wait >= 0 {
+			if req.Wait >= 0 && s.magicSettles(want.Metadata.Type) {
 				wait := req.Wait
 				if wait == 0 {
 					wait = 15
@@ -300,7 +300,7 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 	}
 	answer, card, _ := s.magicSentenceDo(text, "", "")
 	out := magicResponse{Matched: true, Answer: answer, WantType: mm.wantType, Params: mm.params}
-	if card != nil && req.Wait < 0 {
+	if card != nil && (req.Wait < 0 || !s.magicSettles(mm.wantType)) {
 		out.WantID, out.WantName = card.ID, card.Name
 	} else if card != nil {
 		out.WantID, out.WantName = card.ID, card.Name
@@ -314,6 +314,14 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 		out.Settled = s.robotWaitSettled(card.ID, time.Duration(wait)*time.Second)
 	}
 	robotWriteJSON(w, out)
+}
+
+// magicSettles: a want of this type is worth waiting for — it runs and is
+// done. One a person works (user-control: a checklist, a note, a timer) is
+// never done by itself: waited for, a checklist said on the keyboard held its
+// fields back for the whole wait, twenty seconds each time (2026-11-16).
+func (s *Server) magicSettles(wantType string) bool {
+	return s.robotTypeLabel(wantType, "user-control") != "true"
 }
 
 // wantByAlias: the want on the board (not archived) that `said` names by an

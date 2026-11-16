@@ -546,12 +546,14 @@ func (s *Server) setupRoutes() {
 	// turns records a question and what was done for it, for every chat
 	// (turns.go).
 	api.HandleFunc("/tools", s.handleToolsList).Methods("GET")
-	api.HandleFunc("/tools/call", s.handleToolsCall).Methods("POST")
-	api.HandleFunc("/plans/brief", s.handlePlanBrief).Methods("POST")
-	api.HandleFunc("/plans/brief/{id}", s.handlePlanBriefGet).Methods("GET")
+	api.HandleFunc("/tools/call", asyncable(s.handleToolsCall)).Methods("POST")
+	// Asked with Prefer: respond-async, answered at once and fetched from
+	// /jobs/{id} when done (async_jobs.go).
+	api.HandleFunc("/jobs/{id}", s.handleJobGet).Methods("GET")
+	api.HandleFunc("/plans/brief", asyncable(s.handlePlanBrief)).Methods("POST")
 	// A magic sentence said for its result (magic_sentence.go): a keyboard, the CLI.
-	api.HandleFunc("/magic", s.handleMagic).Methods("POST")
-	api.HandleFunc("/plans/params", s.handlePlanParams).Methods("POST")
+	api.HandleFunc("/magic", asyncable(s.handleMagic)).Methods("POST")
+	api.HandleFunc("/plans/params", asyncable(s.handlePlanParams)).Methods("POST")
 	api.HandleFunc("/plans", s.handlePlanCreate).Methods("POST")
 	api.HandleFunc("/plans", s.handlePlanList).Methods("GET")
 	api.HandleFunc("/plans/{name}", s.handlePlanGet).Methods("GET")

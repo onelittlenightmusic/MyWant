@@ -55,9 +55,6 @@ type planBriefRequest struct {
 	// Since is when the client's conversation began (RFC 3339) — cleared
 	// then: nothing asked before it is "earlier in this conversation".
 	Since string `json:"since,omitempty"`
-	// Async: answered at once with a job, the brief fetched from
-	// /plans/brief/{id} when it is made (plan_brief_async.go).
-	Async bool `json:"async,omitempty"`
 }
 
 type planBriefResponse struct {
@@ -98,15 +95,6 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 	var req planBriefRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if req.Async {
-		j := s.startBrief(req)
-		w.Header().Set("Location", "/api/v1/plans/brief/"+j.id)
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
-		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(j.view())
 		return
 	}
 	brief, err := s.planBrief(req.Question, req.Locale, req.Turn, req.Timezone, req.Since)
