@@ -3,7 +3,10 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	mywant "mywant/engine/core"
 )
 
 // The thing store parses its file once and answers from that until the file
@@ -72,5 +75,36 @@ func TestNotificationStoreKeepsWhatItRead(t *testing.T) {
 	all[0].Message = "edited"
 	if a.All(0)[0].Message != "done" {
 		t.Error("a caller's edit reached the log")
+	}
+}
+
+// An alert's large answer is kept by its id only: the log is written whole for
+// every notice. A small one stays.
+func TestNoticeLargeAnswerKeptByIDOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notifications.yaml")
+	n := &NotificationStore{path: path}
+	big := strings.Repeat("x", noticeResultMax+1)
+	if err := n.Record(NotificationEntry{Message: "big", Kind: "alert", TargetType: "want", TargetID: "w1",
+		Output: &mywant.ResultHistoryEntry{ID: "out-big", Result: big, Fields: map[string]any{"first": "22:00"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := n.Record(NotificationEntry{Message: "small", Kind: "alert", TargetType: "want", TargetID: "w1",
+		Output: &mywant.ResultHistoryEntry{ID: "out-small", Result: "song"}}); err != nil {
+		t.Fatal(err)
+	}
+	fresh := &NotificationStore{path: path}
+	got := fresh.All(0)
+	if len(got) != 2 {
+		t.Fatalf("entries: %d", len(got))
+	}
+	small, large := got[0], got[1]
+	if large.Output == nil || large.Output.ID != "out-big" || large.Output.Result != nil || large.Output.Fields["first"] != "22:00" {
+		t.Fatalf("large answer: %+v", large.Output)
+	}
+	if small.Output == nil || small.Output.Result != "song" {
+		t.Fatalf("small answer: %+v", small.Output)
+	}
+	if ids := fresh.UnreadWantOutputs()["w1"]; len(ids) != 2 {
+		t.Fatalf("unread outputs: %v", ids)
 	}
 }

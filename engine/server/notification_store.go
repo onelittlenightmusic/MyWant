@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,6 +15,28 @@ import (
 
 // maxNotifications caps the on-disk notice log. Oldest entries are dropped first.
 const maxNotifications = 500
+
+// noticeResultMax: an alert's answer larger than this (as JSON) is kept in the
+// notice by its id only, the answer itself left to the want's own history,
+// which keeps it under the same id. The whole log is written again for every
+// notice, and a few large answers made most of it: twenty-five of
+// smartgolf-available's, about 93KB each, were 2.3MB of a 3.1MB log
+// (2026-11-17). Nothing reads a notice's answer but its id
+// (UnreadWantOutputs).
+const noticeResultMax = 8 << 10
+
+// slimOutput is the notice's answer with a large result let go (noticeResultMax).
+func slimOutput(out *mywant.ResultHistoryEntry) *mywant.ResultHistoryEntry {
+	if out == nil || out.Result == nil {
+		return out
+	}
+	if b, err := json.Marshal(out.Result); err == nil && len(b) <= noticeResultMax {
+		return out
+	}
+	slim := *out
+	slim.Result = nil
+	return &slim
+}
 
 // NotificationEntry is one notice the GUI spoke through the robot's bubble.
 //
@@ -86,6 +109,10 @@ func (n *NotificationStore) load() []NotificationEntry {
 		}
 		var entries []NotificationEntry
 		_ = yaml.Unmarshal(bytes, &entries)
+		// A log written before noticeResultMax is made small on its next write.
+		for i := range entries {
+			entries[i].Output = slimOutput(entries[i].Output)
+		}
 		n.cached, n.stamp = entries, stamp
 	}
 	return append([]NotificationEntry(nil), n.cached...)
@@ -146,6 +173,8 @@ func (n *NotificationStore) Record(entry NotificationEntry) error {
 	if entry.ID == "" {
 		entry.ID = "notif-" + now.UTC().Format("20060102T150405.000000000")
 	}
+
+	entry.Output = slimOutput(entry.Output)
 
 	n.mu.Lock()
 	defer n.mu.Unlock()
