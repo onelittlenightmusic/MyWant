@@ -99,6 +99,18 @@ func (r *ringBuffer[T]) PeekLast() (T, bool) {
 // Note: not safe against concurrent Append on the same slot (suitable for
 // single-writer or best-effort history merging scenarios).
 func (r *ringBuffer[T]) UpdateLast(fn func(*T)) bool {
+	if !r.updateLast(fn) {
+		return false
+	}
+	r.touched()
+	return true
+}
+
+// UpdateLastQuietly is UpdateLast without moving Version: a change too small
+// to write the memory file for, kept until something else writes it.
+func (r *ringBuffer[T]) UpdateLastQuietly(fn func(*T)) bool { return r.updateLast(fn) }
+
+func (r *ringBuffer[T]) updateLast(fn func(*T)) bool {
 	total := r.head.Load()
 	if total == 0 {
 		return false
@@ -111,7 +123,6 @@ func (r *ringBuffer[T]) UpdateLast(fn func(*T)) bool {
 	entry := v.(T)
 	fn(&entry)
 	r.buf[idx].Store(entry)
-	r.touched()
 	return true
 }
 

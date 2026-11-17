@@ -44,15 +44,23 @@ const (
 // SystemReservedStateFields returns the list of state fields automatically managed by the framework.
 // These must NOT be recommended as data-flow sources in field-match recommendations.
 func SystemReservedStateFields() []string {
-	return []string{
-		StateFieldActionByAgent,
-		StateFieldAchievingPercent,
-		StateFieldCompleted,
-		StateFieldAchieved,
-		StateFieldError,
-		"agent_result",
-		"desired_dispatch",
-	}
+	return append(append([]string(nil), bookkeepingStateFields...), "agent_result", "desired_dispatch")
+}
+
+// bookkeepingStateFields are the reserved fields that tell how a want is
+// getting on rather than what it holds: how far a run has got, why the last
+// attempt failed, which agent acted, whether it is achieved — the last two
+// move with its status, which is saved on its own. They are left out of what
+// asks for the memory file to be written (savesQuietly), like a type's
+// volatile state. The other reserved fields are content — an agent's answer
+// (agent_result), the children a parent is to have (desired_dispatch) — and
+// are saved when they change.
+var bookkeepingStateFields = []string{
+	StateFieldActionByAgent,
+	StateFieldAchievingPercent,
+	StateFieldCompleted,
+	StateFieldAchieved,
+	StateFieldError,
 }
 
 // BackgroundAgent is an interface for long-running background operations
@@ -1251,8 +1259,10 @@ func (n *Want) StoreState(key string, value any) {
 	n.stateTimestamps.Store(key, now)
 	n.getHistoryManager().AddStateEntry(key, value)
 	n.stateRevision.Add(1) // per want, for skipping work derived from this state
-	n.persistTouched()
-	bumpStateEpoch() // a value changed: the memory file is to be written
+	if !n.savesQuietly(key) {
+		n.persistTouched()
+		bumpStateEpoch() // a value changed: the memory file is to be written
+	}
 
 	notification := StateNotification{
 		SourceWantName: n.Metadata.Name,
@@ -1290,7 +1300,9 @@ func (n *Want) GetStateTimestamps() map[string]time.Time {
 // DeleteState removes a key from the want's state map.
 func (n *Want) DeleteState(key string) {
 	if _, had := n.State.LoadAndDelete(key); had {
-		n.persistTouched()
+		if !n.savesQuietly(key) {
+			n.persistTouched()
+		}
 		if !n.isVolatileState(key) {
 			n.changed()
 		}

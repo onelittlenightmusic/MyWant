@@ -28,6 +28,44 @@ func wantChangedByID(id string) {
 	}
 }
 
+// savesQuietly: a change to this field does not ask for the memory file to be
+// written — a type's volatile state, and the engine's bookkeeping
+// (bookkeepingStateFields). Its value is still in the want and goes into the
+// file with the next write any other change asks for, or the whole rebuild
+// (memoryRebuildEvery). On 2026-11-17 a run of smartgolf-available rewrote its
+// 1.3MB want for a progress line and a percentage while its answer stood.
+//
+// So does a field the type declares `persistent: false` — one the restart sets
+// back to its initialValue (Want's reset on restart): written, it would only be
+// thrown away. Unless the want keeps all of its state over a restart
+// (resetOnRestart: false), and except a goal, which Initialize sets again. A
+// robot's last_poll_at, declared so, wrote the whole memory file every five
+// seconds by itself.
+func (n *Want) savesQuietly(key string) bool {
+	if n.isVolatileState(key) {
+		return true
+	}
+	for _, k := range bookkeepingStateFields {
+		if k == key {
+			return true
+		}
+	}
+	return n.resetOnRestart(key)
+}
+
+// resetOnRestart: the restart sets this field back to its initialValue.
+func (n *Want) resetOnRestart(key string) bool {
+	if n.WantTypeDefinition == nil || (n.Spec.ResetOnRestart != nil && !*n.Spec.ResetOnRestart) {
+		return false
+	}
+	for _, sd := range n.WantTypeDefinition.State {
+		if sd.Name == key {
+			return !sd.Persistent && sd.Label != WantTypeStateLabelGoal
+		}
+	}
+	return false
+}
+
 // isVolatileState: the type declares this field volatile.
 func (n *Want) isVolatileState(key string) bool {
 	if n.WantTypeDefinition == nil {

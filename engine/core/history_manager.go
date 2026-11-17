@@ -171,7 +171,10 @@ func (h *HistoryManager) AddResultEntry(entry ResultHistoryEntry) (appended bool
 	fp := resultFingerprint(entry)
 	last, ok := h.ResultHistoryRing.PeekLast()
 	if ok && resultFingerprint(last) == fp {
-		h.ResultHistoryRing.UpdateLast(func(e *ResultHistoryEntry) {
+		// Quietly: an answer found again changes nothing shown (it is left
+		// out of the want's hash too), and is not worth writing the want's
+		// whole history for — it goes with the next write.
+		h.ResultHistoryRing.UpdateLastQuietly(func(e *ResultHistoryEntry) {
 			e.LastSeen = entry.Timestamp
 		})
 		return false, nil

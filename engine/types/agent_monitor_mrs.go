@@ -34,7 +34,7 @@ func init() {
 // any state fields that declare fetchFrom+onFetchData automatically.
 //
 // Progress protocol: the script may emit {"_progress": <0-100>, "_message": "<text>"}
-// lines to stdout at any point; these update achieving_percentage / summary in real time.
+// lines to stdout at any point; these update achieving_percentage in real time (the message goes to the log).
 //
 // Concurrent tick protection is now handled by PollingAgent via Want.TryStartAgentRun /
 // FinishAgentRun, so no per-agent sync.Map guard is needed here.
@@ -68,11 +68,12 @@ func monitorMRSAgentFn(ctx context.Context, want *Want) (bool, error) {
 	// Pass CLI args if skill_json_arg is configured (supports param-driven monitor tasks).
 	args := mrsBuildArgs(want)
 	DebugLog("[%s] [MRS-MONITOR] executing skill: %s args=%v (timeout: %ds)", want.Metadata.Name, scriptPath, args, timeoutSec)
+	// The progress a skill reports is its percentage only. Its words went into
+	// "summary" — the field a plugin's own answer uses for what it found
+	// (claude_info, nearest), overwritten mid-run with "<store> 開始" — and
+	// stay in the log now.
 	raw, err := runMRSSkillForWant(skillCtx, want, scriptPath, args, func(pct int, msg string) {
 		want.SetCurrent("achieving_percentage", pct)
-		if msg != "" {
-			want.SetCurrent("summary", msg)
-		}
 		DebugLog("[%s] [MRS-MONITOR] progress %d%%: %s", want.Metadata.Name, pct, msg)
 	})
 	if err != nil {
@@ -134,10 +135,7 @@ func doMRSAgentFn(ctx context.Context, want *Want) error {
 
 	want.StoreLog("[MRS-DO] executing skill: %s args=%v (timeout: %ds)", scriptPath, args, timeoutSec)
 	raw, err := runMRSSkillForWant(skillCtx, want, scriptPath, args, func(pct int, msg string) {
-		want.SetCurrent("achieving_percentage", pct)
-		if msg != "" {
-			want.SetCurrent("summary", msg)
-		}
+		want.SetCurrent("achieving_percentage", pct) // its words in the log only (see the monitor's)
 		want.StoreLog("[MRS-DO] progress %d%%: %s", pct, msg)
 	})
 	if err != nil {
