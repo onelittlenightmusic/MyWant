@@ -531,6 +531,12 @@ func (s *Server) Start() error {
 	// Every new answer a want arrives at becomes that want's alert.
 	s.RegisterOutputCallback()
 
+	// The wants already answered enter their characters' ask ledgers; from
+	// now on each does as it first answers (character_home.go).
+	go s.seedCharacterHomes()
+	// …and a want's voice script hears its asker's home (character_home.go).
+	mywant.WantHomeOf = s.wantHome
+
 	// The robot acting on events, not only when spoken to (off unless asked).
 	s.startRobotInitiative()
 

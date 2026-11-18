@@ -158,6 +158,24 @@ type VoiceEvent struct {
 	Guide any
 }
 
+// WantHomeOf, when set (by the server), is the home of the character that
+// asked for w at this time of day, in w's type's words — handed to its voice
+// script as "home":
+//
+//	{"part": "夜", "place": "中野坂上", "param": "to", "value": "中野坂上",
+//	 "through": "", "asks": 3, "of": 4, "here": true}
+//
+// here: w's own parameter already names it. nil when the character has no
+// home now, or the type no word for it. The words are the script's.
+var WantHomeOf func(w *Want) map[string]any
+
+func wantHome(w *Want) map[string]any {
+	if WantHomeOf == nil {
+		return nil
+	}
+	return WantHomeOf(w)
+}
+
 // voiceInput is what a script is handed; ev is nil standing on the tile.
 func voiceInput(w *Want, ev *VoiceEvent) map[string]any {
 	entries := w.ResultHistoryEntries()
@@ -174,6 +192,7 @@ func voiceInput(w *Want, ev *VoiceEvent) map[string]any {
 		"state":       w.GetAllState(),
 		"params":      w.GetSpec().Params,
 		"event":       voiceEventInput(ev),
+		"home":        wantHome(w),
 	}
 }
 
@@ -383,6 +402,12 @@ var voiceCache sync.Map // want ID → voiceCacheEntry
 func WantVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	id := w.GetMetadata().ID
 	hash := CalculateWantHash(w) + "|" + script
+	if script != "" {
+		// Its home changes with the time of day and the asks, not the want.
+		if h, err := json.Marshal(wantHome(w)); err == nil {
+			hash += "|" + string(h)
+		}
+	}
 	if e, ok := voiceCache.Load(id); ok && e.(voiceCacheEntry).hash == hash {
 		return e.(voiceCacheEntry).line
 	}

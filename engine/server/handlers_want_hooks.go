@@ -398,6 +398,14 @@ func (h *CanvasNearHook) Run(want *mywant.Want, allWants []*mywant.Want, newBatc
 	if want.GetLabel(canvasLabelX) != "" && want.GetLabel(canvasLabelY) != "" {
 		return nil
 	}
+	// Asked for by whoever is at the controls: theirs, as the GUI stamps what
+	// it adds — the robot's deploy is a person's ask, and their habits are
+	// learned from what they asked for (character_home.go).
+	if target == canvasNearCursor && want.GetLabel(wantLabelOwnerCharacter) == "" {
+		if id := newestCursorCharacter(); id != "" {
+			want.SetLabel(wantLabelOwnerCharacter, id)
+		}
+	}
 	cx, cy, ok := resolveCanvasNear(target, allWants)
 	if !ok {
 		// Nobody by that name, or they have never been anywhere. Not an error
@@ -471,6 +479,23 @@ func resolveCanvasNear(target string, allWants []*mywant.Want) (int, int, bool) 
 // perfectly confident (0, 0) — which is how the first version of this put wants
 // in the top-left corner of the world and reported success. An unset key is not
 // a position, and cursor_visible is what tells the two apart.
+// newestCursorCharacter is the character a browser reported a position for
+// most recently — the person at the controls — never the robot, or "".
+func newestCursorCharacter() string {
+	cursorsMu.RLock()
+	defer cursorsMu.RUnlock()
+	id, newest := "", cursorEntry{}
+	for cid, e := range lastCursorPos {
+		if cid == robotCharacterID {
+			continue
+		}
+		if id == "" || e.LastSeen > newest.LastSeen {
+			id, newest = cid, e
+		}
+	}
+	return id
+}
+
 func resolveCursorSentinel(state map[string]any) (int, int, bool) {
 	var newest cursorEntry
 	found := false

@@ -436,6 +436,8 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/import", s.importCharacters).Methods("POST")
 	characters.HandleFunc("/prune-devices", s.pruneCharacterDevices).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}", s.getCharacter).Methods("GET", "OPTIONS")
+	// Where its person goes at this time of day (character_home.go).
+	characters.HandleFunc("/{id}/home", s.getCharacterHome).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}", s.updateCharacter).Methods("PUT", "OPTIONS")
 	characters.HandleFunc("/{id}", s.deleteCharacter).Methods("DELETE", "OPTIONS")
 	// Move a character to a cell — optionally asking first. The one place that

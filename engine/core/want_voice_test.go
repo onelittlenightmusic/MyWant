@@ -438,3 +438,27 @@ func TestSpaceSentences(t *testing.T) {
 		}
 	}
 }
+
+// A script hears its asker's home, and says it again when the home changes
+// though the want did not.
+func TestWantVoiceHearsTheHome(t *testing.T) {
+	savedRun, savedHome := runVoiceScript, WantHomeOf
+	defer func() { runVoiceScript, WantHomeOf = savedRun, savedHome }()
+
+	runVoiceScript = func(_ context.Context, _ string, input []byte) (map[string]any, error) {
+		var got map[string]any
+		_ = json.Unmarshal(input, &got)
+		if h, ok := got["home"].(map[string]any); ok {
+			return map[string]any{"say": fmt.Sprintf("いつもの%v", h["place"])}, nil
+		}
+		return map[string]any{"say": "ふつう"}, nil
+	}
+	w := voiceWant(t, "home", 1, time.Now())
+	if say := WantVoice(context.Background(), w, "voice.py").Say; say != "ふつう" {
+		t.Errorf("no home: say = %q", say)
+	}
+	WantHomeOf = func(*Want) map[string]any { return map[string]any{"place": "中野坂上"} }
+	if say := WantVoice(context.Background(), w, "voice.py").Say; say != "いつもの中野坂上" {
+		t.Errorf("home: say = %q", say)
+	}
+}

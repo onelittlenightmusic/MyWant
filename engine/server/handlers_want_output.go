@@ -32,7 +32,12 @@ func (s *Server) RegisterOutputCallback() {
 				log.Printf("[want-output] recovered: %v", r)
 			}
 		}()
-		if s.notifications == nil || w == nil || w.Metadata.ID == "" {
+		if w == nil || w.Metadata.ID == "" {
+			return
+		}
+		// Its first answer enters it in its character's ask ledger.
+		s.noteHomeAsk(w)
+		if s.notifications == nil {
 			return
 		}
 		// Told of at the moments its type names and the want chose

@@ -254,6 +254,10 @@ func (m AuraMark) IsEmpty() bool {
 // characterStoreFile is the root document persisted to ~/.mywant/characters.yaml.
 type characterStoreFile struct {
 	Characters []Character `yaml:"characters"`
+	// Homes is each character's ask ledger (character_homes.go): kept beside
+	// the characters, not in them, so no character API returns it and no
+	// settings save replaces it.
+	Homes map[string][]CharacterAsk `yaml:"homes,omitempty"`
 }
 
 var (
@@ -266,6 +270,8 @@ type characterManager struct {
 	path     string
 	lastHash string
 	store    characterStoreFile
+	// homesVersion counts changes to the ledgers (character_homes.go).
+	homesVersion uint64
 }
 
 // GetCharacterManager returns the singleton character manager.
@@ -324,8 +330,15 @@ func (m *characterManager) save() {
 		log.Printf("[WARN] character_store: mkdir failed: %v", err)
 		return
 	}
-	if err := os.WriteFile(m.path, data, 0644); err != nil {
+	// Written beside it and moved over it: a write cut short leaves the old
+	// file whole, never half of everyone's characters.
+	tmp := m.path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
 		log.Printf("[WARN] character_store: write failed: %v", err)
+		return
+	}
+	if err := os.Rename(tmp, m.path); err != nil {
+		log.Printf("[WARN] character_store: rename failed: %v", err)
 		return
 	}
 	m.lastHash = newHash
@@ -410,6 +423,8 @@ func (m *characterManager) Delete(id string) bool {
 	for i, c := range m.store.Characters {
 		if c.ID == id {
 			m.store.Characters = append(m.store.Characters[:i], m.store.Characters[i+1:]...)
+			delete(m.store.Homes, id) // their habits go with them
+			m.homesVersion++
 			m.save()
 			log.Printf("[CharacterStore] Deleted character %s", c.Name)
 			return true

@@ -115,6 +115,23 @@ func (s *Server) offerCandidates(sit initiativeSituation) []offerCandidate {
 	for _, w := range s.offerFinders(sit.Event.WantID) {
 		out = append(out, s.offerRestart(w, false))
 	}
+	// Where the person goes at this time of day (character_home.go): a want
+	// there, or one already there run again. In place of the same want's plain
+	// restart, so the two are not weighed against each other.
+	homes := s.offerHomes(newestCursorCharacter(), time.Now())
+	if len(homes) > 0 {
+		replaced := map[string]bool{}
+		for _, h := range homes {
+			replaced["restart:"+h.Want] = true
+		}
+		kept := out[:0]
+		for _, c := range out {
+			if !replaced[c.Key] {
+				kept = append(kept, c)
+			}
+		}
+		out = append(kept, homes...)
+	}
 	return out
 }
 
@@ -153,14 +170,25 @@ var offerSeeds = []struct {
 	eventType, message string
 	accept             []string // types whose re-run fits
 	own                bool     // running the same want again fits
+	home               bool     // the way to where the person goes now fits (offerHomes)
 }{
-	{"smartgolf_list_available", "北新宿店の12:00が空いてるよ", []string{"smartgolf_check_reserved", "weather"}, false},
-	{"smartgolf_list_available", "中野郵便局前店の15:30が空いたよ", []string{"smartgolf_check_reserved", "weather"}, false},
-	{"weather", "午後から雨、傘を持っていって", []string{"transit_search"}, false},
-	{"weather", "強風注意報が出ています", []string{"transit_search"}, false},
-	{"transit_search", "中央線が遅延中、15分遅れ", nil, true},
-	{"transit_search", "運転見合わせ、振替輸送あり", nil, true},
-	{"backup to google", "バックアップに失敗しました", nil, true},
+	{"smartgolf_list_available", "北新宿店の12:00が空いてるよ", []string{"smartgolf_check_reserved", "weather"}, false, false},
+	{"smartgolf_list_available", "中野郵便局前店の15:30が空いたよ", []string{"smartgolf_check_reserved", "weather"}, false, false},
+	{"weather", "午後から雨、傘を持っていって", []string{"transit_search"}, false, true},
+	{"weather", "強風注意報が出ています", []string{"transit_search"}, false, true},
+	{"transit_search", "中央線が遅延中、15分遅れ", nil, true, true},
+	{"transit_search", "運転見合わせ、振替輸送あり", nil, true, true},
+	{"backup to google", "バックアップに失敗しました", nil, true, false},
+}
+
+// offerHomeSeeds are home offers (offerHomes) the seeds teach with, in the
+// offer's own words so what is learnt holds for the person's own home: each
+// is taught at every part of the day, the person elsewhere — taken up in its
+// own part after news that fits it, declined in the others — and in its own
+// part with the person already there, declined.
+var offerHomeSeeds = []struct{ part, place, elsewhere, text string }{
+	{"朝", "国分寺", "中野坂上", "朝にいつも行く国分寺。国分寺への乗り換えを調べる"},
+	{"夜", "中野坂上", "国分寺", "夜にいつも行く中野坂上。中野坂上への乗り換えを調べる"},
 }
 
 // offerSeedRows are the offer's starting rows, made from what is on the board
@@ -171,7 +199,8 @@ func (s *Server) offerSeedRows() []map[string]any {
 	}
 	finders := s.offerFinders("")
 	var rows []map[string]any
-	for _, seed := range offerSeeds {
+	day := time.Now()
+	for i, seed := range offerSeeds {
 		var event *mywant.Want
 		for _, w := range s.globalBuilder.GetWants() {
 			if w.Metadata.Type == seed.eventType && w.GetLabels()[robotArchived] != "true" {
@@ -182,16 +211,30 @@ func (s *Server) offerSeedRows() []map[string]any {
 		if event == nil {
 			continue
 		}
-		text := fmt.Sprintf("出来事: wantの新しい結果。want: %s。結果: %s。", event.Metadata.Name, seed.message)
-		add := func(c offerCandidate, fits bool) {
+		text := outputNewsText(event.Metadata.Name, seed.message)
+		addAt := func(now string, c offerCandidate, fits bool) {
 			gold := "skip"
 			if fits {
 				gold = "accept"
 			}
-			rows = append(rows, map[string]any{"state": text + "提案: " + c.Text + "。",
+			rows = append(rows, map[string]any{"state": text + now + "提案: " + c.Text + "。",
 				"gold": map[string]string{offerQuestionID: gold}})
 		}
+		// The rest does not turn on the time or the place: each seed at one
+		// part of the day, in turn, nowhere in particular, so the words always
+		// have both.
+		now := offerNow(dayPartAt(dayParts[i%len(dayParts)].Name, day)) + "本人の近く: なし。"
+		add := func(c offerCandidate, fits bool) { addAt(now, c, fits) }
 		add(s.offerRestart(event, true), seed.own)
+		for _, h := range offerHomeSeeds {
+			for _, p := range dayParts {
+				at := offerNow(dayPartAt(p.Name, day))
+				addAt(at+"本人の近く: "+h.elsewhere+"。", offerCandidate{Text: h.text}, seed.home && p.Name == h.part)
+				if p.Name == h.part {
+					addAt(at+"本人の近く: "+h.place+"。", offerCandidate{Text: h.text}, false)
+				}
+			}
+		}
 		for _, w := range finders {
 			if w.Metadata.ID == event.Metadata.ID {
 				continue
@@ -254,7 +297,12 @@ func (s *Server) robotOffer(ri *robotInitiative, sit initiativeSituation) {
 	if len(cands) == 0 {
 		return
 	}
-	base := initiativeEventText(sit) // words, as the news question reads them
+	// The news as the news question reads it, and the time: an offer fits a
+	// time of day or not (offerHomes says when), and Laya weighs that.
+	// And where the person is: an offer to go somewhere fits less when they
+	// are already there.
+	tiles, _ := s.robotTiles()
+	base := initiativeEventText(sit) + offerNow(time.Now()) + offerWhere(sit.PersonX, sit.PersonY, sit.HasPerson, tiles)
 	items := make([]decisionItem, len(cands))
 	for i, c := range cands {
 		items[i] = decisionItem{State: base + "提案: " + c.Text + "。",
