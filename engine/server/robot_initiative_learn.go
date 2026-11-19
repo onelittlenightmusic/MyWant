@@ -233,8 +233,11 @@ func initiativeTrainingRows(logPath string, now time.Time) (recent, older []map[
 		// An offer: after which want's news, which candidate. The news
 		// question: the words read.
 		group := "news|" + rec.State
-		if rec.Event == "offer" {
+		switch rec.Event {
+		case "offer":
 			group = "offer|" + rec.WantID + "|" + rec.Did
+		case "suggest": // a pill (robot_suggest.go): which candidate
+			group = "suggest|" + rec.Did
 		}
 		examples = append(examples, initiativeExample{State: rec.State, Gold: l.gold(), At: at, Group: group})
 	})

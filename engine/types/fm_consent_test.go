@@ -82,7 +82,7 @@ func TestSplitPendingCommand(t *testing.T) {
 	cases := []struct{ sentence, command, args string }{
 		{"mywant wants delete delete-me-test", "wants delete", "delete-me-test"},
 		{"mywant wants create --type weather --param at=Nakano", "wants create", "--type weather --param at=Nakano"},
-		{"mywant thing pin 新宿 5 0", "thing pin", "新宿 5 0"},
+		{"mywant things pin 新宿 5 0", "things pin", "新宿 5 0"},
 		{"mywant undo", "undo", ""},
 	}
 	for _, c := range cases {

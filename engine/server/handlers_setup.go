@@ -574,6 +574,8 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/robot/initiative/label", s.handleRobotInitiativeLabel).Methods("POST")
 	api.HandleFunc("/robot/initiative/retrain", s.handleRobotInitiativeRetrain).Methods("POST")
 	api.HandleFunc("/robot/offer/reply", s.handleRobotOfferReply).Methods("POST")
+	api.HandleFunc("/robot/suggestions", s.handleRobotSuggestions).Methods("GET")
+	api.HandleFunc("/robot/suggestions/{id}", s.handleRobotSuggestionTake).Methods("POST")
 	// The robot's conversation, one record for every client — robot_chat.go.
 	api.HandleFunc("/robot/chat", s.handleRobotChat).Methods("GET")
 	api.HandleFunc("/turns/{id}/replay", s.handleTurnReplay).Methods("POST")

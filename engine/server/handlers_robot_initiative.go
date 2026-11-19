@@ -3,7 +3,10 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 // handleRobotInitiative hands the robot an event now, and answers with what it
@@ -126,5 +129,29 @@ func (s *Server) handleRobotOfferReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.sayTurnAnswer(answer, nil, nil, "") // the chat, the bubble and the conversation
+	robotWriteJSON(w, map[string]string{"answer": answer})
+}
+
+// handleRobotSuggestions is what the robot would offer now, as pills for a
+// chat just opened (robot_suggest.go).
+//
+//	GET /api/v1/robot/suggestions[?fresh=1][&max=<n>]
+//
+// fresh=1 (a ↻ pressed) works them out again, the same situation or not;
+// max is how many pills (3, the chat's; up to 6, the widget's cards).
+func (s *Server) handleRobotSuggestions(w http.ResponseWriter, r *http.Request) {
+	max, _ := strconv.Atoi(r.URL.Query().Get("max"))
+	robotWriteJSON(w, s.robotSuggestionsNow(r.URL.Query().Get("fresh") == "1", max))
+}
+
+// handleRobotSuggestionTake does the pill pressed and says how it went.
+//
+//	POST /api/v1/robot/suggestions/{id}
+func (s *Server) handleRobotSuggestionTake(w http.ResponseWriter, r *http.Request) {
+	answer, ok := s.takeSuggestion(mux.Vars(r)["id"])
+	if !ok {
+		http.Error(w, "no such pill shown lately", http.StatusConflict)
+		return
+	}
 	robotWriteJSON(w, map[string]string{"answer": answer})
 }

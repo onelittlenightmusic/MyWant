@@ -20,6 +20,8 @@ func TestAnswerConstellationsAreTheWants(t *testing.T) {
 	s.thingLabels = &ThingLabelStore{mwlabels.NewFileStore(filepath.Join(dir, "memo-labels.yaml"))}
 	wantID := robotArchiveTestWant(t, s, "golf", nil, map[string]any{"service_time": 0.1})
 	a1, a2 := wantID+answerSep+"k1", wantID+answerSep+"k2"
+	// Named after the want's type (its first alias), else the want.
+	hub, _ := s.wantHub(s.wantByID(wantID))
 
 	// The old way: a constellation per answer, the answer one of its members.
 	for _, m := range []string{a1, "photo-1"} {
@@ -31,7 +33,7 @@ func TestAnswerConstellationsAreTheWants(t *testing.T) {
 	}
 	s.migrateAnswerConstellations()
 
-	if got := s.membersOfConstellation("thing", "golf"); !sameSet(got, []string{"photo-1", "photo-2", "photo-3"}) {
+	if got := s.membersOfConstellation("thing", hub); !sameSet(got, []string{"photo-1", "photo-2", "photo-3"}) {
 		t.Fatalf("the want's constellation = %v", got)
 	}
 	for _, old := range []string{"golf 10.11 09:00", "golf 10.17 13:00"} {
@@ -41,14 +43,14 @@ func TestAnswerConstellationsAreTheWants(t *testing.T) {
 	}
 	marks := map[string]string{"photo-1": "k1", "photo-2": "k2", "photo-3": "k2"}
 	for id, key := range marks {
-		if got := s.thingLabels.Get(id)[constellationAnswerKey("golf")]; got != key {
+		if got := s.thingLabels.Get(id)[constellationAnswerKey(hub)]; got != key {
 			t.Errorf("%s marked %q, want %q", id, got, key)
 		}
 	}
 	// The hub is a member too.
-	waitFor(t, func() bool { return sameSet(s.membersOfConstellation("want", "golf"), []string{wantID}) },
+	waitFor(t, func() bool { return sameSet(s.membersOfConstellation("want", hub), []string{wantID}) },
 		"the want a member of its constellation")
-	if got := s.anyConstellationCapture("golf"); got != wantID {
+	if got := s.anyConstellationCapture(hub); got != wantID {
 		t.Errorf("hub = %q, want the want", got)
 	}
 	joined := s.answerMembers()
@@ -57,16 +59,16 @@ func TestAnswerConstellationsAreTheWants(t *testing.T) {
 	}
 
 	// A wire from an answer ball to a thing: into the want's, marked.
-	if hub, ok := s.joinAnswersIn([]string{a1, "photo-4"}); !ok || hub != "golf" {
-		t.Fatalf("joinAnswersIn = %q %v", hub, ok)
+	if got, ok := s.joinAnswersIn([]string{a1, "photo-4"}); !ok || got != hub {
+		t.Fatalf("joinAnswersIn = %q %v, want %q", got, ok, hub)
 	}
-	if got := s.thingLabels.Get("photo-4")[constellationAnswerKey("golf")]; got != "k1" {
+	if got := s.thingLabels.Get("photo-4")[constellationAnswerKey(hub)]; got != "k1" {
 		t.Errorf("photo-4 marked %q", got)
 	}
 
 	// Leaving takes the mark; a rename carries it.
-	s.setConstellationMembership("thing", "golf", "photo-4", false)
-	if got := s.thingLabels.Get("photo-4")[constellationAnswerKey("golf")]; got != "" {
+	s.setConstellationMembership("thing", hub, "photo-4", false)
+	if got := s.thingLabels.Get("photo-4")[constellationAnswerKey(hub)]; got != "" {
 		t.Errorf("left, still marked %q", got)
 	}
 }

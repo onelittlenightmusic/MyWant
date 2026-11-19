@@ -69,7 +69,11 @@ type offerCandidate struct {
 	Want string
 	Text string // what Laya reads
 	Ask  string // what the robot says
-	run  func(s *Server) (string, error)
+	Pill string // the same, as a pill in the chat (robot_suggest.go)
+	// The want it is about, when there is one, and its type — what a client
+	// draws its pill with (its icon, its colour).
+	WantID, Type string
+	run          func(s *Server) (string, error)
 }
 
 type pendingOffer struct {
@@ -118,21 +122,26 @@ func (s *Server) offerCandidates(sit initiativeSituation) []offerCandidate {
 	// Where the person goes at this time of day (character_home.go): a want
 	// there, or one already there run again. In place of the same want's plain
 	// restart, so the two are not weighed against each other.
-	homes := s.offerHomes(newestCursorCharacter(), time.Now())
-	if len(homes) > 0 {
-		replaced := map[string]bool{}
-		for _, h := range homes {
-			replaced["restart:"+h.Want] = true
-		}
-		kept := out[:0]
-		for _, c := range out {
-			if !replaced[c.Key] {
-				kept = append(kept, c)
-			}
-		}
-		out = append(kept, homes...)
+	return withHomes(out, s.offerHomes(newestCursorCharacter(), time.Now()))
+}
+
+// withHomes adds the home candidates, each in place of its want's plain
+// restart.
+func withHomes(out, homes []offerCandidate) []offerCandidate {
+	if len(homes) == 0 {
+		return out
 	}
-	return out
+	replaced := map[string]bool{}
+	for _, h := range homes {
+		replaced["restart:"+h.Want] = true
+	}
+	kept := out[:0]
+	for _, c := range out {
+		if !replaced[c.Key] {
+			kept = append(kept, c)
+		}
+	}
+	return append(kept, homes...)
 }
 
 // offerRestart is running w again, as a candidate: the same words whether it
@@ -155,7 +164,8 @@ func (s *Server) offerRestart(w *mywant.Want, own bool) offerCandidate {
 		ask = fmt.Sprintf("「%s」をもう一度調べましょうか？", name)
 	}
 	return offerCandidate{
-		Key: "restart:" + name, Want: name, Text: text, Ask: ask,
+		Key: "restart:" + name, Want: name, Text: text, Ask: ask, Pill: fmt.Sprintf("「%s」を最新に", name),
+		WantID: w.Metadata.ID, Type: w.Metadata.Type,
 		run: func(s *Server) (string, error) {
 			return s.useCapability(map[string]string{"capability": "restart", "want": name})
 		},
@@ -244,6 +254,25 @@ func (s *Server) offerSeedRows() []map[string]any {
 				fits = fits || w.Metadata.Type == t
 			}
 			add(s.offerRestart(w, false), fits)
+		}
+	}
+	// The chat opened (robot_suggest.go), no news: the way to where the
+	// person goes fits its own part of the day, unless they are there.
+	for _, h := range offerHomeSeeds {
+		for _, p := range dayParts {
+			at := suggestEvent + offerNow(dayPartAt(p.Name, day))
+			add := func(near string, fits bool) {
+				gold := "skip"
+				if fits {
+					gold = "accept"
+				}
+				rows = append(rows, map[string]any{"state": at + "本人の近く: " + near + "。提案: " + h.text + "。",
+					"gold": map[string]string{offerQuestionID: gold}})
+			}
+			add(h.elsewhere, p.Name == h.part)
+			if p.Name == h.part {
+				add(h.place, false)
+			}
 		}
 	}
 	return rows
@@ -417,15 +446,23 @@ func (s *Server) robotOfferReply(said string) (string, bool) {
 		return "わかりました。やめておきます。", true
 	}
 	out, err := p.Cand.run(s)
+	return offerDone(p.Cand, out, err), true
+}
+
+// offerDone is what the robot says once a candidate taken up has been done.
+func offerDone(c offerCandidate, out string, err error) string {
 	if err != nil {
-		log.Printf("[offer] %s failed: %v", p.Cand.Key, err)
-		return fmt.Sprintf("「%s」でうまくいきませんでした：%v", p.Cand.Want, err), true
+		log.Printf("[offer] %s failed: %v", c.Key, err)
+		return fmt.Sprintf("「%s」でうまくいきませんでした：%v", c.Want, err)
 	}
-	log.Printf("[offer] %s accepted", p.Cand.Key)
-	if strings.HasPrefix(p.Cand.Key, "restart:") {
-		return fmt.Sprintf("「%s」をもう一度実行しました。新しい結果が出たらお知らせします。", p.Cand.Want), true
+	log.Printf("[offer] %s accepted", c.Key)
+	switch {
+	case strings.HasPrefix(c.Key, "restart:"):
+		return fmt.Sprintf("「%s」をもう一度実行しました。新しい結果が出たらお知らせします。", c.Want)
+	case strings.HasPrefix(c.Key, "home:"):
+		return firstLine(out, 160)
 	}
-	return fmt.Sprintf("「%s」で調べました。%s", p.Cand.Want, firstLine(out, 160)), true
+	return fmt.Sprintf("「%s」で調べました。%s", c.Want, firstLine(out, 160))
 }
 
 // robotOfferExpire labels an offer nobody answered as skipped, once it is old;

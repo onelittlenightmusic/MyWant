@@ -555,7 +555,9 @@ func (s *Server) offerHomes(who string, now time.Time) []offerCandidate {
 				name := there.Metadata.Name
 				out = append(out, offerCandidate{
 					Key: "home:" + h.Part + ":" + name, Want: name, Text: text,
-					Ask: fmt.Sprintf("いつもの%sを最新にしましょうか？", what),
+					Ask:    fmt.Sprintf("いつもの%sを最新にしましょうか？", what),
+					Pill:   fmt.Sprintf("いつもの%sを最新に", what),
+					WantID: there.Metadata.ID, Type: typ,
 					run: func(s *Server) (string, error) {
 						return s.useCapability(map[string]string{"capability": "restart", "want": name})
 					},
@@ -565,7 +567,8 @@ func (s *Server) offerHomes(who string, now time.Time) []offerCandidate {
 			typ, params := typ, word.Param+"="+word.Value
 			out = append(out, offerCandidate{
 				Key: "home:" + h.Part + ":" + typ, Want: typ, Text: text,
-				Ask: fmt.Sprintf("いつもの%sを調べましょうか？", what),
+				Ask:  fmt.Sprintf("いつもの%sを調べましょうか？", what),
+				Pill: "いつもの" + what, Type: typ,
 				run: func(s *Server) (string, error) {
 					return s.robotDeployWant(map[string]string{"type": typ, "params": params})
 				},
