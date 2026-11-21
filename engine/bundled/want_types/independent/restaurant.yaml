@@ -14,6 +14,15 @@ wantType:
       # indistinguishable from every other travel type at a glance.
       type-icon: UtensilsCrossed
   finalResultField: reservation_name
+
+  # When it tells of its answer, besides the standard timing "answer": cancelled: the reservation was cancelled.
+  timings:
+    - name: cancelled
+      description: キャンセルされたとき
+      if: cancelled
+      onChange: cancelled
+      murmur: true
+      notify: true
   parameters:
   - name: restaurant_type
     description: Type of restaurant cuisine or service style

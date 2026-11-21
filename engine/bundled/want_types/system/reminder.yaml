@@ -20,6 +20,15 @@ wantType:
       type-icon: BellRing
   finalResultField: reaction_result
 
+  # When it tells of its answer, besides the standard timing "answer": timed_out: it ran out with nobody answering.
+  timings:
+    - name: timed_out
+      description: 反応が無いまま時間切れになったとき
+      if: timeout
+      onChange: timeout
+      murmur: true
+      notify: true
+
   parameters:
   - name: message
     description: Reminder message to display

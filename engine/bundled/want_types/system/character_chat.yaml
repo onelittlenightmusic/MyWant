@@ -33,6 +33,21 @@ wantType:
       # finds something to open.
       list-visible: "false"
 
+  # Its answer, one kept each time it changes, so the moments below
+  # can be told of.
+  finalResultField: cc_latest_message
+  # When it tells of its answer, besides the standard timing "answer": new_message: one more said (not every edit told: answer off).
+  timings:
+    - name: answer
+      description: 新しい結果が出たとき（毎回は知らせない）
+      murmur: false
+      notify: false
+    - name: new_message
+      description: メッセージが増えたとき
+      onIncrease: cc_message_count
+      murmur: true
+      notify: false
+
   parameters:
   - name: character_id
     description: The character this chat belongs to. Set when the want is created alongside the character.

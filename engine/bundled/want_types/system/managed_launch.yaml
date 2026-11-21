@@ -21,6 +21,14 @@ wantType:
 
   finalResultField: launch_summary
 
+  # When it tells of its answer, besides the standard timing "answer": restarted: its process came up again (it fell and was brought back).
+  timings:
+    - name: restarted
+      description: プロセスが起動し直したとき（落ちて復帰した）
+      onChange: process_pid
+      murmur: true
+      notify: true
+
   onInitialize:
     params:
       launch_type: launcher

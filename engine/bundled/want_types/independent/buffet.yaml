@@ -24,6 +24,15 @@ wantType:
       child-role: doer
       type-tone-color: "#c8a035"
   finalResultField: reservation_name
+
+  # When it tells of its answer, besides the standard timing "answer": cancelled: the reservation was cancelled.
+  timings:
+    - name: cancelled
+      description: キャンセルされたとき
+      if: cancelled
+      onChange: cancelled
+      murmur: true
+      notify: true
   parameters:
   - name: buffet_type
     description: Type of breakfast buffet (continental, full, asian, vegetarian)

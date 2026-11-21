@@ -22,6 +22,20 @@ wantType:
       child-role: doer
       type-tone-color: "#5b8fce"
   finalResultField: reservation_name
+
+  # When it tells of its answer, besides the standard timing "answer": cancelled; status_changed: its status moved (another entry in its history).
+  timings:
+    - name: cancelled
+      description: キャンセルされたとき
+      if: cancelled
+      onChange: cancelled
+      murmur: true
+      notify: true
+    - name: status_changed
+      description: 運航状況が変わったとき
+      onIncrease: status_change_history_count
+      murmur: true
+      notify: true
   parameters:
   - name: flight_type
     description: Flight class (economy, business, first)

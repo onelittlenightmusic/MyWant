@@ -24,6 +24,15 @@ wantType:
       child-role: doer
       type-tone-color: "#8b7355"
   finalResultField: reservation_name
+
+  # When it tells of its answer, besides the standard timing "answer": cancelled: the reservation was cancelled.
+  timings:
+    - name: cancelled
+      description: キャンセルされたとき
+      if: cancelled
+      onChange: cancelled
+      murmur: true
+      notify: true
   parameters:
   - name: hotel_type
     description: Classification of hotel (standard, luxury, budget, boutique)

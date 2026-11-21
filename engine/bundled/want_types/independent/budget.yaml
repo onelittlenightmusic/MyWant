@@ -11,6 +11,15 @@ wantType:
       child-role: thinker
       type-icon: Wallet
   finalResultField: budget_summary
+
+  # When it tells of its answer, besides the standard timing "answer": exceeded: the budget went over.
+  timings:
+    - name: exceeded
+      description: 予算を超えたとき
+      if: budget_exceeded
+      onChange: budget_exceeded
+      murmur: true
+      notify: true
   parameters:
   - name: budget
     description: Total budget amount

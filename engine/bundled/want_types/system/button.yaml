@@ -10,6 +10,21 @@ wantType:
       aliases: "button,ボタン"
       riffable: source
       user-control: "true"
+  # Its answer, one kept each time it changes, so the moments below
+  # can be told of.
+  finalResultField: pressed_count
+  # When it tells of its answer, besides the standard timing "answer": pressed: pressed once more (answer off: the count is the answer).
+  timings:
+    - name: answer
+      description: 新しい結果が出たとき（毎回は知らせない）
+      murmur: false
+      notify: false
+    - name: pressed
+      description: 押されたとき
+      onIncrease: pressed_count
+      murmur: true
+      notify: false
+
   parameters:
   - name: label
     description: Text displayed on the button face
