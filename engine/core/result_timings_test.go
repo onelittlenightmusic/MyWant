@@ -54,16 +54,18 @@ func waitFor(ok func() bool) {
 	}
 }
 
+// Every new answer comes at the standard timing (answer) first; one said
+// with no new answer does not.
 func TestAnswersComeAtTheirTypesTimings(t *testing.T) {
 	defer func() { OnWantOutput = nil }()
 	_, play := timingsTestWant(nil)
-	if got := join(play("a1", "A")); got != "track album" {
+	if got := join(play("a1", "A")); got != "answer track album" {
 		t.Errorf("first song: %q", got)
 	}
-	if got := join(play("a2", "A")); got != "track" {
+	if got := join(play("a2", "A")); got != "answer track" {
 		t.Errorf("same album: %q", got)
 	}
-	if got := join(play("b1", "B", "liked")); got != "track album liked" {
+	if got := join(play("b1", "B", "liked")); got != "answer track album liked" {
 		t.Errorf("new album, said liked: %q", got)
 	}
 	// Said with no new answer: told of with the answer it has.

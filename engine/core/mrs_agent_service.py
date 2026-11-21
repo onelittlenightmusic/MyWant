@@ -109,6 +109,12 @@ class _ThreadArgv(list):
         return list(self._cur())
 
 
+# The lines a script says something with rather than answers (mrs_sdk.go's
+# mrsDirective, and progress). One missing here is taken for the answer and
+# lost under the real one — as _timing, _wake_at and _memo were.
+_DIRECTIVE_KEYS = frozenset(("_progress", "_control", "_tile", "_timing", "_wake_at", "_memo"))
+
+
 class _Output(io.TextIOBase):
     """One request's stdout, read the way the engine reads a spawn's: a stream of
     JSON objects, not necessarily one per line."""
@@ -145,9 +151,9 @@ class _Output(io.TextIOBase):
                 return
             self._buf = text[end:]
             # Progress, and what a script says about its own want (stop
-            # itself, move its own tile): sent back as they come, never the
-            # result.
-            if isinstance(obj, dict) and ("_progress" in obj or "_control" in obj or "_tile" in obj):
+            # itself, move its own tile, its timing, its wake, its memo — the
+            # engine's mrsDirective): sent back as they come, never the result.
+            if isinstance(obj, dict) and _DIRECTIVE_KEYS.intersection(obj):
                 self._send_progress(obj)
             elif isinstance(obj, dict):
                 self.result = obj

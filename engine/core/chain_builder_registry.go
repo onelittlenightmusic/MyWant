@@ -71,6 +71,7 @@ func (cb *ChainBuilder) StoreWantTypeDefinition(def *WantTypeDefinition) {
 		cb.wantTypeDefinitions = make(map[string]*WantTypeDefinition)
 	}
 
+	withStandardTimings(def)
 	wantType := def.Metadata.Name
 	cb.wantTypeDefinitions[wantType] = def
 

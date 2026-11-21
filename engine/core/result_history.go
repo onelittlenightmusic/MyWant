@@ -194,7 +194,8 @@ func (n *Want) recordResultHistory() {
 	if prev != nil && sameAnswerResult(prev.Result, entry.Result) {
 		return
 	}
-	entry.Timings = withTimings(n.answerTimings(fields, prev), n.takeTimings())
+	// A new answer: the standard timing, then the type's own it came at.
+	entry.Timings = withTimings(append([]string{AnswerTiming}, n.answerTimings(fields, prev)...), n.takeTimings())
 	told = true
 	go OnWantOutput(n, entry)
 }

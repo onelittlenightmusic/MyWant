@@ -47,13 +47,15 @@ class Want:
 
     def __init__(self, id: str, name: str = "", *, type: str = "", state: Optional[dict] = None,
                  params: Optional[dict] = None, labels: Optional[dict] = None,
-                 server: Optional[Client] = None, out=None):
+                 server: Optional[Client] = None, out=None, memo: Optional[dict] = None):
         self.id = id
         self.name = name
         self.type = type
         self.state = dict(state or {})
         self.params = dict(params or {})
         self.labels = dict(labels or {})
+        # What it kept for this run on the last one (remember).
+        self.memo = dict(memo or {})
         self.server = server or Client()
         self._out = out
         self._answer: dict = {}
@@ -90,6 +92,15 @@ class Want:
         want murmurs and notifies at it as it was set to (labels murmur /
         notify)."""
         self._emit({"_timing": str(name)})
+
+    def remember(self, **kept) -> None:
+        """Keep these for its next run, where they come back in `memo` —
+        nothing to declare in its type. A value of None lets one go."""
+        self.memo.update({k: v for k, v in kept.items() if v is not None})
+        for k, v in kept.items():
+            if v is None:
+                self.memo.pop(k, None)
+        self._emit({"_memo": kept})
 
     def wake_at(self, when) -> None:
         """Run its Progress again at a time of its own, once (a datetime with
@@ -138,6 +149,7 @@ def _enter(context: dict, out=None) -> Want:
         server=Client(srv.get("url"), token=srv.get("token"),
                       username=srv.get("username"), password=srv.get("password")),
         out=out,
+        memo=context.get("memo"),
     )
     _local.want = w
     return w
@@ -167,4 +179,5 @@ def _from_env() -> Want:
         params=_json_env("MYWANT_WANT_PARAMS"),
         labels=_json_env("MYWANT_WANT_LABELS"),
         server=Client(),
+        memo=_json_env("MYWANT_WANT_MEMO"),
     )

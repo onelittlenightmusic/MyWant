@@ -321,6 +321,10 @@ func (p *residentProc) request(ctx context.Context, opt MRSRunOptions) (map[stri
 	if len(opt.Args) > 0 {
 		req["args"] = opt.Args
 	}
+	// Its memo (a resident process outlives the state it started with).
+	if memo, ok := opt.Context["memo"]; ok {
+		req["memo"] = memo
+	}
 	line, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

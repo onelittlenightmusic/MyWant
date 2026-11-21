@@ -127,6 +127,7 @@ func mrsContextEnv(c map[string]any) []string {
 		"MYWANT_WANT_NAME=" + str("want_name"),
 		"MYWANT_WANT_TYPE=" + str("want_type"),
 		"MYWANT_WANT_STATE=" + js("state"),
+		"MYWANT_WANT_MEMO=" + js("memo"),
 		"MYWANT_WANT_PARAMS=" + js("params"),
 		"MYWANT_WANT_LABELS=" + js("labels"),
 	}
@@ -154,6 +155,7 @@ func MRSWantContext(want *Want) map[string]any {
 		"want_name": md.Name,
 		"want_type": md.Type,
 		"state":     want.GetAllState(),
+		"memo":      wantMemo(want),
 		"params":    params,
 		"labels":    md.Labels,
 		"server":    map[string]any{"url": PluginServerURL},
@@ -167,7 +169,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 	_, tile := obj["_tile"]
 	_, timing := obj["_timing"]
 	_, wake := obj["_wake_at"]
-	if !control && !tile && !timing && !wake {
+	_, memo := obj["_memo"]
+	if !control && !tile && !timing && !wake && !memo {
 		return false
 	}
 	if opt.OnDirective != nil {
@@ -179,7 +182,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 // MRSApplyDirective does what a plugin script asked of its own want: stop
 // itself ("_control": "suspend"), move its own tile ("_tile": {x, y}), or say
 // its answer came at a timing ("_timing": "album"), or run again at a time
-// ("_wake_at": "2026-11-21T18:45:00+09:00").
+// ("_wake_at": "2026-11-21T18:45:00+09:00"), or keep something for its next
+// run ("_memo": {"soon_told": "…"}).
 // Only ever that want — nothing in the line names another.
 func MRSApplyDirective(want *Want, obj map[string]any) {
 	if c, _ := obj["_control"].(string); c != "" {
@@ -221,6 +225,11 @@ func MRSApplyDirective(want *Want, obj map[string]any) {
 			want.StoreLog("[MRS] _wake_at %q is not RFC3339; ignored", w)
 		}
 	}
+	// What it keeps for its next run (a dict merged into its memo; a key
+	// set to null is let go) — handed back in MYWANT_WANT_MEMO.
+	if m, ok := obj["_memo"].(map[string]any); ok {
+		rememberMemo(want, m)
+	}
 	if t, ok := obj["_tile"].(map[string]any); ok {
 		cb := GetGlobalChainBuilder()
 		x, okX := t["x"].(float64)
@@ -231,3 +240,35 @@ func MRSApplyDirective(want *Want, obj map[string]any) {
 		}
 	}
 }
+
+// MemoState is the state field a want keeps its plugin's memo in: what the
+// script asked to have back on its next run ({"_memo": {…}}), with nothing to
+// declare in the type — not one of its fields, so a restart leaves it.
+const MemoState = "memo"
+
+// wantMemo is the want's memo, a copy; empty when it has none.
+func wantMemo(want *Want) map[string]any {
+	out := map[string]any{}
+	if v, ok := want.State.Load(MemoState); ok {
+		if m, ok := v.(map[string]any); ok {
+			for k, x := range m {
+				out[k] = x
+			}
+		}
+	}
+	return out
+}
+
+// rememberMemo merges m into the want's memo: a key set to null is let go.
+func rememberMemo(want *Want, m map[string]any) {
+	memo := wantMemo(want)
+	for k, v := range m {
+		if v == nil {
+			delete(memo, k)
+		} else {
+			memo[k] = v
+		}
+	}
+	want.StoreState(MemoState, memo)
+}
+

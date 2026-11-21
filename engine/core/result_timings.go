@@ -144,6 +144,32 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 	return at
 }
 
+// AnswerTiming is the standard timing every type with timings has, declared
+// or not: a new answer — what every answer told of before there were
+// timings. A type's own timings come on top of it, so declaring "soon" does
+// not silence the answers that told of themselves until then; a type that
+// tells of only some of its answers (a player's album, not each song)
+// declares it with murmur and notify off.
+const AnswerTiming = "answer"
+
+// withStandardTimings gives a type that names timings the standard one
+// (AnswerTiming) first, telling of every new answer, unless it declares it
+// itself. A type with no timings is left as it is: it tells of every answer
+// anyway.
+func withStandardTimings(def *WantTypeDefinition) {
+	if def == nil || len(def.Timings) == 0 {
+		return
+	}
+	for _, d := range def.Timings {
+		if d.Name == AnswerTiming {
+			return
+		}
+	}
+	def.Timings = append([]TimingDef{{
+		Name: AnswerTiming, Description: "新しい結果が出たとき", Murmur: true, Notify: true,
+	}}, def.Timings...)
+}
+
 // HasTimings: its type names timings to tell of its answers at.
 func (n *Want) HasTimings() bool { return len(n.typeTimings()) > 0 }
 

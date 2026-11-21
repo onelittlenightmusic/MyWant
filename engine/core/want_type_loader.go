@@ -268,6 +268,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 
 		// Register definition
 		w.warnFinalizeGates(def)
+		withStandardTimings(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptBundled(filePath))
@@ -356,6 +357,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 		}
 		w.mergePredefinedState(def)
 		w.warnFinalizeGates(def)
+		withStandardTimings(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(path)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptEmbedded(fsys, path))
@@ -432,6 +434,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		}
 		w.mergePredefinedState(def)
 		w.warnFinalizeGates(def)
+		withStandardTimings(def)
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = resolver.forCustomFile(dir, path, data)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptOnDisk(path, true))
@@ -700,6 +703,7 @@ func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.warnFinalizeGates(def)
+	withStandardTimings(def)
 	w.definitions[def.Metadata.Name] = def
 	w.origins[def.Metadata.Name] = WantTypeOrigin{Kind: WantTypeOriginAPI, Version: def.Metadata.Version}
 	w.setVoiceScript(def.Metadata.Name, "")

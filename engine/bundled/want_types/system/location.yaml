@@ -20,6 +20,12 @@ wantType:
   # When it tells of an answer (the engine's timings, core/result_timings.go):
   # a want chooses which it murmurs and notifies at (labels murmur / notify).
   timings:
+    # Only the moments below are news: not every answer (the standard
+    # timing "answer" turned off).
+    - name: answer
+      description: 新しい結果が出たとき（毎回は知らせない）
+      murmur: false
+      notify: false
     - name: arrival
       description: 保存した場所の近くに来たとき
       if: near_place
