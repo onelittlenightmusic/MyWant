@@ -34,6 +34,10 @@ type HeardMurmur struct {
 	// Labels: what it is about in set words — MurmurLabelTime, MurmurLabelPlace.
 	Labels map[string]string `json:"labels,omitempty"`
 	At     time.Time         `json:"at"`
+	// What changed in the answer it told (want_change.go), and the advice its
+	// type gave on it (want_advice.go).
+	Change []Change `json:"change,omitempty"`
+	Advice []Advice `json:"advice,omitempty"`
 	// Meaning: what Hear was asked to find in it ("when", "where", …), each
 	// with how likely each candidate is — its labels' when it has them.
 	Meaning map[string]HeardChoice `json:"meaning,omitempty"`
@@ -162,6 +166,7 @@ func heardForScript(wantID string) []map[string]any {
 			"murmur_id": m.MurmurID, "from_want_id": m.FromID, "from_want_name": m.FromName,
 			"from_want_type": m.FromType, "timings": m.Timings, "text": m.Text,
 			"result": m.Result, "fields": m.Fields, "labels": m.Labels, "at": m.At.Format(time.RFC3339),
+			"change": m.Change, "advice": m.Advice,
 		})
 	}
 	return out

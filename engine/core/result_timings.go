@@ -87,14 +87,15 @@ func withTimings(a, b []string) []string {
 	return out
 }
 
-// answerTimings is the type's timings this answer comes at, and remembers
-// each watched field's value (onChange, onIncrease, onDecrease) for the next.
-// The first time (a restart), the values before are those of prev, the
-// answer kept before it.
-func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []string {
+// answerTimings is the type's timings this answer comes at, with what changed
+// in the fields they compared (want_change.go), and remembers each watched
+// field's value (onChange, onIncrease, onDecrease) for the next. The first
+// time (a restart), the values before are those of prev, the answer kept
+// before it.
+func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([]string, []Change) {
 	defs := n.typeTimings()
 	if len(defs) == 0 {
-		return nil
+		return nil, nil
 	}
 	read := func(field string) any {
 		if v, ok := fields[field]; ok {
@@ -131,6 +132,8 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 		return v
 	}
 	var at []string
+	var changes []Change
+	changed := map[string]bool{}
 	for _, d := range defs {
 		if d.If == "" && len(watchedFields(d)) == 0 {
 			continue // said only by the want itself (Timing)
@@ -148,6 +151,16 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 			continue
 		}
 		at = append(at, d.Name)
+		for _, f := range watchedFields(d) {
+			if changed[f] {
+				continue
+			}
+			list := f == d.OnIncrease || f == d.OnDecrease
+			if c := fieldChange(f, n.timingSeen[f], value(f), list); c != nil {
+				changed[f] = true
+				changes = append(changes, *c)
+			}
+		}
 	}
 	// Every watched field is read and kept, whether or not its timing held.
 	for _, d := range defs {
@@ -155,7 +168,7 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 			n.timingSeen[f] = value(f)
 		}
 	}
-	return at
+	return at, changes
 }
 
 // watchedFields are the fields a timing compares with their value at the

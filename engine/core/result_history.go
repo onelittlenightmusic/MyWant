@@ -67,6 +67,11 @@ type ResultHistoryEntry struct {
 	// The rest of the answer — the fields the type publishes or keeps, as they
 	// stood when this answer arrived. See answerFields.
 	Fields map[string]any `json:"fields,omitempty" yaml:"fields,omitempty"`
+	// What changed at the timings it came at (want_change.go), and the
+	// advice its type's advisor gave on it (want_advice.go) — told with it
+	// to the wants that hear it.
+	Change []Change `json:"change,omitempty" yaml:"change,omitempty"`
+	Advice []Advice `json:"advice,omitempty" yaml:"advice,omitempty"`
 	// The type's timings it came at (result_timings.go): what the want tells
 	// of it by.
 	Timings []string `json:"timings,omitempty" yaml:"timings,omitempty"`
@@ -195,7 +200,9 @@ func (n *Want) recordResultHistory() {
 		return
 	}
 	// A new answer: the standard timing, then the type's own it came at.
-	entry.Timings = withTimings(append([]string{AnswerTiming}, n.answerTimings(fields, prev)...), n.takeTimings())
+	timings, changes := n.answerTimings(fields, prev)
+	entry.Timings = withTimings(append([]string{AnswerTiming}, timings...), n.takeTimings())
+	entry.Change = changes
 	told = true
 	go OnWantOutput(n, entry)
 }

@@ -50,6 +50,12 @@ func (s *Server) RegisterOutputCallback() {
 		if !tell.Murmur && !tell.Notify {
 			return
 		}
+		// Its type's advice on it (want_advice.go), told with it.
+		{
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			out.Advice = mywant.AdviceOn(ctx, w, out, s.sideScript(mywant.SideScriptAdvice, w.Metadata.Type))
+			cancel()
+		}
 		voiced := s.newsVoiceLine(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
 		msg, mood := voiced.Say, voiced.Mood
 		// One id for the murmur and the notice of the same answer: what a

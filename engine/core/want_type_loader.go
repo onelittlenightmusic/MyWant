@@ -80,10 +80,11 @@ type WantTypeLoader struct {
 	// warnedGates remembers which finalize-gate notes have already been said,
 	// so a reload does not say them again — see warnFinalizeGates.
 	warnedGates     map[string]bool
-	predefinedState []StateDef                // Common state fields merged into every want type
-	userCustomNames map[string]bool           // types loaded from ~/.mywant/custom-types/ (user-deletable)
-	origins         map[string]WantTypeOrigin // provenance by type name, see want_type_origin.go
-	voiceScripts    map[string]string         // voice script path by type name, see want_voice.go
+	predefinedState []StateDef                   // Common state fields merged into every want type
+	userCustomNames map[string]bool              // types loaded from ~/.mywant/custom-types/ (user-deletable)
+	origins         map[string]WantTypeOrigin    // provenance by type name, see want_type_origin.go
+	voiceScripts    map[string]string            // voice script path by type name, see want_voice.go
+	sideScripts     map[string]map[string]string // side scripts (advice, hear) by kind, then type, see want_side_scripts.go
 }
 
 // PredefinedStateFile is the special YAML file containing common state fields
@@ -109,6 +110,7 @@ func NewWantTypeLoader(directory string) *WantTypeLoader {
 		userCustomNames: make(map[string]bool),
 		origins:         make(map[string]WantTypeOrigin),
 		voiceScripts:    make(map[string]string),
+		sideScripts:     make(map[string]map[string]string),
 	}
 }
 
@@ -272,6 +274,7 @@ func (w *WantTypeLoader) LoadAllWantTypes() error {
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(filePath)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptBundled(filePath))
+		w.setSideScripts(def.Metadata.Name, func(kind string) string { return sideScriptBundled(filePath, kind) })
 		w.indexGlobalParams(def)
 
 		// Index by category
@@ -361,6 +364,7 @@ func (w *WantTypeLoader) loadAllFromFS(fsys fs.FS) error {
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = bundledOrigin(path)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptEmbedded(fsys, path))
+		w.setSideScripts(def.Metadata.Name, func(kind string) string { return sideScriptEmbedded(fsys, path, kind) })
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
 		w.byPattern[def.Metadata.Pattern] = append(w.byPattern[def.Metadata.Pattern], def)
@@ -438,6 +442,7 @@ func (w *WantTypeLoader) loadUserCustomTypes() {
 		w.definitions[def.Metadata.Name] = def
 		w.origins[def.Metadata.Name] = resolver.forCustomFile(dir, path, data)
 		w.setVoiceScript(def.Metadata.Name, voiceScriptOnDisk(path, true))
+		w.setSideScripts(def.Metadata.Name, func(kind string) string { return sideScriptOnDisk(path, kind, true) })
 		w.userCustomNames[def.Metadata.Name] = true
 		w.indexGlobalParams(def)
 		w.byCategory[def.Metadata.Category] = append(w.byCategory[def.Metadata.Category], def)
@@ -707,6 +712,7 @@ func (w *WantTypeLoader) RegisterDefinition(def *WantTypeDefinition) {
 	w.definitions[def.Metadata.Name] = def
 	w.origins[def.Metadata.Name] = WantTypeOrigin{Kind: WantTypeOriginAPI, Version: def.Metadata.Version}
 	w.setVoiceScript(def.Metadata.Name, "")
+	w.setSideScripts(def.Metadata.Name, nil)
 	w.indexGlobalParams(def)
 }
 

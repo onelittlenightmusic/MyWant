@@ -93,8 +93,14 @@ func (s *ScriptableWant) Initialize() {
 				// deleting whatever the user had checked off. A param is only
 				// ever meant to seed a persistent field once, at creation; a
 				// restart is not a creation.
-				if _, isStateDefined := labels[k]; isStateDefined && !persistent[k] {
-					s.SetCurrent(k, v)
+				// It seeds a persistent field only while the want is new —
+				// the field still empty and no answer ever kept (answers come
+				// back before Initialize, chain_builder.go): a list emptied by
+				// hand has kept that as an answer, and a restart leaves it.
+				if _, isStateDefined := labels[k]; isStateDefined {
+					if !persistent[k] || s.seedsPersistent(k) {
+						s.SetCurrent(k, v)
+					}
 				}
 			}
 		}
@@ -486,4 +492,14 @@ func defaultInterval(agentType string, intervalSec int) time.Duration {
 	default: // "think"
 		return 2 * time.Second
 	}
+}
+
+// seedsPersistent says whether a persistent field is still to be seeded from
+// its param: the want is new (no answer kept) and the field holds nothing.
+func (s *ScriptableWant) seedsPersistent(k string) bool {
+	if len(s.ResultHistoryEntries()) > 0 {
+		return false
+	}
+	v, ok := s.getState(k)
+	return !ok || isEmptyAnswer(v)
 }

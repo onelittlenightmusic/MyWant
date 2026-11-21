@@ -61,6 +61,7 @@ func (s *Server) hearMurmur(src *mywant.Want, murmurID, text string, out mywant.
 			m := mywant.HeardMurmur{
 				MurmurID: murmurID, FromID: src.Metadata.ID, FromName: src.Metadata.Name, FromType: srcType,
 				Timings: out.Timings, Text: text, Result: out.Result, Fields: out.Fields, Labels: labels, At: time.Now(),
+				Change: out.Change, Advice: out.Advice,
 			}
 			mywant.DeliverHeard(w.Metadata.ID, m)
 			c := wantConverse{From: src.Metadata.ID, To: w.Metadata.ID, MurmurID: murmurID, At: time.Now().Format(time.RFC3339)}
@@ -151,13 +152,70 @@ func (s *Server) answerHeard(id string, m mywant.HeardMurmur) {
 		s.noteReply(w, m, said)
 		return
 	}
-	line := s.heardVoice(w, m)
-	if line == "" {
-		return
+	// Its type's hearer (want_hearer.go): a line, and what it proposes — asked
+	// of the person, not done.
+	if script := s.sideScript(mywant.SideScriptHear, w.Metadata.Type); mywant.HasHearer(w.Metadata.Type, script) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		out := mywant.HearOn(ctx, w, m, script)
+		cancel()
+		if out.Say != "" {
+			s.sayInReply(w, m, out.Say)
+		}
+		if len(out.Proposals) > 0 {
+			// One at a time: the robot asks one question at once.
+			s.proposeToPerson(w, out.Proposals[0])
+		}
+		if out.Say != "" || len(out.Proposals) > 0 {
+			return
+		}
 	}
+	if line := s.heardVoice(w, m); line != "" {
+		s.sayInReply(w, m, line)
+	}
+}
+
+// sayInReply says the hearer's answer to a murmur, and keeps it.
+func (s *Server) sayInReply(w *mywant.Want, m mywant.HeardMurmur, line string) {
 	w.StoreState(mywant.SayReplyToState, m.MurmurID)
 	w.StoreState("say", line)
 	s.noteReply(w, m, line)
+}
+
+// sideScript is a type's side script of a kind (want_side_scripts.go), or "".
+func (s *Server) sideScript(kind, wantType string) string {
+	if s.wantTypeLoader == nil {
+		return ""
+	}
+	return s.wantTypeLoader.GetSideScript(kind, wantType)
+}
+
+// proposeToPerson asks the person whether the hearer may do what it proposes —
+// the robot's はい / いいえ (robot_offer.go): a yes does it, on the hearer.
+func (s *Server) proposeToPerson(w *mywant.Want, p mywant.Proposal) {
+	id, name := w.Metadata.ID, w.Metadata.Name
+	c := offerCandidate{
+		Key: "propose:" + id, Want: name, Ask: p.Ask, Pill: p.Ask, WantID: id, Type: w.Metadata.Type,
+		Done: fmt.Sprintf("「%s」に反映しました。", name),
+		run: func(s *Server) (string, error) {
+			target := s.findWantByIDInAll(id)
+			if target == nil {
+				return "", fmt.Errorf("「%s」が見つかりません", name)
+			}
+			if err := mywant.CarryOut(target, p); err != nil {
+				return "", err
+			}
+			if s.globalBuilder != nil {
+				s.globalBuilder.TriggerSave()
+			}
+			return "", nil
+		},
+	}
+	offerID := fmt.Sprintf("propose-%d", time.Now().UnixNano())
+	robotOffers.Lock()
+	robotOffers.pending = &pendingOffer{ID: offerID, Cand: c, At: time.Now(), Asked: p.Ask, Proposal: true}
+	robotOffers.Unlock()
+	s.showOffer(offerID, p.Ask)
+	s.sayTurnAnswer(p.Ask, nil, robotYesNo, "")
 }
 
 // noteReply keeps an answer to a murmur as a murmur of the hearer's own, its

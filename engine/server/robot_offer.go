@@ -73,7 +73,10 @@ type offerCandidate struct {
 	// The want it is about, when there is one, and its type — what a client
 	// draws its pill with (its icon, its colour).
 	WantID, Type string
-	run          func(s *Server) (string, error)
+	// Done is what the robot says once it is done, when the default words do
+	// not fit (a want's proposal, hear.go).
+	Done string
+	run  func(s *Server) (string, error)
 }
 
 type pendingOffer struct {
@@ -84,6 +87,9 @@ type pendingOffer struct {
 	// Injected: made after an event handed in through the API — a reply
 	// still teaches, silence does not (nobody may have been there).
 	Injected bool
+	// Proposal: a want's proposal on a murmur it heard (hear.go), not one of
+	// the robot's own offers — nothing Laya chose, so nothing to learn from.
+	Proposal bool
 }
 
 var robotOffers struct {
@@ -437,10 +443,12 @@ func (s *Server) robotOfferReply(said string) (string, bool) {
 	robotOffers.pending = nil
 	robotOffers.Unlock()
 	s.showOffer("", "")
-	_ = appendJSONLine(initiativeHomeFile("robot-initiative-labels.jsonl"), initiativeLabel{
-		ID: p.ID, At: time.Now().Format(time.RFC3339), By: "person",
-		Gold: map[string]string{offerQuestionID: kind}, Reason: "the person answered the offer: " + said,
-	})
+	if !p.Proposal {
+		_ = appendJSONLine(initiativeHomeFile("robot-initiative-labels.jsonl"), initiativeLabel{
+			ID: p.ID, At: time.Now().Format(time.RFC3339), By: "person",
+			Gold: map[string]string{offerQuestionID: kind}, Reason: "the person answered the offer: " + said,
+		})
+	}
 	if kind == "skip" {
 		log.Printf("[offer] %s declined", p.Cand.Key)
 		return "わかりました。やめておきます。", true
@@ -456,6 +464,9 @@ func offerDone(c offerCandidate, out string, err error) string {
 		return fmt.Sprintf("「%s」でうまくいきませんでした：%v", c.Want, err)
 	}
 	log.Printf("[offer] %s accepted", c.Key)
+	if c.Done != "" {
+		return c.Done
+	}
 	switch {
 	case strings.HasPrefix(c.Key, "restart:"):
 		return fmt.Sprintf("「%s」をもう一度実行しました。新しい結果が出たらお知らせします。", c.Want)
@@ -476,7 +487,7 @@ func robotOfferExpire(now time.Time) bool {
 	}
 	robotOffers.pending = nil
 	robotOffers.Unlock()
-	if p.Injected {
+	if p.Injected || p.Proposal {
 		return true
 	}
 	_ = appendJSONLine(initiativeHomeFile("robot-initiative-labels.jsonl"), initiativeLabel{

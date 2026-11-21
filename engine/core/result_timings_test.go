@@ -107,7 +107,8 @@ func TestTimingsOnIncreaseAndDecrease(t *testing.T) {
 		{Name: "up", OnIncrease: "count"},
 	}}}
 	answer := func(items []any, count any) string {
-		return join(w.answerTimings(map[string]any{"items": items, "count": count}, nil))
+		at, _ := w.answerTimings(map[string]any{"items": items, "count": count}, nil)
+		return join(at)
 	}
 	if got := answer([]any{"a"}, 1); got != "edited" {
 		t.Errorf("first answer: %q, want only edited (nothing before to grow from)", got)
@@ -133,7 +134,8 @@ func TestTimingsAfterARestartCompareWithTheAnswerBefore(t *testing.T) {
 	w := &Want{WantTypeDefinition: &WantTypeDefinition{Timings: []TimingDef{{Name: "added", OnIncrease: "items"}}}}
 	w.Spec.FinalResultField = "items"
 	prev := &ResultHistoryEntry{Result: []any{"a"}}
-	if got := join(w.answerTimings(map[string]any{"items": []any{"a", "b"}}, prev)); got != "added" {
+	if at, _ := w.answerTimings(map[string]any{"items": []any{"a", "b"}}, prev); join(at) != "added" {
+		got := join(at)
 		t.Errorf("first answer after a restart, an item added: %q", got)
 	}
 }
