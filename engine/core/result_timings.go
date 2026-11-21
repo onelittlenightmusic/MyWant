@@ -1,6 +1,9 @@
 package mywant
 
 import (
+	"encoding/json"
+	"reflect"
+	"strconv"
 	"strings"
 
 	want_spec "github.com/onelittlenightmusic/want-spec"
@@ -84,8 +87,9 @@ func withTimings(a, b []string) []string {
 }
 
 // answerTimings is the type's timings this answer comes at, and remembers
-// each onChange field's value for the next. The first time (a restart), the
-// values before are those of prev, the answer kept before it.
+// each watched field's value (onChange, onIncrease, onDecrease) for the next.
+// The first time (a restart), the values before are those of prev, the
+// answer kept before it.
 func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []string {
 	defs := n.typeTimings()
 	if len(defs) == 0 {
@@ -104,44 +108,99 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 		n.timingSeen = map[string]any{}
 		if prev != nil {
 			for _, d := range defs {
-				if d.OnChange != "" {
-					n.timingSeen[d.OnChange] = prev.Fields[d.OnChange]
+				for _, f := range watchedFields(d) {
+					n.timingSeen[f] = prev.Fields[f]
 				}
 			}
 		}
 	}
 	now := map[string]any{}
+	value := func(field string) any {
+		v, ok := now[field]
+		if !ok {
+			v = read(field)
+			now[field] = v
+		}
+		return v
+	}
 	var at []string
 	for _, d := range defs {
-		if d.If == "" && d.OnChange == "" {
+		if d.If == "" && len(watchedFields(d)) == 0 {
 			continue // said only by the want itself (Timing)
 		}
 		if d.If != "" && !truthyAnswerField(read(d.If)) {
 			continue
 		}
-		if d.OnChange != "" {
-			v, ok := now[d.OnChange]
-			if !ok {
-				v = read(d.OnChange)
-				now[d.OnChange] = v
-			}
-			if sameAnswerResult(n.timingSeen[d.OnChange], v) {
-				continue
-			}
+		if d.OnChange != "" && sameAnswerResult(n.timingSeen[d.OnChange], value(d.OnChange)) {
+			continue
+		}
+		if d.OnIncrease != "" && !grew(n.timingSeen[d.OnIncrease], value(d.OnIncrease), 1) {
+			continue
+		}
+		if d.OnDecrease != "" && !grew(n.timingSeen[d.OnDecrease], value(d.OnDecrease), -1) {
+			continue
 		}
 		at = append(at, d.Name)
 	}
-	// Every onChange field is read and kept, whether or not its timing held.
+	// Every watched field is read and kept, whether or not its timing held.
 	for _, d := range defs {
-		if d.OnChange == "" {
-			continue
+		for _, f := range watchedFields(d) {
+			n.timingSeen[f] = value(f)
 		}
-		if _, ok := now[d.OnChange]; !ok {
-			now[d.OnChange] = read(d.OnChange)
-		}
-		n.timingSeen[d.OnChange] = now[d.OnChange]
 	}
 	return at
+}
+
+// watchedFields are the fields a timing compares with their value at the
+// last answer.
+func watchedFields(d TimingDef) []string {
+	var out []string
+	for _, f := range []string{d.OnChange, d.OnIncrease, d.OnDecrease} {
+		if f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// grew says whether a field went the way asked (sign 1: up, -1: down) from
+// its value at the last answer — a number, or a list's length. With nothing
+// before to compare with (the first answer), or a value that is neither, it
+// did not: a want started again is not news that its list grew.
+func grew(before, now any, sign int) bool {
+	b, ok1 := answerMeasure(before)
+	a, ok2 := answerMeasure(now)
+	if !ok1 || !ok2 {
+		return false
+	}
+	return (a-b)*float64(sign) > 0
+}
+
+// answerMeasure is a field's size: a number as it is (or written as one), a
+// list as its length.
+func answerMeasure(v any) (float64, bool) {
+	switch x := v.(type) {
+	case nil:
+		return 0, false
+	case int:
+		return float64(x), true
+	case int64:
+		return float64(x), true
+	case float64:
+		return x, true
+	case float32:
+		return float64(x), true
+	case json.Number:
+		f, err := x.Float64()
+		return f, err == nil
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(x), 64)
+		return f, err == nil
+	}
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+		return float64(rv.Len()), true
+	}
+	return 0, false
 }
 
 // AnswerTiming is the standard timing every type with timings has, declared

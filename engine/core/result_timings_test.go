@@ -96,3 +96,32 @@ func TestAWantChoosesWhichTimingsItMurmursAndNotifiesAt(t *testing.T) {
 		t.Errorf("a type with no timings tells of every answer: %+v", tell)
 	}
 }
+
+// onIncrease / onDecrease: a list's length or a number, against the last
+// answer — not on the first, with nothing before it.
+func TestTimingsOnIncreaseAndDecrease(t *testing.T) {
+	w := &Want{WantTypeDefinition: &WantTypeDefinition{Timings: []TimingDef{
+		{Name: "added", OnIncrease: "items"},
+		{Name: "removed", OnDecrease: "items"},
+		{Name: "edited", OnChange: "items"},
+		{Name: "up", OnIncrease: "count"},
+	}}}
+	answer := func(items []any, count any) string {
+		return join(w.answerTimings(map[string]any{"items": items, "count": count}, nil))
+	}
+	if got := answer([]any{"a"}, 1); got != "edited" {
+		t.Errorf("first answer: %q, want only edited (nothing before to grow from)", got)
+	}
+	if got := answer([]any{"a", "b"}, 1); got != "added edited" {
+		t.Errorf("item added: %q", got)
+	}
+	if got := answer([]any{"a", "B"}, "3"); got != "edited up" {
+		t.Errorf("item edited, count up (as text): %q", got)
+	}
+	if got := answer([]any{"a"}, 2.0); got != "removed edited" {
+		t.Errorf("item gone, count down: %q", got)
+	}
+	if got := answer([]any{"a"}, 2.0); got != "" {
+		t.Errorf("nothing moved: %q", got)
+	}
+}

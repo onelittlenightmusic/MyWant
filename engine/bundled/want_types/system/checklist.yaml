@@ -17,6 +17,23 @@ wantType:
       form-style: notepad
       # A navy notebook cover — the surface paints the closed cover in this tone.
       type-tone-color: "#2b3a55"
+  # Its answer is its list: one kept each time it changes, so the moments
+  # below can be told of.
+  finalResultField: items
+  # Every edit is an answer, and not news (the standard timing "answer"
+  # turned off). added: an item put on the list; removed: one taken off.
+  timings:
+  - name: answer
+    description: リストが変わったとき（編集のたびには知らせない）
+    murmur: false
+    notify: false
+  - name: added
+    description: アイテムが追加されたとき
+    onIncrease: items
+    murmur: true
+  - name: removed
+    description: アイテムが削除されたとき
+    onDecrease: items
   parameters:
   - name: items
     description: Initial checklist lines, plain strings — each becomes an unchecked item
