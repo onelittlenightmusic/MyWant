@@ -1813,6 +1813,11 @@ func (s *Server) guiStateWithConfig(want *mywant.Want) map[string]any {
 	state[mywant.DeviceKeyHome] = d.HomeBrowserDevice
 	state[mywant.DeviceKeyActiveLocation] = d.ActiveLocationDevice
 	state[mywant.DeviceKeyLocationWant] = d.LocationWantID
+	noticesOff := d.NoticesOff
+	if noticesOff == nil {
+		noticesOff = []string{}
+	}
+	state[mywant.DeviceKeyNoticesOff] = noticesOff
 	return state
 }
 

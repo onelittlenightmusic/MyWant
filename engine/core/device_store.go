@@ -44,6 +44,9 @@ type DeviceSettings struct {
 	ActiveLocationDevice string `yaml:"activeLocationDevice,omitempty" json:"activeLocationDevice,omitempty"`
 	// LocationWantID is the want those geolocation updates are written to.
 	LocationWantID string `yaml:"locationWantId,omitempty" json:"locationWantId,omitempty"`
+	// NoticesOff are the devices that do not show a want's notices (its
+	// spec.voice.notify) as their notifications; every other device does.
+	NoticesOff []string `yaml:"noticesOff,omitempty" json:"noticesOff,omitempty"`
 }
 
 // The gui_state keys these settings are mirrored under, so that the one place
@@ -54,6 +57,7 @@ const (
 	DeviceKeyHome           = "homeBrowserDevice"
 	DeviceKeyActiveLocation = "activeLocationDevice"
 	DeviceKeyLocationWant   = "locationWantId"
+	DeviceKeyNoticesOff     = "noticesOff"
 	// DeviceKeyRoster is the live list of connected browsers. Not stored here
 	// (see the note above) — named only so it can be excluded from world
 	// snapshots with the rest.
@@ -63,7 +67,7 @@ const (
 // DeviceGUIStateKeys are every gui_state key that is about devices rather than
 // about a board.
 var DeviceGUIStateKeys = []string{
-	DeviceKeyHome, DeviceKeyActiveLocation, DeviceKeyLocationWant, DeviceKeyRoster,
+	DeviceKeyHome, DeviceKeyActiveLocation, DeviceKeyLocationWant, DeviceKeyNoticesOff, DeviceKeyRoster,
 }
 
 type deviceManager struct {
@@ -153,7 +157,37 @@ func (m *deviceManager) save() {
 func (m *deviceManager) Settings() DeviceSettings {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.settings
+	s := m.settings
+	s.NoticesOff = append([]string(nil), m.settings.NoticesOff...)
+	return s
+}
+
+// SetNoticesOff says which devices do not show notices, the list as a whole.
+func (m *deviceManager) SetNoticesOff(ids []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var out []string
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if id != "" && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	m.settings.NoticesOff = out
+	m.save()
+}
+
+// ShowsNotices is whether a device shows a want's notices.
+func (m *deviceManager) ShowsNotices(id string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, off := range m.settings.NoticesOff {
+		if off == id {
+			return false
+		}
+	}
+	return true
 }
 
 // Home is the browser browser-run work is pinned to, or "" for whichever polls

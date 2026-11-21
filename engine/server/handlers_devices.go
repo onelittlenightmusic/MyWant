@@ -21,7 +21,8 @@ import (
 //
 //	GET    /api/v1/devices            {devices: [...], settings}
 //	GET    /api/v1/devices/settings   {homeBrowserDevice, activeLocationDevice, locationWantId}
-//	PUT    /api/v1/devices/settings   any of them; "" unsets
+//	PUT    /api/v1/devices/settings   any of them; "" unsets; noticesOff: [ids]
+//	                                  — the devices that show no notices
 //	GET    /api/v1/devices/{id}       one, with the characters it is assigned to
 //	DELETE /api/v1/devices/{id}       forget it: off the list, off every
 //	                                  character, and unpinned where it was pinned
@@ -35,6 +36,8 @@ type deviceView struct {
 	// location is written to the location want.
 	Home          bool `json:"home,omitempty"`
 	SendsLocation bool `json:"sendsLocation,omitempty"`
+	// Notices: it shows a want's notices as its notifications.
+	Notices bool `json:"notices"`
 	// Characters it is assigned to.
 	Characters []string `json:"characters,omitempty"`
 }
@@ -73,6 +76,7 @@ func (s *Server) deviceViews() []deviceView {
 	for i := range list {
 		list[i].Home = list[i].ID == settings.HomeBrowserDevice
 		list[i].SendsLocation = list[i].ID == settings.ActiveLocationDevice
+		list[i].Notices = mywant.GetDeviceStore().ShowsNotices(list[i].ID)
 		list[i].Characters = assigned[list[i].ID]
 	}
 	if list == nil {
@@ -154,9 +158,10 @@ func (s *Server) getDeviceSettings(w http.ResponseWriter, r *http.Request) {
 // PUT /api/v1/devices/settings  {homeBrowserDevice?, activeLocationDevice?, locationWantId?}
 func (s *Server) putDeviceSettings(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Home     *string `json:"homeBrowserDevice"`
-		Location *string `json:"activeLocationDevice"`
-		Want     *string `json:"locationWantId"`
+		Home       *string   `json:"homeBrowserDevice"`
+		Location   *string   `json:"activeLocationDevice"`
+		Want       *string   `json:"locationWantId"`
+		NoticesOff *[]string `json:"noticesOff"`
 	}
 	if err := DecodeRequest(r, &body); err != nil {
 		s.JSONError(w, r, http.StatusBadRequest, "invalid request body", err.Error())
@@ -173,6 +178,9 @@ func (s *Server) putDeviceSettings(w http.ResponseWriter, r *http.Request) {
 		updates[mywant.DeviceKeyLocationWant] = *body.Want
 	}
 	mywant.GetDeviceStore().ApplyGUIUpdates(updates)
+	if body.NoticesOff != nil {
+		mywant.GetDeviceStore().SetNoticesOff(*body.NoticesOff)
+	}
 	// Mirrored into gui_state, where clients read them (guiStateWithConfig).
 	want := s.findWantByIDInAll(guiStateWantID)
 	if want != nil {

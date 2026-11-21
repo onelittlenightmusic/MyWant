@@ -100,6 +100,7 @@ func (s *Server) RegisterOutputCallback() {
 		// push service to sign up to, nothing to set but the permission.
 		broadcastSSE(noticeEvent, wantNotice{
 			ID: w.Metadata.ID + "/" + out.ID, WantID: w.Metadata.ID, Title: title, Body: msg,
+			Off: mywant.GetDeviceStore().Settings().NoticesOff,
 		})
 	}
 }
@@ -116,6 +117,9 @@ type wantNotice struct {
 	WantID string `json:"wantId"`
 	Title  string `json:"title"`
 	Body   string `json:"body"`
+	// Off: the devices that do not show notices (Devices' 通知, off) — a
+	// device finding itself here leaves it.
+	Off []string `json:"off,omitempty"`
 }
 
 // newsVoice is a want's news said in its own voice (mywant.WantNewsVoice) —
