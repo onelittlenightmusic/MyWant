@@ -95,7 +95,27 @@ func (s *Server) RegisterOutputCallback() {
 			title = "MyWant"
 		}
 		s.sendWantPush(w.Metadata.ID, title, msg, "/w/"+w.Metadata.ID)
+		// And to every page open on it — a browser's tab, the app's — which
+		// shows it as the device's own notification while it is open: no
+		// push service to sign up to, nothing to set but the permission.
+		broadcastSSE(noticeEvent, wantNotice{
+			ID: w.Metadata.ID + "/" + out.ID, WantID: w.Metadata.ID, Title: title, Body: msg,
+		})
 	}
+}
+
+// noticeEvent is the event stream's name for a want's answer it notifies of
+// (spec.voice.notify, or its type's say, and not held back by Laya).
+const noticeEvent = "notice"
+
+// wantNotice is one such answer, for an open page to show as a notification.
+// ID is the same for the same answer, so a device with several pages open
+// shows it once.
+type wantNotice struct {
+	ID     string `json:"id"`
+	WantID string `json:"wantId"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
 }
 
 // newsVoice is a want's news said in its own voice (mywant.WantNewsVoice) —
