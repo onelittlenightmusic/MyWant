@@ -109,7 +109,13 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 		if prev != nil {
 			for _, d := range defs {
 				for _, f := range watchedFields(d) {
-					n.timingSeen[f] = prev.Fields[f]
+					v, ok := prev.Fields[f]
+					if !ok && f == n.Spec.FinalResultField {
+						// The answer itself (a checklist's items): kept as
+						// the entry's result, not among its fields.
+						v = prev.Result
+					}
+					n.timingSeen[f] = v
 				}
 			}
 		}
@@ -201,6 +207,28 @@ func answerMeasure(v any) (float64, bool) {
 		return float64(rv.Len()), true
 	}
 	return 0, false
+}
+
+// TimingMoments says the moments an answer came at in its type's words (each
+// timing's description, else its name), the standard "answer" left out — it
+// is every answer, so it says nothing of which moment this one is. "" when
+// there is no other.
+func (n *Want) TimingMoments(names []string) string {
+	defs := n.typeTimings()
+	var out []string
+	for _, name := range names {
+		if name == AnswerTiming {
+			continue
+		}
+		said := name
+		for _, d := range defs {
+			if d.Name == name && strings.TrimSpace(d.Description) != "" {
+				said = strings.TrimSpace(d.Description)
+			}
+		}
+		out = append(out, said)
+	}
+	return strings.Join(out, "、")
 }
 
 // AnswerTiming is the standard timing every type with timings has, declared

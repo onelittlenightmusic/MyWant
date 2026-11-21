@@ -66,12 +66,12 @@ type pushDecision struct {
 // outputNews asks Laya whether the want's answer (msg, in its own voice) is
 // news; ok false when it is not asked or nobody answered. Every asking is
 // recorded (notePushDecision), its answer or why there was none.
-func (s *Server) outputNews(w *mywant.Want, msg string) (decisionAnswer, string, bool) {
+func (s *Server) outputNews(w *mywant.Want, msg, moment string) (decisionAnswer, string, bool) {
 	ri := s.initiative
 	if ri == nil || w == nil || characterWantTypes[w.Metadata.Type] || !pushFiltered(w) {
 		return decisionAnswer{}, "", false
 	}
-	text := outputNewsText(w.Metadata.Name, msg)
+	text := outputNewsText(w.Metadata.Name, msg, moment)
 	d := pushDecision{
 		At: time.Now().Format(time.RFC3339), WantID: w.Metadata.ID, Want: w.Metadata.Name,
 		WantType: w.Metadata.Type, Text: text, Min: pushNewsThreshold(), Push: "sent",

@@ -221,7 +221,7 @@ func (s *Server) offerSeedRows() []map[string]any {
 		if event == nil {
 			continue
 		}
-		text := outputNewsText(event.Metadata.Name, seed.message)
+		text := outputNewsText(event.Metadata.Name, seed.message, "")
 		addAt := func(now string, c offerCandidate, fits bool) {
 			gold := "skip"
 			if fits {

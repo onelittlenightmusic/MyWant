@@ -377,21 +377,24 @@ wantType:
   - name: cc_latest_message
     description: Latest webhook message {sender, text, timestamp}
     type: object
-    persistent: false
+    persistent: true
     initialValue: {}
     label: current
 
+  # The robot's conversation outlives a restart of the server: its chat is
+  # the one record of what was asked and answered (and what a pill or an
+  # offer led to), and the chat window and the widget read it back.
   - name: cc_messages
     description: FIFO buffer of last 20 user messages
     type: object
-    persistent: false
+    persistent: true
     initialValue: []
     label: current
 
   - name: cc_session_resets
     description: When the session was reset (RFC3339 times). The history stays; the chat thread draws a break at each of these.
     type: object
-    persistent: false
+    persistent: true
     initialValue: []
     label: current
 
@@ -405,7 +408,7 @@ wantType:
   - name: cc_responses
     description: FIFO buffer of last 20 AI responses (paired with cc_messages)
     type: object
-    persistent: false
+    persistent: true
     initialValue: []
     label: current
 
@@ -416,7 +419,7 @@ wantType:
       want's new answer and whether it was pushed. Apart from cc_responses,
       so they never crowd out the conversation nor read as an answer.
     type: object
-    persistent: false
+    persistent: true
     initialValue: []
     label: current
 

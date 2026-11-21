@@ -125,3 +125,15 @@ func TestTimingsOnIncreaseAndDecrease(t *testing.T) {
 		t.Errorf("nothing moved: %q", got)
 	}
 }
+
+// Started again: the field watched is the answer itself, so the answer kept
+// before is what it is compared with — an item added right after a restart
+// is still an item added.
+func TestTimingsAfterARestartCompareWithTheAnswerBefore(t *testing.T) {
+	w := &Want{WantTypeDefinition: &WantTypeDefinition{Timings: []TimingDef{{Name: "added", OnIncrease: "items"}}}}
+	w.Spec.FinalResultField = "items"
+	prev := &ResultHistoryEntry{Result: []any{"a"}}
+	if got := join(w.answerTimings(map[string]any{"items": []any{"a", "b"}}, prev)); got != "added" {
+		t.Errorf("first answer after a restart, an item added: %q", got)
+	}
+}

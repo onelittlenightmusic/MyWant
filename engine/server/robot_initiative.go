@@ -73,7 +73,10 @@ type initiativeEvent struct {
 	WantName string
 	WantType string
 	Message  string // the notice, in the want's own voice
-	At       time.Time
+	// Moment: which of its type's moments the answer came at, in the type's
+	// words (Want.TimingMoments); "" for none but a new answer.
+	Moment string
+	At     time.Time
 	// Injected: handed in through the API (a demonstration, a test) — not
 	// news that reached the person, so what they did after it teaches
 	// nothing (robotLabelInitiatives passes it over).
@@ -424,18 +427,26 @@ func initiativeEventText(sit initiativeSituation) string {
 	if sit.Event.Kind != initiativeOutput {
 		return ""
 	}
-	return outputNewsText(sit.Event.WantName, sit.Event.Message)
+	return outputNewsText(sit.Event.WantName, sit.Event.Message, sit.Event.Moment)
 }
 
 // outputNewsText is a want's new answer as Laya reads it — the same words for
 // the robot's initiative and for whether the notice is pushed, so one answer
 // serves both and what is learnt from one holds for the other.
-func outputNewsText(wantName, message string) string {
+//
+// moment is which of its type's moments the answer came at, in the type's
+// words (Want.TimingMoments: 「キャンセルされたとき」) — a cancellation and a
+// routine answer of the same want read alike without it. "" says nothing more.
+func outputNewsText(wantName, message, moment string) string {
 	msg := []rune(message)
 	if len(msg) > initiativeMessageMax {
 		msg = append(msg[:initiativeMessageMax], '…')
 	}
-	return fmt.Sprintf("出来事: wantの新しい結果。want: %s。結果: %s。", wantName, string(msg))
+	event := "出来事: wantの新しい結果"
+	if moment != "" {
+		event += "（" + moment + "）"
+	}
+	return fmt.Sprintf("%s。want: %s。結果: %s。", event, wantName, string(msg))
 }
 
 // initiativeState says the situation in a few words — short, so it fits the
@@ -444,11 +455,7 @@ func initiativeState(sit initiativeSituation) string {
 	var b strings.Builder
 	switch sit.Event.Kind {
 	case initiativeOutput:
-		msg := []rune(sit.Event.Message)
-		if len(msg) > initiativeMessageMax {
-			msg = append(msg[:initiativeMessageMax], '…')
-		}
-		fmt.Fprintf(&b, "出来事: wantの新しい結果。want: %s。結果: %s。", sit.Event.WantName, string(msg))
+		b.WriteString(outputNewsText(sit.Event.WantName, sit.Event.Message, sit.Event.Moment))
 	case initiativeIdle:
 		fmt.Fprintf(&b, "出来事: 何もない時間が%s続いた。", initiativeAgo(time.Since(sit.Event.At)+initiativeIdleWait()))
 	}

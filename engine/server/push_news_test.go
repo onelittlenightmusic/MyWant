@@ -1,6 +1,7 @@
 package server
 
 import (
+	"strings"
 	"testing"
 
 	mywant "mywant/engine/core"
@@ -26,8 +27,17 @@ func TestPushHeldOnlyWhenLayaIsSureItIsRoutine(t *testing.T) {
 
 func TestOutputNewsIsTheTextTheInitiativeReads(t *testing.T) {
 	sit := initiativeSituation{Event: initiativeEvent{Kind: initiativeOutput, WantName: "Spotify", Message: "曲が変わりました"}}
-	if got, want := initiativeEventText(sit), outputNewsText("Spotify", "曲が変わりました"); got != want {
+	if got, want := initiativeEventText(sit), outputNewsText("Spotify", "曲が変わりました", ""); got != want {
 		t.Errorf("initiative reads %q, the push asks %q", got, want)
+	}
+	// Which moment it came at, said in both the same way.
+	sit.Event.Moment = "キャンセルされたとき"
+	got, want := initiativeEventText(sit), outputNewsText("Spotify", "曲が変わりました", "キャンセルされたとき")
+	if got != want || got != "出来事: wantの新しい結果（キャンセルされたとき）。want: Spotify。結果: 曲が変わりました。" {
+		t.Errorf("with its moment: initiative reads %q, the push asks %q", got, want)
+	}
+	if !strings.HasPrefix(initiativeState(sit), want) {
+		t.Errorf("the state does not begin with it: %q", initiativeState(sit))
 	}
 }
 

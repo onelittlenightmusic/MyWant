@@ -61,3 +61,17 @@ func TestMemoMergesAndLetsGo(t *testing.T) {
 		t.Fatalf("not handed back: %v", c["memo"])
 	}
 }
+
+func TestTimingMoments(t *testing.T) {
+	w := &Want{WantTypeDefinition: &WantTypeDefinition{Timings: []TimingDef{
+		{Name: AnswerTiming, Description: "新しい結果が出たとき"},
+		{Name: "cancelled", Description: "キャンセルされたとき"},
+		{Name: "soon"},
+	}}}
+	if got := w.TimingMoments([]string{AnswerTiming}); got != "" {
+		t.Errorf("only a new answer: %q, want nothing", got)
+	}
+	if got := w.TimingMoments([]string{AnswerTiming, "cancelled", "soon"}); got != "キャンセルされたとき、soon" {
+		t.Errorf("moments: %q", got)
+	}
+}

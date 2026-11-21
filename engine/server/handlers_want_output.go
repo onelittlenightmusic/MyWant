@@ -52,7 +52,7 @@ func (s *Server) RegisterOutputCallback() {
 		msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
 		ev := initiativeEvent{
 			Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
-			WantType: w.Metadata.Type, Message: msg,
+			WantType: w.Metadata.Type, Message: msg, Moment: w.TimingMoments(tell.Timings),
 		}
 		if tell.Murmur {
 			// The murmur: the want's alert, its tile's "!".
@@ -73,7 +73,7 @@ func (s *Server) RegisterOutputCallback() {
 		// default — unless Laya is sure it is routine (push_news.go).
 		push := tell.Notify
 		if push && !tell.NotifyChosen {
-			if a, by, ok := s.outputNews(w, msg); ok {
+			if a, by, ok := s.outputNews(w, msg, ev.Moment); ok {
 				ev.News, ev.NewsBy = &a, by
 				push = !pushHeld(a, pushNewsThreshold())
 			}
