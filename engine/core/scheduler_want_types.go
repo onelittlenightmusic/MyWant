@@ -1,28 +1,70 @@
 package mywant
 
 import (
-	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// SchedulerWant is a System Want that manages all scheduled Wants in the system
-// It continuously monitors all Wants and manages their SchedulerAgents
+// SchedulerWant is a System Want that runs every scheduled Want when its time
+// comes: spec.when, its type's default-every, its own wake (WakeAt).
+//
+// It keeps them in one book (scheduleBook), earliest first, and waits in its
+// Progress for whichever comes first: the earliest time, or word that a
+// want's schedule may have changed (scheduleChanged — a want added, deleted
+// or its spec changed, a wake written). Nothing is looked at meanwhile; a
+// pass with nothing to do waits up to schedulerMaxWait and returns, so the
+// progression loop can still stop or suspend it.
 type SchedulerWant struct {
 	Want
 	builder *ChainBuilder // Reference to ChainBuilder for coordinating restarts
 	// Wall-clock second last written to the last_scan_time state field. The
-	// scheduler scans on every progression cycle, so writing the time each pass
-	// changed the field once a second — and because any real state change makes
-	// the stats writer rebuild and rewrite the entire memory file, a 4-byte
-	// liveness timestamp was costing a 275KB write every second, forever.
+	// scheduler passes many times a minute, and any real state change makes
+	// the stats writer rebuild and rewrite the entire memory file, so it is
+	// written once a minute.
 	lastScanStored int64
+	book           *scheduleBook
+	changed        chan string // want IDs whose schedule may have changed
+	nextSweep      time.Time   // when the targets are next looked after
 }
 
 // schedulerScanTimeResolution is how coarsely last_scan_time is recorded. It
 // exists to show the scheduler is alive, which a minute answers as well as a
 // second, and a minute costs 60× less persistence churn.
 const schedulerScanTimeResolution = 60
+
+// schedulerMaxWait is the longest a pass waits with nothing to do.
+const schedulerMaxWait = time.Second
+
+// targetSweepEvery is how often the targets are looked after (sweepTargets),
+// besides when one is added.
+const targetSweepEvery = 5 * time.Second
+
+// The scheduler's ear: scheduleChanged sends a want's ID to it. Before the
+// scheduler is up nothing is sent — it reads every want when it starts. A
+// full ear asks for every want to be read again (scheduleAll).
+var (
+	scheduleEarMu sync.RWMutex
+	scheduleEar   chan string
+	scheduleAll   atomic.Bool
+)
+
+// scheduleChanged tells the scheduler a want's schedule may have changed: it
+// was added or deleted, its spec changed, or it wrote its wake_at.
+func scheduleChanged(id string) {
+	scheduleEarMu.RLock()
+	ear := scheduleEar
+	scheduleEarMu.RUnlock()
+	if ear == nil || id == "" {
+		return
+	}
+	select {
+	case ear <- id:
+	default:
+		scheduleAll.Store(true)
+	}
+}
 
 // NewSchedulerWant creates a new Scheduler Want
 func NewSchedulerWant() *SchedulerWant {
@@ -34,116 +76,148 @@ func (s *SchedulerWant) SetChainBuilder(builder *ChainBuilder) {
 	s.builder = builder
 }
 
-// Progress is called during the want execution cycle
-// It scans all Wants and manages their SchedulerAgents
+// Progress waits for the first schedule to come, or a change, and runs what
+// has come.
 func (s *SchedulerWant) Progress() {
 	if s.builder == nil {
 		return // ChainBuilder not yet set
 	}
-
-	// Create a snapshot of wants while holding the lock to avoid concurrent map access
-	s.builder.wantsMu.RLock()
-	allWantsSnapshot := make(map[string]*runtimeWant)
-	for name, rw := range s.builder.wants {
-		allWantsSnapshot[name] = rw
+	if s.book == nil {
+		s.start()
 	}
-	s.builder.wantsMu.RUnlock()
 
-	// Scan each Want for scheduling requirements
-	for name, rw := range allWantsSnapshot {
-		want := rw.want
-		// TARGET check: Target wants always need a progression loop even without a schedule
-		isTarget := want.Metadata.Type == "target" || want.Metadata.Type == "custom_target"
-
-		if isTarget {
-			// After a server restart, targets restored in "reaching" state have no active
-			// goroutine. Reset to idle so startWant can restart the loop.
-			if IsReachingStatus(want.GetStatus()) && !want.goroutineActive.Load() {
-				want.RestartWant()
-			}
-			s.builder.startWant(name, rw)
-			continue // No need to create a scheduler agent for targets
+	wait := schedulerMaxWait
+	if at, ok := s.book.next(); ok {
+		wait = min(wait, max(time.Until(at), 0))
+	}
+	wait = min(wait, max(time.Until(s.nextSweep), 0))
+	timer := time.NewTimer(wait)
+	select {
+	case id := <-s.changed:
+		s.refresh(id)
+	case <-timer.C:
+	}
+	timer.Stop()
+	for drained := false; !drained; {
+		select {
+		case id := <-s.changed:
+			s.refresh(id)
+		default:
+			drained = true
 		}
+	}
+	if scheduleAll.Swap(false) {
+		s.refreshAll()
+	}
 
-		// Skip the scheduler itself to avoid recursion
-		if want.Metadata.Type == "scheduler" {
-			continue
+	now := time.Now()
+	for _, id := range s.book.due(now) {
+		name := s.book.name(id)
+		InfoLog("[SCHEDULER] Triggering restart for Want '%s' at %s\n", name, now.Format("15:04:05"))
+		if err := s.builder.RestartWant(id); err != nil {
+			InfoLog("[SCHEDULER] Failed to restart Want '%s': %v\n", name, err)
 		}
-
-		when := scheduleOf(want)
-		// Its own wake (WakeAt, schedule_types.go): one more entry in its schedule.
-		wake, _ := wakeOf(want)
-
-		agentID := fmt.Sprintf("scheduler-%s", want.Metadata.Name)
-
-		// Check if agent already exists for this Want
-		if existingAgent, exists := s.GetBackgroundAgent(agentID); exists {
-			// Verify if the want ID has changed
-			if schedAgent, ok := existingAgent.(*SchedulerAgent); ok {
-				if schedAgent.wantID == want.Metadata.ID {
-					if len(when) == 0 && wake.IsZero() {
-						// Kept only for a wake, done or taken back: nothing left to keep.
-						s.DeleteBackgroundAgent(agentID)
-						continue
-					}
-					schedAgent.setWake(wake)
-					continue // ID matches, no update needed
-				}
-				// ID mismatch! This happens when a Want is redeployed.
-				// Stop and remove the old agent before creating a new one.
-				InfoLog("[SCHEDULER_WANT] Want ID changed for '%s' (%s -> %s), updating agent\n",
-					want.Metadata.Name, schedAgent.wantID, want.Metadata.ID)
-				s.DeleteBackgroundAgent(agentID)
-			} else {
-				continue // Should not happen, but safe fallback
-			}
-		}
-
-		if len(when) == 0 && wake.IsZero() {
-			continue // No schedule specified for this Want
-		}
-
-		// Create a new SchedulerAgent for this Want
-		agent, err := NewSchedulerAgent(
-			when,
-			want.Metadata.ID,
-			want.Metadata.Name,
-			s.builder,
-		)
-		if err != nil {
-			InfoLog("[SCHEDULER_WANT] Failed to create agent for '%s': %v\n",
-				want.Metadata.Name, err)
-			continue
-		}
-		agent.setWake(wake)
-
-		// Add the agent as a BackgroundAgent to this Scheduler Want
-		if err := s.AddBackgroundAgent(agent); err != nil {
-			InfoLog("[SCHEDULER_WANT] Failed to add agent for '%s': %v\n",
-				want.Metadata.Name, err)
-			continue
-		}
-
-		InfoLog("[SCHEDULER_WANT] Added SchedulerAgent for Want '%s'\n",
-			want.Metadata.Name)
+	}
+	if !now.Before(s.nextSweep) {
+		s.sweepTargets()
+		s.nextSweep = now.Add(targetSweepEvery)
 	}
 
 	// Update scheduler statistics in state. The count is idempotent — StoreState
 	// drops a write that changes nothing — but the scan time is not, so it is
 	// only refreshed once every schedulerScanTimeResolution seconds.
-	s.storeState("total_scheduled_wants", s.GetBackgroundAgentCount())
-	if now := time.Now().Unix(); now-s.lastScanStored >= schedulerScanTimeResolution {
-		s.lastScanStored = now
-		s.storeState("last_scan_time", now)
+	s.storeState("total_scheduled_wants", s.book.count())
+	if unix := now.Unix(); unix-s.lastScanStored >= schedulerScanTimeResolution {
+		s.lastScanStored = unix
+		s.storeState("last_scan_time", unix)
 	}
 }
 
-// IsAchieved always returns false since the scheduler runs continuously
+// start opens the ear, then reads every want — in that order, so a change in
+// between is not missed (reading a want twice changes nothing).
+func (s *SchedulerWant) start() {
+	s.book = newScheduleBook()
+	s.changed = make(chan string, 1024)
+	scheduleEarMu.Lock()
+	scheduleEar = s.changed
+	scheduleEarMu.Unlock()
+	s.refreshAll()
+}
+
+// refreshAll reads every want's schedule.
+func (s *SchedulerWant) refreshAll() {
+	s.builder.wantsMu.RLock()
+	ids := make([]string, 0, len(s.builder.wants))
+	for id := range s.builder.wants {
+		ids = append(ids, id)
+	}
+	s.builder.wantsMu.RUnlock()
+	known := map[string]bool{}
+	for _, id := range ids {
+		known[id] = true
+		s.refresh(id)
+	}
+	for id := range s.book.wants {
+		if !known[id] {
+			s.book.remove(id)
+		}
+	}
+}
+
+// refresh reads one want's schedule into the book; a want gone, or the
+// scheduler itself, is taken out. A target added is looked after at once.
+func (s *SchedulerWant) refresh(id string) {
+	s.builder.wantsMu.RLock()
+	rw, ok := s.builder.wants[id]
+	s.builder.wantsMu.RUnlock()
+	if !ok || rw.want == nil || rw.want.Metadata.Type == "scheduler" {
+		s.book.remove(id)
+		return
+	}
+	if isTargetWant(rw.want) {
+		s.lookAfterTarget(id, rw)
+		return
+	}
+	wake, _ := wakeOf(rw.want)
+	s.book.put(id, rw.want.Metadata.Name, scheduleOf(rw.want), wake, time.Now())
+}
+
+func isTargetWant(w *Want) bool {
+	return w.Metadata.Type == "target" || w.Metadata.Type == "custom_target"
+}
+
+// sweepTargets looks after every target: a target always needs a progression
+// loop, schedule or not.
+func (s *SchedulerWant) sweepTargets() {
+	s.builder.wantsMu.RLock()
+	targets := map[string]*runtimeWant{}
+	for id, rw := range s.builder.wants {
+		if rw.want != nil && isTargetWant(rw.want) {
+			targets[id] = rw
+		}
+	}
+	s.builder.wantsMu.RUnlock()
+	for id, rw := range targets {
+		s.lookAfterTarget(id, rw)
+	}
+}
+
+// lookAfterTarget starts a target's loop. After a server restart, targets
+// restored in "reaching" state have no active goroutine: reset to idle so
+// startWant can restart the loop.
+func (s *SchedulerWant) lookAfterTarget(id string, rw *runtimeWant) {
+	if IsReachingStatus(rw.want.GetStatus()) && !rw.want.goroutineActive.Load() {
+		rw.want.RestartWant()
+	}
+	s.builder.startWant(id, rw)
+}
+
 // Initialize resets state before execution begins
 func (s *SchedulerWant) Initialize() {
 	// No state reset needed for scheduler wants
 }
 
+// IsAchieved always returns false since the scheduler runs continuously
 func (s *SchedulerWant) IsAchieved() bool {
 	return false
 }

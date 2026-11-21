@@ -24,49 +24,99 @@ func TestScheduleOfFallsBackToTypeDefaultEvery(t *testing.T) {
 	}
 }
 
-func TestWakeIsOneEntryInTheSchedule(t *testing.T) {
-	a, err := NewSchedulerAgent(nil, "w1", "golf", nil)
-	if err != nil {
-		t.Fatalf("an agent for a wake alone: %v", err)
-	}
+func TestBookWakeIsDoneOnce(t *testing.T) {
+	b := newScheduleBook()
 	now := time.Now()
 	at := now.Add(time.Minute).Truncate(time.Second)
-	a.setWake(at)
-	if !a.nextExec.Equal(at) || len(a.schedules) != 1 {
-		t.Fatalf("wake not scheduled: next %v, %d entries", a.nextExec, len(a.schedules))
+	b.put("w1", "golf", nil, at, now)
+	if next, ok := b.next(); !ok || !next.Equal(at) {
+		t.Fatalf("next = %v %v, want the wake %v", next, ok, at)
 	}
-	a.setWake(at.Add(time.Hour)) // replaced, not added
-	if len(a.schedules) != 1 || !a.nextExec.Equal(at.Add(time.Hour)) {
-		t.Fatalf("replace: next %v, %d entries", a.nextExec, len(a.schedules))
+	b.put("w1", "golf", nil, at.Add(time.Hour), now) // replaced, not added
+	if next, _ := b.next(); !next.Equal(at.Add(time.Hour)) {
+		t.Fatalf("replace: next %v", next)
 	}
-	a.updateNextExecution(at.Add(2 * time.Hour)) // came: done once, dropped
-	if len(a.schedules) != 0 {
-		t.Fatalf("wake still scheduled after it came: %v", a.schedules)
+	if got := b.due(at.Add(30 * time.Minute)); len(got) != 0 {
+		t.Fatalf("due before its time: %v", got)
 	}
-	a.setWake(time.Time{})
-	a.setWake(now.Add(-time.Hour)) // long gone: not put in
-	if len(a.schedules) != 0 {
-		t.Fatalf("an hour-old wake scheduled: %v", a.schedules)
+	if got := b.due(at.Add(2 * time.Hour)); len(got) != 1 || got[0] != "w1" {
+		t.Fatalf("due = %v, want w1", got)
+	}
+	if _, ok := b.next(); ok {
+		t.Fatal("a wake done is still to come")
+	}
+	if got := b.due(at.Add(3 * time.Hour)); len(got) != 0 {
+		t.Fatalf("done twice: %v", got)
+	}
+	b.put("w1", "golf", nil, time.Time{}, now) // the restart took it back
+	if b.count() != 0 || len(b.wants) != 0 {
+		t.Fatalf("nothing to come, yet booked: %v", b.wants)
+	}
+	b.put("w2", "old", nil, now.Add(-time.Hour), now) // long gone: not booked
+	if _, ok := b.next(); ok {
+		t.Fatal("an hour-old wake booked")
 	}
 }
 
-func TestWakeBesideAnEverySchedule(t *testing.T) {
-	a, err := NewSchedulerAgent([]WhenSpec{{Every: "1h"}}, "w1", "golf", nil)
-	if err != nil {
-		t.Fatal(err)
+func TestBookEveryGoesOnAndWakeBesideIt(t *testing.T) {
+	b := newScheduleBook()
+	now := time.Date(2026, 11, 21, 10, 0, 30, 0, time.Local)
+	b.put("w1", "golf", []WhenSpec{{Every: "1h"}}, time.Time{}, now)
+	every, _ := b.next()
+	if !every.Equal(time.Date(2026, 11, 21, 11, 0, 0, 0, time.Local)) {
+		t.Fatalf("every 1h: next %v", every)
 	}
-	every := a.nextExec
-	wake := time.Now().Add(time.Second).Truncate(time.Second)
-	if !wake.Before(every) {
-		t.Skip("the hour turns within a second")
+	wake := now.Add(10 * time.Minute)
+	b.put("w1", "golf", []WhenSpec{{Every: "1h"}}, wake, now)
+	if next, _ := b.next(); !next.Equal(wake) {
+		t.Fatalf("next %v, want the wake %v", next, wake)
 	}
-	a.setWake(wake)
-	if !a.nextExec.Equal(wake) {
-		t.Fatalf("next %v, want the wake %v", a.nextExec, wake)
+	b.due(wake)
+	if next, _ := b.next(); !next.Equal(every) {
+		t.Fatalf("after the wake: next %v, want the hourly %v", next, every)
 	}
-	a.updateNextExecution(wake)
-	if len(a.schedules) != 1 || !a.nextExec.Equal(every) {
-		t.Fatalf("after the wake: next %v (%d entries), want the hourly %v", a.nextExec, len(a.schedules), every)
+	b.due(every)
+	if next, _ := b.next(); !next.Equal(every.Add(time.Hour)) {
+		t.Fatalf("after the hour: next %v, want %v", next, every.Add(time.Hour))
+	}
+	// The same schedule read again changes nothing.
+	b.put("w1", "golf", []WhenSpec{{Every: "1h"}}, wake, every)
+	if next, _ := b.next(); !next.Equal(every.Add(time.Hour)) {
+		t.Fatalf("read again moved it: %v", next)
+	}
+}
+
+func TestBookEarliestFirstAcrossWants(t *testing.T) {
+	b := newScheduleBook()
+	now := time.Now()
+	b.put("a", "a", nil, now.Add(3*time.Minute), now)
+	b.put("b", "b", nil, now.Add(1*time.Minute), now)
+	b.put("c", "c", nil, now.Add(2*time.Minute), now)
+	b.remove("b")
+	if got := b.due(now.Add(150 * time.Second)); len(got) != 1 || got[0] != "c" {
+		t.Fatalf("due = %v, want c only", got)
+	}
+	if next, _ := b.next(); !next.Equal(now.Add(3 * time.Minute)) {
+		t.Fatalf("next %v, want a's", next)
+	}
+}
+
+func TestScheduleChangedReachesTheScheduler(t *testing.T) {
+	ear := make(chan string, 1)
+	scheduleEarMu.Lock()
+	scheduleEar = ear
+	scheduleEarMu.Unlock()
+	defer func() { scheduleEarMu.Lock(); scheduleEar = nil; scheduleEarMu.Unlock(); scheduleAll.Store(false) }()
+
+	w := &Want{Metadata: Metadata{ID: "want-sched-ear"}}
+	w.WakeAt(time.Now().Add(time.Hour))
+	if got := <-ear; got != "want-sched-ear" {
+		t.Fatalf("heard %q", got)
+	}
+	scheduleChanged("x")
+	scheduleChanged("y") // the ear is full: every want is to be read again
+	if !scheduleAll.Load() {
+		t.Fatal("a full ear did not ask for all")
 	}
 }
 

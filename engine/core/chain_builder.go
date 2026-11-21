@@ -1056,6 +1056,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 
 					// Sync ALL fields
 					runtimeWant.want.Spec = updatedConfigWant.Spec
+					scheduleChanged(runtimeWant.want.Metadata.ID) // its when may have changed
 					runtimeWant.want.metadataMutex.Lock()
 					runtimeWant.want.Metadata = updatedConfigWant.Metadata
 					runtimeWant.want.metadataMutex.Unlock()
@@ -1432,6 +1433,7 @@ func (cb *ChainBuilder) addWant(wantConfig *Want) {
 	cb.wants[wantConfig.Metadata.ID] = runtimeWant
 	cb.wantNameToID[wantConfig.Metadata.Name] = wantConfig.Metadata.ID
 	cb.wantsMu.Unlock()
+	scheduleChanged(wantConfig.Metadata.ID) // its schedule, if any, to the scheduler
 
 	// Register want for notification system
 	cb.registerWantForNotifications(wantConfig, wantFunction, wantPtr)
@@ -1571,6 +1573,7 @@ func (cb *ChainBuilder) UpdateWant(wantConfig *Want) {
 		rw.want.Metadata = cloneMetadata(wantConfig.Metadata)
 		rw.want.Spec = cloneSpec(wantConfig.Spec)
 		rw.want.metadataMutex.Unlock()
+		scheduleChanged(wantConfig.Metadata.ID) // its when may have changed
 
 		// Recompute GUI-authored derived fields synchronously so a saved definition's
 		// key appears in state immediately, rather than waiting for the want's own
@@ -1650,6 +1653,7 @@ func (cb *ChainBuilder) deleteWantByID(wantID string) {
 		delete(cb.wants, wantID)
 		delete(cb.wantNameToID, wantName)
 		cb.wantsMu.Unlock()
+		scheduleChanged(wantID) // its schedule goes with it
 	}
 
 	// Cascade: collect child want IDs owned by this want

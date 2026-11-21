@@ -1282,6 +1282,9 @@ func (n *Want) StoreState(key string, value any) {
 	}
 	sendStateNotifications(notification)
 	n.wantMoment(key, value, previousValue)
+	if key == WakeAtState { // its own wake: the scheduler is told (schedule_types.go)
+		scheduleChanged(n.Metadata.ID)
+	}
 	if !n.isVolatileState(key) && !momentOnlyKeys[key] {
 		n.changed()
 	}

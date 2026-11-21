@@ -19,9 +19,6 @@ type ParsedSchedule struct {
 	OriginalEvery string        // Original 'every' expression
 }
 
-// Interval 0 marks an entry done once: a want's own wake (WakeAt).
-func (p ParsedSchedule) isWake() bool { return p.Interval == 0 }
-
 // A want's own wake: Progress run again at a time the want names — once, on
 // top of whatever schedule it has (spec.when, a type's default-every). For a
 // moment only the want knows: fifteen minutes before the reservation it just
@@ -34,9 +31,9 @@ func (p ParsedSchedule) isWake() bool { return p.Interval == 0 }
 // the want and of the server. Naming another time replaces it; a zero time
 // (or "") takes it back.
 //
-// It is one more entry in the want's schedule: the scheduler (SchedulerWant)
-// hands it to the want's SchedulerAgent, which restarts the want when it
-// comes, as for any schedule, and drops it — a wake is done once. The restart
+// It is one more entry in the want's schedule: writing it tells the scheduler
+// (scheduleChanged), which restarts the want when it comes, as for any
+// schedule, and drops it — a wake is done once. The restart
 // takes back a wake whose time has passed (prepareForRestart), so it is not
 // done again after the server starts.
 
