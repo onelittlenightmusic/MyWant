@@ -136,6 +136,87 @@ func fetchWeatherWttr(ctx context.Context, city string) (string, error) {
 
 // fetchWeatherOpenMeteo resolves the city with Open-Meteo's geocoder, then
 // reads the current conditions there. Neither call needs a key.
+// openMeteoPlace finds a place's point (Open-Meteo's geocoding).
+func openMeteoPlace(ctx context.Context, city string) (lat, lon float64, err error) {
+	geoParams := url.Values{}
+	geoParams.Set("name", city)
+	geoParams.Set("count", "1")
+	geoParams.Set("language", "ja")
+	body, err := weatherGet(ctx, "https://geocoding-api.open-meteo.com/v1/search?"+geoParams.Encode())
+	if err != nil {
+		return 0, 0, err
+	}
+	var geo struct {
+		Results []struct {
+			Latitude  float64 `json:"latitude"`
+			Longitude float64 `json:"longitude"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &geo); err != nil {
+		return 0, 0, fmt.Errorf("parse geocoding response: %w", err)
+	}
+	if len(geo.Results) == 0 {
+		return 0, 0, fmt.Errorf("unknown location %q", city)
+	}
+	return geo.Results[0].Latitude, geo.Results[0].Longitude, nil
+}
+
+// fetchForecastAt is the forecast for the hour of `at` at the first of places
+// Open-Meteo finds: its words ("晴れ 12°C 降水 10%") and the place it was for.
+// Only within the forecast's reach (the next 16 days).
+func fetchForecastAt(ctx context.Context, places []string, at time.Time) (text, place string, err error) {
+	now := time.Now()
+	if at.Before(now.Add(-time.Hour)) || at.After(now.Add(16*24*time.Hour)) {
+		return "", "", fmt.Errorf("%s is beyond the forecast", at.Format(time.RFC3339))
+	}
+	var lat, lon float64
+	err = fmt.Errorf("no place to forecast")
+	for _, p := range places {
+		if strings.TrimSpace(p) == "" {
+			continue
+		}
+		if lat, lon, err = openMeteoPlace(ctx, p); err == nil {
+			place = p
+			break
+		}
+	}
+	if err != nil {
+		return "", "", err
+	}
+	hour := at.Format("2006-01-02T15") + ":00"
+	params := url.Values{}
+	params.Set("latitude", fmt.Sprintf("%f", lat))
+	params.Set("longitude", fmt.Sprintf("%f", lon))
+	params.Set("hourly", "temperature_2m,weather_code,precipitation_probability")
+	// The hour is the place's own clock (timezone auto): `at` is read in the
+	// zone it was written in, the place's for a reservation made there.
+	params.Set("timezone", "auto")
+	params.Set("start_hour", hour)
+	params.Set("end_hour", hour)
+	body, err := weatherGet(ctx, "https://api.open-meteo.com/v1/forecast?"+params.Encode())
+	if err != nil {
+		return "", "", err
+	}
+	var fc struct {
+		Hourly struct {
+			Temperature []float64 `json:"temperature_2m"`
+			WeatherCode []int     `json:"weather_code"`
+			Rain        []float64 `json:"precipitation_probability"`
+		} `json:"hourly"`
+	}
+	if err := json.Unmarshal(body, &fc); err != nil {
+		return "", "", fmt.Errorf("parse forecast response: %w", err)
+	}
+	if len(fc.Hourly.Temperature) == 0 || len(fc.Hourly.WeatherCode) == 0 {
+		return "", "", fmt.Errorf("no forecast for %s", hour)
+	}
+	text = fmt.Sprintf("%s %.0f°C", wmoWeatherText(fc.Hourly.WeatherCode[0]), fc.Hourly.Temperature[0])
+	if len(fc.Hourly.Rain) > 0 {
+		text += fmt.Sprintf(" 降水 %.0f%%", fc.Hourly.Rain[0])
+	}
+	return text, place, nil
+}
+
 func fetchWeatherOpenMeteo(ctx context.Context, city string) (string, error) {
 	geoParams := url.Values{}
 	geoParams.Set("name", city)

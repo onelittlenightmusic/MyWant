@@ -148,6 +148,7 @@ func cacheVoiceScript(name string, data []byte) string {
 const (
 	VoiceEventOutput   = "output"   // a new answer; Result is it
 	VoiceEventAchieved = "achieved" // it got where it was going
+	VoiceEventHeard    = "heard"    // it heard another want's murmur; Heard is it
 )
 
 // VoiceEvent is a want's news, handed to its voice script.
@@ -156,6 +157,9 @@ type VoiceEvent struct {
 	Result any
 	// Guide: what a "guide" event is showing the way to (WantGuideVoice).
 	Guide any
+	// Heard: the murmur a "heard" event is about (want_hear.go) — who said
+	// it, at which timing, its words and its answer.
+	Heard *HeardMurmur
 }
 
 // WantHomeOf, when set (by the server), is the home of the character that
@@ -206,6 +210,13 @@ func voiceEventInput(ev *VoiceEvent) any {
 	}
 	if ev.Guide != nil {
 		out["guide"] = ev.Guide
+	}
+	if m := ev.Heard; m != nil {
+		out["heard"] = map[string]any{
+			"murmur_id": m.MurmurID, "from_want_id": m.FromID, "from_want_name": m.FromName,
+			"from_want_type": m.FromType, "timings": m.Timings, "text": m.Text,
+			"result": m.Result, "fields": m.Fields, "labels": m.Labels,
+		}
 	}
 	return out
 }
@@ -386,6 +397,10 @@ func knownMood(m string) bool {
 type VoiceLine struct {
 	Say  string
 	Mood string
+	// Labels: what the line is about in set words — "time" (RFC3339) and
+	// "place" — for the wants that hear it (MurmurLabelTime / MurmurLabelPlace),
+	// given by a voice script's "labels".
+	Labels map[string]string
 }
 
 type voiceCacheEntry struct {
@@ -424,7 +439,13 @@ func computeVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	if script == "" {
 		lines = defaultVoiceFor(w.GetStatus(), len(w.ResultHistoryEntries()))
 	} else {
-		lines, mood = scriptVoice(ctx, w, script, nil)
+		var said bool
+		lines, mood, _, said = scriptVoice(ctx, w, script, nil)
+		if !said {
+			// A script that gives no "say" at all (one there only for its
+			// labels) leaves the want its default lines; "say": null is silence.
+			lines = defaultVoiceFor(w.GetStatus(), len(w.ResultHistoryEntries()))
+		}
 	}
 	// Every line it could say, not only the one picked: the next answer picks
 	// another, and that one is ready too.
@@ -472,30 +493,46 @@ func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) V
 	if script == "" {
 		return VoiceLine{}
 	}
-	lines, mood := scriptVoice(ctx, w, script, &ev)
+	lines, mood, labels, _ := scriptVoice(ctx, w, script, &ev)
 	voiceLinesSaid(lines)
-	return pickVoice(w, lines, mood)
+	line := pickVoice(w, lines, mood)
+	line.Labels = labels
+	return line
 }
 
-// scriptVoice runs a type's voice script: its lines, and its mood when it gave
-// one the board knows.
-func scriptVoice(ctx context.Context, w *Want, script string, ev *VoiceEvent) ([]string, string) {
+// scriptVoice runs a type's voice script: its lines, its mood when it gave one
+// the board knows, and the labels it gave its line ("labels": {"time", "place"}).
+//
+// said: whether it gave "say" at all (null included).
+func scriptVoice(ctx context.Context, w *Want, script string, ev *VoiceEvent) ([]string, string, map[string]string, bool) {
 	input, err := json.Marshal(voiceInput(w, ev))
 	if err != nil {
-		return nil, ""
+		return nil, "", nil, true
 	}
 	ctx, cancel := context.WithTimeout(ctx, voiceTimeout)
 	defer cancel()
 	out, err := runVoiceScript(ctx, script, input)
 	if err != nil {
 		ErrorLog("[VOICE] %s (%s): %v", w.GetMetadata().Name, script, err)
-		return nil, ""
+		return nil, "", nil, true
 	}
 	mood := ""
 	if m, ok := out["mood"].(string); ok && knownMood(m) {
 		mood = m
 	}
-	return voiceLines(out["say"]), mood
+	var labels map[string]string
+	if raw, ok := out["labels"].(map[string]any); ok {
+		for k, v := range raw {
+			if s, ok := v.(string); ok && s != "" {
+				if labels == nil {
+					labels = map[string]string{}
+				}
+				labels[k] = s
+			}
+		}
+	}
+	_, said := out["say"]
+	return voiceLines(out["say"]), mood, labels, said
 }
 
 // pickVoice picks one of lines (voiceSeed), with its mood — given, or read

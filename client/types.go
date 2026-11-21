@@ -62,6 +62,10 @@ type WantSpec struct {
 	Exposes []ExposeEntry   `json:"exposes,omitempty" yaml:"exposes,omitempty"`
 	Imports map[string]any  `json:"imports,omitempty" yaml:"imports,omitempty"`
 	Alerts  []ws.AlertRule  `json:"alerts,omitempty" yaml:"alerts,omitempty"`
+	// When it speaks up (spec.voice), and whose murmurs it hears (spec.hear):
+	// carried as written, or a want made from a file lost them.
+	Voice *ws.VoiceSpec `json:"voice,omitempty" yaml:"voice,omitempty"`
+	Hear  []ws.HearSpec `json:"hear,omitempty" yaml:"hear,omitempty"`
 }
 
 // WhenSpec defines a scheduled execution time for a Want

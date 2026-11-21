@@ -325,6 +325,9 @@ func (p *residentProc) request(ctx context.Context, opt MRSRunOptions) (map[stri
 	if memo, ok := opt.Context["memo"]; ok {
 		req["memo"] = memo
 	}
+	if h, ok := opt.Context["heard"]; ok {
+		req["heard"] = h
+	}
 	line, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

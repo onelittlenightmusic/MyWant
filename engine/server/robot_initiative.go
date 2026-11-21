@@ -87,6 +87,9 @@ type initiativeEvent struct {
 	News   *decisionAnswer
 	NewsBy string
 	Push   string
+	// NoticeID: the notice it was told in (wantNotice.ID) — what a rating of
+	// that notice labels (notices.go).
+	NoticeID string
 }
 
 // initiativeSituation is what the robot knows when it decides.
@@ -689,6 +692,7 @@ type initiativeRecord struct {
 	Error     string                      `json:"error,omitempty"`
 	Questions map[string]decisionQuestion `json:"questions"`
 	Push      string                      `json:"push,omitempty"` // the notice's push: sent, held
+	NoticeID  string                      `json:"noticeId,omitempty"`
 }
 
 func (s *Server) robotTakeInitiative(ri *robotInitiative, ev initiativeEvent) initiativeRecord {
@@ -714,7 +718,7 @@ func (s *Server) robotTakeInitiative(ri *robotInitiative, ev initiativeEvent) in
 	rec := initiativeRecord{
 		ID: fmt.Sprintf("init-%d", time.Now().UnixNano()), WantID: ev.WantID,
 		At: ev.At.Format(time.RFC3339), Event: ev.Kind, Want: ev.WantName, WantType: ev.WantType,
-		State: text, Context: initiativeState(sit), By: "rules", Injected: ev.Injected, Push: ev.Push,
+		State: text, Context: initiativeState(sit), By: "rules", Injected: ev.Injected, Push: ev.Push, NoticeID: ev.NoticeID,
 	}
 	for _, c := range offered {
 		rec.Offered = append(rec.Offered, c.Name)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	mywant "mywant/engine/core"
 )
@@ -49,25 +50,44 @@ func (s *Server) RegisterOutputCallback() {
 		if !tell.Murmur && !tell.Notify {
 			return
 		}
-		msg, mood := s.newsVoice(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
+		voiced := s.newsVoiceLine(w, mywant.VoiceEvent{Kind: mywant.VoiceEventOutput, Result: out.Result}, outputMessage(out))
+		msg, mood := voiced.Say, voiced.Mood
+		// One id for the murmur and the notice of the same answer: what a
+		// want that heard it names in its answer, and what a rating of the
+		// notice is about.
+		murmurID := "notif-" + time.Now().UTC().Format("20060102T150405.000000000")
 		ev := initiativeEvent{
 			Kind: initiativeOutput, WantID: w.Metadata.ID, WantName: w.Metadata.Name,
 			WantType: w.Metadata.Type, Message: msg, Moment: w.TimingMoments(tell.Timings),
+			NoticeID: murmurID,
+		}
+		// What it is about (time, place) and why it was said (its timing).
+		labels := s.murmurLabels(w, out, voiced.Labels)
+		for k, v := range timingReasonLabels(w, out, tell, ev.Moment) {
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels[k] = v
 		}
 		if tell.Murmur {
-			// The murmur: the want's alert, its tile's "!".
+			// The murmur: the want's alert, its tile's "♪".
 			entry := out
 			if err := s.notifications.Record(NotificationEntry{
+				ID:         murmurID,
 				Message:    msg,
 				Mood:       mood,
 				Kind:       "alert",
 				TargetType: "want",
 				TargetID:   w.Metadata.ID,
 				Output:     &entry,
+				Labels:     labels,
 			}); err != nil {
 				log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
 				return
 			}
+			// Heard by the wants that listen for it (spec.hear, hear.go), with
+			// what it is about in set words (its time and place).
+			s.hearMurmur(w, murmurID, msg, out, labels)
 		}
 		// Pushed at its notify timings: as the want chose, or — the type's
 		// default — unless Laya is sure it is routine (push_news.go).
@@ -98,9 +118,14 @@ func (s *Server) RegisterOutputCallback() {
 		// And to every page open on it — a browser's tab, the app's — which
 		// shows it as the device's own notification while it is open: no
 		// push service to sign up to, nothing to set but the permission.
+		// Kept, for a rating of it (👍 / 👎, notices.go) to find what it was.
+		noteNotice(noticeRecord{
+			ID: murmurID, WantID: w.Metadata.ID, Want: w.Metadata.Name, WantType: w.Metadata.Type,
+			Text: msg, Moment: ev.Moment, Timings: tell.Timings, Labels: labels, News: ev.News,
+		})
 		broadcastSSE(noticeEvent, wantNotice{
-			ID: w.Metadata.ID + "/" + out.ID, WantID: w.Metadata.ID, Title: title, Body: msg,
-			Off: mywant.GetDeviceStore().Settings().NoticesOff,
+			ID: murmurID, WantID: w.Metadata.ID, Title: title, Body: msg,
+			Off: mywant.GetDeviceStore().Settings().NoticesOff, Labels: labels,
 		})
 	}
 }
@@ -120,6 +145,8 @@ type wantNotice struct {
 	// Off: the devices that do not show notices (Devices' 通知, off) — a
 	// device finding itself here leaves it.
 	Off []string `json:"off,omitempty"`
+	// Labels: why it was said (reason, timings, trigger…) and what about.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // newsVoice is a want's news said in its own voice (mywant.WantNewsVoice) —
@@ -127,14 +154,23 @@ type wantNotice struct {
 // given, when the type has no script or the script has nothing to say. For
 // the notice and the push alike: the news is told as the tile would tell it.
 func (s *Server) newsVoice(w *mywant.Want, ev mywant.VoiceEvent, plain string) (string, string) {
+	line := s.newsVoiceLine(w, ev, plain)
+	return line.Say, line.Mood
+}
+
+// newsVoiceLine is newsVoice with the labels its voice gave the line (time,
+// place — for the wants that hear it).
+func (s *Server) newsVoiceLine(w *mywant.Want, ev mywant.VoiceEvent, plain string) mywant.VoiceLine {
 	script := ""
 	if s.wantTypeLoader != nil {
 		script = s.wantTypeLoader.GetVoiceScript(w.GetMetadata().Type)
 	}
-	if line := mywant.WantNewsVoice(context.Background(), w, script, ev); line.Say != "" {
-		return line.Say, line.Mood
+	line := mywant.WantNewsVoice(context.Background(), w, script, ev)
+	if line.Say != "" {
+		return line
 	}
-	return plain, ""
+	// No line of its own: the plain words, still with its labels.
+	return mywant.VoiceLine{Say: plain, Labels: line.Labels}
 }
 
 // outputMessage says an answer in one line, for the places that can only show

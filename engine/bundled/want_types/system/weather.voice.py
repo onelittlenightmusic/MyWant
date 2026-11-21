@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """What a weather want says when someone stands on it: how today feels — warm,
-cold, rain coming — rather than the numbers its card already shows.
+cold, rain coming — rather than the numbers its card already shows. And, when
+it heard another want's murmur (event "heard", spec.hear) — a reservation made
+nearby — its answer to it.
 See engine/core/want_voice.go for how a voice script is run."""
 import json
 import re
@@ -68,9 +70,65 @@ def lines(state: dict, answer=None) -> list:
     return out
 
 
+# When the reservation another want just made is (its answer's datetime):
+# "2026-11-22 10:00" → "11/22 10:00".
+WHEN = re.compile(r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})")
+
+
+def heard_reply(state: dict, heard: dict) -> list:
+    """What it says to a murmur it heard (spec.hear): a reservation made
+    nearby — when it is, and how the sky is now, to go out in. Anything else
+    it heard, how the sky is."""
+    now = lines(state)
+    sky = now[0] if now else ""
+    result = heard.get("result")
+    labels = heard.get("labels") or {}
+    when = ""
+    # The murmur's set labels first (time: RFC3339, place), then its answer.
+    m = WHEN.search(str(labels.get("time") or ""))
+    if m:
+        when = f"{int(m.group(2))}/{int(m.group(3))} {m.group(4)}:{m.group(5)}"
+    if labels.get("place"):
+        when = f"{when} {labels['place']}".strip()
+    if not when and isinstance(result, dict):
+        m = WHEN.search(str(result.get("datetime_rfc3339") or result.get("datetime") or ""))
+        if m:
+            when = f"{int(m.group(2))}/{int(m.group(3))} {m.group(4)}:{m.group(5)}"
+    who = heard.get("from_want_name") or ""
+    # The forecast for then and there, looked up in its Progress
+    # (heard_forecast, for this murmur): said in place of the sky now.
+    fc = state.get("heard_forecast") or {}
+    then = ""
+    if isinstance(fc, dict) and fc.get("murmur_id") == heard.get("murmur_id") and fc.get("text"):
+        t = number(TEMP, fc["text"])
+        cond = fc["text"].split(" ")[0]
+        then = f"その時間の{fc.get('city') or ''}は{cond}"
+        if t is not None:
+            then += f"、{t:.0f}°で{feel(t)}"
+        rain = re.search(r"降水 (\d+)%", fc["text"])
+        if rain and int(rain.group(1)) >= 30:
+            then += f"（降水{rain.group(1)}%、傘があると安心）"
+    if heard.get("from_want_type", "").startswith("smartgolf"):
+        head = f"{when}の予約、入ったね！" if when else "予約、入ったね！"
+        if then:
+            return [f"{head} {then}"]
+        return [f"{head} 今は{sky}" if sky else head]
+    if then:
+        return [f"「{who}」、聞いたよ。{then}"]
+    if heard.get("from_want_type") == "weather":
+        # Another sky: how it is there, and how it is here.
+        there = labels.get("place") or who
+        return [f"{there}の空、聞いたよ。こっちは{sky}" if sky else f"{there}の空、聞いたよ"]
+    return [f"「{who}」、聞いたよ。今は{sky}" if sky else f"「{who}」、聞いたよ"]
+
+
 def main() -> None:
     want = json.loads(sys.argv[1])
-    answer = (want.get("event") or {}).get("result")
+    event = want.get("event") or {}
+    if event.get("kind") == "heard" and isinstance(event.get("heard"), dict):
+        print(json.dumps({"say": heard_reply(want.get("state") or {}, event["heard"]) or None}, ensure_ascii=False))
+        return
+    answer = event.get("result")
     print(json.dumps({"say": lines(want.get("state") or {}, answer) or None}, ensure_ascii=False))
 
 

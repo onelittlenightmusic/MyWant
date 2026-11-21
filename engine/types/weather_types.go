@@ -1,7 +1,9 @@
 package types
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	. "mywant/engine/core"
 )
@@ -51,6 +53,38 @@ func (w *WeatherWant) Progress() {
 		w.SetCurrent("weather_condition", classifyWeatherCondition(text))
 		w.SetCurrent("achieving_percentage", 100)
 	}
+	w.forecastHeard()
+}
+
+// forecastHeard looks up what it heard another want say (spec.hear) — when and
+// where it is about, its labels first (Hear) — the forecast there, then: the
+// place heard ("西新宿店", "西新宿"), else its own. Kept for its voice to say
+// in answer (heard_forecast); each murmur once.
+func (w *WeatherWant) forecastHeard() {
+	heard := w.Hear(HearWhen, HearWhere)
+	if len(heard) == 0 {
+		return
+	}
+	m := heard[len(heard)-1]
+	if prev, ok := GetCurrent(w, "heard_forecast", map[string]any(nil))["murmur_id"].(string); ok && prev == m.MurmurID {
+		return
+	}
+	at, err := time.Parse(time.RFC3339, m.Meaning[HearWhen].Choice)
+	if err != nil {
+		return
+	}
+	place := m.Meaning[HearWhere].Choice
+	own := GetCurrent(w, "weather_city", "Tokyo")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	text, city, err := fetchForecastAt(ctx, []string{place, strings.TrimSuffix(place, "店"), own}, at)
+	kept := map[string]any{"murmur_id": m.MurmurID, "time": at.Format(time.RFC3339), "place": place}
+	if err != nil {
+		kept["error"] = err.Error()
+	} else {
+		kept["city"], kept["text"] = city, text
+	}
+	w.StoreState("heard_forecast", kept)
 }
 
 // classifyWeatherCondition maps weather description text to a condition key.

@@ -147,6 +147,7 @@ func (cb *ChainBuilder) deepCopyWants(src []*Want) []*Want {
 				Imports:             copyStringMap(want.Spec.Imports),
 				Alerts:              append([]AlertRule(nil), want.Spec.Alerts...),
 				Voice:               copyVoice(want.Spec.Voice),
+				Hear:                append([]HearSpec(nil), want.Spec.Hear...),
 			},
 		}
 		copiedWants = append(copiedWants, copiedWant)

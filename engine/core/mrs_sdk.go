@@ -115,6 +115,13 @@ func mrsContextEnv(c map[string]any) []string {
 		return nil
 	}
 	str := func(k string) string { s, _ := c[k].(string); return s }
+	jsList := func(k string) string {
+		b, err := json.Marshal(c[k])
+		if err != nil || c[k] == nil {
+			return "[]"
+		}
+		return string(b)
+	}
 	js := func(k string) string {
 		b, err := json.Marshal(c[k])
 		if err != nil || c[k] == nil {
@@ -128,6 +135,7 @@ func mrsContextEnv(c map[string]any) []string {
 		"MYWANT_WANT_TYPE=" + str("want_type"),
 		"MYWANT_WANT_STATE=" + js("state"),
 		"MYWANT_WANT_MEMO=" + js("memo"),
+		"MYWANT_WANT_HEARD=" + jsList("heard"),
 		"MYWANT_WANT_PARAMS=" + js("params"),
 		"MYWANT_WANT_LABELS=" + js("labels"),
 	}
@@ -156,6 +164,7 @@ func MRSWantContext(want *Want) map[string]any {
 		"want_type": md.Type,
 		"state":     want.GetAllState(),
 		"memo":      wantMemo(want),
+		"heard":     heardForScript(md.ID),
 		"params":    params,
 		"labels":    md.Labels,
 		"server":    map[string]any{"url": PluginServerURL},
@@ -170,7 +179,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 	_, timing := obj["_timing"]
 	_, wake := obj["_wake_at"]
 	_, memo := obj["_memo"]
-	if !control && !tile && !timing && !wake && !memo {
+	_, say := obj["_say"]
+	if !control && !tile && !timing && !wake && !memo && !say {
 		return false
 	}
 	if opt.OnDirective != nil {
@@ -183,7 +193,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 // itself ("_control": "suspend"), move its own tile ("_tile": {x, y}), or say
 // its answer came at a timing ("_timing": "album"), or run again at a time
 // ("_wake_at": "2026-11-21T18:45:00+09:00"), or keep something for its next
-// run ("_memo": {"soon_told": "…"}).
+// run ("_memo": {"soon_told": "…"}), or say a line, maybe in answer to a
+// murmur it heard ("_say": {"text": "…", "reply_to": "<murmur id>"}).
 // Only ever that want — nothing in the line names another.
 func MRSApplyDirective(want *Want, obj map[string]any) {
 	if c, _ := obj["_control"].(string); c != "" {
@@ -229,6 +240,19 @@ func MRSApplyDirective(want *Want, obj map[string]any) {
 	// set to null is let go) — handed back in MYWANT_WANT_MEMO.
 	if m, ok := obj["_memo"].(map[string]any); ok {
 		rememberMemo(want, m)
+	}
+	// A line said, maybe in answer to a murmur it heard ({"_say": {"text",
+	// "reply_to"}}, or a plain string).
+	switch v := obj["_say"].(type) {
+	case string:
+		want.StoreState("say", v)
+	case map[string]any:
+		text, _ := v["text"].(string)
+		if replyTo, _ := v["reply_to"].(string); replyTo != "" {
+			want.SayInReply(HeardMurmur{MurmurID: replyTo}, text)
+		} else if text != "" {
+			want.StoreState("say", text)
+		}
 	}
 	if t, ok := obj["_tile"].(map[string]any); ok {
 		cb := GetGlobalChainBuilder()

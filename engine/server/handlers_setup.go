@@ -43,6 +43,7 @@ func (s *Server) setupRoutes() {
 	wants.HandleFunc("/{id}/manifest.webmanifest", s.handleWantManifest).Methods("GET")
 	// Per-want alerts (see handlers_notifications.go).
 	wants.HandleFunc("/{id}/notify", s.notifyWant).Methods("POST", "OPTIONS")
+	wants.HandleFunc("/{id}/hear", s.hearWant).Methods("POST", "OPTIONS")
 	// Its answers, read and edited by hand (handlers_result_history.go).
 	wants.HandleFunc("/{id}/results", s.listResultHistory).Methods("GET")
 	wants.HandleFunc("/{id}/results", s.addResultHistory).Methods("POST")
@@ -588,6 +589,9 @@ func (s *Server) setupRoutes() {
 
 	// Server-Sent Events: real-time push for cursors, gui_state, want_changed
 	api.HandleFunc("/events", s.sseEvents).Methods("GET")
+	// A notice rated 👍 / 👎 (Laya learns from it), and muted (notices.go).
+	api.HandleFunc("/notices/{id}/rate", s.rateNotice).Methods("POST", "OPTIONS")
+	api.HandleFunc("/notices/{id}/mute", s.muteNotice).Methods("POST", "OPTIONS")
 
 	// Health check
 	s.router.HandleFunc("/health", s.healthCheck).Methods("GET")

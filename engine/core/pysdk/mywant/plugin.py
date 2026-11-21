@@ -47,7 +47,8 @@ class Want:
 
     def __init__(self, id: str, name: str = "", *, type: str = "", state: Optional[dict] = None,
                  params: Optional[dict] = None, labels: Optional[dict] = None,
-                 server: Optional[Client] = None, out=None, memo: Optional[dict] = None):
+                 server: Optional[Client] = None, out=None, memo: Optional[dict] = None,
+                 heard: Optional[list] = None):
         self.id = id
         self.name = name
         self.type = type
@@ -56,6 +57,10 @@ class Want:
         self.labels = dict(labels or {})
         # What it kept for this run on the last one (remember).
         self.memo = dict(memo or {})
+        # The murmurs of other wants it heard (spec.hear), oldest first: each
+        # {murmur_id, from_want_id, from_want_name, from_want_type, timings,
+        # text, result, fields, at}. Answer one with say(..., reply_to=).
+        self.heard = list(heard or [])
         self.server = server or Client()
         self._out = out
         self._answer: dict = {}
@@ -92,6 +97,25 @@ class Want:
         want murmurs and notifies at it as it was set to (labels murmur /
         notify)."""
         self._emit({"_timing": str(name)})
+
+    def hear(self, *asks: str) -> list:
+        """What it heard (spec.hear), each murmur with what the asks mean in it
+        — e.g. hear("when", "where") → m["meaning"]["when"] = {"choice":
+        "<RFC3339>", "probabilities": {...}}. A murmur's labels (time, place)
+        answer first; else the server reads it through Laya. Without asks, or
+        with the server out of reach, what it was handed (heard)."""
+        if not asks or not self.id:
+            return list(self.heard)
+        try:
+            res = self.server.request("POST", f"/api/v1/wants/{self.id}/hear", {"asks": list(asks)})
+        except Exception:
+            return list(self.heard)
+        return list((res or {}).get("heard") or [])
+
+    def say(self, text: str, reply_to: str = "") -> None:
+        """Say a line over its tile — in answer to a murmur it heard when
+        reply_to names it (its murmur_id), so the conversation can be traced."""
+        self._emit({"_say": {"text": str(text), "reply_to": str(reply_to or "")}})
 
     def remember(self, **kept) -> None:
         """Keep these for its next run, where they come back in `memo` —
@@ -150,6 +174,7 @@ def _enter(context: dict, out=None) -> Want:
                       username=srv.get("username"), password=srv.get("password")),
         out=out,
         memo=context.get("memo"),
+        heard=context.get("heard"),
     )
     _local.want = w
     return w
@@ -170,6 +195,17 @@ def _json_env(name: str) -> dict:
     return v if isinstance(v, dict) else {}
 
 
+def _json_list_env(name: str) -> list:
+    raw = os.environ.get(name)
+    if not raw:
+        return []
+    try:
+        v = json.loads(raw)
+    except ValueError:
+        return []
+    return v if isinstance(v, list) else []
+
+
 def _from_env() -> Want:
     return Want(
         os.environ.get("MYWANT_WANT_ID", ""),
@@ -180,4 +216,5 @@ def _from_env() -> Want:
         labels=_json_env("MYWANT_WANT_LABELS"),
         server=Client(),
         memo=_json_env("MYWANT_WANT_MEMO"),
+        heard=_json_list_env("MYWANT_WANT_HEARD"),
     )

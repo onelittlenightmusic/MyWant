@@ -111,6 +111,16 @@ wantType:
       label: current
       initialValue: ''
 
+    # What it heard another want say and looked up for it (spec.hear): a
+    # reservation's time and place → the forecast there, then. Its voice says
+    # it in answer (weather.voice.py, event "heard").
+    - name: heard_forecast
+      description: 聞いたつぶやきの時刻・場所の予報 {murmur_id, time, place, city, text}
+      type: object
+      persistent: true
+      label: current
+      initialValue: null
+
   onInitialize:
     params:
       weather_city: at

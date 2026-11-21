@@ -362,3 +362,65 @@ func chosenTimings(label string, defs []TimingDef, byDefault func(TimingDef) boo
 	}
 	return out, true
 }
+
+// NotifyTimings is the timings the want notifies at now, in its type's order
+// (spec.voice.notify, else the older label, else the type's defaults).
+func (n *Want) NotifyTimings() []string {
+	defs := n.typeTimings()
+	var notify *[]string
+	if v := n.Spec.Voice; v != nil {
+		notify = v.Notify
+	}
+	at, _ := voiceTimings(notify, n.GetLabels()[NotifyLabel], defs, func(d TimingDef) bool { return d.Notify })
+	var out []string
+	for _, d := range defs {
+		if at[d.Name] {
+			out = append(out, d.Name)
+		}
+	}
+	return out
+}
+
+// MutedNotify is the want's spec.voice with timings taken out of what it
+// notifies at — written as its own list from then on (an empty one is none).
+func (n *Want) MutedNotify(timings []string) *VoiceSpec {
+	off := map[string]bool{}
+	for _, t := range timings {
+		off[t] = true
+	}
+	keep := []string{}
+	for _, t := range n.NotifyTimings() {
+		if !off[t] {
+			keep = append(keep, t)
+		}
+	}
+	v := VoiceSpec{}
+	if n.Spec.Voice != nil {
+		v = *n.Spec.Voice
+	}
+	v.Notify = &keep
+	return &v
+}
+
+// TimingConditions says what made each timing come, in its type's words:
+// "onIncrease:reservations", "if:…", "onChange:…" — empty for one that comes
+// with every answer (the standard "answer").
+func (n *Want) TimingConditions(names []string) []string {
+	defs := map[string]TimingDef{}
+	for _, d := range n.typeTimings() {
+		defs[d.Name] = d
+	}
+	var out []string
+	for _, name := range names {
+		d, ok := defs[name]
+		if !ok {
+			continue
+		}
+		for _, c := range [][2]string{{"if", d.If}, {"onChange", d.OnChange}, {"onIncrease", d.OnIncrease}, {"onDecrease", d.OnDecrease}} {
+			if c[1] != "" {
+				out = append(out, c[0]+":"+c[1])
+			}
+		}
+	}
+	return out
+}

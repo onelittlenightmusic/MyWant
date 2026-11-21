@@ -75,6 +75,12 @@ type NotificationEntry struct {
 	// description of it. Message is only that answer said in a sentence, for a
 	// push notification that cannot draw one.
 	Output *mywant.ResultHistoryEntry `json:"output,omitempty" yaml:"output,omitempty"`
+
+	// Labels: what a murmur is about and why it was said, in set words —
+	// time, place (core MurmurLabel*), reason ("timing" | "heard"), and for
+	// a timing its event (timings, trigger, condition, output_id), for an
+	// answer heard the murmur it answers (reply_to, from_want_id).
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 // NotificationStore appends notices to ~/.mywant/notifications.yaml.

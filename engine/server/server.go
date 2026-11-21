@@ -379,6 +379,9 @@ func New(config Config) *Server {
 			&CanvasCoordinateHook{},
 		},
 	}
+	// A want that hears another reads what a murmur is about (when, where):
+	// its labels first, else Laya, else the first candidate (hear.go).
+	mywant.HearInterpret = srv.interpretHeard
 	return srv
 }
 

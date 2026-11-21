@@ -112,7 +112,7 @@ class _ThreadArgv(list):
 # The lines a script says something with rather than answers (mrs_sdk.go's
 # mrsDirective, and progress). One missing here is taken for the answer and
 # lost under the real one — as _timing, _wake_at and _memo were.
-_DIRECTIVE_KEYS = frozenset(("_progress", "_control", "_tile", "_timing", "_wake_at", "_memo"))
+_DIRECTIVE_KEYS = frozenset(("_progress", "_control", "_tile", "_timing", "_wake_at", "_memo", "_say"))
 
 
 class _Output(io.TextIOBase):
