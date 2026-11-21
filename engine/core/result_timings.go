@@ -152,12 +152,14 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) []
 // declares it with murmur and notify off.
 const AnswerTiming = "answer"
 
-// withStandardTimings gives a type that names timings the standard one
-// (AnswerTiming) first, telling of every new answer, unless it declares it
-// itself. A type with no timings is left as it is: it tells of every answer
-// anyway.
+// withStandardTimings gives every type that has answers — a result field, or
+// timings of its own — the standard one (AnswerTiming) first, telling of
+// every new answer, unless it declares it itself: so every want with answers
+// can choose whether it murmurs and notifies at them (Want Settings' Timing),
+// and a type adds only the moments of its own. A type with no answers has
+// nothing to tell of and is left as it is.
 func withStandardTimings(def *WantTypeDefinition) {
-	if def == nil || len(def.Timings) == 0 {
+	if def == nil || (len(def.Timings) == 0 && def.FinalResultField == "") {
 		return
 	}
 	for _, d := range def.Timings {
@@ -170,8 +172,16 @@ func withStandardTimings(def *WantTypeDefinition) {
 	}}, def.Timings...)
 }
 
-// HasTimings: its type names timings to tell of its answers at.
-func (n *Want) HasTimings() bool { return len(n.typeTimings()) > 0 }
+// HasTimings: its type names moments of its own to tell of its answers at —
+// not only the standard one every type with answers has.
+func (n *Want) HasTimings() bool {
+	for _, d := range n.typeTimings() {
+		if d.Name != AnswerTiming {
+			return true
+		}
+	}
+	return false
+}
 
 func (n *Want) typeTimings() []TimingDef {
 	if n.WantTypeDefinition == nil {

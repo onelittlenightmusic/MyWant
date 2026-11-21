@@ -22,7 +22,16 @@ func TestStandardAnswerTiming(t *testing.T) {
 	none := &WantTypeDefinition{}
 	withStandardTimings(none)
 	if len(none.Timings) != 0 {
-		t.Fatalf("a type with no timings given one: %+v", none.Timings)
+		t.Fatalf("a type with no answers given a timing: %+v", none.Timings)
+	}
+	answers := &WantTypeDefinition{}
+	answers.FinalResultField = "summary"
+	withStandardTimings(answers)
+	if len(answers.Timings) != 1 || answers.Timings[0].Name != AnswerTiming || !answers.Timings[0].Notify {
+		t.Fatalf("a type with answers and no timings: %+v, want answer, telling", answers.Timings)
+	}
+	if (&Want{WantTypeDefinition: answers}).HasTimings() {
+		t.Fatal("the standard timing alone counted as timings of its own")
 	}
 
 	// A new answer at the standard timing tells, the type's own declared or not.
