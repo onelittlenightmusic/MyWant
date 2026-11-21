@@ -543,6 +543,14 @@ func (n *Want) SetStatus(status WantStatus) {
 			}
 		}
 
+		// A failure that passes by itself is run again later; an answer ends
+		// any failing (want_retry.go).
+		if status == WantStatusFailed {
+			n.noteFailed()
+		} else if IsAchievedStatus(status) {
+			n.noteAnswered()
+		}
+
 		// OpenTelemetry: manage want lifecycle span
 		n.otelOnStatusChange(oldStatus, status)
 	}

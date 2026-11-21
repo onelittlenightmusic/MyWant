@@ -142,6 +142,31 @@ func (s *SchedulerWant) start() {
 	scheduleEar = s.changed
 	scheduleEarMu.Unlock()
 	s.refreshAll()
+	s.retryPassingFailures()
+}
+
+// retryPassingFailures runs again, once, the wants found failed for a
+// passing reason (want_retry.go) with no wake of their own to come — those
+// that failed before the server stopped, or before failures were run again
+// at all. Failing again, each is run again on its own from there.
+func (s *SchedulerWant) retryPassingFailures() {
+	now := time.Now()
+	for _, w := range s.builder.GetWants() {
+		if w.GetStatus() != WantStatusFailed {
+			continue
+		}
+		errText, _ := w.GetStateString(StateFieldError, "")
+		if !IsTransientFailure(errText) {
+			continue
+		}
+		if at, ok := wakeOf(w); ok && at.After(now) {
+			continue // its own wake will run it
+		}
+		InfoLog("[RETRY] Running '%s' again: it failed for a passing reason (%s)\n", w.Metadata.Name, firstLineOf(errText))
+		if err := s.builder.RestartWant(w.Metadata.ID); err != nil {
+			InfoLog("[RETRY] Could not run '%s' again: %v\n", w.Metadata.Name, err)
+		}
+	}
 }
 
 // refreshAll reads every want's schedule.

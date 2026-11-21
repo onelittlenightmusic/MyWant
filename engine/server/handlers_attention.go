@@ -18,7 +18,9 @@ import (
 //                  waiting_user_action status). Answered in the GUI.
 //   - alert:       one of the want's own promises holds (spec.alerts) — its
 //                  person said "call me when this happens". Looked at in the GUI.
-//   - want_error:  a want failed (failed / config_error / module_error).
+//   - want_error:  a want failed (failed / config_error / module_error) —
+//                  not one failing for a passing reason (the network) that is
+//                  being run again and has not failed for an hour yet.
 //                  Looked at in the GUI.
 //   - web_failed:  an automated run in a browser tab (browser-run) came back
 //                  with an error. Looked at in that tab — its URL.
@@ -114,6 +116,11 @@ func (s *Server) getAttention(w http.ResponseWriter, r *http.Request) {
 				ID: "approval:" + id, Kind: "approval", Title: title, Detail: pending, WantID: id,
 				At: time.Now().UnixMilli(),
 			})
+		// A failure that passes by itself (the network down a moment) is run
+		// again on its own and is no one's to see until it has lasted an hour
+		// (core/want_retry.go). Mended by a person — run again, changed — it
+		// is no longer failed, and so no longer here.
+		case status == mywant.WantStatusFailed && mywant.StillRetrying(want, now):
 		case status == mywant.WantStatusFailed || status == mywant.WantStatusConfigError || status == mywant.WantStatusModuleError:
 			items = append(items, AttentionItem{
 				ID: "error:" + id, Kind: "want_error", Title: title, Detail: string(status), WantID: id,
