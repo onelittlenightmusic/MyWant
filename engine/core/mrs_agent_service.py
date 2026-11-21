@@ -375,14 +375,28 @@ _RESIDENT_LIFE = 1800     # seconds a resident serves at most, leaks and all
 _RESIDENT_MAX = 6         # residents at once; the least recently used goes
 _RESIDENT_CPU = 3600      # its CPU limit: a resident adds up its calls'
 
-# The SDK (mywant, mywant.plugin) too, and not only for speed: its directory
-# (PYTHONPATH) is under /tmp, which a jailed child gets a fresh one of, so a
-# script importing it there found nothing — no current(), no memo — unless
-# the zygote had imported it first.
 _WARM = ("json", "re", "datetime", "pathlib", "urllib.request", "urllib.parse",
          "http.client", "ssl", "hashlib", "base64", "subprocess", "colorsys",
-         "math", "random", "time", "traceback", "typing", "dataclasses",
-         "mywant", "mywant.plugin")
+         "math", "random", "time", "traceback", "typing", "dataclasses")
+
+
+def _warm_sdk():
+    """The SDK, every module of it, and not only for speed: its directory
+    (PYTHONPATH) is under /tmp, which a jailed child gets a fresh one of, so
+    nothing of it can be imported there — a script importing mywant found
+    nothing (no current(), no memo), and once mywant itself was imported first
+    (v0.17.126) its Client, which imports its resources as it is made, failed
+    every call. Imported here, the zygote's forks have all of it."""
+    try:
+        import mywant
+    except ImportError:
+        return
+    import pkgutil
+    for mod in pkgutil.iter_modules(mywant.__path__, "mywant."):
+        try:
+            __import__(mod.name)
+        except Exception:
+            pass
 
 CLONE_NEWNS = 0x00020000
 CLONE_NEWNET = 0x40000000
@@ -480,6 +494,7 @@ class _Runner:
                 __import__(name)
             except ImportError:
                 pass
+        _warm_sdk()
         ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
         if os.fork() == 0:
             ours.close()
