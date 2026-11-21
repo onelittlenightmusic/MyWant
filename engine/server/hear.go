@@ -36,6 +36,7 @@ type wantConverse struct {
 	From     string `json:"from"`
 	To       string `json:"to"`
 	MurmurID string `json:"murmurId"`
+	At       string `json:"at,omitempty"` // RFC3339
 }
 
 // hearMurmur hands a murmur just said to every want that hears it, and wakes
@@ -62,7 +63,9 @@ func (s *Server) hearMurmur(src *mywant.Want, murmurID, text string, out mywant.
 				Timings: out.Timings, Text: text, Result: out.Result, Fields: out.Fields, Labels: labels, At: time.Now(),
 			}
 			mywant.DeliverHeard(w.Metadata.ID, m)
-			broadcastSSE(converseEvent, wantConverse{From: src.Metadata.ID, To: w.Metadata.ID, MurmurID: murmurID})
+			c := wantConverse{From: src.Metadata.ID, To: w.Metadata.ID, MurmurID: murmurID, At: time.Now().Format(time.RFC3339)}
+			noteConverse(c)
+			broadcastSSE(converseEvent, c)
 			go s.answerHeard(w.Metadata.ID, m)
 			break // heard once, however many of its hear entries match
 		}

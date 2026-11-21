@@ -591,6 +591,7 @@ func (s *Server) setupRoutes() {
 	api.HandleFunc("/events", s.sseEvents).Methods("GET")
 	// A notice rated 👍 / 👎 (Laya learns from it), and muted (notices.go).
 	api.HandleFunc("/notices/{id}/rate", s.rateNotice).Methods("POST", "OPTIONS")
+	api.HandleFunc("/converse", s.listConverses).Methods("GET", "OPTIONS")
 	api.HandleFunc("/notices/{id}/mute", s.muteNotice).Methods("POST", "OPTIONS")
 
 	// Health check
