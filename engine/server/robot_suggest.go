@@ -13,7 +13,12 @@ import (
 // opened — the browser's, the phone's, the Mac's alike:
 //
 //	GET  /api/v1/robot/suggestions[?fresh=1][&max=6] → {suggestions: [{id, pill, ask, p}], by}
-//	POST /api/v1/robot/suggestions/{id}   → {answer}: done, said in the chat
+//	POST /api/v1/robot/suggestions/{id}   → {pill}: the pill pressed, noted
+//
+// A pill pressed is said in the chat as its words, as if typed: the client
+// sends them as any question, and the robot's chat does the rest as it does
+// for anything asked — the plan, what is done, the answer in its words, the
+// wants it is about as cards. Nothing here does it.
 //
 // The candidates are the offers' own (robot_offer.go) with no news to follow:
 // the way to where the person goes (offerHomes, every part of the day) and
@@ -38,6 +43,9 @@ const (
 	// suggestKept is how long a pill shown can still be pressed: a widget
 	// shows what it fetched a while ago (mywant-ios MyWantWidgets).
 	suggestKept = time.Hour
+	// suggestFloor: a candidate less likely than this is not shown even to
+	// make up the chat's pills.
+	suggestFloor = 0.1
 )
 
 type robotSuggestion struct {
@@ -100,6 +108,25 @@ func (s *Server) suggestBase(now time.Time) string {
 	}
 	tiles, _ := s.robotTiles()
 	return suggestEvent + offerNow(now) + offerWhere(px, py, ok, tiles)
+}
+
+// pickLikely is the candidates to show, likeliest first: every one Laya finds
+// likely (at least min), and when those are fewer than the chat's pills
+// (want), the next likeliest to make them up — a chat opened is offered
+// something even when nothing is sure — but none below floor.
+func pickLikely(ps []float64, min, floor float64, want int) []int {
+	order := make([]int, len(ps))
+	for i := range order {
+		order[i] = i
+	}
+	sort.SliceStable(order, func(a, b int) bool { return ps[order[a]] > ps[order[b]] })
+	var out []int
+	for _, i := range order {
+		if ps[i] >= min || (len(out) < want && ps[i] >= floor) {
+			out = append(out, i)
+		}
+	}
+	return out
 }
 
 // suggestCandidates: running again the wants that find things, and the way
@@ -227,14 +254,36 @@ func (s *Server) pickSuggestions(base string, cands []offerCandidate, now time.T
 		a, who, err := ri.decider.decideMany(items)
 		if err == nil {
 			answers, by = a, who
+			ps := make([]float64, len(a))
 			for i, x := range a {
-				if p := x[offerQuestionID].Probabilities["accept"]; p >= offerMin() {
-					picked = append(picked, scored{i, p})
+				ps[i] = x[offerQuestionID].Probabilities["accept"]
+			}
+			for _, i := range pickLikely(ps, offerMin(), suggestFloor, suggestMax) {
+				picked = append(picked, scored{i, ps[i]})
+			}
+			likely := 0
+			for _, x := range picked {
+				if x.p >= offerMin() {
+					likely++
 				}
 			}
-			sort.SliceStable(picked, func(a, b int) bool { return picked[a].p > picked[b].p })
-			log.Printf("[suggest] %d candidates by %s in %s; %d likely", len(cands), who,
-				time.Since(started).Round(time.Millisecond), len(picked))
+			log.Printf("[suggest] %d candidates by %s in %s; %d likely, %d shown", len(cands), who,
+				time.Since(started).Round(time.Millisecond), likely, len(picked))
+			if likely == 0 && len(a) > 0 {
+				// None likely: the nearest misses, so why none is not a guess.
+				order := make([]int, len(a))
+				for i := range order {
+					order[i] = i
+				}
+				pOf := func(i int) float64 { return a[i][offerQuestionID].Probabilities["accept"] }
+				sort.SliceStable(order, func(x, y int) bool { return pOf(order[x]) > pOf(order[y]) })
+				var near []string
+				for _, i := range order[:min(3, len(order))] {
+					near = append(near, fmt.Sprintf("%s=%.2f", cands[i].Key, pOf(i)))
+				}
+				log.Printf("[suggest] none at %.2f or more; likeliest: %s; asked as: %s", offerMin(),
+					strings.Join(near, ", "), strings.SplitN(items[0].State, "提案:", 2)[0])
+			}
 		} else if err != errNoModel {
 			log.Printf("[suggest] no decision (%v); by the rules", err)
 		}
@@ -292,9 +341,9 @@ func suggestByRules(cands []offerCandidate, now time.Time) []int {
 	return append(homes, rest...)
 }
 
-// takeSuggestion does the pill pressed: said in the chat as the person's,
-// done, and its outcome said by the robot. A yes to it and a no to the rest
-// shown beside it.
+// takeSuggestion notes the pill pressed — a yes to it and a no to the rest
+// shown beside it — and hands its words back for the client to say in the
+// chat as the person's. It does nothing itself: the chat does what is said.
 func (s *Server) takeSuggestion(id string) (string, bool) {
 	robotSuggests.Lock()
 	var taken *shownSuggestion
@@ -333,9 +382,5 @@ func (s *Server) takeSuggestion(id string) (string, bool) {
 		_ = appendJSONLine(labels, initiativeLabel{ID: o.ID, At: at, By: "person",
 			Gold: map[string]string{offerQuestionID: "skip"}, Reason: "another pill was pressed: " + taken.Pill})
 	}
-	s.robotAsked(taken.Pill, "")
-	out, err := taken.cand.run(s)
-	answer := offerDone(taken.cand, out, err)
-	s.sayTurnAnswer(answer, nil, nil, "")
-	return answer, true
+	return taken.Pill, true
 }

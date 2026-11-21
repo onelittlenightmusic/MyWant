@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -50,5 +51,24 @@ func TestTakeSuggestionNeedsAPillShown(t *testing.T) {
 	robotSuggests.Unlock()
 	if _, ok := (&Server{}).takeSuggestion("suggest-1-0"); ok {
 		t.Error("a pill never shown was taken")
+	}
+}
+
+func TestPickLikelyMakesUpThePills(t *testing.T) {
+	// Two likely: both, then the next likeliest to make three.
+	if got := pickLikely([]float64{0.2, 0.7, 0.05, 0.6, 0.3}, 0.5, 0.1, 3); fmt.Sprint(got) != "[1 3 4]" {
+		t.Errorf("two likely: %v, want [1 3 4]", got)
+	}
+	// None likely: the three likeliest above the floor.
+	if got := pickLikely([]float64{0.36, 0.21, 0.05, 0.2, 0.09}, 0.5, 0.1, 3); fmt.Sprint(got) != "[0 1 3]" {
+		t.Errorf("none likely: %v, want [0 1 3]", got)
+	}
+	// More likely than the pills: every likely one (the widget shows six).
+	if got := pickLikely([]float64{0.9, 0.8, 0.7, 0.6, 0.2}, 0.5, 0.1, 3); fmt.Sprint(got) != "[0 1 2 3]" {
+		t.Errorf("four likely: %v, want [0 1 2 3]", got)
+	}
+	// Below the floor: not even to make up.
+	if got := pickLikely([]float64{0.05, 0.02}, 0.5, 0.1, 3); len(got) != 0 {
+		t.Errorf("all below the floor: %v", got)
 	}
 }

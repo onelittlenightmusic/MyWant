@@ -144,14 +144,15 @@ func (s *Server) handleRobotSuggestions(w http.ResponseWriter, r *http.Request) 
 	robotWriteJSON(w, s.robotSuggestionsNow(r.URL.Query().Get("fresh") == "1", max))
 }
 
-// handleRobotSuggestionTake does the pill pressed and says how it went.
+// handleRobotSuggestionTake notes the pill pressed and hands back its words,
+// for the client to send to the robot's chat as any question.
 //
-//	POST /api/v1/robot/suggestions/{id}
+//	POST /api/v1/robot/suggestions/{id} → {"pill": "いつもの中野坂上の天気"}
 func (s *Server) handleRobotSuggestionTake(w http.ResponseWriter, r *http.Request) {
-	answer, ok := s.takeSuggestion(mux.Vars(r)["id"])
+	pill, ok := s.takeSuggestion(mux.Vars(r)["id"])
 	if !ok {
 		http.Error(w, "no such pill shown lately", http.StatusConflict)
 		return
 	}
-	robotWriteJSON(w, map[string]string{"answer": answer})
+	robotWriteJSON(w, map[string]string{"pill": pill})
 }
