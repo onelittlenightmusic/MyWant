@@ -75,3 +75,26 @@ func TestTimingMoments(t *testing.T) {
 		t.Errorf("moments: %q", got)
 	}
 }
+
+func TestVoiceInSpecOverLabels(t *testing.T) {
+	def := &WantTypeDefinition{Timings: []TimingDef{{Name: AnswerTiming, Murmur: true, Notify: true}, {Name: "soon", Murmur: true, Notify: true}}}
+	w := &Want{WantTypeDefinition: def}
+	w.Metadata.Labels = map[string]string{MurmurLabel: "none"}
+	at := ResultHistoryEntry{Timings: []string{AnswerTiming}}
+	if tell := w.TellingOf(at); tell.Murmur || !tell.Notify {
+		t.Fatalf("the label, with no spec.voice: %+v", tell)
+	}
+	soon, none := []string{"soon"}, []string{}
+	w.Spec.Voice = &VoiceSpec{Murmur: &soon, Notify: &none}
+	if tell := w.TellingOf(at); tell.Murmur || tell.Notify || !tell.NotifyChosen {
+		t.Fatalf("spec.voice over the label (answer neither murmured nor notified): %+v", tell)
+	}
+	if tell := w.TellingOf(ResultHistoryEntry{Timings: []string{"soon"}}); !tell.Murmur || tell.Notify {
+		t.Fatalf("soon: murmured, not notified: %+v", tell)
+	}
+	c := cloneSpec(w.Spec)
+	*c.Voice.Murmur = append(*c.Voice.Murmur, "x")
+	if len(*w.Spec.Voice.Murmur) != 1 {
+		t.Fatal("a clone shares its voice")
+	}
+}

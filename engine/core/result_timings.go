@@ -29,7 +29,8 @@ import (
 // The history is not this: every answer the type keeps is kept, told of or
 // not — a player's every song, murmured only when the album changes.
 
-// Labels a want chooses its timings in.
+// Labels a want chose its timings in before spec.voice (WantSpec.Voice), still
+// read when it has none.
 const (
 	MurmurLabel = "murmur"
 	NotifyLabel = "notify"
@@ -280,6 +281,9 @@ func (n *Want) typeTimings() []TimingDef {
 // TimingDef is one moment of a type's answer worth telling of.
 type TimingDef = want_spec.TimingDef
 
+// VoiceSpec is when a want speaks up about its answers (spec.voice).
+type VoiceSpec = want_spec.VoiceSpec
+
 // Telling is how a want tells of one answer.
 type Telling struct {
 	// The type's timings the answer came at.
@@ -298,9 +302,13 @@ func (n *Want) TellingOf(entry ResultHistoryEntry) Telling {
 		return Telling{Murmur: true, Notify: true}
 	}
 	labels := n.GetLabels()
+	var murmur, notify *[]string
+	if v := n.Spec.Voice; v != nil {
+		murmur, notify = v.Murmur, v.Notify
+	}
 	t := Telling{Timings: entry.Timings}
-	murmurAt, _ := chosenTimings(labels[MurmurLabel], defs, func(d TimingDef) bool { return d.Murmur })
-	notifyAt, chosen := chosenTimings(labels[NotifyLabel], defs, func(d TimingDef) bool { return d.Notify })
+	murmurAt, _ := voiceTimings(murmur, labels[MurmurLabel], defs, func(d TimingDef) bool { return d.Murmur })
+	notifyAt, chosen := voiceTimings(notify, labels[NotifyLabel], defs, func(d TimingDef) bool { return d.Notify })
 	t.NotifyChosen = chosen
 	for _, name := range entry.Timings {
 		t.Murmur = t.Murmur || murmurAt[name]
@@ -309,8 +317,26 @@ func (n *Want) TellingOf(entry ResultHistoryEntry) Telling {
 	return t
 }
 
-// chosenTimings reads a want's choice: names, "all" or "none"; with none
-// written, the type's defaults. chosen says the want wrote one.
+// voiceTimings is a want's choice of the timings it murmurs or notifies at:
+// its spec.voice list (an empty one, none), else — a want written before
+// spec.voice — the label of the same name, else the type's defaults. chosen
+// says the want made one.
+func voiceTimings(list *[]string, label string, defs []TimingDef, byDefault func(TimingDef) bool) (map[string]bool, bool) {
+	if list == nil {
+		return chosenTimings(label, defs, byDefault)
+	}
+	out := map[string]bool{}
+	for _, name := range *list {
+		if name = strings.TrimSpace(name); name != "" {
+			out[name] = true
+		}
+	}
+	return out, true
+}
+
+// chosenTimings reads a want's choice as a label held it (before spec.voice):
+// names, "all" or "none"; with none written, the type's defaults. chosen says
+// the want wrote one.
 func chosenTimings(label string, defs []TimingDef, byDefault func(TimingDef) bool) (map[string]bool, bool) {
 	out := map[string]bool{}
 	label = strings.TrimSpace(label)

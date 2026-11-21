@@ -146,6 +146,7 @@ func (cb *ChainBuilder) deepCopyWants(src []*Want) []*Want {
 				Exposes:             copyExposes(want.Spec.Exposes),
 				Imports:             copyStringMap(want.Spec.Imports),
 				Alerts:              append([]AlertRule(nil), want.Spec.Alerts...),
+				Voice:               copyVoice(want.Spec.Voice),
 			},
 		}
 		copiedWants = append(copiedWants, copiedWant)
@@ -260,4 +261,20 @@ func copyExposes(src []ExposeEntry) []ExposeEntry {
 	dst := make([]ExposeEntry, len(src))
 	copy(dst, src)
 	return dst
+}
+
+// copyVoice copies a want's voice (spec.voice), its lists apart: nil stays
+// nil (the type's say), an empty list stays empty (none).
+func copyVoice(v *VoiceSpec) *VoiceSpec {
+	if v == nil {
+		return nil
+	}
+	list := func(l *[]string) *[]string {
+		if l == nil {
+			return nil
+		}
+		c := append([]string{}, (*l)...)
+		return &c
+	}
+	return &VoiceSpec{Murmur: list(v.Murmur), Notify: list(v.Notify)}
 }

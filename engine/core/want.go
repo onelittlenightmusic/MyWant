@@ -2173,6 +2173,7 @@ func cloneSpec(s WantSpec) WantSpec {
 	if s.Alerts != nil {
 		s.Alerts = append([]AlertRule(nil), s.Alerts...)
 	}
+	s.Voice = copyVoice(s.Voice)
 	if s.UnknownFields != nil {
 		s.UnknownFields = append([]string(nil), s.UnknownFields...)
 	}
