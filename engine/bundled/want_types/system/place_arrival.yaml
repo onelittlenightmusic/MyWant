@@ -17,6 +17,23 @@ wantType:
       category-icon: MapPin
       category-bg-light: "linear-gradient(160deg, #bbf7d0 0%, #bfdbfe 100%)"
       category-bg-dark:  "linear-gradient(160deg, #14532d 0%, #1e3a8a 100%)"
+  # Its answer is whether it is there: one kept each time that changes, so
+  # the arrivals are on its history and can be told of.
+  finalResultField: inside
+  # arrived: it came within the place's radius (the edge it fires its
+  # reaction on). Leaving is an answer too, but not news (the standard timing
+  # "answer" turned off).
+  timings:
+    - name: answer
+      description: 新しい結果が出たとき（離れたときは知らせない）
+      murmur: false
+      notify: false
+    - name: arrived
+      description: 場所に着いたとき
+      if: inside
+      onChange: inside
+      murmur: true
+      notify: true
   parameters:
     - name: place
       type: string

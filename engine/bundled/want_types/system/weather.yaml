@@ -30,6 +30,16 @@ wantType:
 
   finalResultField: weather_text
 
+  # When it tells of its answer, besides every new one (the standard timing
+  # "answer"). condition_changed: the weather itself turned (晴れ → 雨), not
+  # only the temperature — a want that wants only this turns answer off.
+  timings:
+    - name: condition_changed
+      description: 天気が変わったとき（晴れ→雨など）
+      onChange: weather_condition
+      murmur: true
+      notify: true
+
   achievedWhen:
     field: weather_date
     operator: "=="

@@ -87,6 +87,18 @@ wantType:
     required: false
     default: ""
 
+  # Its answer is Claude Code's latest reply: one kept for each new reply,
+  # so the replies are on its history and can be told of.
+  finalResultField: latest_response_content
+  # replied: Claude Code answered the last request (besides every new answer,
+  # the standard timing "answer").
+  timings:
+    - name: replied
+      description: Claude Code から返事が来たとき
+      if: has_new_response
+      murmur: true
+      notify: true
+
   state:
   - name: phase
     description: Current phase of the want (monitoring, trigger_ready, requesting, awaiting_response, response_received, achieved, error)
