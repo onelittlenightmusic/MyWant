@@ -375,9 +375,14 @@ _RESIDENT_LIFE = 1800     # seconds a resident serves at most, leaks and all
 _RESIDENT_MAX = 6         # residents at once; the least recently used goes
 _RESIDENT_CPU = 3600      # its CPU limit: a resident adds up its calls'
 
+# The SDK (mywant, mywant.plugin) too, and not only for speed: its directory
+# (PYTHONPATH) is under /tmp, which a jailed child gets a fresh one of, so a
+# script importing it there found nothing — no current(), no memo — unless
+# the zygote had imported it first.
 _WARM = ("json", "re", "datetime", "pathlib", "urllib.request", "urllib.parse",
          "http.client", "ssl", "hashlib", "base64", "subprocess", "colorsys",
-         "math", "random", "time", "traceback", "typing", "dataclasses")
+         "math", "random", "time", "traceback", "typing", "dataclasses",
+         "mywant", "mywant.plugin")
 
 CLONE_NEWNS = 0x00020000
 CLONE_NEWNET = 0x40000000
