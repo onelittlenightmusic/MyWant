@@ -166,7 +166,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 	_, control := obj["_control"]
 	_, tile := obj["_tile"]
 	_, timing := obj["_timing"]
-	if !control && !tile && !timing {
+	_, wake := obj["_wake_at"]
+	if !control && !tile && !timing && !wake {
 		return false
 	}
 	if opt.OnDirective != nil {
@@ -177,7 +178,8 @@ func mrsDirective(obj map[string]any, opt MRSRunOptions) bool {
 
 // MRSApplyDirective does what a plugin script asked of its own want: stop
 // itself ("_control": "suspend"), move its own tile ("_tile": {x, y}), or say
-// its answer came at a timing ("_timing": "album").
+// its answer came at a timing ("_timing": "album"), or run again at a time
+// ("_wake_at": "2026-11-21T18:45:00+09:00").
 // Only ever that want — nothing in the line names another.
 func MRSApplyDirective(want *Want, obj map[string]any) {
 	if c, _ := obj["_control"].(string); c != "" {
@@ -206,6 +208,17 @@ func MRSApplyDirective(want *Want, obj map[string]any) {
 			if s, ok := name.(string); ok {
 				want.Timing(s)
 			}
+		}
+	}
+	// Progress again at a time of its own (Want.WakeAt): RFC3339, "" to take
+	// it back.
+	if w, ok := obj["_wake_at"].(string); ok {
+		if w = strings.TrimSpace(w); w == "" {
+			want.WakeAt(time.Time{})
+		} else if at, err := time.Parse(time.RFC3339, w); err == nil {
+			want.WakeAt(at)
+		} else {
+			want.StoreLog("[MRS] _wake_at %q is not RFC3339; ignored", w)
 		}
 	}
 	if t, ok := obj["_tile"].(map[string]any); ok {

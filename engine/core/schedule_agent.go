@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -17,16 +18,16 @@ type SchedulerAgent struct {
 	done      chan struct{}
 	ctx       context.Context
 	cancel    context.CancelFunc
+	mu        sync.Mutex // schedules and nextExec: the wake is set from the scheduler's pass
 	schedules []ParsedSchedule
 	nextExec  time.Time
+	// wake is the want's own wake (WakeAt) in schedules, zero for none:
+	// what the scheduler compares the want's wake_at with.
+	wake time.Time
 }
 
 // NewSchedulerAgent creates a new scheduler agent for a target Want
 func NewSchedulerAgent(whenSpecs []WhenSpec, wantID, wantName string, builder *ChainBuilder) (*SchedulerAgent, error) {
-	if len(whenSpecs) == 0 {
-		return nil, fmt.Errorf("no schedule specifications provided")
-	}
-
 	schedules := make([]ParsedSchedule, 0, len(whenSpecs))
 	for _, spec := range whenSpecs {
 		if err := ValidateWhenSpec(spec); err != nil {
@@ -102,6 +103,30 @@ func (s *SchedulerAgent) Stop() error {
 	return nil
 }
 
+// setWake puts the want's own wake in its schedule — one entry, done once
+// (Interval 0) — replacing the one it had; a zero time takes it out. A wake
+// already passed by more than wakeGrace is not put in.
+func (s *SchedulerAgent) setWake(at time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.wake.Equal(at) {
+		return
+	}
+	kept := s.schedules[:0]
+	for _, sched := range s.schedules {
+		if !sched.isWake() {
+			kept = append(kept, sched)
+		}
+	}
+	s.schedules = kept
+	s.wake = at
+	if !at.IsZero() && time.Since(at) <= wakeGrace {
+		s.schedules = append(s.schedules, ParsedSchedule{Time: at, IsAbsolute: true, OriginalAt: at.Format(time.RFC3339)})
+		InfoLog("[SCHEDULER] Wake for Want '%s' at %s\n", s.wantName, at.Format(time.RFC3339))
+	}
+	s.nextExec = findEarliestExecution(s.schedules)
+}
+
 // run is the main scheduler loop
 func (s *SchedulerAgent) run() {
 	defer close(s.done)
@@ -112,9 +137,14 @@ func (s *SchedulerAgent) run() {
 			return
 		case <-s.ticker.C:
 			now := time.Now()
-			if now.After(s.nextExec) || now.Equal(s.nextExec) {
-				s.triggerRestart(now)
+			s.mu.Lock()
+			due := len(s.schedules) > 0 && !now.Before(s.nextExec)
+			if due {
 				s.updateNextExecution(now)
+			}
+			s.mu.Unlock()
+			if due {
+				s.triggerRestart(now)
 			}
 		}
 	}
@@ -134,11 +164,24 @@ func (s *SchedulerAgent) triggerRestart(now time.Time) {
 	InfoLog("[SCHEDULER] Successfully restarted Want '%s'\n", s.wantName)
 }
 
-// updateNextExecution recalculates the next execution time after a trigger
+// updateNextExecution recalculates the next execution time after a trigger:
+// each entry that came moves on by its interval, a wake (done once) is
+// dropped. Called with mu held.
 func (s *SchedulerAgent) updateNextExecution(now time.Time) {
-	for i := range s.schedules {
-		s.schedules[i].Time = s.schedules[i].Time.Add(s.schedules[i].Interval)
+	kept := s.schedules[:0]
+	for _, sched := range s.schedules {
+		if sched.Time.After(now) {
+			kept = append(kept, sched)
+			continue
+		}
+		if sched.isWake() {
+			continue
+		}
+		// Every entry that came moves on, as before — by one interval.
+		sched.Time = sched.Time.Add(sched.Interval)
+		kept = append(kept, sched)
 	}
+	s.schedules = kept
 	s.nextExec = findEarliestExecution(s.schedules)
 }
 

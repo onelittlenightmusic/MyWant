@@ -91,6 +91,18 @@ class Want:
         notify)."""
         self._emit({"_timing": str(name)})
 
+    def wake_at(self, when) -> None:
+        """Run its Progress again at a time of its own, once (a datetime with
+        its zone, or an RFC3339 string; None takes it back) — fifteen minutes
+        before what it just found, say, to see that it still holds."""
+        if when is None:
+            value = ""
+        elif isinstance(when, str):
+            value = when
+        else:
+            value = when.isoformat(timespec="seconds")
+        self._emit({"_wake_at": value})
+
     def progress(self, pct: int, message: str = "") -> None:
         self._emit({"_progress": int(pct), "_message": message})
 

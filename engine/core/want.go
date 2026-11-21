@@ -577,6 +577,15 @@ func (n *Want) prepareForRestart() {
 	// Always reset agentRunGuard so DoAgents re-execute on restart.
 	n.agentRunGuard = sync.Map{}
 
+	// A wake whose time has passed is done by this restart, whatever made it
+	// (WakeAt, schedule_types.go): taken back, so it is not done again after the server
+	// starts. One still to come stands.
+	if v, ok := n.State.Load(WakeAtState); ok {
+		if at, ok := parseWake(v); ok && !at.After(time.Now()) {
+			n.StoreState(WakeAtState, "")
+		}
+	}
+
 	// Reset state fields to initialValues when resetOnRestart is enabled (nil = true).
 	// Goal-labeled fields are excluded: they represent configuration set by Initialize()
 	// from params, and must survive want restarts so that Initialize() can read them as

@@ -65,15 +65,14 @@ func (s *SchedulerWant) Progress() {
 			continue // No need to create a scheduler agent for targets
 		}
 
-		when := scheduleOf(want)
-		if len(when) == 0 {
-			continue // No schedule specified for this Want
-		}
-
 		// Skip the scheduler itself to avoid recursion
 		if want.Metadata.Type == "scheduler" {
 			continue
 		}
+
+		when := scheduleOf(want)
+		// Its own wake (WakeAt, schedule_types.go): one more entry in its schedule.
+		wake, _ := wakeOf(want)
 
 		agentID := fmt.Sprintf("scheduler-%s", want.Metadata.Name)
 
@@ -82,6 +81,12 @@ func (s *SchedulerWant) Progress() {
 			// Verify if the want ID has changed
 			if schedAgent, ok := existingAgent.(*SchedulerAgent); ok {
 				if schedAgent.wantID == want.Metadata.ID {
+					if len(when) == 0 && wake.IsZero() {
+						// Kept only for a wake, done or taken back: nothing left to keep.
+						s.DeleteBackgroundAgent(agentID)
+						continue
+					}
+					schedAgent.setWake(wake)
 					continue // ID matches, no update needed
 				}
 				// ID mismatch! This happens when a Want is redeployed.
@@ -92,6 +97,10 @@ func (s *SchedulerWant) Progress() {
 			} else {
 				continue // Should not happen, but safe fallback
 			}
+		}
+
+		if len(when) == 0 && wake.IsZero() {
+			continue // No schedule specified for this Want
 		}
 
 		// Create a new SchedulerAgent for this Want
@@ -106,6 +115,7 @@ func (s *SchedulerWant) Progress() {
 				want.Metadata.Name, err)
 			continue
 		}
+		agent.setWake(wake)
 
 		// Add the agent as a BackgroundAgent to this Scheduler Want
 		if err := s.AddBackgroundAgent(agent); err != nil {
