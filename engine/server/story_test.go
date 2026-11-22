@@ -279,3 +279,24 @@ func TestStoryReadAcrossMidnight(t *testing.T) {
 		}
 	}
 }
+
+// A character's own want (the robot, a character's chat) opened or closed is
+// not in the story: another character is not a place on the board.
+func TestStoryLeavesOutCharacters(t *testing.T) {
+	now := time.Date(2026, 11, 22, 9, 0, 0, 0, time.Local)
+	r := storyTestRecorder(t, &now)
+	want := func(id string) *ws.StoryPlace {
+		typ := "weather"
+		if id == "robot" {
+			typ = "robot"
+		}
+		return &ws.StoryPlace{Kind: "want", ID: id, Type: typ}
+	}
+	r.guiState(map[string]any{"sidebar_want_id_chr-1": ""}, want)
+	r.guiState(map[string]any{"sidebar_want_id_chr-1": "robot"}, want)
+	r.guiState(map[string]any{"sidebar_want_id_chr-1": nil}, want)
+	r.guiState(map[string]any{"sidebar_want_id_chr-1": "want-a"}, want)
+	if got := kinds(r.pending["chr-1"]); len(got) != 1 || got[0] != "want.open" || r.pending["chr-1"][0].To.ID != "want-a" {
+		t.Errorf("only the want, not the robot: %v", got)
+	}
+}

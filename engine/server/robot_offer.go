@@ -287,9 +287,7 @@ func (s *Server) offerSeedRows() []map[string]any {
 // offerFinders are the wants on the board that find things (their type keeps
 // a result), but the one just told — those with news lately first.
 func (s *Server) offerFinders(except string) []*mywant.Want {
-	if s.globalBuilder == nil || s.wantTypeLoader == nil {
-		return nil
-	}
+	out := s.boardFinders(except)
 	recent := map[string]int{}
 	if s.notifications != nil {
 		for i, n := range s.notifications.All(200) {
@@ -297,6 +295,26 @@ func (s *Server) offerFinders(except string) []*mywant.Want {
 				recent[n.TargetID] = i
 			}
 		}
+	}
+	rank := func(w *mywant.Want) int {
+		if i, ok := recent[w.Metadata.ID]; ok {
+			return i
+		}
+		return 1 << 20
+	}
+	sort.SliceStable(out, func(i, j int) bool { return rank(out[i]) < rank(out[j]) })
+	if len(out) > offerOtherWants {
+		out = out[:offerOtherWants]
+	}
+	return out
+}
+
+// boardFinders are the wants on the board that find things (a result
+// field), out in the open (not archived, placed), not a character's nor the
+// robot's.
+func (s *Server) boardFinders(except string) []*mywant.Want {
+	if s.globalBuilder == nil || s.wantTypeLoader == nil {
+		return nil
 	}
 	var out []*mywant.Want
 	for _, w := range s.globalBuilder.GetWants() {
@@ -311,16 +329,6 @@ func (s *Server) offerFinders(except string) []*mywant.Want {
 			continue
 		}
 		out = append(out, w)
-	}
-	rank := func(w *mywant.Want) int {
-		if i, ok := recent[w.Metadata.ID]; ok {
-			return i
-		}
-		return 1 << 20
-	}
-	sort.SliceStable(out, func(i, j int) bool { return rank(out[i]) < rank(out[j]) })
-	if len(out) > offerOtherWants {
-		out = out[:offerOtherWants]
 	}
 	return out
 }

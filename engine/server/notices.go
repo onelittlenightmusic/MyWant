@@ -13,8 +13,10 @@ package server
 // (spec.voice.notify without it) — when it is not the first 👎 for that timing
 // lately with no 👍 since, or when Laya had already thought it routine.
 //
-//	POST /api/v1/notices/{id}/rate {"rating": "up" | "down"}
+//	GET  /api/v1/notices[?limit=100] → {notices: [... with rating, ratedBy, ratedAt]}
+//	POST /api/v1/notices/{id}/rate {"rating": "up" | "down" | "none", "device"?, "character"?}
 //	  → {label, suggestMute?: {wantId, want, timings, text}}
+//	  (rated again, the last rating stands — "none" takes it back)
 //	POST /api/v1/notices/{id}/mute → {wantId, notify}
 
 import (
@@ -22,6 +24,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -50,7 +53,11 @@ type noticeRating struct {
 	At      string   `json:"at"`
 	WantID  string   `json:"wantId"`
 	Timings []string `json:"timings,omitempty"`
-	Rating  string   `json:"rating"` // up | down
+	Rating  string   `json:"rating"` // up | down | none (taken back)
+	// Who rated it: the device it was rated on, and its character (given, or
+	// the device's).
+	Device    string `json:"device,omitempty"`
+	Character string `json:"character,omitempty"`
 }
 
 // muteOfferAfter is how far back a 👎 for the same timing counts towards
@@ -113,28 +120,39 @@ func (s *Server) rateNotice(w http.ResponseWriter, r *http.Request) {
 	}
 	id := mux.Vars(r)["id"]
 	var body struct {
-		Rating string `json:"rating"`
+		Rating    string `json:"rating"`
+		Device    string `json:"device"`
+		Character string `json:"character"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || (body.Rating != "up" && body.Rating != "down") {
-		s.JSONError(w, r, http.StatusBadRequest, `want {"rating": "up" | "down"}`, "")
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || (body.Rating != "up" && body.Rating != "down" && body.Rating != "none") {
+		s.JSONError(w, r, http.StatusBadRequest, `want {"rating": "up" | "down" | "none"}`, "")
 		return
+	}
+	if body.Character == "" && body.Device != "" {
+		body.Character = storyDeviceCharacter(body.Device)
 	}
 	n, ok := findNotice(id)
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "notice not found", id)
 		return
 	}
-	gold := "news"
-	if body.Rating == "down" {
-		gold = "routine"
-	}
 	decision := s.noticeDecisionID(n)
-	l := initiativeLabel{ID: decision, At: time.Now().Format(time.RFC3339), Gold: map[string]string{newsQuestionID: gold},
-		By: "person", Reason: "the person rated the notice " + body.Rating}
+	l := initiativeLabel{ID: decision, At: time.Now().Format(time.RFC3339), By: "person",
+		Reason: "the person rated the notice " + body.Rating}
+	switch body.Rating {
+	case "up":
+		l.Gold = map[string]string{newsQuestionID: "news"}
+	case "down":
+		l.Gold = map[string]string{newsQuestionID: "routine"}
+	default:
+		// Taken back: a label with nothing to learn, the last one standing.
+		l.Reason = "the person took back the rating of the notice"
+	}
 	noticesMu.Lock()
 	err := appendJSONLine(initiativeHomeFile("robot-initiative-labels.jsonl"), l)
 	if err == nil {
-		err = appendJSONLine(noticeRatingsFile(), noticeRating{ID: id, At: l.At, WantID: n.WantID, Timings: n.Timings, Rating: body.Rating})
+		err = appendJSONLine(noticeRatingsFile(), noticeRating{ID: id, At: l.At, WantID: n.WantID, Timings: n.Timings,
+			Rating: body.Rating, Device: body.Device, Character: body.Character})
 	}
 	noticesMu.Unlock()
 	if err != nil {
@@ -238,9 +256,10 @@ func recentDowns(wantID string, timings []string, now time.Time) int {
 		if err != nil || at.Before(since) || r.WantID != wantID || !sharesTiming(r.Timings, timings) {
 			return
 		}
-		if r.Rating == "up" {
+		switch r.Rating {
+		case "up":
 			downs = 0 // a 👍 since: start again
-		} else {
+		case "down":
 			downs++
 		}
 	})
@@ -292,4 +311,38 @@ func (s *Server) muteNotice(w http.ResponseWriter, r *http.Request) {
 	notify := append([]string{}, *voice.Notify...)
 	sort.Strings(notify)
 	s.JSONResponse(w, http.StatusOK, map[string]any{"wantId": n.WantID, "notify": notify})
+}
+
+// noticeListItem is a notice as the list shows it, with its rating now.
+type noticeListItem struct {
+	noticeRecord
+	Rating  string `json:"rating,omitempty"` // up | down; empty: none
+	RatedBy string `json:"ratedBy,omitempty"`
+	RatedAt string `json:"ratedAt,omitempty"`
+}
+
+// listNotices handles GET /api/v1/notices: the notices told, newest first,
+// each with its rating now (the last given).
+func (s *Server) listNotices(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleOptions(w, r)
+		return
+	}
+	limit := 100
+	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 1000 {
+		limit = v
+	}
+	last := map[string]noticeRating{}
+	readJSONLines(noticeRatingsFile(), func(x noticeRating) { last[x.ID] = x })
+	var all []noticeRecord
+	readJSONLines(noticesFile(), func(n noticeRecord) { all = append(all, n) })
+	out := []noticeListItem{}
+	for i := len(all) - 1; i >= 0 && len(out) < limit; i-- {
+		item := noticeListItem{noticeRecord: all[i]}
+		if x, ok := last[all[i].ID]; ok && x.Rating != "none" {
+			item.Rating, item.RatedBy, item.RatedAt = x.Rating, x.Character, x.At
+		}
+		out = append(out, item)
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"notices": out, "count": len(out)})
 }

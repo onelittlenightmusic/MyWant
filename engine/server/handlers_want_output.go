@@ -130,7 +130,7 @@ func (s *Server) RegisterOutputCallback() {
 			Text: msg, Moment: ev.Moment, Timings: tell.Timings, Labels: labels, News: ev.News,
 		})
 		broadcastSSE(noticeEvent, wantNotice{
-			ID: murmurID, WantID: w.Metadata.ID, Title: title, Body: msg,
+			ID: murmurID, WantID: w.Metadata.ID, WantType: w.Metadata.Type, Title: title, Body: msg,
 			Off: mywant.GetDeviceStore().Settings().NoticesOff, Labels: labels,
 		})
 	}
@@ -146,8 +146,11 @@ const noticeEvent = "notice"
 type wantNotice struct {
 	ID     string `json:"id"`
 	WantID string `json:"wantId"`
-	Title  string `json:"title"`
-	Body   string `json:"body"`
+	// WantType: what kind of want said it — a device's notifications of the
+	// same kind stack together (the app's thread).
+	WantType string `json:"wantType,omitempty"`
+	Title    string `json:"title"`
+	Body     string `json:"body"`
 	// Off: the devices that do not show notices (Devices' 通知, off) — a
 	// device finding itself here leaves it.
 	Off []string `json:"off,omitempty"`

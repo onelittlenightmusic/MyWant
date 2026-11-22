@@ -179,8 +179,9 @@ func (s *Server) robotSuggestionsNow(fresh bool, max int) robotSuggestionsView {
 }
 
 // suggestWants are the wants worth a look now: the one that goes where the
-// person goes at this time of day first, then those that find things, news
-// lately first (offerFinders) — each with an answer to show.
+// person goes at this time of day first, then those that find things the
+// person looks at most (wantLookedAt: opened, stood on — their stories) —
+// each with an answer to show.
 func (s *Server) suggestWants(cands []offerCandidate, now time.Time) []suggestWant {
 	out := []suggestWant{}
 	seen := map[string]bool{}
@@ -210,6 +211,18 @@ func (s *Server) suggestWants(cands []offerCandidate, now time.Time) []suggestWa
 			add(c.Want)
 		}
 	}
+	finders := s.boardFinders("")
+	score := wantLookedAt(now)
+	sort.SliceStable(finders, func(i, j int) bool {
+		return score[finders[i].Metadata.ID] > score[finders[j].Metadata.ID]
+	})
+	for _, w := range finders {
+		if score[w.Metadata.ID] <= 0 {
+			break // never looked at: not worth a look for that
+		}
+		add(w.Metadata.ID)
+	}
+	// Too few looked at: those that told something lately, as before.
 	for _, w := range s.offerFinders("") {
 		add(w.Metadata.ID)
 	}
@@ -255,8 +268,11 @@ func (s *Server) pickSuggestions(base string, cands []offerCandidate, now time.T
 		if err == nil {
 			answers, by = a, who
 			ps := make([]float64, len(a))
+			// What the person looks at most (want_looked_at.go) leans its
+			// suggestions up a little.
+			looked := wantLookedAt(now)
 			for i, x := range a {
-				ps[i] = x[offerQuestionID].Probabilities["accept"]
+				ps[i] = x[offerQuestionID].Probabilities["accept"] + lookBoost(looked[cands[i].WantID])
 			}
 			for _, i := range pickLikely(ps, offerMin(), suggestFloor, suggestMax) {
 				picked = append(picked, scored{i, ps[i]})
@@ -292,6 +308,11 @@ func (s *Server) pickSuggestions(base string, cands []offerCandidate, now time.T
 		for _, i := range suggestByRules(cands, now) {
 			picked = append(picked, scored{i, 0})
 		}
+		// What the person looks at most first, the rules' order otherwise.
+		looked := wantLookedAt(now)
+		sort.SliceStable(picked, func(x, y int) bool {
+			return looked[cands[picked[x].i].WantID] > looked[cands[picked[y].i].WantID]
+		})
 	}
 	if len(picked) > suggestMaxAll {
 		picked = picked[:suggestMaxAll]

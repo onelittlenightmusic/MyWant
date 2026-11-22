@@ -323,8 +323,20 @@ func (r *storyRecorder) guiState(updates map[string]any, want func(id string) *w
 			ev.From = &ws.StoryPlace{Kind: "view", ID: view, Name: was}
 			ev.To = &ws.StoryPlace{Kind: "view", ID: view, Name: c.value}
 		}
+		// A character's own want (the robot, a character's chat) is not in a
+		// story: a story is what its person did on the board, and another
+		// character is not a place on it.
+		if storyCharacterPlace(ev.To) || (ev.Kind == ws.StoryKindWantClose && storyCharacterPlace(ev.From)) {
+			continue
+		}
 		r.addLocked(ev)
 	}
+}
+
+// storyCharacterPlace says whether a story place is a want that is a
+// character itself (characterWantTypes).
+func storyCharacterPlace(p *ws.StoryPlace) bool {
+	return p != nil && p.Kind == "want" && characterWantTypes[p.Type]
 }
 
 // characterOf is whose a turn is: the character named, else the device's,

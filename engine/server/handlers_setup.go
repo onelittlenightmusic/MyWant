@@ -448,6 +448,8 @@ func (s *Server) setupRoutes() {
 	// take alike. See handlers_character_summon.go.
 	// What the person playing it did on the board (story.go).
 	characters.HandleFunc("/{id}/story", s.getCharacterStory).Methods("GET", "OPTIONS")
+	// Its story in figures: kinds, parts of the day, wants looked at, homes (story_stats.go).
+	characters.HandleFunc("/{id}/story/stats", s.getStoryStats).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/digests", s.getCharacterDigests).Methods("GET", "OPTIONS")
 	// Kinds of question and how each is best answered (story_ledger.go).
 	api.HandleFunc("/patterns", s.getStoryPatterns).Methods("GET", "OPTIONS")
@@ -592,6 +594,7 @@ func (s *Server) setupRoutes() {
 	// Server-Sent Events: real-time push for cursors, gui_state, want_changed
 	api.HandleFunc("/events", s.sseEvents).Methods("GET")
 	// A notice rated 👍 / 👎 (Laya learns from it), and muted (notices.go).
+	api.HandleFunc("/notices", s.listNotices).Methods("GET", "OPTIONS")
 	api.HandleFunc("/notices/{id}/rate", s.rateNotice).Methods("POST", "OPTIONS")
 	api.HandleFunc("/converse", s.listConverses).Methods("GET", "OPTIONS")
 	api.HandleFunc("/notices/{id}/mute", s.muteNotice).Methods("POST", "OPTIONS")
