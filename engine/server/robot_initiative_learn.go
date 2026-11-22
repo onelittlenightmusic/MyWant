@@ -167,7 +167,9 @@ func (s *Server) initiativeAlertRead(wantID string, since time.Time) bool {
 		if err != nil || at.Before(since.Add(-time.Minute)) {
 			continue
 		}
-		if e.Kind == "alert" && e.Read {
+		// Opened — not only said near the person (near), swept away
+		// (dismissed) or rated (its rating is its own label).
+		if e.Kind == "alert" && e.Read && e.ReadBy == "" {
 			return true
 		}
 	}

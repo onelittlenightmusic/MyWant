@@ -112,15 +112,60 @@ func (s *Server) getWantNotifications(w http.ResponseWriter, r *http.Request) {
 	s.JSONResponse(w, http.StatusOK, map[string]any{"notifications": entries, "unread": unread})
 }
 
-// markWantNotificationsRead handles POST /api/v1/wants/{id}/notifications/read.
+// markWantNotificationsRead handles POST /api/v1/wants/{id}/notifications/read
+// [?by=near]: near — its words said in full near the person, not opened.
 func (s *Server) markWantNotificationsRead(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	n, err := s.notifications.MarkWantRead(id)
+	by := ""
+	if r.URL.Query().Get("by") == "near" {
+		by = "near"
+	}
+	ids, err := s.notifications.MarkWantReadBy(id, by)
 	if err != nil {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to mark read", err.Error())
 		return
 	}
-	s.JSONResponse(w, http.StatusOK, map[string]any{"read": n})
+	noticesRead(id, ids)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"read": len(ids)})
+}
+
+// noticeReadEvent tells every page which murmurs were read — their devices'
+// notifications go too (the app, the browser extension).
+const noticeReadEvent = "notice_read"
+
+// noticesRead tells the pages the ids read, when any were.
+func noticesRead(wantID string, ids []string) {
+	if len(ids) == 0 {
+		return
+	}
+	broadcastSSE(noticeReadEvent, map[string]any{"wantId": wantID, "ids": ids})
+}
+
+// readNotice handles POST /api/v1/notices/{id}/read {"how": "opened" |
+// "dismissed"}: a device's notification of it pressed or swept away — read,
+// on the board too (its "♪" gone) and on the other devices. Only opened
+// counts as it having been news (robot_initiative_learn.go).
+func (s *Server) readNotice(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		s.handleOptions(w, r)
+		return
+	}
+	id := mux.Vars(r)["id"]
+	var body struct {
+		How string `json:"how"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	by := "dismissed"
+	if body.How == "opened" {
+		by = ""
+	}
+	ids, err := s.notifications.MarkReadIDs([]string{id}, by)
+	if err != nil {
+		s.JSONError(w, r, http.StatusInternalServerError, "failed to mark read", err.Error())
+		return
+	}
+	noticesRead(s.notifications.TargetOf(id), ids)
+	s.JSONResponse(w, http.StatusOK, map[string]any{"read": len(ids)})
 }
 
 // getUnreadWantCounts handles GET /api/v1/notifications/unread-counts.

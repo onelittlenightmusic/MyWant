@@ -81,7 +81,8 @@ func TestVoiceInSpecOverLabels(t *testing.T) {
 	w := &Want{WantTypeDefinition: def}
 	w.Metadata.Labels = map[string]string{MurmurLabel: "none"}
 	at := ResultHistoryEntry{Timings: []string{AnswerTiming}}
-	if tell := w.TellingOf(at); tell.Murmur || !tell.Notify {
+	// Murmur none, but notified: a notice is a murmur too.
+	if tell := w.TellingOf(at); !tell.Murmur || !tell.Notify {
 		t.Fatalf("the label, with no spec.voice: %+v", tell)
 	}
 	soon, none := []string{"soon"}, []string{}

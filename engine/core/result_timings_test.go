@@ -78,8 +78,10 @@ func TestAWantChoosesWhichTimingsItMurmursAndNotifiesAt(t *testing.T) {
 	defer func() { OnWantOutput = nil }()
 	def, _ := timingsTestWant(nil)
 	tell := def.TellingOf(ResultHistoryEntry{Timings: []string{"track"}})
-	if tell.Murmur || !tell.Notify || tell.NotifyChosen {
-		t.Errorf("defaults, track: %+v (murmurs at album, notifies at track)", tell)
+	// Notified at track, so murmured too: a notice is a murmur that also goes
+	// to the devices.
+	if !tell.Murmur || !tell.Notify || tell.NotifyChosen {
+		t.Errorf("defaults, track: %+v (notifies at track, and so murmurs)", tell)
 	}
 	if tell := def.TellingOf(ResultHistoryEntry{Timings: []string{"track", "album"}}); !tell.Murmur {
 		t.Errorf("defaults, album: %+v", tell)

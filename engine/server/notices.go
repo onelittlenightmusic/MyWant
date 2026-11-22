@@ -159,6 +159,12 @@ func (s *Server) rateNotice(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusInternalServerError, "failed to keep the rating", err.Error())
 		return
 	}
+	// Rated is read: on the board too, and on the other devices.
+	if s.notifications != nil {
+		if ids, err := s.notifications.MarkReadIDs([]string{id}, "rated"); err == nil {
+			noticesRead(n.WantID, ids)
+		}
+	}
 	// Taught with the rest, once enough have gathered (as the chat's are).
 	if ri := s.initiative; ri != nil {
 		go s.robotMaybeRetrain(ri)

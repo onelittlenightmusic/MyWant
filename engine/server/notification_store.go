@@ -69,6 +69,10 @@ type NotificationEntry struct {
 	// robot-bubble log ("" / legacy). Read is only meaningful for "alert".
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Read bool   `json:"read,omitempty" yaml:"read,omitempty"`
+	// ReadBy: how it was read — "near" for its words said in full near the
+	// person on the board (not opened: not what Laya counts as the notice
+	// having been news, robot_initiative_learn.go); empty for opened.
+	ReadBy string `json:"readBy,omitempty" yaml:"readBy,omitempty"`
 
 	// Output is the answer this alert announces, when it announces one — the
 	// very entry the want's history keeps (see mywant.OnWantOutput), not a
@@ -298,19 +302,52 @@ func (n *NotificationStore) LatestUnreadAlert(id string) *NotificationEntry {
 // MarkWantRead flags every unread "alert" notice for one want as read and
 // returns how many changed.
 func (n *NotificationStore) MarkWantRead(id string) (int, error) {
+	ids, err := n.MarkWantReadBy(id, "")
+	return len(ids), err
+}
+
+// MarkWantReadBy is MarkWantRead, saying how it was read (ReadBy), and
+// returning the ids read.
+func (n *NotificationStore) MarkWantReadBy(id, by string) ([]string, error) {
+	return n.markRead(func(e *NotificationEntry) bool { return e.TargetID == id }, by)
+}
+
+// MarkReadIDs flags the unread alerts with these ids read (a murmur and its
+// notice share an id), returning those read and their wants.
+func (n *NotificationStore) MarkReadIDs(ids []string, by string) ([]string, error) {
+	want := map[string]bool{}
+	for _, id := range ids {
+		want[id] = true
+	}
+	return n.markRead(func(e *NotificationEntry) bool { return want[e.ID] }, by)
+}
+
+func (n *NotificationStore) markRead(which func(*NotificationEntry) bool, by string) ([]string, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	entries := n.load()
-	changed := 0
+	var read []string
 	for i := range entries {
 		e := &entries[i]
-		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID == id && !e.Read {
-			e.Read = true
-			changed++
+		if e.Kind == "alert" && e.TargetType == "want" && !e.Read && which(e) {
+			e.Read, e.ReadBy = true, by
+			read = append(read, e.ID)
 		}
 	}
-	if changed == 0 {
-		return 0, nil
+	if len(read) == 0 {
+		return nil, nil
 	}
-	return changed, n.save(entries)
+	return read, n.save(entries)
+}
+
+// TargetOf is the want an alert is about, or "".
+func (n *NotificationStore) TargetOf(id string) string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for _, e := range n.load() {
+		if e.ID == id {
+			return e.TargetID
+		}
+	}
+	return ""
 }

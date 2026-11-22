@@ -343,6 +343,11 @@ func (n *Want) TellingOf(entry ResultHistoryEntry) Telling {
 		t.Murmur = t.Murmur || murmurAt[name]
 		t.Notify = t.Notify || notifyAt[name]
 	}
+	// A notice is a murmur that also goes to the devices: one id, one read
+	// state (read on the board, gone from the devices; read there, gone here).
+	if t.Notify {
+		t.Murmur = true
+	}
 	return t
 }
 
