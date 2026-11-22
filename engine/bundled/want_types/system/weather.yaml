@@ -34,6 +34,10 @@ wantType:
   # "answer"). condition_changed: the weather itself turned (晴れ → 雨), not
   # only the temperature — a want that wants only this turns answer off.
   timings:
+    - name: failed
+      description: 天気が取れなかったとき
+      murmur: true
+      notify: false
     - name: condition_changed
       description: 天気が変わったとき（晴れ→雨など）
       onChange: weather_condition

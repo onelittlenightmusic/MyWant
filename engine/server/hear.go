@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -48,7 +49,9 @@ func (s *Server) hearMurmur(src *mywant.Want, murmurID, text string, out mywant.
 	wants := s.globalBuilder.GetWants()
 	srcType := src.Metadata.Type
 	for _, w := range wants {
-		if w.Metadata.ID == src.Metadata.ID || w.Metadata.IsSystemWant {
+		// A system want too (the robot, asking the person) — when it was
+		// given something to hear.
+		if w.Metadata.ID == src.Metadata.ID {
 			continue
 		}
 		for _, h := range w.GetSpec().Hear {
@@ -138,13 +141,21 @@ func canvasCell(w *mywant.Want) (float64, float64, bool) {
 // heard is then let go.
 func (s *Server) answerHeard(id string, m mywant.HeardMurmur) {
 	defer mywant.TakeHeard(id)
-	if err := s.globalBuilder.RestartWant(id); err != nil {
-		return
-	}
-	s.robotWaitSettled(id, hearAnswerWait)
 	w := s.findWantByIDInAll(id)
 	if w == nil {
 		return
+	}
+	// A type that answers by its hearer (want_hearer.go) is answered for at
+	// once: nothing to wake (the robot, mid-conversation, is not restarted).
+	// Else it is woken, for its Progress to read what it heard.
+	if !mywant.HasHearer(w.Metadata.Type, s.sideScript(mywant.SideScriptHear, w.Metadata.Type)) {
+		if err := s.globalBuilder.RestartWant(id); err != nil {
+			return
+		}
+		s.robotWaitSettled(id, hearAnswerWait)
+		if w = s.findWantByIDInAll(id); w == nil {
+			return
+		}
 	}
 	if replied, _ := w.GetStateString(mywant.SayReplyToState, ""); replied == m.MurmurID {
 		// Its Progress answered it: kept as its murmur all the same.
@@ -161,11 +172,16 @@ func (s *Server) answerHeard(id string, m mywant.HeardMurmur) {
 		if out.Say != "" {
 			s.sayInReply(w, m, out.Say)
 		}
+		// What it does at once, unasked: only to itself (a fireworks
+		// effect's trigger).
+		for _, a := range out.Do {
+			s.actOn(w, a)
+		}
 		if len(out.Proposals) > 0 {
 			// One at a time: the robot asks one question at once.
 			s.proposeToPerson(w, out.Proposals[0])
 		}
-		if out.Say != "" || len(out.Proposals) > 0 {
+		if out.Say != "" || len(out.Proposals) > 0 || len(out.Do) > 0 {
 			return
 		}
 	}
@@ -201,7 +217,7 @@ func (s *Server) proposeToPerson(w *mywant.Want, p mywant.Proposal) {
 			if target == nil {
 				return "", fmt.Errorf("「%s」が見つかりません", name)
 			}
-			if err := mywant.CarryOut(target, p); err != nil {
+			if err := s.carryOut(target, p); err != nil {
 				return "", err
 			}
 			if s.globalBuilder != nil {
@@ -436,4 +452,106 @@ func (s *Server) hearWant(w http.ResponseWriter, r *http.Request) {
 		heard = []mywant.HeardMurmur{}
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{"heard": heard})
+}
+
+// actOn does what a hearer does at once to itself.
+func (s *Server) actOn(w *mywant.Want, a mywant.Act) {
+	switch a.Action {
+	case mywant.ActWebhook:
+		// As POST /api/v1/webhooks/{id} hands it (handlers_webhook.go): into
+		// its state, for its Progress to consume (ConsumeWebhookAction) — not
+		// restarted, which would put the payload back to nothing.
+		mywant.StoreStateMulti(w, map[string]any{
+			"webhook_payload":     a.Payload,
+			"webhook_received_at": time.Now().Format(time.RFC3339Nano),
+		})
+	}
+}
+
+// carryOut does a proposal the person said yes to, for the hearer that made it.
+func (s *Server) carryOut(hearer *mywant.Want, p mywant.Proposal) error {
+	switch p.Action {
+	case mywant.ProposeAppend:
+		return mywant.AppendTo(hearer, p)
+	case mywant.ProposeCreateWant:
+		name := p.Want.Name
+		if name == "" {
+			name = p.Want.Type
+		}
+		want := map[string]any{
+			"metadata": map[string]any{
+				"name": freeWantName(s.globalBuilder.GetWants(), name),
+				"type": p.Want.Type,
+				"labels": map[string]string{
+					"mywant.io/canvas-near": "cursor",
+					mywant.MadeByLabel:      hearer.Metadata.ID,
+					mywant.AboutLabel:       p.About,
+				},
+			},
+			"spec": map[string]any{"params": p.Want.Params},
+		}
+		return s.backend("POST", "/api/v1/wants", want, nil)
+	case mywant.ProposeDeleteWants:
+		var ids []string
+		for _, w := range s.globalBuilder.GetWants() {
+			l := w.GetLabels()
+			if l[mywant.MadeByLabel] == hearer.Metadata.ID && l[mywant.AboutLabel] == p.About {
+				w.SetStatus(mywant.WantStatusDeleting)
+				ids = append(ids, w.Metadata.ID)
+			}
+		}
+		if len(ids) == 0 {
+			return fmt.Errorf("消すものが見つかりませんでした")
+		}
+		s.globalBuilder.DeleteWantsAsyncWithTracking(ids)
+		for _, id := range ids {
+			boardWantsChanged(id)
+		}
+		return nil
+	case mywant.ProposePostWebhook:
+		url := ""
+		if v, ok := hearer.Spec.Params[p.URLParam].(string); ok {
+			url = strings.TrimSpace(v)
+		}
+		if url == "" {
+			return fmt.Errorf("送り先（%s）が設定されていません", p.URLParam)
+		}
+		body, err := json.Marshal(p.Body)
+		if err != nil {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			return fmt.Errorf("送り先が %d を返しました", resp.StatusCode)
+		}
+		return nil
+	}
+	return fmt.Errorf("できない提案です: %s", p.Action)
+}
+
+// freeWantName is name, or name-2, -3… when a want on the board has it.
+func freeWantName(wants []*mywant.Want, name string) string {
+	taken := map[string]bool{}
+	for _, w := range wants {
+		taken[w.Metadata.Name] = true
+	}
+	if !taken[name] {
+		return name
+	}
+	for i := 2; ; i++ {
+		if n := fmt.Sprintf("%s-%d", name, i); !taken[n] {
+			return n
+		}
+	}
 }

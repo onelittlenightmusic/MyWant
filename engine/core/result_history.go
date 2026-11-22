@@ -72,6 +72,10 @@ type ResultHistoryEntry struct {
 	// to the wants that hear it.
 	Change []Change `json:"change,omitempty" yaml:"change,omitempty"`
 	Advice []Advice `json:"advice,omitempty" yaml:"advice,omitempty"`
+	// Status: "failed" for the want failing (its failed timing), with why;
+	// empty for an answer.
+	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+	Error  string `json:"error,omitempty" yaml:"error,omitempty"`
 	// The type's timings it came at (result_timings.go): what the want tells
 	// of it by.
 	Timings []string `json:"timings,omitempty" yaml:"timings,omitempty"`
@@ -202,6 +206,13 @@ func (n *Want) recordResultHistory() {
 	// A new answer: the standard timing, then the type's own it came at.
 	timings, changes := n.answerTimings(fields, prev)
 	entry.Timings = withTimings(append([]string{AnswerTiming}, timings...), n.takeTimings())
+	// An answer that is a list: what it gained or lost, at every answer (a
+	// list of free slots, the new ones), when no timing told of it already.
+	if prev != nil && !changedField(changes, field) {
+		if c := fieldChange(field, prev.Result, val, true); c != nil && c.Kind != ChangeChanged {
+			changes = append(changes, *c)
+		}
+	}
 	entry.Change = changes
 	told = true
 	go OnWantOutput(n, entry)
@@ -464,4 +475,68 @@ func (n *Want) RestoreResultHistory(entries []ResultHistoryEntry) {
 		}
 		h.ResultHistoryRing.Append(e)
 	}
+}
+
+func changedField(changes []Change, field string) bool {
+	for _, c := range changes {
+		if c.Field == field {
+			return true
+		}
+	}
+	return false
+}
+
+// TellFailure tells of what the want tried failing, as its failed timing —
+// for a want that keeps going after a failure (a backup that tries again at
+// its next tick) and so never takes the failed status. why: the error.
+func (n *Want) TellFailure(why string) { n.tellFailure(n.Status, why) }
+
+// tellFailed tells of the want failing (its status), when its type names a
+// failed timing: an entry with no answer, the status and why.
+func (n *Want) tellFailed(from WantStatus) { n.tellFailure(from, "") }
+
+func (n *Want) tellFailure(from WantStatus, why string) {
+	if OnWantOutput == nil {
+		return
+	}
+	named := false
+	for _, d := range n.typeTimings() {
+		if d.Name == FailedTiming {
+			named = true
+			break
+		}
+	}
+	if !named {
+		return
+	}
+	for _, k := range []string{"error", "error_message", "last_error"} {
+		if why != "" {
+			break
+		}
+		if v, ok := n.getState(k); ok {
+			if s, ok := v.(string); ok && s != "" {
+				why = s
+				break
+			}
+		}
+	}
+	// The same failure again (retried, failing as before): told once.
+	key := why
+	if key == "" {
+		key = "failed"
+	}
+	if n.failureTold == key {
+		return
+	}
+	n.failureTold = key
+	entry := ResultHistoryEntry{
+		ID:        "out-" + strings.TrimPrefix(GenerateUUID(), "want-"),
+		Timestamp: time.Now(),
+		Timings:   []string{FailedTiming},
+		Status:    string(WantStatusFailed),
+		Error:     why,
+		Result:    why,
+		Change:    []Change{{Kind: ChangeChanged, Field: "status", From: string(from), To: string(WantStatusFailed)}},
+	}
+	go OnWantOutput(n, entry)
 }

@@ -13,17 +13,49 @@ import (
 // to do. A proposal is not done: the person is asked (the robot's はい /
 // いいえ, server/hear.go), and only a yes does it.
 
-// Proposal actions the engine can carry out on the hearer itself.
+// What a hearer may propose — each carried out by the engine, on a yes.
 const (
 	// ProposeAppend adds Value to the list in Field (a checklist's items).
 	ProposeAppend = "append"
+	// ProposeCreateWant makes a want (Want), marked as made by the hearer
+	// about About — an item's key — so it can be found again.
+	ProposeCreateWant = "create_want"
+	// ProposeDeleteWants deletes the wants the hearer made about About.
+	ProposeDeleteWants = "delete_wants"
+	// ProposePostWebhook posts Body (JSON) to the URL in the hearer's param
+	// URLParam.
+	ProposePostWebhook = "post_webhook"
 )
 
-// Proposal is one thing a hearer proposes to do to itself.
+// What a hearer may do at once, unasked: only to itself, and harmless.
+const (
+	// ActWebhook hands the hearer an action as a webhook would (its
+	// webhook_payload): a fireworks effect, trigger.
+	ActWebhook = "webhook"
+)
+
+// Act is one thing a hearer does at once.
+type Act struct {
+	Action  string         `json:"action"`
+	Payload map[string]any `json:"payload,omitempty"`
+}
+
+// ProposedWant is a want a hearer proposes to make.
+type ProposedWant struct {
+	Type   string         `json:"type"`
+	Name   string         `json:"name"`
+	Params map[string]any `json:"params,omitempty"`
+}
+
+// Proposal is one thing a hearer proposes to do.
 type Proposal struct {
-	Action string `json:"action"`
-	Field  string `json:"field,omitempty"`
-	Value  any    `json:"value,omitempty"`
+	Action   string        `json:"action"`
+	Field    string        `json:"field,omitempty"`
+	Value    any           `json:"value,omitempty"`
+	Want     *ProposedWant `json:"want,omitempty"`
+	About    string        `json:"about,omitempty"`
+	URLParam string        `json:"url_param,omitempty"`
+	Body     any           `json:"body,omitempty"`
 	// Ask is how the person is asked (「傘を持ち物に足しますか？」); Why, the
 	// reason, from the advice it came of.
 	Ask string `json:"ask"`
@@ -49,6 +81,7 @@ type HearerWant struct {
 type HearerOutput struct {
 	Say       string     `json:"say,omitempty"`
 	Proposals []Proposal `json:"proposals,omitempty"`
+	Do        []Act      `json:"do,omitempty"`
 }
 
 // Hearer answers a murmur a want of its type heard.
@@ -81,12 +114,37 @@ func HearOn(ctx context.Context, w *Want, m HeardMurmur, script string) HearerOu
 	}
 	kept := out.Proposals[:0]
 	for _, p := range out.Proposals {
-		if p.Action == ProposeAppend && p.Field != "" && p.Value != nil && strings.TrimSpace(p.Ask) != "" {
+		if validProposal(p) {
 			kept = append(kept, p)
 		}
 	}
 	out.Proposals = kept
+	acts := out.Do[:0]
+	for _, a := range out.Do {
+		if a.Action == ActWebhook && a.Payload != nil {
+			acts = append(acts, a)
+		}
+	}
+	out.Do = acts
 	return out
+}
+
+// validProposal: an action the engine knows, with what it needs, asked.
+func validProposal(p Proposal) bool {
+	if strings.TrimSpace(p.Ask) == "" {
+		return false
+	}
+	switch p.Action {
+	case ProposeAppend:
+		return p.Field != "" && p.Value != nil
+	case ProposeCreateWant:
+		return p.Want != nil && p.Want.Type != "" && p.About != ""
+	case ProposeDeleteWants:
+		return p.About != ""
+	case ProposePostWebhook:
+		return p.URLParam != "" && p.Body != nil
+	}
+	return false
 }
 
 func scriptHear(ctx context.Context, w *Want, script string, in HearerInput) HearerOutput {
@@ -108,8 +166,16 @@ func scriptHear(ctx context.Context, w *Want, script string, in HearerInput) Hea
 	return out
 }
 
-// CarryOut does a proposal the person said yes to, on the want that made it.
-func CarryOut(w *Want, p Proposal) error {
+// MadeByLabel and AboutLabel mark a want a hearer made (ProposeCreateWant):
+// which hearer, and about which item.
+const (
+	MadeByLabel = "mywant.io/made-by"
+	AboutLabel  = "mywant.io/about"
+)
+
+// AppendTo does an append proposal the person said yes to, on the want that
+// made it (the server carries out the rest, server/hear.go).
+func AppendTo(w *Want, p Proposal) error {
 	switch p.Action {
 	case ProposeAppend:
 		list, _ := w.getState(p.Field)

@@ -110,6 +110,13 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([
 		n.timingSeen = map[string]any{}
 		if prev != nil {
 			for _, d := range defs {
+				if field, sub, ok := allCondition(d.If); ok {
+					v, has := prev.Fields[field]
+					if !has && field == n.Spec.FinalResultField {
+						v = prev.Result
+					}
+					n.timingSeen["if:"+d.If] = allHold(v, sub)
+				}
 				for _, f := range watchedFields(d) {
 					v, ok := prev.Fields[f]
 					if !ok && f == n.Spec.FinalResultField {
@@ -138,7 +145,16 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([
 		if d.If == "" && len(watchedFields(d)) == 0 {
 			continue // said only by the want itself (Timing)
 		}
-		if d.If != "" && !truthyAnswerField(read(d.If)) {
+		if field, sub, ok := allCondition(d.If); ok {
+			// "all:items.done": every item of a list so, and not so before —
+			// told once, as the last is ticked off.
+			now := allHold(value(field), sub)
+			before, _ := n.timingSeen["if:"+d.If].(bool)
+			n.timingSeen["if:"+d.If] = now
+			if !now || before {
+				continue
+			}
+		} else if d.If != "" && !truthyAnswerField(read(d.If)) {
 			continue
 		}
 		if d.OnChange != "" && sameAnswerResult(n.timingSeen[d.OnChange], value(d.OnChange)) {
@@ -436,4 +452,30 @@ func (n *Want) TimingConditions(names []string) []string {
 		}
 	}
 	return out
+}
+
+// allCondition reads a timing's if of the form "all:<list>.<field>" — every
+// item of the list with the field true.
+func allCondition(cond string) (list, field string, ok bool) {
+	rest, found := strings.CutPrefix(cond, "all:")
+	if !found {
+		return "", "", false
+	}
+	list, field, ok = strings.Cut(rest, ".")
+	return list, field, ok && list != "" && field != ""
+}
+
+// allHold says whether a list has items and every one has field true.
+func allHold(v any, field string) bool {
+	items, ok := v.([]any)
+	if !ok || len(items) == 0 {
+		return false
+	}
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok || !truthyAnswerField(m[field]) {
+			return false
+		}
+	}
+	return true
 }

@@ -160,6 +160,8 @@ func backupGoogleFail(want *Want, stage string, err error) error {
 	want.SetCurrent("backup_status", "failed")
 	want.SetCurrent("error", msg)
 	want.StoreLog("[BACKUP-GOOGLE] %s", msg)
+	// Told as its failed timing, to whoever hears it (a Slack notifier).
+	want.TellFailure(msg)
 	// Swallowed: a failed run should not wedge the want. The next `when` tick
 	// tries again, and `error` / `backup_status` say what happened.
 	return nil

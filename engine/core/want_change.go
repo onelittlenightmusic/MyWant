@@ -34,6 +34,10 @@ type Change struct {
 type ChangeItem struct {
 	Key   string `json:"key"`
 	Value any    `json:"value"`
+	// Labels: what the item is about in set words — when (MurmurLabelTime)
+	// and where (MurmurLabelPlace) — read off its fields (itemLabels), so a
+	// want that hears it acts on an item of any type alike.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // fieldChange is what field did, from before to now, as the timing that
@@ -77,12 +81,12 @@ func diffItems(before, now []any) (added, removed []ChangeItem) {
 	b, n := keys(before), keys(now)
 	for k, v := range n {
 		if _, ok := b[k]; !ok {
-			added = append(added, ChangeItem{Key: k, Value: v})
+			added = append(added, ChangeItem{Key: k, Value: v, Labels: itemLabels(v)})
 		}
 	}
 	for k, v := range b {
 		if _, ok := n[k]; !ok {
-			removed = append(removed, ChangeItem{Key: k, Value: v})
+			removed = append(removed, ChangeItem{Key: k, Value: v, Labels: itemLabels(v)})
 		}
 	}
 	sort.Slice(added, func(i, j int) bool { return added[i].Key < added[j].Key })
@@ -90,9 +94,54 @@ func diffItems(before, now []any) (added, removed []ChangeItem) {
 	return added, removed
 }
 
+// The fields an item says when and where it is by, the first it has.
+var (
+	itemTimeFields  = []string{"datetime_rfc3339", "start", "starts_at", "event_time", "datetime", "at"}
+	itemPlaceFields = []string{"place", "store", "location", "venue", "room"}
+)
+
+// itemLabels are an item's set labels: its time (RFC3339, as it is given)
+// and place, when it has them.
+func itemLabels(v any) map[string]string {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	labels := map[string]string{}
+	for _, f := range itemTimeFields {
+		if s, ok := m[f].(string); ok && s != "" {
+			labels[MurmurLabelTime] = s
+			break
+		}
+	}
+	if labels[MurmurLabelTime] == "" {
+		// A day and a clock reading apart (a free slot: date, time).
+		d, _ := m["date"].(string)
+		t, _ := m["time"].(string)
+		if d != "" && t != "" {
+			labels[MurmurLabelTime] = d + "T" + t + ":00"
+		}
+	}
+	for _, f := range itemPlaceFields {
+		if s, ok := m[f].(string); ok && s != "" {
+			labels[MurmurLabelPlace] = s
+			break
+		}
+	}
+	if len(labels) == 0 {
+		return nil
+	}
+	return labels
+}
+
+// FailedTiming is the timing a type names to be told of its want failing:
+// told with the status and the error (ResultHistoryEntry.Status, Error).
+const FailedTiming = "failed"
+
 // itemKeyFields are the fields an item is known by, the first it has: its
-// own id, else what a reservation or a booking is (where and when).
-var itemKeyFields = []string{"id", "key", "url", "datetime_rfc3339"}
+// own id, else what a reservation or a booking is (where and when), else its
+// link (a link alone may be shared by several: a store's page).
+var itemKeyFields = []string{"id", "key", "datetime_rfc3339", "url"}
 
 // ItemKey is how an item is known from one answer to the next: its id (or
 // key, url, time) when it has one, else the item itself written out.
@@ -110,6 +159,22 @@ func ItemKey(v any) string {
 				}
 				return s
 			}
+			if f == "datetime_rfc3339" {
+				break
+			}
+		}
+		// Where, on which day, at what time (a free slot).
+		d, _ := m["date"].(string)
+		t, _ := m["time"].(string)
+		where, _ := m["room"].(string)
+		if where == "" {
+			where, _ = m["store"].(string)
+		}
+		if d != "" && t != "" && where != "" {
+			return where + "@" + d + " " + t
+		}
+		if s, ok := m["url"].(string); ok && s != "" {
+			return s
 		}
 	}
 	if s, ok := v.(string); ok {

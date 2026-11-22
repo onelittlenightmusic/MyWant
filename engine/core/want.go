@@ -289,6 +289,10 @@ type Want struct {
 	historyChangeKnown bool
 	// The onChange fields of its type's timings, as of its last answer (result_timings.go).
 	timingSeen map[string]any
+	// failureTold is the failure last told (its why), so a want failing
+	// again the same way — retried, failing as before — is told once; an
+	// answer clears it (noteAnswered).
+	failureTold string
 	// Timings said by Timing, not yet told of.
 	timingMu       sync.Mutex
 	pendingTimings []string
@@ -547,6 +551,7 @@ func (n *Want) SetStatus(status WantStatus) {
 		// any failing (want_retry.go).
 		if status == WantStatusFailed {
 			n.noteFailed()
+			n.tellFailed(oldStatus)
 		} else if IsAchievedStatus(status) {
 			n.noteAnswered()
 		}

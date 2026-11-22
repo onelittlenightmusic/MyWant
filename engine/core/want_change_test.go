@@ -3,6 +3,7 @@ package mywant
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestFieldChange(t *testing.T) {
@@ -62,5 +63,56 @@ func TestHearOnDropsWhatItCannotDo(t *testing.T) {
 	out := HearOn(context.Background(), w, HeardMurmur{}, "")
 	if len(out.Proposals) != 1 || out.Proposals[0].Value != "傘" {
 		t.Errorf("only what the engine can carry out, asked: %+v", out.Proposals)
+	}
+}
+
+func TestTellFailure(t *testing.T) {
+	saved := OnWantOutput
+	defer func() { OnWantOutput = saved }()
+	got := make(chan ResultHistoryEntry, 1)
+	OnWantOutput = func(_ *Want, e ResultHistoryEntry) { got <- e }
+	w := &Want{Metadata: Metadata{ID: "w", Name: "w", Type: "t"}}
+	w.WantTypeDefinition = &WantTypeDefinition{Timings: []TimingDef{{Name: FailedTiming, Murmur: true}}}
+	w.TellFailure("refresh: invalid_client")
+	e := <-got
+	if e.Status != "failed" || e.Error != "refresh: invalid_client" || len(e.Timings) != 1 || e.Timings[0] != FailedTiming {
+		t.Errorf("a failure told as the failed timing, with why: %+v", e)
+	}
+}
+
+func TestAllCondition(t *testing.T) {
+	items := []any{map[string]any{"text": "a", "done": true}, map[string]any{"text": "b", "done": false}}
+	if l, f, ok := allCondition("all:items.done"); !ok || l != "items" || f != "done" {
+		t.Fatalf("read: %q %q %v", l, f, ok)
+	}
+	if allHold(items, "done") {
+		t.Error("one left: not all done")
+	}
+	items[1].(map[string]any)["done"] = true
+	if !allHold(items, "done") {
+		t.Error("every one done")
+	}
+	if allHold([]any{}, "done") {
+		t.Error("an empty list is not done")
+	}
+}
+
+func TestTellFailureOnce(t *testing.T) {
+	saved := OnWantOutput
+	defer func() { OnWantOutput = saved }()
+	got := make(chan ResultHistoryEntry, 3)
+	OnWantOutput = func(_ *Want, e ResultHistoryEntry) { got <- e }
+	w := &Want{Metadata: Metadata{ID: "w", Name: "w", Type: "t"}}
+	w.WantTypeDefinition = &WantTypeDefinition{Timings: []TimingDef{{Name: FailedTiming, Murmur: true}}}
+	w.TellFailure("down")
+	w.TellFailure("down") // retried, failing as before
+	w.TellFailure("other")
+	<-got
+	<-got
+	time.Sleep(50 * time.Millisecond)
+	select {
+	case e := <-got:
+		t.Errorf("the same failure told again: %+v", e)
+	default:
 	}
 }

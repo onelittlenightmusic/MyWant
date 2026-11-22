@@ -77,6 +77,7 @@ func (n *Want) noteFailed() {
 
 // noteAnswered is a want that answered: whatever failing it was doing is over.
 func (n *Want) noteAnswered() {
+	n.failureTold = ""
 	if v, ok := n.State.Load(RetryingState); !ok || v == nil {
 		if c, _ := n.GetStateInt(RetryCountState, 0); c == 0 {
 			return

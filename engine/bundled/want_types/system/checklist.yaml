@@ -34,6 +34,10 @@ wantType:
   - name: removed
     description: アイテムが削除されたとき
     onDecrease: items
+  - name: completed
+    description: 全部終わったとき
+    if: all:items.done
+    murmur: true
   parameters:
   - name: items
     description: Initial checklist lines, plain strings — each becomes an unchecked item

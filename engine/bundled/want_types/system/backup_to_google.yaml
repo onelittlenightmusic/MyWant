@@ -45,6 +45,10 @@ wantType:
       onChange: last_backup_at
       murmur: true
       notify: false
+    - name: failed
+      description: バックアップに失敗したとき
+      murmur: true
+      notify: true
 
   parameters:
     - name: google_client_id
