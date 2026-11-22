@@ -23,10 +23,24 @@ func (n *Want) stopAgents(label string) {
 	}
 }
 
-// initializeForRun resets per-run state, calls Initialize() on the progressable,
+// initializeForRun readies a run, calls Initialize() on the progressable,
 // syncs locals, and starts background agents. Used at loop startup and on ControlTriggerRestart.
+//
+// For a want whose restarts are new requests (RequestsAsNew), a request's run
+// is prepared once — the state reset to what the type starts
+// a run with (prepareForRestart). Starting again on a request already
+// prepared (the server coming up, the loop picked up again) resumes it as it
+// was: its answer kept, achieved if it had answered (want_request.go).
 func (n *Want) initializeForRun() {
-	n.prepareForRestart()
+	n.runStartedAt.Store(time.Now().UnixNano())
+	if !n.RequestsAsNew() {
+		n.prepareForRestart()
+	} else if r := n.ensureRequest(); r.Started {
+		n.resetRunGuards()
+	} else {
+		n.prepareForRestart()
+		n.markRequestStarted(r)
+	}
 	if n.progressable != nil {
 		n.progressable.Initialize()
 		n.syncLocalsAfterInitialize()
@@ -70,6 +84,7 @@ func (n *Want) handleControlSignal(cmd *ControlCommand) loopSignal {
 	case ControlTriggerRestart:
 		n.SetSuspended(false)
 		n.stopAgents("on restart")
+		n.NewRequest(RequestByRestart)
 		n.initializeForRun()
 		return loopSignalContinue
 	}
@@ -161,16 +176,16 @@ func (n *Want) checkPostProgressStatus() loopSignal {
 		return loopSignalContinue
 	}
 
-	// Check failable state
-	if failable, ok := n.progressable.(Failable); ok && failable.IsFailed() {
+	// Check failable state — for the request it is on (want_request.go)
+	if n.failedNow() {
 		n.SetStatus(WantStatusFailed)
 		n.FlushThinkingAgents(context.Background())
 		n.stopAgents("on failed (post-progress)")
 		return loopSignalReturn
 	}
 
-	// Check achieved state
-	if n.progressable != nil && n.progressable.IsAchieved() {
+	// Check achieved state — for the request it is on (want_request.go)
+	if n.achievedNow() {
 		n.SetStatus(WantStatusAchieved)
 		n.FlushThinkingAgents(context.Background())
 		n.stopAgents("on achieved (post-progress)")

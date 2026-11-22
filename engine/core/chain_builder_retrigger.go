@@ -70,6 +70,7 @@ func (cb *ChainBuilder) RetriggerReceiverWant(wantName string) {
 		// Restart the want's execution (sets status to Idle)
 		// The reconcile loop's startPhase() will detect the Idle status and restart the want
 		// This avoids duplicate execution and keeps retrigger logic in one place
+		want.NewRequest(RequestByInput)
 		want.RestartWant()
 
 		if err := cb.TriggerReconcile(); err != nil {
@@ -109,6 +110,7 @@ func (cb *ChainBuilder) checkAndRetriggerCompletedWants() {
 				for _, userID := range users {
 					// Restart dependent want so it can be re-executed This allows the want to pick up new data from the completed source
 					if runtimeWant, ok := wantSnapshot[userID]; ok {
+						runtimeWant.want.NewRequest(RequestByInput)
 						runtimeWant.want.RestartWant()
 						anyWantRetriggered = true
 					}

@@ -504,9 +504,11 @@ func restartWantWithFallback(want *Want) {
 	cb := GetGlobalChainBuilder()
 	if cb != nil {
 		if err := cb.RestartWant(want.Metadata.ID); err != nil {
+			want.NewRequest(RequestByRestart)
 			want.RestartWant()
 		}
 	} else {
+		want.NewRequest(RequestByRestart)
 		want.RestartWant()
 	}
 }

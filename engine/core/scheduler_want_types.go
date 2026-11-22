@@ -114,7 +114,7 @@ func (s *SchedulerWant) Progress() {
 	for _, id := range s.book.due(now) {
 		name := s.book.name(id)
 		InfoLog("[SCHEDULER] Triggering restart for Want '%s' at %s\n", name, now.Format("15:04:05"))
-		if err := s.builder.RestartWant(id); err != nil {
+		if err := s.builder.RestartWantAsked(id, RequestByWake); err != nil {
 			InfoLog("[SCHEDULER] Failed to restart Want '%s': %v\n", name, err)
 		}
 	}
@@ -163,7 +163,7 @@ func (s *SchedulerWant) retryPassingFailures() {
 			continue // its own wake will run it
 		}
 		InfoLog("[RETRY] Running '%s' again: it failed for a passing reason (%s)\n", w.Metadata.Name, firstLineOf(errText))
-		if err := s.builder.RestartWant(w.Metadata.ID); err != nil {
+		if err := s.builder.RestartWantAsked(w.Metadata.ID, RequestByRetry); err != nil {
 			InfoLog("[RETRY] Could not run '%s' again: %v\n", w.Metadata.Name, err)
 		}
 	}

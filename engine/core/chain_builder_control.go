@@ -41,8 +41,14 @@ func (cb *ChainBuilder) StopWant(wantID string) error {
 }
 
 // RestartWant restarts execution of a specific want by setting its status to Idle
-// This triggers the reconcile loop to re-run the want
+// This triggers the reconcile loop to re-run the want. It is asked anew
+// (want_request.go): an answer it had is to the request before.
 func (cb *ChainBuilder) RestartWant(wantID string) error {
+	return cb.RestartWantAsked(wantID, RequestByRestart)
+}
+
+// RestartWantAsked is RestartWant naming what asked (want_request.go's by).
+func (cb *ChainBuilder) RestartWantAsked(wantID, by string) error {
 	// O(1) lookup since cb.wants is keyed by ID
 	cb.wantsMu.RLock()
 	runtime, exists := cb.wants[wantID]
@@ -59,7 +65,8 @@ func (cb *ChainBuilder) RestartWant(wantID string) error {
 	// State reset and agentRunGuard reset are handled inside ScriptableWant.Initialize()
 	// so that the order is always: reset → onInitialize (idempotent by design).
 
-	// Call Want's RestartWant method which sets status to Idle
+	// Asked anew, then set to Idle (Want.RestartWant).
+	targetWant.NewRequest(by)
 	targetWant.RestartWant()
 	InfoLog("[RESTART:DEBUG] Want '%s' status now: %s\n", targetWant.Metadata.Name, targetWant.GetStatus())
 

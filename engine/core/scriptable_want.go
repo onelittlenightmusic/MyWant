@@ -212,6 +212,29 @@ func (s *ScriptableWant) IsAchieved() bool {
 	return GetCurrent(&s.Want, "achieved", false)
 }
 
+// achieveGateField / failGateField: the fields its conditions read, for
+// want_request.go (an answer to a request may come as a change of one).
+func (s *ScriptableWant) achieveGateField() string {
+	if def := s.WantTypeDefinition; def != nil {
+		switch {
+		case def.FinalizeWhen != nil && def.FinalizeWhen.Achieved != nil:
+			return resolveConditionField(def.FinalizeWhen.Achieved.Field)
+		case def.AchievedWhen != nil:
+			return resolveConditionField(def.AchievedWhen.Field)
+		case hasStatusPendingField(def):
+			return "status"
+		}
+	}
+	return "achieved"
+}
+
+func (s *ScriptableWant) failGateField() string {
+	if def := s.WantTypeDefinition; def != nil && def.FinalizeWhen != nil && def.FinalizeWhen.Failed != nil {
+		return resolveConditionField(def.FinalizeWhen.Failed.Field)
+	}
+	return ""
+}
+
 // IsFailed evaluates the declarative failed condition (finalizeWhen.failed).
 // Returns false if no failed condition is defined.
 func (s *ScriptableWant) IsFailed() bool {
@@ -242,7 +265,9 @@ func hasStatusPendingField(def *WantTypeDefinition) bool {
 // When the want is already achieved, executes the onAchieved lifecycle hook instead.
 // Think and Monitor agents are started automatically by StartBackgroundAgents().
 func (s *ScriptableWant) Progress() {
-	if s.IsAchieved() {
+	// Achieved for the request it is on (want_request.go): an answer kept
+	// from the request before is no reason not to run.
+	if s.AchievedNow(s.IsAchieved()) {
 		if s.WantTypeDefinition != nil && s.WantTypeDefinition.OnAchieved != nil {
 			s.execLifecycleHook(s.WantTypeDefinition.OnAchieved)
 		}

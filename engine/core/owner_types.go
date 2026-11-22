@@ -1219,6 +1219,21 @@ func (oaw *OwnerAwareWant) IsAchieved() bool {
 	return true
 }
 
+// achieveGateField / failGateField pass the wrapped want's on (want_request.go).
+func (oaw *OwnerAwareWant) achieveGateField() string {
+	if g, ok := oaw.BaseWant.(gateFields); ok {
+		return g.achieveGateField()
+	}
+	return ""
+}
+
+func (oaw *OwnerAwareWant) failGateField() string {
+	if g, ok := oaw.BaseWant.(gateFields); ok {
+		return g.failGateField()
+	}
+	return ""
+}
+
 // Progress wraps the base want's execution to add completion notification
 func (oaw *OwnerAwareWant) Progress() {
 	// Call the original Progress method directly

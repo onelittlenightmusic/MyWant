@@ -1088,6 +1088,7 @@ func (cb *ChainBuilder) applyWantChanges(changes []ChangeEvent) {
 					} else {
 						// Reset status to Idle so want can be re-executed — naming the
 						// request the change came with, if any (request_id.go).
+						runtimeWant.want.NewRequest(RequestByParams)
 						runtimeWant.want.RestartWantBy(updatedConfigWant.ChangeBy())
 						updatedConfigWant.SetChangeBy("") // named once; a later change brings its own
 					}

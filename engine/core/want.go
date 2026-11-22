@@ -308,9 +308,15 @@ type Want struct {
 
 	// Tracing (request_id.go): the request a config came in with, the one
 	// the pending restart is for, and why the agents last stopped.
-	changeBy   string
-	restartBy  atomic.Pointer[string]
-	stopReason atomic.Pointer[string]
+	changeBy  string
+	restartBy atomic.Pointer[string]
+	// The request an agent of this want last finished a run for
+	// (want_request.go): an answer, or a failure, to it.
+	answeredRequest atomic.Int64
+	// When this process last readied a run of it (initializeForRun, unix ns):
+	// a value restored from the memory file before then is not an answer.
+	runStartedAt atomic.Int64
+	stopReason   atomic.Pointer[string]
 	// progressedAt: when Progress last ran (unix nanoseconds). One atomic store
 	// a cycle, nothing else: what reads it — the reconcile's READ phase, where
 	// the things a want's parameters name are marked as read (lastRead) — runs
@@ -587,17 +593,7 @@ func (n *Want) RestartWantBy(requestID string) {
 // Type-specific per-run resets (e.g. agentRunGuard for ScriptableWant) are handled
 // inside the progressable's own Initialize().
 func (n *Want) prepareForRestart() {
-	// Always reset agentRunGuard so DoAgents re-execute on restart.
-	n.agentRunGuard = sync.Map{}
-
-	// A wake whose time has passed is done by this restart, whatever made it
-	// (WakeAt, schedule_types.go): taken back, so it is not done again after the server
-	// starts. One still to come stands.
-	if v, ok := n.State.Load(WakeAtState); ok {
-		if at, ok := parseWake(v); ok && !at.After(time.Now()) {
-			n.StoreState(WakeAtState, "")
-		}
-	}
+	n.resetRunGuards()
 
 	// Reset state fields to initialValues when resetOnRestart is enabled (nil = true).
 	// Goal-labeled fields are excluded: they represent configuration set by Initialize()
@@ -634,6 +630,22 @@ func (n *Want) prepareForRestart() {
 					InfoLog("[RESET] Reset %d state field(s) to initialValues for '%s'\n", len(resetState), n.Metadata.Name)
 				}
 			}
+		}
+	}
+}
+
+// resetRunGuards readies the agents to run again — for a request prepared
+// (prepareForRestart) and for one resumed as the server starts again.
+func (n *Want) resetRunGuards() {
+	// Always reset agentRunGuard so DoAgents re-execute on restart.
+	n.agentRunGuard = sync.Map{}
+
+	// A wake whose time has passed is done by this restart, whatever made it
+	// (WakeAt, schedule_types.go): taken back, so it is not done again after the server
+	// starts. One still to come stands.
+	if v, ok := n.State.Load(WakeAtState); ok {
+		if at, ok := parseWake(v); ok && !at.After(time.Now()) {
+			n.StoreState(WakeAtState, "")
 		}
 	}
 }
@@ -1012,16 +1024,15 @@ func (n *Want) StartProgressionLoop(
 			}
 
 			// 3.1a. Check if want has failed (before precondition check)
-			if failable, ok := n.progressable.(Failable); ok {
-				if failable.IsFailed() {
-					n.SetStatus(WantStatusFailed)
-					n.stopAgents("on failed (pre-progress)")
-					return
-				}
+			// Failed or achieved for the request it is on (want_request.go).
+			if n.failedNow() {
+				n.SetStatus(WantStatusFailed)
+				n.stopAgents("on failed (pre-progress)")
+				return
 			}
 
 			// 3.1. Check if want is achieved (before precondition check)
-			if n.progressable != nil && n.progressable.IsAchieved() {
+			if n.achievedNow() {
 				n.SetStatus(WantStatusAchieved)
 				// CRITICAL: run one final cycle to flush FinalResultField and propagate state.
 				n.BeginProgressCycle()
@@ -1944,6 +1955,7 @@ func (n *Want) TryStartAgentRun(agentName string) bool {
 // permanent=false: clears the "running" flag so the agent can run again next tick (MonitorAgent).
 // permanent=true:  stores "done" so the agent is never re-executed until Init() (DoAgent success).
 func (n *Want) FinishAgentRun(agentName string, permanent bool) {
+	n.noteAgentRan()
 	if permanent {
 		n.agentRunGuard.Store(agentName, "done")
 	} else {
