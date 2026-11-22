@@ -246,6 +246,20 @@ func (n *NotificationStore) UnreadWantOutputs() map[string][]string {
 	return out
 }
 
+// UnreadWantMessages is, per want, the words of its newest unread alert —
+// what a tile near the person says in full instead of its "♪".
+func (n *NotificationStore) UnreadWantMessages() map[string]string {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	out := map[string]string{}
+	for _, e := range n.load() { // oldest first: the newest wins
+		if e.Kind == "alert" && e.TargetType == "want" && e.TargetID != "" && !e.Read && e.Message != "" {
+			out[e.TargetID] = e.Message
+		}
+	}
+	return out
+}
+
 // ForWant returns the notices targeting one want, most-recent first (limit 0 =
 // all), plus how many of them are unread alerts.
 func (n *NotificationStore) ForWant(id string, limit int) (entries []NotificationEntry, unread int) {

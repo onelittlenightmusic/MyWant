@@ -132,5 +132,6 @@ func (s *Server) getUnreadWantCounts(w http.ResponseWriter, r *http.Request) {
 	}
 	s.JSONResponse(w, http.StatusOK, map[string]any{
 		"counts": counts, "total": total, "outputs": s.notifications.UnreadWantOutputs(),
+		"messages": s.notifications.UnreadWantMessages(),
 	})
 }
