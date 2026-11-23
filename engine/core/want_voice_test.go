@@ -477,3 +477,17 @@ func TestEventVoiceLines(t *testing.T) {
 		t.Fatalf("output = %q, want none", out)
 	}
 }
+
+// What a want says carries how it feels, and it is kept in its state (mood).
+func TestWantVoiceKeepsItsMood(t *testing.T) {
+	base := time.Date(2026, 10, 18, 10, 0, 0, 0, time.UTC)
+	w := voiceWant(t, "failing", 3, base)
+	w.SetStatus(WantStatusFailed)
+	line := WantVoice(context.Background(), w, "")
+	if line.Mood == "" {
+		t.Fatalf("a failed want's line has no mood: %+v", line)
+	}
+	if got, _ := w.GetStateString(MoodState, ""); got != line.Mood {
+		t.Fatalf("mood in state = %q, want %q (its line's)", got, line.Mood)
+	}
+}

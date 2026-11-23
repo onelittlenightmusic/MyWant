@@ -371,19 +371,45 @@ var voiceCache sync.Map // want ID → voiceCacheEntry
 // voice script ("" when the type has none — see WantTypeLoader.GetVoiceScript).
 func WantVoice(ctx context.Context, w *Want, script string) VoiceLine {
 	id := w.GetMetadata().ID
-	hash := CalculateWantHash(w) + "|" + script
-	if script != "" {
-		// Its home changes with the time of day and the asks, not the want.
-		if h, err := json.Marshal(wantHome(w)); err == nil {
-			hash += "|" + string(h)
-		}
-	}
+	hash := voiceHash(w, script)
 	if e, ok := voiceCache.Load(id); ok && e.(voiceCacheEntry).hash == hash {
 		return e.(voiceCacheEntry).line
 	}
 	line := computeVoice(ctx, w, script)
-	voiceCache.Store(id, voiceCacheEntry{hash: hash, line: line})
+	// Its mood kept in its state first, and the line cached against the want
+	// as it is with it — else the mood just written would be a change, and the
+	// next ask would work the same line out again.
+	noteMood(w, line.Mood)
+	voiceCache.Store(id, voiceCacheEntry{hash: voiceHash(w, script), line: line})
 	return line
+}
+
+// voiceHash is what a want's line depends on: the want, its script, and — with
+// a script — its home, which changes with the time of day and the asks.
+func voiceHash(w *Want, script string) string {
+	hash := CalculateWantHash(w) + "|" + script
+	if script != "" {
+		if h, err := json.Marshal(wantHome(w)); err == nil {
+			hash += "|" + string(h)
+		}
+	}
+	return hash
+}
+
+// MoodState is the predefined state field holding how a want feels (its
+// voice's mood).
+const MoodState = "mood"
+
+// noteMood keeps the mood of what the want says in its state (MoodState), so
+// it can be read like any field; a line with no mood leaves it as it was.
+func noteMood(w *Want, mood string) {
+	if mood == "" || w == nil {
+		return
+	}
+	if cur, _ := w.GetStateString(MoodState, ""); cur == mood {
+		return
+	}
+	w.StoreState(MoodState, mood)
 }
 
 // computeVoice picks the line, and its mood: the script's "mood" when it gave
@@ -459,6 +485,8 @@ func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) V
 	voiceLinesSaid(lines)
 	line := pickVoice(w, lines, mood)
 	line.Labels = labels
+	// Its news is how it feels now, too.
+	noteMood(w, line.Mood)
 	return line
 }
 

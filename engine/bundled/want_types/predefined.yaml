@@ -70,6 +70,18 @@ predefined:
     #
     # Not persistent: it is an utterance, not a fact about the want. Reloading
     # a board should not make everything on it speak again.
+    # How the want feels about where it stands — the mood of what it says
+    # (its voice: the type's voice script's "mood", else read from the words,
+    # core/want_voice.go): joy, eager, calm, waiting, sad, worried. Kept as
+    # state so anything can read it — another want's condition, a card, a
+    # hearer — and not only the bubble it tints. Written by the engine each
+    # time it works out what the want says; "" until it first has.
+    - name: mood
+      description: "How the want feels: joy, eager, calm, waiting, sad or worried (its voice's mood)"
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
     - name: say
       description: A sentence to show over this want's tile, briefly
       type: string
