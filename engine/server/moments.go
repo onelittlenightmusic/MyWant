@@ -49,6 +49,9 @@ const (
 //	        name, as the page draws them — and value (a feed's, shortened)
 //	speech  by (want | character), id, text, at (unix ms), mood, and the
 //	        translations already kept, by language (translate.go)
+//	effect  type (the effect: the want type, fireworks_effect), on (want |
+//	        character) and id — played over it; at (unix ns) keeps each one
+//	        its own, so a burst of presses plays every one
 type moment struct {
 	Kind         string            `json:"kind"`
 	On           string            `json:"on,omitempty"`
@@ -70,6 +73,9 @@ type moment struct {
 
 // key is what makes two moments the same one.
 func (m moment) key() string {
+	if m.Kind == "effect" {
+		return fmt.Sprintf("effect\x00%s\x00%s\x00%s\x00%d", m.On, m.ID, m.Type, m.At)
+	}
 	return m.Kind + "\x00" + m.On + "\x00" + m.ID + "\x00" + m.Mark + "\x00" + m.Type + "\x00" + m.From +
 		"\x00" + m.By + "\x00" + m.Text
 }
@@ -87,7 +93,7 @@ func (m moment) target() string {
 // and the page spaces each kind by its own measure (impactStore) — nor is a
 // line, which is said again only after it was blanked (its writer's rule).
 func (m moment) repeatAfter() time.Duration {
-	if m.Kind == "impact" || m.Kind == "speech" {
+	if m.Kind == "impact" || m.Kind == "speech" || m.Kind == "effect" {
 		return 0
 	}
 	return momentRepeatAfter

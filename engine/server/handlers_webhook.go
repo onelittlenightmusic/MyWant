@@ -99,10 +99,9 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 	// User-control wants (button, switch, etc.) declare webhook_payload as a current-labeled
 	// state field and consume it in Progress(). Store the raw payload there directly.
 	if want.StateLabels.Is("webhook_payload", mywant.LabelCurrent) {
-		mywant.StoreStateMulti(want, map[string]any{
-			"webhook_payload":     payload,
-			"webhook_received_at": time.Now().Format(time.RFC3339),
-		})
+		// Triggered as every trigger is (core TriggerWant): an effect's played
+		// over whoever pressed (characterId), on every board.
+		mywant.TriggerWant(want, payload)
 		log.Printf("[WEBHOOK] Stored webhook_payload for want %s (type=%s)\n", wantID, want.Metadata.Type)
 		s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
 		return

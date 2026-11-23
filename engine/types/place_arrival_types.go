@@ -2,7 +2,6 @@ package types
 
 import (
 	"math"
-	"time"
 
 	. "mywant/engine/core"
 )
@@ -72,39 +71,34 @@ func (p *PlaceArrivalWant) Progress() {
 
 	// Fire only on the outside→inside edge: arrival, not presence.
 	if nowInside && wasInside != true {
-		fireReaction(reactionID)
-		// The effect belongs to whoever arrived — the character whose device is
-		// reporting this position — so play it on their cursor too, and it
-		// animates on every client via the cursor stream (see FireCharacterEffect).
-		if effectType, charID := reactionEffectAndArriver(reactionID); effectType != "" && charID != "" {
-			FireCharacterEffect(charID, effectType)
+		// Triggered as any want is (TriggerWant): its effect, if it is one,
+		// plays over whoever arrived — the character whose device reports
+		// this position.
+		payload := map[string]any{"action": "trigger"}
+		if charID := arriver(); charID != "" {
+			payload["characterId"] = charID
 		}
+		TriggerWantByID(reactionID, payload)
 		p.StoreLog("[PLACE-ARRIVAL] arrived at %q (%.0fm ≤ %.0fm) — fired %s", place, dist, radius, reactionID)
 	}
 }
 
-// reactionEffectAndArriver resolves the reaction want's type (the effect to
-// play) and the character who arrived — the owner of the location want feeding
-// the position. Either may be empty if not resolvable (e.g. a CLI-deployed riff
-// with no owning character), in which case the effect still updates state but
-// no cursor animates.
-func reactionEffectAndArriver(reactionID string) (effectType, characterID string) {
+// arriver is the character who arrived — the owner of the location want
+// feeding the position; "" when there is none (a CLI-deployed riff with no
+// owning character), and the effect then plays over the reaction want itself.
+func arriver() string {
 	cb := GetGlobalChainBuilder()
 	if cb == nil {
-		return "", ""
-	}
-	if want, _, ok := cb.FindWantByID(reactionID); ok {
-		effectType = want.Metadata.Type
+		return ""
 	}
 	for _, w := range cb.GetWants() {
 		if w.Metadata.Type == "location" {
 			if id := w.Metadata.Labels["mywant.io/owner-character"]; id != "" {
-				characterID = id
-				break
+				return id
 			}
 		}
 	}
-	return effectType, characterID
+	return ""
 }
 
 // resolvePlaceCoords looks the named place up in the aura catalog. The naming UI
@@ -127,15 +121,6 @@ func resolvePlaceCoords(name string) (lat, lng float64, ok bool) {
 		}
 	}
 	return 0, 0, false
-}
-
-// fireReaction triggers a reaction want the same way its own webhook would:
-// dropping {action:"trigger"} into webhook_payload with a fresh timestamp, which
-// the reaction's ConsumeWebhookAction picks up on its next Progress. Nanosecond
-// precision guarantees the timestamp differs from the last, so it never dedupes.
-func fireReaction(reactionID string) {
-	StoreWantState(reactionID, "webhook_payload", map[string]any{"action": "trigger"})
-	StoreWantState(reactionID, "webhook_received_at", time.Now().Format(time.RFC3339Nano))
 }
 
 func firstOf(m map[string]any, keys ...string) any {

@@ -154,6 +154,12 @@ func (s *Server) answerHeard(id string, m mywant.HeardMurmur) {
 	if w == nil {
 		return
 	}
+	// An effect with no hearer of its own goes off at what it heard: an
+	// effect does one thing, and that is what hearing asks of it.
+	if mywant.IsEffectWant(w) && !mywant.HasHearer(w.Metadata.Type, s.sideScript(mywant.SideScriptHear, w.Metadata.Type)) {
+		mywant.TriggerWant(w, map[string]any{"action": "trigger"})
+		return
+	}
 	// A type that answers by its hearer (want_hearer.go) is answered for at
 	// once: nothing to wake (the robot, mid-conversation, is not restarted).
 	// Else it is woken, for its Progress to read what it heard.
@@ -467,13 +473,10 @@ func (s *Server) hearWant(w http.ResponseWriter, r *http.Request) {
 func (s *Server) actOn(w *mywant.Want, a mywant.Act) {
 	switch a.Action {
 	case mywant.ActWebhook:
-		// As POST /api/v1/webhooks/{id} hands it (handlers_webhook.go): into
-		// its state, for its Progress to consume (ConsumeWebhookAction) — not
-		// restarted, which would put the payload back to nothing.
-		mywant.StoreStateMulti(w, map[string]any{
-			"webhook_payload":     a.Payload,
-			"webhook_received_at": time.Now().Format(time.RFC3339Nano),
-		})
+		// Triggered as its webhook would (core TriggerWant) — not restarted,
+		// which would put the payload back to nothing — its effect, if it is
+		// one, seen over it on every board.
+		mywant.TriggerWant(w, a.Payload)
 	}
 }
 

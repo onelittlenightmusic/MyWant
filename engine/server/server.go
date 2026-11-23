@@ -504,9 +504,12 @@ func (s *Server) Start() error {
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()
 
-	// Let server-side triggers (e.g. a place_arrival geofence) play effects on a
-	// character's cursor, so they animate on every client via the cursor stream.
-	mywant.OnCharacterEffectFire = FireCharacterEffect
+	// A want of an effect type triggered (core TriggerWant: a press, a place
+	// arrived at, a want that heard another) is seen going off on every board:
+	// a moment of kind effect, over the one who set it off or the want itself.
+	mywant.OnBoardEffect = func(on, id, effectType string) {
+		moments.add(moment{Kind: "effect", On: on, ID: id, Type: effectType, At: time.Now().UnixNano()})
+	}
 
 	// ...and let a want record that a character said something, so the robot's
 	// answers join the same conversation as everybody else's words.

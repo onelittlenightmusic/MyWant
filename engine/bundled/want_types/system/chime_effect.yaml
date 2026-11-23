@@ -10,6 +10,10 @@ wantType:
       aliases: "chime,チャイム"
       riffable: reaction
       type-icon: Bell
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: act
+    description: 盤面でチャイムを鳴らす
   parameters:
     - name: input_button
       type: string

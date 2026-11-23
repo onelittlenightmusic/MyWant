@@ -3,7 +3,7 @@ package mywant
 // OnCharacterSpeak, when set by the server, records that a character said
 // something into the conversation every client reads (GET /api/v1/speech).
 //
-// The seam exists for the same reason OnCharacterEffectFire does: a want knows
+// The seam exists for the same reason OnBoardEffect does: a want knows
 // what was said and nothing about how the world keeps a record, and the types
 // package cannot depend on the server package to find out. The server registers
 // it on the way up; want code calls CharacterSpeaks and does not care whether

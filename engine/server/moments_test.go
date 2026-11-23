@@ -133,3 +133,16 @@ func TestWantSayIsASpeechMoment(t *testing.T) {
 		t.Fatalf("moment = %+v", m)
 	}
 }
+
+// A burst of presses is a burst of effects: each its own, none held back.
+func TestMomentsPlayEveryEffect(t *testing.T) {
+	h, sent, _ := testMoments(t, 30*time.Millisecond)
+	for i := int64(1); i <= 3; i++ {
+		h.add(moment{Kind: "effect", On: "character", ID: "chr-1", Type: "fireworks_effect", At: i})
+	}
+	time.Sleep(80 * time.Millisecond)
+	got := sent()
+	if len(got) != 1 || len(got[0]) != 3 {
+		t.Fatalf("sent = %v, want one event of three effects", got)
+	}
+}
