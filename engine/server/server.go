@@ -484,6 +484,13 @@ func (s *Server) Start() error {
 		if gs := s.findWantByIDInAll(guiStateWantID); gs != nil {
 			seedLastKnownPositions(gs.GetAllState())
 		}
+		// With everyone back in place, the tiles' record of who stands on
+		// them is checked against it — and again now and then, as a tile
+		// moved under a standing character changes nothing else.
+		s.reconcileOccupancy()
+		for range time.Tick(20 * time.Second) {
+			s.reconcileOccupancy()
+		}
 	}()
 
 	// Wire the drive engine's per-character mover into core so each

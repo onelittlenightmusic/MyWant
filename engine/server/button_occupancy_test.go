@@ -262,3 +262,24 @@ func TestApplyButtonOccupancyStepOntoNonGoingButtonDoesNotStartGoing(t *testing.
 	}
 	_ = motion
 }
+
+// A server started again has forgotten who stood where: a tile still counting
+// a character who has walked off (a notepad left open) is put right, and one
+// still standing there is remembered again, so stepping off is noticed.
+func TestReconcileOccupants(t *testing.T) {
+	resetButtonOccupancy()
+	list := buttonWantAt("list", 5, -3)
+	list.SetCurrent("characters", []string{"chr-gone", "chr-here"})
+	reconcileOccupants([]*mywant.Want{list}, map[string][2]string{
+		"chr-gone": {"7", "7"},
+		"chr-here": {"5", "-3"},
+	})
+	if got := characterIDsOf(list); len(got) != 1 || got[0] != "chr-here" {
+		t.Fatalf("characters = %v, want only chr-here", got)
+	}
+	// Remembered: stepping off now takes them off.
+	applyButtonOccupancy("chr-here", 6, -3, []*mywant.Want{list}, func(string) bool { return true })
+	if got := characterIDsOf(list); len(got) != 0 {
+		t.Fatalf("after stepping off, characters = %v, want none", got)
+	}
+}
