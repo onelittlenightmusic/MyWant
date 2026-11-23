@@ -141,3 +141,28 @@ func TestTimingsAfterARestartCompareWithTheAnswerBefore(t *testing.T) {
 		t.Errorf("first answer after a restart, an item added: %q", got)
 	}
 }
+
+// A checklist item ticked: one more of them done (count:items.done) — and
+// not an item added or unticked.
+func TestTimingsOnACountOfItemsSo(t *testing.T) {
+	w := &Want{WantTypeDefinition: &WantTypeDefinition{Timings: []TimingDef{
+		{Name: "checked", OnIncrease: "count:items.done"},
+	}}}
+	item := func(id string, done bool) any { return map[string]any{"id": id, "done": done} }
+	answer := func(items ...any) string {
+		at, _ := w.answerTimings(map[string]any{"items": items}, nil)
+		return join(at)
+	}
+	if got := answer(item("a", false), item("b", false)); got != "" {
+		t.Errorf("first answer: %q", got)
+	}
+	if got := answer(item("a", true), item("b", false)); got != "checked" {
+		t.Errorf("one ticked: %q, want checked", got)
+	}
+	if got := answer(item("a", true), item("b", false), item("c", false)); got != "" {
+		t.Errorf("one added: %q, want nothing", got)
+	}
+	if got := answer(item("a", false), item("b", false), item("c", false)); got != "" {
+		t.Errorf("one unticked: %q, want nothing", got)
+	}
+}

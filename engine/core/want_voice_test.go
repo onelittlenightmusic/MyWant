@@ -68,7 +68,7 @@ func TestDefaultVoiceFor(t *testing.T) {
 		{WantStatusReaching, 20, "ベテランです"},
 		{WantStatusAchieved, 2, "できたよ"},
 		{WantStatusAchieved, 20, "ベテランです"},
-		{WantStatusReachingWithWarning, 12, warningVoice},
+		{WantStatusReachingWithWarning, 12, defaultBook().warning},
 		{WantStatusReachingWithWarning, 12, "調子いいよ"},
 		{WantStatusAchievedWithWarning, 0, "できたよ"},
 		{WantStatusDeleting, 20, ""},
@@ -89,7 +89,7 @@ func TestDefaultVoiceFor(t *testing.T) {
 			t.Errorf("%s/%d: %q not among %v", c.status, c.experience, c.want, lines)
 		}
 	}
-	if len(statusVoice[WantStatusReaching]) != 0 {
+	if len(defaultBook().status[WantStatusReaching]) != 0 {
 		t.Error("reaching is left to experience")
 	}
 }
@@ -233,26 +233,26 @@ func TestWantNewsVoice(t *testing.T) {
 // heard first.
 func TestMoodOf(t *testing.T) {
 	cases := map[string]string{
-		"できたよ":          MoodJoy,
-		"いつもありがとう":      MoodJoy,
-		"12回こなしたよ":      MoodJoy,
-		"はじめての仕事だ":      MoodEager,
-		"今日も任せて":        MoodEager,
-		"まだ3回だけ、覚えてる途中": MoodEager,
-		"準備してるよ":        MoodCalm,
-		"ひと休み中":         MoodCalm,
-		"しまわれてます":       MoodCalm,
-		"あなたの返事を待ってるよ":  MoodWaiting,
-		"急がなくていいよ":      MoodWaiting,
-		"うまくいかなかった…":    MoodSad,
-		"おしまい":          MoodSad,
-		"設定を見てもらえる？":    MoodWorried,
-		"調子が悪いみたい":      MoodWorried,
-		warningVoice:    MoodWorried,
-		"雪だ！足元に気をつけて":   MoodWorried,
-		"全部終わった！":       MoodJoy,
-		"今日は空が見えなかった":   MoodSad,
-		"霧で前が見えないよ":     MoodWorried,
+		"できたよ":                MoodJoy,
+		"いつもありがとう":            MoodJoy,
+		"12回こなしたよ":            MoodJoy,
+		"はじめての仕事だ":            MoodEager,
+		"今日も任せて":              MoodEager,
+		"まだ3回だけ、覚えてる途中":       MoodEager,
+		"準備してるよ":              MoodCalm,
+		"ひと休み中":               MoodCalm,
+		"しまわれてます":             MoodCalm,
+		"あなたの返事を待ってるよ":        MoodWaiting,
+		"急がなくていいよ":            MoodWaiting,
+		"うまくいかなかった…":          MoodSad,
+		"おしまい":                MoodSad,
+		"設定を見てもらえる？":          MoodWorried,
+		"調子が悪いみたい":            MoodWorried,
+		defaultBook().warning: MoodWorried,
+		"雪だ！足元に気をつけて":         MoodWorried,
+		"全部終わった！":             MoodJoy,
+		"今日は空が見えなかった":         MoodSad,
+		"霧で前が見えないよ":           MoodWorried,
 	}
 	for line, want := range cases {
 		if got := moodOf(line); got != want {
@@ -460,5 +460,20 @@ func TestWantVoiceHearsTheHome(t *testing.T) {
 	WantHomeOf = func(*Want) map[string]any { return map[string]any{"place": "中野坂上"} }
 	if say := WantVoice(context.Background(), w, "voice.py").Say; say != "いつもの中野坂上" {
 		t.Errorf("home: say = %q", say)
+	}
+}
+
+func TestEventVoiceLines(t *testing.T) {
+	got := EventVoiceLines("ja", VoiceEventHearFar, map[string]string{"from": "持ち物"})
+	if len(got) == 0 || got[0] != "持ち物 が遠くて聞こえなくなった" {
+		t.Fatalf("hear_far = %q", got)
+	}
+	// A language with no book is said in the default one.
+	if en := EventVoiceLines("en", VoiceEventHearGained, map[string]string{"from": "x"}); len(en) == 0 || en[0] != "x が聞こえるようになった" {
+		t.Fatalf("fallback = %q", en)
+	}
+	// An event with nothing said by default says nothing.
+	if out := EventVoiceLines("ja", VoiceEventOutput, nil); out != nil {
+		t.Fatalf("output = %q, want none", out)
 	}
 }

@@ -143,14 +143,6 @@ func cacheVoiceScript(name string, data []byte) string {
 	return out
 }
 
-// What happened, for a script saying a want's news rather than what it says
-// to the one standing on it.
-const (
-	VoiceEventOutput   = "output"   // a new answer; Result is it
-	VoiceEventAchieved = "achieved" // it got where it was going
-	VoiceEventHeard    = "heard"    // it heard another want's murmur; Heard is it
-)
-
 // VoiceEvent is a want's news, handed to its voice script.
 type VoiceEvent struct {
 	Kind   string
@@ -160,6 +152,9 @@ type VoiceEvent struct {
 	// Heard: the murmur a "heard" event is about (want_hear.go) — who said
 	// it, at which timing, its words and its answer.
 	Heard *HeardMurmur
+	// Vars: the names an event is about ("from", "to"), for its words —
+	// the default lines' {from} (want_voice_defaults.go), and a script's.
+	Vars map[string]string
 }
 
 // WantHomeOf, when set (by the server), is the home of the character that
@@ -205,6 +200,9 @@ func voiceEventInput(ev *VoiceEvent) any {
 		return nil
 	}
 	out := map[string]any{"kind": ev.Kind}
+	if len(ev.Vars) > 0 {
+		out["vars"] = ev.Vars
+	}
 	if ev.Result != nil {
 		out["result"] = ev.Result
 	}
@@ -221,49 +219,6 @@ func voiceEventInput(ev *VoiceEvent) any {
 	return out
 }
 
-// defaultVoice is what a want with no voice of its own says, by how much it
-// has done: the lines of the highest threshold it has reached. Twenty is the
-// top because the engine keeps twenty answers (resultHistoryDepth) and so
-// twenty is "a lot"; below five it is still learning, and says so.
-var defaultVoice = []struct {
-	at    int
-	lines []string
-}{
-	{20, []string{"ベテランです", "いつもありがとう", "なんでも聞いて", "今日も元気です", "ずっとここにいるよ"}},
-	{15, []string{"もう目をつぶってもできる", "いい感じに回ってる"}},
-	{10, []string{"%d回こなしたよ", "今日も任せて", "調子いいよ"}},
-	{5, []string{"だんだん慣れてきたよ", "ちょっとずつ分かってきた"}},
-	{1, []string{"まだ%d回だけ、覚えてる途中", "少しずつ慣れてきた"}},
-	{0, []string{"はじめての仕事だ", "はじめまして、やってみるね"}},
-}
-
-// statusVoice is what a want says about where it stands, before anything about
-// how much it has done: a want waiting for you or one that failed has that to
-// say first. Quiet words, never a call — the board is somewhere to come back
-// to, not something that shouts. A status not here (reaching, achieved past
-// its first time) leaves it to experience; deleting says nothing.
-var statusVoice = map[WantStatus][]string{
-	WantStatusIdle:              {"準備してるよ", "これから始めるね"},
-	WantStatusInitializing:      {"準備してるよ", "これから始めるね"},
-	WantStatusPrepareAgent:      {"準備してるよ", "これから始めるね"},
-	WantStatusWaitingUserAction: {"あなたの返事を待ってるよ", "急がなくていいよ"},
-	WantStatusSuspended:         {"ひと休み中", "また呼んでね"},
-	WantStatusFailed:            {"うまくいかなかった…", "もう一回やらせて"},
-	WantStatusConfigError:       {"設定を見てもらえる？"},
-	WantStatusModuleError:       {"調子が悪いみたい"},
-	WantStatusCancelled:         {"別のに替わったよ"},
-	WantStatusTerminated:        {"おしまい"},
-	WantStatusArchived:          {"しまわれてます"},
-}
-
-// achievedVoice is what a want that has finished says while it has little
-// experience to speak of; past that it talks like any seasoned want.
-var achievedVoice = []string{"できたよ", "おわった、ひと休み"}
-
-// warningVoice is mixed into what a want says when it got where it is with
-// something logged against it (reaching/achieved with a warning).
-const warningVoice = "…ちょっと気になることがある"
-
 // defaultVoiceFor is what w says with no script: its status first, then how
 // much it has done.
 func defaultVoiceFor(status WantStatus, experience int) []string {
@@ -278,21 +233,21 @@ func defaultVoiceFor(status WantStatus, experience int) []string {
 	switch {
 	case status == WantStatusDeleting:
 		return nil
-	case statusVoice[status] != nil:
-		lines = statusVoice[status]
+	case defaultBook().status[status] != nil:
+		lines = defaultBook().status[status]
 	case status == WantStatusAchieved && experience < 5:
-		lines = achievedVoice
+		lines = defaultBook().achieved
 	default:
 		lines = defaultVoiceLines(experience)
 	}
 	if warned {
-		lines = append(append([]string{}, lines...), warningVoice)
+		lines = append(append([]string{}, lines...), defaultBook().warning)
 	}
 	return lines
 }
 
 func defaultVoiceLines(experience int) []string {
-	for _, step := range defaultVoice {
+	for _, step := range defaultBook().experience {
 		if experience >= step.at {
 			out := make([]string, len(step.lines))
 			for i, l := range step.lines {
@@ -490,10 +445,17 @@ func WantGuideVoice(ctx context.Context, w *Want, script string, guide any) map[
 }
 
 func WantNewsVoice(ctx context.Context, w *Want, script string, ev VoiceEvent) VoiceLine {
-	if script == "" {
-		return VoiceLine{}
+	var lines []string
+	var mood string
+	var labels map[string]string
+	if script != "" {
+		lines, mood, labels, _ = scriptVoice(ctx, w, script, &ev)
 	}
-	lines, mood, labels, _ := scriptVoice(ctx, w, script, &ev)
+	// Nothing of its own to say about it: what any want says
+	// (want_voice_defaults.go), if anything.
+	if len(lines) == 0 {
+		lines = EventVoiceLines(VoiceLangDefault, ev.Kind, ev.Vars)
+	}
 	voiceLinesSaid(lines)
 	line := pickVoice(w, lines, mood)
 	line.Labels = labels

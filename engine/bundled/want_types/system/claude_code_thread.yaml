@@ -95,6 +95,7 @@ wantType:
   timings:
     - name: replied
       description: Claude Code から返事が来たとき
+      icon: message-square-reply
       if: has_new_response
       murmur: true
       notify: true

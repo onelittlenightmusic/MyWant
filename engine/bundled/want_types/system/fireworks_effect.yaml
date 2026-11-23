@@ -10,6 +10,10 @@ wantType:
       aliases: "fireworks,花火"
       riffable: reaction
       type-icon: Sparkles
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: act
+    description: 盤面で花火を上げる
   parameters:
     - name: input_button
       type: string

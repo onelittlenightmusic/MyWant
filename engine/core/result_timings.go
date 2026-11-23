@@ -118,11 +118,18 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([
 					n.timingSeen["if:"+d.If] = allHold(v, sub)
 				}
 				for _, f := range watchedFields(d) {
-					v, ok := prev.Fields[f]
-					if !ok && f == n.Spec.FinalResultField {
+					src, sub, counted := countCondition(f)
+					if !counted {
+						src = f
+					}
+					v, ok := prev.Fields[src]
+					if !ok && src == n.Spec.FinalResultField {
 						// The answer itself (a checklist's items): kept as
 						// the entry's result, not among its fields.
 						v = prev.Result
+					}
+					if counted {
+						v = countHold(v, sub)
 					}
 					n.timingSeen[f] = v
 				}
@@ -133,7 +140,12 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([
 	value := func(field string) any {
 		v, ok := now[field]
 		if !ok {
-			v = read(field)
+			if list, sub, counted := countCondition(field); counted {
+				// "count:items.done": how many items are so.
+				v = countHold(read(list), sub)
+			} else {
+				v = read(field)
+			}
 			now[field] = v
 		}
 		return v
@@ -171,7 +183,8 @@ func (n *Want) answerTimings(fields map[string]any, prev *ResultHistoryEntry) ([
 			if changed[f] {
 				continue
 			}
-			list := f == d.OnIncrease || f == d.OnDecrease
+			_, _, counted := countCondition(f)
+			list := (f == d.OnIncrease || f == d.OnDecrease) && !counted
 			if c := fieldChange(f, n.timingSeen[f], value(f), list); c != nil {
 				changed[f] = true
 				changes = append(changes, *c)
@@ -279,15 +292,22 @@ func withStandardTimings(def *WantTypeDefinition) {
 	if def == nil || (len(def.Timings) == 0 && def.FinalResultField == "") {
 		return
 	}
-	for _, d := range def.Timings {
+	for i, d := range def.Timings {
 		if d.Name == AnswerTiming {
+			// Declared by the type: its words, the standard glyph if none.
+			if d.Icon == "" {
+				def.Timings[i].Icon = AnswerTimingIcon
+			}
 			return
 		}
 	}
 	def.Timings = append([]TimingDef{{
-		Name: AnswerTiming, Description: "新しい結果が出たとき", Murmur: true, Notify: true,
+		Name: AnswerTiming, Description: "新しい結果が出たとき", Icon: AnswerTimingIcon, Murmur: true, Notify: true,
 	}}, def.Timings...)
 }
+
+// AnswerTimingIcon is the standard timing's glyph: a new answer.
+const AnswerTimingIcon = "refresh-cw"
 
 // HasTimings: its type names moments of its own to tell of its answers at —
 // not only the standard one every type with answers has.
@@ -470,6 +490,34 @@ func allCondition(cond string) (list, field string, ok bool) {
 	return list, field, ok && list != "" && field != ""
 }
 
+// countCondition reads a watched field of the form "count:<list>.<field>" —
+// the number of items of the list with the field true, so onIncrease of it is
+// "one more of them is so" (a checklist item ticked: count:items.done).
+func countCondition(f string) (list, field string, ok bool) {
+	rest, found := strings.CutPrefix(f, "count:")
+	if !found {
+		return "", "", false
+	}
+	list, field, ok = strings.Cut(rest, ".")
+	return list, field, ok && list != "" && field != ""
+}
+
+// countHold is how many items of a list have field true; nil when it is no
+// list (nothing to compare with yet).
+func countHold(v any, field string) any {
+	items, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	n := 0
+	for _, it := range items {
+		if m, ok := it.(map[string]any); ok && truthyAnswerField(m[field]) {
+			n++
+		}
+	}
+	return n
+}
+
 // allHold says whether a list has items and every one has field true.
 func allHold(v any, field string) bool {
 	items, ok := v.([]any)
@@ -483,4 +531,24 @@ func allHold(v any, field string) bool {
 		}
 	}
 	return true
+}
+
+// MurmurTimings are the type's timings this want murmurs at — what another
+// want can hear of it (spec.hear). A notice is a murmur too.
+func (n *Want) MurmurTimings() []TimingDef {
+	defs := n.typeTimings()
+	labels := n.GetLabels()
+	var murmur, notify *[]string
+	if v := n.Spec.Voice; v != nil {
+		murmur, notify = v.Murmur, v.Notify
+	}
+	murmurAt, _ := voiceTimings(murmur, labels[MurmurLabel], defs, func(d TimingDef) bool { return d.Murmur })
+	notifyAt, _ := voiceTimings(notify, labels[NotifyLabel], defs, func(d TimingDef) bool { return d.Notify })
+	var out []TimingDef
+	for _, d := range defs {
+		if murmurAt[d.Name] || notifyAt[d.Name] {
+			out = append(out, d)
+		}
+	}
+	return out
 }

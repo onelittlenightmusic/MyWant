@@ -24,11 +24,16 @@ wantType:
   timings:
     - name: timed_out
       description: 反応が無いまま時間切れになったとき
+      icon: alarm-clock-off
       if: timeout
       onChange: timeout
       murmur: true
       notify: true
 
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: propose
+    description: 予定の1時間前のリマインダーを作るか聞く
   parameters:
   - name: message
     description: Reminder message to display

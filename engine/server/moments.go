@@ -62,6 +62,10 @@ type moment struct {
 	Mood         string            `json:"mood,omitempty"`
 	At           int64             `json:"at,omitempty"`
 	Translations map[string]string `json:"translations,omitempty"`
+	// Aloud: a line said in full over its tile wherever the person is, for
+	// a moment (a want's voice event, handlers_voice_event.go) — not a "♪"
+	// waiting to be heard.
+	Aloud bool `json:"aloud,omitempty"`
 }
 
 // key is what makes two moments the same one.

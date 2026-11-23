@@ -16,6 +16,7 @@ wantType:
   timings:
     - name: exceeded
       description: 予算を超えたとき
+      icon: wallet
       if: budget_exceeded
       onChange: budget_exceeded
       murmur: true

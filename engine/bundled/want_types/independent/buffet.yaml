@@ -29,6 +29,7 @@ wantType:
   timings:
     - name: cancelled
       description: キャンセルされたとき
+      icon: calendar-x
       if: cancelled
       onChange: cancelled
       murmur: true

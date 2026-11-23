@@ -25,6 +25,7 @@ wantType:
   timings:
     - name: restarted
       description: プロセスが起動し直したとき（落ちて復帰した）
+      icon: rotate-ccw
       onChange: process_pid
       murmur: true
       notify: true

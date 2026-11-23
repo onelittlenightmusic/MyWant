@@ -30,6 +30,7 @@ wantType:
       notify: false
     - name: arrived
       description: 場所に着いたとき
+      icon: map-pinned
       if: inside
       onChange: inside
       murmur: true

@@ -36,10 +36,12 @@ wantType:
   timings:
     - name: failed
       description: 天気が取れなかったとき
+      icon: cloud-off
       murmur: true
       notify: false
     - name: condition_changed
       description: 天気が変わったとき（晴れ→雨など）
+      icon: cloud-sun-rain
       onChange: weather_condition
       murmur: true
       notify: true
@@ -49,6 +51,10 @@ wantType:
     operator: "=="
     value: "$today"
 
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: say
+    description: その時間と場所の天気を答える
   parameters:
     - name: at
       description: Where to read the weather — a city, place or station

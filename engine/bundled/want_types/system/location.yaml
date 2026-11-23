@@ -28,6 +28,7 @@ wantType:
       notify: false
     - name: arrival
       description: 保存した場所の近くに来たとき
+      icon: map-pin
       if: near_place
       onChange: near_place
       murmur: true

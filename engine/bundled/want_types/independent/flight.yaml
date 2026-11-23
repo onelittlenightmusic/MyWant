@@ -27,12 +27,14 @@ wantType:
   timings:
     - name: cancelled
       description: キャンセルされたとき
+      icon: calendar-x
       if: cancelled
       onChange: cancelled
       murmur: true
       notify: true
     - name: status_changed
       description: 運航状況が変わったとき
+      icon: plane
       onIncrease: status_change_history_count
       murmur: true
       notify: true

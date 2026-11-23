@@ -44,6 +44,7 @@ wantType:
       notify: false
     - name: new_message
       description: メッセージが増えたとき
+      icon: message-circle
       onIncrease: cc_message_count
       murmur: true
       notify: false

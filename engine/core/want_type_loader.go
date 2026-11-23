@@ -18,6 +18,9 @@ import (
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition = want_spec.WantTypeDefinition
 
+// HearingDef is what a type does with a murmur it heard.
+type HearingDef = want_spec.HearingDef
+
 // WantCapabilityDef is one thing a want of a type can answer beyond its result
 // (the robot's use_capability — server/tools_capability.go).
 type WantCapabilityDef = want_spec.WantCapabilityDef

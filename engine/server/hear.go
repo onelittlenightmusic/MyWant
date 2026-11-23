@@ -93,9 +93,15 @@ func hearsAt(listen, at []string) bool {
 	return false
 }
 
+// HearRadiusCells is how far a want hears: a want of the type it hears more
+// than this many cells away (in a straight line) is not heard, however near
+// it is compared to the others. The board warns when a move takes the one it
+// hears out of reach (GUI hearingNearest, the same number).
+const HearRadiusCells = 10.0
+
 // amongNearest says whether src is one of the n wants of its type nearest to
-// the hearer on the board (by their cells). A want with no cell is as far as
-// can be.
+// the hearer on the board (by their cells), within HearRadiusCells. A want
+// with no cell is as far as can be.
 func amongNearest(src, hearer *mywant.Want, wants []*mywant.Want, typ string, n int) bool {
 	if n <= 0 {
 		n = 1
@@ -116,6 +122,9 @@ func amongNearest(src, hearer *mywant.Want, wants []*mywant.Want, typ string, n 
 		d := math.Inf(1)
 		if x, y, ok := canvasCell(w); ok {
 			d = math.Hypot(x-hx, y-hy)
+		}
+		if d > HearRadiusCells {
+			continue // out of earshot
 		}
 		all = append(all, far{w.Metadata.ID, d})
 	}

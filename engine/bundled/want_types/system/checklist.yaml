@@ -25,19 +25,32 @@ wantType:
   timings:
   - name: answer
     description: リストが変わったとき（編集のたびには知らせない）
+    icon: list
     murmur: false
     notify: false
   - name: added
     description: アイテムが追加されたとき
+    icon: list-plus
     onIncrease: items
     murmur: true
   - name: removed
     description: アイテムが削除されたとき
+    icon: list-minus
     onDecrease: items
+  - name: checked
+    description: アイテムに済みをつけたとき
+    icon: check-circle
+    onIncrease: count:items.done
+    murmur: true
   - name: completed
     description: 全部終わったとき
+    icon: trophy
     if: all:items.done
     murmur: true
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: propose
+    description: 持っていくといいものを、リストに足すか聞く
   parameters:
   - name: items
     description: Initial checklist lines, plain strings — each becomes an unchecked item

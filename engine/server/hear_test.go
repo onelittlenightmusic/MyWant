@@ -20,13 +20,23 @@ func TestAmongNearest(t *testing.T) {
 	}
 	hearer := at("h", "weather", "0", "0")
 	near := at("g1", "golf", "1", "0")
-	far := at("g2", "golf", "9", "9")
+	far := at("g2", "golf", "6", "6")
 	all := []*mywant.Want{hearer, near, far}
 	if !amongNearest(near, hearer, all, "golf", 1) || amongNearest(far, hearer, all, "golf", 1) {
 		t.Fatal("nearest 1")
 	}
 	if !amongNearest(far, hearer, all, "golf", 2) {
 		t.Fatal("nearest 2")
+	}
+	// Beyond the radius it is not heard, even as the only one of its type.
+	gone := at("g3", "golf", "11", "0")
+	alone := []*mywant.Want{hearer, gone}
+	if amongNearest(gone, hearer, alone, "golf", 1) {
+		t.Fatal("heard a want 11 cells away")
+	}
+	edge := at("g4", "golf", "6", "8") // exactly 10
+	if !amongNearest(edge, hearer, []*mywant.Want{hearer, edge}, "golf", 1) {
+		t.Fatal("did not hear a want 10 cells away")
 	}
 }
 

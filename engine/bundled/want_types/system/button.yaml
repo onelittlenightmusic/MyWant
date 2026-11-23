@@ -21,6 +21,7 @@ wantType:
       notify: false
     - name: pressed
       description: 押されたとき
+      icon: mouse-pointer-click
       onIncrease: pressed_count
       murmur: true
       notify: false

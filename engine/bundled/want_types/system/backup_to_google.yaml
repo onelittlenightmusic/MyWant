@@ -42,11 +42,13 @@ wantType:
   timings:
     - name: backed_up
       description: バックアップが済んだとき
+      icon: upload-cloud
       onChange: last_backup_at
       murmur: true
       notify: false
     - name: failed
       description: バックアップに失敗したとき
+      icon: alert-circle
       murmur: true
       notify: true
 

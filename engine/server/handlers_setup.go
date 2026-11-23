@@ -44,6 +44,8 @@ func (s *Server) setupRoutes() {
 	// Per-want alerts (see handlers_notifications.go).
 	wants.HandleFunc("/{id}/notify", s.notifyWant).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/hear", s.hearWant).Methods("POST", "OPTIONS")
+	wants.HandleFunc("/{id}/hear-candidates", s.hearCandidates).Methods("GET", "OPTIONS")
+	wants.HandleFunc("/{id}/voice-event", s.wantVoiceEvent).Methods("POST", "OPTIONS")
 	wants.HandleFunc("/{id}/tile.png", s.getTileImage).Methods("GET", "HEAD", "OPTIONS")
 	wants.HandleFunc("/{id}/tile.png", s.putTileImage).Methods("PUT")
 	// Its answers, read and edited by hand (handlers_result_history.go).

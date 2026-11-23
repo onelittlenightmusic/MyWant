@@ -24,6 +24,10 @@ wantType:
       user-control: "true"
       type-icon: "Bot"
 
+  # What a want of this type does with a murmur it heard (spec.hear).
+  hearing:
+    kind: propose
+    description: 空いた枠の予約をすすめる
   parameters:
   - name: provider
     description: |
