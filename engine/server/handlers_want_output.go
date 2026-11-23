@@ -91,6 +91,12 @@ func (s *Server) RegisterOutputCallback() {
 				log.Printf("[want-output] failed to record alert for %s: %v", w.Metadata.Name, err)
 				return
 			}
+			// Kept on the want: its last news, said again to whoever stands on
+			// it after the notice is read (predefined last_murmur).
+			mywant.StoreStateMulti(w, map[string]any{
+				"last_murmur":    msg,
+				"last_murmur_at": time.Now().Format(time.RFC3339),
+			})
 			// Heard by the wants that listen for it (spec.hear, hear.go), with
 			// what it is about in set words (its time and place).
 			s.hearMurmur(w, murmurID, msg, out, labels)

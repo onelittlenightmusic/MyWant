@@ -76,6 +76,22 @@ predefined:
     # state so anything can read it — another want's condition, a card, a
     # hearer — and not only the bubble it tints. Written by the engine each
     # time it works out what the want says; "" until it first has.
+    # What the want last murmured (its news: the alert, the "♪"), and when —
+    # kept after it is read, so standing on it again says it once more rather
+    # than a line about nothing (はじめまして). Written by the server as it
+    # records the murmur (handlers_want_output.go).
+    - name: last_murmur
+      description: What the want last murmured (its news), kept after it is read
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
+    - name: last_murmur_at
+      description: When it last murmured (RFC3339)
+      type: string
+      label: current
+      persistent: true
+      initialValue: ""
     - name: mood
       description: "How the want feels: joy, eager, calm, waiting, sad or worried (its voice's mood)"
       type: string
