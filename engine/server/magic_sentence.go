@@ -298,6 +298,7 @@ func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bo
 	if q == "" {
 		return false
 	}
+	s.noteAsked(askerOf(character, q), q) // for their context (user_context.go)
 	// An answer to a question put to them (which of two a request was) is
 	// done here too, whatever it reads as alone (「乗り換え」).
 	if !resolveWaitingFor(askerOf(character, q)) {
@@ -316,7 +317,13 @@ func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bo
 		if card != nil {
 			cards = []robotCard{*card}
 		}
-		s.sayTurnAnswer(answer, cards, nil, "")
+		// Which of two or three: the candidates under the question, side by
+		// side, each pressed (or its name said) to say it is the one.
+		var choices []string
+		if tiles, names, asking := resolveAsking(askerOf(character, q), answer); asking {
+			cards, choices = tiles, names
+		}
+		s.sayTurnAnswer(answer, cards, choices, "")
 	}()
 	return true
 }

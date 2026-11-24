@@ -191,7 +191,7 @@ func (s *Server) magicResolve(said string, mm magicMatch) (magicMatch, string, [
 		s.markedEnds(said, &c)
 		if s.candidateMadeOf(c) {
 			made = append(made, c)
-			if len(made) == 2 {
+			if len(made) == 3 {
 				break
 			}
 		}
@@ -203,11 +203,17 @@ func (s *Server) magicResolve(said string, mm magicMatch) (magicMatch, string, [
 	fields := map[string]any{"weighed": strings.Join(trace, ","), "made_of": len(made)}
 	outcome := resolveNone
 	switch {
-	case len(made) == 1, len(made) == 2 && made[0].score-made[1].score >= resolveMargin:
+	case len(made) == 0:
+	case len(made) == 1, made[0].score-made[1].score >= resolveMargin:
 		outcome = resolveMatched
 		fields["chose"] = made[0].src.key()
-	case len(made) == 2:
+	default:
+		// Those as near the best as the next: two, or all three — shown to
+		// the person side by side, to say which (resolveQuestion).
 		outcome = resolveAsk
+		if len(made) == 3 && made[0].score-made[2].score >= resolveMargin {
+			made = made[:2]
+		}
 	}
 	fields["outcome"] = outcome
 	s.robotChatTrace("laya.resolve", fields, []string{"outcome", "chose", "weighed", "made_of"})
@@ -244,11 +250,16 @@ func (s *Server) candidateLabel(c magicMatch) string {
 	return c.wantType
 }
 
-// A question put to the person: which of two a request was.
+// A question put to the person: which of two or three a request was.
 type resolvePending struct {
 	said, turn, locale, who string
 	cands                   []magicMatch
 	at                      time.Time
+	// What was put to them: the question, and the candidates as tiles
+	// (cards of kind "choice") with their names as the replies.
+	question string
+	tiles    []robotCard
+	choices  []string
 }
 
 var (
@@ -256,16 +267,91 @@ var (
 	resolveWaiting = map[string]resolvePending{} // by who asked ("" unknown)
 )
 
-// resolveQuestion is the question put to the person, and kept to be answered.
-func (s *Server) resolveQuestion(said, turn, locale, who string, cands []magicMatch) string {
-	resolveMu.Lock()
-	resolveWaiting[who] = resolvePending{said: said, turn: turn, locale: locale, who: who, cands: cands, at: time.Now()}
-	resolveMu.Unlock()
-	var names []string
-	for _, c := range cands {
-		names = append(names, s.candidateLabel(c))
+// resolveOfferPrefix marks the robot's bubble question (robot_offer) as one of
+// these, answered by doing the one chosen (handleRobotOfferReply).
+const resolveOfferPrefix = "resolve-"
+
+// candidateSummary is what a candidate would be made with, in a line: its
+// parameters as the type lists them (「中野坂上 → 大森」 is from, to).
+func (s *Server) candidateSummary(c magicMatch) string {
+	var vals []string
+	seen := map[string]bool{}
+	add := func(k string) {
+		if v := strings.TrimSpace(c.params[k]); v != "" && !seen[k] {
+			seen[k] = true
+			vals = append(vals, v)
+		}
 	}
-	return fmt.Sprintf("「%s」は、%sですか？それとも%sですか？", said, names[0], strings.Join(names[1:], "、"))
+	if def := s.typeDefinition(c.wantType); def != nil && c.tool == "" {
+		for _, p := range def.Parameters {
+			add(p.Name)
+		}
+	}
+	var rest []string
+	for k := range c.params {
+		rest = append(rest, k)
+	}
+	sort.Strings(rest)
+	for _, k := range rest {
+		add(k)
+	}
+	return strings.Join(vals, " → ")
+}
+
+// resolveQuestion is the question put to the person, and kept to be answered:
+// the candidates shown side by side as tiles — under it in the chat, and in
+// the robot's bubble (robot_offer) — each pressed to say it is the one.
+func (s *Server) resolveQuestion(said, turn, locale, who string, cands []magicMatch) string {
+	var names []string
+	var tiles []robotCard
+	for i, c := range cands {
+		name := s.candidateLabel(c)
+		names = append(names, name)
+		typ := c.wantType
+		if c.tool != "" {
+			typ = ""
+		}
+		tiles = append(tiles, robotCard{Kind: "choice", ID: fmt.Sprintf("choice-%d", i+1), Name: name, Type: typ, Summary: s.candidateSummary(c)})
+	}
+	q := fmt.Sprintf("「%s」は、%sですか？それとも%sですか？", said, names[0], strings.Join(names[1:], "、"))
+	resolveMu.Lock()
+	resolveWaiting[who] = resolvePending{said: said, turn: turn, locale: locale, who: who, cands: cands, at: time.Now(), question: q, tiles: tiles, choices: names}
+	resolveMu.Unlock()
+	if robot, err := s.robotWantNow(); err == nil {
+		robot.SetCurrent("robot_offer", map[string]any{
+			"id": fmt.Sprintf("%s%d", resolveOfferPrefix, time.Now().UnixNano()), "ask": q,
+			"choices": names, "tiles": tiles, "who": who, "at": time.Now().Format(time.RFC3339),
+		})
+	}
+	return q
+}
+
+// resolveAsking is what was put to who, when answer is that question: the
+// candidates' tiles and their names, for the chat to show under it.
+func resolveAsking(who, answer string) ([]robotCard, []string, bool) {
+	resolveMu.Lock()
+	defer resolveMu.Unlock()
+	p, ok := resolveWaiting[who]
+	if !ok || p.question != answer {
+		return nil, nil, false
+	}
+	return p.tiles, p.choices, true
+}
+
+// clearResolveOffer takes a question of these down from the robot's bubble,
+// answered or let go; another offer there is left.
+func (s *Server) clearResolveOffer() {
+	robot, err := s.robotWantNow()
+	if err != nil {
+		return
+	}
+	if o, ok := robot.GetCurrent("robot_offer"); ok {
+		if m, ok := o.(map[string]any); ok {
+			if id, _ := m["id"].(string); strings.HasPrefix(id, resolveOfferPrefix) {
+				robot.SetCurrent("robot_offer", map[string]any{})
+			}
+		}
+	}
 }
 
 // resolveAnswered is the answer to a question put to who: the candidate the
@@ -276,7 +362,10 @@ func (s *Server) resolveAnswered(answer, who string) (resolvePending, magicMatch
 	defer resolveMu.Unlock()
 	p, waiting := resolveWaiting[who]
 	if !waiting || time.Since(p.at) > resolveAskFor {
-		delete(resolveWaiting, who)
+		if waiting {
+			delete(resolveWaiting, who)
+			go s.clearResolveOffer()
+		}
 		return p, magicMatch{}, false
 	}
 	a := strings.TrimSpace(answer)
@@ -296,13 +385,23 @@ func (s *Server) resolveAnswered(answer, who string) (resolvePending, magicMatch
 	case pick >= 0:
 	case strings.Contains(a, "1") || strings.Contains(a, "最初") || strings.Contains(a, "前"):
 		pick = 0
+	case strings.Contains(a, "3") || strings.Contains(a, "三"):
+		pick = 2
 	case strings.Contains(a, "2") || strings.Contains(a, "後") || strings.Contains(a, "二"):
 		pick = 1
 	}
 	delete(resolveWaiting, who)
+	go s.clearResolveOffer()
+	var offered []string
+	for _, c := range p.cands {
+		offered = append(offered, c.src.key())
+	}
 	if pick < 0 || pick >= len(p.cands) {
+		// Something else said: none of them, in their story.
+		story.choose(who, p.turn, p.said, offered, "", -1)
 		return p, magicMatch{}, false
 	}
+	story.choose(who, p.turn, p.said, offered, p.cands[pick].src.key(), pick)
 	noteClarified(p.said, p.cands[pick].src.key())
 	return p, p.cands[pick], true
 }

@@ -81,7 +81,13 @@ func (s *Server) clearWantChatSession(w http.ResponseWriter, r *http.Request) {
 		resets = resets[len(resets)-maxSessionResetMarks:]
 	}
 	want.SetCurrent("cc_session_resets", resets)
-	s.JSONResponse(w, http.StatusOK, map[string]any{"cleared": cleared})
+	// The robot's chat cleared: what it gathered of where each person is
+	// going (user_context.go) goes with it.
+	contexts := 0
+	if want.Metadata.Type == "robot" {
+		contexts = clearUserContexts()
+	}
+	s.JSONResponse(w, http.StatusOK, map[string]any{"cleared": cleared, "contexts_cleared": contexts})
 }
 
 // maxSessionResetMarks keeps the reset marks about as long as the history they

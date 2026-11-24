@@ -652,8 +652,13 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		turn.Cards = s.robotAnswerCards(turn)
-		cards := turn.Cards
-		_, _ = s.robotUpdateTurn(turn.ID, func(t *robotTurn) error { t.Cards = cards; return nil })
+		// Which of two or three a request was (magic_resolve.go): the
+		// candidates as tiles under the question, their names its replies.
+		if tiles, names, asking := resolveAsking(s.turnAsker(turn.ID), turn.Answer); asking {
+			turn.Cards, turn.Choices = tiles, names
+		}
+		cards, choices := turn.Cards, turn.Choices
+		_, _ = s.robotUpdateTurn(turn.ID, func(t *robotTurn) error { t.Cards, t.Choices = cards, choices; return nil })
 		if !turn.Quiet {
 			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices, turn.ID)
 		}

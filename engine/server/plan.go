@@ -106,6 +106,11 @@ func (s *Server) handlePlanBrief(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) planBrief(question, locale, turn, timezone, since string) (planBriefResponse, error) {
+	who := s.turnAsker(turn)
+	if who == "" {
+		who = askerOf("", question)
+	}
+	s.noteAsked(who, question) // for their context (user_context.go)
 	// A reply to what the robot offered (はい / いいえ): done here.
 	if answer, ok := s.robotOfferReply(question); ok {
 		return planBriefResponse{Answered: answer, Refs: []string{"-"}, Types: []string{"-"},
@@ -136,6 +141,7 @@ func (s *Server) planBrief(question, locale, turn, timezone, since string) (plan
 	var b strings.Builder
 	fmt.Fprintf(&b, "The person asked: 「%s」\n\n", question)
 	b.WriteString(earlierText(earlier))
+	b.WriteString(userContextText(who))
 	b.WriteString("You answer with the board: show a want or thing already there that answers it, or make a want that will. Decide which:\n")
 	// Nothing on the board about it: existing is not offered at all. Offered,
 	// the phone's small model chose it with no name to go with it (「伊東から
@@ -519,6 +525,11 @@ func (s *Server) handlePlanParams(w http.ResponseWriter, r *http.Request) {
 	now := planNow(req.Timezone, time.Now())
 	b.WriteString(planNowText(req.Timezone, time.Now()))
 	b.WriteString(earlierText(s.earlierInConversation(req.Turn, req.Question, req.Since)))
+	if who := s.turnAsker(req.Turn); who != "" {
+		b.WriteString(userContextText(who))
+	} else {
+		b.WriteString(userContextText(askerOf("", req.Question)))
+	}
 	if rerun != nil {
 		b.WriteString(rerunParamsText())
 	} else {

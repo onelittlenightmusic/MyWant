@@ -358,6 +358,23 @@ Swift 側は自分のコメントが挙げる反例「はい、でも先に天�
 - `pending_command` ＝オーバーレイが読む待機中コマンド
 - 失敗しても**必ず何か言う**。「答えられませんでした: 理由」。黙るのは聞こえていないのと区別がつかないため。
 
+### 9. 依頼が近い候補で割れたとき・その人の今のコンテキスト
+
+**候補を並べて選んでもらう**（`engine/server/magic_resolve.go`）
+Laya の上位から作れる候補のうち、1位との差が 0.1 未満のもの（2〜3個）を、文字の聞き返しの代わりに
+want タイルとして並べる。チャット（`cards` の kind `choice`＋`choices`）にも、ロボットの吹き出し
+（`robot_offer.tiles`、id は `resolve-…`）にも出る。押すか名前・番号を言うとその型で作る。
+選んだ結果は Laya の学習用（`laya-clarified.jsonl`）と、その人のストーリー（`chat.choose`：
+依頼・並んだ候補・選んだ型・順位。選ばずに別のことを言えば chosen は空）に残る。
+
+**その人の今のコンテキスト**（`engine/server/user_context.go`）
+依頼に答えた後（4秒静かになってから）、その人の直近10件（1時間以内）の依頼と作った want を Apple FM に
+読ませ、`destination / origin / arrive_by / topic` の固定項目に集約して `~/.mywant/contexts/<character>.json` に置く。
+場所は「作った want のパラメータ値」か「依頼に出てきた盤面の Thing」だけ、時刻は依頼で言われた時だけ採用。
+使い道は2つ：型のラベル `context/<param>: <field>`（transit_search・route の `context/to: destination`）で
+言われなかった値を埋める（言われた値 → コンテキスト → ホームの順。here-param は埋めない）、
+ロボットの brief に一行で渡す。ロボットのチャットのクリア（`DELETE /wants/robot/chat/session`）で全員分消える。
+
 ## 8kトークンとの戦い（各段の対策）
 
 | 段 | 対策 |
@@ -441,4 +458,5 @@ fmtool には自分から mywant を導く手がかりがないので、サー�
 | コマンドカタログ（risk/kind/canvas） | `client/cmd/mywant/commands/commands.go` |
 | `mywant do` | `client/cmd/mywant/commands/do.go` |
 | fmtool 本体 | `fmtool/Sources/fmtool/{main,Serve,Plan,Rescue,MyWantCLI,Broker,Handback,Tools}.swift`（上流: `fm-tools-proto/swift/`） |
+| 候補の選択・今のコンテキスト | `engine/server/magic_resolve.go`, `user_context.go` ↔ `mywant-gui/web/src/components/common/ChoiceTiles.tsx`, guiex `CanvasSpeechBubble.tsx` |
 | Yes/No UI | `mywant-gui/web/src/components/dashboard/PendingConfirmOverlay.tsx` |

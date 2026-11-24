@@ -411,6 +411,27 @@ func (r *storyRecorder) answer(turn string, cards []robotCard, failed bool) {
 	r.answeredLocked(turn, cards)
 }
 
+// storyKindChatChoose: the person said which of the wants put side by side a
+// request was (magic_resolve.go) — or said something else, choosing none.
+const storyKindChatChoose = "chat.choose"
+
+// choose is which of the candidates put to character they took: the request,
+// what was offered (type keys, in order), the one chosen ("" none) and its
+// place among them.
+func (r *storyRecorder) choose(character, turn, said string, offered []string, chosen string, at int) {
+	if character == "" {
+		character = storyUnknown
+	}
+	detail := map[string]string{"question": said, "offered": strings.Join(offered, ","), "chosen": chosen}
+	if at >= 0 {
+		detail["rank"] = strconv.Itoa(at + 1)
+	}
+	r.running()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.addLocked(ws.StoryEvent{Character: character, Kind: storyKindChatChoose, Ref: turn, Detail: detail})
+}
+
 // actDone is an act finished: what its plan did, in the turn's story.
 func (r *storyRecorder) actDone(a ws.Act, plan ws.PlanSpec) {
 	detail := map[string]string{"phase": a.Status.Phase, "plan": a.Spec.Plan, "action": plan.Action}

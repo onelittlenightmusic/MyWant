@@ -1115,6 +1115,10 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question, who
 	// The request's time as Laya reads it (time-reading/<param>, time_reading.go):
 	// 「10分後」 worked out here on what it chose, not left to the model.
 	filled += s.robotReadTimes(typ, def.Metadata.Labels, params, question)
+	// What was said, kept for who's context (user_context.go); then what
+	// they did not say, from it: 「天気は？」 after 「国分寺まで」 is 国分寺's.
+	s.noteMade(who, question, typ, params)
+	filled += s.robotContextParams(def.Metadata.Labels, params, who)
 	// A place not said, filled with where the person who asked goes at this
 	// part of the day (home_params.go): 「天気」 in the evening is home's.
 	filled += s.robotHomeParams(typ, params, who)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -118,9 +119,34 @@ func (s *Server) handleRobotInitiativeRetrain(w http.ResponseWriter, r *http.Req
 func (s *Server) handleRobotOfferReply(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Said string `json:"said"`
+		// The offer answered: one of resolveOfferPrefix is which of two or
+		// three a request was (magic_resolve.go), asked of who.
+		ID  string `json:"id,omitempty"`
+		Who string `json:"who,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.HasPrefix(req.ID, resolveOfferPrefix) {
+		if !resolveWaitingFor(req.Who) {
+			s.clearResolveOffer()
+			http.Error(w, "that question is no longer waiting", http.StatusConflict)
+			return
+		}
+		// Said in the chat as the person's reply, and done as one typed.
+		s.robotAsked(req.Said, "")
+		answer, card, _, ok := s.magicSentenceDoBy(req.Said, "", "", req.Who)
+		if !ok {
+			http.Error(w, "that is none of the ones asked", http.StatusConflict)
+			return
+		}
+		var cards []robotCard
+		if card != nil {
+			cards = []robotCard{*card}
+		}
+		s.sayTurnAnswer(answer, cards, nil, "")
+		robotWriteJSON(w, map[string]string{"answer": answer})
 		return
 	}
 	answer, ok := s.robotOfferReply(req.Said)
