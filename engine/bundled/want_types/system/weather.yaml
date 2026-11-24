@@ -10,6 +10,9 @@ wantType:
     category: weather
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "ある場所の天気を調べる"
       aliases: "weather,天気"
       # Drawn on the canvas as a probe: a reach out to the place it reads.
       form-type: probe
@@ -35,6 +38,8 @@ wantType:
   # only the temperature — a want that wants only this turns answer off.
   timings:
     - name: failed
+      irregular: true   # out of the ordinary: the robot looks at it
+      requires: [retry]   # what it needs done (met by a capability that attends to it)
       description: 天気が取れなかったとき
       icon: cloud-off
       murmur: true
@@ -145,3 +150,36 @@ wantType:
 
   requires:
     - weather_agency
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "中野の天気"
+      variants: ["中野の天気を出して", "中野は晴れてる？天気を見せて", "中野の今日の天気"]
+      params: {"at": "中野"}
+    - say: "国分寺の天気を見せて"
+      variants: ["国分寺の天気", "国分寺は雨？天気を調べて", "国分寺の今日の天気を出して"]
+      params: {"at": "国分寺"}
+    - say: "札幌の天気"
+      variants: ["札幌の天気を調べて", "札幌は今日どんな天気？", "札幌の天気予報"]
+      params: {"at": "札幌"}
+    - say: "Tokyoの天気を出して"
+      variants: ["Tokyoの天気", "Tokyoの天気予報を見せて", "Tokyoは晴れ？"]
+      params: {"at": "Tokyo"}
+    - say: "横浜の天気が知りたい"
+      variants: ["横浜の天気", "横浜の天気を調べて", "横浜は今日雨降る？"]
+      params: {"at": "横浜"}
+    # <alias> is said as each of the type's aliases (天気, weather); <home> is
+    # where the person who asked goes at that part of the day.
+    - say: "<alias>"
+      variants: ["<alias>を見せて", "今日の<alias>"]
+      at: "18:00"
+      params: {"at": "<home>"}
+    - say: "<alias>を出して"
+      variants: ["<alias>を置いて", "<alias>を調べて"]
+      at: "13:00"
+      params: {"at": "<home>"}
+    - say: "<alias> 札幌"
+      variants: ["札幌の<alias>", "<alias>、札幌"]
+      params: {"at": "札幌"}

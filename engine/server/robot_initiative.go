@@ -206,6 +206,10 @@ const initiativeDecideWait = 15 * time.Second
 type decisionItem struct {
 	State     string                      `json:"state"`
 	Questions map[string]decisionQuestion `json:"questions"`
+	// Cues: per question, per option, what was seen of it in the state —
+	// 1 for an option one of whose keywords is in the words. How much it
+	// counts is the head's to learn (fmtool LayaHead.keyword).
+	Cues map[string]map[string]float64 `json:"cues,omitempty"`
 }
 
 // robotDecider hands decisions and trainings to whichever worker can take
@@ -214,7 +218,12 @@ type robotDecider struct{}
 
 // decide returns the answers and who gave them.
 func (d *robotDecider) decide(state string, questions map[string]decisionQuestion) (map[string]decisionAnswer, string, error) {
-	all, by, err := d.decideMany([]decisionItem{{State: state, Questions: questions}})
+	return d.decideCued(state, questions, nil)
+}
+
+// decideCued is decide with what was seen of each option in the state (cues).
+func (d *robotDecider) decideCued(state string, questions map[string]decisionQuestion, cues map[string]map[string]float64) (map[string]decisionAnswer, string, error) {
+	all, by, err := d.decideMany([]decisionItem{{State: state, Questions: questions, Cues: cues}})
 	if err != nil {
 		return nil, by, err
 	}
@@ -835,10 +844,19 @@ func layaCan(op string) bool {
 	return modelDeviceCan(op, "", time.Now()) || types.LayaHere()
 }
 
-// layaJob runs a Laya op as Apple's model's work is run (runModelJob): a
-// device that can, first — the phone, the Mac app, a GPU server — else this
-// Mac's fmtool.
+// layaJob runs a Laya op: this Mac's fmtool first, when it has Laya — a
+// decision there takes a tenth of a second, where one handed to a device
+// (the Mac app on this same Mac, through the queue it polls) took ten
+// (2026-11-24) — else, or when it fails, a device that can: the phone, the
+// Mac app, a GPU server (Fly, with no fmtool, has only these).
 func layaJob(op string, in json.RawMessage, wait time.Duration) (json.RawMessage, modelBy, error) {
+	if types.LayaHere() {
+		out, err := types.AskModelOp(op, in, wait)
+		if err == nil {
+			return out, modelByServer, nil
+		}
+		log.Printf("[laya] this Mac's fmtool did not answer %s (%v); asking a device", op, err)
+	}
 	if modelDeviceCan(op, "", time.Now()) {
 		res, ok := waitForModelDevice(context.Background(),
 			modelClaim{RequestID: generateWantID(), Op: op, Input: in}, wait)
@@ -848,10 +866,6 @@ func layaJob(op string, in json.RawMessage, wait time.Duration) (json.RawMessage
 			}
 			return res.Output, modelByDevice, nil
 		}
-	}
-	if types.LayaHere() {
-		out, err := types.AskModelOp(op, in, wait)
-		return out, modelByServer, err
 	}
 	return nil, "", fmt.Errorf("no worker answered within %s", wait)
 }

@@ -7,6 +7,9 @@ wantType:
     category: utility
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "メモを貼る"
       aliases: "note,メモ,付箋"
       user-control: "true"
       type-icon: StickyNote
@@ -35,3 +38,14 @@ wantType:
       metadata:
         name: my-note
         type: note
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "メモを置いて"
+      variants: ["メモを貼って", "メモを作る", "メモ書きを置いて"]
+    - say: "付箋を貼って"
+      variants: ["付箋を置いて", "付箋にメモ", "付箋がほしい"]
+    - say: "メモ"
+      variants: ["メモ帳", "書き留めるメモ"]

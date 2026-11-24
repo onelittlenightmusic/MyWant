@@ -59,13 +59,14 @@ public actor LayaDecider {
     /// `heads` come with the job, from the server (whatever worker fitted
     /// them): this device keeps none of its own.
     public func decide(state: String, questions: [String: LayaQuestion],
-                       heads: [String: LayaHead] = [:]) async throws -> [String: Any] {
+                       heads: [String: LayaHead] = [:], cues: [String: [String: Double]] = [:]) async throws -> [String: Any] {
         let model = try await loaded()
         let started = Date()
         var answers: [String: Any] = [:]
         var byHead: [String] = []
         for (id, q) in questions.sorted(by: { $0.key < $1.key }) {
-            let reading = try await model.read(state: state, question: q)
+            var reading = try await model.read(state: state, question: q)
+            if let c = cues[id] { reading.cues = reading.labels.map { c[$0] ?? 0 } }
             var probs = reading.probabilities
             if let head = heads[Self.headKey(id, q)], head.serving, head.labels == reading.labels {
                 probs = head.probabilities(reading)
@@ -85,6 +86,8 @@ public actor LayaDecider {
     public struct Row: Decodable, Sendable {
         public let state: String
         public let gold: [String: String]
+        /// Per question, per label, its cue in these words (LayaReading.cues).
+        public let cues: [String: [String: Double]]?
     }
 
     /// Fits the heads and hands them back, for the server to keep and send
@@ -103,7 +106,9 @@ public actor LayaDecider {
             for row in labelled {
                 // Each read awaits the model: a decision asked meanwhile is
                 // run between them.
-                readings.append(try await model.read(state: row.state, question: q))
+                var reading = try await model.read(state: row.state, question: q)
+                if let c = row.cues?[id] { reading.cues = reading.labels.map { c[$0] ?? 0 } }
+                readings.append(reading)
                 gold.append(row.gold[id]!)
             }
             let labels = Array(q.labels.prefix(readings.first?.labels.count ?? q.labels.count))
@@ -138,7 +143,7 @@ public actor LayaDecider {
 
     /// A job's input run as `op`, its output as the server takes it back.
     public func run(op: String, input: Data) async -> (output: Any?, error: String?) {
-        struct Item: Decodable { let state: String; let questions: [String: LayaQuestion] }
+        struct Item: Decodable { let state: String; let questions: [String: LayaQuestion]; let cues: [String: [String: Double]]? }
         // One state, or several at once ({"items": [...]}, the server's form).
         struct DecideIn: Decodable {
             let state: String?; let questions: [String: LayaQuestion]?; let items: [Item]?
@@ -152,7 +157,7 @@ public actor LayaDecider {
                 if let items = req.items {
                     var out: [[String: Any]] = []
                     for item in items {
-                        out.append(try await decide(state: item.state, questions: item.questions, heads: req.heads ?? [:]))
+                        out.append(try await decide(state: item.state, questions: item.questions, heads: req.heads ?? [:], cues: item.cues ?? [:]))
                     }
                     return (["items": out, "worker": Self.workerName], nil)
                 }

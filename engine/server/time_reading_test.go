@@ -102,3 +102,58 @@ func TestMagicSentenceWords(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestExpandAlias(t *testing.T) {
+	got := expandAlias("中野の<alias>", []string{"天気", "weather"})
+	if len(got) != 2 || got[0] != "中野の天気" || got[1] != "中野のweather" {
+		t.Fatalf("got %v", got)
+	}
+	if got := expandAlias("横浜の天気が知りたい", []string{"天気"}); len(got) != 1 || got[0] != "横浜の天気が知りたい" {
+		t.Fatalf("words with no <alias> are themselves: %v", got)
+	}
+	if got := expandAlias("<alias>", nil); len(got) != 0 {
+		t.Fatalf("no aliases, none: %v", got)
+	}
+	if got := cleanAliases([]string{" 天気", "", "天気", "weather"}); len(got) != 2 {
+		t.Fatalf("clean: %v", got)
+	}
+}
+
+func TestMeets(t *testing.T) {
+	if got := meets([]string{"reschedule"}, []string{"reschedule", "notify"}); len(got) != 1 || got[0] != "reschedule" {
+		t.Fatalf("got %v", got)
+	}
+	if got := meets([]string{"rebook"}, []string{"reschedule", "notify"}); len(got) != 0 {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestSayShape(t *testing.T) {
+	route := sayShape("15分後に中野から渋谷に行きたい", []string{"中野", "渋谷"})
+	if route != "○分後に○から○に行きたい" {
+		t.Fatalf("shape %q", route)
+	}
+	transit := sayShape("1時間半後に渋谷から品川に行きたい", []string{"渋谷", "品川"})
+	weather := sayShape("札幌の天気が知りたい", []string{"札幌"})
+	if shapeSimilarity(route, transit) <= shapeSimilarity(route, weather) {
+		t.Fatalf("a route is liker a route: %.2f vs %.2f", shapeSimilarity(route, transit), shapeSimilarity(route, weather))
+	}
+}
+
+func TestKeywordCues(t *testing.T) {
+	byKey := map[string]magicSource{
+		"ある場所の天気を調べる":     {typ: "weather", aliases: []string{"weather", "天気"}},
+		"盤面の場所やものの位置を見せる": {tool: "point", aliases: []string{"場所・どこ"}},
+		"メモを貼る":           {typ: "note", aliases: []string{"メモ", "x"}},
+	}
+	got := keywordCues("札幌の天気", byKey)
+	if got["ある場所の天気を調べる"] != 1 || len(got) != 1 {
+		t.Fatalf("got %v", got)
+	}
+	if got := keywordCues("国分寺はどこ", byKey); got["盤面の場所やものの位置を見せる"] != 1 {
+		t.Fatalf("a tool's words: %v", got)
+	}
+	if got := keywordCues("Weather Tokyo", byKey); got["ある場所の天気を調べる"] != 1 {
+		t.Fatalf("any case: %v", got)
+	}
+}

@@ -43,10 +43,10 @@ func TestFMFitParamsByWhatEachParameterIs(t *testing.T) {
 	s.setupRoutes()
 
 	params := map[string]any{"at": "9時40分", "how": "到着"}
-	if _, err := s.robotFitParams("fit_probe", params, ""); err != nil || params["at"] != "09:40" {
+	if _, err := s.robotFitParams("fit_probe", params, "", ""); err != nil || params["at"] != "09:40" {
 		t.Fatalf("fit = %v, %v", params, err)
 	}
-	if _, err := s.robotFitParams("fit_probe", map[string]any{"how": "着"}, ""); err == nil || !strings.Contains(err.Error(), "到着, 出発") {
+	if _, err := s.robotFitParams("fit_probe", map[string]any{"how": "着"}, "", ""); err == nil || !strings.Contains(err.Error(), "到着, 出発") {
 		t.Errorf("a value outside the choices: %v", err)
 	}
 	if h := s.robotHintsText(); !strings.Contains(h, "- fit_probe: Say it plainly.") || !strings.Contains(h, "「probe at nine」 → deploy_want fit_probe") {

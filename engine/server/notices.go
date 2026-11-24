@@ -109,6 +109,11 @@ func timingReasonLabels(w *mywant.Want, out mywant.ResultHistoryEntry, tell mywa
 	if out.ID != "" {
 		labels["output_id"] = out.ID
 	}
+	// Out of the ordinary (irregular timings): said on the murmur and the
+	// notice, for what shows them to mark them so.
+	if len(tell.Irregular) > 0 {
+		labels["irregular"] = strings.Join(tell.Irregular, ",")
+	}
 	return labels
 }
 

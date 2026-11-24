@@ -7,6 +7,9 @@ wantType:
     category: effect
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "ハートを飛ばす"
       aliases: "heart,ハート"
       riffable: reaction
       type-icon: Heart
@@ -41,3 +44,12 @@ wantType:
       description: Timestamp of the last received webhook
       type: string
       label: current
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "ハートを置いて"
+      variants: ["ハートを飛ばして", "ハートを出して", "ハートマーク"]
+    - say: "ハートのエフェクト"
+      variants: ["ハートが飛ぶエフェクト", "ハートの演出"]

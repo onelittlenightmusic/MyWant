@@ -24,6 +24,8 @@ wantType:
   # When it tells of its answer, besides the standard timing "answer": restarted: its process came up again (it fell and was brought back).
   timings:
     - name: restarted
+      irregular: true   # out of the ordinary: the robot looks at it
+      requires: [notify]   # what it needs done (met by a capability that attends to it)
       description: プロセスが起動し直したとき（落ちて復帰した）
       icon: rotate-ccw
       onChange: process_pid

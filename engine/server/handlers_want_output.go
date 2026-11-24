@@ -47,6 +47,11 @@ func (s *Server) RegisterOutputCallback() {
 		if w.HasTimings() {
 			s.noteTelling(w, out, tell)
 		}
+		// Out of the ordinary (irregular timings): the robot's to look at
+		// (irregular.go), whether or not the want tells of it itself.
+		if len(tell.Irregular) > 0 {
+			defer func() { s.noteIrregular(w, tell.Irregular, out) }()
+		}
 		if !tell.Murmur && !tell.Notify {
 			return
 		}
@@ -104,7 +109,8 @@ func (s *Server) RegisterOutputCallback() {
 		// Pushed at its notify timings: as the want chose, or — the type's
 		// default — unless Laya is sure it is routine (push_news.go).
 		push := tell.Notify
-		if push && !tell.NotifyChosen {
+		// An irregular moment is not Laya's to hold back as routine.
+		if push && !tell.NotifyChosen && len(tell.Irregular) == 0 {
 			if a, by, ok := s.outputNews(w, msg, ev.Moment); ok {
 				ev.News, ev.NewsBy = &a, by
 				push = !pushHeld(a, pushNewsThreshold())

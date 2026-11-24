@@ -342,6 +342,10 @@ type Telling struct {
 	// NotifyChosen: the want named its notify timings itself — its own
 	// choice, not a default for Laya to weigh.
 	NotifyChosen bool
+	// Irregular: the timings the answer came at that are out of the ordinary
+	// (TimingDef.Irregular: a train late, a reservation changed) — what the
+	// robot looks at, never held back as routine.
+	Irregular []string
 }
 
 // TellingOf says whether the want murmurs and notifies of this answer.
@@ -356,6 +360,13 @@ func (n *Want) TellingOf(entry ResultHistoryEntry) Telling {
 		murmur, notify = v.Murmur, v.Notify
 	}
 	t := Telling{Timings: entry.Timings}
+	for _, name := range entry.Timings {
+		for _, d := range defs {
+			if d.Name == name && d.Irregular {
+				t.Irregular = append(t.Irregular, name)
+			}
+		}
+	}
 	murmurAt, _ := voiceTimings(murmur, labels[MurmurLabel], defs, func(d TimingDef) bool { return d.Murmur })
 	notifyAt, chosen := voiceTimings(notify, labels[NotifyLabel], defs, func(d TimingDef) bool { return d.Notify })
 	t.NotifyChosen = chosen

@@ -7,6 +7,9 @@ wantType:
     category: utility
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "やることのチェックリストを作る"
       user-control: "true"
       type-icon: ListChecks
       # What a person calls it (the robot finds it by these — tools.go's fmAliasLabel).
@@ -87,3 +90,20 @@ wantType:
       spec:
         params:
           items: ["passport", "charger", "toothbrush"]
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "チェックリストを作って"
+      variants: ["チェックリストを置いて", "やることリストを作る", "チェックリストがほしい"]
+    - say: "やることリスト"
+      variants: ["やることを書き出すリスト", "ToDoリストを作って", "やること一覧"]
+    - say: "牛乳と卵とパンのチェックリスト"
+      variants: ["牛乳、卵、パンの買い物リスト", "買うもの：牛乳と卵とパン", "牛乳と卵とパンをチェックするリストを作って"]
+      params: {"items": ["牛乳", "卵", "パン"]}
+    - say: "やること：洗濯、掃除、買い物"
+      variants: ["洗濯と掃除と買い物のやることリスト", "今日やること：洗濯、掃除、買い物", "洗濯、掃除、買い物をチェックリストに"]
+      params: {"items": ["洗濯", "掃除", "買い物"]}
+    - say: "ToDoを作る"
+      variants: ["ToDoリスト", "やることを管理するリスト", "タスクのチェックリスト"]

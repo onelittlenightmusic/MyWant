@@ -63,13 +63,38 @@ func (s *Server) layaReadingsRows() ([]map[string]any, map[string]decisionQuesti
 	rng := rand.New(rand.NewSource(7))
 	places := s.layaPlaces()
 	sources, _ := s.magicSources()
-	crit, byKey := magicLayaOptions(sources)
+	crit, byKey, labelOf := magicLayaOptions(sources)
 	questions := timeReadingQuestions(true)
 	questions[magicLayaQuestionID] = magicLayaQuestion(crit)
+	questions[magicRequestQuestionID] = magicRequestQuestion()
 
 	var rows []map[string]any
 	add := func(state string, gold map[string]string) {
-		rows = append(rows, map[string]any{"state": state, "gold": gold})
+		// Anything said that is one of the sentences is a request; talk is
+		// said so by its own rows.
+		if _, sentence := gold[magicLayaQuestionID]; sentence {
+			gold[magicRequestQuestionID] = magicLayaAsk
+		}
+		// Which sentence, and whether a request, are asked of what was said
+		// with its numbers taken out (magicLayaSaid); how its time is read,
+		// of it as said. One row each way.
+		which, timed := map[string]string{}, map[string]string{}
+		for k, v := range gold {
+			switch k {
+			case magicLayaQuestionID, magicRequestQuestionID:
+				which[k] = v
+			default:
+				timed[k] = v
+			}
+		}
+		if len(which) > 0 {
+			said := magicLayaSaid(state)
+			rows = append(rows, map[string]any{"state": said, "gold": which,
+				"cues": map[string]map[string]float64{magicLayaQuestionID: keywordCues(said, byKey)}})
+		}
+		if len(timed) > 0 {
+			rows = append(rows, map[string]any{"state": state, "gold": timed})
+		}
 	}
 	for key, src := range byKey {
 		if src.tool != "" || src.name != "" {
@@ -80,24 +105,40 @@ func (s *Server) layaReadingsRows() ([]map[string]any, map[string]decisionQuesti
 			gold[magicLayaQuestionID] = key
 			add(r.state, gold)
 		}
-	}
-	for _, said := range notRequests {
-		for range 2 {
-			add(said, map[string]string{magicLayaQuestionID: magicLayaNone, "time_reading": "none"})
+		// Its aliases said alone, or asked for plainly — 「天気」, 「天気を
+		// 出して」: the type, nothing else said. Not written in its asks, so
+		// an alias added is taught by the next training.
+		for _, a := range cleanAliases(src.aliases) {
+			add(a, map[string]string{magicLayaQuestionID: key, "time_reading": "none"})
 		}
 	}
+	// What the person said requests were, asked which of two (magic_resolve
+	// .go): taught as said, weighed thrice — a person's word, not a made row.
+	readJSONLines(initiativeHomeFile("laya-clarified.jsonl"), func(c struct {
+		Say string `json:"say"`
+		Key string `json:"key"`
+	}) {
+		if label, known := labelOf[c.Key]; known && c.Say != "" {
+			for range 3 {
+				add(c.Say, map[string]string{magicLayaQuestionID: label})
+			}
+		}
+	})
+	for _, said := range notRequests {
+		add(said, map[string]string{magicRequestQuestionID: magicLayaTalk, "time_reading": "none"})
+	}
 	// The robot's own: where, and how.
-	if _, ok := crit["tool:point"]; ok {
+	if label, ok := labelOf["tool:point"]; ok {
 		for _, say := range pointSays {
-			for range 6 {
-				add(strings.ReplaceAll(say, "{x}", places[rng.Intn(len(places))]), map[string]string{magicLayaQuestionID: "tool:point"})
+			for range 2 {
+				add(strings.ReplaceAll(say, "{x}", places[rng.Intn(len(places))]), map[string]string{magicLayaQuestionID: label})
 			}
 		}
 	}
-	if _, ok := crit["tool:look"]; ok {
+	if label, ok := labelOf["tool:look"]; ok {
 		for _, say := range lookSays {
-			for range 5 {
-				add(strings.ReplaceAll(say, "{y}", lookNames[rng.Intn(len(lookNames))]), map[string]string{magicLayaQuestionID: "tool:look", "time_reading": "none"})
+			for range 2 {
+				add(strings.ReplaceAll(say, "{y}", lookNames[rng.Intn(len(lookNames))]), map[string]string{magicLayaQuestionID: label, "time_reading": "none"})
 			}
 		}
 	}
@@ -110,10 +151,6 @@ type askRow struct {
 	gold  map[string]string
 }
 
-// askVariants is how many rows each ask makes: itself, and others with its
-// places and numbers changed — neither changes how its time is read.
-const askVariants = 5
-
 // askRows are a type's asks as rows: what is said, and what of it Laya is to
 // read — how its time is read (the reading that works out to the time it is
 // to be made with, at the time it was said) and whether that is a time to
@@ -124,8 +161,23 @@ func (s *Server) askRows(typ string, places []string, rng *rand.Rand) []askRow {
 		return nil
 	}
 	param, sideParam, sideValues := timeReadingOf(def.Metadata.Labels)
-	var out []askRow
+	aliases := cleanAliases(strings.Split(def.Metadata.Labels[robotAliasLabel], ","))
+	// What is learnt is each ask said its other ways (its variants); what is
+	// tested on is the ask as said (laya_asks_check.go), so it is tested on
+	// words it has not learnt. An ask with no variants is learnt as said.
+	var said []mywant.AskDef
 	for _, ask := range def.Asks {
+		ways := ask.Variants
+		if len(ways) == 0 {
+			ways = []string{ask.Say}
+		}
+		for _, w := range ways {
+			v := ask
+			v.Say = w
+			said = append(said, expandAsks([]mywant.AskDef{v}, aliases)...)
+		}
+	}
+	rowOf := func(ask mywant.AskDef, state string) askRow {
 		gold := map[string]string{}
 		if param != "" {
 			if reading, side, ok := askReading(ask, param, sideParam, sideValues); ok {
@@ -135,13 +187,26 @@ func (s *Server) askRows(typ string, places []string, rng *rand.Rand) []askRow {
 				}
 			}
 		}
-		out = append(out, askRow{ask.Say, gold})
-		for range askVariants - 1 {
-			out = append(out, askRow{askVariant(ask, places, rng), gold})
+		return askRow{state, gold}
+	}
+	// Every type as many rows (askRowsPerType): one asked many ways is not
+	// what every request is taken for, one asked few ways not lost beside it.
+	// Fewer are said again of other places and numbers (askVariant).
+	var out []askRow
+	order := rng.Perm(len(said))
+	for i := 0; i < askRowsPerType; i++ {
+		ask := said[order[i%len(said)]]
+		if i < len(said) {
+			out = append(out, rowOf(ask, ask.Say))
+		} else {
+			out = append(out, rowOf(ask, askVariant(ask, places, rng)))
 		}
 	}
 	return out
 }
+
+// askRowsPerType is how many rows each type's asks make.
+const askRowsPerType = 12
 
 // timeReadingOf is a type's time-reading label: the time parameter, and its
 // side parameter with its leave and arrive values ("" when it has none).
@@ -279,11 +344,39 @@ func (s *Server) handleLayaTrainReadings(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "no Laya to train with: no device that trains has asked for work, and this Mac has none", http.StatusConflict)
 		return
 	}
+	// Questions: only these trained (magic_sentence, magic_request,
+	// time_reading, time_side) — the heads of the others kept as they are
+	// (keepInitiativeHeads merges). None, all of them.
+	var req struct {
+		Questions []string `json:"questions"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
 	if !layaReadingsTraining.CompareAndSwap(false, true) {
 		http.Error(w, "a training is running", http.StatusConflict)
 		return
 	}
 	rows, questions := s.layaReadingsRows()
+	if len(req.Questions) > 0 {
+		only := map[string]decisionQuestion{}
+		for _, id := range req.Questions {
+			if q, ok := questions[id]; ok {
+				only[id] = q
+			}
+		}
+		questions = only
+		// Only the rows that answer one of them.
+		var kept []map[string]any
+		for _, row := range rows {
+			gold, _ := row["gold"].(map[string]string)
+			for id := range only {
+				if _, has := gold[id]; has {
+					kept = append(kept, row)
+					break
+				}
+			}
+		}
+		rows = kept
+	}
 	go func() {
 		defer layaReadingsTraining.Store(false)
 		started := time.Now()
@@ -309,4 +402,18 @@ func orJSON(raw []byte) []byte {
 		return raw
 	}
 	return []byte("null")
+}
+
+// expandAsks are a type's asks with each <alias> said as each of its aliases
+// (expandAlias): one written, as many as it has aliases.
+func expandAsks(asks []mywant.AskDef, aliases []string) []mywant.AskDef {
+	var out []mywant.AskDef
+	for _, a := range asks {
+		for _, say := range expandAlias(a.Say, aliases) {
+			b := a
+			b.Say = say
+			out = append(out, b)
+		}
+	}
+	return out
 }

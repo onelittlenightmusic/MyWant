@@ -14,6 +14,10 @@ public struct LayaReading: Sendable {
     public let probabilities: [Double]
     public let rawLogits: [Double]
     public let pooled: [Float]
+    /// Per label, what the asker saw of it in what was said — 1 when one of
+    /// its keywords (its aliases) is in the words, else 0 (the server's, with
+    /// the job). How much it counts is the head's to learn (LayaHead.keyword).
+    public var cues: [Double] = []
 }
 
 /// Laya (the multilingual checkpoint) on this device, through Apple's Core AI:

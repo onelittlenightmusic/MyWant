@@ -7,6 +7,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "押しボタンを置く"
       aliases: "button,ボタン"
       riffable: source
       user-control: "true"
@@ -73,3 +76,13 @@ wantType:
         params:
           label: "Go!"
           target_param: trigger_count
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "ボタンを置いて"
+      variants: ["押しボタンを置いて", "ボタンを出して", "押すボタン"]
+    - say: "「押して」ボタン"
+      variants: ["「押して」と書いたボタン", "「押して」ラベルのボタンを置いて"]
+      params: {"label": "押して"}

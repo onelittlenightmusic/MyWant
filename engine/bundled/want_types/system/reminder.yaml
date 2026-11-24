@@ -16,6 +16,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "決まった時刻にリマインドして知らせる"
       aliases: "reminder,リマインダー"
       type-icon: BellRing
   finalResultField: reaction_result
@@ -23,6 +26,8 @@ wantType:
   # When it tells of its answer, besides the standard timing "answer": timed_out: it ran out with nobody answering.
   timings:
     - name: timed_out
+      irregular: true   # out of the ordinary: the robot looks at it
+      requires: [notify]   # what it needs done (met by a capability that attends to it)
       description: 反応が無いまま時間切れになったとき
       icon: alarm-clock-off
       if: timeout
@@ -34,6 +39,13 @@ wantType:
   hearing:
     kind: propose
     description: 予定の1時間前のリマインダーを作るか聞く
+  # Told of what went wrong (attends: what an irregular moment nobody hears
+  # requires — the robot proposes a reminder of it).
+  capabilities:
+    - name: remind
+      description: 困りごとを知らせるリマインダーを出す
+      attends: [notify]
+
   parameters:
   - name: message
     description: Reminder message to display
@@ -504,3 +516,20 @@ wantType:
   requires:
     - reminder_monitoring
     - reminder_queue_management
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "10分後に会議をリマインドして"
+      variants: ["会議を10分後に知らせて", "10分後に会議って教えて", "10分たったら会議のリマインダー"]
+      params: {"message": "会議", "duration_from_now": "10 minutes"}
+    - say: "30分後に薬を飲むと教えて"
+      variants: ["薬を飲むのを30分後にリマインド", "30分後に薬を飲むって知らせて", "30分たったら薬を飲むリマインダー"]
+      params: {"message": "薬を飲む", "duration_from_now": "30 minutes"}
+    - say: "1時間後に洗濯物を取り込むリマインダー"
+      variants: ["洗濯物を取り込むのを1時間後に知らせて", "1時間後に洗濯物を取り込むって教えて", "1時間たったら洗濯物を取り込むってリマインド"]
+      params: {"message": "洗濯物を取り込む", "duration_from_now": "60 minutes"}
+    - say: "5分後にお湯が沸くって知らせて"
+      variants: ["お湯が沸くのを5分後に教えて", "5分後にお湯が沸くリマインダー", "5分たったらお湯が沸くと知らせて"]
+      params: {"message": "お湯が沸く", "duration_from_now": "5 minutes"}

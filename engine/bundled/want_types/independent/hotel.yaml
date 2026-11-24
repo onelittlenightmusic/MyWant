@@ -20,6 +20,9 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "ホテルを予約する"
       aliases: "hotel,ホテル"
       child-role: doer
       type-tone-color: "#8b7355"
@@ -336,3 +339,13 @@ wantType:
   requires:
     - hotel_agency
     - condition_thinking
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "ホテルを予約して"
+      variants: ["ホテルを取って", "泊まるホテルを予約", "ホテルの予約"]
+    - say: "高級ホテルを取って"
+      variants: ["高級ホテルを予約して", "いいホテルを予約", "高級なホテルに泊まりたい"]
+      params: {"hotel_type": "luxury"}

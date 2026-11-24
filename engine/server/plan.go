@@ -564,6 +564,9 @@ type actRequest struct {
 	Params   map[string]string `json:"params"`
 	// For existing: what is asked of the want (tools_capability.go), or "-".
 	Capability string `json:"capability"`
+	// Who asked (a character id), when it is known: what they did not say
+	// may be their home's (home_params.go). From the turn when not given.
+	Who string `json:"who,omitempty"`
 }
 
 // doAct carries a plan out (carryOutPlan) and says what was done: the steps, the
@@ -608,6 +611,15 @@ func (s *Server) carryOutPlan(req actRequest, onStep func(robotStep)) []robotSte
 	run := func(tool string, args map[string]string) robotStep {
 		if robotHearsQuestion(tool) && req.Question != "" {
 			args[robotQuestionArg] = req.Question
+		}
+		if tool == "deploy_want" {
+			who := req.Who
+			if who == "" && req.Turn != "" {
+				who = s.turnAsker(req.Turn)
+			}
+			if who != "" {
+				args[robotWhoArg] = who
+			}
 		}
 		st := robotStep{Tool: tool, Arguments: args}
 		s.robotRunStep(&st)

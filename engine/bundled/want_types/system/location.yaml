@@ -7,6 +7,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "今いる場所の位置情報を記録する"
       aliases: "location,browser,場所"
       riffable: source
       user-control: "true"
@@ -226,3 +229,12 @@ wantType:
         spec:
           params:
             label: "Home Device"
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "今いる場所を記録して"
+      variants: ["現在地を記録", "今の位置を残して", "どこにいるか記録して"]
+    - say: "位置情報"
+      variants: ["現在地の位置情報", "GPSの位置を記録", "位置を記録して"]

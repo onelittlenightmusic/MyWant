@@ -7,10 +7,26 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "シェルのコマンドを実行する"
       aliases: "command,コマンド"
       type-tone-color: "#3a6a4f"
 
   finalResultField: stdout
+
+  # failed: the command did not succeed (its error message, newly said) —
+  # out of the ordinary, for the robot to look at.
+  timings:
+    - name: failed
+      description: コマンドが失敗したとき
+      icon: alert-triangle
+      if: error_message
+      onChange: error_message
+      irregular: true
+      requires: [retry, notify]   # what it needs done (met by a capability that attends to it)
+      murmur: true
+      notify: false
 
   parameters:
   - name: command
@@ -361,3 +377,14 @@ wantType:
 
   requires:
     - command_execution
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "ls -la を実行して"
+      variants: ["ls -la のコマンドを走らせて", "シェルで ls -la", "ls -la を実行する"]
+      params: {"command": "ls -la"}
+    - say: "コマンド df -h を走らせて"
+      variants: ["df -h を実行して", "シェルで df -h", "df -h のコマンド"]
+      params: {"command": "df -h"}

@@ -51,6 +51,9 @@ type robotTool struct {
 	// point's, not a route's. Words: what it is, in a word or two.
 	Sentence string `json:"-"`
 	Words    string `json:"-"`
+	// Option: the tool in a few words of its own, as Laya is asked which
+	// it is (a type's laya-option label).
+	Option string `json:"-"`
 	run    func(s *Server, args map[string]string) (string, error)
 	// replays: run again when a turn is played again (turns.go) — the
 	// steps that show something. Not the ones that make something, which a
@@ -100,6 +103,7 @@ var robotTools = []robotTool{
 		replays:  true,
 		Sentence: "<name:thing>はどこ|<name:thing>どこ|<name:thing>に連れてって|<name:thing>の場所を見せて",
 		Words:    "場所・どこ",
+		Option:   "盤面の場所やものの位置を見せる",
 	},
 	{
 		Name:        "look",
@@ -110,6 +114,7 @@ var robotTools = []robotTool{
 		run:      (*Server).robotLook,
 		Sentence: "<name:want>の天気は|<name:want>はどう|<name:want>の様子は|<name:want>は何て言ってる|<name:want>の予約は",
 		Words:    "様子・どうなってる",
+		Option:   "盤面のwantの様子や結果を聞く",
 	},
 	{
 		Name:        "use_capability",
@@ -257,6 +262,11 @@ func (s *Server) handleToolsCall(w http.ResponseWriter, r *http.Request) {
 		// again before the step is kept.
 		if q := s.turnQuestion(req.Turn); q != "" {
 			req.Arguments[robotQuestionArg] = q
+		}
+		// Who asked, for what they did not say to be filled from their home
+		// (home_params.go) — taken out as the question is.
+		if who := s.turnAsker(req.Turn); who != "" && req.Tool == "deploy_want" {
+			req.Arguments[robotWhoArg] = who
 		}
 	}
 	step := robotStep{Tool: req.Tool, Arguments: req.Arguments}
@@ -791,6 +801,8 @@ func (s *Server) robotDescribeType(args map[string]string) (string, error) {
 func (s *Server) robotDeployWant(args map[string]string) (string, error) {
 	question := args[robotQuestionArg]
 	delete(args, robotQuestionArg)
+	who := args[robotWhoArg]
+	delete(args, robotWhoArg)
 	typ, err := s.robotResolveType(args["type"])
 	if err != nil {
 		return "", err
@@ -807,7 +819,7 @@ func (s *Server) robotDeployWant(args map[string]string) (string, error) {
 	// small model often puts the question in the name (「新宿→横浜」) and
 	// sends {} — which made a route with neither end, and an answer that said
 	// it had searched.
-	filled, err := s.robotFitParams(typ, params, question)
+	filled, err := s.robotFitParams(typ, params, question, who)
 	if err != nil {
 		return "", err
 	}
@@ -1079,7 +1091,7 @@ func robotMarks(question, v string, markers []string) bool {
 // written, a value outside a parameter's choices sent back with them, and the
 // type's here-param, left out, filled with where the person is. Says what it
 // filled, for the robot to tell.
-func (s *Server) robotFitParams(typ string, params map[string]any, question string) (string, error) {
+func (s *Server) robotFitParams(typ string, params map[string]any, question, who string) (string, error) {
 	var def struct {
 		Metadata struct {
 			Labels map[string]string `json:"labels"`
@@ -1103,6 +1115,9 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question stri
 	// The request's time as Laya reads it (time-reading/<param>, time_reading.go):
 	// 「10分後」 worked out here on what it chose, not left to the model.
 	filled += s.robotReadTimes(typ, def.Metadata.Labels, params, question)
+	// A place not said, filled with where the person who asked goes at this
+	// part of the day (home_params.go): 「天気」 in the evening is home's.
+	filled += s.robotHomeParams(typ, params, who)
 	for _, p := range def.Parameters {
 		if !said(p.Name) {
 			if p.Name == def.Metadata.Labels[robotHereLabel] {
@@ -1651,6 +1666,10 @@ func robotTakeUnread(args map[string]string) []robotUnreadPhoto {
 // robotQuestionArg carries what the person asked to look and deploy_want,
 // within a turn (handleToolsCall); each takes it out before anything is kept.
 const robotQuestionArg = "_question"
+
+// robotWhoArg carries who asked (a character id) to deploy_want, as
+// robotQuestionArg carries what they asked: taken out before it runs.
+const robotWhoArg = "_who"
 
 // robotShortArg asks look for its short form (the values and what they mean),
 // never the whole type and want.

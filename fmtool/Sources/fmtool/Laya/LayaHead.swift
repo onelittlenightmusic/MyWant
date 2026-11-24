@@ -17,6 +17,11 @@ public struct LayaHead: Codable, Sendable {
     let scale: [Float]
     let weights: [[Float]] // [label][feature]
     let bias: [Float]
+    /// How much a keyword of a label seen in the words raises it (its cue,
+    /// LayaReading.cues): one weight for every label, learnt with the rest —
+    /// large when what is said by name is what it is. None in a head fitted
+    /// before cues, or on rows that had none.
+    var keyword: Float? = nil
     /// Balanced accuracy in five-fold cross-validation, the head's and Laya's own.
     public let heldOutAccuracy: Double
     public let layaHeldOutAccuracy: Double
@@ -31,10 +36,11 @@ public struct LayaHead: Codable, Sendable {
         guard x.count == mean.count else { return r.probabilities }
         let z = zip(zip(x, mean), scale).map { ($0.0 - $0.1) * $1 }
         var logits: [Double] = []
+        let kw = Double(keyword ?? 0)
         for k in weights.indices {
             var sum = bias[k]
             for j in 0..<z.count { sum += weights[k][j] * z[j] }
-            logits.append(Double(sum))
+            logits.append(Double(sum) + (r.cues.indices.contains(k) ? kw * r.cues[k] : 0))
         }
         return softmax(logits)
     }
@@ -72,7 +78,8 @@ public struct LayaHead: Codable, Sendable {
         }
         let final = train(rows.map { ($0.0, $0.1) }, labels: labels)
         return LayaHead(labels: labels, mean: final.mean, scale: final.scale, weights: final.weights,
-                        bias: final.bias, heldOutAccuracy: balanced(headPicks), layaHeldOutAccuracy: balanced(layaPicks))
+                        bias: final.bias, keyword: final.keyword,
+                        heldOutAccuracy: balanced(headPicks), layaHeldOutAccuracy: balanced(layaPicks))
     }
 
     static func argmax(_ ps: [Double]) -> Int { ps.indices.max(by: { ps[$0] < ps[$1] }) ?? 0 }
@@ -106,20 +113,31 @@ public struct LayaHead: Codable, Sendable {
         var w = [[Float]](repeating: [Float](repeating: 0, count: d), count: k)
         var b = [Float](repeating: 0, count: k)
         var mw = w, vw = w, mb = b, vb = b
+        // The keyword weight: one for every label, on the rows' cues.
+        let cues = rows.map { r in (0..<k).map { r.0.cues.indices.contains($0) ? Float(r.0.cues[$0]) : 0 } }
+        let hasCues = cues.contains { $0.contains { $0 != 0 } }
+        var kw: Float = 0, mk: Float = 0, vk: Float = 0
         let lr: Float = 0.05, l2: Float = 1e-2, b1: Float = 0.9, b2: Float = 0.999
         for step in 1...300 {
             var gw = [[Float]](repeating: [Float](repeating: 0, count: d), count: k)
             var gb = [Float](repeating: 0, count: k)
+            var gk: Float = 0
             for (i, z) in zs.enumerated() {
-                let logits = (0..<k).map { c in zip(w[c], z).reduce(b[c]) { $0 + $1.0 * $1.1 } }
+                let logits = (0..<k).map { c in zip(w[c], z).reduce(b[c]) { $0 + $1.0 * $1.1 } + kw * cues[i][c] }
                 let p = softmax(logits.map(Double.init)).map(Float.init)
                 for c in 0..<k {
                     let g = (p[c] - (c == rows[i].1 ? 1 : 0)) / n
                     gb[c] += g
+                    gk += g * cues[i][c]
                     for j in 0..<d { gw[c][j] += g * z[j] }
                 }
             }
             let t = Float(step)
+            if hasCues {
+                mk = b1 * mk + (1 - b1) * gk
+                vk = b2 * vk + (1 - b2) * gk * gk
+                kw -= lr * (mk / (1 - pow(b1, t))) / ((vk / (1 - pow(b2, t))).squareRoot() + 1e-8)
+            }
             for c in 0..<k {
                 for j in 0..<d {
                     let g = gw[c][j] + l2 * w[c][j]
@@ -133,6 +151,6 @@ public struct LayaHead: Codable, Sendable {
             }
         }
         return LayaHead(labels: labels, mean: mean, scale: scale, weights: w, bias: b,
-                        heldOutAccuracy: 0, layaHeldOutAccuracy: 0)
+                        keyword: hasCues ? kw : nil, heldOutAccuracy: 0, layaHeldOutAccuracy: 0)
     }
 }

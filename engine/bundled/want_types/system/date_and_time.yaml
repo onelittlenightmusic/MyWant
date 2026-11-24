@@ -7,6 +7,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "日付と時刻を選ぶ・時計を表示する"
       aliases: "date,time,日時,時刻"
       user-control: "true"
       type-icon: "Calendar"
@@ -94,3 +97,16 @@ wantType:
         exposes:
           - currentState: datetime
             asGoal: scheduled_at
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "時計を置いて"
+      variants: ["時計を出して", "時計を表示して", "今の時刻の時計"]
+      params: {"now": true}
+    - say: "今の時刻を出して"
+      variants: ["現在時刻を表示して", "今何時か時計で見せて", "時計で今の時間"]
+      params: {"now": true}
+    - say: "日時を選ぶ"
+      variants: ["日付と時刻を選ぶ", "カレンダーで日時を選択", "日付を選ぶ"]

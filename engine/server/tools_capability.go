@@ -190,6 +190,12 @@ func (s *Server) boardCapabilities() []wantCap {
 			if strings.TrimSpace(c.Name) == "" || strings.TrimSpace(c.Description) == "" {
 				continue
 			}
+			// One that only says what it attends to (irregular.go) — no data
+			// to read, no prompt, no skill — is not something to look up: the
+			// robot proposes it when such a moment comes, it is not asked.
+			if len(c.Attends) > 0 && len(c.Reads) == 0 && strings.TrimSpace(c.Prompt) == "" && strings.TrimSpace(c.Skill) == "" {
+				continue
+			}
 			out = append(out, wantCap{want: w, def: c, dir: dir})
 		}
 	}

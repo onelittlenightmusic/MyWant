@@ -7,6 +7,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "決まった間隔で繰り返す"
       aliases: "timer,タイマー"
       user-control: "true"
       type-icon: "Timer"
@@ -69,3 +72,20 @@ wantType:
         exposes:
           - currentState: schedule
             asGlobalParam: global_timer_1
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "タイマー"
+      variants: ["タイマーを置いて", "繰り返しのタイマーを出して"]
+    # A timer is a repeating interval: said with 「ごとに」「おきに」「繰り返し」,
+    # not a time — so a request with a time (「10分後に…」) is not taken for one.
+    - say: "5分ごとに繰り返すタイマー"
+      variants: ["5分おきに鳴るタイマー", "5分間隔で繰り返すタイマー", "5分ごとに知らせる繰り返しタイマー"]
+      params: {"default_every": "5m"}
+    - say: "1時間おきに鳴るタイマーを置いて"
+      variants: ["1時間ごとに繰り返すタイマー", "1時間間隔のタイマー", "1時間に1回鳴る繰り返しタイマー"]
+      params: {"default_every": "1h"}
+    - say: "繰り返しのタイマー"
+      variants: ["一定の間隔で繰り返すタイマー", "インターバルタイマー"]

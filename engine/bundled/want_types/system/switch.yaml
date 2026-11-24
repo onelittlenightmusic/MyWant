@@ -7,6 +7,9 @@ wantType:
     category: system
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "オンオフのスイッチを置く"
       aliases: "switch,スイッチ"
       user-control: "true"
   parameters:
@@ -56,3 +59,13 @@ wantType:
       spec:
         params:
           label: "Generator"
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "スイッチを置いて"
+      variants: ["オンオフのスイッチを置いて", "スイッチを出して", "切り替えスイッチ"]
+    - say: "照明のスイッチ"
+      variants: ["照明のオンオフスイッチ", "照明を切り替えるスイッチ"]
+      params: {"label": "照明"}

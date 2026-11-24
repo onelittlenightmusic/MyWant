@@ -166,3 +166,22 @@ func TestTimingsOnACountOfItemsSo(t *testing.T) {
 		t.Errorf("one unticked: %q, want nothing", got)
 	}
 }
+
+// An irregular timing (a train late) is said apart in how an answer is told;
+// the others are not.
+func TestTellingSaysIrregular(t *testing.T) {
+	want := NewWantWithLocals(Metadata{Name: "route"}, WantSpec{}, nil, "base")
+	want.WantTypeDefinition = &WantTypeDefinition{
+		Timings: []TimingDef{
+			{Name: "leave_soon", Murmur: true},
+			{Name: "late", OnChange: "late", Irregular: true, Murmur: true},
+		},
+	}
+	tell := want.TellingOf(ResultHistoryEntry{Timings: []string{"leave_soon", "late"}})
+	if len(tell.Irregular) != 1 || tell.Irregular[0] != "late" {
+		t.Fatalf("irregular: %v", tell.Irregular)
+	}
+	if tell := want.TellingOf(ResultHistoryEntry{Timings: []string{"leave_soon"}}); len(tell.Irregular) != 0 {
+		t.Fatalf("not irregular: %v", tell.Irregular)
+	}
+}

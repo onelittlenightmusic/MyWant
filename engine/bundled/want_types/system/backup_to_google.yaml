@@ -47,6 +47,8 @@ wantType:
       murmur: true
       notify: false
     - name: failed
+      irregular: true   # out of the ordinary: the robot looks at it
+      requires: [retry, notify]   # what it needs done (met by a capability that attends to it)
       description: バックアップに失敗したとき
       icon: alert-circle
       murmur: true

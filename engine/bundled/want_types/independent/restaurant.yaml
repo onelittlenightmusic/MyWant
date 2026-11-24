@@ -7,6 +7,9 @@ wantType:
     category: travel
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "レストランを予約する"
       aliases: "restaurant,レストラン"
       child-role: doer
       type-tone-color: "#a05240"
@@ -423,3 +426,14 @@ wantType:
   requires:
     - restaurant_agency
     - condition_thinking
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "4人でフレンチのレストランを予約"
+      variants: ["フレンチのレストランを4人で予約して", "4人でフレンチのお店を予約", "レストラン予約、フレンチ、4人"]
+      params: {"party_size": 4, "cuisine": "french"}
+    - say: "19時半に2人でイタリアン"
+      variants: ["イタリアンのレストランを19時半に2人で予約", "19時半から2人でイタリアンのお店", "2人で19時半、イタリアンを予約"]
+      params: {"preferred_time": "19:30", "party_size": 2, "cuisine": "italian"}

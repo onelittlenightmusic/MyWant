@@ -19,6 +19,9 @@ wantType:
     category: ui
     pattern: independent
     labels:
+      # What the robot reads a request against, when it asks Laya which want
+      # it is: the type in a few words of its own (laya-option).
+      laya-option: "写真を盤面に貼る"
       aliases: "picture,写真,画像"
       user-control: "true"
       type-icon: "ImagePlus"
@@ -157,3 +160,13 @@ wantType:
             url: https://photos.app.goo.gl/XXXXXXXXXXXXXXXXX
             pin_dx: 2
             pin_dy: 0
+
+  # How a want of this type is asked for, in words, and what it is made with
+  # (want-spec asks): what reads requests (the robot, Laya) learns from these
+  # and is tested on them. A parameter left out is one the request does not say.
+  asks:
+    - say: "この写真を貼って https://photos.app.goo.gl/abc123"
+      variants: ["https://photos.app.goo.gl/abc123 の写真を置いて", "写真を貼る https://photos.app.goo.gl/abc123"]
+      params: {"url": "https://photos.app.goo.gl/abc123"}
+    - say: "写真を置いて"
+      variants: ["写真を貼って", "画像を盤面に貼る", "写真を飾って"]

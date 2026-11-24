@@ -96,8 +96,15 @@ type magicMatch struct {
 	params             map[string]string
 	slots              []magicSlotDef
 	tool               string // a robot tool's sentence: the tool is run, nothing made
-	byLaya             bool   // which sentence Laya said; the values are the model's
-	known              int    // slot values that are things of their subtype
+	// Laya's: how likely it said this was (p), the sentence it is of (src),
+	// and — on the likeliest — the three likeliest, to settle among
+	// (magicResolve).
+	p          float64
+	src        magicSource
+	candidates []magicMatch
+	score      float64 // p and how like its asks what was said is (magicResolve)
+	byLaya     bool    // which sentence Laya said; the values are the model's
+	known      int     // slot values that are things of their subtype
 }
 
 // magicSentenceMatch: the want whose magic sentence the question is, and the
@@ -196,31 +203,55 @@ func (s *Server) magicSentenceDo(question, turn, locale string) (string, *robotC
 // magicSentenceDoMatch is magicSentenceDo with the match it made the want by
 // (its parameters as they were read).
 func (s *Server) magicSentenceDoMatch(question, turn, locale string) (string, *robotCard, magicMatch, bool) {
+	return s.magicSentenceDoBy(question, turn, locale, "")
+}
+
+// magicSentenceDoBy is magicSentenceDoMatch for a character who asked (a
+// chat message says who): what they did not say may be their home's
+// (home_params.go). Unknown, it is the turn's, or whoever just said it.
+func (s *Server) magicSentenceDoBy(question, turn, locale, who string) (string, *robotCard, magicMatch, bool) {
+	if who == "" && turn != "" {
+		who = s.turnAsker(turn)
+	}
+	if who == "" {
+		who = askerOf("", question)
+	}
+	// The answer to a question put to them — which of two a request was
+	// (magic_resolve.go): that one, done for what they asked.
+	if p, c, ok := s.resolveAnswered(question, who); ok {
+		return s.magicCarryOut(p.said, p.turn, p.locale, who, c)
+	}
 	mm, ok := s.magicSentenceMatch(question)
 	if !ok {
 		return "", nil, mm, false
 	}
-	// The sentence said which type; what fills it is read by the model from
-	// what was said (magicModelParams), the sentence's own reading kept where
-	// the model has none.
-	s.magicModelParams(question, &mm)
+	// Which of Laya's likeliest it is, with what fills it read by the model
+	// from what was said (magicResolve): one, two to ask the person between,
+	// or none that can be made of it.
+	chosen, outcome, cands := s.magicResolve(question, mm)
+	switch outcome {
+	case resolveNone:
+		return "", nil, mm, false
+	case resolveAsk:
+		return s.resolveQuestion(question, turn, locale, who, cands), nil, chosen, true
+	}
+	return s.magicCarryOut(question, turn, locale, who, chosen)
+}
+
+// magicCarryOut does a sentence settled on, its parameters read: a robot
+// tool's runs the tool, a type's makes the want.
+func (s *Server) magicCarryOut(question, turn, locale, who string, mm magicMatch) (string, *robotCard, magicMatch, bool) {
 	// A robot tool's sentence: the tool, not a want (magicToolDo).
 	if mm.tool != "" {
 		return s.magicToolDo(mm)
 	}
-	// Laya said which sentence, and the model could not read what fills it:
-	// not that sentence after all — the robot is asked as it would be.
-	// Every one of its slots, not some: 「国分寺はどこ？」 taken for a route
-	// gave a from and no to, and the robot said it could not make one
-	// (2026-11-24) instead of answering where 国分寺 is.
-	if mm.byLaya {
-		for _, sl := range mm.slots {
-			if strings.TrimSpace(mm.params[sl.param]) == "" {
-				return "", nil, mm, false
-			}
+	params := map[string]string{}
+	for k, v := range mm.params {
+		if strings.TrimSpace(v) != "" {
+			params[k] = v
 		}
 	}
-	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: mm.params}, nil)
+	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: params, Who: who}, nil)
 	if len(steps) == 0 {
 		return "", nil, mm, false
 	}
@@ -230,6 +261,13 @@ func (s *Server) magicSentenceDoMatch(question, turn, locale string) (string, *r
 		name = made.Card.Name
 	}
 	switch {
+	case mm.byLaya && strings.HasPrefix(made.Output, "Error:"):
+		// Laya said which sentence, and what was read does not make one (a
+		// required parameter not said): not that sentence after all — the
+		// robot is asked as it would be. 「国分寺はどこ？」 taken for a
+		// route gave a from and no to, and the robot said it could not make
+		// one (2026-11-24) instead of answering where 国分寺 is.
+		return "", nil, mm, false
 	case strings.HasPrefix(made.Output, "Error:"):
 		return fmt.Sprintf("「%s」で作ろうとしましたが、できませんでした（%s）。", question, strings.TrimSpace(strings.TrimPrefix(made.Output, "Error:"))), nil, mm, true
 	case strings.Contains(made.Output, "already on the board"):
@@ -254,16 +292,20 @@ func (s *Server) magicSentenceDoMatch(question, turn, locale string) (string, *r
 // the message is taken; one that turns out not to be a sentence done here —
 // what a want says (look), a place not on the board, a value the model could
 // not read — goes to the robot then, by notDone, as it would have at once.
-func (s *Server) magicSentenceToRobot(text string, notDone func()) bool {
+func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bool {
 	q := strings.TrimSpace(text)
 	if q == "" {
 		return false
 	}
-	if _, ok := s.magicSentenceMatch(q); !ok {
-		return false
+	// An answer to a question put to them (which of two a request was) is
+	// done here too, whatever it reads as alone (「乗り換え」).
+	if !resolveWaitingFor(askerOf(character, q)) {
+		if _, ok := s.magicSentenceMatch(q); !ok {
+			return false
+		}
 	}
 	go func() {
-		answer, card, ok := s.magicSentenceDo(q, "", "")
+		answer, card, _, ok := s.magicSentenceDoBy(q, "", "", askerOf(character, q))
 		if !ok {
 			notDone()
 			return
@@ -429,9 +471,11 @@ func (s *Server) magicSources() ([]magicSource, map[string]bool) {
 	// whole question as the want is made — not a station named 「10分後に
 	// 国分寺駅」 (2026-11-24, a route searched from there for now).
 	readsTime := map[string]bool{}
+	optionOf := map[string]string{}
 	types, _ := s.robotWantTypes()
 	for _, t := range types {
 		aliasesOf[t.Name] = strings.Split(t.Labels[robotAliasLabel], ",")
+		optionOf[t.Name] = t.Labels[layaOptionLabel]
 		for k := range t.Labels {
 			if strings.HasPrefix(k, timeReadingLabel) {
 				readsTime[t.Name] = true
@@ -443,21 +487,32 @@ func (s *Server) magicSources() ([]magicSource, map[string]bool) {
 			if t := w.Metadata.Labels[magicSentenceLabel]; t != "" && w.Metadata.Labels[robotArchived] != "true" {
 				// A want's <alias> is any of its own aliases, or its type's.
 				own := robotWantAliases(w.Metadata.Labels, w.Metadata.Type, nil)
-				sources = append(sources, magicSource{name: w.Metadata.Name, typ: w.Metadata.Type, tmpls: t, aliases: append(own, aliasesOf[w.Metadata.Type]...)})
+				sources = append(sources, magicSource{name: w.Metadata.Name, typ: w.Metadata.Type, tmpls: t, aliases: append(own, aliasesOf[w.Metadata.Type]...), option: optionOf[w.Metadata.Type]})
 			}
 		}
 	}
 	for _, t := range types {
 		if tmpl := t.Labels[magicSentenceLabel]; tmpl != "" {
-			sources = append(sources, magicSource{typ: t.Name, tmpls: tmpl, aliases: aliasesOf[t.Name]})
+			src := magicSource{typ: t.Name, tmpls: tmpl, aliases: aliasesOf[t.Name], option: t.Labels[layaOptionLabel]}
+			// Told to Laya by its sentences and, as unlike them as can be, a
+			// few of its asks (with a time, when it has some): told by its
+			// sentences alone, a route was nothing like a request with a time.
+			if def := s.typeDefinition(t.Name); def != nil && len(def.Asks) > 0 {
+				src.words = magicSentenceWords(src) + " / " +
+					strings.Join(askSamples(def.Asks, cleanAliases(aliasesOf[t.Name]), magicWordsAsks), " / ")
+			}
+			sources = append(sources, src)
 		}
 	}
+	// A type that says how it is asked for (asks) and has no sentence: a
+	// choice too, known by its aliases and its asks (askSources).
+	sources = append(sources, s.askSources(types, aliasesOf)...)
 	// What is asked of the robot itself: where a thing is (point), how a
 	// want is (look) — choices beside the types', so 「国分寺はどこ？」 is
 	// read as where 国分寺 is, not taken for a route.
 	for _, t := range robotTools {
 		if t.Sentence != "" {
-			sources = append(sources, magicSource{tool: t.Name, tmpls: t.Sentence, aliases: []string{t.Words}})
+			sources = append(sources, magicSource{tool: t.Name, tmpls: t.Sentence, aliases: []string{t.Words}, option: t.Option})
 		}
 	}
 	return sources, readsTime
