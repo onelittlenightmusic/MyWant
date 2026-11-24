@@ -18,6 +18,9 @@ import (
 // WantTypeDefinition represents a complete want type definition
 type WantTypeDefinition = want_spec.WantTypeDefinition
 
+// AskDef is one way a type's want is asked for, in words (want-spec asks).
+type AskDef = want_spec.AskDef
+
 // HearingDef is what a type does with a murmur it heard.
 type HearingDef = want_spec.HearingDef
 

@@ -563,6 +563,9 @@ func (s *Server) setupRoutes() {
 	// A magic sentence said for its result (magic_sentence.go): a keyboard, the CLI.
 	api.HandleFunc("/magic", asyncable(s.handleMagic)).Methods("POST")
 	api.HandleFunc("/plans/params", asyncable(s.handlePlanParams)).Methods("POST")
+	// Teaching Laya to read requests (laya_readings_train.go).
+	api.HandleFunc("/laya/train-readings", s.handleLayaTrainReadings).Methods("GET", "POST")
+	api.HandleFunc("/laya/test-asks", s.handleLayaTestAsks).Methods("GET", "POST")
 	api.HandleFunc("/plans", s.handlePlanCreate).Methods("POST")
 	api.HandleFunc("/plans", s.handlePlanList).Methods("GET")
 	api.HandleFunc("/plans/{name}", s.handlePlanGet).Methods("GET")

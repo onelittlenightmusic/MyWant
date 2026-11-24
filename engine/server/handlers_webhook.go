@@ -60,7 +60,10 @@ func (s *Server) receiveWebhook(w http.ResponseWriter, r *http.Request) {
 		character, _ := payload["character"].(string)
 		// A magic sentence to the robot (magic_sentence.go): done here, not
 		// handed to its model.
-		if want.Metadata.Type == "robot" && sender != "robot" && s.magicSentenceToRobot(text) {
+		if want.Metadata.Type == "robot" && sender != "robot" && s.magicSentenceToRobot(text, func() {
+			storeWebhookMessage(want, webhookMessage{Sender: sender, Text: text,
+				Timestamp: time.Now().Format(time.RFC3339), Character: character}, ccStateCfg)
+		}) {
 			s.JSONResponse(w, http.StatusOK, map[string]string{"status": "received"})
 			return
 		}

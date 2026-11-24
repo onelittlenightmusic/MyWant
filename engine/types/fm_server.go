@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -214,6 +215,9 @@ type fmReply struct {
 	// own, because the model paraphrasing them is the first thing to go wrong.
 	Goal  string `json:"goal"`
 	Error string `json:"error"`
+	// Output: a model op's answer (AskModelOp) — Laya's decision, as a
+	// device's worker posts it.
+	Output json.RawMessage `json:"output"`
 	// None: asked about one photo among several (askPictureOrNone), the
 	// agent found the photo does not answer the question.
 	None bool `json:"none"`
@@ -370,6 +374,45 @@ func (s *fmServer) askPlain(prompt, root string, timeout time.Duration) (fmReply
 // the likeliest words gave back the same words shuffled. ok=false when there
 // is no model here (Fly: Linux) — a device with one answers instead — or it
 // could not be asked.
+// LayaHere: this Mac can take Laya's work itself — fmtool is here and the
+// Laya bundle the Mac app fetched is on disk (~/Library/Application
+// Support/Laya/macos/wfp16-s256, mywant-ios LayaFiles). fmtool decides with
+// the same code the apps do (mywant-ios MyWantKit LayaDecider), built in when
+// mywant-ios sits beside this repository.
+func LayaHere() bool {
+	if _, ok := fmToolPath(); !ok {
+		return false
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	dir := filepath.Join(home, "Library", "Application Support", "Laya", "macos", "wfp16-s256")
+	if _, err := os.Stat(filepath.Join(dir, "metadata.json")); err != nil {
+		return false
+	}
+	models, _ := filepath.Glob(filepath.Join(dir, "*.aimodel"))
+	return len(models) > 0
+}
+
+// AskModelOp hands a model op (Laya's decide, train-decider) to this Mac's
+// fmtool, as a device's worker is handed it: its input in, its output back.
+func AskModelOp(op string, input []byte, timeout time.Duration) (json.RawMessage, error) {
+	binary, ok := fmToolPath()
+	if !ok {
+		return nil, fmt.Errorf("no fmtool on this server")
+	}
+	root, _ := os.UserHomeDir()
+	r, err := fmServerFor(binary).request("", root, timeout, map[string]any{"modelOp": op, "modelInput": string(input)})
+	if err != nil {
+		return nil, err
+	}
+	if r.Error != "" {
+		return nil, fmt.Errorf("%s", r.Error)
+	}
+	return r.Output, nil
+}
+
 func AskPlain(prompt string, warm bool) (string, bool) {
 	binary, ok := fmToolPath()
 	if !ok {

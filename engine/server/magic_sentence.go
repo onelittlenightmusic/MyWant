@@ -94,7 +94,10 @@ func compileMagic(tmpl string, aliases ...string) (*regexp.Regexp, []magicSlotDe
 type magicMatch struct {
 	wantName, wantType string
 	params             map[string]string
-	known              int // slot values that are things of their subtype
+	slots              []magicSlotDef
+	tool               string // a robot tool's sentence: the tool is run, nothing made
+	byLaya             bool   // which sentence Laya said; the values are the model's
+	known              int    // slot values that are things of their subtype
 }
 
 // magicSentenceMatch: the want whose magic sentence the question is, and the
@@ -123,30 +126,8 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 		}
 		return thingsBySub[sub][v]
 	}
-	// Where sentences are said: each want's own, then each type's default. On
-	// a tie the first wins, so a want's own sentence before its type's.
-	type source struct {
-		name, typ, tmpls string
-		aliases          []string
-	}
-	var sources []source
-	aliasesOf := map[string][]string{}
-	types, _ := s.robotWantTypes()
-	for _, t := range types {
-		aliasesOf[t.Name] = strings.Split(t.Labels[robotAliasLabel], ",")
-	}
-	for _, w := range s.globalBuilder.GetWants() {
-		if t := w.Metadata.Labels[magicSentenceLabel]; t != "" && w.Metadata.Labels[robotArchived] != "true" {
-			// A want's <alias> is any of its own aliases, or its type's.
-			own := robotWantAliases(w.Metadata.Labels, w.Metadata.Type, nil)
-			sources = append(sources, source{w.Metadata.Name, w.Metadata.Type, t, append(own, aliasesOf[w.Metadata.Type]...)})
-		}
-	}
-	for _, t := range types {
-		if tmpl := t.Labels[magicSentenceLabel]; tmpl != "" {
-			sources = append(sources, source{"", t.Name, tmpl, aliasesOf[t.Name]})
-		}
-	}
+	sources, readsTime := s.magicSources()
+	untimed := magicCutTime(q)
 	var best magicMatch
 	found := false
 	for _, src := range sources {
@@ -156,13 +137,21 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 			if re == nil {
 				continue
 			}
-			m := re.FindStringSubmatch(q)
+			said := q
+			if readsTime[src.typ] {
+				said = untimed
+			}
+			m := re.FindStringSubmatch(said)
 			if m == nil {
 				continue
 			}
-			mm := magicMatch{wantName: src.name, wantType: src.typ, params: map[string]string{}}
+			mm := magicMatch{wantName: src.name, wantType: src.typ, tool: src.tool, params: map[string]string{}, slots: slots}
 			for i, sl := range slots {
 				v := strings.TrimSpace(m[i+1])
+				// 「国分寺駅」 is the station 国分寺 when that is the thing known.
+				if t := strings.TrimSuffix(v, "駅"); t != v && t != "" && !knownThing(sl.subtype, v) && knownThing(sl.subtype, t) {
+					v = t
+				}
 				mm.params[sl.param] = v
 				if knownThing(sl.subtype, v) {
 					mm.known++
@@ -172,6 +161,19 @@ func (s *Server) magicSentenceMatch(question string) (magicMatch, bool) {
 				best, found = mm, true
 			}
 		}
+	}
+	// Which sentence it is, if any, is Laya's to say (magic_laya.go), written
+	// as it is or not: 「国分寺から中野坂上に行きたい」 is a route though no
+	// sentence is said word for word, and 「東京から来た友達と話した」 is
+	// none though it is 「<from>から<to>」 word for word. The sentence as
+	// written decides only when there is no Laya to ask.
+	if mm, ok, asked := s.magicLayaMatch(q, sources); asked {
+		if ok && found && mm.wantType == best.wantType && mm.wantName == best.wantName {
+			// Laya's sentence, as written: its reading is where the model has none.
+			best.byLaya = true
+			return best, true
+		}
+		return mm, ok
 	}
 	return best, found
 }
@@ -187,13 +189,40 @@ func (s *Server) magicSentenceReply(question, turn, locale string) (string, bool
 // magicSentenceDo is magicSentenceReply with the want it made (or found) as
 // its card, for a chat to show under the answer.
 func (s *Server) magicSentenceDo(question, turn, locale string) (string, *robotCard, bool) {
+	answer, card, _, ok := s.magicSentenceDoMatch(question, turn, locale)
+	return answer, card, ok
+}
+
+// magicSentenceDoMatch is magicSentenceDo with the match it made the want by
+// (its parameters as they were read).
+func (s *Server) magicSentenceDoMatch(question, turn, locale string) (string, *robotCard, magicMatch, bool) {
 	mm, ok := s.magicSentenceMatch(question)
 	if !ok {
-		return "", nil, false
+		return "", nil, mm, false
+	}
+	// The sentence said which type; what fills it is read by the model from
+	// what was said (magicModelParams), the sentence's own reading kept where
+	// the model has none.
+	s.magicModelParams(question, &mm)
+	// A robot tool's sentence: the tool, not a want (magicToolDo).
+	if mm.tool != "" {
+		return s.magicToolDo(mm)
+	}
+	// Laya said which sentence, and the model could not read what fills it:
+	// not that sentence after all — the robot is asked as it would be.
+	// Every one of its slots, not some: 「国分寺はどこ？」 taken for a route
+	// gave a from and no to, and the robot said it could not make one
+	// (2026-11-24) instead of answering where 国分寺 is.
+	if mm.byLaya {
+		for _, sl := range mm.slots {
+			if strings.TrimSpace(mm.params[sl.param]) == "" {
+				return "", nil, mm, false
+			}
+		}
 	}
 	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: mm.params}, nil)
 	if len(steps) == 0 {
-		return "", nil, false
+		return "", nil, mm, false
 	}
 	made := steps[0]
 	name := ""
@@ -202,16 +231,16 @@ func (s *Server) magicSentenceDo(question, turn, locale string) (string, *robotC
 	}
 	switch {
 	case strings.HasPrefix(made.Output, "Error:"):
-		return fmt.Sprintf("「%s」で作ろうとしましたが、できませんでした（%s）。", question, strings.TrimSpace(strings.TrimPrefix(made.Output, "Error:"))), nil, true
+		return fmt.Sprintf("「%s」で作ろうとしましたが、できませんでした（%s）。", question, strings.TrimSpace(strings.TrimPrefix(made.Output, "Error:"))), nil, mm, true
 	case strings.Contains(made.Output, "already on the board"):
-		return fmt.Sprintf("もうあります。ここです（%s）。", name), made.Card, true
+		return fmt.Sprintf("もうあります。ここです（%s）。", name), made.Card, mm, true
 	case strings.Contains(made.Output, "archived"):
-		return fmt.Sprintf("同じものがアーカイブにあります（%s）。", name), made.Card, true
+		return fmt.Sprintf("同じものがアーカイブにあります（%s）。", name), made.Card, mm, true
 	}
 	if name == "" {
 		name = mm.wantType
 	}
-	return fmt.Sprintf("「%s」を作りました。", name), made.Card, true
+	return fmt.Sprintf("「%s」を作りました。", name), made.Card, mm, true
 }
 
 // magicSentenceToRobot: a message to the robot want (its chat — the GUI's, a
@@ -220,7 +249,12 @@ func (s *Server) magicSentenceDo(question, turn, locale string) (string, *robotC
 // card, and nothing handed to its model — which, given the sentence, made the
 // same route by its own tools and then said something of its own about it.
 // False: not one; the message goes to the robot as it is.
-func (s *Server) magicSentenceToRobot(text string) bool {
+//
+// Doing it takes the models a while (Laya, then Apple's), so it is done after
+// the message is taken; one that turns out not to be a sentence done here —
+// what a want says (look), a place not on the board, a value the model could
+// not read — goes to the robot then, by notDone, as it would have at once.
+func (s *Server) magicSentenceToRobot(text string, notDone func()) bool {
 	q := strings.TrimSpace(text)
 	if q == "" {
 		return false
@@ -228,12 +262,13 @@ func (s *Server) magicSentenceToRobot(text string) bool {
 	if _, ok := s.magicSentenceMatch(q); !ok {
 		return false
 	}
-	s.robotAsked(q, "")
 	go func() {
 		answer, card, ok := s.magicSentenceDo(q, "", "")
 		if !ok {
+			notDone()
 			return
 		}
+		s.robotAsked(q, "")
 		var cards []robotCard
 		if card != nil {
 			cards = []robotCard{*card}
@@ -298,7 +333,16 @@ func (s *Server) handleMagic(w http.ResponseWriter, r *http.Request) {
 		robotWriteJSON(w, magicResponse{Matched: false})
 		return
 	}
-	answer, card, _ := s.magicSentenceDo(text, "", "")
+	answer, card, read, done := s.magicSentenceDoMatch(text, "", "")
+	if !done {
+		// Read as a sentence and not one done here (look, a place not on
+		// the board): not a match, for the keyboard as for the robot.
+		robotWriteJSON(w, magicResponse{Matched: false})
+		return
+	}
+	if read.params != nil {
+		mm = read // the parameters as the model read them
+	}
 	out := magicResponse{Matched: true, Answer: answer, WantType: mm.wantType, Params: mm.params}
 	if card != nil && (req.Wait < 0 || !s.magicSettles(mm.wantType)) {
 		out.WantID, out.WantName = card.ID, card.Name
@@ -355,4 +399,87 @@ func (s *Server) wantByAlias(said string) *mywant.Want {
 		}
 	}
 	return nil
+}
+
+// A time said in a request, with the words around it that only say it is a
+// time: 明日の朝9時40分までに, 10分後に, 20:15発で, 十分後に.
+var magicTimePhrase = regexp.MustCompile(
+	`(?:(?:明日|今日|あした|きょう|あす)の?)?(?:(?:朝|昼|夕方|夜|午前|午後)の?)?` +
+		`(?:[0-9０-９一二三四五六七八九十]+\s*時間(?:\s*[0-9０-９一二三四五六七八九十]+\s*分|半)?\s*後` +
+		`|[0-9０-９一二三四五六七八九十]+\s*分\s*後` +
+		`|[0-9０-９]{1,2}\s*[:：]\s*[0-9０-９]{2}` +
+		`|[0-9０-９一二三四五六七八九十]+\s*時(?:\s*[0-9０-９一二三四五六七八九十]+\s*分|半)?)` +
+		`\s*(?:ごろ|頃)?\s*(?:出発|到着|発|着)?\s*(?:までに|まで|に|で)?`)
+
+// magicCutTime is the request without the time it says, for a sentence of a
+// type whose time is read apart (readsTime above).
+func magicCutTime(q string) string {
+	return strings.Join(strings.Fields(magicTimePhrase.ReplaceAllString(q, " ")), " ")
+}
+
+// magicSources is where sentences are said: each want's own, then each
+// type's default (on a tie the first wins, so a want's own sentence before
+// its type's) — and which types read their time apart.
+func (s *Server) magicSources() ([]magicSource, map[string]bool) {
+	var sources []magicSource
+	aliasesOf := map[string][]string{}
+	// A type whose time is read (time-reading/<param>, time_reading.go) has
+	// its sentence matched without the time said: 「10分後に国分寺駅から
+	// 中野坂上」 is its 「<from>から<to>」, the time read by Laya from the
+	// whole question as the want is made — not a station named 「10分後に
+	// 国分寺駅」 (2026-11-24, a route searched from there for now).
+	readsTime := map[string]bool{}
+	types, _ := s.robotWantTypes()
+	for _, t := range types {
+		aliasesOf[t.Name] = strings.Split(t.Labels[robotAliasLabel], ",")
+		for k := range t.Labels {
+			if strings.HasPrefix(k, timeReadingLabel) {
+				readsTime[t.Name] = true
+			}
+		}
+	}
+	if s.globalBuilder != nil {
+		for _, w := range s.globalBuilder.GetWants() {
+			if t := w.Metadata.Labels[magicSentenceLabel]; t != "" && w.Metadata.Labels[robotArchived] != "true" {
+				// A want's <alias> is any of its own aliases, or its type's.
+				own := robotWantAliases(w.Metadata.Labels, w.Metadata.Type, nil)
+				sources = append(sources, magicSource{name: w.Metadata.Name, typ: w.Metadata.Type, tmpls: t, aliases: append(own, aliasesOf[w.Metadata.Type]...)})
+			}
+		}
+	}
+	for _, t := range types {
+		if tmpl := t.Labels[magicSentenceLabel]; tmpl != "" {
+			sources = append(sources, magicSource{typ: t.Name, tmpls: tmpl, aliases: aliasesOf[t.Name]})
+		}
+	}
+	// What is asked of the robot itself: where a thing is (point), how a
+	// want is (look) — choices beside the types', so 「国分寺はどこ？」 is
+	// read as where 国分寺 is, not taken for a route.
+	for _, t := range robotTools {
+		if t.Sentence != "" {
+			sources = append(sources, magicSource{tool: t.Name, tmpls: t.Sentence, aliases: []string{t.Words}})
+		}
+	}
+	return sources, readsTime
+}
+
+// magicToolDo is a robot tool's sentence done: where a thing is (point) —
+// the robot walks there, and says so. Anything else the tool's sentence was
+// (look: what a want says, which takes words of the robot's own to answer
+// with), or a point that found nothing to walk to, is the robot's to
+// answer, as it would have been: not a match.
+func (s *Server) magicToolDo(mm magicMatch) (string, *robotCard, magicMatch, bool) {
+	for _, sl := range mm.slots {
+		if strings.TrimSpace(mm.params[sl.param]) == "" {
+			return "", nil, mm, false
+		}
+	}
+	if mm.tool != "point" {
+		return "", nil, mm, false
+	}
+	out, err := robotToolByName("point").run(s, mm.params)
+	if err != nil || !strings.HasPrefix(out, "The robot is standing on") {
+		return "", nil, mm, false // not there, or archived: the robot says so
+	}
+	return fmt.Sprintf("%sに来ました。", mm.params["name"]), nil, mm, true
 }

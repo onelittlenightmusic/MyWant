@@ -45,6 +45,12 @@ type robotTool struct {
 	// Writes: the call changes the board. A device that shows the board
 	// (the iPhone app's web view) says "reflecting…" until it reads it back.
 	Writes bool `json:"writes,omitempty"`
+	// Sentence: how a request for this tool is said, as a want type's magic
+	// sentence is (slots are its arguments): one of the choices Laya reads a
+	// request as (magic_laya.go), beside the types' — 「国分寺はどこ？」 is
+	// point's, not a route's. Words: what it is, in a word or two.
+	Sentence string `json:"-"`
+	Words    string `json:"-"`
 	run    func(s *Server, args map[string]string) (string, error)
 	// replays: run again when a turn is played again (turns.go) — the
 	// steps that show something. Not the ones that make something, which a
@@ -90,8 +96,10 @@ var robotTools = []robotTool{
 		Arguments: []robotParam{
 			{Name: "name", Description: "The name alone, e.g. 荻窪 or note-instance", Required: true},
 		},
-		run:     (*Server).robotPoint,
-		replays: true,
+		run:      (*Server).robotPoint,
+		replays:  true,
+		Sentence: "<name:thing>はどこ|<name:thing>どこ|<name:thing>に連れてって|<name:thing>の場所を見せて",
+		Words:    "場所・どこ",
 	},
 	{
 		Name:        "look",
@@ -99,7 +107,9 @@ var robotTools = []robotTool{
 		Arguments: []robotParam{
 			{Name: "name", Description: "The want's name or part of it, e.g. Nakano for NakanoのWeather", Required: true},
 		},
-		run: (*Server).robotLook,
+		run:      (*Server).robotLook,
+		Sentence: "<name:want>の天気は|<name:want>はどう|<name:want>の様子は|<name:want>は何て言ってる|<name:want>の予約は",
+		Words:    "様子・どうなってる",
 	},
 	{
 		Name:        "use_capability",
@@ -1090,6 +1100,9 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question stri
 		return ok && v != nil && strings.TrimSpace(fmt.Sprint(v)) != ""
 	}
 	filled := robotMarkedParams(def.Metadata.Labels, params, question)
+	// The request's time as Laya reads it (time-reading/<param>, time_reading.go):
+	// 「10分後」 worked out here on what it chose, not left to the model.
+	filled += s.robotReadTimes(typ, def.Metadata.Labels, params, question)
 	for _, p := range def.Parameters {
 		if !said(p.Name) {
 			if p.Name == def.Metadata.Labels[robotHereLabel] {

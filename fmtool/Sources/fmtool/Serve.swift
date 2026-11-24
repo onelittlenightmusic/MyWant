@@ -143,6 +143,10 @@ private struct ServeRequest: Decodable {
     /// of it. Answered from those alone (Picture.swift), not by the tools —
     /// the caller has already decided what the question is about.
     let picture: PictureInput?
+    /// Laya's work (Laya.swift): a model op — decide, train-decider — and its
+    /// input as JSON, as the server hands a device's worker. No prompt.
+    let modelOp: String?
+    let modelInput: String?
 }
 
 struct PictureInput: Decodable, Sendable {
@@ -218,6 +222,15 @@ func serve(makeTools: @Sendable (CallTracker) -> (localTools: [any LocalTool], t
         if request.reset == true {
             await box.reset()
             writeLine(["id": id, "text": "(session reset)"])
+            continue
+        }
+        if let op = request.modelOp {
+            let (output, error) = await runLaya(op: op, input: request.modelInput ?? "{}")
+            if let error {
+                writeLine(["id": id, "error": error])
+            } else {
+                writeLine(["id": id, "output": output ?? NSNull()])
+            }
             continue
         }
         guard let prompt = request.prompt, !prompt.isEmpty else {

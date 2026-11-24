@@ -42,6 +42,7 @@ import (
 	"time"
 
 	mywant "mywant/engine/core"
+	types "mywant/engine/types"
 )
 
 const (
@@ -225,7 +226,7 @@ func (d *robotDecider) decide(state string, questions map[string]decisionQuestio
 // more workers there are (the phone, the Mac, a GPU server), the sooner all
 // are answered. `by` is the workers that answered.
 func (d *robotDecider) decideMany(items []decisionItem) ([]map[string]decisionAnswer, string, error) {
-	if !modelDeviceCan(modelOpDecide, "", time.Now()) {
+	if !layaCan(modelOpDecide) {
 		return nil, "", errNoModel
 	}
 	answers := make([]map[string]decisionAnswer, len(items))
@@ -259,13 +260,9 @@ func decideOne(item decisionItem) (map[string]decisionAnswer, string, error) {
 	// The heads go with the job: whichever worker takes it decides with what
 	// was learnt, wherever it was learnt (initiativeHeads).
 	in, _ := json.Marshal(map[string]any{"items": []decisionItem{item}, "heads": initiativeHeads()})
-	res, ok := waitForModelDevice(context.Background(),
-		modelClaim{RequestID: generateWantID(), Op: modelOpDecide, Input: in}, initiativeDecideWait)
-	if !ok {
-		return nil, "", fmt.Errorf("no worker answered within %s", initiativeDecideWait)
-	}
-	if res.Error != "" {
-		return nil, "laya-worker", fmt.Errorf("%s", res.Error)
+	output, where, err := layaJob(modelOpDecide, in, initiativeDecideWait)
+	if err != nil {
+		return nil, "laya-worker", err
 	}
 	var out struct {
 		Worker string `json:"worker"`
@@ -273,11 +270,14 @@ func decideOne(item decisionItem) (map[string]decisionAnswer, string, error) {
 			Answers map[string]decisionAnswer `json:"answers"`
 		} `json:"items"`
 	}
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(output, &out); err != nil {
 		return nil, "laya-worker", err
 	}
 	by := "laya-worker"
-	if out.Worker != "" {
+	switch {
+	case where == modelByServer:
+		by = "laya@server" // this Mac's fmtool, not a device
+	case out.Worker != "":
 		by = "laya@" + out.Worker
 	}
 	if len(out.Items) != 1 {
@@ -291,26 +291,25 @@ func decideOne(item decisionItem) (map[string]decisionAnswer, string, error) {
 // (initiativeHeads) and sent with every decision from then on — so one
 // worker's training serves them all, and no worker keeps anything of its own.
 func (d *robotDecider) train(rows []map[string]any, questions map[string]decisionQuestion) (json.RawMessage, string, error) {
-	if !modelDeviceCan(modelOpTrainDecider, "", time.Now()) {
+	if !layaCan(modelOpTrainDecider) {
 		return nil, "", errNoModel
 	}
 	// seeded: the rows are the whole set (initiativeTrainingSet).
 	in, _ := json.Marshal(map[string]any{"rows": rows, "questions": questions, "seeded": true})
-	res, ok := waitForModelDevice(context.Background(),
-		modelClaim{RequestID: generateWantID(), Op: modelOpTrainDecider, Input: in}, 20*time.Minute)
-	if !ok {
-		return nil, "", fmt.Errorf("no worker finished the training")
-	}
-	if res.Error != "" {
-		return nil, "laya-worker", fmt.Errorf("%s", res.Error)
+	output, where, err := layaJob(modelOpTrainDecider, in, 20*time.Minute)
+	if err != nil {
+		return nil, "laya-worker", err
 	}
 	var out map[string]json.RawMessage
-	if err := json.Unmarshal(res.Output, &out); err != nil {
+	if err := json.Unmarshal(output, &out); err != nil {
 		return nil, "laya-worker", err
 	}
 	by := "laya-worker"
 	var worker string
-	if json.Unmarshal(out["worker"], &worker) == nil && worker != "" {
+	switch {
+	case where == modelByServer:
+		by = "laya@server"
+	case json.Unmarshal(out["worker"], &worker) == nil && worker != "":
 		by = "laya@" + worker
 	}
 	if heads, ok := out["heads"]; ok {
@@ -348,10 +347,24 @@ func initiativeHeads() json.RawMessage {
 	return initiativeHeadsCache.heads
 }
 
+// keepInitiativeHeads keeps the heads a training fitted beside the ones it
+// did not train: a training of some questions (the push, the readings —
+// laya_readings_train.go) is not a reason to lose the others' heads. A head
+// is under its question as worded (its key), so one trained again replaces
+// itself.
 func keepInitiativeHeads(heads json.RawMessage) error {
-	if !json.Valid(heads) {
-		return fmt.Errorf("the worker's heads are not JSON")
+	fitted := map[string]json.RawMessage{}
+	if err := json.Unmarshal(heads, &fitted); err != nil {
+		return fmt.Errorf("the worker's heads are not JSON: %v", err)
 	}
+	all := map[string]json.RawMessage{}
+	if raw, err := os.ReadFile(initiativeHeadsFile()); err == nil {
+		_ = json.Unmarshal(raw, &all)
+	}
+	for k, v := range fitted {
+		all[k] = v
+	}
+	heads, _ = json.Marshal(all)
 	tmp := initiativeHeadsFile() + ".tmp"
 	if err := os.WriteFile(tmp, heads, 0o644); err != nil {
 		return err
@@ -814,4 +827,31 @@ func sign(v int) int {
 		return -1
 	}
 	return 0
+}
+
+// layaCan: Laya can take op — a device that does has asked for work lately,
+// or this Mac has Laya itself (types.LayaHere: fmtool and the app's bundle).
+func layaCan(op string) bool {
+	return modelDeviceCan(op, "", time.Now()) || types.LayaHere()
+}
+
+// layaJob runs a Laya op as Apple's model's work is run (runModelJob): a
+// device that can, first — the phone, the Mac app, a GPU server — else this
+// Mac's fmtool.
+func layaJob(op string, in json.RawMessage, wait time.Duration) (json.RawMessage, modelBy, error) {
+	if modelDeviceCan(op, "", time.Now()) {
+		res, ok := waitForModelDevice(context.Background(),
+			modelClaim{RequestID: generateWantID(), Op: op, Input: in}, wait)
+		if ok {
+			if res.Error != "" {
+				return nil, modelByDevice, fmt.Errorf("%s", res.Error)
+			}
+			return res.Output, modelByDevice, nil
+		}
+	}
+	if types.LayaHere() {
+		out, err := types.AskModelOp(op, in, wait)
+		return out, modelByServer, err
+	}
+	return nil, "", fmt.Errorf("no worker answered within %s", wait)
 }
