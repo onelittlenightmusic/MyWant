@@ -63,6 +63,7 @@ wantType:
       max: 24
     example: 8.5
   - name: departure_date
+    context: time.date
     description: Departure date in YYYY-MM-DD format
     type: string
     default: '2024-01-01'

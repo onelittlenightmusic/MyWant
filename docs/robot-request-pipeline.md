@@ -369,10 +369,20 @@ want タイルとして並べる。チャット（`cards` の kind `choice`＋`c
 
 **その人の今のコンテキスト**（`engine/server/user_context.go`）
 依頼に答えた後（4秒静かになってから）、その人の直近10件（1時間以内）の依頼と作った want を Apple FM に
-読ませ、`destination / origin / arrive_by / topic` の固定項目に集約して `~/.mywant/contexts/<character>.json` に置く。
-場所は「作った want のパラメータ値」か「依頼に出てきた盤面の Thing」だけ、時刻は依頼で言われた時だけ採用。
-使い道は2つ：型のラベル `context/<param>: <field>`（transit_search・route の `context/to: destination`）で
-言われなかった値を埋める（言われた値 → コンテキスト → ホームの順。here-param は埋めない）、
+読ませ、コンテキストの種類（want-spec `ContextKinds`）ごとに集約して `~/.mywant/contexts/<character>.json` に置く。
+聞くのは、どれかの型のパラメータが使っている種類と `interest.topic` だけ。
+
+| 分類 | 種類 |
+|---|---|
+| place（どこ） | `place.destination` 行き先 / `place.origin` 出発地 / `place.area` 話題の街 |
+| time（いつ） | `time.date` 日付 / `time.at` 予定の時刻 / `time.arrive_by` 着く時刻 / `time.depart_at` 出る時刻 / `time.duration` 長さ |
+| people（だれと） | `people.party_size` 人数 / `people.who` 相手 |
+| interest（なにを） | `interest.topic` していること / `interest.subject` 追っているチーム・イベント |
+| preference（好み） | `preference.mode` 移動手段 / `preference.budget` 予算 / `preference.cuisine` 料理 |
+
+値は種類ごとの形（HH:MM、YYYY-MM-DD、数字…）で、作った want の値か依頼で言われたもの（場所は盤面の Thing）だけ採用。
+使い道は2つ：パラメータ定義の `context: <種類>`（want-spec `ParameterDef.Context`）で言われなかった値を埋める
+（言われた値 → コンテキスト → ホームの順。here-param は埋めず、enum のあるパラメータはその値のときだけ）、
 ロボットの brief に一行で渡す。ロボットのチャットのクリア（`DELETE /wants/robot/chat/session`）で全員分消える。
 
 ## 8kトークンとの戦い（各段の対策）

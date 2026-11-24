@@ -23,6 +23,7 @@ wantType:
       notify: true
   parameters:
   - name: budget
+    context: preference.budget
     description: Total budget amount
     type: float64
     default: 5000.0

@@ -21,6 +21,7 @@ wantType:
 
   parameters:
     - name: at
+      context: place.destination
       description: Where to read the weather — a city, place or station
       type: string
       subType: city

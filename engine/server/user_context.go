@@ -1,20 +1,24 @@
 package server
 
-// user_context.go — where the person is going, read from what they asked.
+// user_context.go — what the person is about now, read from what they asked.
 //
 // 「何時に着く？」「天気は？」 said a minute after 「国分寺までの乗り換え」 are
 // about 国分寺. Each person's last requests (userContextKeep, this hour) are
-// read, after one is answered, by Apple's model into a few fixed fields:
+// read, after one is answered, by Apple's model into kinds of context
+// (want-spec ContextKinds: place.destination, time.date, people.party_size, …
+// — those some type's parameter takes, and interest.topic):
 //
-//	{"destination": "国分寺", "origin": "中野坂上", "arrive_by": "10:00", "topic": "移動"}
+//	{"place.destination": "国分寺", "place.origin": "中野坂上", "time.arrive_by": "10:00", "interest.topic": "移動"}
 //
 // kept per character (~/.mywant/contexts/<character>.json). A value is kept
-// only when it is words the person said (or a want was made with): the model
-// is small and fills a field it was asked for. Used two ways:
+// only as the person said it or a want was made with it, in the kind's form
+// (contextValueOK): the model is small and fills a field it was asked for.
+// Used two ways:
 //
-//   - a parameter not said is filled from it, by the type's labels
-//     (context/<param>: <field> — transit_search's context/to: destination),
-//     before home's (home_params.go): what was said, then this, then home;
+//   - a parameter not said is filled from it, by the parameter's context
+//     (want-spec ParameterDef.Context — transit_search's to is
+//     place.destination), before home's (home_params.go): what was said, then
+//     this, then home;
 //   - the robot's brief (plan.go) carries it as a line, for the model that
 //     answers.
 //
@@ -31,6 +35,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	ws "github.com/onelittlenightmusic/want-spec"
 )
 
 const (
@@ -38,11 +44,47 @@ const (
 	userContextWindow = 60 * time.Minute // older than this, not now's
 	userContextAfter  = 4 * time.Second  // quiet this long after a request, it is read
 	userContextWait   = 30 * time.Second // the model, waited for
-	userContextLabel  = "context/"       // context/<param>: <field>
 )
 
-// userContextFields are what the model is asked for, in order.
-var userContextFields = []string{"destination", "origin", "arrive_by", "topic"}
+// userContextAlways are asked for whatever the types take.
+var userContextAlways = []string{"interest.topic"}
+
+// userContextKinds are the kinds asked for: those some type's parameter is
+// filled from, and userContextAlways, in want-spec's order.
+func (s *Server) userContextKinds() []string {
+	used := map[string]bool{}
+	for _, k := range userContextAlways {
+		used[k] = true
+	}
+	if s.wantTypeLoader != nil {
+		for _, def := range s.wantTypeLoader.GetAll() {
+			for _, p := range def.Parameters {
+				if p.Context != "" {
+					used[p.Context] = true
+				}
+			}
+		}
+	}
+	var out []string
+	for _, k := range ws.ContextKinds {
+		if used[k.Name] {
+			out = append(out, k.Name)
+		}
+	}
+	return out
+}
+
+// paramContextKind is the kind a type's parameter is filled from ("" none).
+func (s *Server) paramContextKind(typ, param string) string {
+	if def := s.typeDefinition(typ); def != nil {
+		for _, p := range def.Parameters {
+			if p.Name == param {
+				return p.Context
+			}
+		}
+	}
+	return ""
+}
 
 // userRequest is one thing a person asked, and the want made for it.
 type userRequest struct {
@@ -154,7 +196,8 @@ func (s *Server) readUserContext(who string) {
 	if len(list) == 0 {
 		return
 	}
-	prompt := userContextPrompt(list)
+	kinds := s.userContextKinds()
+	prompt := userContextPrompt(list, kinds, s.paramContextKind)
 	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), userContextWait)
 	defer cancel()
@@ -169,9 +212,15 @@ func (s *Server) readUserContext(who string) {
 	for _, v := range s.boardWords() {
 		things[v] = true
 	}
-	c := userContext{Fields: userContextRead(text, list, func(v string) bool { return things[v] }), UpdatedAt: time.Now(), From: len(list), Requests: list}
+	fields := userContextRead(text, list, kinds, func(v string) bool { return things[v] }, personNow())
+	for k, v := range madeContext(list, s.paramContextKind) {
+		if fields[k] == "" {
+			fields[k] = v
+		}
+	}
+	c := userContext{Fields: fields, UpdatedAt: time.Now(), From: len(list), Requests: list}
 	order := []string{"who", "requests"}
-	for _, f := range userContextFields {
+	for _, f := range kinds {
 		if v := c.Fields[f]; v != "" {
 			trace[f] = v
 			order = append(order, f)
@@ -187,9 +236,10 @@ func (s *Server) readUserContext(who string) {
 	}
 }
 
-// userContextPrompt: the requests, newest first, with what was made of each.
+// userContextPrompt: the requests, newest first, with what was made of each —
+// each parameter with the kind it is, where it has one — and the kinds asked.
 // No clock times: the model took one for arrive_by (2026-11-25).
-func userContextPrompt(list []userRequest) string {
+func userContextPrompt(list []userRequest, kinds []string, kindOf func(typ, param string) string) string {
 	var b strings.Builder
 	b.WriteString("These are a person's requests, the LATEST FIRST, with the want made for each:\n")
 	for i := len(list) - 1; i >= 0; i-- {
@@ -202,27 +252,43 @@ func userContextPrompt(list []userRequest) string {
 		if r.Type != "" {
 			var kv []string
 			for k, v := range r.Params {
-				kv = append(kv, k+"="+v)
+				item := k + "=" + v
+				if kindOf != nil {
+					if kind := kindOf(r.Type, k); kind != "" {
+						item += " [" + kind + "]"
+					}
+				}
+				kv = append(kv, item)
 			}
 			sort.Strings(kv)
 			fmt.Fprintf(&b, " → %s %s", r.Type, strings.Join(kv, " "))
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Say what the person is about now. When requests differ, the latest one (1) is right — they changed their mind:\n" +
-		"destination: the place they are going to\n" +
-		"origin: the place they are leaving from\n" +
-		"arrive_by: the time (HH:MM) they must be there by\n" +
-		"topic: what they are doing, in a word or two\n" +
-		"A place is its name alone (国分寺), never a sentence or a question. Leave a line empty when the requests do not say it. " +
-		"Fill in these lines and write nothing else:\n")
-	for _, f := range userContextFields {
-		b.WriteString(f + "=\n")
+	b.WriteString("Say what the person is about now. When requests differ, the latest one (1) is right — they changed their mind:\n")
+	for _, name := range kinds {
+		if k, ok := ws.ContextKindByName(name); ok {
+			fmt.Fprintf(&b, "%s: %s (e.g. %s)\n", k.Name, k.Description, k.Example)
+		}
 	}
+	b.WriteString("A place is its name alone, never a sentence or a question. Leave a value \"\" when the requests do not say it. " +
+		"Fill in this JSON and write nothing else:\n{")
+	for i, k := range kinds {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%q: \"\"", k)
+	}
+	b.WriteString("}\n")
 	return b.String()
 }
 
-var userContextTime = regexp.MustCompile(`^\d{1,2}:\d{2}$`)
+var (
+	userContextTime     = regexp.MustCompile(`^\d{1,2}:\d{2}$`)
+	userContextDate     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	userContextDuration = regexp.MustCompile(`^(\d+h)?(\d+m)?(\d+s)?$`)
+	userContextNumber   = regexp.MustCompile(`^\d+$`)
+)
 
 // timeSaid: HH:MM is a time a request says — its hour said as 「H時」 or the
 // time as it is.
@@ -241,6 +307,38 @@ func timeSaid(v string, list []userRequest) bool {
 	return false
 }
 
+// dateSaid: YYYY-MM-DD is a day a request says — 今日, 明日, 明後日 from now,
+// or its month and day (11月26日, 11/26).
+func dateSaid(v string, list []userRequest, now time.Time) bool {
+	d, err := time.ParseInLocation("2006-01-02", v, now.Location())
+	if err != nil {
+		return false
+	}
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	words := map[int][]string{0: {"今日", "きょう"}, 1: {"明日", "あした", "あす"}, 2: {"明後日", "あさって"}}
+	md := []string{fmt.Sprintf("%d月%d日", d.Month(), d.Day()), fmt.Sprintf("%d/%d", d.Month(), d.Day())}
+	for _, r := range list {
+		said := toHalfWidthDigits(r.Said)
+		for days, said2 := range words {
+			if !today.AddDate(0, 0, days).Equal(d) {
+				continue
+			}
+			for _, w := range said2 {
+				// 「明後日」 holds 「明日」 too: only 明日 when it is not 明後日.
+				if strings.Contains(said, w) && !(days == 1 && strings.Contains(said, "明後日")) {
+					return true
+				}
+			}
+		}
+		for _, w := range md {
+			if strings.Contains(said, w) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // toHalfWidthDigits writes ０-９ as 0-9.
 func toHalfWidthDigits(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -251,88 +349,201 @@ func toHalfWidthDigits(s string) string {
 	}, s)
 }
 
-// userContextRead reads the model's lines, a place kept only when a want was
-// made with it, or it is a thing named on the board that the person said —
-// the model wrote a whole request as the destination (2026-11-25) — and a
-// time only as HH:MM.
-func userContextRead(text string, list []userRequest, thing func(string) bool) map[string]string {
-	said := func(v string) bool {
+// userContextModes are preference.mode's values, with words that say each.
+var userContextModes = map[string][]string{
+	"walking":   {"歩", "徒歩"},
+	"cycling":   {"自転車", "チャリ"},
+	"driving":   {"車", "ドライブ"},
+	"transit":   {"電車", "乗り換え", "乗換"},
+}
+
+// contextValueOK: v, read by the model for kind, is what the person said or a
+// want was made with, in the kind's form.
+func contextValueOK(kind, v string, list []userRequest, thing func(string) bool, now time.Time) bool {
+	made := func(v string) bool {
 		for _, r := range list {
 			for _, pv := range r.Params {
 				if pv == v {
 					return true
 				}
 			}
-			if thing != nil && thing(v) && strings.Contains(r.Said, v) {
+		}
+		return false
+	}
+	saidWord := func(v string) bool {
+		for _, r := range list {
+			if strings.Contains(toHalfWidthDigits(r.Said), v) {
 				return true
 			}
 		}
 		return false
 	}
+	switch {
+	case strings.HasPrefix(kind, "place."):
+		// A place only as a want was made with it, or a thing on the board
+		// they said: the model wrote a whole request as the destination
+		// (2026-11-25).
+		return made(v) || (thing != nil && thing(v) && saidWord(v))
+	case kind == "time.date":
+		return userContextDate.MatchString(v) && (made(v) || dateSaid(v, list, now))
+	case kind == "time.duration":
+		if !userContextDuration.MatchString(v) || v == "" {
+			return false
+		}
+		if made(v) {
+			return true
+		}
+		for _, n := range regexp.MustCompile(`\d+`).FindAllString(v, -1) {
+			if !saidWord(n) {
+				return false
+			}
+		}
+		return true
+	case strings.HasPrefix(kind, "time."):
+		// Only a time they said (「10時」, 「9:40」).
+		return userContextTime.MatchString(v) && (made(v) || timeSaid(v, list))
+	case kind == "people.party_size", kind == "preference.budget":
+		return userContextNumber.MatchString(v) && (made(v) || saidWord(v))
+	case kind == "preference.mode":
+		words, ok := userContextModes[v]
+		if !ok {
+			return false
+		}
+		if made(v) {
+			return true
+		}
+		for _, w := range words {
+			if saidWord(w) {
+				return true
+			}
+		}
+		return false
+	case kind == "interest.topic":
+		return len([]rune(v)) <= 20
+	default:
+		// people.who, interest.subject, preference.cuisine: their words.
+		return len([]rune(v)) <= 20 && (made(v) || saidWord(v))
+	}
+}
+
+// madeContext is what the wants made say of each kind, the latest first: a
+// kind the model left empty, or wrote what was not said for, is the last
+// want's made with it — 「荻窪から吉祥寺」 then 「スマートゴルフの予約は？」 is
+// still on the way to 吉祥寺, where the model wrote スマートゴルフ (2026-11-25).
+func madeContext(list []userRequest, kindOf func(typ, param string) string) map[string]string {
 	out := map[string]string{}
-	for _, line := range strings.Split(text, "\n") {
-		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "-*・ "))
-		i := strings.IndexAny(line, "=:")
-		if i < 0 {
+	for i := len(list) - 1; i >= 0; i-- {
+		r := list[i]
+		if r.Type == "" || kindOf == nil {
 			continue
 		}
-		f := strings.ToLower(strings.TrimSpace(line[:i]))
-		v := strings.Trim(strings.TrimSpace(line[i+1:]), "\"'「」`")
-		if v == "" || strings.EqualFold(v, "none") || strings.EqualFold(v, "unknown") {
-			continue
-		}
-		switch f {
-		case "destination", "origin":
-			if t := strings.TrimSuffix(v, "駅"); t != v && said(t) {
-				v = t
-			}
-			if said(v) {
-				out[f] = v
-			}
-		case "arrive_by":
-			// Only a time they said (「10時」, 「9:40」).
-			if userContextTime.MatchString(v) && timeSaid(v, list) {
-				out[f] = v
-			}
-		case "topic":
-			if len([]rune(v)) <= 20 {
-				out[f] = v
+		for p, v := range r.Params {
+			if k := kindOf(r.Type, p); k != "" && out[k] == "" && v != "" {
+				out[k] = v
 			}
 		}
 	}
 	return out
 }
 
-// robotContextParams fills what who did not say with their context, by the
-// type's context/<param> labels, and says what it filled; "" when nothing.
-// Never the here-param (where the person is now).
-func (s *Server) robotContextParams(labels map[string]string, params map[string]any, who string) string {
+// userContextRead reads the model's lines: each kind asked whose value
+// contextValueOK keeps (a station as said, 「国分寺駅」 is 国分寺).
+func userContextRead(text string, list []userRequest, kinds []string, thing func(string) bool, now time.Time) map[string]string {
+	asked := map[string]bool{}
+	for _, k := range kinds {
+		asked[k] = true
+	}
+	out := map[string]string{}
+	keep := func(kind, v string) {
+		v = strings.Trim(strings.TrimSpace(v), "\"'「」`")
+		if !asked[kind] || v == "" || v == "-" || strings.EqualFold(v, "none") || strings.EqualFold(v, "unknown") {
+			return
+		}
+		if strings.HasPrefix(kind, "place.") {
+			if t := strings.TrimSuffix(v, "駅"); t != v && contextValueOK(kind, t, list, thing, now) {
+				v = t
+			}
+		}
+		if contextValueOK(kind, v, list, thing, now) {
+			out[kind] = v
+		}
+	}
+	// The JSON asked for (in a code fence or not), its values any type.
+	if i, j := strings.Index(text, "{"), strings.LastIndex(text, "}"); i >= 0 && j > i {
+		var obj map[string]any
+		if json.Unmarshal([]byte(text[i:j+1]), &obj) == nil {
+			for k, v := range obj {
+				if v != nil {
+					keep(strings.ToLower(strings.TrimSpace(k)), fmt.Sprint(v))
+				}
+			}
+			return out
+		}
+	}
+	// Else lines, kind=value.
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "-*・ "))
+		i := strings.Index(line, "=")
+		if i < 0 {
+			i = strings.IndexAny(line, ":：")
+		}
+		if i < 0 {
+			continue
+		}
+		kind := strings.ToLower(strings.TrimSpace(line[:i]))
+		keep(kind, strings.TrimPrefix(strings.TrimSpace(line[i+1:]), "="))
+	}
+	return out
+}
+
+// robotContextParams fills what who did not say with their context, by each
+// parameter's context field (want-spec ParameterDef.Context: a route's to is
+// the destination), and says what it filled; "" when nothing. Never the
+// here-param (where the person is now).
+//
+// A parameter with a list of values (validation.enum) takes only one of them:
+// a route's mode is walking, cycling or driving, not transit.
+func (s *Server) robotContextParams(contextOf map[string]string, here string, params map[string]any, who string, enums map[string][]any) string {
+	if len(contextOf) == 0 {
+		return ""
+	}
 	c, ok := userContextNow(who)
 	if !ok {
 		return ""
 	}
-	filled := ""
 	var names []string
-	for k := range labels {
-		if strings.HasPrefix(k, userContextLabel) {
-			names = append(names, strings.TrimPrefix(k, userContextLabel))
-		}
+	for p := range contextOf {
+		names = append(names, p)
 	}
 	sort.Strings(names)
+	filled := ""
 	for _, p := range names {
-		if p == labels[robotHereLabel] {
+		if p == here {
 			continue
 		}
 		if v, said := params[p]; said && v != nil && strings.TrimSpace(fmt.Sprint(v)) != "" {
 			continue
 		}
-		field := strings.TrimSpace(labels[userContextLabel+p])
-		if v := c.Fields[field]; v != "" {
+		field := contextOf[p]
+		if v := c.Fields[field]; v != "" && inEnum(v, enums[p]) {
 			params[p] = v
 			filled += fmt.Sprintf(" (%s=%s: the person's %s now, from what they asked before, as none was said)", p, v, field)
 		}
 	}
 	return filled
+}
+
+// inEnum: v is one of enum, or there is no enum.
+func inEnum(v string, enum []any) bool {
+	if len(enum) == 0 {
+		return true
+	}
+	for _, e := range enum {
+		if fmt.Sprint(e) == v {
+			return true
+		}
+	}
+	return false
 }
 
 // clearUserContexts forgets every person's context: the robot's chat cleared
@@ -360,9 +571,9 @@ func userContextText(who string) string {
 		return ""
 	}
 	var kv []string
-	for _, f := range userContextFields {
-		if v := c.Fields[f]; v != "" {
-			kv = append(kv, f+"="+v)
+	for _, k := range ws.ContextKinds {
+		if v := c.Fields[k.Name]; v != "" {
+			kv = append(kv, k.Name+"="+v)
 		}
 	}
 	if len(kv) == 0 {

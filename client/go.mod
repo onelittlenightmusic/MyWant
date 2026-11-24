@@ -3,7 +3,7 @@ module mywant/client
 go 1.26.2
 
 require (
-	github.com/onelittlenightmusic/want-spec v0.1.36
+	github.com/onelittlenightmusic/want-spec v0.1.37
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0

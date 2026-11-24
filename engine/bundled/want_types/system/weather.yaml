@@ -62,6 +62,7 @@ wantType:
     description: その時間と場所の天気を答える
   parameters:
     - name: at
+      context: place.destination
       description: Where to read the weather — a city, place or station
       type: string
       subType: city

@@ -44,6 +44,7 @@ wantType:
       - vegan
     example: fine dining
   - name: party_size
+    context: people.party_size
     description: Number of people in the party
     type: int
     default: 2
@@ -53,6 +54,7 @@ wantType:
       max: 20
     example: 4
   - name: preferred_time
+    context: time.at
     description: Preferred booking time in HH:MM 24-hour format
     type: string
     default: '19:00'

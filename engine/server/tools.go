@@ -1099,6 +1099,7 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question, who
 		Parameters []struct {
 			Name       string `json:"name"`
 			SubType    string `json:"subType"`
+			Context    string `json:"context"`
 			Validation struct {
 				Enum []any `json:"enum"`
 			} `json:"validation"`
@@ -1106,6 +1107,13 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question, who
 	}
 	if err := s.backend("GET", "/api/v1/want-types/"+typ, nil, &def); err != nil {
 		return "", nil
+	}
+	contextOf, enums := map[string]string{}, map[string][]any{}
+	for _, p := range def.Parameters {
+		if p.Context != "" {
+			contextOf[p.Name] = p.Context
+			enums[p.Name] = p.Validation.Enum
+		}
 	}
 	said := func(name string) bool {
 		v, ok := params[name]
@@ -1118,7 +1126,7 @@ func (s *Server) robotFitParams(typ string, params map[string]any, question, who
 	// What was said, kept for who's context (user_context.go); then what
 	// they did not say, from it: 「天気は？」 after 「国分寺まで」 is 国分寺's.
 	s.noteMade(who, question, typ, params)
-	filled += s.robotContextParams(def.Metadata.Labels, params, who)
+	filled += s.robotContextParams(contextOf, def.Metadata.Labels[robotHereLabel], params, who, enums)
 	// A place not said, filled with where the person who asked goes at this
 	// part of the day (home_params.go): 「天気」 in the evening is home's.
 	filled += s.robotHomeParams(typ, params, who)
