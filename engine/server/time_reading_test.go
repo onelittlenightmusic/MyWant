@@ -157,3 +157,18 @@ func TestKeywordCues(t *testing.T) {
 		t.Fatalf("any case: %v", got)
 	}
 }
+
+func TestPlaceFit(t *testing.T) {
+	station := map[string]bool{"station": true}
+	both := map[string]bool{"station": true, "city": true}
+	two := []namedThing{{"中野坂上", both}, {"大森", station}}
+	if f := placeFit([]string{"station", "station"}, two); f != 1 {
+		t.Fatalf("a route of two stations: %v", f)
+	}
+	if f := placeFit([]string{"city"}, two); f != 0.5 {
+		t.Fatalf("a weather of one of two: %v", f)
+	}
+	if f := placeFit([]string{"station"}, []namedThing{{"大森", station}}); f != 1 {
+		t.Fatalf("大森まで, the to alone: %v", f)
+	}
+}

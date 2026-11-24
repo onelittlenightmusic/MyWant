@@ -103,6 +103,7 @@ type magicMatch struct {
 	src        magicSource
 	candidates []magicMatch
 	score      float64 // p and how like its asks what was said is (magicResolve)
+	fit        float64 // how well the things named fill its places (thingFits)
 	byLaya     bool    // which sentence Laya said; the values are the model's
 	known      int     // slot values that are things of their subtype
 }

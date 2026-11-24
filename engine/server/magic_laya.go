@@ -142,20 +142,30 @@ func (s *Server) magicLayaMatch(q string, sources []magicSource) (mm magicMatch,
 		return magicMatch{}, false, false
 	}
 
-	crit, byKey, _ := magicLayaOptions(sources)
+	crit, byKey, labelOf := magicLayaOptions(sources)
 	started := time.Now()
 	// Its numbers taken out (a time is read apart, time_reading.go): numbers
 	// alone drew every request with a time to the timer (2026-11-24).
 	said := magicLayaSaid(q)
+	fits := s.thingFits(said, byKey)
 	answers, by, err := (&robotDecider{}).decideCued(said, map[string]decisionQuestion{
 		magicLayaQuestionID:    magicLayaQuestion(crit),
 		magicRequestQuestionID: magicRequestQuestion(),
 	}, map[string]map[string]float64{magicLayaQuestionID: keywordCues(said, byKey)})
 	a, req := answers[magicLayaQuestionID], answers[magicRequestQuestionID]
 	fields := map[string]any{"talk": "", "top": "", "by": by, "ms": time.Since(started).Milliseconds()}
+	// What the things named fill, the best fits first (thingFits).
+	var fitSaid []string
+	for k, v := range fits {
+		if v >= 0.5 {
+			fitSaid = append(fitSaid, fmt.Sprintf("%s=%.2f", byKey[k].typ, v))
+		}
+	}
+	sort.Strings(fitSaid)
+	fields["fits"] = strings.Join(fitSaid, ",")
 	if err != nil {
 		fields["error"] = err.Error()
-		s.robotChatTrace("laya.magic", fields, []string{"talk", "top", "by", "ms", "error"})
+		s.robotChatTrace("laya.magic", fields, []string{"talk", "top", "fits", "by", "ms", "error"})
 		return magicMatch{}, false, false
 	}
 	talk := req.Probabilities[magicLayaTalk]
@@ -178,15 +188,43 @@ func (s *Server) magicLayaMatch(q string, sources []magicSource) (mm magicMatch,
 			top = append(top, fmt.Sprintf("%s=%.2f", k, a.Probabilities[k]))
 		}
 	}
+	// What the dictionary says the request names fills, not learnt: a type
+	// every place of which is filled by the things named (「中野坂上から大森」:
+	// two stations, a route's from and to) is a candidate whatever Laya made
+	// of the words — weighed with the rest by its fit (magicResolve).
+	for k, fit := range fits {
+		if fit < 1 {
+			continue
+		}
+		already := false
+		for _, c := range mm.candidates {
+			already = already || c.src.key() == byKey[k].key()
+		}
+		if !already {
+			if c, has := magicCandidate(byKey[k], a.Probabilities[k]); has {
+				mm.candidates = append(mm.candidates, c)
+				top = append(top, fmt.Sprintf("%s=fit", k))
+			}
+		}
+	}
+	for i := range mm.candidates {
+		mm.candidates[i].fit = fits[labelOf[mm.candidates[i].src.key()]]
+	}
 	fields["top"] = strings.Join(top, ",")
-	if talk < magicLayaTalkP && len(mm.candidates) > 0 {
+	// Every place of a type filled by what the dictionary says was named is
+	// a request, whatever Laya made of the words as talk.
+	filledAll := false
+	for _, fit := range fits {
+		filledAll = filledAll || fit >= 1
+	}
+	if (talk < magicLayaTalkP || filledAll) && len(mm.candidates) > 0 {
 		cands := mm.candidates
 		mm = cands[0]
 		mm.candidates = cands
 		ok = true
 	}
 	fields["request"] = ok
-	s.robotChatTrace("laya.magic", fields, []string{"talk", "request", "top", "by", "ms", "error"})
+	s.robotChatTrace("laya.magic", fields, []string{"talk", "request", "top", "fits", "by", "ms", "error"})
 	magicLayaMu.Lock()
 	magicLayaSeen[q] = magicLayaAnswer{at: time.Now(), match: mm, ok: ok}
 	for k, v := range magicLayaSeen {
@@ -255,9 +293,11 @@ func magicLayaOptions(sources []magicSource) (crit map[string]string, byKey map[
 	kept := map[string]magicSource{}
 	var order []string
 	for _, src := range sources {
-		// The same sentences of the same type are one option, whatever the
-		// aliases: a want's own aliases include its name.
-		same := src.tool + "\x00" + src.typ + "\x00" + strings.Join(strings.Fields(src.tmpls), " ")
+		// One option for one type, whatever its wants' own sentences and
+		// aliases (a want's own aliases include its name): what is made is a
+		// want of the type. Two for one type put 「乗り換えですか？それとも
+		// 乗り換えですか？」 to the person (2026-11-25).
+		same := src.tool + "\x00" + src.typ
 		if k, ok := seen[same]; ok {
 			if src.name != "" || k == "type:"+src.typ {
 				continue // the type's, or the first want's, already says it
@@ -425,4 +465,125 @@ func keywordCues(said string, byKey map[string]magicSource) map[string]float64 {
 		}
 	}
 	return out
+}
+
+// Kinds of thing that are not where or what a request names: a time is read
+// apart (time_reading.go), a secret is never said.
+var thingFitSkip = map[string]bool{"time": true, "date": true, "datetime": true, "date_time": true, "secret": true}
+
+// namedThing is a thing of the dictionary named in what was said, with every
+// kind it is known as (中野坂上: a station, and a city).
+type namedThing struct {
+	value string
+	kinds map[string]bool
+}
+
+// thingsNamed are the things of the dictionary (every value named and kept,
+// thingFulls) said in what was said — the longest first, each place in the
+// words taken once (中野坂上駅 before 中野坂上).
+func (s *Server) thingsNamed(said string) []namedThing {
+	kinds := map[string]map[string]bool{}
+	for _, t := range s.thingFulls() {
+		v := strings.TrimSpace(t.Value)
+		if len([]rune(v)) < 2 || thingFitSkip[t.Subtype] {
+			continue
+		}
+		if kinds[v] == nil {
+			kinds[v] = map[string]bool{}
+		}
+		kinds[v][t.Subtype] = true
+	}
+	values := make([]string, 0, len(kinds))
+	for v := range kinds {
+		values = append(values, v)
+	}
+	sort.SliceStable(values, func(i, j int) bool { return len([]rune(values[i])) > len([]rune(values[j])) })
+	rest := strings.ToLower(said)
+	var out []namedThing
+	for _, v := range values {
+		lv := strings.ToLower(v)
+		if strings.Contains(rest, lv) {
+			out = append(out, namedThing{value: v, kinds: kinds[v]})
+			rest = strings.Replace(rest, lv, "○", 1)
+		}
+	}
+	return out
+}
+
+// thingFits is, for each option, how well the things named in what was said
+// fill the places it takes (its parameters' subTypes, of the kinds the
+// dictionary knows): each thing given to one place of its kind, and of the
+// places and the things, the more counts — 「中野坂上から大森」 (two
+// stations) fills a route's from and to (1), a weather's at with one of its
+// two (中野坂上 is a city too: 0.5) — not to Laya, nothing learnt: what the dictionary says is so. A type every
+// place of which is filled is a candidate (magicLayaMatch), and its fit adds
+// to its score (magicResolve).
+func (s *Server) thingFits(said string, byKey map[string]magicSource) map[string]float64 {
+	named := s.thingsNamed(said)
+	if len(named) == 0 {
+		return nil
+	}
+	out := map[string]float64{}
+	for label, src := range byKey {
+		if src.tool != "" {
+			continue
+		}
+		def := s.typeDefinition(src.typ)
+		if def == nil {
+			continue
+		}
+		// The places it cannot be made without: its required ones — with or
+		// without where the person is (its here-param: a transit search's
+		// from, when not said, is where they are), whichever the things named
+		// fill better; a type that requires none, every place it takes. A
+		// route's via, never required, left a route below a transit search
+		// for two stations. 「中野坂上から大森」 fills a transit search's from
+		// and to; 「大森まで」 its to, all it needs.
+		here := def.Metadata.Labels[robotHereLabel]
+		var withHere, withoutHere, all []string
+		for _, p := range def.Parameters {
+			if sub := strings.TrimSpace(p.SubType); sub != "" && !thingFitSkip[sub] {
+				all = append(all, sub)
+				if p.Required {
+					withHere = append(withHere, sub)
+					if p.Name != here {
+						withoutHere = append(withoutHere, sub)
+					}
+				}
+			}
+		}
+		if len(withHere) == 0 {
+			withHere, withoutHere = all, all
+		}
+		if fit := max(placeFit(withHere, named), placeFit(withoutHere, named)); fit > 0 {
+			out[label] = fit
+		}
+	}
+	return out
+}
+
+// placeFit is how well the things named fill these places: each thing given
+// to one place of its kind (the thing known as fewest kinds first — a station
+// only before one that is a city too), and of the places and the things, the
+// more counts: what else was named and fills none of it counts against it (a
+// weather of one of two places named).
+func placeFit(places []string, named []namedThing) float64 {
+	if len(places) == 0 {
+		return 0
+	}
+	used := make([]bool, len(named))
+	filled := 0
+	for _, kind := range places {
+		best := -1
+		for i, n := range named {
+			if !used[i] && n.kinds[kind] && (best < 0 || len(n.kinds) < len(named[best].kinds)) {
+				best = i
+			}
+		}
+		if best >= 0 {
+			used[best] = true
+			filled++
+		}
+	}
+	return float64(filled) / float64(max(len(places), len(named)))
 }

@@ -28,6 +28,11 @@ import (
 // made, else the person is asked which.
 const resolveMargin = 0.1
 
+// resolveFloor is the least score a candidate is made at: one that needs
+// nothing (a tunnel) can always be made, and at 0.02 it was put to the person
+// beside the one meant (「大森まで」, 2026-11-25).
+const resolveFloor = 0.2
+
 // resolveAskFor is how long a question put to the person waits for an answer.
 const resolveAskFor = 5 * time.Minute
 
@@ -172,12 +177,18 @@ func (s *Server) magicResolve(said string, mm magicMatch) (magicMatch, string, [
 	copy(cands, mm.candidates)
 	for i := range cands {
 		cands[i].params = map[string]string{}
-		cands[i].score = (cands[i].p + s.askSimilarity(said, cands[i], things)) / 2
+		// Laya's likelihood and how like its asks the words are, and — from
+		// the dictionary, as it is — how well what was named fills it.
+		cands[i].score = (cands[i].p+s.askSimilarity(said, cands[i], things))/2 + cands[i].fit
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].score > cands[j].score })
 	var made []magicMatch
 	for _, c := range cands {
+		if c.score < resolveFloor {
+			continue
+		}
 		s.magicModelParams(said, &c)
+		s.markedEnds(said, &c)
 		if s.candidateMadeOf(c) {
 			made = append(made, c)
 			if len(made) == 2 {
@@ -316,4 +327,28 @@ func resolveWaitingFor(who string) bool {
 	defer resolveMu.Unlock()
 	p, ok := resolveWaiting[who]
 	return ok && time.Since(p.at) <= resolveAskFor
+}
+
+// markedEnds puts what the model read where the words say it goes, by the
+// type's param-marker labels (robotMarkedParams, as a want made is): 「大森
+// まで」 is to, read by the model as from (2026-11-25).
+func (s *Server) markedEnds(said string, c *magicMatch) {
+	if c.tool != "" {
+		return
+	}
+	def := s.typeDefinition(c.wantType)
+	if def == nil {
+		return
+	}
+	params := map[string]any{}
+	for k, v := range c.params {
+		if strings.TrimSpace(v) != "" {
+			params[k] = v
+		}
+	}
+	robotMarkedParams(def.Metadata.Labels, params, said)
+	c.params = map[string]string{}
+	for k, v := range params {
+		c.params[k] = fmt.Sprint(v)
+	}
 }
