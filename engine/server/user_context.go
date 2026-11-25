@@ -10,7 +10,8 @@ package server
 //
 //	{"place.destination": "国分寺", "place.origin": "中野坂上", "time.arrive_by": "10:00", "interest.topic": "移動"}
 //
-// kept per character (~/.mywant/contexts/<character>.json). A value is kept
+// kept in the global state, a key a kind under the character's name
+// (Hero.place.destination, Hero.context_at) — read and set there by anyone. A value is kept
 // only as the person said it or a want was made with it, in the kind's form
 // (contextValueOK): the model is small and fills a field it was asked for.
 // Used two ways:
@@ -28,13 +29,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	mywant "mywant/engine/core"
 
 	ws "github.com/onelittlenightmusic/want-spec"
 )
@@ -94,23 +95,37 @@ type userRequest struct {
 	Params map[string]string `json:"params,omitempty"`
 }
 
-// userContext is what a person is about now.
+// userContext is what a person is about now: kind → value.
 type userContext struct {
-	Fields    map[string]string `json:"fields"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	From      int               `json:"from_requests"`
-	Requests  []userRequest     `json:"requests,omitempty"`
+	Fields    map[string]string
+	UpdatedAt time.Time
 }
 
+// The requests read are kept here, for the next reading; what was read is
+// kept in the global state, a key a kind (userContextKey), for anyone to read
+// and change.
 var userContexts = struct {
 	sync.Mutex
 	asked   map[string][]userRequest
-	now     map[string]userContext
 	pending map[string]*time.Timer
-}{asked: map[string][]userRequest{}, now: map[string]userContext{}, pending: map[string]*time.Timer{}}
+}{asked: map[string][]userRequest{}, pending: map[string]*time.Timer{}}
 
-func userContextFile(who string) string {
-	return initiativeHomeFile(filepath.Join("contexts", who+".json"))
+// userContextAt is the key beside the kinds that says when they were read.
+const userContextAt = "context_at"
+
+// userContextName is who's name in the global state: the character's name
+// (Hero), its id when it has none.
+func userContextName(who string) string {
+	if c, ok := mywant.GetCharacter(who); ok && strings.TrimSpace(c.Name) != "" {
+		return strings.TrimSpace(c.Name)
+	}
+	return who
+}
+
+// userContextKey is where a kind of who's context is kept in the global
+// state: <character name>.<kind> — Hero.place.destination.
+func userContextKey(who, kind string) string {
+	return userContextName(who) + "." + kind
 }
 
 // noteAsked keeps a request of who's, and reads their context again soon.
@@ -138,9 +153,6 @@ func (s *Server) noteRequest(who string, r userRequest) {
 	userContexts.Lock()
 	defer userContexts.Unlock()
 	list := userContexts.asked[who]
-	if len(list) == 0 {
-		list = loadUserContext(who).Requests
-	}
 	// The same request again (its want made after it was asked): one.
 	if n := len(list); n > 0 && list[n-1].Said == r.Said && r.At.Sub(list[n-1].At) < time.Minute {
 		if r.Type != "" {
@@ -159,28 +171,45 @@ func (s *Server) noteRequest(who string, r userRequest) {
 	userContexts.pending[who] = time.AfterFunc(userContextAfter, func() { s.readUserContext(who) })
 }
 
-func loadUserContext(who string) userContext {
-	var c userContext
-	if b, err := os.ReadFile(userContextFile(who)); err == nil {
-		_ = json.Unmarshal(b, &c)
-	}
-	return c
-}
-
-// userContextNow is who's context, when it is of this hour.
+// userContextNow is who's context from the global state, when it is of this
+// hour — read here, or set there by anyone since (a kind set by hand, with no
+// time beside it, is now's).
 func userContextNow(who string) (userContext, bool) {
 	who = strings.TrimSpace(who)
 	if who == "" {
 		return userContext{}, false
 	}
-	userContexts.Lock()
-	c, ok := userContexts.now[who]
-	if !ok {
-		c = loadUserContext(who)
-		userContexts.now[who] = c
+	c := userContext{Fields: map[string]string{}, UpdatedAt: time.Now()}
+	for _, k := range ws.ContextKinds {
+		if v, ok := mywant.GetGlobalState(userContextKey(who, k.Name)); ok && v != nil {
+			if sv := strings.TrimSpace(fmt.Sprint(v)); sv != "" {
+				c.Fields[k.Name] = sv
+			}
+		}
 	}
-	userContexts.Unlock()
+	if v, ok := mywant.GetGlobalState(userContextKey(who, userContextAt)); ok {
+		if t, err := time.Parse(time.RFC3339, fmt.Sprint(v)); err == nil {
+			c.UpdatedAt = t
+		}
+	}
 	return c, len(c.Fields) > 0 && time.Since(c.UpdatedAt) <= userContextWindow
+}
+
+// storeUserContext puts who's context in the global state, a key a kind; a
+// kind no longer read is taken away.
+func storeUserContext(who string, c userContext) {
+	m := map[string]any{userContextKey(who, userContextAt): c.UpdatedAt.Format(time.RFC3339)}
+	for k, v := range c.Fields {
+		m[userContextKey(who, k)] = v
+	}
+	for _, k := range ws.ContextKinds {
+		if _, kept := c.Fields[k.Name]; !kept {
+			if _, there := mywant.GetGlobalState(userContextKey(who, k.Name)); there {
+				mywant.DeleteGlobalStateKey(userContextKey(who, k.Name))
+			}
+		}
+	}
+	mywant.MergeGlobalState(m)
 }
 
 // readUserContext has the model read who's last requests into the fields.
@@ -218,7 +247,7 @@ func (s *Server) readUserContext(who string) {
 			fields[k] = v
 		}
 	}
-	c := userContext{Fields: fields, UpdatedAt: time.Now(), From: len(list), Requests: list}
+	c := userContext{Fields: fields, UpdatedAt: time.Now()}
 	order := []string{"who", "requests"}
 	for _, f := range kinds {
 		if v := c.Fields[f]; v != "" {
@@ -227,13 +256,8 @@ func (s *Server) readUserContext(who string) {
 		}
 	}
 	s.robotChatTrace("fm.context", trace, append(order, "by", "ms"))
-	userContexts.Lock()
-	userContexts.now[who] = c
-	userContexts.Unlock()
-	if b, err := json.MarshalIndent(c, "", "  "); err == nil {
-		_ = os.MkdirAll(filepath.Dir(userContextFile(who)), 0o755)
-		_ = os.WriteFile(userContextFile(who), b, 0o644)
-	}
+	trace["key"] = userContextName(who) + ".*"
+	storeUserContext(who, c)
 }
 
 // userContextPrompt: the requests, newest first, with what was made of each —
@@ -546,22 +570,42 @@ func inEnum(v string, enum []any) bool {
 	return false
 }
 
-// clearUserContexts forgets every person's context: the robot's chat cleared
-// is the conversation ending (clearWantChatSession).
+// clearUserContexts forgets every character's context, in the global state
+// and the requests kept for it: the robot's chat cleared is the conversation
+// ending (clearWantChatSession). Says how many keys went.
 func clearUserContexts() int {
 	userContexts.Lock()
-	defer userContexts.Unlock()
 	for _, t := range userContexts.pending {
 		t.Stop()
 	}
 	userContexts.asked = map[string][]userRequest{}
-	userContexts.now = map[string]userContext{}
 	userContexts.pending = map[string]*time.Timer{}
-	files, _ := filepath.Glob(initiativeHomeFile(filepath.Join("contexts", "*.json")))
-	for _, f := range files {
-		_ = os.Remove(f)
+	userContexts.Unlock()
+	n := 0
+	all := mywant.GetAllGlobalState()
+	for _, ch := range mywant.ListCharacters() {
+		for _, name := range []string{ch.Name, ch.ID} {
+			if name == "" {
+				continue
+			}
+			for _, k := range append(contextKindNames(), userContextAt) {
+				if _, ok := all[name+"."+k]; ok {
+					mywant.DeleteGlobalStateKey(name + "." + k)
+					n++
+				}
+			}
+		}
 	}
-	return len(files)
+	return n
+}
+
+// contextKindNames are every kind's name.
+func contextKindNames() []string {
+	var out []string
+	for _, k := range ws.ContextKinds {
+		out = append(out, k.Name)
+	}
+	return out
 }
 
 // userContextText is who's context as a line for the robot's brief; "" none.

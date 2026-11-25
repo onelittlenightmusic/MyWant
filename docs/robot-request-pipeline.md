@@ -369,7 +369,9 @@ want タイルとして並べる。チャット（`cards` の kind `choice`＋`c
 
 **その人の今のコンテキスト**（`engine/server/user_context.go`）
 依頼に答えた後（4秒静かになってから）、その人の直近10件（1時間以内）の依頼と作った want を Apple FM に
-読ませ、コンテキストの種類（want-spec `ContextKinds`）ごとに集約して `~/.mywant/contexts/<character>.json` に置く。
+読ませ、コンテキストの種類（want-spec `ContextKinds`）ごとに集約して、グローバル状態にキャラクター名で置く
+（`<名前>.<種類>`：`Hero.place.destination`、読んだ時刻は `Hero.context_at`）。誰でも `mywant state global` や
+`PUT /api/v1/global-state/{key}` で読み書きでき、書かれた値はそのまま使われる（時刻のないものは今のものとして）。
 聞くのは、どれかの型のパラメータが使っている種類と `interest.topic` だけ。
 
 | 分類 | 種類 |
