@@ -35,16 +35,19 @@ import (
 
 // noticeRecord is a notice as it was told, kept to be rated.
 type noticeRecord struct {
-	ID       string            `json:"id"`
-	At       string            `json:"at"`
-	WantID   string            `json:"wantId"`
-	Want     string            `json:"want"`
-	WantType string            `json:"wantType,omitempty"`
-	Text     string            `json:"text"`
-	Moment   string            `json:"moment,omitempty"`
-	Timings  []string          `json:"timings,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty"`
-	News     *decisionAnswer   `json:"news,omitempty"` // what Laya thought of it, when asked
+	ID       string `json:"id"`
+	At       string `json:"at"`
+	WantID   string `json:"wantId"`
+	Want     string `json:"want"`
+	WantType string `json:"wantType,omitempty"`
+	// Character: the character it is from, when it is a character's
+	// (character_timings.go) — the want then is what it was about, if any.
+	Character string            `json:"character,omitempty"`
+	Text      string            `json:"text"`
+	Moment    string            `json:"moment,omitempty"`
+	Timings   []string          `json:"timings,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	News      *decisionAnswer   `json:"news,omitempty"` // what Laya thought of it, when asked
 }
 
 // noticeRating is one rating given.
@@ -347,8 +350,13 @@ func (s *Server) listNotices(w http.ResponseWriter, r *http.Request) {
 	readJSONLines(noticeRatingsFile(), func(x noticeRating) { last[x.ID] = x })
 	var all []noticeRecord
 	readJSONLines(noticesFile(), func(n noticeRecord) { all = append(all, n) })
+	// ?character=<id>: only the notices from that character.
+	from := r.URL.Query().Get("character")
 	out := []noticeListItem{}
 	for i := len(all) - 1; i >= 0 && len(out) < limit; i-- {
+		if from != "" && all[i].Character != from {
+			continue
+		}
 		item := noticeListItem{noticeRecord: all[i]}
 		if x, ok := last[all[i].ID]; ok && x.Rating != "none" {
 			item.Rating, item.RatedBy, item.RatedAt = x.Rating, x.Character, x.At

@@ -33,6 +33,11 @@ func (s *Server) getCharacter(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	// ?format=yaml: as want-spec's Character document (character_timings.go).
+	if r.URL.Query().Get("format") == "yaml" {
+		writeCharacterDocument(w, *c)
+		return
+	}
 	s.JSONResponse(w, http.StatusOK, c)
 }
 
@@ -707,6 +712,9 @@ func (s *Server) importCharacters(w http.ResponseWriter, r *http.Request) {
 				}
 				if c.AvatarImage != "" {
 					m.SetAvatarImage(c.ID, c.AvatarImage)
+				}
+				if c.Timings != nil {
+					m.SetTimings(c.ID, c.Timings)
 				}
 				ids = append(ids, c.ID)
 				go broadcastSSE("character_changed", c.ID)

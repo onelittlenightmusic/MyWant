@@ -134,6 +134,13 @@ func (s *Server) finishErrand(e errand) {
 	}
 	story.add(ws.StoryEvent{Character: e.body.Character, Kind: storyKindErrandReport, To: storyWantPlace(w),
 		Detail: map[string]string{"said": report, "verdict": verdict, "asker": e.asker}})
+	// Back: their timings read with how it went (character_timings.go) — the
+	// standard one tells of an errand that found other than expected.
+	s.characterMoment(e.body.Character, map[string]any{
+		ws.CharacterStateErrandVerdict:   verdict,
+		ws.CharacterStateErrandDifferent: verdict == errandDifferent,
+		ws.CharacterStateErrandReport:    report,
+	}, &characterAbout{wantID: w.Metadata.ID, wantName: w.Metadata.Name, wantType: w.Metadata.Type})
 	log.Printf("[errand] %s at %s: %s — %s", e.body.Character, w.Metadata.Name, verdict, report)
 }
 

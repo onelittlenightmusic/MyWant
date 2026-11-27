@@ -563,3 +563,46 @@ func (n *Want) MurmurTimings() []TimingDef {
 	}
 	return out
 }
+
+// TimingsAt is the timings among defs that hold now, read off a state that
+// is not a want's answer — a character's (want-spec's Character): If a field
+// truthy, OnChange / OnIncrease / OnDecrease a field changed since seen, which
+// keeps what each watched field was when last read and is brought up to date
+// here. A watched field never seen before has not changed: the first reading
+// is where things stand, not news.
+func TimingsAt(defs []TimingDef, seen map[string]any, value func(field string) any) []string {
+	var at []string
+	for _, d := range defs {
+		if d.If == "" && len(watchedFields(d)) == 0 {
+			continue
+		}
+		if d.If != "" && !truthyAnswerField(value(d.If)) {
+			continue
+		}
+		held := true
+		for _, f := range watchedFields(d) {
+			if _, ok := seen[f]; !ok {
+				held = false
+			}
+		}
+		if !held {
+			continue
+		}
+		if d.OnChange != "" && sameAnswerResult(seen[d.OnChange], value(d.OnChange)) {
+			continue
+		}
+		if d.OnIncrease != "" && !grew(seen[d.OnIncrease], value(d.OnIncrease), 1) {
+			continue
+		}
+		if d.OnDecrease != "" && !grew(seen[d.OnDecrease], value(d.OnDecrease), -1) {
+			continue
+		}
+		at = append(at, d.Name)
+	}
+	for _, d := range defs {
+		for _, f := range watchedFields(d) {
+			seen[f] = value(f)
+		}
+	}
+	return at
+}

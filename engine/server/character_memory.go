@@ -335,6 +335,9 @@ func (s *Server) heardBy(character string, w *mywant.Want, say, mood string, dis
 	if kept {
 		story.add(ws.StoryEvent{Character: character, Kind: storyKindMemoryKeep, To: place,
 			Detail: map[string]string{"say": say, "mood": mood, "impact": strconv.FormatFloat(mem.Impact, 'f', 2, 64)}})
+		// What they keep may change how they feel: their timings are read
+		// (character_timings.go).
+		s.characterMoment(character, nil, &characterAbout{wantID: mem.WantID, wantName: mem.WantName, wantType: mem.WantType})
 	}
 }
 

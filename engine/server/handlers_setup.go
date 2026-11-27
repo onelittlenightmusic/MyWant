@@ -263,7 +263,6 @@ func (s *Server) setupRoutes() {
 	// Registered before /config/{...} style routes so it is not shadowed.
 	api.HandleFunc("/config/reload-env", s.reloadConfigEnv).Methods("POST", "OPTIONS")
 
-
 	// Global State endpoint
 	api.HandleFunc("/global-state", s.getGlobalState).Methods("GET", "OPTIONS")
 	api.HandleFunc("/global-state", s.deleteGlobalState).Methods("DELETE", "OPTIONS")
@@ -440,6 +439,7 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/export", s.exportCharacters).Methods("POST")
 	characters.HandleFunc("/import", s.importCharacters).Methods("POST")
 	characters.HandleFunc("/prune-devices", s.pruneCharacterDevices).Methods("POST", "OPTIONS")
+	characters.HandleFunc("/apply", s.applyCharacter).Methods("POST", "OPTIONS")
 	characters.HandleFunc("/{id}", s.getCharacter).Methods("GET", "OPTIONS")
 	// Where its person goes at this time of day (character_home.go).
 	characters.HandleFunc("/{id}/home", s.getCharacterHome).Methods("GET", "OPTIONS")

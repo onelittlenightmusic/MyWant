@@ -139,10 +139,16 @@ func (s *Server) robotStoryStep(b robotBody, was map[string]*ws.StoryPlace) map[
 			story.leave(b.Character, p)
 		}
 	}
+	arrived := false
 	for id, p := range now {
 		if _, before := was[id]; !before {
 			story.arrive(b.Character, p)
+			arrived = true
 		}
+	}
+	if arrived {
+		// Somewhere new: their timings are read (a place changed).
+		go s.characterMoment(b.Character, nil, nil)
 	}
 	return now
 }

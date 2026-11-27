@@ -103,6 +103,13 @@ type Character struct {
 	// iPhone app all draw it without fetching anything. Owned by
 	// SetAvatarImage (PUT /characters/{id}/avatar-image); empty = the emoji.
 	AvatarImage string `yaml:"avatarImage,omitempty" json:"avatarImage,omitempty"`
+	// Timings are the moments worth telling of what happens to this
+	// character, as a want type's are (want-spec's Character): read off their
+	// state when they hear something, come back from an errand or move.
+	// Every character has the standard ones (want-spec's
+	// CharacterStandardTimings) unless one here is named the same. Owned by
+	// SetTimings (POST /characters/apply).
+	Timings []TimingDef `yaml:"timings,omitempty" json:"timings,omitempty"`
 }
 
 // CharacterDisplay carries one person's look-and-feel choices.
@@ -409,6 +416,7 @@ func (m *characterManager) Update(id string, updated Character) bool {
 			updated.Display = c.Display
 			updated.Labels = c.Labels           // owned by SetLabel / DeleteLabel
 			updated.AvatarImage = c.AvatarImage // owned by SetAvatarImage
+			updated.Timings = c.Timings         // owned by SetTimings
 			m.store.Characters[i] = updated
 			m.save()
 			return true
@@ -741,6 +749,22 @@ func (m *characterManager) SetAvatarImage(characterID, image string) (*Character
 	return nil, false
 }
 
+// SetTimings replaces a character's timings (nil: none of their own).
+func (m *characterManager) SetTimings(characterID string, timings []TimingDef) (*Character, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, c := range m.store.Characters {
+		if c.ID != characterID {
+			continue
+		}
+		m.store.Characters[i].Timings = timings
+		m.save()
+		cp := m.store.Characters[i]
+		return &cp, true
+	}
+	return nil, false
+}
+
 // DeleteLabel removes one label from a character.
 func (m *characterManager) DeleteLabel(characterID, key string) (*Character, bool) {
 	return m.editLabels(characterID, func(l map[string]string) map[string]string {
@@ -862,6 +886,9 @@ func SetCharacterLabel(id, key, value string) (*Character, bool) {
 }
 func SetCharacterAvatarImage(id, image string) (*Character, bool) {
 	return GetCharacterManager().SetAvatarImage(id, image)
+}
+func SetCharacterTimings(id string, timings []TimingDef) (*Character, bool) {
+	return GetCharacterManager().SetTimings(id, timings)
 }
 func DeleteCharacterLabel(id, key string) (*Character, bool) {
 	return GetCharacterManager().DeleteLabel(id, key)

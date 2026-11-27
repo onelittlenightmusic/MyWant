@@ -171,6 +171,13 @@ type wantNotice struct {
 	Off []string `json:"off,omitempty"`
 	// Labels: why it was said (reason, timings, trigger…) and what about.
 	Labels map[string]string `json:"labels,omitempty"`
+	// Character: the character it is from, when it is a character's
+	// (character_timings.go).
+	Character string `json:"character,omitempty"`
+	// Avatar and Color: theirs, for a device to draw them as the notice's
+	// picture (their photo, when they have one, is read from the character).
+	Avatar string `json:"avatar,omitempty"`
+	Color  string `json:"color,omitempty"`
 }
 
 // newsVoice is a want's news said in its own voice (mywant.WantNewsVoice) —
