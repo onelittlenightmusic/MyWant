@@ -105,6 +105,9 @@ func (s *Server) RegisterOutputCallback() {
 			// Heard by the wants that listen for it (spec.hear, hear.go), with
 			// what it is about in set words (its time and place).
 			s.hearMurmur(w, murmurID, msg, out, labels)
+			// Heard by the characters standing near it too: what moves them,
+			// they remember (character_memory.go).
+			go s.hearMurmurNearby(w, msg, mood)
 		}
 		// Pushed at its notify timings: as the want chose, or — the type's
 		// default — unless Laya is sure it is routine (push_news.go).

@@ -662,7 +662,17 @@ func (m *characterManager) SetDisplay(characterID string, d CharacterDisplay) (*
 const (
 	LabelTileDesign = "tile-design"
 	LabelAuraDesign = "aura-design"
+	// LabelRobot: "true" makes the character act as a robot — answered by
+	// the robot's model with the robot's tools, standing where the server
+	// puts it (the server's robot_body.go). Any other value, or none: a
+	// person, moved by their device.
+	LabelRobot = "robot"
 )
+
+// IsRobotCharacter: the character is labelled to act as a robot.
+func IsRobotCharacter(c Character) bool {
+	return c.Labels[LabelRobot] == "true"
+}
 
 // withDesignLabels returns labels with the two design picks set, an empty pick
 // removing its label (empty = inherit the canvas's design). Copy-on-write,

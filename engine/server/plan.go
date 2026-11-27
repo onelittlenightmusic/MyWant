@@ -578,6 +578,9 @@ type actRequest struct {
 	// Who asked (a character id), when it is known: what they did not say
 	// may be their home's (home_params.go). From the turn when not given.
 	Who string `json:"who,omitempty"`
+	// Body: who carries it out, a character acting as a robot
+	// (robot_body.go). From the turn when not given; the robot when neither.
+	Body string `json:"body,omitempty"`
 }
 
 // doAct carries a plan out (carryOutPlan) and says what was done: the steps, the
@@ -606,11 +609,19 @@ func (s *Server) doAct(req actRequest, onStep func(robotStep)) (prompt string, c
 	if req.Turn != "" && len(steps) > 0 {
 		if _, err := s.robotUpdateTurn(req.Turn, func(t *robotTurn) error { t.Steps = append(t.Steps, steps...); return nil }); err == nil {
 			for _, st := range steps {
-				s.robotShowStep(st, "")
+				s.robotShowStepAs(s.actBody(req), st, "")
 			}
 		}
 	}
 	return robotAnswerPrompt(req, facts) + robotLocaleText(req.Locale), cards, steps
+}
+
+// actBody is who carries an act out.
+func (s *Server) actBody(req actRequest) robotBody {
+	if req.Body != "" {
+		return bodyOf(req.Body)
+	}
+	return s.turnBody(req.Turn)
 }
 
 // carryOutPlan carries the decision out, as the steps the old tools would have
@@ -619,7 +630,9 @@ func (s *Server) carryOutPlan(req actRequest, onStep func(robotStep)) []robotSte
 	// said: what was done before the step, said first in its output (the
 	// parameters changed before a want is run again).
 	said := ""
+	body := s.actBody(req)
 	run := func(tool string, args map[string]string) robotStep {
+		withBody(args, body)
 		if robotHearsQuestion(tool) && req.Question != "" {
 			args[robotQuestionArg] = req.Question
 		}

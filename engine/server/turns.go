@@ -38,18 +38,21 @@ import (
 type robotStep = ws.RobotStep
 
 type robotTurn struct {
-	ID         string      `json:"id"`
-	Question   string      `json:"question"`
-	Steps      []robotStep `json:"steps"`
-	Answer     string      `json:"answer,omitempty"`
-	Error      string      `json:"error,omitempty"`
-	StartedAt  string      `json:"started_at"`
+	ID        string      `json:"id"`
+	Question  string      `json:"question"`
+	Steps     []robotStep `json:"steps"`
+	Answer    string      `json:"answer,omitempty"`
+	Error     string      `json:"error,omitempty"`
+	StartedAt string      `json:"started_at"`
 	// DeviceID and Character are who asked, when the client says: the
 	// device's own id (its character is the one it is assigned to) or the
 	// character itself. Whose story the turn is part of (story.go).
 	DeviceID  string `json:"deviceId,omitempty"`
 	Character string `json:"character,omitempty"`
-	FinishedAt string      `json:"finished_at,omitempty"`
+	// Body: the character who answered, when it is not the robot — one
+	// labelled to act as one (robot_body.go). Its walks and words are its own.
+	Body       string `json:"body,omitempty"`
+	FinishedAt string `json:"finished_at,omitempty"`
 	// Where the answering model ran: "device" for one elsewhere, "robot" for
 	// the Mac's own (fmtool).
 	By string `json:"by,omitempty"`
@@ -219,7 +222,12 @@ func (s *Server) robotAddTurn(turn robotTurn) error {
 
 // robotAsked puts the question in the robot's chat, where what was said to it goes.
 func (s *Server) robotAsked(question, turn string) {
-	robot, err := s.robotWantNow()
+	s.robotAskedAs(theRobot, question, turn)
+}
+
+// robotAskedAs puts the question in a body's chat.
+func (s *Server) robotAskedAs(b robotBody, question, turn string) {
+	robot, err := s.bodyWant(b)
 	if err != nil || question == "" {
 		return
 	}
@@ -241,16 +249,21 @@ func (s *Server) robotAsked(question, turn string) {
 // chat shows each under the answer, so what the answer is about is there at a
 // glance (and a press away), as on the phone.
 func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []string, turn string) {
+	s.sayTurnAnswerAs(theRobot, answer, cards, choices, turn)
+}
+
+// sayTurnAnswerAs is sayTurnAnswer in a body's chat and mouth.
+func (s *Server) sayTurnAnswerAs(b robotBody, answer string, cards []robotCard, choices []string, turn string) {
 	if answer == "" {
 		return
 	}
-	s.robotChatSay(answer, cards, choices, turn)
+	s.robotChatSayAs(b, answer, cards, choices, turn)
 	// An answer asking for a reply (its choices) is a question, marked so.
 	kind := ""
 	if len(choices) > 0 {
 		kind = speechAsk
 	}
-	recordSpeechAs(robotCharacterID, answer, "agent", kind)
+	recordSpeechAs(b.Character, answer, "agent", kind)
 }
 
 // robotChatSay puts a line of the robot's in its chat (cc_responses) — the one
@@ -258,7 +271,12 @@ func (s *Server) sayTurnAnswer(answer string, cards []robotCard, choices []strin
 // (GET /api/v1/robot/chat) — with the wants it is about, the replies it takes
 // and the turn it answers ("" when said unasked).
 func (s *Server) robotChatSay(text string, cards []robotCard, choices []string, turn string) {
-	robot, err := s.robotWantNow()
+	s.robotChatSayAs(theRobot, text, cards, choices, turn)
+}
+
+// robotChatSayAs puts a line in a body's chat.
+func (s *Server) robotChatSayAs(b robotBody, text string, cards []robotCard, choices []string, turn string) {
+	robot, err := s.bodyWant(b)
 	if err != nil || text == "" {
 		return
 	}
@@ -425,7 +443,12 @@ func turnCards(turn robotTurn) []robotCard {
 // robotShowStep writes a step into the robot's working log, the line its chat
 // shows between a question and its answer.
 func (s *Server) robotShowStep(step robotStep, prefix string) {
-	robot, err := s.robotWantNow()
+	s.robotShowStepAs(theRobot, step, prefix)
+}
+
+// robotShowStepAs writes a step into a body's working log.
+func (s *Server) robotShowStepAs(b robotBody, step robotStep, prefix string) {
+	robot, err := s.bodyWant(b)
 	if err != nil {
 		return
 	}
@@ -479,7 +502,7 @@ func (s *Server) robotAlignPlace(turn robotTurn) *robotStep {
 	if named < 0 {
 		return nil
 	}
-	robot, err := s.robotWantNow()
+	robot, err := s.bodyWant(bodyOf(turn.Body))
 	if err != nil {
 		return nil
 	}
@@ -487,7 +510,7 @@ func (s *Server) robotAlignPlace(turn robotTurn) *robotStep {
 	if labels[robotCanvasX] == fmt.Sprint(tiles[named].x) && labels[robotCanvasY] == fmt.Sprint(tiles[named].y) {
 		return nil
 	}
-	step := robotStep{Tool: "point", Arguments: map[string]string{"name": tiles[named].name}}
+	step := robotStep{Tool: "point", Arguments: withBody(map[string]string{"name": tiles[named].name}, bodyOf(turn.Body))}
 	s.robotRunStep(&step)
 	step.Card = robotTakeCard(step.Arguments)
 	log.Printf("[fm] turn %s said here of %q away from it: walked there", turn.ID, tiles[named].name)
@@ -536,8 +559,15 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 	if turn.By == "" {
 		turn.By = "device"
 	}
+	// Who answers: the robot, or a character acting as one (robot_body.go).
+	b := bodyOf(turn.Body)
+	if b.Character != robotCharacterID {
+		turn.Body = b.Character
+	} else {
+		turn.Body = ""
+	}
 	if !turn.Quiet {
-		s.robotAsked(turn.Question, turn.ID)
+		s.robotAskedAs(b, turn.Question, turn.ID)
 	}
 	for i := range turn.Steps {
 		if turn.Steps[i].Arguments == nil {
@@ -547,6 +577,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 			if robotHearsQuestion(turn.Steps[i].Tool) {
 				turn.Steps[i].Arguments[robotQuestionArg] = turn.Question
 			}
+			withBody(turn.Steps[i].Arguments, b)
 			s.robotRunStep(&turn.Steps[i])
 		}
 		// The want the step brought the robot to, as its card (see robotTakeCard).
@@ -554,7 +585,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 			turn.Steps[i].Card = robotTakeCard(turn.Steps[i].Arguments)
 		}
 		if !turn.Quiet {
-			s.robotShowStep(turn.Steps[i], "")
+			s.robotShowStepAs(b, turn.Steps[i], "")
 		}
 	}
 	if turn.Answer = strings.TrimSpace(turn.Answer); turn.Answer != "" {
@@ -562,7 +593,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 		if step := s.robotAlignPlace(turn); step != nil {
 			turn.Steps = append(turn.Steps, *step)
 			if !turn.Quiet {
-				s.robotShowStep(*step, "")
+				s.robotShowStepAs(b, *step, "")
 			}
 		}
 		turn.Cards = s.robotAnswerCards(turn)
@@ -570,7 +601,7 @@ func (s *Server) handleTurnPost(w http.ResponseWriter, r *http.Request) {
 			turn.Choices = robotReplyChoices(turn.Answer)
 		}
 		if !turn.Quiet {
-			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices, turn.ID)
+			s.sayTurnAnswerAs(b, turn.Answer, turn.Cards, turn.Choices, turn.ID)
 		}
 	}
 	if err := s.robotAddTurn(turn); err != nil {
@@ -643,12 +674,13 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	b := bodyOf(turn.Body)
 	if turn.Answer != "" {
 		if step := s.robotAlignPlace(turn); step != nil {
 			turn.Steps = append(turn.Steps, *step)
 			_, _ = s.robotUpdateTurn(turn.ID, func(t *robotTurn) error { t.Steps = append(t.Steps, *step); return nil })
 			if !turn.Quiet {
-				s.robotShowStep(*step, "")
+				s.robotShowStepAs(b, *step, "")
 			}
 		}
 		turn.Cards = s.robotAnswerCards(turn)
@@ -660,11 +692,11 @@ func (s *Server) handleTurnAnswer(w http.ResponseWriter, r *http.Request) {
 		cards, choices := turn.Cards, turn.Choices
 		_, _ = s.robotUpdateTurn(turn.ID, func(t *robotTurn) error { t.Cards, t.Choices = cards, choices; return nil })
 		if !turn.Quiet {
-			s.sayTurnAnswer(turn.Answer, turn.Cards, turn.Choices, turn.ID)
+			s.sayTurnAnswerAs(b, turn.Answer, turn.Cards, turn.Choices, turn.ID)
 		}
 	}
 	if turn.Error != "" && !turn.Quiet {
-		if robot, err := s.robotWantNow(); err == nil {
+		if robot, err := s.bodyWant(b); err == nil {
 			types.RecordCCActivityDetail(robot, "error", firstLine(turn.Error, 120), turn.Error)
 		}
 	}
@@ -709,18 +741,19 @@ func (s *Server) handleTurnReplay(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
+	b := bodyOf(turn.Body)
 	var replayed []robotStep
 	for _, step := range turn.Steps {
 		if !robotToolByName(step.Tool).replays {
 			continue
 		}
-		again := robotStep{Tool: step.Tool, Arguments: step.Arguments}
+		again := robotStep{Tool: step.Tool, Arguments: withBody(step.Arguments, b)}
 		s.robotRunStep(&again)
-		s.robotShowStep(again, "↻ ")
+		s.robotShowStepAs(b, again, "↻ ")
 		replayed = append(replayed, again)
 	}
 	if turn.Answer != "" {
-		mywant.CharacterSpeaks(robotWantName, turn.Answer, "agent")
+		mywant.CharacterSpeaks(b.Character, turn.Answer, "agent")
 	}
 	log.Printf("[fm] turn %s replayed (%d steps)", turn.ID, len(replayed))
 	robotWriteJSON(w, map[string]any{"turn": turn, "replayed": replayed})

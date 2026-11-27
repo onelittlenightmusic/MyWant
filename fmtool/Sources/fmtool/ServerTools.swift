@@ -90,9 +90,11 @@ enum ServerTools {
     /// character's, in its story beside where it went next (the server's
     /// story.go).
     static func openTurn(question: String, target: ServerTarget = .fromEnvironment,
-                         by: String = "robot", chat: Bool = false, character: String? = nil) async -> String? {
+                         by: String = "robot", chat: Bool = false, character: String? = nil,
+                         body: String? = nil) async -> String? {
         var payload: [String: Any] = ["question": question, "by": by, "chat": chat]
         if let character, !character.isEmpty { payload["character"] = character }
+        if let body, !body.isEmpty { payload["body"] = body }
         guard let body = try? JSONSerialization.data(withJSONObject: payload),
               let (data, _) = try? await request("api/v1/turns", method: "POST", body: body, target: target) else { return nil }
         struct Turn: Decodable { let id: String }

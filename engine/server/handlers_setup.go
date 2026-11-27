@@ -453,6 +453,8 @@ func (s *Server) setupRoutes() {
 	// Its story in figures: kinds, parts of the day, wants looked at, homes (story_stats.go).
 	characters.HandleFunc("/{id}/story/stats", s.getStoryStats).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/digests", s.getCharacterDigests).Methods("GET", "OPTIONS")
+	characters.HandleFunc("/{id}/memory", s.getCharacterMemory).Methods("GET", "OPTIONS")
+	characters.HandleFunc("/{id}/glance", s.getCharacterGlance).Methods("GET", "OPTIONS")
 	// Kinds of question and how each is best answered (story_ledger.go).
 	api.HandleFunc("/patterns", s.getStoryPatterns).Methods("GET", "OPTIONS")
 	// A turn keeps how its answer went, once the story has judged it.

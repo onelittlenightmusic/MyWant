@@ -53,6 +53,13 @@ type fmServer struct {
 	// "character" (fmtool's openTurn puts it on the turn). Set like the
 	// handlers, for one question.
 	asker string
+	// body: the character answering — one acting as a robot, "" for the
+	// robot — sent as "body" (fmtool's openTurn puts it on the turn, and the
+	// server walks and speaks as it). lastBody: who the session's talk so far
+	// is with; another body's question starts the session afresh, so one
+	// robot does not answer from what was said to another.
+	body     string
+	lastBody string
 
 	// How a person stops a turn that is already running.
 	//
@@ -115,6 +122,13 @@ func (s *fmServer) watch(handler func(kind, text string)) {
 func (s *fmServer) askedBy(character string) {
 	s.activityMu.Lock()
 	s.asker = character
+	s.activityMu.Unlock()
+}
+
+// answeredAs is who answers the next question, "" for the robot.
+func (s *fmServer) answeredAs(character string) {
+	s.activityMu.Lock()
+	s.body = character
 	s.activityMu.Unlock()
 }
 
@@ -463,11 +477,29 @@ func (s *fmServer) request(prompt, root string, timeout time.Duration, extra map
 				return fmReply{}, fmt.Errorf("cannot start the on-device agent: %w", err)
 			}
 		}
+		s.activityMu.Lock()
+		answering := s.body
+		s.activityMu.Unlock()
+		conversing := extra["plain"] == nil && extra["modelOp"] == nil
+		if conversing && answering != s.lastBody {
+			// Another robot's turn: what was said to the last one is not
+			// this one's to answer from.
+			s.resetLocked()
+			s.lastBody = answering
+			if !s.started {
+				if err := s.start(root); err != nil {
+					return fmReply{}, fmt.Errorf("cannot start the on-device agent: %w", err)
+				}
+			}
+		}
 		s.nextID++
 		body := map[string]any{"id": s.nextID, "prompt": prompt}
 		s.activityMu.Lock()
 		if s.asker != "" {
 			body["character"] = s.asker
+		}
+		if conversing && s.body != "" {
+			body["body"] = s.body
 		}
 		s.activityMu.Unlock()
 		for k, v := range extra {
@@ -601,10 +633,16 @@ func (s *fmServer) reset() (bool, error) {
 		return false, fmt.Errorf("the agent is in the middle of a turn — stop it first")
 	}
 	defer s.mu.Unlock()
+	return s.resetLocked(), nil
+}
+
+// resetLocked forgets the conversation, the lock held; true when there was
+// one to forget.
+func (s *fmServer) resetLocked() bool {
 	if !s.started {
 		// Nothing running means nothing remembered: the next question starts
 		// a new process and a new session anyway.
-		return false, nil
+		return false
 	}
 	s.nextID++
 	request, _ := json.Marshal(map[string]any{"id": s.nextID, "reset": true})
@@ -612,11 +650,11 @@ func (s *fmServer) reset() (bool, error) {
 		s.stop()
 		// The process is gone, which forgets the conversation just as
 		// thoroughly. The person asked for it to be forgotten; it is.
-		return true, nil
+		return true
 	}
 	// The acknowledgement is read so it is not mistaken for the next answer.
 	if _, err := s.readReply(10 * time.Second); err != nil {
 		s.stop()
 	}
-	return true, nil
+	return true
 }

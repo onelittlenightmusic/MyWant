@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -94,6 +95,12 @@ func (s *Server) stdRestart(w *mywant.Want, args map[string]string) (string, err
 		return "", fmt.Errorf("could not run %q again: %v", w.Metadata.Name, err)
 	}
 	out := fmt.Sprintf("Ran %q (%s) again.", w.Metadata.Name, w.Metadata.Type)
+	// Sent to run it again, the robot goes there — as a route searched again
+	// does (robotRunAgain): it is there to hear what it says (errand.go).
+	pointed := carryBody(args, map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID})
+	if _, err := s.robotPoint(pointed); err != nil {
+		log.Printf("[robot] could not walk to %s: %v", w.Metadata.Name, err)
+	}
 	if s.robotWaitSettled(w.Metadata.ID, planResultWait) {
 		look := map[string]string{"name": w.Metadata.Name, robotShortArg: "true"}
 		if said, err := s.robotLook(look); err == nil {
@@ -290,7 +297,7 @@ func (s *Server) capAnswer(c wantCap, args map[string]string) (string, error) {
 	question := args[robotQuestionArg]
 	w := c.want
 	args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
-	go s.walkRobotToEvidence(w.Metadata.ID)
+	go s.walkBodyToEvidence(bodyFromArgs(args), w.Metadata.ID)
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s can %s.\n", w.Metadata.Name, firstLine(c.def.Description, 160))

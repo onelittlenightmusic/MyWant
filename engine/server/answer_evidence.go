@@ -22,6 +22,11 @@ import (
 // walkRobotToEvidence stands the robot on the thing or want an answer was
 // read off. Quietly nothing when it is not on the board.
 func (s *Server) walkRobotToEvidence(id string) {
+	s.walkBodyToEvidence(theRobot, id)
+}
+
+// walkBodyToEvidence is walkRobotToEvidence for a body.
+func (s *Server) walkBodyToEvidence(b robotBody, id string) {
 	if i := strings.Index(id, answerSep); i >= 0 {
 		id = id[:i]
 	}
@@ -36,7 +41,7 @@ func (s *Server) walkRobotToEvidence(id string) {
 		if t.id != id {
 			continue
 		}
-		if err := s.robotWalkRobot(t.x, t.y); err != nil {
+		if err := s.walkBody(b, t.x, t.y); err != nil {
 			log.Printf("[robot] could not walk to %s: %v", t.name, err)
 		}
 		return

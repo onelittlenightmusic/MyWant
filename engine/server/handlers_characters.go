@@ -620,6 +620,9 @@ func (s *Server) setCharacterLabel(w http.ResponseWriter, r *http.Request) {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", id)
 		return
 	}
+	if req.Key == mywant.LabelRobot && id != robotCharacterID {
+		s.ensureCharacterChatWant(id) // a robot now, or a person again
+	}
 	go broadcastSSE("character_changed", id)
 	s.JSONResponse(w, http.StatusOK, c)
 }
@@ -631,6 +634,9 @@ func (s *Server) removeCharacterLabel(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		s.JSONError(w, r, http.StatusNotFound, "Character not found", vars["id"])
 		return
+	}
+	if vars["key"] == mywant.LabelRobot && vars["id"] != robotCharacterID {
+		s.ensureCharacterChatWant(vars["id"])
 	}
 	go broadcastSSE("character_changed", vars["id"])
 	s.JSONResponse(w, http.StatusOK, c)

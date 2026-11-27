@@ -246,11 +246,14 @@ func New(config Config) *Server {
 		if statefulSystemTypes[w.Metadata.Type] {
 			w.Metadata.IsSystemWant = true
 			filtered = append(filtered, w)
-			restoredStateful[w.Metadata.Type] = true
+			// By id, not type: a character acting as a robot has a robot
+			// want of its own (robot_body.go), and its being restored is
+			// no reason to leave the robot out.
+			restoredStateful[w.Metadata.ID] = true
 		}
 	}
 	for _, sw := range systemWants {
-		if restoredStateful[sw.Metadata.Type] {
+		if restoredStateful[sw.Metadata.ID] {
 			continue
 		}
 		filtered = append(filtered, sw)
@@ -507,6 +510,10 @@ func (s *Server) Start() error {
 	mywant.LocateCharacter = func(target string) (int, int, bool) {
 		return resolveCanvasNear(target, s.globalBuilder.GetWants())
 	}
+
+	// The robot's story, kept as a character's is: it is moved by the server,
+	// not by a device, so where it goes is read off its want (story_robot.go).
+	go s.followRobotStory()
 
 	// Wire in-process rule registration so want agents can register without HTTP
 	wireRuleGlobals()

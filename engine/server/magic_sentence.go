@@ -211,6 +211,11 @@ func (s *Server) magicSentenceDoMatch(question, turn, locale string) (string, *r
 // chat message says who): what they did not say may be their home's
 // (home_params.go). Unknown, it is the turn's, or whoever just said it.
 func (s *Server) magicSentenceDoBy(question, turn, locale, who string) (string, *robotCard, magicMatch, bool) {
+	return s.magicSentenceDoAs(theRobot, question, turn, locale, who)
+}
+
+// magicSentenceDoAs is magicSentenceDoBy carried out by a body.
+func (s *Server) magicSentenceDoAs(b robotBody, question, turn, locale, who string) (string, *robotCard, magicMatch, bool) {
 	if who == "" && turn != "" {
 		who = s.turnAsker(turn)
 	}
@@ -220,7 +225,7 @@ func (s *Server) magicSentenceDoBy(question, turn, locale, who string) (string, 
 	// The answer to a question put to them — which of two a request was
 	// (magic_resolve.go): that one, done for what they asked.
 	if p, c, ok := s.resolveAnswered(question, who); ok {
-		return s.magicCarryOut(p.said, p.turn, p.locale, who, c)
+		return s.magicCarryOutAs(b, p.said, p.turn, p.locale, who, c)
 	}
 	mm, ok := s.magicSentenceMatch(question)
 	if !ok {
@@ -236,15 +241,20 @@ func (s *Server) magicSentenceDoBy(question, turn, locale, who string) (string, 
 	case resolveAsk:
 		return s.resolveQuestion(question, turn, locale, who, cands), nil, chosen, true
 	}
-	return s.magicCarryOut(question, turn, locale, who, chosen)
+	return s.magicCarryOutAs(b, question, turn, locale, who, chosen)
 }
 
 // magicCarryOut does a sentence settled on, its parameters read: a robot
 // tool's runs the tool, a type's makes the want.
 func (s *Server) magicCarryOut(question, turn, locale, who string, mm magicMatch) (string, *robotCard, magicMatch, bool) {
+	return s.magicCarryOutAs(theRobot, question, turn, locale, who, mm)
+}
+
+// magicCarryOutAs is magicCarryOut done by a body.
+func (s *Server) magicCarryOutAs(b robotBody, question, turn, locale, who string, mm magicMatch) (string, *robotCard, magicMatch, bool) {
 	// A robot tool's sentence: the tool, not a want (magicToolDo).
 	if mm.tool != "" {
-		return s.magicToolDo(mm)
+		return s.magicToolDoAs(b, mm)
 	}
 	params := map[string]string{}
 	for k, v := range mm.params {
@@ -252,7 +262,7 @@ func (s *Server) magicCarryOut(question, turn, locale, who string, mm magicMatch
 			params[k] = v
 		}
 	}
-	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: params, Who: who}, nil)
+	_, _, steps := s.doAct(actRequest{Turn: turn, Question: question, Locale: locale, Kind: "new", Type: mm.wantType, Params: params, Who: who, Body: withBodyID(b)}, nil)
 	if len(steps) == 0 {
 		return "", nil, mm, false
 	}
@@ -271,6 +281,11 @@ func (s *Server) magicCarryOut(question, turn, locale, who string, mm magicMatch
 		return "", nil, mm, false
 	case strings.HasPrefix(made.Output, "Error:"):
 		return fmt.Sprintf("「%s」で作ろうとしましたが、できませんでした（%s）。", question, strings.TrimSpace(strings.TrimPrefix(made.Output, "Error:"))), nil, mm, true
+	case strings.HasPrefix(made.Output, "Ran ") || strings.HasPrefix(made.Output, "Brought "):
+		// Run again — 「…, already on the board, again」 is not 「もうあります」:
+		// it is being asked now, and what it says comes back as the errand's
+		// report (errand.go).
+		return fmt.Sprintf("「%s」をもう一度調べてきます。", name), made.Card, mm, true
 	case strings.Contains(made.Output, "already on the board"):
 		return fmt.Sprintf("もうあります。ここです（%s）。", name), made.Card, mm, true
 	case strings.Contains(made.Output, "archived"):
@@ -294,6 +309,12 @@ func (s *Server) magicCarryOut(question, turn, locale, who string, mm magicMatch
 // what a want says (look), a place not on the board, a value the model could
 // not read — goes to the robot then, by notDone, as it would have at once.
 func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bool {
+	return s.magicSentenceToBody(theRobot, text, character, notDone)
+}
+
+// magicSentenceToBody is magicSentenceToRobot said to a body — a character
+// acting as a robot, in its own chat.
+func (s *Server) magicSentenceToBody(b robotBody, text, character string, notDone func()) bool {
 	q := strings.TrimSpace(text)
 	if q == "" {
 		return false
@@ -307,12 +328,12 @@ func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bo
 		}
 	}
 	go func() {
-		answer, card, _, ok := s.magicSentenceDoBy(q, "", "", askerOf(character, q))
+		answer, card, _, ok := s.magicSentenceDoAs(b, q, "", "", askerOf(character, q))
 		if !ok {
 			notDone()
 			return
 		}
-		s.robotAsked(q, "")
+		s.robotAskedAs(b, q, "")
 		var cards []robotCard
 		if card != nil {
 			cards = []robotCard{*card}
@@ -323,7 +344,7 @@ func (s *Server) magicSentenceToRobot(text, character string, notDone func()) bo
 		if tiles, names, asking := resolveAsking(askerOf(character, q), answer); asking {
 			cards, choices = tiles, names
 		}
-		s.sayTurnAnswer(answer, cards, choices, "")
+		s.sayTurnAnswerAs(b, answer, cards, choices, "")
 	}()
 	return true
 }
@@ -532,6 +553,11 @@ func (s *Server) magicSources() ([]magicSource, map[string]bool) {
 // with), or a point that found nothing to walk to, is the robot's to
 // answer, as it would have been: not a match.
 func (s *Server) magicToolDo(mm magicMatch) (string, *robotCard, magicMatch, bool) {
+	return s.magicToolDoAs(theRobot, mm)
+}
+
+// magicToolDoAs is magicToolDo by a body.
+func (s *Server) magicToolDoAs(b robotBody, mm magicMatch) (string, *robotCard, magicMatch, bool) {
 	for _, sl := range mm.slots {
 		if strings.TrimSpace(mm.params[sl.param]) == "" {
 			return "", nil, mm, false
@@ -540,7 +566,15 @@ func (s *Server) magicToolDo(mm magicMatch) (string, *robotCard, magicMatch, boo
 	if mm.tool != "point" {
 		return "", nil, mm, false
 	}
-	out, err := robotToolByName("point").run(s, mm.params)
+	args := withBody(map[string]string{}, b)
+	for k, v := range mm.params {
+		args[k] = v
+	}
+	out := s.robotRunTool("point", args)
+	var err error
+	if strings.HasPrefix(out, "Error:") {
+		err = fmt.Errorf("%s", out)
+	}
 	if err != nil || !strings.HasPrefix(out, "The robot is standing on") {
 		return "", nil, mm, false // not there, or archived: the robot says so
 	}

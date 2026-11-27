@@ -240,6 +240,13 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	// Who asked goes with the question, so the turn fmtool opens for it is
 	// that character's (the server's story.go).
 	server.askedBy(asker)
+	// Who answers: a robot want that is a character's body (robot_body.go
+	// on the server) answers as that character.
+	if want.Metadata.Name != "robot" {
+		server.answeredAs(want.GetStringParam("character_id", ""))
+	} else {
+		server.answeredAs("")
+	}
 	// A question about a photo is answered from the photo and the words in
 	// it, not from whatever command the model would reach for — see
 	// robot_subject.go for how the subject is decided and why here.
@@ -268,6 +275,7 @@ func fmRequester(ctx context.Context, want *Want, binary string) error {
 	server.watch(nil)
 	server.broker(nil)
 	server.askedBy("")
+	server.answeredAs("")
 	answer := strings.TrimSpace(reply.Text)
 	notes := reply.Error
 

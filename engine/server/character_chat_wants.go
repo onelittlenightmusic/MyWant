@@ -48,6 +48,13 @@ func (s *Server) ensureCharacterChatWants() {
 
 func (s *Server) ensureCharacterChatWant(characterID string) {
 	name := characterChatWantName(characterID)
+	wantType := s.chatWantTypeOf(characterID)
+	if existing := s.findWantByIDOrName(name); existing != nil && existing.Metadata.Type != wantType {
+		// A person made a robot, or a robot a person again: the same mouth,
+		// of the other type — its chat starts afresh, where it stands kept.
+		go s.swapCharacterChatWant(characterID, existing)
+		return
+	}
 	if existing := s.findWantByIDOrName(name); existing != nil {
 		// Re-assert the mark as well as the binding. A want that predates this
 		// being a system want is still on disk without it, and would be swept
@@ -57,11 +64,76 @@ func (s *Server) ensureCharacterChatWant(characterID string) {
 		return
 	}
 
-	want := &mywant.Want{
+	want := s.newCharacterChatWant(characterID, wantType, nil)
+	if _, err := s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{want}); err != nil {
+		log.Printf("[CharacterChat] could not create chat want for %s: %v", characterID, err)
+		return
+	}
+	bindCharacterToChatWant(characterID, name)
+	log.Printf("[CharacterChat] created %s (%s)", name, wantType)
+}
+
+// chatWantTypeOf is the type of a character's mouth: the robot's for one
+// acting as a robot (robot_body.go), a plain chat otherwise.
+func (s *Server) chatWantTypeOf(characterID string) string {
+	if c, ok := mywant.GetCharacter(characterID); ok && mywant.IsRobotCharacter(*c) {
+		return "robot"
+	}
+	return characterChatWantType
+}
+
+// swapCharacterChatWant replaces a character's mouth with one of the other
+// type: the old one removed, and once it is gone, the new one made where it
+// stood.
+func (s *Server) swapCharacterChatWant(characterID string, old *mywant.Want) {
+	name := old.Metadata.Name
+	at := map[string]string{}
+	for _, k := range []string{robotCanvasX, robotCanvasY} {
+		if v := old.GetLabels()[k]; v != "" {
+			at[k] = v
+		}
+	}
+	if err := s.globalBuilder.QueueWantDelete([]string{old.Metadata.ID}); err != nil {
+		log.Printf("[CharacterChat] could not remove %s to change it: %v", name, err)
+		return
+	}
+	for i := 0; i < 50 && s.findWantByIDOrName(name) != nil; i++ {
+		time.Sleep(100 * time.Millisecond)
+	}
+	wantType := s.chatWantTypeOf(characterID)
+	want := s.newCharacterChatWant(characterID, wantType, at)
+	if _, err := s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{want}); err != nil {
+		log.Printf("[CharacterChat] could not make %s again as %s: %v", name, wantType, err)
+		return
+	}
+	bindCharacterToChatWant(characterID, name)
+	log.Printf("[CharacterChat] %s is now %s", name, wantType)
+}
+
+// newCharacterChatWant is a character's mouth of a type. A robot's is the
+// robot's want, with the robot's settings (its model, its timeout) and its
+// character's id; it stands at `at` when given, else beside its character.
+func (s *Server) newCharacterChatWant(characterID, wantType string, at map[string]string) *mywant.Want {
+	name := characterChatWantName(characterID)
+	params := map[string]any{"character_id": characterID}
+	if wantType == "robot" {
+		if robot := s.findWantByIDOrName(robotWantName); robot != nil {
+			for _, k := range []string{"provider", "model", "timeout_seconds", "permission_mode", "allowed_tools", "working_dir"} {
+				if v, ok := robot.Spec.Params[k]; ok {
+					params[k] = v
+				}
+			}
+		}
+	}
+	labels := map[string]string{canvasLabelNear: characterID}
+	if len(at) == 2 {
+		labels = at
+	}
+	return &mywant.Want{
 		Metadata: mywant.Metadata{
 			ID:   name,
 			Name: name,
-			Type: characterChatWantType,
+			Type: wantType,
 			// A character's mouth belongs to the person, not to the board.
 			//
 			// Switching worlds tears down every want that is not a system want
@@ -77,25 +149,14 @@ func (s *Server) ensureCharacterChatWant(characterID string) {
 			// there. They cannot be — there is one per character, and who the
 			// characters are is not known until the store is read.
 			IsSystemWant: true,
-			Labels: map[string]string{
-				// Starts beside its character and moves onto them as soon as
-				// they are seen (moveCharacterWant). Asking for "near" rather than
-				// a coordinate because at creation the character's position is
-				// the server's to know, not this call's — see CanvasNearHook.
-				canvasLabelNear: characterID,
-			},
+			// Starts beside its character and moves onto them as soon as
+			// they are seen (moveCharacterWant). Asking for "near" rather than
+			// a coordinate because at creation the character's position is
+			// the server's to know, not this call's — see CanvasNearHook.
+			Labels: labels,
 		},
-		Spec: mywant.WantSpec{
-			Params: map[string]any{"character_id": characterID},
-		},
+		Spec: mywant.WantSpec{Params: params},
 	}
-
-	if _, err := s.globalBuilder.AddWantsAsyncWithTracking([]*mywant.Want{want}); err != nil {
-		log.Printf("[CharacterChat] could not create chat want for %s: %v", characterID, err)
-		return
-	}
-	bindCharacterToChatWant(characterID, name)
-	log.Printf("[CharacterChat] created %s", name)
 }
 
 // bindCharacterToChatWant points a character at its chat want, unless the

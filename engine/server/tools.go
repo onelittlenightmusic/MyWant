@@ -230,6 +230,9 @@ func (s *Server) handleToolsCall(w http.ResponseWriter, r *http.Request) {
 		// The turn this call is a step of (turns.go); recorded there and
 		// shown in the robot's chat. Without one the call is only run.
 		Turn string `json:"turn"`
+		// Body: which robot runs it, a character acting as one
+		// (robot_body.go). Within a turn, the turn's; without, the robot.
+		Body string `json:"body,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
@@ -269,6 +272,11 @@ func (s *Server) handleToolsCall(w http.ResponseWriter, r *http.Request) {
 			req.Arguments[robotWhoArg] = who
 		}
 	}
+	b := bodyOf(req.Body)
+	if req.Turn != "" {
+		b = s.turnBody(req.Turn)
+	}
+	withBody(req.Arguments, b)
 	step := robotStep{Tool: req.Tool, Arguments: req.Arguments}
 	if req.Turn == "" {
 		// Outside a turn it is only run: nobody asked the robot anything, so
@@ -287,7 +295,7 @@ func (s *Server) handleToolsCall(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("[fm] step outside a known turn: %v", err)
 	} else if !turn.Quiet {
-		s.robotShowStep(step, "")
+		s.robotShowStepAs(b, step, "")
 	}
 	robotWriteJSON(w, map[string]any{"output": step.Output, "card": step.Card, "unread_photos": unread})
 }
@@ -334,11 +342,22 @@ func (s *Server) robotRunTool(name string, args map[string]string) string {
 	if t.run == nil {
 		return "Error: unknown tool " + name
 	}
+	// What was asked and by whom, read before the tool takes them out: an
+	// errand (errand.go) reports to them about it.
+	question, who := args[robotQuestionArg], args[robotWhoArg]
 	out, err := t.run(s, args)
 	if err != nil {
 		out = "Error: " + err.Error()
 	}
 	log.Printf("[fm] %s %v → %s", name, args, firstLine(out, 160))
+	if robotRunsAgain(name, args, out) {
+		if card := robotPeekCard(args); card != nil && card.Kind == "want" && card.ID != "" {
+			b := bodyFromArgs(args)
+			s.startErrand(b, card.ID, question, who, rememberedOf(b.Character, card.ID))
+		}
+	}
+	s.storyRobotTool(name, args, out)
+	delete(args, robotBodyArg)
 	return out
 }
 
@@ -857,7 +876,7 @@ func (s *Server) robotDeployWant(args map[string]string) (string, error) {
 		return fmt.Sprintf("%q (%s) with these parameters exists but is archived — put away, off the board. Nothing new was made. %s", existing, typ, robotAskRestore(existing)), nil
 	}
 	if existing != "" {
-		pointed := map[string]string{"name": existing}
+		pointed := carryBody(args, map[string]string{"name": existing})
 		for _, w := range wants {
 			if w.Metadata.Name == existing {
 				pointed["id"] = w.Metadata.ID
@@ -914,10 +933,11 @@ func (s *Server) robotDeployWant(args map[string]string) (string, error) {
 	// returns — on fly more than two seconds later. The answer does not wait
 	// for the walk: its card is already the POST's, and the robot goes there
 	// once the want is on the board.
+	walkTo := carryBody(args, map[string]string{"name": name})
 	go func() {
 		for i := 0; i < robotDeployWalkWait; i++ {
 			if s.robotWantOnBoard(name) {
-				s.robotPoint(map[string]string{"name": name})
+				s.robotPoint(walkTo)
 				return
 			}
 			time.Sleep(100 * time.Millisecond)
@@ -1555,7 +1575,7 @@ func (s *Server) robotRunAgain(w robotWant, params map[string]any, filled string
 	if !w.archived() {
 		out = fmt.Sprintf("Ran %q (%s, %s)%s, already on the board, again with these parameters — nothing to ask, it is running.", w.Metadata.Name, w.Metadata.Type, robotParamsText(params), filled)
 	}
-	pointed := map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID}
+	pointed := carryBody(args, map[string]string{"name": w.Metadata.Name, "id": w.Metadata.ID})
 	if walked, err := s.robotPoint(pointed); err == nil {
 		if c, ok := pointed[robotCardArg]; ok {
 			args[robotCardArg] = c
@@ -1606,7 +1626,7 @@ func (s *Server) robotRestoreWant(args map[string]string) (string, error) {
 		return "", fmt.Errorf("could not restore %q: %v", w.Metadata.Name, err)
 	}
 	out := fmt.Sprintf("Restored %q (%s); it is back on the board.", w.Metadata.Name, w.Metadata.Type)
-	pointed := map[string]string{"name": w.Metadata.Name}
+	pointed := carryBody(args, map[string]string{"name": w.Metadata.Name})
 	if walked, err := s.robotPoint(pointed); err == nil {
 		if c, ok := pointed[robotCardArg]; ok {
 			args[robotCardArg] = c
@@ -1747,7 +1767,9 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 	}
 	for _, w := range wants.Wants {
 		// Archived: put away, off the board — as the GUI draws it.
-		if w.Metadata.Name == robotWantName || w.Metadata.Labels[robotArchived] == "true" {
+		// A robot's body (the robot, or a character acting as one) is no
+		// thing on the board to point at.
+		if w.Metadata.Name == robotWantName || w.Metadata.Type == "robot" || w.Metadata.Labels[robotArchived] == "true" {
 			continue
 		}
 		if tile, ok := robotTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
@@ -1889,14 +1911,15 @@ func (s *Server) robotPoint(args map[string]string) (string, error) {
 		// here and read out another want instead.
 		return "", fmt.Errorf("%q is not on the board — a want's parameter need not be: if it was asked for, deploy_want with it", name)
 	}
-	if err := s.robotWalkRobot(found.x, found.y); err != nil {
+	body := bodyFromArgs(args)
+	if err := s.walkBody(body, found.x, found.y); err != nil {
 		return "", fmt.Errorf("could not walk the robot there: %v", err)
 	}
 	if found.id != "" {
 		args[robotCardArg] = robotCardValue(found.cardKind, found.id, found.name)
 	}
 	words := fmt.Sprintf("「%s」はここです (%d, %d)", found.name, found.x, found.y)
-	if err := s.robotSay(words); err != nil {
+	if err := s.sayBody(body, words, ""); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("The robot is standing on %s and saying: %s", found, words), nil
@@ -1905,11 +1928,7 @@ func (s *Server) robotPoint(args map[string]string) (string, error) {
 // robotWalkRobot stands the robot on a cell — how point shows where something is,
 // and how an answer shows what it was read off (answer_evidence.go).
 func (s *Server) robotWalkRobot(x, y int) error {
-	// x and y in one step: two would leave the robot a moment at one of them.
-	walk := map[string]any{"metadata": map[string]any{"labels": map[string]string{
-		robotCanvasX: fmt.Sprint(x), robotCanvasY: fmt.Sprint(y),
-	}}}
-	return s.backend("PATCH", "/api/v1/wants/"+robotWantName, walk, nil)
+	return s.walkBody(theRobot, x, y)
 }
 
 // robotLook reads one want: its status and the state it has gathered, short.
@@ -2035,7 +2054,7 @@ func (s *Server) robotLook(args map[string]string) (string, error) {
 		args[robotCardArg] = robotCardValue("want", w.Metadata.ID, w.Metadata.Name)
 		// What the answer is read off: the robot stands on the want.
 		if question != "" {
-			s.walkRobotToEvidence(w.Metadata.ID)
+			s.walkBodyToEvidence(bodyFromArgs(args), w.Metadata.ID)
 		}
 	}
 	note := ""
@@ -2254,12 +2273,7 @@ func (s *Server) robotSay(words string) error {
 
 // robotSayAs is robotSay with what kind of line it is (SpeechEntry.Kind).
 func (s *Server) robotSayAs(words, kind string) error {
-	words = strings.TrimSpace(words)
-	if words == "" {
-		return nil
-	}
-	recordSpeechAs(robotCharacterID, words, "say", kind)
-	return s.backend("PUT", "/api/v1/states/"+robotWantName, map[string]any{"say": words}, nil)
+	return s.sayBody(theRobot, words, kind)
 }
 
 // robotFirstSentence is a description cut to its first sentence, on one line —
