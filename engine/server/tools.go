@@ -1661,6 +1661,10 @@ type robotTile struct {
 	// thing's, and which of the two it is.
 	id       string
 	cardKind string
+	// color: a thing's own colour; rotation and length: how a want's tile
+	// lies (mywant.io/canvas-rotation, -length — cells past its anchor).
+	color            string
+	rotation, length int
 }
 
 // robotCardArg is the key under which a tool notes, in its own arguments, the
@@ -1739,6 +1743,7 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 			Value   string            `json:"value"`
 			Subtype string            `json:"subtype"`
 			Catalog string            `json:"catalog"`
+			Color   string            `json:"color"`
 			Labels  map[string]string `json:"labels"`
 		} `json:"things"`
 	}
@@ -1761,7 +1766,7 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 			kind = t.Catalog
 		}
 		if tile, ok := robotTileAt(t.Value, kind, t.Labels); ok {
-			tile.id, tile.cardKind = t.ID, "thing"
+			tile.id, tile.cardKind, tile.color = t.ID, "thing", t.Color
 			tiles = append(tiles, tile)
 		}
 	}
@@ -1774,6 +1779,8 @@ func (s *Server) robotTiles() ([]robotTile, error) {
 		}
 		if tile, ok := robotTileAt(w.Metadata.Name, "want "+w.Metadata.Type, w.Metadata.Labels); ok {
 			tile.id, tile.cardKind = w.Metadata.ID, "want"
+			tile.rotation, _ = strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-rotation"])
+			tile.length, _ = strconv.Atoi(w.Metadata.Labels["mywant.io/canvas-length"])
 			tile.typ = w.Metadata.Type
 			tile.aliases = robotWantAliases(w.Metadata.Labels, w.Metadata.Type, aliases)
 			tile.aliasesOwn = strings.Split(w.Metadata.Labels[robotAliasLabel], ",")

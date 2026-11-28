@@ -49,6 +49,12 @@ type SeenTile struct {
 	Kind string `json:"kind"`
 	X    int    `json:"x"`
 	Y    int    `json:"y"`
+	// Color: a thing's own. Rotation and Length: how a want's tile lies, as
+	// on the board (cells past its anchor, toward 0 right, 90 down, 180
+	// left, 270 up).
+	Color    string `json:"color,omitempty"`
+	Rotation int    `json:"rotation,omitempty"`
+	Length   int    `json:"length,omitempty"`
 	// At: when its cell was seen last. Now: seen from where they stand now.
 	At  string `json:"at"`
 	Now bool   `json:"now,omitempty"`
@@ -223,6 +229,7 @@ func (s *Server) getCharacterSeen(w http.ResponseWriter, r *http.Request) {
 			}
 			out.TilesSeen++
 			st := SeenTile{ID: t.id, Name: t.name, Type: t.typ, Kind: t.cardKind, X: t.x, Y: t.y,
+				Color: t.color, Rotation: t.rotation, Length: t.length,
 				At: at.Format(time.RFC3339), Now: seesNow(t.x, t.y)}
 			if h, ok := heard[t.id]; ok {
 				st.Mood, st.Say = h.Mood, h.Say
