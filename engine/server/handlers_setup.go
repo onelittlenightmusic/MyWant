@@ -455,6 +455,7 @@ func (s *Server) setupRoutes() {
 	characters.HandleFunc("/{id}/digests", s.getCharacterDigests).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/memory", s.getCharacterMemory).Methods("GET", "OPTIONS")
 	characters.HandleFunc("/{id}/glance", s.getCharacterGlance).Methods("GET", "OPTIONS")
+	characters.HandleFunc("/{id}/seen", s.getCharacterSeen).Methods("GET", "OPTIONS")
 	// Kinds of question and how each is best answered (story_ledger.go).
 	api.HandleFunc("/patterns", s.getStoryPatterns).Methods("GET", "OPTIONS")
 	// A turn keeps how its answer went, once the story has judged it.
